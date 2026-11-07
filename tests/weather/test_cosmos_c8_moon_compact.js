@@ -85,3 +85,25 @@ test("Moon C10 matches the six-pixel COSMOS overview and mode-page stage gutter"
  assert.match(moon,/anchors\.topMargin: moonPane\.contentInset/);
  assert.match(moon,/anchors\.bottomMargin: moonPane\.contentInset/);
 });
+
+test("C18 MOON uses three equal-width SUN-style modes above phase instruments",()=>{
+ assert.match(moon,/objectName: "cosmos-c18-moon-fullwidth-mode-rail"/);
+ assert.match(moon,/id: moonModeRail/);
+ assert.match(moon,/anchors\.top: titleRail\.bottom/);
+ assert.match(moon,/anchors\.top: moonModeRail\.bottom/);
+ assert.match(moon,/height: Math\.min\(166,Math\.max\(0,moonPane\.height-138\)\)/);
+ for(const name of [
+   "cosmos-c18-moon-observation-tab",
+   "cosmos-c11-open-moon-year",
+   "cosmos-c17-open-moon-forecast"
+ ])assert.ok(moon.includes('objectName: "'+name+'"'),name);
+ assert.equal((moon.match(/\(moonModeRail\.width-2\*moonModeRail\.spacing\)\/3/g)||[]).length,3);
+ assert.equal((moon.match(/height: 27/g)||[]).length,4);
+ assert.match(moon,/label: "PHASE \+ POSITION"[\s\S]*?selected: true/);
+ assert.match(moon,/onClicked: moonPane\.routeRequested\("cosmos\/moon\/year"\)/);
+ assert.match(moon,/onClicked: moonPane\.routeRequested\("cosmos\/moon\/forecast"\)/);
+ const title=moon.slice(moon.indexOf('id: titleRail'),moon.indexOf('id: moonModeRail'));
+ assert.doesNotMatch(title,/ActionButton/);
+ assert.match(title,/USNO /);
+ assert.doesNotMatch(moon,/Flickable\s*\{|ScrollView\s*\{/);
+});

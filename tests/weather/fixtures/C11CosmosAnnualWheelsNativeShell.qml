@@ -129,6 +129,11 @@ ShellRoot {
             const forecastModes=find(forecast,"magick-m7-annual-subject-tabs");
             const forecastOutlook=find(forecast,"magick-m7-forecast-outlook");
             const forecastCanvas=find(forecast,"magick-m7-annual-wheel-canvas");
+            const yearRail=find(moon,"cosmos-c11-moon-year-mode-rail");
+            const forecastRail=find(forecast,"cosmos-c11-moon-year-mode-rail");
+            const phaseTab=find(moon,"cosmos-c11-back-to-moon");
+            const yearTab=find(moon,"cosmos-c17-moon-wheel-tab");
+            const forecastTab=find(forecast,"cosmos-c17-moon-forecast-tab");
             if(root.phase===0){
                 if(ml.view!=="moon" || ml.lockedView!=="moon"
                     || sl.view!=="solar" || sl.lockedView!=="solar"
@@ -138,6 +143,14 @@ ShellRoot {
                     || moonModes.visible || sunModes.visible || forecastModes.visible
                     || forecastCanvas.visible)
                     return root.fail("REUSED_WHEEL_LOCK_OR_FORECAST_MISSING");
+                if(!yearRail || !forecastRail || !phaseTab
+                    || !yearTab || !forecastTab
+                    || yearRail.height!==27 || forecastRail.height!==27
+                    || phaseTab.width<130 || yearTab.width<130
+                    || forecastTab.width<130 || phaseTab.height!==27
+                    || yearTab.height!==27 || forecastTab.height!==27
+                    || !yearTab.selected || !forecastTab.selected)
+                    return root.fail("MOON_C18_FULL_WIDTH_MODE_RAIL_FAILED");
                 if(moonCanvas.width<400 || moonCanvas.height<220
                     || sunCanvas.width<400 || sunCanvas.height<250
                     || forecastOutlook.width<400 || forecastOutlook.height<215)

@@ -9,6 +9,7 @@ ShellRoot {
     property bool done: false
     property int step: 0
     property int ticks: 0
+    property string lastMoonRoute: ""
     QtObject {
         id: fakeWeather
         // Start without coordinates so no network fetcher starts before
@@ -32,6 +33,7 @@ ShellRoot {
             anchors.fill: parent
             weatherService: fakeWeather
             runtimeNowMs: Date.UTC(2026,10,6,7,55)
+            onRouteRequested: function(path) { root.lastMoonRoute=path; }
         }
     }
     function find(item, name) {
@@ -115,6 +117,11 @@ ShellRoot {
                 const provenanceAt=provenance.mapToItem(moon,0,0);
                 const header=find(moon,"cosmos-c9-moon-free-header");
                 const headerAt=header ? header.mapToItem(moon,0,0) : null;
+                const rail=find(moon,"cosmos-c18-moon-fullwidth-mode-rail");
+                const phaseTab=find(moon,"cosmos-c18-moon-observation-tab");
+                const yearTab=find(moon,"cosmos-c11-open-moon-year");
+                const forecastTab=find(moon,"cosmos-c17-open-moon-forecast");
+                const railAt=rail ? rail.mapToItem(moon,0,0) : null;
                 const inset=moon.contentInset;
                 if(inset!==6 || !headerAt
                    || headerAt.x<inset || headerAt.y<inset
@@ -126,6 +133,23 @@ ShellRoot {
                    || rack.x<inset || rack.x+rack.width>moon.width-inset+1
                    || rack.y+rack.height>moon.height-inset+1)
                     return root.fail("MOON_C10_STAGE_GUTTER_NOT_PRESERVED");
+                // All three MOON modes occupy a single full-width top rail.
+                if(!railAt || !phaseTab || !yearTab || !forecastTab
+                    || railAt.x<inset || railAt.y<headerAt.y+header.height
+                    || railAt.x+rail.width>moon.width-inset+1
+                    || rail.height!==27
+                    || phaseTab.height!==27 || yearTab.height!==27
+                    || forecastTab.height!==27
+                    || phaseTab.width<130 || yearTab.width<130
+                    || forecastTab.width<130 || !phaseTab.selected
+                    || phaseAt.y<railAt.y+rail.height)
+                    return root.fail("MOON_SUN_STYLE_MODE_RAIL_FAILED");
+                yearTab.clicked(null);
+                if(root.lastMoonRoute!=="cosmos/moon/year")
+                    return root.fail("MOON_YEAR_MODE_ROUTE_BROKEN");
+                forecastTab.clicked(null);
+                if(root.lastMoonRoute!=="cosmos/moon/forecast")
+                    return root.fail("MOON_FORECAST_MODE_ROUTE_BROKEN");
                 if(positionAt.x < phaseAt.x+phase.width-1
                     || Math.abs(positionAt.y-phaseAt.y)>1
                     || ribbonAt.y<phaseAt.y+phase.height-1

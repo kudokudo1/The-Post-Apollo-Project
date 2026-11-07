@@ -90,3 +90,16 @@ test("COSMOS wheel mode is fixed and leaves MAGICK free to choose all three mode
  assert.match(host,/objectName: "cosmos-c11-back-to-moon"/);
  assert.match(moon,/readonly property int contentInset: 6/);
 });
+test("C18 COSMOS lunar year and forecast keep identical full-width MOON tabs",()=>{
+ assert.match(host,/objectName: "cosmos-c11-moon-year-mode-rail"/);
+ assert.match(host,/height: visible \? 27 : 0/);
+ for(const name of ["PHASE + POSITION","LUNAR WHEEL","FORECAST"])
+   assert.ok(host.includes('label: "'+name+'"'),name);
+ assert.equal((host.match(/height: 27/g)||[]).length,3);
+ assert.equal((host.match(/\(lunarModeRail\.width-2\*lunarModeRail\.spacing\)\/3/g)||[]).length,3);
+ assert.match(host,/selected: annualFocus\.moonView !== "forecast"/);
+ assert.match(host,/selected: annualFocus\.moonView === "forecast"/);
+ assert.match(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/ephemeris"\)/);
+ assert.match(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/year"\)/);
+ assert.match(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/forecast"\)/);
+});

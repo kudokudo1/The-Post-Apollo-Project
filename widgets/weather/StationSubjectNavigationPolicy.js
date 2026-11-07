@@ -43,13 +43,10 @@ var SUBJECTS = [
     {id:"sky",label:"ASTRONOMY",children:[
       {id:"full",label:"ASTRONOMY // CELESTIAL INSTRUMENTS"}]},
     {id:"sun",label:"SUN",children:[
-      {id:"position",label:"POSITION"}, {id:"twilight",label:"TWILIGHT"},
-      {id:"photo-light",label:"PHOTO LIGHT"},
-      {id:"activity",label:"SOLAR ACTIVITY // ALL ORIGINAL"},
-      {id:"suvi",label:"SUVI IMAGER"}, {id:"xray",label:"X-RAY FLUX"},
-      {id:"flares",label:"SOLAR FLARES"},
-      {id:"cycle",label:"SOLAR CYCLE // NOAA PREDICTION"},
-      {id:"year",label:"SOLAR YEAR // JPL WHEEL"}]},
+      {id:"live",label:"LIVE // SUVI + X-RAY + FLARES"},
+      {id:"position",label:"POSITION + LIGHT // SKY + TWILIGHT"},
+      {id:"activity",label:"ACTIVITY // X-RAY + FLARES + CYCLE"},
+      {id:"year",label:"YEAR // JPL SOLAR WHEEL"}]},
     {id:"moon",label:"MOON",children:[
       {id:"ephemeris",label:"PHASE AND RISE/SET"},
       {id:"position",label:"CURRENT POSITION"},

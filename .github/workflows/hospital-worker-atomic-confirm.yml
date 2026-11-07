@@ -1,0 +1,38 @@
+name: Hospital Atomic Attachment Confirm UI
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalWorkerAttachmentActionService.qml"
+      - "tests/hospital/test_worker_atomic_attach_ui_contracts.py"
+      - "tests/hospital/test_worker_attachment_preview_ui_contracts.py"
+      - ".github/workflows/hospital-worker-atomic-confirm.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalWorkerAttachmentActionService.qml"
+      - "tests/hospital/test_worker_atomic_attach_ui_contracts.py"
+      - "tests/hospital/test_worker_attachment_preview_ui_contracts.py"
+      - ".github/workflows/hospital-worker-atomic-confirm.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  staged-confirmation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify two-click confirmation and pinned PX endpoint
+        run: |
+          python3 tests/hospital/test_worker_atomic_attach_ui_contracts.py
+      - name: Preserve preview, existing worker connections, and Quick controls
+        run: |
+          python3 tests/hospital/test_worker_attachment_preview_ui_contracts.py
+          python3 tests/hospital/test_worker_connection_ui_contracts.py
+          python3 tests/hospital/test_registered_worker_routes.py
+          python3 tests/hospital/test_worker_attention_ui_contracts.py
+          python3 tests/hospital/test_main_mode_keyboard_contracts.py

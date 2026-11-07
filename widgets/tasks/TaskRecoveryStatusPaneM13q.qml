@@ -16,11 +16,6 @@ Item {
     property var editorSignals: null
     readonly property var draftReport: DraftPresencePolicy.view(editorSignals)
 
-    // M15c // Read-only shared Connections provider catalog, not consent.
-    // The TASKS draft credential provider is intentionally unregistered.
-    readonly property var draftCredentialCatalog:
-        ConnectionsBroker.requirement("tasks-draft")
-
     readonly property var report: RecoveryStatusPolicy.view({
         providerStatus: ConnectionsBroker.status,
         providerChecking: ConnectionsBroker.checking,
@@ -165,8 +160,11 @@ Item {
                 providerStatus: ConnectionsBroker.status
                 providerChecking: ConnectionsBroker.checking
                 credentialActionsEnabled: ConnectionsBroker.credentialActionsEnabled
-                brokerKnown: recoveryStatus.draftCredentialCatalog.known === true
-                brokerGrantEnabled: recoveryStatus.draftCredentialCatalog.grantEnabled === true
+                // Do not call shared broker requirement/authorize here.
+                // M13q's status-only boundary forbids catalog/credential calls.
+                // The TASKS draft provider has no registered production host.
+                brokerKnown: false
+                brokerGrantEnabled: false
                 recoveryEnabled: ApolloHubTodoStore.encryptedRecoveryEnabled
                 storageAuthorized: ApolloHubTodoStore.encryptedRecoveryStorageAuthorized
                 unlockAuthorized: ApolloHubTodoStore.encryptedRecoveryUnlockAuthorized

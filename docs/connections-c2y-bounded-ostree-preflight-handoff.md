@@ -30,6 +30,12 @@ The next two full tests, [42304618652](https://github.com/kudokudo1/The-Post-Apo
 
 The current bounded diagnostic change extends the independent read-only guest resource probe, recording `systemctl show` for original first-boot controller, monitor, worker and rpm-ostreed; cgroup presence, freeze state and events; and `ostree admin status --json` obtained from local OSTree state instead of the rpm-ostree daemon's status API. All new commands have explicit timeouts and run only in the disposable isolated Fedora guest. They are **observations only**, not an authorization to reboot on a log string or to bypass the authoritative pending deployment and actual two-reboot checks. The existing CI safety preflight requires the instrumentation. The next run should establish which units survived and whether local OSTree reports a staged default deployment independently of the daemon.
 
+### Confirmed transient monitor exit and next discriminator
+
+On exact prior head `dfd04d3b1cfb8e87d4d1d55aad7f1f2c300022ef`, [CI run 42313463869](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42313463869) and [42313463899](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42313463899) both completed **failure**. The final serial evidence shows the original first-boot controller `ActiveState=inactive; Result=success; ExecMainStatus=0`, test RPM worker `inactive; Result=success; ExecMainStatus=0`, but independent monitor `ActiveState=failed; Result=exit-code; ExecMainStatus=1`. The rpm-ostree daemon was inactive with result success. Direct read-only `ostree admin status --json` returned a *pending, staged, non-booted* deployment at index zero and the original booted deployment at index one, matching the RPM installation log showing the exact inert fixture added and queued. The guest resource probe continued, so no whole-VM freeze. This **proves an independent monitor exit**, not a completed rollback. No `C2V_MONITOR_REBOOT_REQUESTED`, booted fixture or rollback marker was observed.
+
+The latest diagnostic correction now adds a shell `ERR` trap capturing the monitor's exact failing command and line, an `EXIT` trap for its result, and distinct `C2V_MONITOR_STATUS_QUERY_OK`, `C2V_MONITOR_PENDING_JSON_REJECTED`, `C2V_MONITOR_STATUS_QUERY_FAILED`, and per-iteration markers. The host runner extracts monitor-specific evidence from the **whole** guest serial file so it cannot be hidden behind hundreds of unrelated probe ticks. Both CI workflow preflights require this. It does not change pending-deployment acceptance conditions, reboot decision, SELinux, networking or production auth. The next CI must determine the first actual monitor error. Do not infer that the monitor failed because a status query blocked; that remains a hypothesis until the traps and journal prove it.
+
 ## HOW TO USE
 
 None on your desktop. The PR's GitHub runner builds a temporary signed inert RPM, boots an ephemeral Fedora Silverblue 44 guest, and reports diagnostic/reboot status in CI.
@@ -65,7 +71,10 @@ This is a diagnostic boundary fix, not a demonstrated solution to offline rpm-os
 - [x] Require monitor readiness before RPM worker starts; original one-shot exits
 - [x] Recover both independent-monitor test failures and confirm monitor never reached attempt 2
 - [x] Add bounded read-only service state, cgroup and direct OSTree administrative probes
-- [ ] Verify current exact-head CI and identify the first service lifecycle failure
+- [x] Verify first-boot and RPM worker exited success but monitor exited code 1
+- [x] Prove local OSTree pending/staged deployment via direct admin status and inert RPM log
+- [x] Add monitor ERR/EXIT line+command tracing and full host serial extraction
+- [ ] Verify latest exact-head CI and identify first monitor failing command
 - [ ] Verify booted RPM layer and booted rollback with all gates intact
 - [ ] Review any actual offline rpm-ostree failure and independently verify successful rollback
 - [ ] Obtain operator acceptance; no merge or production enablement by this worker

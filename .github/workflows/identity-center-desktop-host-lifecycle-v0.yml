@@ -5,11 +5,13 @@ on:
     paths:
       - 'services/identity/desktop_host_lifecycle_v0.py'
       - 'tests/identity/test_desktop_host_lifecycle_v0.py'
+      - 'tests/identity/test_desktop_seat_invalidation_v0.py'
       - 'services/identity/desktop_session_host_v0.py'
       - 'services/identity/native_loopback_callback_v0.py'
       - 'services/identity/private_context_ipc_v0.py'
       - 'services/identity/desktop_context_projection_v0.py'
       - 'MODEL/contracts/identity-center-host-lifecycle-integration-v0.md'
+      - 'MODEL/contracts/identity-center-desktop-seat-invalidation-v0.md'
       - 'MODEL/README.md'
       - '.github/workflows/identity-center-desktop-host-lifecycle-v0.yml'
   push:
@@ -17,11 +19,13 @@ on:
     paths:
       - 'services/identity/desktop_host_lifecycle_v0.py'
       - 'tests/identity/test_desktop_host_lifecycle_v0.py'
+      - 'tests/identity/test_desktop_seat_invalidation_v0.py'
       - 'services/identity/desktop_session_host_v0.py'
       - 'services/identity/native_loopback_callback_v0.py'
       - 'services/identity/private_context_ipc_v0.py'
       - 'services/identity/desktop_context_projection_v0.py'
       - 'MODEL/contracts/identity-center-host-lifecycle-integration-v0.md'
+      - 'MODEL/contracts/identity-center-desktop-seat-invalidation-v0.md'
       - 'MODEL/README.md'
       - '.github/workflows/identity-center-desktop-host-lifecycle-v0.yml'
   workflow_dispatch:
@@ -43,9 +47,11 @@ jobs:
         run: |
           python3 -m py_compile services/identity/desktop_host_lifecycle_v0.py
           python3 -m py_compile tests/identity/test_desktop_host_lifecycle_v0.py
+          python3 -m py_compile tests/identity/test_desktop_seat_invalidation_v0.py
       - name: Execute explicit host lifecycle integration
         run: |
           python3 -m unittest discover -s tests/identity -p 'test_desktop_host_lifecycle_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_seat_invalidation_v0.py' -v
       - name: Preserve host token and private IPC boundaries
         run: |
           python3 -m unittest discover -s tests/identity -p 'test_desktop_session_host_v0.py' -v

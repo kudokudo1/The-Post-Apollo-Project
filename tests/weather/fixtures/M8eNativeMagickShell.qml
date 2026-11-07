@@ -10,6 +10,11 @@ ShellRoot {
     property bool complete: false
     property string stage: "BOOT"
 
+    Window {
+        id: testSurface
+        visible: true
+        width: 650
+        height: 550
     StationMagickUtcDateField {
         id: dateField
         width: 360
@@ -27,6 +32,7 @@ ShellRoot {
         width: 450
         height: 360
         visible: false
+    }
     }
     function fail(code) {
         if(complete)return;
@@ -57,7 +63,6 @@ ShellRoot {
 
             root.stage="NATAL_AUTO_DATE";
             natalForm.visible=true;
-            console.log("M8E_DEBUG_NATAL // visible="+natalForm.visible+" date="+natalForm.utcDate+" expected="+utcNow+" place="+natalForm.place.source);
             if(!root.check(natalForm.utcDate===utcNow,
                 "NATAL_DATE_NOT_DEFAULTED"))return;
             if(!root.check(natalForm.place.source==="UNAVAILABLE",

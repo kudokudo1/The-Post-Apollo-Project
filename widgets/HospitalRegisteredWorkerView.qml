@@ -4,6 +4,7 @@ import "../services/hospital"
 import "../services/hospital/HospitalWorkerSessionPolicy.js" as SessionPolicy
 import "../services/hospital/HospitalWorkerAttentionPolicy.js" as WorkerAttentionPolicy
 import "../services/hospital/HospitalWorkerConnectionPolicy.js" as ConnectionPolicy
+import "../services/hospital/HospitalWorkerAttachmentPreviewPolicy.js" as AttachPreviewPolicy
 
 // Exact durable Room / pinned PX Session inspection. No room-bind,
 // no session-create, no browser-chat access and no automatic agent turns.
@@ -18,6 +19,37 @@ Item {
     property string viewMode: "chat"
     property bool runtimeStatusVerified: false
     property string actionError: ""
+
+    // Explicit PREVIEW selection, never an active worker attachment.
+    property var availableDoctors: []
+    property var availableProviders: []
+    property var allRooms: []
+    property var allSessions: []
+    property bool roomsSnapshotLoaded: false
+    property bool sessionsSnapshotLoaded: false
+    property bool doctorDirectoryLoaded: false
+    property bool providerDirectoryLoaded: false
+    property string attachmentSourceError: ""
+    property string previewAssignmentId: ""
+    property string previewDoctorId: ""
+    property string previewProviderId: ""
+    readonly property var attachmentPreview: AttachPreviewPolicy.plan({
+        room: root.roomData,
+        rooms: root.allRooms,
+        sessions: root.allSessions,
+        assignments: assignmentPreview.assignments,
+        doctors: root.availableDoctors,
+        providers: root.availableProviders,
+        assignmentId: root.previewAssignmentId,
+        doctorId: root.previewDoctorId,
+        providerId: root.previewProviderId,
+        roomsLoaded: root.roomsSnapshotLoaded,
+        sessionsLoaded: root.sessionsSnapshotLoaded,
+        assignmentsLoaded: assignmentPreview.loaded,
+        doctorsLoaded: root.doctorDirectoryLoaded,
+        providersLoaded: root.providerDirectoryLoaded,
+        loadError: root.attachmentSourceError || assignmentPreview.lastError
+    })
     readonly property var recordedAttention:
         WorkerAttentionPolicy.describe(root.roomData)
     readonly property var connectionPlan:
@@ -61,6 +93,20 @@ Item {
         refreshRequested();
     }
 
+    function openAttachmentPreview() {
+        if (!root.active || !root.roomMatches)
+            return false;
+        // Fresh operator choices start from the durable Room records.
+        // Selecting here cannot update staffing or start a PX Session.
+        previewAssignmentId = String(root.roomData.assignmentId || "").trim();
+        previewDoctorId = String(root.roomData.roomDoctorId || "").trim();
+        previewProviderId = String(root.roomData.roomProviderId || "").trim();
+        viewMode = "attachPreview";
+        assignmentPreview.refresh();
+        refreshRequested();
+        return true;
+    }
+
     function runQuick(commandValue) {
         const command = String(commandValue || "").trim().toUpperCase();
         const allowed = ConnectionPolicy.allowsCommand(root.roomData, command)
@@ -88,6 +134,9 @@ Item {
         if (active) {
             viewMode = initialMode === "connections" ? "connections"
                 : initialMode === "quick" ? "quick" : "chat";
+            previewAssignmentId = "";
+            previewDoctorId = "";
+            previewProviderId = "";
             reload();
         } else {
             runtimeStatusVerified = false;
@@ -103,6 +152,12 @@ Item {
         runtimeStatusVerified = false;
         if (active && sessionMatches)
             runtime.refresh();
+    }
+
+    HospitalWorkerAttachmentPreviewService {
+        id: assignmentPreview
+        roomId: root.active && root.viewMode === "attachPreview"
+            ? root.pinnedRoomId : ""
     }
 
     HospitalWorkerTranscriptService {
@@ -448,6 +503,14 @@ Item {
                     color: Colors.blue
                     wrapMode: Text.Wrap
                 }
+                HospitalActionButton {
+                    width: parent.width
+                    height: 30
+                    label: "PREVIEW ATTACHMENT"
+                    compactIcon: "LINK"
+                    accent: Colors.orange
+                    onTriggered: root.openAttachmentPreview()
+                }
             }
         }
 
@@ -455,6 +518,253 @@ Item {
             flickable: connectionsScroll
             handleStyle: "star"
             visible: root.viewMode === "connections" && scrollable
+        }
+
+        Flickable {
+            id: attachScroll
+            visible: root.viewMode === "attachPreview"
+            anchors.fill: parent
+            clip: true
+            contentWidth: width
+            contentHeight: attachRows.height
+            boundsBehavior: Flickable.StopAtBounds
+
+            Column {
+                id: attachRows
+                width: attachScroll.width
+                spacing: 7
+
+                GohuText {
+                    width: parent.width
+                    text: "ATTACHMENT // READ-ONLY PREFLIGHT"
+                    color: Colors.orange
+                    font.pixelSize: 12
+                    elide: Text.ElideRight
+                }
+                GohuText {
+                    width: parent.width
+                    text: root.attachmentPreview.headline
+                    color: root.attachmentPreview.reviewable
+                        ? Colors.green : Colors.orange
+                    font.pixelSize: 10
+                    wrapMode: Text.Wrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "Room and Patient are pinned. Choose only existing records below. No attach command is exposed."
+                    font.pixelSize: 9
+                    color: Colors.blue
+                    wrapMode: Text.Wrap
+                }
+                Repeater {
+                    model: root.attachmentPreview.facts
+                    GohuText {
+                        required property var modelData
+                        width: attachRows.width
+                        text: String(modelData.label || "") + " // "
+                            + String(modelData.value || "")
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                        elide: Text.ElideMiddle
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    text: "ASSIGNMENT // SELECT AN EXISTING CONTRACT"
+                    font.pixelSize: 10
+                    color: Colors.orange
+                }
+                GohuText {
+                    width: parent.width
+                    visible: assignmentPreview.loading || !!assignmentPreview.lastError
+                    text: assignmentPreview.lastError
+                        || "READING EXACT ROOM ASSIGNMENTS..."
+                    font.pixelSize: 9
+                    color: assignmentPreview.lastError ? Colors.red : Colors.cyan
+                    wrapMode: Text.Wrap
+                }
+                Repeater {
+                    model: assignmentPreview.assignments
+                    Rectangle {
+                        required property var modelData
+                        width: attachRows.width
+                        height: 31
+                        color: Colors.black
+                        border.width: 1
+                        border.color: String(modelData.id || "") === root.previewAssignmentId
+                            ? Colors.orange : Colors.magenta
+                        GohuText {
+                            anchors.fill: parent
+                            anchors.margins: 6
+                            text: "#" + String(modelData.id || "")
+                                + " // " + String(modelData.status || "")
+                                + " // " + String(modelData.title || "")
+                            font.pixelSize: 9
+                            color: Colors.white
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.previewAssignmentId =
+                                String(modelData.id || "")
+                        }
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "DOCTOR // CHOOSE REGISTERED STAFF"
+                    font.pixelSize: 10
+                    color: Colors.orange
+                }
+                GohuText {
+                    width: parent.width
+                    visible: root.availableDoctors.length === 0
+                    text: "NO DOCTORS LOADED // REFRESH HOSPITAL DIRECTORY"
+                    font.pixelSize: 9
+                    color: Colors.orange
+                }
+                Repeater {
+                    model: root.availableDoctors
+                    Rectangle {
+                        required property var modelData
+                        width: attachRows.width
+                        height: 30
+                        color: Colors.black
+                        border.width: 1
+                        border.color: String(modelData.id || "") === root.previewDoctorId
+                            ? Colors.orange : Colors.magenta
+                        GohuText {
+                            anchors.fill: parent
+                            anchors.margins: 6
+                            text: String(modelData.name || modelData.id || "")
+                                + " // " + String(modelData.status || "")
+                                + " // " + String(modelData.id || "")
+                            color: Colors.white
+                            font.pixelSize: 9
+                            elide: Text.ElideRight
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.previewDoctorId =
+                                String(modelData.id || "")
+                        }
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "PROVIDER // CHOOSE PX RUNTIME"
+                    font.pixelSize: 10
+                    color: Colors.orange
+                }
+                GohuText {
+                    width: parent.width
+                    visible: root.availableProviders.length === 0
+                    text: "NO PROVIDERS LOADED // REFRESH PROVIDER DIRECTORY"
+                    font.pixelSize: 9
+                    color: Colors.orange
+                }
+                Repeater {
+                    model: root.availableProviders
+                    Rectangle {
+                        required property var modelData
+                        width: attachRows.width
+                        height: 30
+                        color: Colors.black
+                        border.width: 1
+                        border.color: String(modelData.id || "") === root.previewProviderId
+                            ? Colors.orange : Colors.magenta
+                        GohuText {
+                            anchors.fill: parent
+                            anchors.margins: 6
+                            text: String(modelData.name || modelData.id || "")
+                                + " // " + (modelData.available ? "LISTED AVAILABLE"
+                                    : "UNAVAILABLE")
+                                + " // " + String(modelData.id || "")
+                            color: Colors.white
+                            font.pixelSize: 9
+                            elide: Text.ElideRight
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.previewProviderId =
+                                String(modelData.id || "")
+                        }
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "VERIFICATION // BED AND SESSION"
+                    font.pixelSize: 10
+                    color: Colors.orange
+                }
+                GohuText {
+                    width: parent.width
+                    text: "No Bed edits or Session creation. The preview checks open Sessions across Rooms to avoid collisions."
+                    color: Colors.blue
+                    font.pixelSize: 9
+                    wrapMode: Text.Wrap
+                }
+                Repeater {
+                    model: root.attachmentPreview.blockers
+                    GohuText {
+                        required property string modelData
+                        width: attachRows.width
+                        text: "! " + modelData
+                        color: Colors.red
+                        font.pixelSize: 9
+                        wrapMode: Text.Wrap
+                    }
+                }
+                Repeater {
+                    model: root.attachmentPreview.notes
+                    GohuText {
+                        required property string modelData
+                        width: attachRows.width
+                        text: "· " + modelData
+                        color: Colors.blue
+                        font.pixelSize: 9
+                        wrapMode: Text.Wrap
+                    }
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 48
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.orange
+                    GohuText {
+                        anchors.fill: parent
+                        anchors.margins: 7
+                        text: root.attachmentPreview.reviewable
+                            ? "PREVIEW CONSISTENT // NO ATTACHMENT MADE. Operator approval and atomic PX preflight required."
+                            : "BLOCKED // NOTHING CHANGED. Resolve listed issues; no connection or registration attempted."
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.Wrap
+                    }
+                }
+                HospitalActionButton {
+                    width: parent.width
+                    height: 29
+                    label: "BACK TO CONNECTIONS"
+                    compactIcon: "LINK"
+                    accent: Colors.cyan
+                    onTriggered: root.viewMode = "connections"
+                }
+            }
+        }
+
+        NeonScrollBar {
+            flickable: attachScroll
+            handleStyle: "star"
+            visible: root.viewMode === "attachPreview" && scrollable
         }
 
         Column {

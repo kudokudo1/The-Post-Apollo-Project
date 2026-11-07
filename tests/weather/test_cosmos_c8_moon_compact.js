@@ -86,22 +86,24 @@ test("Moon C10 matches the six-pixel COSMOS overview and mode-page stage gutter"
  assert.match(moon,/anchors\.bottomMargin: moonPane\.contentInset/);
 });
 
-test("C18 MOON uses three equal-width SUN-style modes above phase instruments",()=>{
+test("C19 MOON overview and year share top modes above source-backed forecast",()=>{
  assert.match(moon,/objectName: "cosmos-c18-moon-fullwidth-mode-rail"/);
  assert.match(moon,/id: moonModeRail/);
  assert.match(moon,/anchors\.top: titleRail\.bottom/);
  assert.match(moon,/anchors\.top: moonModeRail\.bottom/);
- assert.match(moon,/height: Math\.min\(166,Math\.max\(0,moonPane\.height-138\)\)/);
+ assert.match(moon,/height: Math\.min\(166,Math\.max\(95,Math\.round\(moonPane\.height\*0\.39\)\)\)/);
  for(const name of [
    "cosmos-c18-moon-observation-tab",
-   "cosmos-c11-open-moon-year",
-   "cosmos-c17-open-moon-forecast"
+   "cosmos-c11-open-moon-year"
  ])assert.ok(moon.includes('objectName: "'+name+'"'),name);
- assert.equal((moon.match(/\(moonModeRail\.width-2\*moonModeRail\.spacing\)\/3/g)||[]).length,3);
- assert.equal((moon.match(/height: 27/g)||[]).length,4);
- assert.match(moon,/label: "PHASE \+ POSITION"[\s\S]*?selected: true/);
+ assert.equal((moon.match(/\(moonModeRail\.width-moonModeRail\.spacing\)\/2/g)||[]).length,2);
+ assert.equal((moon.match(/height: 27/g)||[]).length,3);
+ assert.match(moon,/label: "OVERVIEW"[\s\S]*?selected: true/);
  assert.match(moon,/onClicked: moonPane\.routeRequested\("cosmos\/moon\/year"\)/);
- assert.match(moon,/onClicked: moonPane\.routeRequested\("cosmos\/moon\/forecast"\)/);
+ assert.doesNotMatch(moon,/onClicked: moonPane\.routeRequested\("cosmos\/moon\/forecast"\)/);
+ assert.match(moon,/StationCosmosMoonForecastStrip\s*\{/);
+ assert.match(moon,/anchors\.top: moonForecastStrip\.bottom/);
+ assert.match(moon,/height: Math\.max\(43,Math\.min\(80,Math\.round\(moonPane\.height\*0\.17\)\)\)/);
  const title=moon.slice(moon.indexOf('id: titleRail'),moon.indexOf('id: moonModeRail'));
  assert.doesNotMatch(title,/ActionButton/);
  assert.match(title,/USNO /);

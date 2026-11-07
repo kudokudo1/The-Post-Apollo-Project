@@ -177,8 +177,8 @@ set -Eeuo pipefail
 exec >/dev/ttyS0 2>&1
 # Preserve the exact first failing command and exit status; a successful
 # systemd-run start does not prove its later transient unit stayed healthy.
-trap 'rc=$?; msg="C2V_MONITOR_ERR // rc=$rc line=$LINENO command=$BASH_COMMAND"; echo "$msg"; printf "%s\\n" "$msg" >> /var/tmp/c2v-monitor-exit.log' ERR
-trap 'rc=$?; msg="C2V_MONITOR_EXIT // rc=$rc"; echo "$msg"; printf "%s\\n" "$msg" >> /var/tmp/c2v-monitor-exit.log' EXIT
+trap 'rc=$?; msg="C2V_MONITOR_ERR // rc=$rc line=$LINENO command=$BASH_COMMAND"; echo "$msg"; printf "%s\n" "$msg" >> /var/tmp/c2v-monitor-exit.log' ERR
+trap 'rc=$?; msg="C2V_MONITOR_EXIT // rc=$rc"; echo "$msg"; printf "%s\n" "$msg" >> /var/tmp/c2v-monitor-exit.log' EXIT
 echo "C2V_MONITOR_READY // $(date --iso-8601=seconds)"
 echo ready > /run/c2v-monitor-ready
 pkg=postapollo-connections-c2t-fixture

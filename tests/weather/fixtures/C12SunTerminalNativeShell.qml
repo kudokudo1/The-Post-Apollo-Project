@@ -184,16 +184,19 @@ ShellRoot {
             const xrayBay=fixture.locate(activity,"cosmos-c13-xray-bay");
             const flareBay=fixture.locate(activity,"cosmos-c13-flare-bay");
             const cycleBay=fixture.locate(activity,"cosmos-c13-cycle-bay");
+            const rangeChart=fixture.locate(activity,"cosmos-c15-cycle-range-chart");
+            const historyGraph=fixture.locate(activity,"cosmos-c13-xray-graph");
             if(!hero||!side||!sun||!ledger||!strip||!metrics
                 ||!trend||!xray||!flare||!cycle||!cluster
-                ||!xrayBay||!flareBay||!cycleBay
+                ||!xrayBay||!flareBay||!cycleBay||!rangeChart||!historyGraph
                 ||!obsImage||!obsArc||!obsLive||!obsSky||!obsLight)return;
             if(fixture.phase===0){
                 if(position.positionRows.length!==8||position.positionStrip.length!==5)
                     return fixture.stop("POSITION_DATA_MISSING");
                 if(sun.width<220||ledger.width<120||strip.height<25
                     ||hero.width<230||side.width<120
-                    ||metrics.height!==52)
+                    ||metrics.height!==39||historyGraph.height<40
+                    ||rangeChart.width<90||flareBay.height<120)
                     return fixture.stop("TERMINAL_GEOMETRY_TOO_SMALL");
                 if(obsImage.width<200||obsArc.width<200||obsLive.height<20
                     ||obsSky.height<24||obsLight.height<40
@@ -204,7 +207,7 @@ ShellRoot {
                 if(hero.height>live.height+1||sun.height>position.height+1
                     ||strip.y+strip.height>position.height+1
                     ||cluster.y+cluster.height>activity.height+1
-                    ||cycleBay.y+cycleBay.height>cluster.height+1
+                    ||cycleBay.y+cycleBay.height>activity.height-8
                     ||flareBay.y+flareBay.height>cluster.height+1)
                     return fixture.stop("TERMINAL_VIEWPORT_OVERFLOW");
                 if(activity.flareCount!==2

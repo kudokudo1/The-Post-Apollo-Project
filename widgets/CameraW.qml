@@ -54,6 +54,10 @@ PanelWindow {
     // Camera M4d: X/Instagram-style private browser guest in a measured bay.
     // Only a verified native actor/viewport enables the alpha + input hole.
     property bool zoomWebDocked: false
+    // A previously verified guest remains visually presented while Sway
+    // repositions it. The input cutout STILL requires zoomWebDocked, and a
+    // missing/unverified/failed actor clears this presentation latch.
+    property bool zoomWebVisualHeld: false
     property bool zoomWebBusy: false
     property string zoomWebState: "NOT_STARTED"
     // Typed Sway rectangle deltas only; never expose browser titles or logins.
@@ -77,11 +81,8 @@ PanelWindow {
     readonly property int zoomActorTop: zoomBayTop
     readonly property int zoomActorWidth: zoomBayWidth
     readonly property int zoomActorHeight: zoomBayHeight
-    // Measured from the operator's cropped screenshot, the physical browser
-    // started about 12 logical px below the visible mode-button edge, while
-    // both client/outer Sway rectangles already matched. Extend the browser
-    // upward only; its bottom and side edges remain unchanged.
-    readonly property int zoomVisualTopOverlap: 12
+    // The mode row owns its full button height. No guest overlap into
+    // Camera's controls; compact chassis gives the web body room below.
     // The browser can sit behind Camera chrome, but its input cutout must
     // never cut through the row of live Camera mode buttons.
     readonly property int zoomInputTop: Math.max(
@@ -114,6 +115,15 @@ PanelWindow {
             return;
         const aligned = reply.aligned === true && reply.state === "ALIGNED";
         zoomWebDocked = aligned;
+        if (aligned) {
+            zoomWebVisualHeld = true;
+        } else if (reply.state === "MISSING" || reply.state === "UNVERIFIED"
+                   || reply.state === "FAILED") {
+            // No stale browser should remain exposed on loss of trust.
+            zoomWebVisualHeld = false;
+        }
+        // CHECKING/MISALIGNED during an ordinary resize keep the already
+        // authenticated actor visually present, but with input closed.
         zoomWebState = aligned ? "WEB_APP_DOCKED"
                      : "FOLLOWER // " + String(reply.state || "UNVERIFIED");
     }
@@ -127,7 +137,9 @@ PanelWindow {
         // one-shot launch.
         zoomWebDocked = false;
         if (zoomFollowProcess.running) {
-            sendZoomFollowTarget();
+            // QML emits separate x/y/width/height signals while resizing.
+            // Coalesce those before requesting physical Sway movement.
+            zoomWebFollowTargetDebounce.restart();
             return;
         }
         if (zoomWebBusy) {
@@ -151,9 +163,11 @@ PanelWindow {
             return false;
         if (zoomFollowProcess.running) {
             zoomWebDocked = false;
-            return sendZoomFollowTarget();
+            zoomWebFollowTargetDebounce.restart();
+            return true;
         }
         zoomWebDocked = false;
+        zoomWebVisualHeld = false;
         zoomWebRectDelta = null;
         zoomWebNeedsRealign = false;
         zoomWebBusy = true;
@@ -163,6 +177,8 @@ PanelWindow {
     }
     function hideZoomWeb() {
         zoomWebDocked = false;  // input cutout closes before guest is hidden
+        zoomWebVisualHeld = false;
+        zoomWebFollowTargetDebounce.stop();
         zoomFollowProcess.running = false;
         zoomWebState = "HIDDEN";
         zoomWebHideProcess.exec(zoomWebArgs("hide"));
@@ -177,8 +193,8 @@ PanelWindow {
             return;
         }
         if (zoomWebNeedsRealign) {
-            // Host checked an older rectangle; keep the cutout closed until
-            // its same existing browser window is moved and verified again.
+            // Host checked an older rectangle. Reverify the existing guest
+            // without clearing the visual latch during a normal resize.
             zoomWebNeedsRealign = false;
             zoomWebDocked = false;
             zoomWebState = "REALIGNING_WEB_APP";
@@ -192,11 +208,11 @@ PanelWindow {
         zoomWebState = initiallyDocked ? "FOLLOWER // STARTING"
                         : "WEB_HOST_UNAVAILABLE // " + String(reply && (reply.error || reply.state) || "NO_RESULT");
         if (initiallyDocked) {
-            // Start one persistent Sway IPC session: physical browser geometry
-            // is remeasured and corrected until leaving Zoom mode.
+            // First verified alignment is still established by the follower.
             zoomFollowProcess.running = true;
             feedback = "ZOOM WEB // CONTINUOUS SIZE AND POSITION FOLLOW";
         } else {
+            zoomWebVisualHeld = false;
             feedback = "ZOOM WEB // " + zoomWebState;
         }
     }
@@ -217,9 +233,9 @@ PanelWindow {
     onZoomIdentityIdChanged: selectedZoomAccountId = ""
     // The native slurp overlay owns the region drag; Camera unmaps while it runs.
     property bool nativeRegionSelecting: false
-    // Same finance-size policy and top/bottom chrome budget for medium
-    // and fullscreen, while preserving Camera's existing 770x675 compact
-    // frame. One mapped PanelWindow persists across all size changes.
+    // Finance sizing in medium/fullscreen; the compact deck gets enough
+    // width and height to contain normal-size buttons and the Zoom browser.
+    // One mapped PanelWindow persists across all size changes.
     property string chassisLevel: "compact"
     property real dockCenterX: 0
     readonly property int glowGutter: 12
@@ -234,11 +250,11 @@ PanelWindow {
         glowGutter, frameTopInset, bottomScreenGap)
     readonly property int frameWidth:
         chassisLevel === "compact"
-        ? Math.max(1, Math.min(770, viewportWidth - 2 * glowGutter))
+        ? Math.max(1, Math.min(784, viewportWidth - 2 * glowGutter))
         : financeSize.width
     readonly property int frameHeight:
         chassisLevel === "compact"
-        ? Math.max(1, Math.min(675, viewportHeight
+        ? Math.max(1, Math.min(699, viewportHeight
                                - frameTopInset - bottomScreenGap))
         : financeSize.height
     readonly property int gutter: glowGutter
@@ -689,9 +705,10 @@ PanelWindow {
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus:
-        menuOpen && !zoomWebDocked ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-    // A docked browser receives its own keyboard focus for Zoom login/calls.
-    focusable: menuOpen && !zoomWebDocked
+        menuOpen && !zoomWebVisualHeld ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // Avoid keyboard focus thrash during routine browser geometry changes.
+    // The actual input cutout remains guarded by live zoomWebDocked.
+    focusable: menuOpen && !zoomWebVisualHeld
     color: "transparent"
     surfaceFormat.opaque: false
     visible: !camera.nativeRegionSelecting
@@ -727,6 +744,12 @@ PanelWindow {
         }
     }
 
+    Timer {
+        id: zoomWebFollowTargetDebounce
+        interval: 90
+        repeat: false
+        onTriggered: camera.sendZoomFollowTarget()
+    }
     Timer {
         id: zoomWebRealign
         interval: 240
@@ -781,6 +804,7 @@ PanelWindow {
         onExited: function(code, status) {
             if (camera.menuOpen && camera.activeView === "zoom") {
                 camera.zoomWebDocked = false;
+                camera.zoomWebVisualHeld = false;
                 camera.zoomWebState = "FOLLOWER // EXITED";
             }
         }
@@ -862,7 +886,7 @@ PanelWindow {
         focus: camera.menuOpen
         fillColor: Colors.black
         // Expose the web app ONLY through a compositor-measured slot.
-        fillOpacity: camera.zoomWebDocked ? 0.0 : 0.97
+        fillOpacity: camera.zoomWebVisualHeld ? 0.0 : 0.97
         borderColor: Colors.cyan
         borderWidth: 1
         glowVisible: camera.menuOpen
@@ -884,7 +908,7 @@ PanelWindow {
             width: parent.width
             height: camera.zoomActorTop
             color: Colors.black
-            visible: camera.zoomWebDocked
+            visible: camera.zoomWebVisualHeld
         }
         Rectangle {
             x: 0
@@ -892,7 +916,7 @@ PanelWindow {
             width: parent.width
             height: Math.max(0, parent.height - y)
             color: Colors.black
-            visible: camera.zoomWebDocked
+            visible: camera.zoomWebVisualHeld
         }
 
         // One frame-owned viewport for the real web actor, its input mask
@@ -901,13 +925,10 @@ PanelWindow {
         Item {
             id: zoomViewport
             x: cameraBodyColumn.x
-            // The real Sway Zoom client starts about 12 logical pixels below
-            // Camera's visible button edge even with the normal Column gap
-            // removed. Overlap the visual chrome by that measured amount.
-            // Keep the input hole clamped below the mode row so its buttons
-            // remain clickable; the physical browser follows this rectangle.
+            // Zoom starts below the full mode row. It must never overlap
+            // the default-sized mode buttons or rely on an invisible trim.
+            // Frame growth maintains room for the Zoom guest beneath it.
             y: cameraBodyColumn.y + cameraModes.y + cameraModes.height
-               - camera.zoomVisualTopOverlap
             width: Math.max(0, cameraBodyColumn.width)
             height: Math.max(0, frame.height - y - camera.zoomBayBottom)
             visible: camera.menuOpen && camera.activeView === "zoom"
@@ -915,7 +936,7 @@ PanelWindow {
             Flickable {
                 id: zoomPage
                 anchors.fill: parent
-                visible: camera.activeView === "zoom" && !camera.zoomWebDocked
+                visible: camera.activeView === "zoom" && !camera.zoomWebVisualHeld
                 clip: true
                 contentHeight: zoomContent.implicitHeight
                 boundsBehavior: Flickable.StopAtBounds
@@ -1472,7 +1493,9 @@ PanelWindow {
             Row {
                 id: cameraModes
                 width: parent.width
-                height: 38
+                // Leave breathing room below 34px action buttons rather
+                // than positioning the hosted browser inside the button row.
+                height: 42
                 spacing: 8
 
                 Repeater {

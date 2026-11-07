@@ -32,10 +32,10 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('const initiallyDocked = !!(reply && reply.ok === true && reply.docked === true)', QML)
         self.assertIn('zoomFollowProcess.running = true;', QML)
         self.assertIn('zoomWebDocked = aligned;', QML)
-        self.assertIn('fillOpacity: camera.zoomWebDocked ? 0.0 : 0.97', QML)
+        self.assertIn('fillOpacity: camera.zoomWebVisualHeld ? 0.0 : 0.97', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
         self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0', QML)
-        self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
+        self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebVisualHeld', QML)
         self.assertIn('function openZoomMode()', QML)
         entry = QML.split('function openZoomMode()',1)[1].split(
             'function prepareZoomInstall(choice)',1)[0]
@@ -44,8 +44,8 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertNotIn('zoomClientOpen',entry)
         self.assertIn('scripts/camera/ZoomWebHost.py',QML)
         self.assertIn('zoomWebHideProcess.exec(zoomWebArgs("hide"))',QML)
-        self.assertIn('menuOpen && !zoomWebDocked ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None',QML)
-        self.assertIn('focusable: menuOpen && !zoomWebDocked',QML)
+        self.assertIn('menuOpen && !zoomWebVisualHeld ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None',QML)
+        self.assertIn('focusable: menuOpen && !zoomWebVisualHeld',QML)
         self.assertIn('visible: camera.activeView === "zoom"',QML)
         self.assertIn('label: "↓ DOWNLOAD"',QML)
         self.assertIn('camera.hideZoomWeb();',QML)
@@ -74,10 +74,11 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('Math.round(zoomViewport.y)', QML)
         self.assertIn('Math.round(zoomViewport.width)', QML)
         self.assertIn('Math.round(zoomViewport.height)', QML)
-        # Compact is still 675 px tall, but the browser uses the body instead
-        # of leaving the 38px phantom footer: approx 539 vs 506px at y=131.
-        compact_height, page_start, bottom = 675, 131, 2
-        self.assertEqual(compact_height - page_start - bottom, 542)
+        # Compact now makes room for its full-size control deck. The frame
+        # grows by 24px; the browser starts 16px lower (no 12px overlap
+        # and a 4px taller mode row), leaving MORE browser height than before.
+        compact_height, page_start, bottom = 699, 147, 2
+        self.assertEqual(compact_height - page_start - bottom, 550)
         self.assertGreater(compact_height - page_start - bottom,
                            compact_height - 169)
 
@@ -87,50 +88,73 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('Zoom is hosted by the sibling zoomViewport instead.', QML)
         self.assertNotIn('height: camera.activeView === "zoom" && camera.zoomWebDocked', QML)
         self.assertIn('visible: camera.activeView !== "zoom"', QML)
-        self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
+        self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebVisualHeld', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
         self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0', QML)
         self.assertIn('height: camera.zoomWebDocked ? camera.zoomInputHeight : 0', QML)
-        self.assertIn('menuOpen && !zoomWebDocked ? WlrKeyboardFocus.OnDemand', QML)
+        self.assertIn('menuOpen && !zoomWebVisualHeld ? WlrKeyboardFocus.OnDemand', QML)
         # The fallback instructions are scrollable only when the web actor is
         # absent. A QML Flickable must not intercept Zoom's native mouse wheel.
         self.assertIn('id: zoomPage', QML)
-        self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
+        self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebVisualHeld', QML)
 
-    def test_measured_zoom_visual_top_overlap_preserves_mode_button_input(self):
-        # After the old Column spacing removal, an enlarged screenshot still
-        # showed about 12 logical px of transparent top strip. Sway reported
-        # a full-size client at Y=210, with no internal titlebar offset.
-        # Move the actual browser top upward 12px, extend height 12px and
-        # keep the mode-button controls outside the input subtraction.
+    def test_deck_containment_keeps_default_buttons_and_browser_below_them(self):
+        # The apparent top-edge 'gap' came from drawing the browser behind
+        # the lower 12px of normal-height action buttons. The browser must
+        # start BELOW the entire mode row, not overlap its children.
+        self.assertNotIn('zoomVisualTopOverlap', QML)
         self.assertIn(
             'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
-        self.assertIn('               - camera.zoomVisualTopOverlap', QML)
-        self.assertIn('readonly property int zoomVisualTopOverlap: 12', QML)
-        self.assertIn('readonly property int zoomInputTop: Math.max(', QML)
-        self.assertIn(
-            'zoomActorTop, cameraBodyColumn.y + cameraModes.y + cameraModes.height)', QML)
-        self.assertIn(
-            '0, zoomActorHeight - (zoomInputTop - zoomActorTop))', QML)
-        self.assertIn('y: camera.zoomInputTop', QML)
-        self.assertIn(
-            'height: camera.zoomWebDocked ? camera.zoomInputHeight : 0', QML)
         self.assertNotIn('cameraModes.height + cameraBodyColumn.spacing', QML)
+        self.assertIn('height: 42', QML)
+        self.assertIn('height: 34', QML)
+        self.assertIn('Math.min(784, viewportWidth - 2 * glowGutter)', QML)
+        self.assertIn('Math.min(699, viewportHeight', QML)
         self.assertIn(
             'height: Math.max(0, frame.height - y - camera.zoomBayBottom)', QML)
         self.assertIn('readonly property int zoomBayBottom: 2', QML)
         self.assertIn('x: cameraBodyColumn.x', QML)
         self.assertIn('width: Math.max(0, cameraBodyColumn.width)', QML)
+        self.assertIn('readonly property int zoomActorTop: zoomBayTop', QML)
+        self.assertIn('readonly property int zoomActorHeight: zoomBayHeight', QML)
+        # 38px row -> 42px row, no -12px overlap, 24px taller frame.
+        # The guest moves 16px lower, gains 8px height, and keeps sides
+        # aligned to the widened compact body (not an arbitrary browser trim).
+        old_top, old_height, old_width = 131, 542, 734
+        new_top = old_top + 12 + 4
+        new_height = old_height + 24 - 16
+        new_width = old_width + 14
+        self.assertEqual((new_top,new_height,new_width), (147,550,748))
+        self.assertGreaterEqual(42,34)
+
+    def test_resize_retains_verified_visual_without_exposing_unverified_input(self):
+        self.assertIn('property bool zoomWebVisualHeld: false', QML)
+        self.assertIn('zoomWebDocked = aligned;', QML)
+        self.assertIn('zoomWebVisualHeld = true;', QML)
+        self.assertIn('zoomWebVisualHeld = false;', QML)
+        self.assertIn('reply.state === "MISSING"', QML)
+        self.assertIn('reply.state === "UNVERIFIED"', QML)
+        self.assertIn('reply.state === "FAILED"', QML)
+        self.assertIn('zoomWebFollowTargetDebounce.restart();', QML)
+        self.assertIn('id: zoomWebFollowTargetDebounce', QML)
+        self.assertIn('interval: 90', QML)
+        self.assertIn('onTriggered: camera.sendZoomFollowTarget()', QML)
+        self.assertIn('zoomWebFollowTargetDebounce.stop();', QML)
+        self.assertIn('fillOpacity: camera.zoomWebVisualHeld ? 0.0 : 0.97', QML)
         self.assertIn(
-            'readonly property int zoomActorTop: zoomBayTop', QML)
-        self.assertIn(
-            'readonly property int zoomActorHeight: zoomBayHeight', QML)
-        # Fixed bottom: lowering the actual browser top by 12 extends its
-        # height by 12 without moving the bottom or disturbing side margins.
-        for old_top, old_height in ((131, 542), (131, 875), (131, 1200)):
-            new_top = old_top - 12
-            new_height = old_height + 12
-            self.assertEqual(old_top + old_height, new_top + new_height)
+            'visible: camera.activeView === "zoom" && !camera.zoomWebVisualHeld', QML)
+        self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0', QML)
+        self.assertIn('height: camera.zoomWebDocked ? camera.zoomInputHeight : 0', QML)
+        self.assertIn('intersection: Intersection.Subtract', QML)
+        # The fallback must not reappear on CHECKING/MISALIGNED if the actor
+        # had already passed Sway origin/geometry validation.
+        follow = QML.split('function consumeZoomFollow(raw)',1)[1].split(
+            'function scheduleZoomWebRealign()',1)[0]
+        self.assertIn('if (aligned)',follow)
+        self.assertNotIn('zoomWebVisualHeld = false;\n        }\n        // CHECKING',follow)
+        self.assertIn('reply.state === "MISSING"',follow)
+        self.assertIn('reply.state === "UNVERIFIED"',follow)
+        self.assertIn('reply.state === "FAILED"',follow)
 
     def test_zoom_viewport_is_frame_owned_and_fallback_is_not_in_camera_page(self):
         # A shared Camera Column previously owned the browser rectangle.
@@ -170,7 +194,7 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('zoomInputHeight: Math.max(', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
         # A verified browser has no overlapping QML fallback controls.
-        self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
+        self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebVisualHeld', QML)
 
     def test_actor_matches_camera_viewport_without_old_arbitrary_trims(self):
         # Operator Sway measurement: actual Zoom 92,126 718x514 exactly

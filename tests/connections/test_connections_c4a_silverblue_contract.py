@@ -139,7 +139,7 @@ class C4aContract(unittest.TestCase):
             doc = {
                 "transaction": transaction,
                 "deployments": [
-                    {"pending": pending, "booted": False,
+                    {"pending": pending, "booted": not pending,
                      "requested-local-packages": refs,
                      "packages": list(packages)},
                     {"booted": True},

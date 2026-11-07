@@ -4,6 +4,8 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
 import qs.services.time
+import qs.services.favorites
+import qs.services.location
 import "../components"
 import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy
 import "../services/time/WorldClockPolicy.js" as WorldClockPolicy
@@ -354,6 +356,15 @@ PanelWindow {
     // directory-search mode and disables the four preset buttons, without
     // deleting their selections. Returning restores the last quick zone.
     property bool worldModeActive: false
+    // U2 opt-in global preview; never changes the original WORLD writer.
+    property bool universalFavoritesOpen: false
+
+    FavoritesUnifiedCatalog {
+        id: unifiedFavoritesCatalog
+        appControlSource: FavoritesStore
+        worldSource: TimeSettings
+        placesSource: PlaceRegistry
+    }
     property string selectedQuickZone: "UTC"
     property string selectedSearchedZone: ""
     property string selectedWorldZone: "UTC"
@@ -1305,8 +1316,11 @@ PanelWindow {
     }
 
     function chooseMode(index) {
-        if (index >= 0 && index < modes.length)
+        if (index >= 0 && index < modes.length) {
             selectedModeIndex = index;
+            if (selectedMode !== "clock")
+                universalFavoritesOpen = false;
+        }
     }
 
     function cycleMainMode(direction) {
@@ -1323,6 +1337,7 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!menuOpen) {
+            universalFavoritesOpen = false;
             dismissWorldSearchPopup();
             closeConverterDropdowns();
             TimeSettings.cancelResync();
@@ -2512,12 +2527,29 @@ PanelWindow {
                                                    timew.worldZoneCatalog)
                             }
 
+                            ActionButton {
+                                id: unifiedFavoritesButton
+                                width: 78
+                                height: 29
+                                label: timew.universalFavoritesOpen
+                                       ? "CLOSE ALL" : "ALL FAVS"
+                                labelPixelSize: 10
+                                accentColor: Colors.magenta
+                                selected: timew.universalFavoritesOpen
+                                onLeftClicked: {
+                                    timew.dismissWorldSearchPopup();
+                                    timew.universalFavoritesOpen =
+                                        !timew.universalFavoritesOpen;
+                                }
+                            }
+
                             Flickable {
                                 id: favoriteZoneScroll
                                 width: Math.max(0, parent.width
                                                 - favoriteCount.width
                                                 - worldFavoriteToggle.width
-                                                - parent.spacing * 2)
+                                                - unifiedFavoritesButton.width
+                                                - parent.spacing * 3)
                                 height: parent.height
                                 clip: true
                                 boundsBehavior: Flickable.StopAtBounds
@@ -2563,6 +2595,22 @@ PanelWindow {
                                     font.pixelSize: 9
                                     color: Colors.cyan
                                 }
+                            }
+                        }
+
+                        // U2 optional popup: overlays, never changes clock
+                        // layout, timezone selection or source persistence.
+                        Item {
+                            width: parent.width
+                            height: 0
+                            z: 45
+                            FavoritesUnifiedPreview {
+                                width: parent.width
+                                height: 226
+                                visible: timew.universalFavoritesOpen
+                                snapshot: unifiedFavoritesCatalog.snapshot
+                                onCloseRequested:
+                                    timew.universalFavoritesOpen = false
                             }
                         }
 

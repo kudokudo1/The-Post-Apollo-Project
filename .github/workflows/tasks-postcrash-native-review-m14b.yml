@@ -1,0 +1,62 @@
+name: TASKS M14b isolated native postcrash review bridge
+
+on:
+  pull_request:
+    paths:
+      - 'TaskPostCrashReviewHarnessM14b.qml'
+      - 'tests/tasks/fixtures/TaskPostCrashReviewLabM14b.qml'
+      - 'tests/tasks/test_task_postcrash_native_review_bridge_m14b.cjs'
+      - 'docs/tasks-postcrash-native-review-bridge-m14b.md'
+      - '.github/workflows/tasks-postcrash-native-review-m14b.yml'
+      - 'widgets/tasks/TaskRecoveryReviewPolicyM13z.js'
+      - 'tests/tasks/fixtures/TaskPostCrashSourceReviewM13y.py'
+  push:
+    branches: [main]
+    paths:
+      - 'TaskPostCrashReviewHarnessM14b.qml'
+      - 'tests/tasks/fixtures/TaskPostCrashReviewLabM14b.qml'
+      - 'tests/tasks/test_task_postcrash_native_review_bridge_m14b.cjs'
+      - '.github/workflows/tasks-postcrash-native-review-m14b.yml'
+permissions:
+  contents: read
+
+jobs:
+  disposable-native-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Real disposable SQLite/JSON evidence through M13y to M13z presentation
+        run: node --test tests/tasks/test_task_postcrash_native_review_bridge_m14b.cjs
+      - name: Existing M13y post-crash source classification
+        run: |
+          python3 -B -m unittest discover -s tests/tasks \
+            -p 'test_task_postcrash_source_review_m13y.py' -v
+      - name: Existing M13z and M14a display-only policies
+        run: |
+          node --test tests/tasks/test_task_operator_save_review_m13z.cjs
+          node --test tests/tasks/test_task_live_native_save_observation_m14a.cjs
+      - name: Single source writer, closed M12r admission and C2 Connections grants
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node --test tests/tasks/test_task_disabled_admission_m12r.cjs
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Standalone Quickshell fixture QML syntax only
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat TaskPostCrashReviewHarnessM14b.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat tests/tasks/fixtures/TaskPostCrashReviewLabM14b.qml >/dev/null
+      - name: No production import, new writer or automatic native launch
+        run: |
+          set -euo pipefail
+          ! grep -Eq 'TaskPostCrashReviewLabM14b|TaskPostCrashReviewHarnessM14b' \
+            shell.qml services/hub/ApolloHubTodoStore.qml \
+            widgets/tasks/TaskRecoveryStatusPaneM13q.qml
+          ! grep -Eq 'FileView *\{|\\.setText\\(|Component.onCompleted|running:[[:space:]]*true' \
+            tests/tasks/fixtures/TaskPostCrashReviewLabM14b.qml
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          printf '%s\n' 'M14B_DISPOSABLE_READBACK_OPERATOR_REVIEW_NO_SOURCE_WRITE_PASS'

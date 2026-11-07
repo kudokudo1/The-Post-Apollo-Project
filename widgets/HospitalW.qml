@@ -217,6 +217,9 @@ PanelWindow {
     // Switching views never dispatches, binds, or starts a worker.
     function setWorkforceRosterVisible(nextValue) {
         const enabled = !!nextValue;
+        if (!enabled && root.rosterEditingRoomId
+                && !root.closeRosterIdentityEditor())
+            return;
         workforceRosterVisible = enabled;
         if (enabled) {
             responsibilityService.refreshDurableGraph();
@@ -6002,7 +6005,8 @@ PanelWindow {
         Rectangle {
             id: rosterNameEditor
             z: 850
-            visible: !root.operationsOpen && root.rosterEditingRoomId.length > 0
+            visible: !root.operationsOpen && root.workforceRosterVisible
+                && root.rosterEditingRoomId.length > 0
             anchors.fill: hospitalScroll
             color: Colors.dark
             border.width: 2

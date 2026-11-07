@@ -1,0 +1,49 @@
+name: Connections C3e offline root-pinned release admission (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/**"
+      - "tests/connections/test_connections_c3e_release_trust.py"
+      - ".github/workflows/connections-c3e-offline-release-root.yml"
+      - "docs/connections-c3e-independent-release-root-policy.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-root-pin-and-revocation:
+    # Do not generate CI signing material for untrusted fork code.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify offline GnuPG and deny-only production boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v gpg
+          command -v gpgv
+          command -v python3
+          python3 -m py_compile tests/connections/c3e_release_trust/C3eReleaseAdmission.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path("services/connections")
+          assert "readonly property bool hostAuthenticated: false" in (root/"ConnectionsRequestStatus.qml").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in (root/"ConnectionsBroker.qml").read_text()
+          for p in (*root.glob("*.qml"), *root.glob("*.js"), root/"qmldir"):
+              assert "C3eReleaseAdmission" not in p.read_text(), p
+          print("C3E_PASS // REAL_CREDENTIAL_AND_HOST_PERMISSIONS_STAY_DENIED")
+          PY
+      - name: Exercise real offline signed-root, delegated signer, rotation and revocation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3e_release_trust.py
+          echo "C3E_PASS // REAL_GPG_ROOT_DELEGATION_AND_REVOCATION_CI_ONLY"
+          echo "C3E_LIMITATION // NO_PRODUCTION_ROOT_OR_RELEASE_SIGNING_KEYS"

@@ -4,12 +4,9 @@
 // modes; mode changes never move the user's scroll offset. Pure metadata only.
 var MODES = {
     sun: [
-        {label:"PATH", route:"cosmos/sun/position", kind:"solar-path"},
-        {label:"LIGHT", route:"cosmos/sun/twilight", kind:"light"},
-        {label:"SUVI", route:"cosmos/sun/suvi", kind:"solar-section"},
-        {label:"X-RAY", route:"cosmos/sun/xray", kind:"solar-section"},
-        {label:"FLARES", route:"cosmos/sun/flares", kind:"solar-section"},
-        {label:"CYCLE", route:"cosmos/sun/cycle", kind:"solar-section"},
+        {label:"LIVE", route:"cosmos/sun/live", kind:"sun-live"},
+        {label:"POSITION + LIGHT", route:"cosmos/sun/position", kind:"sun-position"},
+        {label:"ACTIVITY", route:"cosmos/sun/activity", kind:"sun-activity"},
         {label:"YEAR", route:"cosmos/sun/year", kind:"annual-solar"}
     ],
     astronomy: [
@@ -26,8 +23,17 @@ var MODES = {
 
 var ALIASES = {
     "cosmos/sun/photo-light":"cosmos/sun/twilight",
-    "cosmos/sun/activity":"cosmos/sun/suvi",
     "cosmos/events/overview":"cosmos/events/meteors"
+};
+
+// Existing deep links remain valid specialist inspectors. They are not
+// shown as separate tabs on the new four-mode terminal rail.
+var LEGACY_SUN = {
+    "cosmos/sun/twilight":"light",
+    "cosmos/sun/suvi":"solar-section",
+    "cosmos/sun/xray":"solar-section",
+    "cosmos/sun/flares":"solar-section",
+    "cosmos/sun/cycle":"solar-section"
 };
 
 function canonical(path) {
@@ -37,6 +43,8 @@ function canonical(path) {
 
 function family(path) {
     var route = canonical(path);
+    if (Object.prototype.hasOwnProperty.call(LEGACY_SUN,route))
+        return "sun";
     for (var key in MODES) {
         if (!Object.prototype.hasOwnProperty.call(MODES,key))
             continue;
@@ -53,6 +61,8 @@ function modesFor(path) {
 
 function kind(path) {
     var route = canonical(path);
+    if (Object.prototype.hasOwnProperty.call(LEGACY_SUN,route))
+        return LEGACY_SUN[route];
     var modes = modesFor(route);
     for (var i=0;i<modes.length;i++)
         if (modes[i].route === route) return modes[i].kind;
@@ -69,8 +79,8 @@ function dataRoute(path) {
 function usesSky(path) {
     var key = family(path);
     return key === "astronomy" || key === "events"
-        || (key === "sun" && kind(path) !== "solar-section"
-            && kind(path) !== "annual-solar");
+        || (key === "sun" && (kind(path)==="sun-position"
+            || kind(path)==="solar-path" || kind(path)==="light"));
 }
 
 function usesInnerScroll(path) {

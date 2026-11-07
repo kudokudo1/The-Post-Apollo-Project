@@ -171,6 +171,8 @@ Item {
                 draftHostEnabled: ApolloHubTodoStore.encryptedDraftHostEnabled
                 draftHostWriteAuthorized: ApolloHubTodoStore.encryptedDraftHostWriteAuthorized
                 editorStatus: recoveryStatus.draftReport.status
+                // M15d: exact M13s status-only booleans. No ID or plaintext.
+                editorSignals: recoveryStatus.editorSignals
             }
 
             Rectangle {

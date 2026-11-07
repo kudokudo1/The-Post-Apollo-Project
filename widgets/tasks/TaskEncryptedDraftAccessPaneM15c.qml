@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "TaskEncryptedDraftAccessPolicyM15c.js" as AccessPolicy
+import "TaskDraftTargetPolicyM15d.js" as DraftTargetPolicy
 
 // TASKS M15c // User-facing scopes & requirements, no consent/credential actor.
 // This component receives ONLY existing status/boolean metadata from M13q.
@@ -22,6 +23,12 @@ Column {
     property bool draftHostEnabled: false
     property bool draftHostWriteAuthorized: false
     property string editorStatus: "EDITOR STATUS // NOT VERIFIED"
+    // M15d: same bounded M13s booleans already shared with RECOVERY.
+    // No editor text, task ID, key, source path or credential enters here.
+    property var editorSignals: null
+    property string selectedDraftTarget: "none"
+    readonly property var draftSelection:
+        DraftTargetPolicy.view(editorSignals, selectedDraftTarget)
 
     property string selectedOperation: "capture"
     property bool requirementsChecked: false
@@ -155,6 +162,79 @@ Column {
                 font.pixelSize: 9
                 wrapMode: Text.WordWrap
             }
+        }
+    }
+
+    // M15d: an explicit in-memory target CHOICE, not draft capture.
+    // No plaintext or task identity is copied from either editor.
+    Column {
+        id: targetReview
+        visible: access.selectedOperation === "capture"
+        width: parent.width
+        height: visible ? implicitHeight : 0
+        spacing: 6
+
+        GohuText {
+            width: parent.width
+            text: "CHOOSE UNSAVED EDITOR // NO DATA CAPTURE"
+            color: Colors.magenta
+            font.pixelSize: 10
+            font.bold: true
+            wrapMode: Text.WordWrap
+        }
+        Row {
+            id: targetRail
+            width: parent.width
+            height: 30
+            spacing: 3
+            Repeater {
+                model: [
+                    {id:"none", label:"NONE"},
+                    {id:"entry", label:"NEW / RENAME"},
+                    {id:"details", label:"DETAILS"}
+                ]
+                delegate: ModeButton {
+                    required property var modelData
+                    width: Math.floor((targetRail.width - targetRail.spacing * 2) / 3)
+                    height: targetRail.height
+                    textOnly: true
+                    labelText: modelData.label
+                    labelFontSize: 9
+                    bordered: false
+                    selected: access.selectedDraftTarget === modelData.id
+                    interactive: modelData.id === "none"
+                        || (modelData.id === "entry" && access.draftSelection.entryAvailable)
+                        || (modelData.id === "details" && access.draftSelection.detailsAvailable)
+                    onTriggered: {
+                        access.selectedDraftTarget = modelData.id;
+                        access.requirementsChecked = false;
+                    }
+                }
+            }
+        }
+        GohuText {
+            width: parent.width
+            text: access.draftSelection.statusLabel
+            color: access.draftSelection.state === "ENTRY_SELECTED"
+                   || access.draftSelection.state === "DETAILS_SELECTED"
+                ? Colors.cyan : Colors.orange
+            font.pixelSize: 10
+            font.bold: true
+            wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
+            text: access.draftSelection.explanation
+            color: Colors.white
+            font.pixelSize: 9
+            wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
+            text: access.draftSelection.scopeLabel
+            color: Colors.yellow
+            font.pixelSize: 9
+            wrapMode: Text.WordWrap
         }
     }
 

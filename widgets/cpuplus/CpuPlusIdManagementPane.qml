@@ -2,8 +2,8 @@ import QtQuick
 import "../../components"
 import qs.services.social
 
-// Read-only CPU++ ID inspection, embedded in each existing fixed-size bay.
-// Never authorizes an organization, switches live provider accounts or writes.
+// CPU++ local-ID creation, inspection and guarded deletion in existing bays.
+// Does not handle authenticated identities, provider logins or permissions.
 Item {
     id: pane
     required property string area
@@ -16,6 +16,14 @@ Item {
     property bool creationPending: false
     property string creationMode: "default"
     property string creationFeedback: ""
+    property string removeArmedId: ""
+    property string removeArmedName: ""
+    property string pendingRemoveId: ""
+    property string removeFeedback: ""
+    onSelectedIdChanged: {
+        removeArmedId = "";
+        removeArmedName = "";
+    }
     readonly property bool editingText:
         area === "selector" ? newIdNameField.editingText
         : area === "details" ? detailEditor.editingText : false
@@ -49,10 +57,71 @@ Item {
         }
     }
 
+    function armRemove(id, name) {
+        if (!snapshot || !snapshot.writable || creatingId
+                || creationPending || pendingRemoveId !== "")
+            return;
+        idRequested(id); // Select for editing only; never activate a provider.
+        removeArmedId = id;
+        removeArmedName = name;
+        removeFeedback = "";
+    }
+
+    function cancelRemove() {
+        removeArmedId = "";
+        removeArmedName = "";
+        removeFeedback = "";
+    }
+
+    function requestRemove() {
+        if (!snapshot || !snapshot.writable || creatingId || creationPending
+                || pendingRemoveId !== "" || removeArmedId === "")
+            return;
+        const current = identities.find(function(item) {
+            return item.id === pane.removeArmedId && item.name === pane.removeArmedName;
+        });
+        if (!current || effectiveId !== removeArmedId) {
+            cancelRemove();
+            removeFeedback = "ID CHANGED // SELECT REMOVE AGAIN";
+            return;
+        }
+        if (SocialIdentityStore.removeIdentity(removeArmedId)) {
+            pendingRemoveId = removeArmedId;
+            removeFeedback = "REMOVING LOCAL ID...";
+        } else {
+            const code = SocialIdentityStore.identityActionError || "REMOVE NOT AVAILABLE";
+            removeFeedback = code === "UNLINK_ORGANIZATION_FIRST"
+                ? "UNLINK ORGANIZATION LINKS FIRST // SOCIAL ACCOUNT CENTER"
+                : code === "CLEAR_CONTACT_AND_ACCOUNT_NAMES_FIRST"
+                ? "CLEAR CONTACT AND ACCOUNT NAMES FIRST // THEN REMOVE"
+                : code === "LAST_ID_REQUIRED" ? "KEEP AT LEAST ONE LOCAL ID"
+                : code === "RELATED_DATA_UNAVAILABLE"
+                ? "RELATED DATA UNAVAILABLE // RELOAD BEFORE REMOVAL"
+                : "REMOVE BLOCKED // " + code;
+        }
+    }
+
     Connections {
         target: SocialIdentityStore
         function onStorageStateChanged() {
-            if (pane.area !== "selector" || !pane.creationPending)
+            if (pane.area !== "selector")
+                return;
+            if (pane.pendingRemoveId !== "") {
+                if (SocialIdentityStore.storageState === "ready") {
+                    pane.pendingRemoveId = "";
+                    pane.removeArmedId = "";
+                    pane.removeArmedName = "";
+                    pane.removeFeedback = "LOCAL ID REMOVED";
+                    pane.idRequested(""); // Inspect the remaining active ID.
+                } else if (SocialIdentityStore.storageState === "error"
+                           || SocialIdentityStore.storageState === "unsupported") {
+                    pane.pendingRemoveId = "";
+                    pane.removeFeedback = "REMOVE FAILED // "
+                        + (SocialIdentityStore.errorCode || "STORAGE ERROR");
+                }
+                return;
+            }
+            if (!pane.creationPending)
                 return;
             if (SocialIdentityStore.storageState === "ready") {
                 pane.creationPending = false;
@@ -160,18 +229,93 @@ Item {
                 }
                 Repeater {
                     model: pane.identities
-                    delegate: ActionButton {
+                    delegate: Row {
+                        id: idRow
                         required property var modelData
                         width: selectorSection.width
                         height: 39
-                        label: modelData.name
-                        labelPixelSize: 10
-                        labelElide: Text.ElideRight
-                        contentPadding: 5
-                        selected: pane.effectiveId === modelData.id
-                        accentColor: Colors.cyan
-                        onClicked: pane.idRequested(modelData.id)
+                        spacing: 4
+                        ActionButton {
+                            width: idRow.width - removeButton.width - idRow.spacing
+                            height: parent.height
+                            label: idRow.modelData.name
+                            labelPixelSize: 10
+                            labelElide: Text.ElideRight
+                            contentPadding: 5
+                            selected: pane.effectiveId === idRow.modelData.id
+                            accentColor: Colors.cyan
+                            onClicked: {
+                                pane.cancelRemove();
+                                pane.idRequested(idRow.modelData.id);
+                            }
+                        }
+                        ActionButton {
+                            id: removeButton
+                            width: 34
+                            height: parent.height
+                            label: "X"
+                            labelPixelSize: 11
+                            destructive: true
+                            accentColor: Colors.red
+                            interactive: pane.snapshot && pane.snapshot.writable
+                                         && pane.identities.length > 1
+                                         && !pane.creatingId && !pane.creationPending
+                                         && pane.pendingRemoveId === ""
+                            onClicked: pane.armRemove(idRow.modelData.id,
+                                                      idRow.modelData.name)
+                        }
                     }
+                }
+                Column {
+                    width: parent.width
+                    spacing: 7
+                    visible: pane.removeArmedId !== ""
+                    GohuText {
+                        width: parent.width
+                        text: "REMOVE ID // " + pane.removeArmedName
+                        color: Colors.red
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: "PERMANENTLY REMOVES THIS LOCAL LAYOUT. "
+                              + "IF ACTIVE, THE FIRST REMAINING ID BECOMES ACTIVE. "
+                              + "CLEAR CONTACTS, ACCOUNT NAMES AND ORGANIZATION LINKS FIRST."
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 34
+                        label: pane.pendingRemoveId !== "" ? "REMOVING..."
+                               : "CONFIRM REMOVE ID"
+                        labelPixelSize: 9
+                        destructive: true
+                        accentColor: Colors.red
+                        interactive: pane.snapshot && pane.snapshot.writable
+                                     && pane.pendingRemoveId === ""
+                                     && !pane.creationPending
+                        onClicked: pane.requestRemove()
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 29
+                        label: "CANCEL REMOVAL"
+                        labelPixelSize: 9
+                        accentColor: Colors.white
+                        interactive: pane.pendingRemoveId === ""
+                        onClicked: pane.cancelRemove()
+                    }
+                }
+                QuietText {
+                    width: parent.width
+                    visible: pane.removeFeedback !== ""
+                    text: pane.removeFeedback
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
                 }
                 ActionButton {
                     width: parent.width
@@ -187,6 +331,7 @@ Item {
                         pane.creatingId = !pane.creatingId;
                         pane.creationMode = "default";
                         pane.creationFeedback = "";
+                        pane.cancelRemove();
                         newIdNameField.text = "";
                     }
                 }

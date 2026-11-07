@@ -130,8 +130,8 @@ test("C13 ACTIVITY renders xray, flare and cycle in one non-scrolling instrument
  assert.match(terminal,/cycle\.refresh\(true\)/);
  assert.match(terminal,/flares\.refresh\(\)/);
  assert.match(terminal,/xray\.refresh\(\)/);
- assert.match(terminal,/NOAA SOLAR CYCLE \/\/ MONTHLY PREDICTION, NOT LIVE FLUX/);
- assert.match(terminal,/OBSERVED EVENT PEAKS, NOT ALERTS/);
+ assert.match(terminal,/SOLAR CYCLE \/\/ MONTHLY MODEL \+ RANGES \/\/ NOT LIVE/);
+ assert.match(terminal,/OBSERVED FLARES/);
  assert.doesNotMatch(terminal,/id: activityTabs\b|id: activityInstrument\b/);
  assert.doesNotMatch(terminal,/activityFocus===|cycleDetailPage|flareDetailPage|xraySourcePage/);
  assert.match(focus,/id: solarDetails\s*StationCosmosSunInstrumentPane\s*\{/);

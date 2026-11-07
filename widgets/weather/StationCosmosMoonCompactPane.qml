@@ -154,6 +154,21 @@ Rectangle {
         }
     }
 
+    // C23 // Restore the two-pixel cyan header divider used by COSMOS SUN.
+    // The 2px gap protects compact Moon disk and telemetry dimensions.
+    Rectangle {
+        id: moonHeaderDivider
+        objectName: "cosmos-c23-moon-overview-divider"
+        anchors.top: moonModeRail.bottom
+        anchors.topMargin: 2
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: moonPane.contentInset
+        anchors.rightMargin: moonPane.contentInset
+        height: 2
+        color: Colors.cyan
+    }
+
     // C20 // Instrument-first asymmetric board:
     // large MAGICK-derived Moon visual left; seven actual daily observations
     // and the USNO event ledger right. There is no dead provenance spacer.
@@ -162,7 +177,7 @@ Rectangle {
         objectName: "cosmos-c9-moon-hero-row"
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: moonModeRail.bottom
+        anchors.top: moonHeaderDivider.bottom
         anchors.bottom: parent.bottom
         anchors.leftMargin: moonPane.contentInset
         anchors.rightMargin: moonPane.contentInset

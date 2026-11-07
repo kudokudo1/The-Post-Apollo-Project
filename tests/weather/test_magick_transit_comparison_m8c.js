@@ -142,7 +142,9 @@ test("M8c is manual, source-bounded, privacy-preserving and keeps M8b paths",()=
     assert.match(ui,/transits\.relatedAspects\.forEach/);
     assert.match(ui,/natal\.planets\.forEach/);
     assert.match(ui,/transits\.comparison\.transit\.forEach/);
-    assert.match(ui,/onVisibleChanged: if\(!visible\)clearEntry\(\)/);
+    assert.match(ui,/onVisibleChanged: \{/);
+    assert.match(ui,/if\(!dateText\)dateText=Defaults\.utcDay\(\)/);
+    assert.match(ui,/else clearEntry\(\)/);
     assert.match(previous,/Chart\.validate\(chartData\)/);
     assert.match(service,/stdinEnabled: true/);
     assert.match(backend,/sys\.stdin\.readline\(2049\)/);

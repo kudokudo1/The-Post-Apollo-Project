@@ -50,7 +50,7 @@ Rectangle {
             {name:"SATURN",events:[]}
         ]
     readonly property bool sourceConfigured: {
-        if (kind === "solar-path")
+        if (kind === "solar-path" || kind === "sun-position")
             return !!skyFeed && /^\d{4}-\d{2}-\d{2}$/.test(civilDate)
                 && skyFeed.moonCivilOffsetMinutes !== null
                 && skyFeed.moonCivilOffsetMinutes !== undefined
@@ -79,7 +79,7 @@ Rectangle {
     readonly property string sourceStatus: {
         if (!Modes.usesSky(subjectRoute)) return "";
         if (!skyFeed) return "ASTRONOMY SOURCE HOST NOT LOADED";
-        if (kind === "solar-path")
+        if (kind === "solar-path" || kind === "sun-position")
             return sourceConfigured
                 ? (astronomy && astronomy.available
                    ? "SOLAR MODEL READY // WEATHER FORECAST ANCHOR"
@@ -180,7 +180,8 @@ Rectangle {
     // disabled, including the original SUVI Image network consumer.
     Loader {
         id: spaceSourceLoader
-        active: cosmosModePane.visible && cosmosModePane.kind === "solar-section"
+        active: cosmosModePane.visible && (cosmosModePane.kind === "solar-section"
+            || cosmosModePane.kind === "sun-live" || cosmosModePane.kind === "sun-activity")
         width: 1
         height: 1
         opacity: 0
@@ -303,7 +304,10 @@ Rectangle {
             id: instrumentLoader
             anchors.fill: parent
             active: cosmosModePane.visible
-            sourceComponent: cosmosModePane.kind === "annual-solar" ? solarYear
+            sourceComponent: cosmosModePane.kind === "sun-position"
+                || cosmosModePane.kind === "sun-live" || cosmosModePane.kind === "sun-activity"
+                    ? sunTerminalBoard
+                : cosmosModePane.kind === "annual-solar" ? solarYear
                 : cosmosModePane.kind === "solar-path" ? sunPath
                 : cosmosModePane.kind === "light" ? sunLight
                 : cosmosModePane.kind === "planet-clock" ? planetClock
@@ -317,7 +321,8 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
             width: Math.max(1,stage.width-32)
-            visible: (cosmosModePane.kind === "solar-path" || cosmosModePane.kind === "light")
+            visible: (cosmosModePane.kind === "solar-path"
+                || cosmosModePane.kind === "sun-position" || cosmosModePane.kind === "light")
                 && !cosmosModePane.sourceConfigured
             text: cosmosModePane.sourceStatus || "SOURCE WAITING"
             color: Colors.orange
@@ -337,7 +342,10 @@ Rectangle {
         QuietText {
             width: Math.max(0,footer.width
                 - 111 - (retrySource.visible ? 83 : 0))
-            text: cosmosModePane.kind === "annual-solar" ? "JPL // CALCULATE YEAR ON DEMAND"
+            text: cosmosModePane.kind === "sun-position" ? "LOCAL SUN // SOLAR ARC + TWILIGHT"
+                : cosmosModePane.kind === "sun-live" ? "NOAA // SUVI + XRS + FLARES"
+                : cosmosModePane.kind === "sun-activity" ? "NOAA // XRS + FLARES + CYCLE"
+                : cosmosModePane.kind === "annual-solar" ? "JPL // CALCULATE YEAR ON DEMAND"
                 : cosmosModePane.kind === "meteors" ? "IAU MDC // SCROLL MIDDLE ONLY"
                 : cosmosModePane.kind === "solar-section" ? "NOAA // ONE INSTRUMENT"
                 : "SOURCE-BACKED // FOCUSED VIEW"
@@ -372,6 +380,18 @@ Rectangle {
             labelPixelSize: 8
             accentColor: Colors.yellow
             onClicked: cosmosModePane.routeRequested(Modes.fullRoute(cosmosModePane.subjectRoute))
+        }
+    }
+
+    Component {
+        id: sunTerminalBoard
+        StationCosmosSunTerminalPane {
+            terminalMode: cosmosModePane.kind === "sun-position" ? "position"
+                : cosmosModePane.kind === "sun-activity" ? "activity" : "live"
+            weatherService: cosmosModePane.weatherService
+            spaceService: cosmosModePane.spaceService
+            skyFeed: cosmosModePane.skyFeed
+            sourceSpace: cosmosModePane.spaceFeed
         }
     }
 

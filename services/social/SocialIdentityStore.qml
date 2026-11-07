@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "SocialIdentityPolicy.js" as IdentityPolicy
+import qs.services.social
 
 // Single writer for Social identity ORGANIZATION metadata. Sessions, browser
 // profiles, QR pairing, secret storage and live account switching stay separate.
@@ -84,6 +85,37 @@ Scope {
     function renameIdentity(id, name) {
         return applyIdentityAction(IdentityPolicy.renameIdentity(
             document, id, name));
+    }
+
+    // No compulsory backup/archive. Refuse removal while other local stores
+    // still reference the stable identity key, instead of orphaning data.
+    // This removes only a Social layout ID, never a provider login.
+    function removeIdentity(id) {
+        const result = IdentityPolicy.removeIdentity(document, id);
+        if (!result.ok)
+            return applyIdentityAction(result);
+        if (storageState !== "ready") {
+            identityActionError = "STORAGE_UNAVAILABLE";
+            return false;
+        }
+        if (SocialAccountDetailsStore.state !== "ready"
+                || SocialOrganizationLinksStore.state !== "ready") {
+            identityActionError = "RELATED_DATA_UNAVAILABLE";
+            return false;
+        }
+        const linked = SocialOrganizationLinksStore.saved.links.some(function(link) {
+            return link.identityId === id;
+        });
+        if (linked) {
+            identityActionError = "UNLINK_ORGANIZATION_FIRST";
+            return false;
+        }
+        const saved = SocialAccountDetailsStore.saved.identities;
+        if (Object.prototype.hasOwnProperty.call(saved, id)) {
+            identityActionError = "CLEAR_CONTACT_AND_ACCOUNT_NAMES_FIRST";
+            return false;
+        }
+        return applyIdentityAction(result);
     }
 
     // A UI layout preference only. The running service, native adapter and

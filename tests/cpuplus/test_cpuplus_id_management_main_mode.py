@@ -61,7 +61,7 @@ class CpuPlusIdManagementMainModeContracts(unittest.TestCase):
     def test_local_id_editor_uses_owner_stores_without_host_actions(self):
         for snippet in ("SocialIdentityStore.snapshot",
                         "SocialAccountDetailsStore.recordFor(",
-                        "idRequested(modelData.id)",
+                        "idRequested(idRow.modelData.id)",
                         "SocialIdentityStore.createIdentity(",
                         "CpuPlusIdDetailsEditor {",
                         "NEW ID SAVED // LOCAL",

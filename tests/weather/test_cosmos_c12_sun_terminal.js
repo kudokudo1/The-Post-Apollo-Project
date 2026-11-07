@@ -15,6 +15,7 @@ const nav=policy("widgets/weather/StationSubjectNavigationPolicy.js");
 const focus=read("widgets/weather/StationCosmosModesPane.qml");
 const terminal=read("widgets/weather/StationCosmosSunTerminalPane.qml");
 const old=read("widgets/weather/StationCosmosSunInstrumentPane.qml");
+const viewportMath=policy("widgets/weather/StationSolarImageViewportPolicy.js");
 
 test("C12 primary SUN rail has four composite destinations while old routes still work",()=>{
  const expected=[
@@ -168,4 +169,55 @@ test("C15 OBSERVATION distinguishes live class, source-backed meters, daylight a
  assert.match(terminal,/highlights:/);
  assert.doesNotMatch(terminal,/model: observation\.liveReadings/);
  assert.doesNotMatch(terminal,/Flickable\s*\{|ScrollView\s*\{/);
+});
+
+test("C16 twilight is a four-row single-line ledger, not a compact 2x2 grid",()=>{
+ assert.match(terminal,/objectName: "cosmos-c15-twilight-groups"/);
+ assert.match(terminal,/objectName: "cosmos-c16-twilight-single-row"/);
+ assert.match(terminal,/objectName: "cosmos-c16-twilight-one-line-time"/);
+ assert.match(terminal,/model: observation\.highlights/);
+ for (const label of ["BLUE AM","GOLD AM","GOLD PM","BLUE PM"])
+   assert.ok(terminal.includes('name:"'+label+'"'),label);
+ assert.match(terminal,/shownRows: twilightRows\.count/);
+ assert.match(terminal,/text: modelData\.value/);
+ assert.match(terminal,/horizontalAlignment: Text\.AlignRight/);
+ const singleLine=terminal.slice(terminal.indexOf('id: twilightGroups'),
+    terminal.indexOf('    // ACTIVITY'));
+ assert.doesNotMatch(singleLine,/columns: 2/);
+ assert.ok((singleLine.match(/wrapMode: Text\.NoWrap/g)||[]).length>=2);
+});
+
+test("C16 SUVI zoom is opt-in for OBSERVATION, bounded, panable and resettable",()=>{
+ assert.match(terminal,/objectName: "cosmos-c14-suvi-hero"[\s\S]*?imageInteractive: true/);
+ assert.doesNotMatch(terminal,/objectName: "cosmos-c12-suvi-hero"[\s\S]*?imageInteractive: true[\s\S]*?objectName: "cosmos-c12-live-telemetry"/);
+ for(const token of ["cosmos-c16-suvi-viewport","cosmos-c16-suvi-pan-input",
+    "cosmos-c16-suvi-zoom-controls","cosmos-c16-suvi-expand",
+    "onWheel: (wheel)","onPositionChanged: (mouse)",
+    "function panBy(dx,dy)","function zoomAt(factor,focusX,focusY)",
+    "function resetZoom()","source: solarFocus.sourceSpace"])
+   assert.ok(old.includes(token),token);
+ assert.match(old,/property bool imageInteractive: false/);
+ assert.match(old,/visible: solarFocus\.imageInteractive/);
+ assert.match(old,/solarFocus\.imageExpanded = !solarFocus\.imageExpanded/);
+ assert.match(old,/onSourceChanged: solarFocus\.resetSuviView\(\)/);
+ assert.match(old,/width: solarFocus\.imageInteractive && solarFocus\.imageExpanded/);
+ assert.match(old,/ImageViewportPolicy\.clampPan/);
+ assert.match(old,/ImageViewportPolicy\.zoomAt/);
+ assert.doesNotMatch(old,/Process\s*\{|XMLHttpRequest|new WebSocket|Flickable\s*\{|ScrollView\s*\{/);
+});
+
+test("C16 image math clamps zoom/pan and keeps the zoom cursor fixed",()=>{
+ assert.equal(viewportMath.zoom(-4),1);
+ assert.equal(viewportMath.zoom(1),1);
+ assert.equal(viewportMath.zoom(99),5);
+ const fit=viewportMath.clampPan(1,300,-300,120,120,120,120);
+ assert.equal(fit.x,0); assert.equal(fit.y,0);
+ const bounded=viewportMath.clampPan(2,300,-300,120,120,120,120);
+ assert.equal(bounded.x,60); assert.equal(bounded.y,-60);
+ const left=viewportMath.zoomAt(1,2,0,0,30,60,120,120,120,120);
+ assert.equal(left.zoom,2); assert.equal(left.x,30); assert.equal(left.y,0);
+ const letterbox=viewportMath.clampPan(2,150,150,220,120,120,120);
+ assert.equal(letterbox.x,10); assert.equal(letterbox.y,60);
+ const out=viewportMath.zoomAt(5,2,0,0,60,60,120,120,120,120);
+ assert.equal(out.zoom,5);
 });

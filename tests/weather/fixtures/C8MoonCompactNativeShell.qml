@@ -173,10 +173,9 @@ ShellRoot {
                     || !dividerAt || headerDivider.height!==2
                     || dividerAt.x<inset
                     || dividerAt.x+headerDivider.width>moon.width-inset+1
-                    || dividerAt.y<railAt.y+rail.height+1
-                    || dividerAt.y>railAt.y+rail.height+3
+                    || dividerAt.y!==railAt.y+rail.height+5
                     || phaseAt.x<inset
-                    || phaseAt.y<dividerAt.y+headerDivider.height-1
+                    || phaseAt.y!==dividerAt.y+headerDivider.height+3
                     || phaseAt.x+phase.width>moon.width-inset+1
                     || positionAt.x<inset
                     || provenanceAt.x<inset

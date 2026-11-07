@@ -661,7 +661,7 @@ Item {
                 }
                 GohuText {
                     width: parent.width
-                    text: "Room and Patient are pinned. Choose only existing records below. No attach command is exposed."
+                    text: "Room and Patient are pinned. Selecting candidates is read-only; registration needs REVIEW and CONFIRM ATTACH."
                     font.pixelSize: 9
                     color: Colors.blue
                     wrapMode: Text.Wrap
@@ -964,7 +964,7 @@ Item {
                         anchors.fill: parent
                         anchors.margins: 7
                         text: root.attachmentPreview.reviewable
-                            ? "PREVIEW CONSISTENT // NO ATTACHMENT MADE. Operator approval and atomic PX preflight required."
+                            ? "PREVIEW CONSISTENT // NOTHING SENT UNTIL CONFIRM ATTACH. PX rechecks current records."
                             : "BLOCKED // NOTHING CHANGED. Resolve listed issues; no connection or registration attempted."
                         color: Colors.orange
                         font.pixelSize: 9
@@ -1112,7 +1112,7 @@ Item {
         GohuText {
             anchors.fill: parent
             anchors.margins: 7
-            text: "PX ONLY // Not a browser ChatGPT tab. Attachment registers a Session only; provider launch and role authority remain separate."
+            text: "PX ONLY // Not a ChatGPT browser tab. CHAT is read-only. CONFIRM registers an IDLE Session; no AI launch or authority."
             font.pixelSize: 9
             color: Colors.cyan
             wrapMode: Text.Wrap

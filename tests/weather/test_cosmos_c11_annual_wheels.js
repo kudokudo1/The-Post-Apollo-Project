@@ -103,3 +103,16 @@ test("C19 COSMOS year and INDEX forecast offer two full-width main Moon modes",(
  assert.match(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/year"\)/);
  assert.doesNotMatch(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/forecast"\)/);
 });
+
+test("C23 MOON year and INDEX forecast reuse the cyan header divider without moving SUN",()=>{
+ assert.match(host,/id: moonHeaderDivider[\s\S]*?objectName: "cosmos-c23-moon-year-divider"/);
+ assert.match(host,/id: moonHeaderDivider[\s\S]*?visible: annualFocus\.isMoon/);
+ assert.match(host,/anchors\.top: lunarModeRail\.bottom/);
+ assert.match(host,/anchors\.topMargin: visible \? 2 : 0/);
+ assert.match(host,/height: visible \? 2 : 0\s*color: Colors\.cyan/);
+ assert.match(host,/anchors\.top: moonHeaderDivider\.bottom/);
+ assert.match(host,/anchors\.topMargin: 0/);
+ // The original YEAR child began 4px after modeRail. 2px gap +
+ // 2px line preserves that exact stage Y coordinate.
+ assert.doesNotMatch(host,/anchors\.topMargin: annualFocus\.isMoon \? 4 : 0/);
+});

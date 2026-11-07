@@ -60,6 +60,12 @@ case "$phase" in
       die "RPM contains scriptlets"
     [[ -z "$(rpm -qp --triggers c3d-status.rpm)" ]] ||
       die "RPM contains triggers"
+    expected_files="$(printf '%s\n' "$host" "$unitpath" "$buspolicy" | sort)"
+    observed_files="$(rpm -qpl c3d-status.rpm | sort)" ||
+      die "RPM payload file listing failed"
+    [[ "$observed_files" == "$expected_files" ]] ||
+      die "unexpected or missing signed RPM payload path"
+    echo "C3D_PASS // SIGNED_RPM_PAYLOAD_PATH_ALLOWLIST"
     # Refuse unknown signing identities until the test public key is imported.
     before="$(rpmkeys --checksig -v c3d-status.rpm 2>&1)" || true
     echo "$before" | grep -Eiq 'NOKEY|NOTTRUSTED|MISSING' ||

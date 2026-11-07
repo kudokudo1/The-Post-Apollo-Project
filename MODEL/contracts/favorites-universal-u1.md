@@ -18,7 +18,7 @@ Schema: post-apollo.favorites.default.v1
 
 Fields: schema, version=1, revision, favorites, pins.
 
-Each favorites/pins entry is only a U0 canonical local key: fav1:local:provider:kind:percent-encoded-resourceId. The file does not retain labels, live measurements, URLs, credentials, account data, executable actions, or source snapshots.
+Each favorites/pins entry is a U0 canonical local key: fav1:local:provider:kind:percent-encoded-resourceId. The store adds no separate labels, measurements, URLs, credentials, account records, executable actions, or source snapshots. **A resourceId is still serialized verbatim (percent-encoded), so a provider must not construct it from secrets, tokens, private content, raw sensitive URLs or commands. Prefer opaque, non-secret, stable identifiers.**
 Maximums: 2048 favorite keys, 512 pin keys, 8192 characters per serialized key, 1,048,576 characters per document.
 Unsupported versions, extra document fields, noncanonical keys, reserved providers, duplicates, and invalid data block writes until reviewed.
 Unfavoriting does not remove an independent pin; no implicit semantic relationship or safety protection is created.

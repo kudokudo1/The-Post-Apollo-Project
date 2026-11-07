@@ -68,6 +68,22 @@ if [[ -v C3D_SERVICE_RPM_DIR && -n "$C3D_SERVICE_RPM_DIR" ]]; then
     "c3d-guest-gate.sh"
   echo "C3D_STAGED // PUBLIC_TEST_RPM_AND_KEY_ONLY"
 fi
+# C3e-B passes an approved digest through a separate CI input after the
+# root-signed release admission has succeeded. Never derive this from the
+# guest's candidate key or unsigned manifest.
+c3eb_requested=0
+if [[ -v C3EB_APPROVED_SHA256 ]]; then
+  [[ "$c3d_requested" == 1 &&
+     "$C3EB_APPROVED_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
+    echo "C3EB_BLOCKED // APPROVED_DIGEST_OR_C3D_MISSING"
+    exit 2
+  }
+  c3eb_requested=1
+  printf '%s  c3d-status.rpm\n' "$C3EB_APPROVED_SHA256" \
+    > "$tmp/c3eb-approved.sha256"
+  add_file "$tmp/c3eb-approved.sha256" "c3eb-approved.sha256"
+  echo "C3EB_STAGED // ROOT_ADMITTED_RPM_DIGEST_SEPARATE_FROM_CANDIDATE"
+fi
 cat >> "$tmp/user-data" <<'EOF'
 runcmd:
   - ["/usr/bin/bash", "-lc", "/usr/bin/bash /root/c2q/guest_status_smoke.sh >/var/tmp/c2r-guest-output.log 2>&1; rc=$?; tail -n 110 /var/tmp/c2r-guest-output.log >/dev/ttyS0 2>&1 || true; echo C2R_VM_GUEST_SCRIPT_EXIT_CODE=$rc >/dev/ttyS0; if [ $rc -eq 0 ]; then echo C2R_VM_PASS >/dev/ttyS0; else echo C2R_VM_FAIL >/dev/ttyS0; fi; exit $rc"]
@@ -93,7 +109,7 @@ for i in $(seq 1 210); do
   if ! kill -0 "$vm_pid" 2>/dev/null; then result=VM_EXITED; break; fi
   sleep 2
 done
-grep -a -E 'C2R_|C3B_|C3D_|cloud-init.*(Error|FAIL)' "$tmp/serial.log" 2>/dev/null \
+grep -a -E 'C2R_|C3B_|C3D_|C3EB_|cloud-init.*(Error|FAIL)' "$tmp/serial.log" 2>/dev/null \
   | tail -n 75 || true
 # The C3b guest proof is mandatory, never inferred from C2r's older success.
 if [[ "$result" == PASS ]] && \
@@ -103,6 +119,10 @@ fi
 if [[ "$result" == PASS && "$c3d_requested" == 1 ]] && \
     ! grep -a -Fq 'C3D_PASS // SIGNED_FAKE_SERVICE_ERASE_AND_TEST_KEY_CLEANUP' "$tmp/serial.log"; then
   result=C3D_PROVENANCE_EVIDENCE_MISSING
+fi
+if [[ "$result" == PASS && "$c3eb_requested" == 1 ]] && \
+    ! grep -a -Fq 'C3EB_PASS // GUEST_RPM_DIGEST_MATCHES_ROOT_ADMITTED_BYTES' "$tmp/serial.log"; then
+  result=C3EB_GUEST_ADMISSION_EVIDENCE_MISSING
 fi
 if [[ "$result" != PASS ]]; then
   echo "C2R_BLOCKED // GUEST_RESULT=$result"

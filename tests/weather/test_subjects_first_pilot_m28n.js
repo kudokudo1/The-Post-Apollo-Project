@@ -53,6 +53,9 @@ test("one original data-owner family remains and all native panes are mounted",(
 test("source migration is not equivalent to enabling unsafe video or workstation acceptance",()=>{
   assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
   assert.match(read("widgets/weather/StationChannelScreen.qml"),/readonly property bool playbackAvailable: false/);
-  assert.match(station,/implicitWidth: menuOpen \? 1000 : 0/);
-  assert.match(station,/implicitHeight: menuOpen \? 700 : 0/);
+  assert.match(station,/implicitWidth: menuOpen \? frameWidth : 0/);
+  assert.match(station,/implicitHeight: menuOpen \? frameHeight : 0/);
+  assert.match(station,/property string chassisLevel: "compact"/);
+  assert.match(station,/ChassisSize\.step\(chassisLevel, 1\)/);
+  assert.match(station,/ChassisSize\.step\(chassisLevel, -1\)/);
 });

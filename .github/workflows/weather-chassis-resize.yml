@@ -1,0 +1,26 @@
+name: Weather Station manual four-size chassis
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'widgets/weather/StationChassisSizePolicy.js'
+      - 'tests/weather/test_weather_chassis_resize.js'
+      - '.github/workflows/weather-chassis-resize.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-and-terminal-geometry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify four size steps and existing terminal geometry contracts
+        run: |
+          node --test \
+            tests/weather/test_weather_chassis_resize.js \
+            tests/weather/test_station_terminal_geometry.js \
+            tests/weather/test_tools_terminal_cutover_m28c.js

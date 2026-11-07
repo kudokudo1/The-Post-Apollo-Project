@@ -10,6 +10,7 @@ import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
 import "StationSubjectSourceBadgePolicy.js" as SubjectSourceBadge
 import "StationSubjectDefaultPolicy.js" as SubjectDefaultPolicy
 import "StationMediaViewportPolicy.js" as ViewportPolicy
+import "StationChassisSizePolicy.js" as ChassisSize
 import "StationProviderDiagnosticsPolicy.js" as ProviderDiagnostics
 import "StationMagickSubjectPanelPolicy.js" as MagickPanelPolicy
 import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
@@ -107,6 +108,30 @@ PanelWindow {
     signal keyboardOwnershipRequested()
 
     property bool menuOpen: false
+    // Exactly four manual sizes, following TASKS/Finance. Retain the same
+    // mapped Weather window, data owners, route and terminal session.
+    property string chassisLevel: "compact"
+    readonly property int chassisTopInset: 9
+    readonly property int chassisBottomGap: 8
+    readonly property int chassisRightMargin:
+        chassisLevel === "fullscreen" ? 0 : 20
+    readonly property var chassisFrame: ChassisSize.frame(
+        chassisLevel,
+        weatherStation.screen && weatherStation.screen.width > 0
+            ? weatherStation.screen.width : 2560,
+        weatherStation.screen && weatherStation.screen.height > 0
+            ? weatherStation.screen.height : 1440,
+        chassisTopInset, chassisBottomGap, chassisRightMargin)
+    readonly property int frameWidth: chassisFrame.width
+    readonly property int frameHeight: chassisFrame.height
+
+    function expandChassis() {
+        chassisLevel = ChassisSize.step(chassisLevel, 1);
+    }
+    function collapseChassis() {
+        chassisLevel = ChassisSize.step(chassisLevel, -1);
+    }
+
     // SUBJECTS is the only presentation; the collapsed host unloads it.
     property bool providerDiagnosticsOpen: false
     onMenuOpenChanged: {
@@ -131,7 +156,7 @@ PanelWindow {
 
     // M31 // Sole SUBJECTS/MEDIA player rectangle for the native Stage
     // Director WATCH v2 client. Coordinates are relative to the original
-    // 1000x700 Weather chassis, not to a screen or native wl_surface.
+    // current Weather chassis, not to a screen or native wl_surface.
     // This is READ-ONLY and grants no browser, scene, input or popup rights.
     readonly property rect activeSubjectPlayerViewportRect: {
         const owner = ViewportPolicy.owner(
@@ -460,9 +485,9 @@ PanelWindow {
         onTriggered: weatherStation.sourceStatusClock++
     }
 
-    implicitWidth: menuOpen ? 1000 : 0
+    implicitWidth: menuOpen ? frameWidth : 0
 
-    implicitHeight: menuOpen ? 700 : 0
+    implicitHeight: menuOpen ? frameHeight : 0
 
     visible: true
     color: "transparent"
@@ -501,20 +526,20 @@ PanelWindow {
     }
 
     // Match the 9px visible top line of FinanceW, TasksW and TimeW.
-    // No weather station resizing or internal position changes.
+    // Only the operator's arrows change size; geometry follows the output.
     margins {
-        top: 9
+        top: chassisTopInset
         bottom: 0
-        right: 20
+        right: chassisRightMargin
         left: 0
     }
 
     // Mouse can still pass through the Star Map
     // display area while Kitty is visible.
     mask: Region {
-        width: weatherStation.menuOpen ? 1000 : 0
+        width: weatherStation.menuOpen ? weatherStation.frameWidth : 0
 
-        height: weatherStation.menuOpen ? 700 : 0
+        height: weatherStation.menuOpen ? weatherStation.frameHeight : 0
 
         Region {
             x: weatherStation.terminalHoleX
@@ -766,8 +791,8 @@ PanelWindow {
     WindowPanelFrame {
         id: stationBackground
 
-        width: 1000
-        height: 700
+        width: weatherStation.frameWidth
+        height: weatherStation.frameHeight
 
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -930,6 +955,30 @@ PanelWindow {
                     onLeftClicked:
                         weatherStation.providerDiagnosticsOpen =
                             !weatherStation.providerDiagnosticsOpen
+                }
+
+                // Reused TASKS/Finance size controls; no automatic changes.
+                ActionButton {
+                    id: collapseChassisButton
+                    width: 30
+                    height: 30
+                    label: "↓"
+                    labelPixelSize: 17
+                    accentColor: Colors.cyan
+                    available: weatherStation.menuOpen
+                               && weatherStation.chassisLevel !== "compact"
+                    onLeftClicked: weatherStation.collapseChassis()
+                }
+                ActionButton {
+                    id: expandChassisButton
+                    width: 30
+                    height: 30
+                    label: "↑"
+                    labelPixelSize: 17
+                    accentColor: Colors.magenta
+                    available: weatherStation.menuOpen
+                               && weatherStation.chassisLevel !== "fullscreen"
+                    onLeftClicked: weatherStation.expandChassis()
                 }
 
                 // Live source badge, matching the Git/Finance header grammar.
@@ -1130,7 +1179,7 @@ PanelWindow {
                 targetScreen: weatherStation.screen
                 stationWidth: stationBackground.width
                 stationHeight: stationBackground.height
-                stationRightMargin: 20
+                stationRightMargin: weatherStation.chassisRightMargin
                 stationBottomMargin: 90
                 stationHeaderHeight: header.height
                 stationRailWidth: modeRail.width

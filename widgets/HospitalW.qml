@@ -2982,11 +2982,21 @@ PanelWindow {
             : rosterData.hasActiveSession ? Colors.cyan : Colors.magenta
 
         width: roomsColumn.width
-        height: 82
+        height: 103
         color: Colors.dark
         border.width: selected ? 2 : 1
         border.color: selected ? Colors.orange : Colors.magenta
         clip: true
+
+        // The row selection is still Git/Patient guarded; the EDIT
+        // button is a separate, operator-controlled PX identity action.
+        MouseArea {
+            anchors.fill: parent
+            enabled: rosterRow.linkedIndex >= 0
+            hoverEnabled: true
+            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: root.selectRoomIndex(rosterRow.linkedIndex)
+        }
 
         Column {
             anchors.fill: parent
@@ -3027,31 +3037,66 @@ PanelWindow {
             GohuText {
                 width: parent.width
                 text: "ASSIGNMENT // "
-                    + String(rosterRow.rosterData.assignmentId || "NONE")
-                    + "  //  PATIENT // "
-                    + String(rosterRow.rosterData.patientLabel
-                        || rosterRow.rosterData.repository || "UNKNOWN")
+                    + (String(rosterRow.rosterData.assignmentTitle || "").trim()
+                       || (rosterRow.rosterData.assignmentId
+                           ? "#" + String(rosterRow.rosterData.assignmentId)
+                           : "NONE"))
+                    + (rosterRow.rosterData.assignmentTitle
+                       && rosterRow.rosterData.assignmentId
+                       ? "  [#" + String(rosterRow.rosterData.assignmentId) + "]"
+                       : "")
                 font.pixelSize: 9
                 color: Colors.white
                 elide: Text.ElideRight
             }
             GohuText {
                 width: parent.width
+                text: "PATIENT // "
+                    + String(rosterRow.rosterData.patientLabel
+                        || rosterRow.rosterData.repository || "UNKNOWN")
+                font.pixelSize: 9
+                color: Colors.blue
+                elide: Text.ElideRight
+            }
+            GohuText {
+                width: parent.width - 92
                 text: rosterRow.linkedIndex >= 0
-                    ? "REGISTERED PX ROOM // CLICK TO SELECT"
-                    : "REGISTERED PX ROOM // OTHER FLOOR OR NO GIT MATCH"
+                    ? "PX ROOM // CLICK TO SELECT"
+                    : "PX ROOM // OTHER FLOOR OR NO GIT MATCH"
                 font.pixelSize: 8
                 color: rosterRow.linkedIndex >= 0 ? Colors.green : Colors.blue
                 elide: Text.ElideRight
             }
         }
 
-        MouseArea {
-            anchors.fill: parent
-            enabled: rosterRow.linkedIndex >= 0
-            hoverEnabled: true
-            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onClicked: root.selectRoomIndex(rosterRow.linkedIndex)
+        Rectangle {
+            id: rosterEditButton
+            z: 2
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.rightMargin: 8
+            anchors.bottomMargin: 7
+            width: 78
+            height: 22
+            color: rosterEditMouse.pressed ? Colors.orange : Colors.black
+            border.width: 1
+            border.color: Colors.cyan
+            opacity: roomNameService.saving || doctorService.saving ? 0.45 : 1
+
+            GohuText {
+                anchors.centerIn: parent
+                text: "EDIT NAME"
+                font.pixelSize: 8
+                color: rosterEditMouse.pressed ? Colors.black : Colors.cyan
+            }
+            MouseArea {
+                id: rosterEditMouse
+                anchors.fill: parent
+                enabled: !roomNameService.saving && !doctorService.saving
+                hoverEnabled: true
+                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onClicked: root.openRosterIdentityEditor(rosterRow.rosterData)
+            }
         }
     }
 
@@ -5941,6 +5986,162 @@ PanelWindow {
 
             }
         }
+        // Only the WORKERS list exposes this operator-facing editor.
+        // No session turn or mutation of technical Room identity is possible.
+        Rectangle {
+            id: rosterNameEditor
+            z: 850
+            visible: !root.operationsOpen && root.rosterEditingRoomId.length > 0
+            anchors.fill: hospitalScroll
+            color: Colors.dark
+            border.width: 2
+            border.color: Colors.magenta
+            clip: true
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 6
+
+                Row {
+                    width: parent.width
+                    height: 26
+                    spacing: 8
+                    SectionLabel {
+                        width: parent.width - 85
+                        text: "WORKFORCE // EDIT DISPLAY NAMES"
+                        elide: Text.ElideRight
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    HospitalActionButton {
+                        height: 24
+                        width: 74
+                        label: "CLOSE"
+                        compactIcon: "X"
+                        accent: Colors.red
+                        enabledAction: !roomNameService.saving && !doctorService.saving
+                        onTriggered: root.closeRosterIdentityEditor()
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    height: 14
+                    text: "ROOM ID // " + root.rosterEditingRoomId
+                        + "  //  TECHNICAL ID UNCHANGED"
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                    elide: Text.ElideMiddle
+                }
+
+                Row {
+                    width: parent.width
+                    height: 28
+                    spacing: 8
+                    MetaLabel {
+                        width: 88
+                        text: "ROOM NAME"
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Rectangle {
+                        width: parent.width - 96
+                        height: parent.height
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.magenta
+                        TextInput {
+                            id: rosterRoomNameField
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            font.family: "GohuFont 11 Nerd Font Mono"
+                            font.pixelSize: 11
+                            color: Colors.white
+                            selectionColor: Colors.magenta
+                            selectByMouse: true
+                            maximumLength: 96
+                            verticalAlignment: TextInput.AlignVCenter
+                            clip: true
+                        }
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    height: 28
+                    spacing: 8
+                    MetaLabel {
+                        width: 88
+                        text: "DOCTOR NAME"
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Rectangle {
+                        width: parent.width - 96
+                        height: parent.height
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.cyan
+                        opacity: root.rosterEditingDoctorId ? 1 : 0.4
+                        TextInput {
+                            id: rosterDoctorNameField
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            font.family: "GohuFont 11 Nerd Font Mono"
+                            font.pixelSize: 11
+                            color: Colors.white
+                            selectionColor: Colors.magenta
+                            selectByMouse: true
+                            maximumLength: 96
+                            enabled: !!root.rosterEditingDoctorId
+                            verticalAlignment: TextInput.AlignVCenter
+                            clip: true
+                        }
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 8
+                    HospitalActionButton {
+                        width: (parent.width - 8) / 2
+                        height: 28
+                        compactIcon: "✓"
+                        label: roomNameService.saving ? "SAVING ROOM" : "SAVE ROOM"
+                        accent: Colors.green
+                        enabledAction: !roomNameService.saving && !doctorService.saving
+                        onTriggered: root.saveRosterRoomName()
+                    }
+                    HospitalActionButton {
+                        width: (parent.width - 8) / 2
+                        height: 28
+                        compactIcon: "✓"
+                        label: doctorService.saving ? "SAVING DOCTOR" : "SAVE DOCTOR"
+                        accent: Colors.cyan
+                        enabledAction: !!root.rosterEditingDoctorId
+                            && !roomNameService.saving && !doctorService.saving
+                        onTriggered: root.saveRosterDoctorName()
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    height: 36
+                    text: roomNameService.lastError
+                        || doctorService.lastError
+                        || root.rosterIdentityMessage
+                        || "EMPTY ROOM NAME RESETS TO TECHNICAL LABEL // NO ID OR ROLE CHANGES"
+                    font.pixelSize: 9
+                    color: roomNameService.lastError || doctorService.lastError
+                        ? Colors.red : Colors.orange
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 3
+                    elide: Text.ElideRight
+                }
+            }
+        }
+
         NeonScrollBar {
             flickable: hospitalScroll
             handleStyle: "star"

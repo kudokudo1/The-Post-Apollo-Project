@@ -13,6 +13,8 @@ trap 'rc=$?; if [[ "$rc" -ne 0 ]]; then echo "C2V_FAIL // SCRIPT_EXIT_$rc line $
 stagefile=/var/lib/c2v-transaction-stage
 pkg=postapollo-connections-c2t-fixture
 data=/mnt/c2v-offline
+c4a_mode=/var/lib/c4a-signed-service-test
+c4a_gate=/var/lib/c4a-guest-signed-status-gate.sh
 echo "C2V_GUEST_BOOT // $(cat /etc/fedora-release) kernel=$(uname -r)"
 [[ -e /run/ostree-booted ]] || failure "NOT_BOOTED_OSTREE"
 [[ "$(getenforce)" == Enforcing ]] || failure "SELINUX_NOT_ENFORCING"
@@ -46,6 +48,16 @@ case "$stage" in
       failure "OFFLINE_ARTIFACTS_MISSING"
     ( cd "$data" && sha256sum --check --status c2t-artifact-manifest.sha256 ) ||
       failure "SIGNED_TEST_ARTIFACT_CHECKSUM"
+    # Explicit C4a-only signed fake host; never enters the normal C2v test.
+    if [[ -f "$data/c4a-opt-in.marker" ]]; then
+      [[ -s "$data/c4a-guest-signed-status-gate.sh" ]] ||
+        failure "C4A_GUEST_GATE_MISSING"
+      install -m 0700 "$data/c4a-guest-signed-status-gate.sh" "$c4a_gate"
+      /usr/bin/bash "$c4a_gate" prelayer ||
+        failure "C4A_SIGNED_STATUS_PRELAYER_VERIFICATION_FAILED"
+      printf '%s\n' signed-test-only > "$c4a_mode"
+      echo "C4A_PASS // EXPLICIT_SILVERBLUE_SIGNED_SERVICE_MODE_ACCEPTED"
+    fi
     echo "C2V_PASS // REAL_SILVERBLUE_FIRST_BOOT_BASELINE"
     echo staged > "$stagefile"
     # No guest network exists. Fedora's standard repos point to a metalink,
@@ -226,7 +238,7 @@ for attempt in $(seq 1 50); do
   if timeout --signal=TERM --kill-after=5s 12s rpm-ostree status --json > "$staged_json" 2>/dev/null; then
     echo "C2V_MONITOR_STATUS_QUERY_OK // attempt=$attempt bytes=$(wc -c < "$staged_json")"
     if python3 - "$staged_json" "$pkg" <<'C2V_PENDING_CHECK'
-import json,sys
+import json,sys,os
 with open(sys.argv[1],encoding="utf-8") as fp:
     status=json.load(fp)
 ds=status.get("deployments") or []
@@ -237,6 +249,22 @@ pending=bool(d.get("staged") or d.get("pending")) or d.get("booted") is False
 package_refs=json.dumps({"requested-local-packages":d.get("requested-local-packages",[]),"packages":d.get("packages",[])})
 if not (pending and sys.argv[2] in package_refs):
     sys.exit(1)
+# C4a requires BOTH exact signed-test NEVRAs as LOCAL requested layers,
+# never substring matches in unrelated package names or JSON fields.
+if os.path.isfile("/var/lib/c4a-signed-service-test"):
+    import re
+    local_refs=d.get("requested-local-packages") or []
+    expected=(
+        "postapollo-connections-c2t-fixture-0.1-1.fc44.noarch",
+        "postapollo-connections-c3d-ci-status-0.1-1.fc44.noarch",
+    )
+    if not isinstance(local_refs,list) or not all(
+        any(isinstance(ref,str) and (
+            ref==nevra or
+            re.fullmatch(r"sha256:[a-fA-F0-9]{64}:"+re.escape(nevra),ref)
+        ) for ref in local_refs) for nevra in expected
+    ):
+        sys.exit(1)
 print("C2V_PENDING_DEPLOYMENT_AUTHORITY // staged-or-pending, idle transaction, exact test RPM")
 C2V_PENDING_CHECK
     then
@@ -301,7 +329,15 @@ C2V_MONITOR
 set -u
 log=/var/tmp/c2v-rpm-ostree-install.log
 printf "C2V_WORKER_START // %s\n" "$(date --iso-8601=seconds)" >> "$log"
-if timeout --signal=TERM --kill-after=20s 480s rpm-ostree install --cache-only /mnt/c2v-offline/c2t-0.1.rpm >> "$log" 2>&1; then
+set -- /mnt/c2v-offline/c2t-0.1.rpm
+if [[ -f /var/lib/c4a-signed-service-test ]]; then
+  set -- "$@" /mnt/c2v-offline/c3d-status.rpm
+  if [[ ! -s /mnt/c2v-offline/c3d-status.rpm ]]; then
+    printf '2\n' > /run/c2v-rpm-layer-worker-exit
+    exit 2
+  fi
+fi
+if timeout --signal=TERM --kill-after=20s 480s rpm-ostree install --cache-only "$@" >> "$log" 2>&1; then
   printf "0\n" > /run/c2v-rpm-layer-worker-exit
 else
   printf "%s\n" "$?" > /run/c2v-rpm-layer-worker-exit
@@ -324,6 +360,11 @@ C2V_WORKER
       failure "LAYER_NOT_IN_BOOTED_RPMDB"
     [[ "$(cat /usr/share/post-apollo/c2t-fixture/fixture-version.txt)" == 0.1 ]] ||
       failure "LAYER_NOT_IN_BOOTED_USR"
+    if [[ -f "$c4a_mode" ]]; then
+      [[ -s "$c4a_gate" ]] || failure "C4A_GATE_LOST_AFTER_FIRST_REBOOT"
+      /usr/bin/bash "$c4a_gate" booted ||
+        failure "C4A_SIGNED_SERVICE_NOT_VALID_AFTER_REBOOT"
+    fi
     echo "C2V_PASS // LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT"
     echo rollback_pending > "$stagefile"
     rpm-ostree rollback --reboot || failure "RPM_OSTREE_ROLLBACK_FAILED"
@@ -344,6 +385,11 @@ C2V_WORKER
       [[ -f "$original" ]] || continue
       cp -a "$original" "/etc/yum.repos.d/$(basename "$original")"
     done
+    if [[ -f "$c4a_mode" ]]; then
+      [[ -s "$c4a_gate" ]] || failure "C4A_GATE_LOST_AFTER_ROLLBACK"
+      /usr/bin/bash "$c4a_gate" rolledback ||
+        failure "C4A_SIGNED_SERVICE_ROLLBACK_NOT_VERIFIED"
+    fi
     echo "C2V_PASS // OFFLINE_REPO_CONFIG_RESTORED_AFTER_ROLLBACK"
     echo "C2V_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER"
     echo "C2V_PASS // NO_CONNECTIONS_SERVICE_OR_CREDENTIALS_ACTIVATED"

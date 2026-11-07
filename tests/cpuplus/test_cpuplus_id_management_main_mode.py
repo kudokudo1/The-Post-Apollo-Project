@@ -58,19 +58,21 @@ class CpuPlusIdManagementMainModeContracts(unittest.TestCase):
         self.assertNotIn("PanelWindow {", PANE)
         self.assertNotIn("FloatingWindow {", PANE)
 
-    def test_actual_readonly_local_id_data_without_auth_claims(self):
+    def test_local_id_editor_uses_owner_stores_without_host_actions(self):
         for snippet in ("SocialIdentityStore.snapshot",
                         "SocialAccountDetailsStore.recordFor(",
                         "idRequested(modelData.id)",
-                        "READ-ONLY FOUNDATION",
-                        "NOT SIGNED-IN PERSONS",
-                        'text: "SELECT LOCAL ID // INSPECT ONLY"'):
+                        "SocialIdentityStore.createIdentity(",
+                        "CpuPlusIdDetailsEditor {",
+                        "NEW ID SAVED // LOCAL",
+                        "SELECT LOCAL ID // EDIT DETAILS",
+                        "LOCAL IDS ARE LAYOUT LABELS"):
             self.assertIn(snippet, PANE)
         self.assertIn("selectedLocalIdForManagement = localId;", CPU)
+        self.assertIn("idManagementDetailsPane.editingText", CPU)
+        self.assertIn("idManagementSelectorPane.editingText", CPU)
         for forbidden in ("FileView {", "Process {",
                           "SocialIdentityStore.selectIdentity(",
-                          "SocialIdentityStore.createIdentity(",
-                          "SocialAccountDetailsStore.saveContact(",
                           "Qt.openUrlExternally("):
             self.assertNotIn(forbidden, PANE)
         self.assertNotIn('id: "ID MANAGEMENT"', SOCIAL)

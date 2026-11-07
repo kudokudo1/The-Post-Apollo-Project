@@ -10,6 +10,8 @@ ShellRoot {
     property int step: 0
     property int ticks: 0
     property string lastMoonRoute: ""
+    property real compactMoonDiskWidth: 0
+    property real compactMoonHeroWidth: 0
     QtObject {
         id: fakeWeather
         // Start without coordinates so no network fetcher starts before
@@ -25,6 +27,7 @@ ShellRoot {
         property real localObservationAnchorMs: 0
     }
     Window {
+        id: testWindow
         visible: true
         width: 450
         height: 276
@@ -130,6 +133,12 @@ ShellRoot {
                 if(!phase||!rack||!position||!ribbon||!provenance
                     || !phase.compactMode || !phase.showMoon || phase.showSun)
                     return root.fail("MAGICK_PHASE_OR_NEW_HIERARCHY_MISSING");
+                const disk=find(phase,"cosmos-c21-moon-hero-disk");
+                if(!disk || !phase.prominentMoon
+                    || disk.width<100 || phase.width<275)
+                    return root.fail("C21_ACTUAL_MOON_DISK_NOT_ENLARGED");
+                root.compactMoonDiskWidth=disk.width;
+                root.compactMoonHeroWidth=phase.width;
                 const phaseAt=phase.mapToItem(moon,0,0);
                 const positionAt=position.mapToItem(moon,0,0);
                 const ribbonAt=ribbon.mapToItem(moon,0,0);
@@ -175,6 +184,9 @@ ShellRoot {
                     || !phaseTab.selected
                     || phase.height<125
                     || phase.height<=position.height
+                    || position.height<20 || position.height>30
+                    || provenance.height<20 || provenance.height>30
+                    || phase.height<155
                     || provenanceAt.y<positionAt.y+position.height-1
                     || provenanceAt.y+provenance.height>moon.height-inset+1
                     || forecastAt.y<railAt.y+rail.height
@@ -234,8 +246,22 @@ ShellRoot {
                    || moon.facts[4].value!=="--"
                    || moon.facts[5].value!=="--")
                     return root.fail("BELOW_DISPLAY_LIMIT_MISREPRESENTED");
+                // Verify manually selected larger chassis can scale the Moon
+                // without changing source ownership or right-side contents.
+                testWindow.width=700;
+                testWindow.height=420;
+                root.step=6;
+            } else if(root.step===6){
+                const phase=find(moon,"cosmos-c8-moon-phase");
+                const disk=find(phase,"cosmos-c21-moon-hero-disk");
+                const right=find(moon,"cosmos-c19-moon-forecast-strip");
+                if(!disk || !right || disk.width<root.compactMoonDiskWidth+20
+                    || phase.width<root.compactMoonHeroWidth+100
+                    || right.rows.length!==7
+                    || count(moon,"cosmos-c8-moon-fact")!==9)
+                    return root.fail("C21_LARGE_SIZE_MOON_SCALE_OR_SOURCE_LOSS");
                 root.done=true;
-                console.log("C8_MOON_PASS // NINE_FACTS COMPACT_PHASE NO_SCROLL PROVIDER_LIMITS C9_VISUAL_HIERARCHY C10_6PX_STAGE_GUTTER");
+                console.log("C8_MOON_PASS // C21_LARGE_DISK COMPACT+LARGE NO_SCROLL NINE_FACTS SOURCE_PRESERVED");
                 Qt.quit();
             }
         }

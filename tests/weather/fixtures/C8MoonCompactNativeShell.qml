@@ -150,6 +150,9 @@ ShellRoot {
                 const header=find(moon,"cosmos-c9-moon-free-header");
                 const headerAt=header ? header.mapToItem(moon,0,0) : null;
                 const rail=find(moon,"cosmos-c18-moon-fullwidth-mode-rail");
+                const headerDivider=find(moon,"cosmos-c23-moon-overview-divider");
+                const dividerAt=headerDivider
+                    ? headerDivider.mapToItem(moon,0,0) : null;
                 const phaseTab=find(moon,"cosmos-c18-moon-observation-tab");
                 const yearTab=find(moon,"cosmos-c11-open-moon-year");
                 const forecastStrip=find(moon,"cosmos-c19-moon-forecast-strip");
@@ -167,8 +170,13 @@ ShellRoot {
                     || headerAt.x+header.width>moon.width-inset+1
                     || railAt===null || railAt.x<inset
                     || railAt.x+rail.width>moon.width-inset+1
+                    || !dividerAt || headerDivider.height!==2
+                    || dividerAt.x<inset
+                    || dividerAt.x+headerDivider.width>moon.width-inset+1
+                    || dividerAt.y<railAt.y+rail.height+1
+                    || dividerAt.y>railAt.y+rail.height+3
                     || phaseAt.x<inset
-                    || phaseAt.y<railAt.y+rail.height
+                    || phaseAt.y<dividerAt.y+headerDivider.height-1
                     || phaseAt.x+phase.width>moon.width-inset+1
                     || positionAt.x<inset
                     || provenanceAt.x<inset

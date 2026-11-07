@@ -133,8 +133,9 @@ class DesktopHostLifecycle:
         """Host-only seat event, NOT an IPC command or OS subscription.
 
         Call on an actual trusted lock, suspend, user switch or end event.
-        The Event is set BEFORE waiting on the mutex; a pending HTTPS fetch
-        cannot publish an older organization preview after revocation.
+        The Event is set BEFORE waiting on the mutex. A pending HTTPS fetch
+        that reaches its post-fetch check after revocation is denied. An IPC
+        payload already checked/queued for send cannot be recalled.
         """
         if kind not in ("lock", "suspend", "user-switch", "session-end"):
             raise ValueError("Unsupported trusted desktop session event")

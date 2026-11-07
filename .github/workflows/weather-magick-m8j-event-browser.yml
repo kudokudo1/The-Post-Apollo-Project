@@ -1,0 +1,49 @@
+name: MAGICK M8j paged source event browser and inspector
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationMagickTransitEventBrowserPolicy.js'
+      - 'widgets/weather/StationMagickTransitMultiPane.qml'
+      - 'tests/weather/test_magick_event_browser_m8j.js'
+      - 'tests/weather/fixtures/M8jNativeEventBrowserShell.qml'
+      - 'scripts/weather/verify_magick_native_m8j.sh'
+      - '.github/workflows/weather-magick-m8j-event-browser.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify event filtering paging exact-source inspection and wheel preservation
+        run: node --test tests/weather/test_magick_event_browser_m8j.js
+      - name: Preserve accepted M8h and M8g source and interaction contracts
+        run: |
+          node --test tests/weather/test_magick_transit_multi_ui_m8h.js
+          node --test tests/weather/test_magick_transit_timeline_ui_m8g.js
+          node --test tests/weather/test_magick_transit_comparison_m8c.js
+  native-quickshell:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:unstable
+    timeout-minutes: 15
+    steps:
+      - name: Install real disposable Quickshell and Qt dependencies
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git nodejs quickshell qt6-qpa-plugins coreutils findutils \
+            qml6-module-qtquick-effects qml6-module-qt5compat-graphicaleffects
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: Exercise M8j paging inspector and wheel callback in real offscreen Qt
+        run: bash scripts/weather/verify_magick_native_m8j.sh

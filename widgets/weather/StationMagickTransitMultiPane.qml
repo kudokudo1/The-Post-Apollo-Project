@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationMagickTransitMultiPolicy.js" as Multi
+import "StationMagickTransitEventBrowserPolicy.js" as Browser
 import "StationMagickDateLocationPolicy.js" as Defaults
 
 // M8h // Selected natal reference + up to three moving JPL body trajectories.
@@ -20,6 +21,10 @@ Rectangle {
     property var selectedAspects:[0,60,90,120,180]
     property string browserKind:"ALL"
     property string browserPlanet:""
+    property string browserAspect:"ALL"
+    property string browserMotion:"ALL"
+    property int pageIndex:0
+    property string inspectedEventKey:""
     property bool descending:false
     property real zoom:1
     property real panX:0
@@ -30,15 +35,26 @@ Rectangle {
     readonly property bool busy:!!finder&&finder.loading
     readonly property var model:finder&&finder.ready?finder.result:null
     readonly property var geometry:Multi.graph(model,plot.width,plot.height)
-    readonly property var visibleEvents:Multi.browserEvents(
-        model,browserKind,browserPlanet,descending)
+    readonly property var visibleEvents:Browser.filtered(
+        model,browserKind,browserPlanet,descending,browserAspect,browserMotion)
+    readonly property var pageData:Browser.page(
+        model,browserKind,browserPlanet,descending,
+        browserAspect,browserMotion,pageIndex)
+    readonly property var inspectedEvent:Browser.inspect(model,inspectedEventKey)
     readonly property bool canSearch:Multi.request(natalData,startDate,spanDays,
         natalBody,selectedBodies,selectedAspects,sampleMinutes)!==null&&!busy
     readonly property var palette:[Colors.cyan,Colors.magenta,Colors.orange]
 
     function invalidated(){
         selectedEventKey="";
+        inspectedEventKey="";
+        pageIndex=0;
         if(finder&&finder.ready)finder.clearState();
+    }
+    function resetBrowse(){
+        pageIndex=0;
+        eventScroll.contentY=0;
+        plot.requestPaint();
     }
     onStartDateChanged:invalidated()
     onSpanDaysChanged:invalidated()
@@ -78,7 +94,9 @@ Rectangle {
     function search(){
         if(!finder||!canSearch)return;
         selectedEventKey="";
-        browserPlanet="";browserKind="ALL";descending=false;
+        browserPlanet="";browserKind="ALL";browserAspect="ALL";
+        browserMotion="ALL";descending=false;pageIndex=0;
+        inspectedEventKey="";
         finder.search(startDate,spanDays,natalBody,
             selectedBodies,selectedAspects,sampleMinutes);
     }
@@ -95,8 +113,19 @@ Rectangle {
         panX=x-(x-panX-plot.width/2)*(next/zoom)-plot.width/2;
         zoom=next;clampPan();
     }
-    function eventKey(e){
-        return e.utc+"|"+e.transit_body+"|"+e.type+"|"+e.aspect;
+    function eventKey(e){return Browser.eventKey(e);}
+    function inspectEvent(e){
+        if(!model||!model.ready||!e)return;
+        const key=eventKey(e);
+        if(!model.events.some(function(row){return eventKey(row)===key;}))return;
+        inspectedEventKey=key;
+        selectedEventKey=key;
+    }
+    function goPage(direction){
+        const next=pageData.index+direction;
+        if(next<0||next>=pageData.pages)return;
+        pageIndex=next;
+        eventScroll.contentY=0;
     }
     function chooseEvent(e){
         if(!model||!model.ready||!e)return;
@@ -105,12 +134,20 @@ Rectangle {
         selectedEventKey=eventKey(e);
         eventRequested(e.utc,e.transit_body,e.type);
     }
-    onModelChanged:plot.requestPaint()
+    onModelChanged:{
+        inspectedEventKey="";
+        selectedEventKey="";
+        pageIndex=0;
+        plot.requestPaint();
+    }
     onGeometryChanged:plot.requestPaint()
     onZoomChanged:plot.requestPaint()
     onPanXChanged:plot.requestPaint()
-    onBrowserKindChanged:plot.requestPaint()
-    onBrowserPlanetChanged:plot.requestPaint()
+    onBrowserKindChanged:resetBrowse()
+    onBrowserPlanetChanged:resetBrowse()
+    onBrowserAspectChanged:resetBrowse()
+    onBrowserMotionChanged:resetBrowse()
+    onDescendingChanged:resetBrowse()
     onSelectedEventKeyChanged:plot.requestPaint()
 
     Row {
@@ -348,6 +385,34 @@ Rectangle {
         }
     }
     Row {
+        id:advancedFilters
+        anchors.left:parent.left;anchors.right:parent.right
+        anchors.bottom:eventHeader.top
+        height:23;spacing:3
+        ActionButton {
+            width:Math.max(50,(advancedFilters.width-85-2*advancedFilters.spacing)/2)
+            height:22;label:"ASPECT "+atlas.browserAspect.toUpperCase()
+            labelPixelSize:8;accentColor:Colors.yellow
+            available:!!atlas.model
+            onClicked:atlas.browserAspect=Browser.nextOption(
+                Browser.ASPECTS,atlas.browserAspect)
+        }
+        ActionButton {
+            width:Math.max(50,(advancedFilters.width-85-2*advancedFilters.spacing)/2)
+            height:22;label:"MOTION "+atlas.browserMotion.toUpperCase()
+            labelPixelSize:8;accentColor:Colors.cyan
+            available:!!atlas.model
+            onClicked:atlas.browserMotion=Browser.nextOption(
+                Browser.MOTIONS,atlas.browserMotion)
+        }
+        QuietText {
+            width:85;height:22;font.pixelSize:8
+            color:Colors.magenta
+            verticalAlignment:Text.AlignVCenter
+            text:atlas.pageData.total+" / "+(atlas.model?atlas.model.events.length:0)
+        }
+    }
+    Row {
         id:eventHeader
         anchors.left:parent.left;anchors.right:parent.right
         anchors.bottom:eventPanel.top
@@ -392,13 +457,42 @@ Rectangle {
     Rectangle {
         id:eventPanel
         anchors.left:parent.left;anchors.right:parent.right
-        anchors.bottom:footer.top
-        height:Math.max(52,Math.min(118,parent.height*.26))
+        anchors.bottom:inspector.top
+        height:Math.max(54,Math.min(138,parent.height*.27))
         border.width:1;border.color:Colors.blue
         color:Colors.black;clip:true
+        Row {
+            id:pageControls
+            anchors.top:parent.top
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.margins:2;height:22;spacing:3
+            QuietText {
+                width:Math.max(50,pageControls.width-94-2*pageControls.spacing)
+                height:22;font.pixelSize:9;color:Colors.cyan
+                verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight
+                text:atlas.pageData.first+"-"+atlas.pageData.last+
+                    " / "+atlas.pageData.total+
+                    "   PAGE "+(atlas.pageData.index+1)+"/"+atlas.pageData.pages
+            }
+            ActionButton {
+                width:47;height:22;label:"PREV";labelPixelSize:8
+                accentColor:Colors.cyan
+                available:atlas.pageData.index>0
+                onClicked:atlas.goPage(-1)
+            }
+            ActionButton {
+                width:47;height:22;label:"NEXT";labelPixelSize:8
+                accentColor:Colors.cyan
+                available:atlas.pageData.index+1<atlas.pageData.pages
+                onClicked:atlas.goPage(1)
+            }
+        }
         Flickable {
             id:eventScroll
-            anchors.fill:parent;anchors.margins:2
+            anchors.top:pageControls.bottom
+            anchors.bottom:parent.bottom
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.margins:2
             contentWidth:width
             contentHeight:eventRows.implicitHeight
             boundsBehavior:Flickable.StopAtBounds;clip:true
@@ -406,7 +500,7 @@ Rectangle {
                 id:eventRows
                 width:eventScroll.width;spacing:2
                 Repeater {
-                    model:atlas.visibleEvents
+                    model:atlas.pageData.items
                     delegate:Rectangle {
                         required property var modelData
                         width:eventRows.width;height:22
@@ -416,7 +510,10 @@ Rectangle {
                         border.width:1
                         border.color:selected?Colors.magenta:Colors.blue
                         QuietText {
-                            anchors.fill:parent;anchors.margins:3
+                            anchors.left:parent.left
+                            anchors.right:inspectButton.left
+                            anchors.top:parent.top;anchors.bottom:parent.bottom
+                            anchors.margins:3
                             color:modelData.type==="station"?Colors.orange:Colors.yellow
                             font.pixelSize:9;verticalAlignment:Text.AlignVCenter
                             elide:Text.ElideRight
@@ -430,19 +527,67 @@ Rectangle {
                                      " ERR "+modelData.residual_deg.toFixed(5)+"°")
                         }
                         MouseArea {
-                            anchors.fill:parent
+                            anchors.top:parent.top;anchors.bottom:parent.bottom
+                            anchors.left:parent.left;anchors.right:inspectButton.left
                             cursorShape:Qt.PointingHandCursor
                             onClicked:atlas.chooseEvent(modelData)
+                        }
+                        ActionButton {
+                            id:inspectButton
+                            anchors.right:parent.right
+                            width:42;height:21
+                            label:"INFO";labelPixelSize:8
+                            accentColor:Colors.magenta
+                            selected:atlas.inspectedEventKey===atlas.eventKey(modelData)
+                            onClicked:atlas.inspectEvent(modelData)
                         }
                     }
                 }
                 QuietText {
-                    visible:!!atlas.model&&atlas.visibleEvents.length===0
+                    visible:!!atlas.model&&atlas.pageData.total===0
                     width:eventRows.width;height:22
                     color:Colors.cyan;font.pixelSize:9
                     text:"NO MATCHING EVENTS IN SELECTED FILTERS"
                 }
             }
+        }
+    }
+    Rectangle {
+        id:inspector
+        anchors.left:parent.left;anchors.right:parent.right
+        anchors.bottom:footer.top
+        height:visible?41:0
+        visible:!!atlas.inspectedEvent
+        color:Colors.dark
+        border.width:1;border.color:Colors.magenta
+        clip:true
+        QuietText {
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.top:parent.top;anchors.topMargin:3
+            anchors.leftMargin:5;anchors.rightMargin:5
+            height:17;font.pixelSize:9;color:Colors.magenta
+            elide:Text.ElideRight
+            text:!atlas.inspectedEvent?""
+                :atlas.inspectedEvent.utc+" / "+
+                 Multi.shortLabel(atlas.inspectedEvent.planet)+" / "+
+                 (atlas.inspectedEvent.type==="station"
+                     ?"STATION "+atlas.inspectedEvent.direction.toUpperCase()
+                     :atlas.inspectedEvent.aspect.toUpperCase()+" "+
+                        atlas.inspectedEvent.angle_deg+"°")
+        }
+        QuietText {
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.bottom:parent.bottom;anchors.bottomMargin:3
+            anchors.leftMargin:5;anchors.rightMargin:5
+            height:16;font.pixelSize:8;color:Colors.yellow
+            elide:Text.ElideRight
+            text:!atlas.inspectedEvent?""
+                :atlas.inspectedEvent.type==="station"
+                    ?"LONG "+atlas.inspectedEvent.longitude_deg.toFixed(4)+"°"+
+                     " / RATE "+atlas.inspectedEvent.velocity_deg_day.toFixed(5)+
+                     "°/DAY / NUMERICAL BRACKET ≤60S"
+                    :"ANGLE RESIDUAL "+atlas.inspectedEvent.residual_deg.toFixed(6)+
+                     "° / NUMERICAL BRACKET ≤1S"
         }
     }
     QuietText {

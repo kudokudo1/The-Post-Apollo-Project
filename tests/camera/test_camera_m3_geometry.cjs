@@ -18,10 +18,10 @@ const financePolicy = read("widgets/FinanceChassisPolicy.js");
 const policy = vm.createContext({});
 vm.runInContext(financePolicy.replace(/^\s*\.pragma library\s*$/m, ""), policy);
 
-test("Camera compact preserves old frame, expanded uses Finance's 1000x900", () => {
+test("Camera compact contains full-size deck, expanded uses Finance's 1000x900", () => {
     assert.match(camera, /property string chassisLevel: "compact"/);
-    assert.match(camera, /chassisLevel === "compact"\s*\? Math\.max\(1, Math\.min\(770,/);
-    assert.match(camera, /chassisLevel === "compact"\s*\? Math\.max\(1, Math\.min\(675,/);
+    assert.match(camera, /chassisLevel === "compact"\s*\? Math\.max\(1, Math\.min\(784,/);
+    assert.match(camera, /chassisLevel === "compact"\s*\? Math\.max\(1, Math\.min\(699,/);
     assert.match(camera, /FinanceChassisPolicy\.frame\(\s*chassisLevel, viewportWidth, viewportHeight,/);
     assert.match(camera, /: financeSize\.width/);
     assert.match(camera, /: financeSize\.height/);

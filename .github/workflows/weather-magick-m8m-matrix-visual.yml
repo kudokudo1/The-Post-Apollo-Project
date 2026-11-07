@@ -1,0 +1,49 @@
+name: MAGICK M8m matrix heatmap UTC timeline and source inspection
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationMagickTransitMatrixVisualPolicy.js'
+      - 'widgets/weather/StationMagickTransitMatrixPane.qml'
+      - 'tests/weather/test_magick_matrix_visual_m8m.js'
+      - 'tests/weather/fixtures/M8mNativeMatrixVisualShell.qml'
+      - 'scripts/weather/verify_magick_native_m8m.sh'
+      - '.github/workflows/weather-magick-m8m-matrix-visual.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  visual-source-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify JPL source-only heatmap tiers, UTC lane markers, exact inspection and longitude wrapping
+        run: node --test tests/weather/test_magick_matrix_visual_m8m.js
+      - name: Preserve accepted M8l/M8k/M8j interface and provenance contracts
+        run: |
+          node --test tests/weather/test_magick_four_by_four_ui_m8l.js
+          node --test tests/weather/test_magick_natal_transit_matrix_ui_m8k.js
+          node --test tests/weather/test_magick_event_browser_m8j.js
+  native-quickshell:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:unstable
+    timeout-minutes: 15
+    steps:
+      - name: Install disposable real Quickshell and Qt
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git nodejs quickshell qt6-qpa-plugins coreutils findutils \
+            qml6-module-qtquick-effects qml6-module-qt5compat-graphicaleffects
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: Real offscreen QML heatmap timeline inspection and wheel callback
+        run: bash scripts/weather/verify_magick_native_m8m.sh

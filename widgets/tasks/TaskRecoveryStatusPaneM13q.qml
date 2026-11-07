@@ -153,6 +153,22 @@ Item {
                 opacity: 0.7
             }
 
+            // M15a // Real, point-in-time structural source check invoked
+            // ONLY by an operator click; no new FileView or writer.
+            TaskLocalSourceInspectPaneM15a {
+                width: parent.width
+                sourcePath: ApolloHubTodoStore.storagePath
+                saveRequestCount: ApolloHubTodoStore.nativeSaveRequestsM14a
+                saveInProgress: ApolloHubTodoStore.storageState === "saving"
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Colors.cyan
+                opacity: 0.7
+            }
+
             // M13z // Operator-visible, EXAMPLE-ONLY crash-state review.
             // The real M13y inspector is not connected to live TASKS.
             // Reuse M13s above for genuine in-memory unsaved editor status.

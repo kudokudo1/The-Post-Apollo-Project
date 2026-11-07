@@ -1,0 +1,105 @@
+name: TASKS M15a explicit live local source inspection
+
+on:
+  pull_request:
+    paths:
+      - 'services/hub/TaskLocalSourceInspectM15a.py'
+      - 'widgets/tasks/TaskLocalSourceInspectPolicyM15a.js'
+      - 'widgets/tasks/TaskLocalSourceInspectPaneM15a.qml'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'tests/tasks/test_task_local_source_inspect_m15a.py'
+      - 'tests/tasks/test_task_local_source_inspect_ui_m15a.cjs'
+      - 'docs/tasks-live-source-inspection-m15a.md'
+      - 'TaskLocalSourceNativeSmokeM15a.qml'
+      - 'tests/tasks/native_local_source_inspect_m15a.py'
+      - '.github/workflows/tasks-local-source-inspection-m15a.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/hub/TaskLocalSourceInspectM15a.py'
+      - 'widgets/tasks/TaskLocalSourceInspectPolicyM15a.js'
+      - 'widgets/tasks/TaskLocalSourceInspectPaneM15a.qml'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'tests/tasks/test_task_local_source_inspect_m15a.py'
+      - 'tests/tasks/test_task_local_source_inspect_ui_m15a.cjs'
+      - 'TaskLocalSourceNativeSmokeM15a.qml'
+      - 'tests/tasks/native_local_source_inspect_m15a.py'
+      - '.github/workflows/tasks-local-source-inspection-m15a.yml'
+permissions:
+  contents: read
+
+jobs:
+  real-readonly-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Real Linux source read checks with malformed, symlink and permission cases
+        run: |
+          python3 -B -m unittest discover -s tests/tasks \
+            -p 'test_task_local_source_inspect_m15a.py' -v
+      - name: Strict UI projection and canonical TASKS source path bindings
+        run: node --test tests/tasks/test_task_local_source_inspect_ui_m15a.cjs
+      - name: Original recovery UI and native save hint regressions
+        run: |
+          node --test tests/tasks/test_task_recovery_status_m13q.cjs
+          node --test tests/tasks/test_task_live_draft_presence_m13s.cjs
+          node --test tests/tasks/test_task_operator_save_review_m13z.cjs
+          node --test tests/tasks/test_task_live_native_save_observation_m14a.cjs
+      - name: M13y synthetic recovery classifier remains synthetic and unmounted
+        run: |
+          python3 -B -m unittest discover -s tests/tasks \
+            -p 'test_task_postcrash_source_review_m13y.py' -v
+      - name: Existing sole FileView writer and disabled Connections grants
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Parse changed Qt 6 QML without live desktop
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/tasks/TaskLocalSourceInspectPaneM15a.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/tasks/TaskRecoveryStatusPaneM13q.qml >/dev/null
+      - name: No task writes, no auto-source scan, no keyring permission
+        run: |
+          set -euo pipefail
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          ! grep -Eq 'FileView *\{|\\.setText\\(|Qt.openUrlExternally|ConnectionsBroker\\.' \
+            widgets/tasks/TaskLocalSourceInspectPaneM15a.qml
+          ! grep -Eq 'os\\.replace\\(|os\\.chmod\\(|os\\.chown\\(|os\\.unlink\\(' \
+            services/hub/TaskLocalSourceInspectM15a.py
+          printf '%s\n' 'M15A_CLICK_ONLY_LOCAL_READ_SOURCE_NO_ACK_NO_WRITES_PASS'
+
+
+  real-quickshell:
+    name: Actual Quickshell UI -> private local JSON read-only on Xvfb
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    container:
+      image: debian:unstable-slim
+    env:
+      POST_APOLLO_M15A_DISPOSABLE_CI: '1'
+    steps:
+      - name: Install native Quickshell and isolated X11 display
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 \
+            qt6-qpa-plugins xvfb xauth libxcb-cursor0 libxkbcommon-x11-0 \
+            qml6-module-qtquick qml6-module-qtquick-layouts \
+            qml6-module-qtquick-effects qml6-module-qt5compat-graphicaleffects \
+            qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Real Quickshell reads legitimate private synthetic TASKS v3
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 tests/tasks/native_local_source_inspect_m15a.py --scenario valid
+      - name: Real Quickshell refuses missing local source without creating a file
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 tests/tasks/native_local_source_inspect_m15a.py --scenario missing
+      - name: Real Quickshell refuses malformed source
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 tests/tasks/native_local_source_inspect_m15a.py --scenario malformed
+      - name: Real Quickshell shows unsafe permissions without chmod
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 tests/tasks/native_local_source_inspect_m15a.py --scenario permissions
+      - name: Real Quickshell refuses symlink source without following it
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 tests/tasks/native_local_source_inspect_m15a.py --scenario symlink

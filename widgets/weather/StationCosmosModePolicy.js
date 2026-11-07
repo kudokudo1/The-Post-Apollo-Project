@@ -4,8 +4,7 @@
 // modes; mode changes never move the user's scroll offset. Pure metadata only.
 var MODES = {
     sun: [
-        {label:"LIVE", route:"cosmos/sun/live", kind:"sun-live"},
-        {label:"POSITION + LIGHT", route:"cosmos/sun/position", kind:"sun-position"},
+        {label:"OBSERVATION", route:"cosmos/sun/observation", kind:"sun-observation"},
         {label:"ACTIVITY", route:"cosmos/sun/activity", kind:"sun-activity"},
         {label:"YEAR", route:"cosmos/sun/year", kind:"annual-solar"}
     ],
@@ -29,6 +28,8 @@ var ALIASES = {
 // Existing deep links remain valid specialist inspectors. They are not
 // shown as separate tabs on the new four-mode terminal rail.
 var LEGACY_SUN = {
+    "cosmos/sun/live":"sun-live",
+    "cosmos/sun/position":"sun-position",
     "cosmos/sun/twilight":"light",
     "cosmos/sun/suvi":"solar-section",
     "cosmos/sun/xray":"solar-section",
@@ -79,8 +80,9 @@ function dataRoute(path) {
 function usesSky(path) {
     var key = family(path);
     return key === "astronomy" || key === "events"
-        || (key === "sun" && (kind(path)==="sun-position"
-            || kind(path)==="solar-path" || kind(path)==="light"));
+        || (key === "sun" && (kind(path)==="sun-observation"
+            || kind(path)==="sun-position" || kind(path)==="solar-path"
+            || kind(path)==="light"));
 }
 
 function usesInnerScroll(path) {

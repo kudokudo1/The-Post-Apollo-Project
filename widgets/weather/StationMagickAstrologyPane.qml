@@ -4,6 +4,7 @@ import "../../services/weather" as WeatherServices
 import "StationMagickTransitComparisonPolicy.js" as Transit
 import "StationMagickTransitTimelinePolicy.js" as Timeline
 import "StationMagickTransitMultiPolicy.js" as Multi
+import "StationMagickTransitMatrixPolicy.js" as Matrix
 
 // M30-F // A standalone, no-outer-scroll source-verified astrology instrument.
 // All chart modes use the existing single on-demand JPL/CelestialVisualService
@@ -23,6 +24,8 @@ Rectangle {
     property bool transitMode: false
     property bool timelineMode: false
     property bool multiMode: false
+    property bool matrixMode: false
+    property string selectedNatalReference: ""
     property string selectedContactUtc: ""
     property string selectedEventKind: "aspect"
     property string selectedMultiBody: ""
@@ -31,6 +34,8 @@ Rectangle {
     onTransitModeChanged: if(!transitMode){
         timelineMode=false;
         multiMode=false;
+        matrixMode=false;
+        selectedNatalReference="";
         selectedContactUtc="";
         selectedEventKind="aspect";
         selectedMultiBody="";
@@ -50,9 +55,11 @@ Rectangle {
             astrology.selectedContactUtc="";
             astrology.selectedEventKind="aspect";
             astrology.selectedMultiBody="";
+            astrology.selectedNatalReference="";
             transitSource.clearState();
             timelineSource.clearState();
             multiSource.clearState();
+            matrixSource.clearState();
         }
     }
     WeatherServices.CelestialNatalChartService {
@@ -70,6 +77,13 @@ Rectangle {
         id: multiSource
         active: astrology.visible && astrology.natalMode
             && astrology.transitMode && astrology.multiMode
+            && natalSource.ready
+        natalChart: astrology.fullChartData
+    }
+    WeatherServices.CelestialTransitMatrixService {
+        id: matrixSource
+        active: astrology.visible && astrology.natalMode
+            && astrology.transitMode && astrology.matrixMode
             && natalSource.ready
         natalChart: astrology.fullChartData
     }
@@ -379,33 +393,48 @@ Rectangle {
             height:24
             spacing:4
             ActionButton {
-                width:Math.max(36,(transitViewRow.width-2*transitViewRow.spacing)/3)
+                width:Math.max(33,(transitViewRow.width-3*transitViewRow.spacing)/4)
                 height:23;label:"WHEEL";labelPixelSize:9
                 selected:!astrology.timelineMode&&!astrology.multiMode
+                    &&!astrology.matrixMode
                 accentColor:selected?Colors.magenta:Colors.cyan
                 onClicked:{
                     astrology.timelineMode=false;
                     astrology.multiMode=false;
+                    astrology.matrixMode=false;
                 }
             }
             ActionButton {
-                width:Math.max(36,(transitViewRow.width-2*transitViewRow.spacing)/3)
+                width:Math.max(33,(transitViewRow.width-3*transitViewRow.spacing)/4)
                 height:23;label:"TIMELINE";labelPixelSize:9
                 selected:astrology.timelineMode
                 accentColor:selected?Colors.magenta:Colors.cyan
                 onClicked:{
                     astrology.multiMode=false;
+                    astrology.matrixMode=false;
                     astrology.timelineMode=true;
                 }
             }
             ActionButton {
-                width:Math.max(36,(transitViewRow.width-2*transitViewRow.spacing)/3)
+                width:Math.max(33,(transitViewRow.width-3*transitViewRow.spacing)/4)
                 height:23;label:"MULTI";labelPixelSize:9
                 selected:astrology.multiMode
                 accentColor:selected?Colors.magenta:Colors.cyan
                 onClicked:{
                     astrology.timelineMode=false;
+                    astrology.matrixMode=false;
                     astrology.multiMode=true;
+                }
+            }
+            ActionButton {
+                width:Math.max(33,(transitViewRow.width-3*transitViewRow.spacing)/4)
+                height:23;label:"MATRIX";labelPixelSize:9
+                selected:astrology.matrixMode
+                accentColor:selected?Colors.magenta:Colors.cyan
+                onClicked:{
+                    astrology.timelineMode=false;
+                    astrology.multiMode=false;
+                    astrology.matrixMode=true;
                 }
             }
         }
@@ -418,18 +447,21 @@ Rectangle {
             anchors.bottom:parent.bottom
             visible: astrology.natalMode && astrology.transitMode
                 && !astrology.timelineMode && !astrology.multiMode
+                && !astrology.matrixMode
             natalData: astrology.fullChartData
             transitData: transitSource.ready?transitSource.chartData:null
             expectedUtc: astrology.transitExpectedUtc
             selectedContactUtc: astrology.selectedContactUtc
             selectedEventKind: astrology.selectedEventKind
             inspectionTarget: astrology.selectedMultiBody
+            inspectionNatal: astrology.selectedNatalReference
             loading: transitSource.loading
             statusText: transitSource.statusText
             onCalculateRequested: function(instant){
                 astrology.selectedContactUtc="";
                 astrology.selectedEventKind="aspect";
                 astrology.selectedMultiBody="";
+                astrology.selectedNatalReference="";
                 astrology.requestTransit(instant);
             }
         }
@@ -442,6 +474,7 @@ Rectangle {
             anchors.bottom:parent.bottom
             visible: astrology.natalMode && astrology.transitMode
                 && astrology.timelineMode && !astrology.multiMode
+                && !astrology.matrixMode
             natalData: astrology.fullChartData
             finder: timelineSource
             onContactRequested: function(exactUtc) {
@@ -449,6 +482,7 @@ Rectangle {
                 if(!minute)return;
                 astrology.selectedContactUtc=exactUtc;
                 astrology.selectedEventKind="aspect";
+                astrology.selectedNatalReference="";
                 astrology.selectedMultiBody=
                     timelineSource.ready?timelineSource.result.transit_body:"";
                 astrology.timelineMode=false;
@@ -463,7 +497,7 @@ Rectangle {
             anchors.topMargin:3
             anchors.bottom:parent.bottom
             visible: astrology.natalMode && astrology.transitMode
-                && astrology.multiMode
+                && astrology.multiMode && !astrology.matrixMode
             natalData: astrology.fullChartData
             finder:multiSource
             onEventRequested: function(exactUtc,body,kind) {
@@ -472,10 +506,33 @@ Rectangle {
                 astrology.selectedContactUtc=exactUtc;
                 astrology.selectedEventKind=kind;
                 astrology.selectedMultiBody=body;
+                astrology.selectedNatalReference="";
                 astrology.multiMode=false;
                 astrology.requestTransit(minute);
             }
         }
+        StationMagickTransitMatrixPane {
+            anchors.left:parent.left
+            anchors.right:parent.right
+            anchors.top:transitViewRow.bottom
+            anchors.topMargin:3
+            anchors.bottom:parent.bottom
+            visible:astrology.natalMode && astrology.transitMode
+                && astrology.matrixMode
+            natalData:astrology.fullChartData
+            finder:matrixSource
+            onEventRequested:function(exactUtc,natalBody,transitBody,kind){
+                const minute=Matrix.nearestMinute(exactUtc);
+                if(!minute)return;
+                astrology.selectedContactUtc=exactUtc;
+                astrology.selectedEventKind=kind;
+                astrology.selectedMultiBody=transitBody;
+                astrology.selectedNatalReference=natalBody;
+                astrology.matrixMode=false;
+                astrology.requestTransit(minute);
+            }
+        }
+
     }
 
     Row {

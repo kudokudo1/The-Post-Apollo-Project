@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationCosmosSolarDetailPolicy.js" as SolarDetails
+import "StationSolarImageViewportPolicy.js" as ImageViewportPolicy
 
 // Focused single-viewport NOAA instruments. StationSpace sourceOnly owns
 // ALL fetchers and SUVI URL state; this component only draws their data.
@@ -12,6 +13,20 @@ Rectangle {
     property string modeRoute: ""
     property var sourceSpace: null
     property var spaceService: null
+    // Enabled by OBSERVATION only. Legacy INDEX SUVI remains unchanged.
+    property bool imageInteractive: false
+    property bool imageExpanded: false
+    property real suviZoom: 1
+    property real suviPanX: 0
+    property real suviPanY: 0
+
+    function resetSuviView() {
+        suviZoom = 1;
+        suviPanX = 0;
+        suviPanY = 0;
+    }
+
+    onImageExpandedChanged: resetSuviView()
     readonly property string mode: modeRoute.split("/").slice(-1)[0]
     readonly property var xray: sourceSpace ? sourceSpace.xrayObservation : null
     readonly property var flares: sourceSpace ? sourceSpace.flareObservation : null
@@ -28,7 +43,11 @@ Rectangle {
         spaceService ? spaceService.solarFluxText : "")
     readonly property var xrayFields: SolarDetails.xrayPage(
         xray && xray.ready ? xray : null,xrayPage)
-    onModeRouteChanged: {xrayPage=0;flareIndex=0;flareDataPage=0;cyclePage=0;}
+    onModeRouteChanged: {
+        xrayPage=0;flareIndex=0;flareDataPage=0;cyclePage=0;
+        resetSuviView();
+        imageExpanded=false;
+    }
     onFlareCountChanged: {
         if (flareIndex >= flareCount) flareIndex = Math.max(0,flareCount-1);
     }
@@ -100,38 +119,170 @@ Rectangle {
                 id: imageBody
                 width: parent.width
                 height: Math.max(0,parent.height-imageControls.height-6)
-                spacing: 8
+                spacing: solarFocus.imageInteractive && solarFocus.imageExpanded ? 0 : 8
                 Rectangle {
                     id: imageFrame
-                    width: Math.max(1,Math.min(imageBody.height,imageBody.width*0.58))
+                    objectName: "cosmos-c16-suvi-viewport"
+                    width: solarFocus.imageInteractive && solarFocus.imageExpanded
+                        ? imageBody.width
+                        : Math.max(1,Math.min(imageBody.height,imageBody.width*0.58))
                     height: imageBody.height
                     color: Colors.dark
                     border.width: 1
                     border.color: Colors.magenta
                     clip: true
-                    Image {
-                        id: focusedSuviImage
+                    readonly property real currentZoom: solarFocus.suviZoom
+
+                    function constrainPan() {
+                        if (!imageViewport || !focusedSuviImage) return;
+                        var pan = ImageViewportPolicy.clampPan(
+                            solarFocus.suviZoom, solarFocus.suviPanX,
+                            solarFocus.suviPanY, imageViewport.width,
+                            imageViewport.height, focusedSuviImage.paintedWidth,
+                            focusedSuviImage.paintedHeight);
+                        solarFocus.suviPanX = pan.x;
+                        solarFocus.suviPanY = pan.y;
+                    }
+                    function panBy(dx,dy) {
+                        if (!solarFocus.imageInteractive || solarFocus.suviZoom<=1)
+                            return;
+                        var pan = ImageViewportPolicy.clampPan(
+                            solarFocus.suviZoom,solarFocus.suviPanX+dx,
+                            solarFocus.suviPanY+dy,imageViewport.width,
+                            imageViewport.height,focusedSuviImage.paintedWidth,
+                            focusedSuviImage.paintedHeight);
+                        solarFocus.suviPanX = pan.x;
+                        solarFocus.suviPanY = pan.y;
+                    }
+                    function zoomAt(factor,focusX,focusY) {
+                        if (!solarFocus.imageInteractive) return;
+                        var view = ImageViewportPolicy.zoomAt(
+                            solarFocus.suviZoom,factor,
+                            solarFocus.suviPanX,solarFocus.suviPanY,
+                            focusX,focusY,imageViewport.width,
+                            imageViewport.height,focusedSuviImage.paintedWidth,
+                            focusedSuviImage.paintedHeight);
+                        solarFocus.suviZoom = view.zoom;
+                        solarFocus.suviPanX = view.x;
+                        solarFocus.suviPanY = view.y;
+                    }
+                    function resetZoom() { solarFocus.resetSuviView(); }
+                    onWidthChanged: constrainPan()
+                    onHeightChanged: constrainPan()
+
+                    Item {
+                        id: imageViewport
                         anchors.fill: parent
                         anchors.margins: 3
-                        source: solarFocus.sourceSpace
-                            ? solarFocus.sourceSpace.solarImageUrl : ""
-                        asynchronous: true
-                        cache: false
-                        fillMode: Image.PreserveAspectFit
-                        onStatusChanged: {
-                            if (!solarFocus.sourceSpace) return;
-                            if (status === Image.Ready) {
-                                solarFocus.sourceSpace.solarImageLastLoadedMs = Date.now();
-                                solarFocus.sourceSpace.solarImageError = "";
-                            } else if (status === Image.Error) {
-                                solarFocus.sourceSpace.solarImageError =
-                                    "SUVI IMAGE LOAD FAILED";
+                        clip: true
+                        Image {
+                            id: focusedSuviImage
+                            width: parent.width
+                            height: parent.height
+                            x: solarFocus.suviPanX
+                            y: solarFocus.suviPanY
+                            scale: solarFocus.suviZoom
+                            transformOrigin: Item.Center
+                            source: solarFocus.sourceSpace
+                                ? solarFocus.sourceSpace.solarImageUrl : ""
+                            asynchronous: true
+                            cache: false
+                            fillMode: Image.PreserveAspectFit
+                            onSourceChanged: solarFocus.resetSuviView()
+                            onStatusChanged: {
+                                if (!solarFocus.sourceSpace) return;
+                                if (status === Image.Ready) {
+                                    solarFocus.sourceSpace.solarImageLastLoadedMs = Date.now();
+                                    solarFocus.sourceSpace.solarImageError = "";
+                                } else if (status === Image.Error) {
+                                    solarFocus.sourceSpace.solarImageError =
+                                        "SUVI IMAGE LOAD FAILED";
+                                }
                             }
+                        }
+                        MouseArea {
+                            id: suviPointer
+                            objectName: "cosmos-c16-suvi-pan-input"
+                            anchors.fill: parent
+                            enabled: solarFocus.imageInteractive
+                            acceptedButtons: Qt.LeftButton
+                            preventStealing: true
+                            cursorShape: solarFocus.suviZoom > 1
+                                ? Qt.OpenHandCursor : Qt.CrossCursor
+                            property real lastX: 0
+                            property real lastY: 0
+                            onPressed: (mouse) => {
+                                lastX = mouse.x;
+                                lastY = mouse.y;
+                            }
+                            onPositionChanged: (mouse) => {
+                                if (!pressed || solarFocus.suviZoom <= 1) return;
+                                imageFrame.panBy(mouse.x-lastX,mouse.y-lastY);
+                                lastX = mouse.x;
+                                lastY = mouse.y;
+                            }
+                            onWheel: (wheel) => {
+                                if (wheel.angleDelta.y !== 0)
+                                    imageFrame.zoomAt(
+                                        wheel.angleDelta.y > 0 ? 1.25 : 0.8,
+                                        wheel.x,wheel.y);
+                                wheel.accepted = true;
+                            }
+                            onDoubleClicked: imageFrame.resetZoom()
+                        }
+                    }
+                    ActionButton {
+                        objectName: "cosmos-c16-suvi-expand"
+                        visible: solarFocus.imageInteractive
+                        width: 38
+                        height: 19
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.margins: 4
+                        label: solarFocus.imageExpanded ? "REST" : "EXP"
+                        labelPixelSize: 9
+                        contentPadding: 1
+                        accentColor: Colors.magenta
+                        onClicked: solarFocus.imageExpanded = !solarFocus.imageExpanded
+                    }
+                    Row {
+                        id: suviZoomControls
+                        objectName: "cosmos-c16-suvi-zoom-controls"
+                        visible: solarFocus.imageInteractive
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 3
+                        spacing: 2
+                        ActionButton {
+                            width: 26; height: 19
+                            label: "−"; labelPixelSize: 13; contentPadding: 1
+                            available: solarFocus.suviZoom > 1
+                            accentColor: Colors.cyan
+                            onClicked: imageFrame.zoomAt(0.8,
+                                imageViewport.width/2,imageViewport.height/2)
+                        }
+                        ActionButton {
+                            width: 26; height: 19
+                            label: "+"; labelPixelSize: 13; contentPadding: 1
+                            available: solarFocus.suviZoom < 5
+                            accentColor: Colors.cyan
+                            onClicked: imageFrame.zoomAt(1.25,
+                                imageViewport.width/2,imageViewport.height/2)
+                        }
+                        ActionButton {
+                            width: 36; height: 19
+                            label: "FIT"; labelPixelSize: 9; contentPadding: 1
+                            accentColor: Colors.orange
+                            onClicked: imageFrame.resetZoom()
                         }
                     }
                 }
                 Column {
-                    width: Math.max(1,imageBody.width-imageFrame.width-imageBody.spacing)
+                    id: imageNotes
+                    visible: !solarFocus.imageExpanded || !solarFocus.imageInteractive
+                    width: visible
+                        ? Math.max(1,imageBody.width-imageFrame.width-imageBody.spacing)
+                        : 0
                     spacing: 8
                     GohuText {
                         width: parent.width

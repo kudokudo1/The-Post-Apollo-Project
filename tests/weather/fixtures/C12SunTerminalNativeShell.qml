@@ -185,6 +185,12 @@ ShellRoot {
             const obsMeters=fixture.locate(observation,"cosmos-c15-space-context-meters");
             const obsTimeline=fixture.locate(observation,"cosmos-c15-daylight-timeline");
             const obsTwilightGroups=fixture.locate(observation,"cosmos-c15-twilight-groups");
+            const obsSingleRow=fixture.locate(observation,"cosmos-c16-twilight-single-row");
+            const obsRowTime=fixture.locate(observation,"cosmos-c16-twilight-one-line-time");
+            const obsSuviViewport=fixture.locate(observation,"cosmos-c16-suvi-viewport");
+            const liveSuviViewport=fixture.locate(live,"cosmos-c16-suvi-viewport");
+            const obsZoomButtons=fixture.locate(observation,"cosmos-c16-suvi-zoom-controls");
+            const obsExpandButton=fixture.locate(observation,"cosmos-c16-suvi-expand");
             const metrics=fixture.locate(activity,"cosmos-c12-activity-metrics");
             const trend=fixture.locate(activity,"cosmos-c12-xray-trend");
             const xray=fixture.locate(activity,"cosmos-c12-xray-facts");
@@ -200,7 +206,9 @@ ShellRoot {
                 ||!trend||!xray||!flare||!cycle||!cluster
                 ||!xrayBay||!flareBay||!cycleBay||!rangeChart||!historyGraph
                 ||!obsBoard||!obsImage||!obsArc||!obsLive||!obsSky||!obsLight
-                ||!obsMeters||!obsTimeline||!obsTwilightGroups)return;
+                ||!obsMeters||!obsTimeline||!obsTwilightGroups
+                ||!obsSingleRow||!obsRowTime||!obsSuviViewport
+                ||!liveSuviViewport||!obsZoomButtons||!obsExpandButton)return;
             if(fixture.phase===0){
                 if(position.positionRows.length!==8||position.positionStrip.length!==5)
                     return fixture.stop("POSITION_DATA_MISSING");
@@ -215,7 +223,12 @@ ShellRoot {
                     ||observation.positionRows.length!==8
                     ||observation.positionStrip.length!==5
                     ||obsMeters.width<200||obsTimeline.width<170
-                    ||obsTwilightGroups.width<170||obsLight.height<40)
+                    ||obsTwilightGroups.width<170||obsLight.height<40
+                    ||obsTwilightGroups.shownRows!==4
+                    ||obsSingleRow.width<170
+                    ||obsSingleRow.height<9
+                    ||obsRowTime.width<110
+                    ||obsRowTime.wrapMode!==Text.NoWrap)
                     return fixture.stop("OBSERVATION_INSTRUMENT_GEOMETRY_INVALID");
                 if(obsBoard.contextMeters[0].value!=="3.2"
                     ||obsBoard.contextMeters[1].value!=="473 KM/S"
@@ -239,9 +252,24 @@ ShellRoot {
                 if(activity.xrayFields[4].value!=="2026-11-06 12:00 UTC"
                     ||activity.cycleFields[10].value!=="185.0")
                     return fixture.stop("HISTORY_OR_PREDICTION_MISSING");
+                // A blank URL is intentional: exercise view controls without
+                // fetching NOAA or forcing a real image into offscreen CI.
+                if(!obsZoomButtons.visible||!obsExpandButton.visible
+                    ||obsSuviViewport.currentZoom!==1
+                    ||liveSuviViewport.currentZoom!==1)
+                    return fixture.stop("SUVI_CONTROLS_NOT_SCOPED");
+                liveSuviViewport.zoomAt(2,25,25);
+                if(liveSuviViewport.currentZoom!==1)
+                    return fixture.stop("LEGACY_SUVI_ZOOM_UNEXPECTED");
+                obsSuviViewport.zoomAt(2,40,40);
                 activity.selectedFlareIndex=1;
                 fixture.phase=1;
             }else if(fixture.phase===1){
+                if(obsSuviViewport.currentZoom!==2)
+                    return fixture.stop("SUVI_ZOOM_NOT_UPDATED");
+                obsSuviViewport.resetZoom();
+                if(obsSuviViewport.currentZoom!==1)
+                    return fixture.stop("SUVI_FIT_DID_NOT_RESET");
                 if(activity.selectedFlare.classLabel!=="C2.1"
                     ||activity.flareFields[0].value!=="C2.1"
                     ||activity.flareFields[5].value!=="0.000002100")

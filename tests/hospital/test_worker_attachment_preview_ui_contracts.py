@@ -51,6 +51,19 @@ check('root.availableProviders' in view and 'root.previewProviderId' in view,
 check('root.attachmentPreview.blockers' in view
       and 'root.attachmentPreview.notes' in view,
       "Blockers and review notes are visible")
+check('readonly property int previewPageSize: 10' in view
+      and 'root.previewAssignmentPage * root.previewPageSize' in view
+      and 'root.previewDoctorPage * root.previewPageSize' in view
+      and 'root.previewProviderPage * root.previewPageSize' in view,
+      "Each large selection list must render only a bounded page")
+check('root.previewAssignmentPage++' in view
+      and 'root.previewDoctorPage++' in view
+      and 'root.previewProviderPage++' in view,
+      "Every selection list must have forward pagination")
+check('root.previewAssignmentPage--' in view
+      and 'root.previewDoctorPage--' in view
+      and 'root.previewProviderPage--' in view,
+      "Every selection list must have backward pagination")
 check('root.attachmentPreview.facts' in view
       and 'root.attachmentPreview.headline' in view,
       "Exact selection and overall status remain visible")

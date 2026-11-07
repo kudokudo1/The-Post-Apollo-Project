@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "widgets/HospitalRegisteredWorkerView.qml"
+      - "widgets/HospitalW.qml"
       - "services/hospital/HospitalWorkerAttachmentActionService.qml"
       - "tests/hospital/test_worker_atomic_attach_ui_contracts.py"
       - "tests/hospital/test_worker_attachment_preview_ui_contracts.py"
@@ -13,6 +14,7 @@ on:
       - main
     paths:
       - "widgets/HospitalRegisteredWorkerView.qml"
+      - "widgets/HospitalW.qml"
       - "services/hospital/HospitalWorkerAttachmentActionService.qml"
       - "tests/hospital/test_worker_atomic_attach_ui_contracts.py"
       - "tests/hospital/test_worker_attachment_preview_ui_contracts.py"

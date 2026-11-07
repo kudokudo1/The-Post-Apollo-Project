@@ -31,12 +31,16 @@ Scope {
         roomsProcess.exec([
             "bash",
             "-lc",
-            'exec "$HOME/.local/bin/px" hospital rooms --json'
+            'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"; '
+                + '[ -x "$px" ] || px="$HOME/.local/bin/px"; '
+                + 'exec "$px" hospital rooms --json'
         ]);
         sessionsProcess.exec([
             "bash",
             "-lc",
-            'exec "$HOME/.local/bin/px" hospital sessions --json'
+            'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"; '
+                + '[ -x "$px" ] || px="$HOME/.local/bin/px"; '
+                + 'exec "$px" hospital sessions --json'
         ]);
         return true;
     }

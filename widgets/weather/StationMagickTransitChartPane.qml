@@ -3,6 +3,7 @@ import "../../components"
 import "StationMagickNatalWheelPolicy.js" as Chart
 import "StationMagickTransitComparisonPolicy.js" as Transit
 import "StationMagickWheelViewportPolicy.js" as Viewport
+import "StationMagickDateLocationPolicy.js" as Defaults
 
 // M8c // Dual-epoch chart, from TWO complete M8b/JPL results at one explicit
 // observer location. No hidden time now, forecast, guess, or persisted record.
@@ -43,10 +44,21 @@ Rectangle {
         const p=Viewport.boundedPan(panX+dx,panY+dy,fitRadius,zoom);
         panX=p.x;panY=p.y;
     }
-    function clearEntry(){dateEntry.text="";timeEntry.text="";}
-    onVisibleChanged: if(!visible)clearEntry()
+    function clearEntry(){dateText="";timeEntry.text="";timeText="";}
+    function setCurrentInstant(){
+        const current=Defaults.utcClock();
+        if(!current)return;
+        dateText=current.date;
+        timeEntry.text=current.time;
+    }
+    onVisibleChanged: {
+        if(visible){
+            if(!dateText)dateText=Defaults.utcDay();
+        }else clearEntry();
+    }
     onNatalDataChanged: {
         clearEntry();
+        if(visible)dateText=Defaults.utcDay();
         selectedTarget="sun";
         wheel.requestPaint();
     }
@@ -95,29 +107,40 @@ Rectangle {
             onClicked:transits.fit()
         }
     }
+    // M8d // Exactly the same month/day/year arrow controls as TASKS.
+    Row {
+        id: dateRow
+        anchors.top:sourceRow.bottom
+        anchors.left:parent.left
+        anchors.right:parent.right
+        anchors.topMargin:2
+        height:26
+        StationMagickUtcDateField {
+            id:dateEntry
+            width:parent.width
+            height:26
+            dateValue:transits.dateText
+            canEdit:!transits.loading
+            onDateEdited:function(date){transits.dateText=date;}
+        }
+    }
     Row {
         id: timeRow
-        anchors.top:sourceRow.bottom
+        anchors.top:dateRow.bottom
         anchors.left:parent.left
         anchors.right:parent.right
         anchors.topMargin:2
         height:25
         spacing:3
-        Rectangle {
-            width:Math.max(65,(timeRow.width-74-66-3*timeRow.spacing)*.64)
-            height:24
-            color:Colors.dark;border.width:1;border.color:Colors.blue
-            TextInput {
-                id:dateEntry
-                anchors.fill:parent;anchors.margins:3
-                color:Colors.white;font.pixelSize:10;font.family:"monospace"
-                maximumLength:10;selectByMouse:true
-                text:transits.dateText
-                onTextChanged:transits.dateText=text
-            }
+        QuietText {
+            width:52;height:24
+            text:"UTC TIME"
+            font.pixelSize:9
+            color:Colors.cyan
+            verticalAlignment:Text.AlignVCenter
         }
         Rectangle {
-            width:Math.max(45,(timeRow.width-74-66-3*timeRow.spacing)*.36)
+            width:Math.max(45,timeRow.width-52-54-74-66-4*timeRow.spacing)
             height:24
             color:Colors.dark;border.width:1;border.color:Colors.blue
             TextInput {
@@ -125,9 +148,17 @@ Rectangle {
                 anchors.fill:parent;anchors.margins:3
                 color:Colors.white;font.pixelSize:10;font.family:"monospace"
                 maximumLength:5;selectByMouse:true
+                inputMethodHints:Qt.ImhTime
                 text:transits.timeText
                 onTextChanged:transits.timeText=text
             }
+        }
+        ActionButton {
+            width:54;height:24
+            label:"NOW UTC";labelPixelSize:8
+            accentColor:Colors.yellow
+            available:!transits.loading
+            onClicked:transits.setCurrentInstant()
         }
         ActionButton {
             width:74;height:24
@@ -157,7 +188,7 @@ Rectangle {
         font.pixelSize:9
         elide:Text.ElideRight
         text:transits.loading?"JPL CALCULATION RUNNING":
-            "ENTER DATE YYYY-MM-DD / UTC HH:MM // "+
+            "UTC DATE: TASKS STEPPERS / TIME HH:MM // "+
             (transits.statusText||"NO TRANSIT LOADED")
     }
     Canvas {

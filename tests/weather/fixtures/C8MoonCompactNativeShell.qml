@@ -135,6 +135,10 @@ ShellRoot {
                     return root.fail("MAGICK_PHASE_OR_NEW_HIERARCHY_MISSING");
                 const disk=find(phase,"cosmos-c21-moon-hero-disk");
                 const phaseButtons=find(phase,"cosmos-c22-moon-phase-buttons");
+                console.log("C24_GEOMETRY // disk="+(disk?disk.width:-1)
+                    +" phase="+phase.width+"x"+phase.height
+                    +" controls="+(phaseButtons?phaseButtons.height:-1)
+                    +" count="+count(phase,"cosmos-c22-moon-phase-choice"));
                 if(!disk || !phaseButtons || !phase.prominentMoon
                     || disk.width<98 || phase.width<275
                     || count(phase,"cosmos-c22-moon-phase-choice")!==8)

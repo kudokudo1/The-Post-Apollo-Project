@@ -17,6 +17,7 @@ Rectangle {
     property string selectedContactUtc: ""
     property string selectedEventKind: "aspect"
     property string inspectionTarget: ""
+    property string inspectionNatal: ""
     onInspectionTargetChanged: {
         if(Transit.TARGETS.indexOf(inspectionTarget)>=0)
             selectedTarget=inspectionTarget;
@@ -354,6 +355,18 @@ Rectangle {
               ? "SIGNED SHIFT "+transits.selectedDelta.signed_delta_deg.toFixed(2)+
                 "° // CROSS-ASPECTS "+transits.relatedAspects.length
               : "SEPARATE UTC EPOCHS / SAME EXPLICIT OBSERVER AND JPL KERNEL"
+        }
+        QuietText {
+            width:parent.width
+            visible:transits.inspectionNatal!=="" &&
+                Transit.TARGETS.indexOf(transits.inspectionNatal)>=0
+            height:visible?18:0
+            color:Colors.yellow
+            font.pixelSize:9
+            elide:Text.ElideRight
+            text:"NATAL REFERENCE "+transits.inspectionNatal.toUpperCase()+
+                " × TRANSIT "+transits.selectedTarget.toUpperCase()+
+                " / VERIFIED MATRIX PAIR"
         }
         QuietText {
             width:parent.width

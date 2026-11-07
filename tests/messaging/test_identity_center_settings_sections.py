@@ -27,10 +27,11 @@ class IdentityCenterSettingsSectionsContracts(unittest.TestCase):
         self.assertNotIn("PopupWindow {", SECTIONS)
         self.assertNotIn("PanelWindow {", SECTIONS)
 
-    def test_all_five_sections_are_selectable_inside_same_workspace(self):
+    def test_all_six_sections_are_selectable_inside_same_workspace(self):
         ids = re.findall(r'\{\s*id: "([^"]+)", label: "([^"]+)"\s*\}', SECTIONS)
         self.assertEqual(ids, [
             ("PROFILE", "PROFILE"),
+            ("ID MANAGEMENT", "ID MANAGEMENT"),
             ("ORGANIZATIONS", "ORGANIZATIONS"),
             ("CONNECTED ACCOUNTS", "CONNECTED ACCOUNTS"),
             ("SECURITY", "SECURITY"),
@@ -44,6 +45,20 @@ class IdentityCenterSettingsSectionsContracts(unittest.TestCase):
         self.assertIn("selected: sections.activeSection === modelData.id", SECTIONS)
         self.assertIn("flickableDirection: Flickable.HorizontalFlick", SECTIONS)
         self.assertIn("clip: true", SECTIONS)
+
+    def test_id_management_main_mode_uses_existing_three_column_geometry(self):
+        self.assertIn('visible: sections.activeSection === "ID MANAGEMENT"', SECTIONS)
+        self.assertIn('activeSection !== "SOCIAL LAYOUT" && activeSection !== "ID MANAGEMENT"', SECTIONS)
+        self.assertIn("id: idManagementRow", SECTIONS)
+        for pane in ("idManagementListPane", "idManagementDetailsPane", "idManagementLinksPane"):
+            self.assertIn("id: " + pane, SECTIONS)
+        self.assertIn("anchors.top: navigationBackground.bottom", SECTIONS)
+        self.assertIn("anchors.bottom: parent.bottom", SECTIONS)
+        self.assertIn("model: sections.localIdRows", SECTIONS)
+        self.assertIn('label: "OPEN EXISTING ID EDITOR"', SECTIONS)
+        self.assertIn('onTriggered: sections.sectionRequested("SOCIAL LAYOUT")', SECTIONS)
+        self.assertNotIn("SocialIdentityStore.selectIdentity(", SECTIONS)
+        self.assertNotIn("SocialIdentityStore.createIdentity(", SECTIONS)
 
     def test_original_social_editors_remain_and_default_on_open(self):
         first = SELECTOR.index("onSettingsOpenChanged:")

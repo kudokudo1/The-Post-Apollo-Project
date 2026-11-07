@@ -1,0 +1,36 @@
+name: MAGICK M8e isolated native Quickshell acceptance preflight
+
+on:
+  pull_request:
+    paths:
+      - 'tests/weather/fixtures/M8eNativeMagickShell.qml'
+      - 'scripts/weather/verify_magick_native_m8e.sh'
+      - '.github/workflows/weather-magick-m8e-isolated-native.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-quickshell:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:unstable
+    timeout-minutes: 15
+    steps:
+      - name: Install disposable real Quickshell and Qt
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git nodejs quickshell qt6-qpa-plugins coreutils findutils \
+            qml6-module-qtquick-effects qml6-module-qt5compat-graphicaleffects
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: Load actual MAGICK QML and exercise UTC/TASKS/Home/transit with fake Home
+        run: bash scripts/weather/verify_magick_native_m8e.sh
+      - name: Preserve source-contract unit tests
+        run: |
+          node --test tests/weather/test_magick_date_location_m8d.js
+          node --test tests/weather/test_magick_natal_integration_m8b.js
+          node --test tests/weather/test_magick_transit_comparison_m8c.js

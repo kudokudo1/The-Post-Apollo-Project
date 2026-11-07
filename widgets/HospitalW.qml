@@ -264,6 +264,9 @@ PanelWindow {
             responsibilityService.refreshDurableGraph();
             if (!doctorService.refreshing)
                 doctorService.refresh();
+        } else {
+            root.requestOpenAudit();
+            root.ensureFirstRoomSelected();
         }
     }
 
@@ -854,7 +857,9 @@ PanelWindow {
     function ensureFirstRoomSelected() {
         const rows = auditService.rooms || [];
 
-        if (!menuOpen
+        // The WORKERS view must never auto-select a guessed Git Room.
+        // This also avoids a second immediate Room audit on first opening.
+        if (root.workforceRosterVisible || !menuOpen
                 || selectedRoomTeam
                 || !Array.isArray(rows)
                 || rows.length === 0)

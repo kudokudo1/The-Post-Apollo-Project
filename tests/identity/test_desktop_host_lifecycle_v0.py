@@ -42,7 +42,7 @@ class HostLifecycleIntegrationTests(unittest.TestCase):
         self.api_status = 200
         self.api_bogus = False
         self.host = self._host()
-        self.addCleanup(self.host.close)
+        self.addCleanup(lambda: self.host.close())
 
     def _clock(self) -> int:
         return self.time

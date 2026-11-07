@@ -1,6 +1,7 @@
 import QtQuick
 import qs.components
 import "../services/hospital"
+import "../services/hospital/HospitalWorkerSessionPolicy.js" as SessionPolicy
 
 // Exact durable Room / pinned PX Session inspection. No room-bind,
 // no session-create, no browser-chat access and no automatic agent turns.
@@ -17,16 +18,11 @@ Item {
     property string actionError: ""
 
     readonly property bool roomMatches:
-        !!pinnedRoomId && String(roomData.roomId || "") === pinnedRoomId
+        SessionPolicy.roomMatches(roomData, pinnedRoomId)
     readonly property bool sessionMatches:
-        roomMatches && !!pinnedSessionId
-        && String(roomData.sessionId || "") === pinnedSessionId
-        && roomData.hasActiveSession === true
-    readonly property bool runtimeSessionMatches: {
-        const payload = runtime.lastStatusPayload || {};
-        const session = payload.session || {};
-        return String(session.id || session.sessionId || "") === pinnedSessionId;
-    }
+        SessionPolicy.sessionMatches(roomData, pinnedRoomId, pinnedSessionId)
+    readonly property bool runtimeSessionMatches:
+        SessionPolicy.statusMatches(runtime.lastStatusPayload, pinnedSessionId)
     readonly property bool canCommand:
         active && sessionMatches && runtimeStatusVerified
         && runtimeSessionMatches && !runtime.lastError
@@ -50,12 +46,19 @@ Item {
 
     function runQuick(commandValue) {
         const command = String(commandValue || "").trim().toUpperCase();
-        if (!canCommand) {
-            actionError = "SESSION NOT VERIFIED // REFRESH STATUS";
-            return false;
-        }
-        if (runtime.operating && command !== "STATUS" && command !== "PAUSE") {
-            actionError = "WORKER ALREADY OPERATING // USE STATUS OR PAUSE";
+        const allowed = SessionPolicy.canIssueQuick({
+            command: command,
+            active: root.active,
+            sessionMatches: root.sessionMatches,
+            runtimeStatusVerified: root.runtimeStatusVerified,
+            runtimeSessionMatches: root.runtimeSessionMatches,
+            hasError: !!runtime.lastError,
+            busy: runtime.refreshing || runtime.cancelling
+                || runtime.quickRunning || runtime.feedbackRunning,
+            operating: runtime.operating
+        });
+        if (!allowed) {
+            actionError = "QUICK REFUSED // UNVERIFIED, BLOCKED, OR OPERATING";
             return false;
         }
         actionError = "";

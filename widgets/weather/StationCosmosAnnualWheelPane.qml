@@ -10,12 +10,14 @@ Rectangle {
     clip: true
 
     property string subject: "moon"  // "moon" or "sun"
+    property string moonView: "year"  // "year" or "forecast" on MOON
     property var weatherService: null
     property real runtimeNowMs: 0
     signal routeRequested(string path)
 
     readonly property bool isMoon: subject === "moon"
-    readonly property string annualView: isMoon ? "moon" : "solar"
+    readonly property string annualView:
+        isMoon ? (moonView === "forecast" ? "forecast" : "moon") : "solar"
     readonly property int contentInset: isMoon ? 6 : 0
     readonly property var wheelItem: annualWheel
 
@@ -34,7 +36,7 @@ Rectangle {
 
         ActionButton {
             objectName: "cosmos-c11-back-to-moon"
-            width: Math.max(1,(lunarModeRail.width-lunarModeRail.spacing)/2)
+            width: Math.max(1,(lunarModeRail.width-2*lunarModeRail.spacing)/3)
             height: 21
             label: "PHASE + POSITION"
             labelPixelSize: 9
@@ -43,13 +45,26 @@ Rectangle {
             onClicked: annualFocus.routeRequested("cosmos/moon/ephemeris")
         }
         ActionButton {
-            width: Math.max(1,(lunarModeRail.width-lunarModeRail.spacing)/2)
+            objectName: "cosmos-c17-moon-wheel-tab"
+            width: Math.max(1,(lunarModeRail.width-2*lunarModeRail.spacing)/3)
             height: 21
-            label: "YEAR"
+            label: "LUNAR WHEEL"
             labelPixelSize: 9
             contentPadding: 1
-            selected: true
-            accentColor: Colors.magenta
+            selected: annualFocus.moonView !== "forecast"
+            accentColor: selected ? Colors.magenta : Colors.cyan
+            onClicked: annualFocus.routeRequested("cosmos/moon/year")
+        }
+        ActionButton {
+            objectName: "cosmos-c17-moon-forecast-tab"
+            width: Math.max(1,(lunarModeRail.width-2*lunarModeRail.spacing)/3)
+            height: 21
+            label: "FORECAST"
+            labelPixelSize: 9
+            contentPadding: 1
+            selected: annualFocus.moonView === "forecast"
+            accentColor: selected ? Colors.magenta : Colors.cyan
+            onClicked: annualFocus.routeRequested("cosmos/moon/forecast")
         }
     }
 
@@ -59,7 +74,10 @@ Rectangle {
     StationMagickAnnualCalendarPane {
         id: annualWheel
         objectName: annualFocus.isMoon
-            ? "cosmos-c11-moon-year-wheel" : "cosmos-c11-sun-year-wheel"
+            ? (annualFocus.moonView === "forecast"
+                ? "cosmos-c17-moon-forecast-panel"
+                : "cosmos-c11-moon-year-wheel")
+            : "cosmos-c11-sun-year-wheel"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -71,6 +89,7 @@ Rectangle {
 
         view: annualFocus.annualView
         lockedView: annualFocus.annualView
+        compactForecast: annualFocus.isMoon && annualFocus.moonView === "forecast"
         weatherService: annualFocus.weatherService
         runtimeNowMs: annualFocus.runtimeNowMs
     }

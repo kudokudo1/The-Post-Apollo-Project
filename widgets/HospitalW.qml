@@ -275,9 +275,9 @@ PanelWindow {
             return false;
         }
         const name = String(rosterDoctorNameField.text || "").trim();
-        if (!name || name.length > 96) {
+        if (name.length > 96) {
             root.rosterIdentityMessage =
-                "WORKER NAME // ENTER 1 TO 96 CHARACTERS";
+                "WORKER NAME // 96 CHARACTERS MAXIMUM";
             return false;
         }
         root.rosterIdentityMessage = "WORKER NAME // SAVING";
@@ -6143,7 +6143,7 @@ PanelWindow {
                         || doctorNameService.lastError
                         || doctorService.lastError
                         || root.rosterIdentityMessage
-                        || "EMPTY ROOM NAME RESETS TO TECHNICAL LABEL // NO ID OR ROLE CHANGES"
+                        || "EMPTY NAME RESETS TO TECHNICAL LABEL // IDS AND STAFF ROLES UNCHANGED"
                     font.pixelSize: 9
                     color: roomNameService.lastError || doctorNameService.lastError
                         || doctorService.lastError

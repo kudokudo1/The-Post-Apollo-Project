@@ -33,6 +33,10 @@ class SocialIdentitySourceContracts(unittest.TestCase):
     def test_user_intent_only_and_safe_fallback(self):
         self.assertIn("function createIdentity(name, mode, copyFromId)", STORE)
         self.assertIn("function selectIdentity(id)", STORE)
+        self.assertIn("function renameIdentity(id, name)", STORE)
+        self.assertIn("function renameIdentity(doc, id, name)", POLICY)
+        self.assertIn("IdentityPolicy.renameIdentity(", STORE)
+        self.assertIn("identityActionError", STORE)
         self.assertIn('? "unsupported" : "error"', STORE)
         self.assertIn("identityFile.reload()", STORE)
         self.assertIn("pendingDocument = result.document", STORE)

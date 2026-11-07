@@ -63,7 +63,7 @@ class FollowTests(unittest.TestCase):
         self.assertIn('camera.margins.left + camera.glowGutter + zoomActorLeft', QML)
         self.assertIn('width: zoomActorWidth, height: zoomActorHeight', QML)
         self.assertNotIn('id: zoomStatusRefreshTimer', QML)
-        self.assertIn('menuOpen && !zoomWebDocked', QML)
+        self.assertIn('menuOpen && !zoomWebVisualHeld', QML)
 
     def test_input_hole_remains_fail_closed_on_misalignment(self):
         self.assertIn('zoomWebDocked = aligned;', QML)
@@ -73,7 +73,9 @@ class FollowTests(unittest.TestCase):
         self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0', QML)
         self.assertIn('height: camera.zoomWebDocked ? camera.zoomInputHeight : 0', QML)
         self.assertIn('y: camera.zoomInputTop', QML)
-        self.assertIn('readonly property int zoomVisualTopOverlap: 12', QML)
+        self.assertNotIn('zoomVisualTopOverlap', QML)
+        self.assertIn('id: zoomWebFollowTargetDebounce', QML)
+        self.assertIn('onTriggered: camera.sendZoomFollowTarget()', QML)
         self.assertIn('zoomActorTop, cameraBodyColumn.y + cameraModes.y + cameraModes.height)', QML)
         self.assertIn('zoomFollowProcess.running = true;', QML)
 

@@ -155,12 +155,18 @@ test("store serializes atomic writes, respects errors and does not pre-write emp
     assert.match(src,/queuedDocument !== null \? queuedDocument/);
     assert.match(src,/if \(pendingDocument !== null\)/);
     assert.match(src,/queuedDocument = result\.document/);
+    assert.match(src,/writeDispatchTimer\.start\(\)/);
+    assert.match(src,/id: writeDispatchTimer/);
     assert.match(src,/root\.startWrite\(waiting\)/);
     assert.match(src,/root\.favoritesSaved\(saved\.revision\)/);
     assert.match(src,/root\.favoritesSaveFailed\(root\.errorCode\)/);
     assert.match(read("services/favorites/qmldir"),
         /singleton FavoritesDefaultStore 1\.0 FavoritesDefaultStore\.qml/);
     assert.doesNotMatch(src,/execDetached|Process\s*\{|restart\(|setTimeout|onFileChanged/);
+    const dispatch=src.split("function startWrite(next)")[1].split("function requestFeature")[0];
+    assert.doesNotMatch(dispatch,/preferencesFile\.setText/);
+    const harness=read("scripts/favorites/verify_default_store_fedora_u1.sh");
+    assert.match(harness,/phase=\$phase contained failure marker/);
 });
 
 test("no existing favorites owners, data or authority are read or rewritten",()=>{

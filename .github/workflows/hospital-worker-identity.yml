@@ -5,6 +5,7 @@ on:
     paths:
       - "widgets/HospitalW.qml"
       - "services/hospital/HospitalRoomNameService.qml"
+      - "services/hospital/HospitalDoctorNameService.qml"
       - "services/hospital/HospitalWorkforceRosterPolicy.js"
       - "services/hospital/HospitalResponsibilityService.qml"
       - "tests/hospital/test_worker_identity_editor_contracts.py"
@@ -17,6 +18,7 @@ on:
     paths:
       - "widgets/HospitalW.qml"
       - "services/hospital/HospitalRoomNameService.qml"
+      - "services/hospital/HospitalDoctorNameService.qml"
       - "services/hospital/HospitalWorkforceRosterPolicy.js"
       - "services/hospital/HospitalResponsibilityService.qml"
       - "tests/hospital/test_worker_identity_editor_contracts.py"

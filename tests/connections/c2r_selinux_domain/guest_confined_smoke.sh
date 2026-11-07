@@ -136,6 +136,13 @@ journalctl -u "$unit" --no-pager | grep -Fq 'C2R_PASS // SELINUX_REFUSED_WORLD_R
 echo "C2R_PASS // DEDICATED_CONFINED_SERVICE_DOMAIN_AND_NEGATIVE_ACCESS_DENIAL"
 [[ "$context" == *:*:*:* ]] || bad "service context not recorded"
 
+# C3b performs independent read-only checks against the live, explicitly
+# started fake status host. It cannot issue credentials or change the service.
+echo "C3B_VERIFY_BEGIN // REAL_ENFORCING_FEDORA_GUEST"
+GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1 \
+  "$python" -I -B /root/c2q/C3bOriginCheck.py \
+  || bad "C3b D-Bus / systemd / proc / SELinux origin mismatch"
+
 check c2q-reader status OBSERVED_UNVERIFIED
 check c2q-reader approve METHOD_REFUSED
 check c2q-reader claim OWN_REFUSED

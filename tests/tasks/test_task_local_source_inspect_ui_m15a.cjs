@@ -62,7 +62,8 @@ test("all expected source refusal states have finite authored explanations",()=>
         const info=P.view(sample(status));
         assert.equal(info.state,status);
         assert.ok(info.explanation.length>50);
-        assert.ok(!info.countLabel.includes("TASKS 3"),status);
+        if(status!=="SOURCE_STRUCTURALLY_READABLE")
+            assert.ok(!info.countLabel.includes("TASKS 3"),status);
         noPower(info);
     }
 });

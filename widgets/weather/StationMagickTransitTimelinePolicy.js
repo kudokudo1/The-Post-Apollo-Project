@@ -6,6 +6,9 @@ var RESULT_FORMAT="post-apollo.weather.magick-transit-timeline-result.m8f.v1";
 var TARGETS=["sun","moon","mercury","venus","mars_barycenter",
     "jupiter_barycenter","saturn_barycenter","uranus_barycenter",
     "neptune_barycenter","pluto_barycenter"];
+var NAIF={sun:10,moon:301,mercury:199,venus:299,
+    mars_barycenter:4,jupiter_barycenter:5,saturn_barycenter:6,
+    uranus_barycenter:7,neptune_barycenter:8,pluto_barycenter:9};
 var ASPECT_NAMES={conjunction:0,sextile:60,square:90,trine:120,opposition:180};
 var DEFAULT_ASPECTS=[0,60,90,120,180];
 var SPANS=[1,7,14,31];
@@ -40,10 +43,11 @@ function validNatal(chart) {
        chart.observer.longitude_deg< -180||chart.observer.longitude_deg>180||
        typeof chart.epoch_utc!=="string"||
        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(chart.epoch_utc)||
+       !isFinite(utc(chart.epoch_utc))||
        !Array.isArray(chart.positions)||chart.positions.length!==10)return false;
     for(var i=0;i<10;i++){
         var v=chart.positions.find(function(p){return p.id===TARGETS[i];});
-        if(!v||typeof v.longitude_deg!=="number"||
+        if(!v||v.naif_id!==NAIF[v.id]||typeof v.longitude_deg!=="number"||
            !isFinite(v.longitude_deg)||v.longitude_deg<0||
            v.longitude_deg>=360)return false;
     }
@@ -113,6 +117,15 @@ function validate(result,req,chart){
             longitude_deg:row.longitude_deg,
             relative_deg:row.relative_unwrapped_deg});
         last=ms;
+    }
+    if(result.sample_count!==Math.ceil((to-from)/(req.sample_minutes*60000))+1)
+        return fail("SAMPLE COUNT INCONSISTENT");
+    for(var j=0;j<positions.length;j++){
+        var v=positions[j];
+        var expected=((v.longitude_deg-result.natal_longitude_deg)%360+360)%360;
+        var reported=((v.relative_deg%360)+360)%360;
+        if(separation(expected,reported)>0.002)
+            return fail("SAMPLE LONGITUDES INCONSISTENT");
     }
     if(positions[0].ms!==from||positions[positions.length-1].ms!==to)
         return fail("TIMELINE BOUNDARIES INCOMPLETE");

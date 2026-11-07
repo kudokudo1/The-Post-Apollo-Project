@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Actual disposable D-Bus daemon/process pilot; never a production trust test."""
 import asyncio
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
 from dbus_next import Message, MessageType
@@ -178,6 +180,104 @@ class C2mPrivateBusTests(unittest.TestCase):
         args = methods[0].findall("arg")
         self.assertEqual([a.attrib["direction"] for a in args], ["out"])
         self.assertEqual([a.attrib["type"] for a in args], ["s"])
+
+
+class C3aOwnerPinningTests(unittest.TestCase):
+    """Deterministic owner-switch tests, alongside the actual bus tests above."""
+
+    def simulated_inspection(self, owners):
+        spec = importlib.util.spec_from_file_location("c3a_c2m_pilot", PILOT)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        pilot = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(pilot)
+        routes = []
+        seen = []
+
+        class Daemon:
+            async def call_get_name_owner(self, name):
+                self_name = owners[min(len(seen), len(owners) - 1)]
+                seen.append(self_name)
+                if self_name is None:
+                    raise RuntimeError("simulated owner disappeared")
+                return self_name
+
+            async def call_get_connection_unix_user(self, owner):
+                if owner != owners[0]:
+                    raise RuntimeError("wrong owner UID lookup")
+                return 1100
+
+        daemon = Daemon()
+
+        class Service:
+            async def call_get_status(self):
+                return pilot._payload()
+
+        class Proxy:
+            def __init__(self, service):
+                self.service = service
+
+            def get_interface(self, name):
+                return daemon if self.service == "daemon" else Service()
+
+        class Bus:
+            async def connect(self):
+                return self
+
+            async def introspect(self, destination, path):
+                routes.append(("introspect", destination, path))
+                if destination not in {"org.freedesktop.DBus", owners[0]}:
+                    raise RuntimeError("must never call the replaceable name")
+                return object()
+
+            def get_proxy_object(self, destination, path, xml):
+                routes.append(("proxy", destination, path))
+                if destination == "org.freedesktop.DBus":
+                    return Proxy("daemon")
+                if destination != owners[0]:
+                    raise RuntimeError("must use pinned unique owner")
+                return Proxy("service")
+
+            def disconnect(self):
+                routes.append(("disconnect", "", ""))
+
+        with patch.object(pilot, "MessageBus", side_effect=lambda bus_address: Bus()):
+            result = asyncio.run(pilot._inspect("unix:path=/ci-only"))
+        return result, routes
+
+    def assert_never_granted(self, result):
+        for key in ("hostAuthenticated", "credentialPresent", "grantActive",
+                    "canApprove", "canUseApi"):
+            self.assertIs(result[key], False, (key, result))
+
+    def test_09_stable_unique_owner_pins_all_service_calls(self):
+        result, routes = self.simulated_inspection([":1.42", ":1.42"])
+        self.assertEqual(result["status"], "OBSERVED_UNVERIFIED")
+        self.assertEqual(result["state"], "IDLE")
+        for action in ("introspect", "proxy"):
+            self.assertIn((action, ":1.42", OBJ_PATH), routes)
+        self.assertNotIn(("introspect", BUS_NAME, OBJ_PATH), routes)
+        self.assertNotIn(("proxy", BUS_NAME, OBJ_PATH), routes)
+        self.assert_never_granted(result)
+
+    def test_10_owner_switch_after_response_fails_closed(self):
+        result, routes = self.simulated_inspection([":1.42", ":1.43"])
+        self.assertEqual(result["status"], "HOST_OWNER_CHANGED")
+        self.assertEqual(result["state"], "")
+        self.assert_never_granted(result)
+        self.assertIn(("proxy", ":1.42", OBJ_PATH), routes)
+
+    def test_11_owner_disappearance_after_response_fails_closed(self):
+        result, _ = self.simulated_inspection([":1.42", None])
+        self.assertEqual(result["status"], "HOST_OWNER_CHANGED")
+        self.assert_never_granted(result)
+
+    def test_12_forged_nonunique_name_fails_before_service_call(self):
+        result, routes = self.simulated_inspection([BUS_NAME])
+        self.assertEqual(result["status"], "RESPONSE_INVALID")
+        self.assertNotIn(("proxy", BUS_NAME, OBJ_PATH), routes)
+        self.assert_never_granted(result)
+
 
 
 if __name__ == "__main__":

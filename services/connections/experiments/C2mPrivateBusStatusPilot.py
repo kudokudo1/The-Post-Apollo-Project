@@ -9,6 +9,7 @@ Do not import this module into Quickshell or any credential broker.
 import asyncio
 import json
 import os
+import re
 import signal
 import sys
 
@@ -99,14 +100,27 @@ async def _inspect(address):
             owner = await daemon.call_get_name_owner(NAME)
         except Exception:
             return denied("HOST_NOT_FOUND")
+        # Name ownership is a moving pointer. Bind the read to the unique
+        # connection returned by the daemon, not the replaceable public name.
+        if not isinstance(owner, str) or not re.fullmatch(
+                r":[0-9]+(?:\.[0-9]+)+", owner):
+            return denied("RESPONSE_INVALID")
         try:
-            # This UID is from the bus daemon, not a self-asserted service field.
+            # The UID comes from the daemon, not the service's JSON payload.
+            # A bus-reported UID remains insufficient for app authentication.
             owner_uid = await daemon.call_get_connection_unix_user(owner)
-            xml = await bus.introspect(NAME, PATH)
-            obj = bus.get_proxy_object(NAME, PATH, xml)
+            xml = await bus.introspect(owner, PATH)
+            obj = bus.get_proxy_object(owner, PATH, xml)
             reply = await obj.get_interface(IFACE).call_get_status()
         except Exception:
             return denied("RESPONSE_INVALID")
+        # An owner replacement during the exchange invalidates this snapshot.
+        # Missing owner also fails closed; neither situation grants anything.
+        try:
+            if await daemon.call_get_name_owner(NAME) != owner:
+                return denied("HOST_OWNER_CHANGED")
+        except Exception:
+            return denied("HOST_OWNER_CHANGED")
         return _project(reply, owner_uid, os.geteuid())
     finally:
         bus.disconnect()

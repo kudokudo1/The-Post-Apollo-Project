@@ -5,6 +5,12 @@ on:
     paths:
       - 'widgets/CpuPlusW.qml'
       - 'widgets/cpuplus/CpuPlusIdManagementPane.qml'
+      - 'widgets/cpuplus/CpuPlusIdVerifiedContextPane.qml'
+      - 'tests/cpuplus/test_cpuplus_identity_host_context_v0.py'
+      - 'widgets/messanger/IdentityCenterOrganizationDisplayReader.qml'
+      - 'services/identity/identity_display_reader_cli_v0.py'
+      - 'MODEL/contracts/identity-center-cpuplus-host-context-view-v0.md'
+      - 'MODEL/README.md'
       - 'widgets/cpuplus/CpuPlusIdDetailsEditor.qml'
       - 'widgets/cpuplus/CpuPlusIdOrganizationLinksEditor.qml'
       - 'tests/cpuplus/test_cpuplus_id_organization_links.py'
@@ -27,6 +33,12 @@ on:
     paths:
       - 'widgets/CpuPlusW.qml'
       - 'widgets/cpuplus/CpuPlusIdManagementPane.qml'
+      - 'widgets/cpuplus/CpuPlusIdVerifiedContextPane.qml'
+      - 'tests/cpuplus/test_cpuplus_identity_host_context_v0.py'
+      - 'widgets/messanger/IdentityCenterOrganizationDisplayReader.qml'
+      - 'services/identity/identity_display_reader_cli_v0.py'
+      - 'MODEL/contracts/identity-center-cpuplus-host-context-view-v0.md'
+      - 'MODEL/README.md'
       - 'widgets/cpuplus/CpuPlusIdDetailsEditor.qml'
       - 'widgets/cpuplus/CpuPlusIdOrganizationLinksEditor.qml'
       - 'tests/cpuplus/test_cpuplus_id_organization_links.py'
@@ -59,6 +71,10 @@ jobs:
         run: |
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_management_main_mode.py' -v
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_management_editor.py' -v
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_identity_host_context_v0.py' -v
+          node tests/messaging/test_identity_center_ipc_viewer_v0.cjs
+          python3 -m unittest discover -s tests/identity -p 'test_identity_display_reader_cli_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_context_projection_v0.py' -v
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_organization_links.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_org_links_v1.py' -v
           node tests/messaging/test_social_identity_policy.cjs

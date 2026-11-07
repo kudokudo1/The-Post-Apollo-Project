@@ -234,6 +234,15 @@ Item {
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap
                 }
+
+                // Independent host-returned membership preview. A selected
+                // local layout ID is never interpreted as a host principal.
+                CpuPlusIdVerifiedContextPane {
+                    id: verifiedHostContextPane
+                    width: parent.width
+                    height: implicitHeight
+                    activeMode: pane.area === "overview" && pane.visible
+                }
             }
 
             Column {

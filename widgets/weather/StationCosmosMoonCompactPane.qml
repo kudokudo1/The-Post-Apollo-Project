@@ -172,7 +172,9 @@ Rectangle {
         Column {
             id: moonMain
             objectName: "cosmos-c20-moon-primary-instruments"
-            width: Math.max(1,Math.round((heroRow.width-heroRow.spacing)*0.57))
+            // Moon-first: give the primary instrument 65% of the stage.
+            // Right-side forecast logic and rendering remain unchanged.
+            width: Math.max(1,Math.round((heroRow.width-heroRow.spacing)*0.65))
             height: heroRow.height
             spacing: 4
 
@@ -181,9 +183,10 @@ Rectangle {
                 id: moonVisual
                 objectName: "cosmos-c8-moon-phase"
                 width: moonMain.width
-                height: Math.max(90,Math.round(
-                    (moonMain.height-2*moonMain.spacing)*0.62))
+                height: Math.max(90,moonMain.height-positionColumn.height
+                    -provenanceRow.height-2*moonMain.spacing)
                 compactMode: true
+                prominentMoon: true
                 showMoon: true
                 showSun: false
                 moonReady: moonPane.moonReady
@@ -205,8 +208,9 @@ Rectangle {
                 id: positionColumn
                 objectName: "cosmos-c9-moon-tall-position"
                 width: moonMain.width
-                height: Math.max(41,Math.round(
-                    (moonMain.height-2*moonMain.spacing)*0.23))
+                // One compact line of key measurements under the hero.
+                height: Math.max(23,Math.min(30,
+                    Math.round(moonMain.height*0.11)))
                 color: Colors.dark
                 border.width: 1
                 border.color: Colors.cyan
@@ -218,7 +222,8 @@ Rectangle {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 2
-                    height: 11
+                    height: 0
+                    visible: false
                     text: "CURRENT SKY // POSITION"
                     color: Colors.cyan
                     font.pixelSize: 8
@@ -228,8 +233,9 @@ Rectangle {
                     id: currentSkyFacts
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    anchors.top: currentSkyTitle.bottom
+                    anchors.top: parent.top
                     anchors.bottom: parent.bottom
+                    anchors.topMargin: 2
                     anchors.leftMargin: 3
                     anchors.rightMargin: 3
                     anchors.bottomMargin: 2
@@ -242,10 +248,10 @@ Rectangle {
                             readonly property var info: moonPane.facts[modelData]
                             width: Math.max(1,(currentSkyFacts.width-6)/3)
                             height: currentSkyFacts.height
-                            spacing: 1
+                            spacing: 0
                             QuietText {
                                 width: parent.width
-                                height: 10
+                                height: 9
                                 text: info ? info.label : "--"
                                 color: Colors.cyan
                                 font.pixelSize: 8
@@ -253,7 +259,7 @@ Rectangle {
                             }
                             GohuText {
                                 width: parent.width
-                                height: Math.max(1,currentSkyFacts.height-11)
+                                height: Math.max(1,currentSkyFacts.height-9)
                                 text: info ? info.value : "--"
                                 font.pixelSize: 10
                                 color: modelData===4 ? Colors.yellow : Colors.white
@@ -270,8 +276,10 @@ Rectangle {
                 id: provenanceRow
                 objectName: "cosmos-c9-moon-free-provenance"
                 width: moonMain.width
-                height: Math.max(1,moonMain.height-moonVisual.height
-                    -positionColumn.height-2*moonMain.spacing)
+                // Preserve all three provenance facts in a shallow one-line
+                // shelf; extra vertical space now belongs to the Moon disk.
+                height: Math.max(23,Math.min(30,
+                    Math.round(moonMain.height*0.11)))
                 spacing: 3
                 Repeater {
                     model: 3

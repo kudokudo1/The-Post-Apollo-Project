@@ -1,0 +1,43 @@
+name: Hospital Worker Identity Editor
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalW.qml"
+      - "services/hospital/HospitalRoomNameService.qml"
+      - "services/hospital/HospitalWorkforceRosterPolicy.js"
+      - "services/hospital/HospitalResponsibilityService.qml"
+      - "tests/hospital/test_worker_identity_editor_contracts.py"
+      - "tests/hospital/test_workforce_roster_policy.js"
+      - "tests/hospital/test_workforce_roster_ui_contracts.py"
+      - ".github/workflows/hospital-worker-identity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalW.qml"
+      - "services/hospital/HospitalRoomNameService.qml"
+      - "services/hospital/HospitalWorkforceRosterPolicy.js"
+      - "services/hospital/HospitalResponsibilityService.qml"
+      - "tests/hospital/test_worker_identity_editor_contracts.py"
+      - "tests/hospital/test_workforce_roster_policy.js"
+      - "tests/hospital/test_workforce_roster_ui_contracts.py"
+      - ".github/workflows/hospital-worker-identity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify roster projection and old identity rules
+        run: |
+          node --check services/hospital/HospitalWorkforceRosterPolicy.js
+          node tests/hospital/test_workforce_roster_policy.js
+      - name: Verify identity editor scope and existing Surgery contracts
+        run: |
+          python3 tests/hospital/test_worker_identity_editor_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py
+          python3 tests/hospital/test_main_mode_keyboard_contracts.py

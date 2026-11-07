@@ -25,6 +25,8 @@ MODEL describes architecture, ownership, contracts, services, and subsystem rela
 
 **Navigation / classification only.** These links identify contracts in their *current* paths; they do not rename, certify, relocate or supersede the originals.
 
+- **Favorites++ U0 provider contract (draft, read-only):** [Stable identities, optional capabilities, and legacy projection without writer takeover](./contracts/favorites-universal-u0.md). No existing storage migration, global UI or runtime activation.
+
 - **TASKS / storage ownership architectural decision (operator-selected direction; design only):** [M12l local-first coordinator, separate GitHub/format adapters, and deferral of a privileged broker](./contracts/tasks-storage-ownership-adr-m12l.md). Evidence includes M12j's isolated native receipts, M12k's independently tested same-UID writer limitations, and official local-first/synchronization references. No production writer approval or activation.
 
 - **Weather Station / Observatory worker recovery (proposed plan):** [Backend-first master roadmap](../docs/weather-station-backend-first-roadmap.md) covers connected sources, shared Hi-Fi radio, terminal/viewer architecture, remaining domains and acceptance gates. It is a proposed staged plan, not a live Hospital Assignment or implementation certification. The [Syntagma rules entry](https://github.com/kudokudo1/Meta-Apollo-Logos-How-I-Think/blob/main/AGENTS.md) owns shared operator/semantic guidance; this repository owns QML implementation and local technical contracts.

@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationMagickTransitMultiPolicy.js" as Multi
+import "StationMagickTransitEventBrowserPolicy.js" as Browser
 import "StationMagickDateLocationPolicy.js" as Defaults
 
 // M8h // Selected natal reference + up to three moving JPL body trajectories.
@@ -20,6 +21,10 @@ Rectangle {
     property var selectedAspects:[0,60,90,120,180]
     property string browserKind:"ALL"
     property string browserPlanet:""
+    property string browserAspect:"ALL"
+    property string browserMotion:"ALL"
+    property int pageIndex:0
+    property string inspectedEventKey:""
     property bool descending:false
     property real zoom:1
     property real panX:0
@@ -30,15 +35,26 @@ Rectangle {
     readonly property bool busy:!!finder&&finder.loading
     readonly property var model:finder&&finder.ready?finder.result:null
     readonly property var geometry:Multi.graph(model,plot.width,plot.height)
-    readonly property var visibleEvents:Multi.browserEvents(
-        model,browserKind,browserPlanet,descending)
+    readonly property var visibleEvents:Browser.filtered(
+        model,browserKind,browserPlanet,descending,browserAspect,browserMotion)
+    readonly property var pageData:Browser.page(
+        model,browserKind,browserPlanet,descending,
+        browserAspect,browserMotion,pageIndex)
+    readonly property var inspectedEvent:Browser.inspect(model,inspectedEventKey)
     readonly property bool canSearch:Multi.request(natalData,startDate,spanDays,
         natalBody,selectedBodies,selectedAspects,sampleMinutes)!==null&&!busy
     readonly property var palette:[Colors.cyan,Colors.magenta,Colors.orange]
 
     function invalidated(){
         selectedEventKey="";
+        inspectedEventKey="";
+        pageIndex=0;
         if(finder&&finder.ready)finder.clearState();
+    }
+    function resetBrowse(){
+        pageIndex=0;
+        eventScroll.contentY=0;
+        plot.requestPaint();
     }
     onStartDateChanged:invalidated()
     onSpanDaysChanged:invalidated()
@@ -78,7 +94,9 @@ Rectangle {
     function search(){
         if(!finder||!canSearch)return;
         selectedEventKey="";
-        browserPlanet="";browserKind="ALL";descending=false;
+        browserPlanet="";browserKind="ALL";browserAspect="ALL";
+        browserMotion="ALL";descending=false;pageIndex=0;
+        inspectedEventKey="";
         finder.search(startDate,spanDays,natalBody,
             selectedBodies,selectedAspects,sampleMinutes);
     }
@@ -95,8 +113,19 @@ Rectangle {
         panX=x-(x-panX-plot.width/2)*(next/zoom)-plot.width/2;
         zoom=next;clampPan();
     }
-    function eventKey(e){
-        return e.utc+"|"+e.transit_body+"|"+e.type+"|"+e.aspect;
+    function eventKey(e){return Browser.eventKey(e);}
+    function inspectEvent(e){
+        if(!model||!model.ready||!e)return;
+        const key=eventKey(e);
+        if(!model.events.some(function(row){return eventKey(row)===key;}))return;
+        inspectedEventKey=key;
+        selectedEventKey=key;
+    }
+    function goPage(direction){
+        const next=pageData.index+direction;
+        if(next<0||next>=pageData.pages)return;
+        pageIndex=next;
+        eventScroll.contentY=0;
     }
     function chooseEvent(e){
         if(!model||!model.ready||!e)return;
@@ -105,12 +134,20 @@ Rectangle {
         selectedEventKey=eventKey(e);
         eventRequested(e.utc,e.transit_body,e.type);
     }
-    onModelChanged:plot.requestPaint()
+    onModelChanged:{
+        inspectedEventKey="";
+        selectedEventKey="";
+        pageIndex=0;
+        plot.requestPaint();
+    }
     onGeometryChanged:plot.requestPaint()
     onZoomChanged:plot.requestPaint()
     onPanXChanged:plot.requestPaint()
-    onBrowserKindChanged:plot.requestPaint()
-    onBrowserPlanetChanged:plot.requestPaint()
+    onBrowserKindChanged:resetBrowse()
+    onBrowserPlanetChanged:resetBrowse()
+    onBrowserAspectChanged:resetBrowse()
+    onBrowserMotionChanged:resetBrowse()
+    onDescendingChanged:resetBrowse()
     onSelectedEventKeyChanged:plot.requestPaint()
 
     Row {

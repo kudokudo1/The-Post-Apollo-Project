@@ -9,7 +9,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname,
     "../../services/hospital/HospitalWorkerConnectionPolicy.js"), "utf8"), ctx);
 
 const base = {
-    roomId: "room-42", repository: "org/project", patientId: "patient-9",
+    roomId: "room-42", repository: "org/project", patientId: "patient-9", branch: "map-integration",
     roomDoctorId: "doctor-7", sessionDoctorId: "doctor-7",
     roomProviderId: "codex", sessionProviderId: "codex",
     bedPath: "/synthetic/worktree", sessionWorkingDirectory: "/synthetic/worktree",
@@ -40,6 +40,8 @@ assert.match(good.next, /PX must still check/);
 assert.equal(good.checks.every(x=>x.ok), true);
 assert.equal(ctx.inspect({...base, assignmentStatus: ""}).canRequestTurn, true);
 check({roomId: ""}, "NO_ROOM");
+check({repository: ""}, "NO_PATIENT");
+check({branch: ""}, "NO_BRANCH");
 check({sessionId: "", hasActiveSession: false}, "NO_SESSION");
 check({sessionStatus: "FAILED", hasActiveSession: false}, "ENDED_SESSION");
 check({sessionEndedAt: "2026-11-07", hasActiveSession: false}, "ENDED_SESSION");

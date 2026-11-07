@@ -70,6 +70,12 @@ function inspect(roomValue) {
     if (!roomId) {
         code = "NO_ROOM"; label = "NO ROOM";
         next = "Register a durable Room identity first.";
+    } else if (!valueOf(room.repository)) {
+        code = "NO_PATIENT"; label = "PATIENT NOT LINKED";
+        next = "Bind a Patient repository to this Room before provider dispatch.";
+    } else if (!valueOf(room.branch)) {
+        code = "NO_BRANCH"; label = "BRANCH NOT LINKED";
+        next = "Verify the approved Room branch and Bed before provider dispatch.";
     } else if (!sessionId) {
         code = "NO_SESSION"; label = "NO SESSION";
         next = "Attach an approved PX Session to this Room; browser tabs are external.";

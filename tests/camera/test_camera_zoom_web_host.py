@@ -156,7 +156,7 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('id: cleanupPage', QML[page_start:])
         self.assertNotIn('id: zoomPage', QML[page_start:])
 
-    def test_zoom_host_and_input_mask_share_the_exact_frame_viewport(self):
+    def test_zoom_host_follows_viewport_and_cutout_stays_below_mode_buttons(self):
         self.assertIn('readonly property int zoomBayInset: Math.max(0, Math.round(zoomViewport.x))', QML)
         self.assertIn('readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))', QML)
         self.assertIn('readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))', QML)
@@ -165,6 +165,9 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('"--width", String(zoomActorWidth), "--height", String(zoomActorHeight)', QML)
         self.assertIn('x: camera.zoomActorLeft', QML)
         self.assertIn('y: camera.zoomInputTop', QML)
+        self.assertIn('height: camera.zoomWebDocked ? camera.zoomInputHeight : 0', QML)
+        self.assertIn('zoomInputTop: Math.max(', QML)
+        self.assertIn('zoomInputHeight: Math.max(', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
         # A verified browser has no overlapping QML fallback controls.
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
@@ -186,9 +189,9 @@ class ZoomWebHostTests(unittest.TestCase):
             '"--width", String(zoomActorWidth), "--height", String(zoomActorHeight)',
             'width: zoomActorWidth, height: zoomActorHeight',
             'x: camera.zoomActorLeft',
-            'y: camera.zoomActorTop',
+            'y: camera.zoomInputTop',
             'width: camera.zoomWebDocked ? camera.zoomActorWidth : 0',
-            'height: camera.zoomWebDocked ? camera.zoomActorHeight : 0'
+            'height: camera.zoomWebDocked ? camera.zoomInputHeight : 0'
         ):
             self.assertIn(expr, QML)
         # Current code/measurement arithmetic, not a new Sway offset.

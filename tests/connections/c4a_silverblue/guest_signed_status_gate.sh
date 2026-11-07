@@ -52,7 +52,21 @@ check_installed() {
   [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}\n' "$pkg")" == \
      "$pkg 0.1 noarch" ]] ||
     die "WRONG_INSTALLED_PACKAGE"
-  rpm -V "$pkg" || die "RPMDB_CONTENT_INTEGRITY_FAILED"
+  # rpm-ostree composes an OSTree deployment whose immutable /usr files can
+  # have different mtimes from the original signed RPM. rpm -V marks ONLY
+  # this field with T. Never tolerate a hash, size, mode, owner, group,
+  # capabilities, symlink, missing-path or other verification failure.
+  if verify_out="$(LC_ALL=C rpm -V "$pkg" 2>&1)"; then
+    echo "C4A_PASS // BOOTED_RPMDB_FULL_FILE_VERIFICATION"
+  else
+    expected_timestamps="$(
+      printf '.......T.    %s\n' "$host" "$unitpath" "$buspolicy" | LC_ALL=C sort
+    )"
+    observed_timestamps="$(printf '%s\n' "$verify_out" | LC_ALL=C sort)"
+    [[ "$observed_timestamps" == "$expected_timestamps" ]] ||
+      die "RPMDB_CONTENT_INTEGRITY_FAILED"
+    echo "C4A_PASS // BOOTED_RPMDB_TIMESTAMP_ONLY_DRIFT_EXACT_THREE_FILES"
+  fi
   for item in "$host" "$unitpath" "$buspolicy"; do
     [[ -f "$item" && ! -L "$item" ]] ||
       die "MISSING_OR_SYMLINKED_PACKAGE_FILE"

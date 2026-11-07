@@ -1,0 +1,47 @@
+name: Hospital Worker Connection Audit
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalWorkforceRosterPolicy.js"
+      - "services/hospital/HospitalWorkerConnectionPolicy.js"
+      - "tests/hospital/test_worker_connection_policy.js"
+      - "tests/hospital/test_worker_connection_ui_contracts.py"
+      - "tests/hospital/test_workforce_roster_policy.js"
+      - ".github/workflows/hospital-worker-connections.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalWorkforceRosterPolicy.js"
+      - "services/hospital/HospitalWorkerConnectionPolicy.js"
+      - "tests/hospital/test_worker_connection_policy.js"
+      - "tests/hospital/test_worker_connection_ui_contracts.py"
+      - "tests/hospital/test_workforce_roster_policy.js"
+      - ".github/workflows/hospital-worker-connections.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  connection-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Connection policy syntax and behavioral regression
+        run: |
+          node --check services/hospital/HospitalWorkerConnectionPolicy.js
+          node --check services/hospital/HospitalWorkforceRosterPolicy.js
+          node tests/hospital/test_worker_connection_policy.js
+          node tests/hospital/test_workforce_roster_policy.js
+      - name: Existing Hospital worker controls remain safe
+        run: |
+          python3 tests/hospital/test_worker_connection_ui_contracts.py
+          python3 tests/hospital/test_registered_worker_routes.py
+          python3 tests/hospital/test_worker_attention_ui_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py
+          python3 tests/hospital/test_main_mode_keyboard_contracts.py

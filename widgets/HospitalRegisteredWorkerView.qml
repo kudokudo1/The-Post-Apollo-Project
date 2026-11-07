@@ -3,6 +3,7 @@ import qs.components
 import "../services/hospital"
 import "../services/hospital/HospitalWorkerSessionPolicy.js" as SessionPolicy
 import "../services/hospital/HospitalWorkerAttentionPolicy.js" as WorkerAttentionPolicy
+import "../services/hospital/HospitalWorkerConnectionPolicy.js" as ConnectionPolicy
 
 // Exact durable Room / pinned PX Session inspection. No room-bind,
 // no session-create, no browser-chat access and no automatic agent turns.
@@ -19,6 +20,14 @@ Item {
     property string actionError: ""
     readonly property var recordedAttention:
         WorkerAttentionPolicy.describe(root.roomData)
+    readonly property var connectionPlan:
+        ConnectionPolicy.inspect(root.roomData)
+    readonly property color connectionColor:
+        connectionPlan.canRequestTurn ? Colors.cyan
+        : connectionPlan.code === "DOCTOR_MISMATCH"
+          || connectionPlan.code === "PROVIDER_MISMATCH"
+          || connectionPlan.code === "BED_MISMATCH" ? Colors.red
+        : Colors.orange
     readonly property color recordedAttentionColor:
         recordedAttention.severity >= 3 ? Colors.red
         : recordedAttention.severity === 2 ? Colors.orange
@@ -54,7 +63,8 @@ Item {
 
     function runQuick(commandValue) {
         const command = String(commandValue || "").trim().toUpperCase();
-        const allowed = SessionPolicy.canIssueQuick({
+        const allowed = ConnectionPolicy.allowsCommand(root.roomData, command)
+            && SessionPolicy.canIssueQuick({
             command: command,
             active: root.active,
             sessionMatches: root.sessionMatches,
@@ -66,7 +76,8 @@ Item {
             operating: runtime.operating
         });
         if (!allowed) {
-            actionError = "QUICK REFUSED // UNVERIFIED, BLOCKED, OR OPERATING";
+            actionError = "QUICK REFUSED // " + root.connectionPlan.label
+                + " // CHECK CONNECTIONS OR PX AUTHORITY";
             return false;
         }
         actionError = "";
@@ -75,7 +86,8 @@ Item {
 
     onActiveChanged: {
         if (active) {
-            viewMode = initialMode === "quick" ? "quick" : "chat";
+            viewMode = initialMode === "connections" ? "connections"
+                : initialMode === "quick" ? "quick" : "chat";
             reload();
         } else {
             runtimeStatusVerified = false;
@@ -191,6 +203,14 @@ Item {
         }
         GohuText {
             width: parent.width
+            text: "CONNECTION // " + root.connectionPlan.label
+                + " // " + root.connectionPlan.next
+            color: root.connectionColor
+            font.pixelSize: 9
+            elide: Text.ElideRight
+        }
+        GohuText {
+            width: parent.width
             text: "PX SESSION // " + (root.pinnedSessionId || "NONE")
                 + "  |  RECORDED // "
                 + String(root.roomData.sessionStatus || "NO SESSION")
@@ -221,10 +241,10 @@ Item {
         GohuText {
             width: parent.width
             text: root.runtimeStatusVerified
-                ? "LIVE PX STATUS // " + runtime.displayStatus
+                ? "PX STATUS READ // " + runtime.displayStatus
                   + "  |  " + String(runtime.lastActivityText || "NO ACTIVITY TEXT")
                 : root.sessionMatches
-                  ? "LIVE PX STATUS // UNVERIFIED OR REFRESHING"
+                  ? "PX STATUS READ // UNVERIFIED OR REFRESHING"
                   : "SESSION UNAVAILABLE // VIEW DURABLE ROOM TRANSCRIPT ONLY"
             color: root.runtimeStatusVerified ? Colors.green : Colors.orange
             font.pixelSize: 9
@@ -245,22 +265,31 @@ Item {
         height: 30
         spacing: 7
         HospitalActionButton {
-            width: (parent.width - 7) / 2
+            width: (parent.width - 14) / 3
             height: parent.height
-            label: "ROOM CHAT // READ ONLY"
+            label: "CHAT // SAVED" 
             compactIcon: "CHAT"
             selectedAction: root.viewMode === "chat"
             accent: Colors.cyan
             onTriggered: root.viewMode = "chat"
         }
         HospitalActionButton {
-            width: (parent.width - 7) / 2
+            width: (parent.width - 14) / 3
             height: parent.height
-            label: "QUICK // PINNED SESSION"
+            label: "QUICK // PX" 
             compactIcon: "QUICK"
             selectedAction: root.viewMode === "quick"
             accent: Colors.orange
             onTriggered: root.viewMode = "quick"
+        }
+        HospitalActionButton {
+            width: (parent.width - 14) / 3
+            height: parent.height
+            label: "CONNECTIONS"
+            compactIcon: "LINK"
+            selectedAction: root.viewMode === "connections"
+            accent: root.connectionColor
+            onTriggered: root.viewMode = "connections"
         }
     }
 
@@ -346,6 +375,88 @@ Item {
             visible: root.viewMode === "chat" && scrollable
         }
 
+        Flickable {
+            id: connectionsScroll
+            visible: root.viewMode === "connections"
+            anchors.fill: parent
+            clip: true
+            contentWidth: width
+            contentHeight: connectionsRows.height
+            boundsBehavior: Flickable.StopAtBounds
+
+            Column {
+                id: connectionsRows
+                width: connectionsScroll.width
+                spacing: 7
+
+                GohuText {
+                    width: parent.width
+                    text: "PX BINDINGS // " + root.connectionPlan.label
+                    font.pixelSize: 12
+                    color: root.connectionColor
+                    elide: Text.ElideRight
+                }
+                GohuText {
+                    width: parent.width
+                    text: root.connectionPlan.next
+                    font.pixelSize: 10
+                    color: Colors.orange
+                    wrapMode: Text.Wrap
+                }
+                Repeater {
+                    model: root.connectionPlan.checks
+                    Rectangle {
+                        required property var modelData
+                        width: connectionsRows.width
+                        height: 42
+                        color: Colors.black
+                        border.width: 1
+                        border.color: modelData.ok ? Colors.cyan : Colors.orange
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 6
+                            spacing: 4
+                            GohuText {
+                                width: parent.width
+                                text: (modelData.ok ? "✓  " : "!  ")
+                                    + String(modelData.label || "")
+                                font.pixelSize: 9
+                                color: modelData.ok ? Colors.green : Colors.orange
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: String(modelData.detail || "")
+                                font.pixelSize: 9
+                                color: Colors.white
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: root.runtimeStatusVerified
+                        ? "PX STATUS RECORD // EXACT SESSION ID CHECKED"
+                        : "PX STATUS RECORD // NOT YET VERIFIED"
+                    font.pixelSize: 9
+                    color: root.runtimeStatusVerified ? Colors.green : Colors.orange
+                }
+                GohuText {
+                    width: parent.width
+                    text: "A status read proves the PX record was accessible, not that the Provider can answer a turn. No connection is created here."
+                    font.pixelSize: 9
+                    color: Colors.blue
+                    wrapMode: Text.Wrap
+                }
+            }
+        }
+
+        NeonScrollBar {
+            flickable: connectionsScroll
+            handleStyle: "star"
+            visible: root.viewMode === "connections" && scrollable
+        }
+
         Column {
             visible: root.viewMode === "quick"
             anchors.fill: parent
@@ -353,9 +464,11 @@ Item {
 
             GohuText {
                 width: parent.width
-                text: root.canCommand
-                    ? "EXACT SESSION VERIFIED // CHOOSE ONE COMMAND"
-                    : "QUICK LOCKED // NO VERIFIED ACTIVE PX SESSION"
+                text: !root.canCommand
+                    ? "QUICK LOCKED // EXACT PX SESSION NOT VERIFIED"
+                    : root.connectionPlan.canRequestTurn
+                      ? "PX SESSION VERIFIED // REQUEST SUBJECT TO BACKEND PREFLIGHT"
+                      : "WORKER NOT READY // STATUS ONLY; SEE CONNECTIONS"
                 font.pixelSize: 10
                 color: root.canCommand ? Colors.green : Colors.orange
                 wrapMode: Text.Wrap
@@ -378,6 +491,8 @@ Item {
                         compactIcon: modelData === "CONTINUE" ? "GO" : modelData
                         accent: modelData === "PAUSE" ? Colors.orange : Colors.cyan
                         enabledAction: root.canCommand
+                            && ConnectionPolicy.allowsCommand(
+                                root.roomData, modelData)
                             && (!runtime.operating || modelData === "STATUS"
                                 || modelData === "PAUSE")
                         onTriggered: root.runQuick(modelData)
@@ -413,7 +528,7 @@ Item {
         GohuText {
             anchors.fill: parent
             anchors.margins: 7
-            text: "PX ONLY // Not a ChatGPT browser tab. CHAT is read-only; QUICK acts only after operator click and exact Session verification."
+            text: "PX ONLY // Not a ChatGPT browser tab. CHAT is read-only. CONNECTIONS are saved bindings; QUICK requires PX authority."
             font.pixelSize: 9
             color: Colors.cyan
             wrapMode: Text.Wrap

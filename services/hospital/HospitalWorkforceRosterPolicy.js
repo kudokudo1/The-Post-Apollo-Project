@@ -69,13 +69,24 @@ function buildRoster(rooms, sessions, doctors) {
             nameIsFallback: !textValue(room.displayName),
             team: textValue(room.team),
             repository: textValue(room.repository),
+            patientId: textValue(room.patientId),
             patientLabel: textValue(room.patientLabel),
             branch: textValue(room.branch),
             doctorId: doctorId,
             doctorName: doctorName(doctorId, doctors),
+            // Preserve both ends. A matching fallback label is not proof
+            // that Room staffing and the selected Session agree.
+            roomDoctorId: textValue(room.doctorId),
+            sessionDoctorId: session ? textValue(session.doctorId) : "",
+            roomProviderId: textValue(room.providerId),
+            sessionProviderId: session ? textValue(session.providerId) : "",
             providerId: textValue(
                 (session && session.providerId) || room.providerId
             ),
+            providerSessionId: session ? textValue(session.providerSessionId) : "",
+            sessionWorkingDirectory: session ? textValue(session.workingDirectory) : "",
+            bedPath: textValue(room.bedPath),
+            sessionActivePid: session ? Number(session.activePid || 0) : 0,
             assignmentId: textValue(room.assignmentId),
             assignmentTitle: textValue(room.assignmentTitle),
             assignmentStatus: textValue(room.assignmentStatus).toUpperCase(),

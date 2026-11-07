@@ -62,6 +62,11 @@ jobs:
           assert 'C2V_INSTALL_WORKER_STARTED_IN_SEPARATE_CGROUP' in guest
           assert 'C2V_MONITOR_STARTED_IN_SEPARATE_CGROUP' in guest
           assert 'C2V_MONITOR_HANDOFF_COMPLETE' in guest
+          assert 'C2V_MONITOR_ERR' in guest
+          assert 'C2V_MONITOR_EXIT' in guest
+          assert 'C2V_MONITOR_ITERATION_DONE' in guest
+          assert 'C2V_MONITOR_STATUS_QUERY_FAILED' in guest
+          assert 'C2V_HOST_MONITOR_EVIDENCE' in host
           assert 'C2V_MONITOR_REBOOT_REQUESTED' in guest
           assert '--unit=c2v-rpm-layer-monitor' in guest
           assert '[[ "$monitor_ready" == 1 ]]' in guest

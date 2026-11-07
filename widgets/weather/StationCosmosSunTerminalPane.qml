@@ -11,7 +11,7 @@ Rectangle {
     color: Colors.black
     clip: true
 
-    property string terminalMode: "live" // live | position | activity
+    property string terminalMode: "live" // observation | live | position | activity
     property var weatherService: null
     property var spaceService: null
     property var skyFeed: null
@@ -97,7 +97,8 @@ Rectangle {
         id: activeTerminal
         objectName: "cosmos-c12-active-board"
         anchors.fill: parent
-        sourceComponent: sunTerminal.terminalMode==="position" ? positionBoard
+        sourceComponent: sunTerminal.terminalMode==="observation" ? observationBoard
+            : sunTerminal.terminalMode==="position" ? positionBoard
             : sunTerminal.terminalMode==="activity" ? activityBoard : liveBoard
     }
 
@@ -388,6 +389,205 @@ Rectangle {
                     +"   •   "+(sunTerminal.xray && sunTerminal.xray.ready
                         ? (sunTerminal.xray.sampleFresh ? "XRS CURRENT" : "XRS STALE")
                         : "XRS UNAVAILABLE")
+            }
+        }
+    }
+
+    // OBSERVATION // keep live image and solar arc as large, simultaneous
+    // instruments. The related telemetry, position and twilight readings
+    // occupy three fixed lower lanes; this panel never scrolls.
+    Component {
+        id: observationBoard
+        Item {
+            id: observation
+            objectName: "cosmos-c14-observation-board"
+            anchors.fill: parent
+            readonly property bool roomy: width >= 620 && height >= 330
+            readonly property int captionSize: roomy ? 10 : 8
+            readonly property int readingSize: roomy ? 14 : 9
+            readonly property int liveRowHeight: roomy ? 40 : 23
+            readonly property int skyRowHeight: roomy ? 44 : 25
+            readonly property int lightRowHeight: roomy ? 78 : 50
+            readonly property var liveReadings: [
+                {name:"X-RAY // GOES",value:sunTerminal.xray && sunTerminal.xray.ready
+                    ? sunTerminal.show(sunTerminal.xray.classEquivalent.label) : "--",
+                 border:Colors.yellow},
+                {name:"FLARES // 24H",value:sunTerminal.flares && sunTerminal.flares.ready
+                    ? sunTerminal.flares.count24h+" EVENTS" : "--",
+                 border:Colors.magenta},
+                {name:"SUVI CHANNEL",value:sunTerminal.sourceSpace
+                    ? sunTerminal.sourceSpace.solarImageInfo.shortLabel : "--",
+                 border:Colors.cyan},
+                {name:"XRS STATUS",value:sunTerminal.xray && sunTerminal.xray.ready
+                    ? (sunTerminal.xray.sampleFresh ? "CURRENT" : "STALE") : "WAITING",
+                 border:Colors.blue}
+            ]
+
+            Row {
+                id: observationHeroes
+                objectName: "cosmos-c14-observation-heroes"
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: Math.max(1,observation.height-observation.liveRowHeight
+                    -observation.skyRowHeight-observation.lightRowHeight-13)
+                spacing: 5
+
+                StationCosmosSunInstrumentPane {
+                    objectName: "cosmos-c14-suvi-hero"
+                    width: Math.max(1,Math.round((observationHeroes.width-5)*0.52))
+                    height: observationHeroes.height
+                    modeRoute: "cosmos/sun/suvi"
+                    sourceSpace: sunTerminal.sourceSpace
+                    spaceService: sunTerminal.spaceService
+                }
+                StationCosmosVisualInstruments {
+                    objectName: "cosmos-c14-sun-path-hero"
+                    width: Math.max(1,observationHeroes.width-5
+                        -Math.round((observationHeroes.width-5)*0.52))
+                    height: observationHeroes.height
+                    compactMode: true
+                    showMoon: false
+                    showSun: true
+                    astronomySummary: sunTerminal.astronomy
+                    twilightSummary: sunTerminal.twilight
+                    currentSolarPosition: sunTerminal.solarFix
+                    providerLocalMinute: sunTerminal.skyFeed
+                        ? sunTerminal.skyFeed.focusedLocalMinute : -1
+                    solarDate: sunTerminal.skyFeed
+                        ? sunTerminal.skyFeed.focusedCivilDate : ""
+                    solarCivilOffsetMinutes: sunTerminal.skyFeed
+                        ? sunTerminal.skyFeed.moonCivilOffsetMinutes : null
+                    solarOffsetSource: sunTerminal.skyFeed
+                        ? sunTerminal.skyFeed.moonCivilOffsetSource : "UNKNOWN"
+                    latitude: sunTerminal.weatherService
+                        ? sunTerminal.weatherService.latitude : ""
+                    longitude: sunTerminal.weatherService
+                        ? sunTerminal.weatherService.longitude : ""
+                }
+            }
+
+            Row {
+                id: observationLive
+                objectName: "cosmos-c14-live-telemetry"
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: observationHeroes.bottom
+                anchors.topMargin: 3
+                height: observation.liveRowHeight
+                spacing: 3
+                Repeater {
+                    model: observation.liveReadings
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(1,(observationLive.width-9)/4)
+                        height: observationLive.height
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: modelData.border
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            spacing: 1
+                            QuietText {
+                                width: parent.width
+                                text: modelData.name
+                                color: modelData.border
+                                font.pixelSize: observation.captionSize
+                                elide: Text.ElideRight
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: modelData.value
+                                color: Colors.white
+                                font.pixelSize: observation.readingSize
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
+            }
+
+            Row {
+                id: observationSky
+                objectName: "cosmos-c14-position-live-strip"
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: observationLive.bottom
+                anchors.topMargin: 3
+                height: observation.skyRowHeight
+                spacing: 3
+                Repeater {
+                    model: sunTerminal.positionStrip
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(1,(observationSky.width-12)/5)
+                        height: observationSky.height
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.blue
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            spacing: 1
+                            QuietText {
+                                width: parent.width
+                                text: modelData.name
+                                color: Colors.cyan
+                                font.pixelSize: observation.captionSize
+                                elide: Text.ElideRight
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: modelData.value
+                                color: Colors.yellow
+                                font.pixelSize: observation.readingSize
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
+            }
+            Grid {
+                id: observationLight
+                objectName: "cosmos-c14-twilight-ledger"
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: observationSky.bottom
+                anchors.topMargin: 3
+                anchors.bottom: parent.bottom
+                columns: 4
+                spacing: 3
+                Repeater {
+                    model: sunTerminal.positionRows
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(1,(observationLight.width-9)/4)
+                        height: Math.max(1,(observationLight.height-3)/2)
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.orange
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            spacing: 1
+                            QuietText {
+                                width: parent.width
+                                text: modelData.name
+                                color: Colors.cyan
+                                font.pixelSize: observation.captionSize
+                                elide: Text.ElideRight
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: modelData.value
+                                color: Colors.white
+                                font.pixelSize: observation.readingSize
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
             }
         }
     }

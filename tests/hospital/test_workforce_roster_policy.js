@@ -14,7 +14,8 @@ const rooms = [
     { id: "job-2", team: "finance", repository: "owner/finance",
       doctorId: "doc-2", providerId: "codex", assignmentId: "42" },
     { id: "job-1", team: "map", repository: "owner/company",
-      doctorId: "doc-1", assignmentId: "41",
+      doctorId: "doc-1", providerId: "hermes", bedPath: "/tmp/map-bed",
+      assignmentId: "41", patientId: "patient-1",
       assignmentTitle: "Integrate Company Map", assignmentStatus: "ACTIVE" },
     { id: "job-1", team: "DUPLICATE" },
     { id: "" }
@@ -24,6 +25,8 @@ const sessions = [
       status: "FAILED", updatedAt: "2026-11-06 09:00:00" },
     { id: "s-now", roomId: "job-1", doctorId: "doc-1",
       providerId: "hermes", status: "IDLE",
+      providerSessionId: "provider-91", workingDirectory: "/tmp/map-bed",
+      activePid: 0,
       lastError: "turn needs provider token", lastExitCode: 21,
       updatedAt: "2026-11-07 08:00:00" },
     { id: "s-failed", roomId: "job-2", doctorId: "doc-2",
@@ -40,6 +43,19 @@ assert.equal(roster[1].name, "map");
 assert.equal(roster[1].doctorName, "Map Specialist");
 assert.equal(roster[1].sessionId, "s-now");
 assert.equal(roster[1].sessionStatus, "IDLE");
+assert.equal(roster[1].roomDoctorId, "doc-1");
+assert.equal(roster[1].sessionDoctorId, "doc-1");
+assert.equal(roster[1].roomProviderId, "hermes");
+assert.equal(roster[1].sessionProviderId, "hermes");
+assert.equal(roster[1].providerSessionId, "provider-91");
+assert.equal(roster[1].sessionWorkingDirectory, "/tmp/map-bed");
+assert.equal(roster[1].bedPath, "/tmp/map-bed");
+assert.equal(roster[1].patientId, "patient-1");
+assert.equal(roster[0].providerSessionId, "");
+assert.equal(roster[0].sessionWorkingDirectory, "");
+assert.equal(roster[0].roomProviderId, "codex");
+assert.equal(roster[0].sessionProviderId, "");
+
 assert.equal(roster[1].sessionLastError, "turn needs provider token");
 assert.equal(roster[1].sessionLastExitCode, 21);
 assert.equal(roster[1].sessionEndedAt, "");

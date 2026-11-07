@@ -68,8 +68,13 @@ def _private_directory(path: Path, *, create: bool) -> bool:
         if create:
             path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
         info = path.parent.lstat()
+        # Post-Apollo already uses this shared state directory. Its normal
+        # user-owned 0755 permissions are safe for an owner-only 0600
+        # preference file and 0600 lock: other users can list filenames but
+        # cannot read or write the record. Do not chmod the shared directory,
+        # and still refuse group/other writable or symlinked directories.
         return (stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid()
-                and info.st_mode & 0o077 == 0)
+                and info.st_mode & 0o022 == 0)
     except FileNotFoundError:
         return not create  # Missing store is an unapproved state.
     except OSError:

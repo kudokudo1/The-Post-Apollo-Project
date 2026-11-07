@@ -103,6 +103,19 @@ function inspect(roomValue) {
     } else if (assignmentStatus && assignmentStatus !== "ACTIVE") {
         code = "ASSIGNMENT_INACTIVE"; label = "ASSIGNMENT NOT ACTIVE";
         next = "Review Assignment status; do not auto-activate or override.";
+    } else if (status === "REVIEW" || status === "WAITING") {
+        code = "SESSION_HOLD"; label = "SESSION NEEDS REVIEW";
+        next = "Session records a hold; inspect the reason before any new turn.";
+    } else if (status === "PAUSED") {
+        code = "SESSION_PAUSED"; label = "SESSION PAUSED";
+        next = "Deliberate pause; review before an authorized resume.";
+    } else if (status === "OPERATING" || status === "THINKING"
+            || Number(room.sessionActivePid || 0) > 0) {
+        code = "SESSION_BUSY"; label = "SESSION RECORDED BUSY";
+        next = "Do not issue another worker turn over in-flight work.";
+    } else if (status !== "IDLE") {
+        code = "UNKNOWN_STATE"; label = "SESSION STATE UNKNOWN";
+        next = "PX must resolve the recorded Session state before dispatch.";
     } else {
         code = "STRUCTURED";
         label = "PX PREFLIGHT NEEDED";

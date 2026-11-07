@@ -115,7 +115,7 @@ def structural_counts(data) -> tuple[int, int] | None:
 def check(source: Path) -> dict:
     # The actual production QML supplies the existing singleton's path;
     # this CLI refusal is not a general OS authorization capability.
-    if (type(source) is not Path or not source.is_absolute()
+    if (not isinstance(source, Path) or not source.is_absolute()
             or source.name != FILENAME or len(str(source)) > 4096
             or os.path.normpath(str(source)) != str(source)
             or "\x00" in str(source)):

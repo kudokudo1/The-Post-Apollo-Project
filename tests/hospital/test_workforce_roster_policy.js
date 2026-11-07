@@ -24,6 +24,7 @@ const sessions = [
       status: "FAILED", updatedAt: "2026-11-06 09:00:00" },
     { id: "s-now", roomId: "job-1", doctorId: "doc-1",
       providerId: "hermes", status: "IDLE",
+      lastError: "turn needs provider token", lastExitCode: 21,
       updatedAt: "2026-11-07 08:00:00" },
     { id: "s-failed", roomId: "job-2", doctorId: "doc-2",
       status: "FAILED", endedAt: "2026-11-07 08:30:00" }
@@ -39,6 +40,11 @@ assert.equal(roster[1].name, "map");
 assert.equal(roster[1].doctorName, "Map Specialist");
 assert.equal(roster[1].sessionId, "s-now");
 assert.equal(roster[1].sessionStatus, "IDLE");
+assert.equal(roster[1].sessionLastError, "turn needs provider token");
+assert.equal(roster[1].sessionLastExitCode, 21);
+assert.equal(roster[1].sessionEndedAt, "");
+assert.equal(roster[0].sessionLastError, "");
+assert.equal(roster[0].sessionEndedAt, "2026-11-07 08:30:00");
 assert.equal(roster[1].hasActiveSession, true);
 assert.equal(roster[1].assignmentId, "41");
 assert.equal(roster[1].assignmentTitle, "Integrate Company Map");
@@ -56,6 +62,8 @@ const renamed = policy.buildRoster(
 assert.equal(renamed[0].name, "Company Map");
 assert.equal(renamed[0].nameIsFallback, false);
 assert.equal(renamed[0].sessionStatus, "NO SESSION");
+assert.equal(renamed[0].sessionLastError, "");
+assert.equal(renamed[0].sessionLastExitCode, null);
 assert.equal(renamed[0].hasActiveSession, false);
 assert.equal(policy.buildRoster([{ id: "branch-only" }], [], []).length, 1);
 assert.equal(policy.buildRoster([], [{ roomId: "phantom" }], []).length, 0);

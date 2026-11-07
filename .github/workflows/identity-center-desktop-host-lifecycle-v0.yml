@@ -1,0 +1,55 @@
+name: Identity Center Explicit Desktop Host Lifecycle V0
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/desktop_host_lifecycle_v0.py'
+      - 'tests/identity/test_desktop_host_lifecycle_v0.py'
+      - 'services/identity/desktop_session_host_v0.py'
+      - 'services/identity/native_loopback_callback_v0.py'
+      - 'services/identity/private_context_ipc_v0.py'
+      - 'services/identity/desktop_context_projection_v0.py'
+      - 'MODEL/contracts/identity-center-host-lifecycle-integration-v0.md'
+      - 'MODEL/README.md'
+      - '.github/workflows/identity-center-desktop-host-lifecycle-v0.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/desktop_host_lifecycle_v0.py'
+      - 'tests/identity/test_desktop_host_lifecycle_v0.py'
+      - 'services/identity/desktop_session_host_v0.py'
+      - 'services/identity/native_loopback_callback_v0.py'
+      - 'services/identity/private_context_ipc_v0.py'
+      - 'services/identity/desktop_context_projection_v0.py'
+      - 'MODEL/contracts/identity-center-host-lifecycle-integration-v0.md'
+      - 'MODEL/README.md'
+      - '.github/workflows/identity-center-desktop-host-lifecycle-v0.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle:
+    name: Explicit test-host callback + scoped API + private IPC
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile identity host and lifecycle tests
+        run: |
+          python3 -m py_compile services/identity/desktop_host_lifecycle_v0.py
+          python3 -m py_compile tests/identity/test_desktop_host_lifecycle_v0.py
+      - name: Execute explicit host lifecycle integration
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_host_lifecycle_v0.py' -v
+      - name: Preserve host token and private IPC boundaries
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_session_host_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_native_loopback_callback_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_private_context_ipc_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_context_projection_v0.py' -v
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_identity_host_context_v0.py' -v

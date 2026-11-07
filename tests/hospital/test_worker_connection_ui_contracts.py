@@ -86,7 +86,8 @@ check("A status read proves the PX record was accessible" in view
       and "Not a ChatGPT browser tab" in view,
       "No false live provider or browser connection claims")
 check("CHAT is read-only" in view, "Previous Chat limitation remains explained")
-check('text: "PX STATUS READ // "' in view,
+check('"PX STATUS READ // "' in view
+      and '"LIVE PX STATUS // "' not in view,
       "PX database status must not masquerade as a live heartbeat")
 check("sessionMatches(roomData, roomId, sessionId)" in session,
       "No structural link can bypass Session identity policy")

@@ -163,6 +163,10 @@ PROBE
 #!/usr/bin/bash
 set -Eeuo pipefail
 exec >/dev/ttyS0 2>&1
+# Preserve the exact first failing command and exit status; a successful
+# systemd-run start does not prove its later transient unit stayed healthy.
+trap 'rc=$?; echo "C2V_MONITOR_ERR // rc=$rc line=$LINENO command=$BASH_COMMAND"' ERR
+trap 'rc=$?; echo "C2V_MONITOR_EXIT // rc=$rc"' EXIT
 echo "C2V_MONITOR_READY // $(date --iso-8601=seconds)"
 echo ready > /run/c2v-monitor-ready
 pkg=postapollo-connections-c2t-fixture
@@ -182,6 +186,7 @@ for attempt in $(seq 1 50); do
   echo "C2V_INSTALL_WATCHDOG // independent-monitor-attempt=$attempt"
   tail -n 5 "$log" 2>/dev/null || true
   if timeout --signal=TERM --kill-after=5s 12s rpm-ostree status --json > "$staged_json" 2>/dev/null; then
+    echo "C2V_MONITOR_STATUS_QUERY_OK // attempt=$attempt bytes=$(wc -c < "$staged_json")"
     if python3 - "$staged_json" "$pkg" <<'C2V_PENDING_CHECK'
 import json,sys
 with open(sys.argv[1],encoding="utf-8") as fp:
@@ -210,7 +215,11 @@ C2V_PENDING_CHECK
       echo "C2V_MONITOR_REBOOT_REQUESTED // verified pending deployment"
       systemctl reboot --no-block || fail "REBOOT_REQUEST_FAILED"
       exit 0
+    else
+      echo "C2V_MONITOR_PENDING_JSON_REJECTED // attempt=$attempt"
     fi
+  else
+    echo "C2V_MONITOR_STATUS_QUERY_FAILED // attempt=$attempt"
   fi
   if [[ -e "$resultfile" ]]; then
     rc="$(cat "$resultfile")"
@@ -220,6 +229,7 @@ C2V_PENDING_CHECK
       fail "OFFLINE_RPM_OSTREE_INSTALL_FAILED_$rc"
     fi
   fi
+  echo "C2V_MONITOR_ITERATION_DONE // attempt=$attempt"
   sleep 15
 done
 echo "C2V_INSTALL_PENDING_CHECK_TIMED_OUT"

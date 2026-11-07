@@ -97,6 +97,38 @@ class CpuPlusIdEditorContracts(unittest.TestCase):
         self.assertIn("if (confirmRemoveId !== selectedAccountId)", ACCOUNTS)
         self.assertIn("pendingIdentityId === accountEditor.identityId", ACCOUNTS)
 
+    def test_per_id_red_remove_and_guarded_two_click_confirmation(self):
+        for snippet in ('label: "X"', "destructive: true",
+                        "function armRemove(id, name)",
+                        "function requestRemove()",
+                        "function cancelRemove()",
+                        "CONFIRM REMOVE ID", "CANCEL REMOVAL",
+                        "pane.identities.length > 1",
+                        "SocialIdentityStore.removeIdentity(",
+                        "removeArmedId", "removeArmedName",
+                        "pendingRemoveId", "LOCAL ID REMOVED",
+                        'pane.idRequested("");',
+                        "UNLINK ORGANIZATION LINKS FIRST",
+                        "CLEAR CONTACT AND ACCOUNT NAMES FIRST",
+                        "NO BACKUP REQUIRED" if False else "LAST_ID_REQUIRED"):
+            self.assertIn(snippet, PANE)
+        for snippet in ("function removeIdentity(doc, id)",
+                        "if (doc.identities.length <= 1)",
+                        "next.identities.splice(index, 1)",
+                        "next.activeId = next.identities[0].id"):
+            self.assertIn(snippet, POLICY)
+        for snippet in ("function removeIdentity(id)",
+                        "IdentityPolicy.removeIdentity(document, id)",
+                        'SocialAccountDetailsStore.state !== "ready"',
+                        'SocialOrganizationLinksStore.state !== "ready"',
+                        'link.identityId === id',
+                        "UNLINK_ORGANIZATION_FIRST",
+                        "CLEAR_CONTACT_AND_ACCOUNT_NAMES_FIRST",
+                        "Object.prototype.hasOwnProperty.call(saved, id)"):
+            self.assertIn(snippet, STORE)
+        self.assertEqual(STORE.count("FileView {"), 1)
+        self.assertEqual(STORE.count("identityFile.setText("), 1)
+
     def test_input_semantics_and_no_bypass_writers(self):
         for snippet in ("color: Colors.magenta",
                         "color: Colors.orange",

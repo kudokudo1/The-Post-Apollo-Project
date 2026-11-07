@@ -33,8 +33,15 @@ check_inactive() {
   if systemctl is-active --quiet "$unit"; then
     die "FAKE_SERVICE_ACTIVE"
   fi
-  if systemctl is-enabled --quiet "$unit"; then
-    die "FAKE_SERVICE_ENABLED"
+  # This reference unit intentionally has no [Install] section, so
+  # systemd may report "static" with a successful is-enabled exit code.
+  # Accept static/disabled ONLY; fail closed on actual enablement or drift.
+  if [[ -e "$unitpath" ]]; then
+    enablement="$(systemctl is-enabled "$unit" 2>&1 || true)"
+    case "$enablement" in
+      static|disabled) ;;
+      *) die "FAKE_SERVICE_ENABLED_OR_INDETERMINATE" ;;
+    esac
   fi
   if busctl --system get-name-owner org.postapollo.ConnectionsStatus1 >/dev/null 2>&1; then
     die "FAKE_DBUS_NAME_OWNED"

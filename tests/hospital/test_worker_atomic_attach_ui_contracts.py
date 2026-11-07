@@ -50,6 +50,17 @@ require('root.attachmentArmKey = "";' in view
 require('root.runtimeStatusVerified = false;' in view
         and 'root.refreshRequested();' in view,
         "Successful registration invalidates stale runtime status")
+require('signal attachmentRegistered(string roomId, string sessionId)' in view
+        and 'root.attachmentRegistered(' in view,
+        "Only a confirmed PX result can announce the new pinned Session")
+require('onAttachmentRegistered: function(roomId, sessionId)' in host
+        and 'String(roomId || "") === root.rosterFocusedRoomId' in host
+        and 'root.rosterFocusedSessionId = String(sessionId);' in host,
+        "Surgery may follow only the exact confirmed Room and Session ID")
+require('onRoomDataChanged: {' in view
+        and 'if (root.active && root.sessionMatches && !runtime.refreshing)' in view
+        and 'runtime.refresh();' in view,
+        "Fresh registry projection triggers a read of the newly pinned Session")
 require('PROVIDER NOT LAUNCHED' in view
         and 'No AI launch or authority' not in view,
         "Never declare a started worker after Session registration")

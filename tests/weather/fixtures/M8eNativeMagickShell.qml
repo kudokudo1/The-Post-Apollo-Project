@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import Quickshell
 import qs.services.location
 import "widgets/weather"

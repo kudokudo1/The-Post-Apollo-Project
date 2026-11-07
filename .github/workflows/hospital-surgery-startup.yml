@@ -5,6 +5,7 @@ on:
     paths:
       - "widgets/HospitalW.qml"
       - "services/hospital/HospitalSurgeryStartupPolicy.js"
+      - "services/hospital/HospitalAuditService.qml"
       - "tests/hospital/test_surgery_startup_policy.js"
       - "tests/hospital/test_surgery_first_open_contracts.py"
       - ".github/workflows/hospital-surgery-startup.yml"
@@ -14,6 +15,7 @@ on:
     paths:
       - "widgets/HospitalW.qml"
       - "services/hospital/HospitalSurgeryStartupPolicy.js"
+      - "services/hospital/HospitalAuditService.qml"
       - "tests/hospital/test_surgery_startup_policy.js"
       - "tests/hospital/test_surgery_first_open_contracts.py"
       - ".github/workflows/hospital-surgery-startup.yml"

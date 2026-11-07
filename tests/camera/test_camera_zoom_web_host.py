@@ -151,7 +151,10 @@ class ZoomWebHostTests(unittest.TestCase):
         follow = QML.split('function consumeZoomFollow(raw)',1)[1].split(
             'function scheduleZoomWebRealign()',1)[0]
         self.assertIn('if (aligned)',follow)
-        self.assertNotIn('zoomWebVisualHeld = false;\n        }\n        // CHECKING',follow)
+        trust_loss = follow.split('} else if (reply.state === "MISSING"',1)[1].split('}',1)[0]
+        self.assertIn('zoomWebVisualHeld = false;',trust_loss)
+        transient = follow.split('// CHECKING/MISALIGNED',1)[1].split('zoomWebState',1)[0]
+        self.assertNotIn('zoomWebVisualHeld = false;',transient)
         self.assertIn('reply.state === "MISSING"',follow)
         self.assertIn('reply.state === "UNVERIFIED"',follow)
         self.assertIn('reply.state === "FAILED"',follow)

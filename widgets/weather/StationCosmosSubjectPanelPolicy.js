@@ -18,6 +18,9 @@ var ROUTES = {
     space:["header","solar"]},
 
   // The bottom SUN landing includes all original solar/time/light sections.
+  "cosmos/sun/observation": {page:"space",
+    sky:["header","astronomy","twilight"],
+    space:["header","suvi","xray","flares"]},
   "cosmos/sun/position": {page:"sky",sky:["header","astronomy","twilight"]},
   "cosmos/sun/live": {page:"space",space:["header","suvi","xray","flares"]},
   "cosmos/sun/twilight": {page:"sky",sky:["header","twilight"]},

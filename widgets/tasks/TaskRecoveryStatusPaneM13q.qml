@@ -16,6 +16,11 @@ Item {
     property var editorSignals: null
     readonly property var draftReport: DraftPresencePolicy.view(editorSignals)
 
+    // M15c // Read-only shared Connections provider catalog, not consent.
+    // The TASKS draft credential provider is intentionally unregistered.
+    readonly property var draftCredentialCatalog:
+        ConnectionsBroker.requirement("tasks-draft")
+
     readonly property var report: RecoveryStatusPolicy.view({
         providerStatus: ConnectionsBroker.status,
         providerChecking: ConnectionsBroker.checking,
@@ -144,6 +149,30 @@ Item {
                 color: Colors.orange
                 font.pixelSize: 9
                 wrapMode: Text.WordWrap
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Colors.cyan
+                opacity: 0.7
+            }
+
+            // M15c // Fixed-scope encrypted draft review. Exactly the
+            // existing live M13s metadata, no task text or credentials.
+            TaskEncryptedDraftAccessPaneM15c {
+                width: parent.width
+                providerStatus: ConnectionsBroker.status
+                providerChecking: ConnectionsBroker.checking
+                credentialActionsEnabled: ConnectionsBroker.credentialActionsEnabled
+                brokerKnown: recoveryStatus.draftCredentialCatalog.known === true
+                brokerGrantEnabled: recoveryStatus.draftCredentialCatalog.grantEnabled === true
+                recoveryEnabled: ApolloHubTodoStore.encryptedRecoveryEnabled
+                storageAuthorized: ApolloHubTodoStore.encryptedRecoveryStorageAuthorized
+                unlockAuthorized: ApolloHubTodoStore.encryptedRecoveryUnlockAuthorized
+                draftHostEnabled: ApolloHubTodoStore.encryptedDraftHostEnabled
+                draftHostWriteAuthorized: ApolloHubTodoStore.encryptedDraftHostWriteAuthorized
+                editorStatus: recoveryStatus.draftReport.status
             }
 
             Rectangle {

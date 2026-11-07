@@ -3,6 +3,7 @@ import "../../components"
 import "../../services/weather" as WeatherServices
 import "StationMagickTransitComparisonPolicy.js" as Transit
 import "StationMagickTransitTimelinePolicy.js" as Timeline
+import "StationMagickTransitMultiPolicy.js" as Multi
 
 // M30-F // A standalone, no-outer-scroll source-verified astrology instrument.
 // All chart modes use the existing single on-demand JPL/CelestialVisualService
@@ -21,12 +22,18 @@ Rectangle {
     // UTC time, never a reinterpretation of the old selected-pair graph.
     property bool transitMode: false
     property bool timelineMode: false
+    property bool multiMode: false
     property string selectedContactUtc: ""
+    property string selectedEventKind: "aspect"
+    property string selectedMultiBody: ""
     property string transitExpectedUtc: ""
     onNatalModeChanged: if(!natalMode)transitMode=false
     onTransitModeChanged: if(!transitMode){
         timelineMode=false;
+        multiMode=false;
         selectedContactUtc="";
+        selectedEventKind="aspect";
+        selectedMultiBody="";
     }
     // A complete independent chart service will supply this in a later
     // verified milestone. The existing M4 two-body source is NOT substituted.
@@ -41,8 +48,11 @@ Rectangle {
             // Every new natal input invalidates the comparison.
             astrology.transitExpectedUtc="";
             astrology.selectedContactUtc="";
+            astrology.selectedEventKind="aspect";
+            astrology.selectedMultiBody="";
             transitSource.clearState();
             timelineSource.clearState();
+            multiSource.clearState();
         }
     }
     WeatherServices.CelestialNatalChartService {
@@ -54,6 +64,13 @@ Rectangle {
         id: timelineSource
         active: astrology.visible && astrology.natalMode
             && astrology.transitMode && natalSource.ready
+        natalChart: astrology.fullChartData
+    }
+    WeatherServices.CelestialTransitMultiService {
+        id: multiSource
+        active: astrology.visible && astrology.natalMode
+            && astrology.transitMode && astrology.multiMode
+            && natalSource.ready
         natalChart: astrology.fullChartData
     }
     function requestTransit(instant){
@@ -362,18 +379,34 @@ Rectangle {
             height:24
             spacing:4
             ActionButton {
-                width:Math.max(36,(transitViewRow.width-4)/2)
+                width:Math.max(36,(transitViewRow.width-2*transitViewRow.spacing)/3)
                 height:23;label:"WHEEL";labelPixelSize:9
-                selected:!astrology.timelineMode
+                selected:!astrology.timelineMode&&!astrology.multiMode
                 accentColor:selected?Colors.magenta:Colors.cyan
-                onClicked:astrology.timelineMode=false
+                onClicked:{
+                    astrology.timelineMode=false;
+                    astrology.multiMode=false;
+                }
             }
             ActionButton {
-                width:Math.max(36,(transitViewRow.width-4)/2)
+                width:Math.max(36,(transitViewRow.width-2*transitViewRow.spacing)/3)
                 height:23;label:"TIMELINE";labelPixelSize:9
                 selected:astrology.timelineMode
                 accentColor:selected?Colors.magenta:Colors.cyan
-                onClicked:astrology.timelineMode=true
+                onClicked:{
+                    astrology.multiMode=false;
+                    astrology.timelineMode=true;
+                }
+            }
+            ActionButton {
+                width:Math.max(36,(transitViewRow.width-2*transitViewRow.spacing)/3)
+                height:23;label:"MULTI";labelPixelSize:9
+                selected:astrology.multiMode
+                accentColor:selected?Colors.magenta:Colors.cyan
+                onClicked:{
+                    astrology.timelineMode=false;
+                    astrology.multiMode=true;
+                }
             }
         }
 
@@ -384,15 +417,19 @@ Rectangle {
             anchors.topMargin:3
             anchors.bottom:parent.bottom
             visible: astrology.natalMode && astrology.transitMode
-                && !astrology.timelineMode
+                && !astrology.timelineMode && !astrology.multiMode
             natalData: astrology.fullChartData
             transitData: transitSource.ready?transitSource.chartData:null
             expectedUtc: astrology.transitExpectedUtc
             selectedContactUtc: astrology.selectedContactUtc
+            selectedEventKind: astrology.selectedEventKind
+            inspectionTarget: astrology.selectedMultiBody
             loading: transitSource.loading
             statusText: transitSource.statusText
             onCalculateRequested: function(instant){
                 astrology.selectedContactUtc="";
+                astrology.selectedEventKind="aspect";
+                astrology.selectedMultiBody="";
                 astrology.requestTransit(instant);
             }
         }
@@ -404,14 +441,38 @@ Rectangle {
             anchors.topMargin:3
             anchors.bottom:parent.bottom
             visible: astrology.natalMode && astrology.transitMode
-                && astrology.timelineMode
+                && astrology.timelineMode && !astrology.multiMode
             natalData: astrology.fullChartData
             finder: timelineSource
             onContactRequested: function(exactUtc) {
                 const minute=Timeline.nearestMinute(exactUtc);
                 if(!minute)return;
                 astrology.selectedContactUtc=exactUtc;
+                astrology.selectedEventKind="aspect";
+                astrology.selectedMultiBody=
+                    timelineSource.ready?timelineSource.result.transit_body:"";
                 astrology.timelineMode=false;
+                astrology.requestTransit(minute);
+            }
+        }
+
+        StationMagickTransitMultiPane {
+            anchors.left:parent.left
+            anchors.right:parent.right
+            anchors.top:transitViewRow.bottom
+            anchors.topMargin:3
+            anchors.bottom:parent.bottom
+            visible: astrology.natalMode && astrology.transitMode
+                && astrology.multiMode
+            natalData: astrology.fullChartData
+            finder:multiSource
+            onEventRequested: function(exactUtc,body,kind) {
+                const minute=Multi.nearestMinute(exactUtc);
+                if(!minute)return;
+                astrology.selectedContactUtc=exactUtc;
+                astrology.selectedEventKind=kind;
+                astrology.selectedMultiBody=body;
+                astrology.multiMode=false;
                 astrology.requestTransit(minute);
             }
         }

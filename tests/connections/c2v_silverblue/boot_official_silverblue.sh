@@ -56,6 +56,25 @@ done
 (cd "$seed" && sha256sum --check --status c2t-artifact-manifest.sha256) ||
   { echo "C2V_BLOCKED // BAD_TEST_RPM_CHECKSUM"; exit 2; }
 
+# C4a opts in ONLY when the new dedicated CI provides the already reviewed
+# signed fake-service fixture. Existing C2v/C2x tests remain C2t-only.
+c4a_requested=0
+if [[ -v C4A_SERVICE_RPM_DIR && -n "$C4A_SERVICE_RPM_DIR" ]]; then
+  c4a_requested=1
+  for name in c3d-status.rpm c3d-disposable-public.asc \
+              c3d-public-fingerprint.txt c3d-artifact-manifest.sha256; do
+    [[ -s "$C4A_SERVICE_RPM_DIR/$name" ]] ||
+      { echo "C4A_BLOCKED // SIGNED_FAKE_SERVICE_ARTIFACT_MISSING"; exit 2; }
+    cp "$C4A_SERVICE_RPM_DIR/$name" "$seed/$name"
+  done
+  (cd "$seed" && sha256sum --check --status c3d-artifact-manifest.sha256) ||
+    { echo "C4A_BLOCKED // SIGNED_STATUS_ARTIFACT_MANIFEST_INVALID"; exit 2; }
+  cp "$repo/tests/connections/c4a_silverblue/guest_signed_status_gate.sh" \
+    "$seed/c4a-guest-signed-status-gate.sh"
+  printf '%s\n' C4A_EXPLICIT_SIGNED_STATUS_CI_ONLY > "$seed/c4a-opt-in.marker"
+  echo "C4A_PASS // PUBLIC_SIGNED_TEST_ARTIFACTS_STAGED_WITH_NO_PRIVATE_KEY"
+fi
+
 payload="$(base64 -w0 "$repo/tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh")"
 cat > "$seed/ks.cfg" <<EOF
 # C2u fully disposable, offline Fedora Silverblue 44 VM only.
@@ -193,6 +212,21 @@ if [[ "$result" != PASS ]]; then
   tail -n 130 "$tmp/guest-serial.log" 2>/dev/null || true
   tail -n 45 "$tmp/guest-qemu.log" || true
   exit 1
+fi
+# The ordinary C2v success marker is necessary but not sufficient for C4a.
+# Only exact runtime evidence from the real rebooted guest is accepted.
+if [[ "$c4a_requested" == 1 ]]; then
+  for evidence in \
+    'C4A_PASS // TEST_SIGNER_UNTRUSTED_BEFORE_EXPLICIT_IMPORT' \
+    'C4A_PASS // TEST_ONLY_RPM_SIGNATURE_VERIFIED_ISOLATED_FROM_BOOTED_RPMDB' \
+    'C4A_PASS // SIGNED_FAKE_SERVICE_BOOTED_FILES_OWNED_AND_INTACT' \
+    'C4A_PASS // FAKE_SERVICE_NEVER_STARTED_OR_ENABLED' \
+    'C4A_PASS // SIGNED_FAKE_SERVICE_REMOVED_BY_REAL_BOOTED_ROLLBACK' \
+    'C4A_PASS // ISOLATED_TEST_SIGNER_KEYRING_REMOVED'; do
+    grep -a -Fq "$evidence" "$tmp/guest-serial.log" ||
+      { echo "C4A_BLOCKED // SIGNED_SILVERBLUE_BOOT_ROLLBACK_EVIDENCE_MISSING"; exit 1; }
+  done
+  echo "C4A_PASS // SIGNED_FAKE_SERVICE_SILVERBLUE_TWO_REBOOT_SEQUENCE"
 fi
 echo "C2V_PASS // ACTUAL_SILVERBLUE_BOOTED_LAYER_AND_ROLLBACK_SEQUENCE"
 echo "C2V_LIMITATION // EPHEMERAL_SELF_SIGNED_INERT_PACKAGE_NOT_PRODUCTION"

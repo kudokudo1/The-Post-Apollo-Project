@@ -2,7 +2,6 @@
 """Offline C3b negative/positive tests; no host queries, credentials or grants."""
 from __future__ import annotations
 
-import copy
 import importlib.util
 from pathlib import Path
 import subprocess
@@ -109,6 +108,16 @@ class C3bOriginPolicyTests(unittest.TestCase):
             snapshot = valid()
             snapshot[key] = value
             self.denied(snapshot, "C3B_CONFINEMENT_MISMATCH")
+
+    def test_06b_kernel_attr_current_nul_terminator_is_not_domain_data(self):
+        context = "system_u:system_r:postapollo_connections_t:s0"
+        self.assertEqual(m.normalize_kernel_context(context + "\x00"), context)
+        self.assertEqual(m.normalize_kernel_context(context + "\x00\x00"), context)
+        self.assertEqual(m.normalize_kernel_context(context + "\x00unsafe"),
+                         context + "\x00unsafe")
+        snapshot = valid()
+        snapshot["proc_context"] = m.normalize_kernel_context(context + "\x00")
+        self.denied(snapshot, "C3B_OS_ORIGIN_COHERENT_TEST_ONLY")
 
     def test_07_reject_unprotected_service_unit_and_dbus_policy(self):
         for name in m.FILES:

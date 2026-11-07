@@ -1,0 +1,35 @@
+name: Favorites++ U0 read-only resource contracts
+
+on:
+  pull_request:
+    paths:
+      - "services/favorites/**"
+      - "tests/favorites/**"
+      - ".github/workflows/favorites-universal-u0.yml"
+  push:
+    paths:
+      - "services/favorites/**"
+      - "tests/favorites/**"
+      - ".github/workflows/favorites-universal-u0.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Provider-neutral identity, capability and legacy projection regressions
+        run: node --test tests/favorites/test_favorites_universal_u0.cjs
+      - name: Existing WORLD favorites storage regression
+        run: node tests/time/test_world_favorites_policy.cjs
+      - name: Existing Weather HOME favorites regression
+        run: node --test tests/weather/test_home_favorites_w2b.js
+      - name: Existing RADIO favorites regression
+        run: node tests/weather/test_station_radio_memory.js
+      - name: Existing Places favorites regression
+        run: node tests/location/test_place_registry_policy.cjs
+      - name: Existing Notifications favorites contract regression
+        run: python3 tests/notifications/test_notification_policy_contracts.py

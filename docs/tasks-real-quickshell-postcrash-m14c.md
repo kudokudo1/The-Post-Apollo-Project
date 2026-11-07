@@ -9,17 +9,17 @@
 
 ## IMPLEMENTATION
 
-M14b demonstrated real *disposable* JSON and SQLite source readback through Python and a strict M13z UI policy, but it only used **QML syntax checking**, not real Quickshell. M14c closes that specific test gap by reusing a CI technique already present in `.github/workflows/identity-center-real-quickshell-native-smoke.yml`, which installs **Debian-packaged Quickshell 0.3.2** in a disposable GitHub container and launches Qt offscreen.
+M14b demonstrated real *disposable* JSON and SQLite source readback through Python and a strict M13z UI policy, but it only used **QML syntax checking**, not real Quickshell. M14c closes that specific test gap by reusing a CI technique already present in `.github/workflows/identity-center-real-quickshell-native-smoke.yml`, which installs **Debian-packaged Quickshell 0.3.2** in a disposable GitHub container and launches Qt on a **private Xvfb virtual X11 display**. The initial offscreen attempt failed before QML startup because `PanelWindow` requires a real window backend.
 
 - `TaskPostCrashNativeSmokeM14c.qml` is a new **unmounted ShellRoot** that contains the actual M14b `TaskPostCrashReviewLabM14b` component. It is gated on the literal `POST_APOLLO_TASKS_M14C_NATIVE=CI_DISPOSABLE_ONLY` environment value and a fixed six-case scenario set. Unlike M14b's normal human-click interaction, only this CI root uses a bounded Timer to call the existing `inspectOnce()` method automatically. It verifies the resulting **real QML** status, redacted policy label, and denial of all replay/write/draft-clear/key authorities. It exits with a fixed marker or refuses/times out. It never mounts inside `shell.qml`.
-- `tests/tasks/native_quickshell_postcrash_smoke_m14c.py` creates a fresh private `/tmp/m14c-real-qs-*/m11e-fileview-test` folder, synthetic `0600` JSON, and the existing M12h SQLite source-stage journal. It simulates **baseline**, **expected-but-unsettled**, **settled-but-UI-unacknowledged**, **unsafe symlink**, **missing source**, and **cooperating owner with an exclusive lock**. It then launches the **real `qs` binary** with its own isolated HOME, XDG_CONFIG_HOME, XDG_STATE_HOME, XDG_DATA_HOME, XDG_CACHE_HOME, XDG_RUNTIME_DIR, and no Wayland/X11 display. The real QML runs M14b's existing Quickshell `Process` to invoke M13y's inspector and passes the frame to M13z's strict presentation projection. Python verifies the fixed native PASS marker, checks source bytes are unchanged, checks application SQLite rows are unchanged, and closes the fixture lock. It never invokes the live TASKS writer or reads a real task.
+- `tests/tasks/native_quickshell_postcrash_smoke_m14c.py` creates a fresh private `/tmp/m14c-real-qs-*/m11e-fileview-test` folder, synthetic `0600` JSON, and the existing M12h SQLite source-stage journal. It simulates **baseline**, **expected-but-unsettled**, **settled-but-UI-unacknowledged**, **unsafe symlink**, **missing source**, and **cooperating owner with an exclusive lock**. It then launches the **real `qs` binary** with its own isolated HOME, XDG_CONFIG_HOME, XDG_STATE_HOME, XDG_DATA_HOME, XDG_CACHE_HOME, XDG_RUNTIME_DIR, and no connection to the operator's Wayland/X11 session. Each CI scenario gets a fresh, local Xvfb display with Qt's `xcb` backend. The real QML runs M14b's existing Quickshell `Process` to invoke M13y's inspector and passes the frame to M13z's strict presentation projection. Python verifies the fixed native PASS marker, checks source bytes are unchanged, checks application SQLite rows are unchanged, and closes the fixture lock. It never invokes the live TASKS writer or reads a real task.
 - `tests/tasks/test_task_real_quickshell_postcrash_guard_m14c.py` checks the CI-only gate, strictly unmounted test root, existing single writer and closed Connections grants, fixture-only source, and confirms a non-CI invocation is refused *before looking for Quickshell*. The workflow reruns M14b/M14a/M13y/M13z/M11d/C2a guard suites.
 
 This uses a **real native Qt/Quickshell process** in CI if the Debian container can install and load the dependency. It is *not* evidence that the operator's exact Fedora Silverblue/Wayland/Quickshell build renders correctly, or that callback and source ownership are cryptographically authenticated.
 
 ## HOW TO USE
 
-The new GitHub workflow runs after a PR is opened. The native job itself is confined to disposable GitHub CI and refuses to run unless `GITHUB_ACTIONS=true` and `POST_APOLLO_M14C_DISPOSABLE_CI=1`. **Do not set those markers on the operator's live Fedora desktop**. They are process preflight gates, not real security authorization.
+The new GitHub workflow runs after a PR is opened. Each native scenario is wrapped in `xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp"`, so the real `PanelWindow` has a private X11 backend without touching the user's compositor. The native job itself is confined to disposable GitHub CI and refuses to run unless `GITHUB_ACTIONS=true` and `POST_APOLLO_M14C_DISPOSABLE_CI=1`. **Do not set those markers on the operator's live Fedora desktop**. They are process preflight gates, not real security authorization.
 
 The six native CI scenarios are launched individually:
 
@@ -44,7 +44,7 @@ Successful native CI must prove:
 - Existing production TASKS continues to contain exactly one `FileView`, one `todoFile.setText()`; no new production reader/writer, secret action or Connections control.
 - Native PASS is corroborated by independent post-run Python source/journal comparison, not by a test-only QML claim alone.
 
-Native proof applies only to a **disposable CI offscreen Qt environment**. It does not cover a user clicking the manual M14b panel on Fedora, native Wayland focus behavior, same-UID malicious writers, full disk durability after power loss, or authenticated live-source provenance.
+Native proof applies only to a **disposable CI Xvfb virtual X11 environment**. It does not cover a user clicking the manual M14b panel on Fedora, native Wayland focus behavior, same-UID malicious writers, full disk durability after power loss, or authenticated live-source provenance.
 
 ## WATCH OUT FOR
 
@@ -61,7 +61,7 @@ A Debian Quickshell 0.3.2 CI PASS cannot be called Fedora native acceptance. If 
 - [x] Create gated, standalone real Quickshell CI root
 - [x] Create disposable Python launcher for six source/journal/lock scenarios
 - [x] Add negative security guards and CI workflow
-- [ ] Final PR-head GitHub CI, including **real native Qt/Quickshell execution**
+- [x] Real native Qt/Quickshell **six-scenario execution** verified in CI on the Xvfb-enabled PR head (rerun required on final documentation-only commit)
 - [ ] Independent Nurse 2 review and operator merge
 - [ ] Separately authorized local Fedora/Wayland acceptance
 - [ ] Independently authenticated live source owner and opt-in encrypted draft recovery

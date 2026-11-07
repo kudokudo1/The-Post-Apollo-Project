@@ -147,6 +147,43 @@ def find_stations(sampler, start, end, minutes):
     return [{k: v for k, v in row.items() if k != "instant"} for row in found]
 
 
+def aggregate(req, natal, source_for_body, start, end):
+    """Pure aggregation from validated source-callables, useful for regression."""
+    if not (isinstance(natal, (int, float)) and math.isfinite(natal)
+            and 0 <= natal < 360):
+        raise ContractError("invalid natal source longitude")
+    series, events = [], []
+    for body in req["transit_bodies"]:
+        moving = source_for_body(body)
+        points, contacts, count = search_crossings(
+            moving, natal, start, end,
+            req["sample_minutes"], req["aspects_deg"])
+        if not 2 <= len(points) <= 300 or not 2 <= count <= 1500:
+            raise ContractError("multi transit sample budget exceeded")
+        series.append({
+            "id": body, "sample_count": count,
+            "timeline": points,
+        })
+        for event in contacts:
+            events.append({
+                **event, "type": "aspect", "natal_body": req["natal_body"],
+                "transit_body": body,
+            })
+        if req["include_stations"]:
+            for event in find_stations(
+                moving, start, end, req["sample_minutes"]):
+                events.append({
+                    **event, "natal_body": req["natal_body"],
+                    "transit_body": body,
+                })
+    if len(events) > MAX_EVENTS:
+        raise ContractError("too many events in bounded search")
+    events.sort(key=lambda e: (
+        e["utc"], e["transit_body"], e["type"],
+        e.get("aspect", "")))
+    return series, events
+
+
 def compute(raw, kernel_path):
     req = normalize(raw)
     path = _kernel_file(kernel_path)
@@ -179,35 +216,7 @@ def compute(raw, kernel_path):
         natal = source(req["natal_body"])(
             parse_utc(req["natal_epoch_utc"]))
         start, end = parse_utc(req["start_utc"]), parse_utc(req["end_utc"])
-        series, events = [], []
-        for body in req["transit_bodies"]:
-            moving = source(body)
-            points, contacts, count = search_crossings(
-                moving, natal, start, end,
-                req["sample_minutes"], req["aspects_deg"])
-            if not 2 <= len(points) <= 300 or not 2 <= count <= 1500:
-                raise ContractError("multi transit sample budget exceeded")
-            series.append({
-                "id": body, "sample_count": count,
-                "timeline": points,
-            })
-            for event in contacts:
-                events.append({
-                    **event, "type": "aspect", "natal_body": req["natal_body"],
-                    "transit_body": body,
-                })
-            if req["include_stations"]:
-                for event in find_stations(
-                    moving, start, end, req["sample_minutes"]):
-                    events.append({
-                        **event, "natal_body": req["natal_body"],
-                        "transit_body": body,
-                    })
-        if len(events) > MAX_EVENTS:
-            raise ContractError("too many events in bounded search")
-        events.sort(key=lambda e: (
-            e["utc"], e["transit_body"], e["type"],
-            e.get("aspect", "")))
+        series, events = aggregate(req, natal, source, start, end)
         return {
             "format": RESULT_FORMAT,
             "source": {

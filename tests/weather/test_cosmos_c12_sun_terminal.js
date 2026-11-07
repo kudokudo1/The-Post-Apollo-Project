@@ -107,9 +107,9 @@ test("C12 ACTIVITY keeps xray history/source, flare event paging and cycle three
    "flareCount","flareAt","flarePage","cyclePage","xrayPage",
    "selectedFlareIndex","flareDetailPage","cycleDetailPage","xraySourcePage"
  ]) assert.ok(terminal.includes(key),key);
- assert.match(terminal,/sunTerminal\.cycle\.refresh\(true\)/);
- assert.match(terminal,/sunTerminal\.flares\.refresh\(\)/);
- assert.match(terminal,/sunTerminal\.xray\.refresh\(\)/);
+ assert.match(terminal,/cycle\.refresh\(true\)/);
+ assert.match(terminal,/flares\.refresh\(\)/);
+ assert.match(terminal,/xray\.refresh\(\)/);
  assert.match(terminal,/NOAA SOLAR CYCLE \/\/ MONTHLY PREDICTION, NOT LIVE FLUX/);
  assert.match(terminal,/OBSERVED EVENT PEAKS, NOT ALERTS/);
  assert.match(focus,/id: solarDetails\s*StationCosmosSunInstrumentPane\s*\{/);

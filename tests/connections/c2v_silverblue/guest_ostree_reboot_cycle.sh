@@ -111,6 +111,34 @@ for n in $(seq 1 72); do
       esac
     done
     tail -n 6 /var/tmp/c2v-rpm-ostree-install.log 2>/dev/null || true
+    # Independent evidence channel: the monitor's serial ERR/EXIT traps were
+    # absent even though systemd recorded ExecMainStatus=1. Read its journal
+    # and on-disk exit marker from the still-live resource probe.
+    if [[ -f /var/tmp/c2v-monitor-output.log ]]; then
+      echo "C2V_PROBE_MONITOR_OUTPUT_BEGIN"
+      tail -n 18 /var/tmp/c2v-monitor-output.log || true
+    fi
+    if [[ -f /var/tmp/c2v-monitor-exit.log ]]; then
+      echo "C2V_PROBE_MONITOR_EXIT_FILE_BEGIN"
+      tail -n 12 /var/tmp/c2v-monitor-exit.log || true
+    fi
+    if [[ -f /var/tmp/c2v-monitor-shell-trace.log ]]; then
+      echo "C2V_PROBE_MONITOR_SHELL_TRACE_BEGIN"
+      tail -n 26 /var/tmp/c2v-monitor-shell-trace.log || true
+    fi
+    if (( n <= 12 || n % 6 == 0 )); then
+      echo "C2V_PROBE_MONITOR_SYSTEMD_PROPERTIES_BEGIN"
+      timeout --signal=TERM --kill-after=2s 6s systemctl show c2v-rpm-layer-monitor.service \
+        --property=Type --property=TimeoutStartUSec --property=RuntimeMaxUSec \
+        --property=ExecMainCode --property=ExecMainStatus --property=Result \
+        --property=KillMode --property=OOMPolicy --no-pager 2>&1 || \
+        echo "C2V_PROBE_MONITOR_PROPERTIES_UNAVAILABLE"
+    fi
+    if (( n <= 12 || n % 6 == 0 )); then
+      echo "C2V_PROBE_MONITOR_JOURNAL_BEGIN"
+      timeout --signal=TERM --kill-after=2s 6s journalctl -b -u c2v-rpm-layer-monitor.service --no-pager -n 16 2>&1 ||
+        echo "C2V_PROBE_MONITOR_JOURNAL_UNAVAILABLE"
+    fi
     # The last two CI runs showed both transient units disappear or stop
     # reporting while this separate resource probe stayed active. Capture
     # actual systemd unit lifetime and read-only libostree state, without
@@ -162,11 +190,21 @@ PROBE
     cat > "$monitor" <<'C2V_MONITOR'
 #!/usr/bin/bash
 set -Eeuo pipefail
-exec >/dev/ttyS0 2>&1
+# Serial is diagnostic-only and can reject writes in the disposable VM.
+# A failed serial echo previously triggered errexit after the first sleep.
+# Persist monitor output independently; the guest probe relays it to serial
+# without making that channel part of reboot authorization.
+exec >>/var/tmp/c2v-monitor-output.log 2>&1
+# Trace to an independent guest-local file: stdout/ERR/EXIT traps have not
+# survived the observed first poll. The resource probe collects this file.
+exec 9>>/var/tmp/c2v-monitor-shell-trace.log
+export BASH_XTRACEFD=9
+PS4='+C2V_TRACE line=${LINENO} rc=$? '
+set -x
 # Preserve the exact first failing command and exit status; a successful
 # systemd-run start does not prove its later transient unit stayed healthy.
-trap 'rc=$?; echo "C2V_MONITOR_ERR // rc=$rc line=$LINENO command=$BASH_COMMAND"' ERR
-trap 'rc=$?; echo "C2V_MONITOR_EXIT // rc=$rc"' EXIT
+trap 'rc=$?; msg="C2V_MONITOR_ERR // rc=$rc line=$LINENO command=$BASH_COMMAND"; echo "$msg"; printf "%s\n" "$msg" >> /var/tmp/c2v-monitor-exit.log' ERR
+trap 'rc=$?; msg="C2V_MONITOR_EXIT // rc=$rc"; echo "$msg"; printf "%s\n" "$msg" >> /var/tmp/c2v-monitor-exit.log' EXIT
 echo "C2V_MONITOR_READY // $(date --iso-8601=seconds)"
 echo ready > /run/c2v-monitor-ready
 pkg=postapollo-connections-c2t-fixture
@@ -230,7 +268,14 @@ C2V_PENDING_CHECK
     fi
   fi
   echo "C2V_MONITOR_ITERATION_DONE // attempt=$attempt"
-  sleep 15
+  echo "C2V_MONITOR_SLEEP_BEGIN // attempt=$attempt"
+  if sleep 15; then
+    echo "C2V_MONITOR_SLEEP_COMPLETED // attempt=$attempt"
+  else
+    rc="$?"
+    echo "C2V_MONITOR_SLEEP_FAILED // attempt=$attempt rc=$rc"
+    fail "POLL_SLEEP_FAILED_$rc"
+  fi
 done
 echo "C2V_INSTALL_PENDING_CHECK_TIMED_OUT"
 journalctl -b -u rpm-ostreed.service --no-pager -n 65 || true

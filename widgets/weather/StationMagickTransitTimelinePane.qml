@@ -137,7 +137,7 @@ Rectangle {
             onClicked:timeline.setTarget("natal",-1)
         }
         QuietText {
-            width:Math.max(26,(pairRow.width-4*26-3*pairRow.spacing)/2)
+            width:Math.max(26,(pairRow.width-4*26-5*pairRow.spacing)/2)
             height:23;verticalAlignment:Text.AlignVCenter
             color:Colors.yellow;font.pixelSize:9
             elide:Text.ElideRight
@@ -154,7 +154,7 @@ Rectangle {
             onClicked:timeline.setTarget("transit",-1)
         }
         QuietText {
-            width:Math.max(26,(pairRow.width-4*26-3*pairRow.spacing)/2)
+            width:Math.max(26,(pairRow.width-4*26-5*pairRow.spacing)/2)
             height:23;verticalAlignment:Text.AlignVCenter
             color:Colors.cyan;font.pixelSize:9
             elide:Text.ElideRight

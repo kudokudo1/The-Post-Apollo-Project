@@ -120,6 +120,11 @@ def _proc_uids_and_nnp(pid: int) -> tuple[list[int], bool]:
     return [int(s) for s in props["Uid"].split()], props["NoNewPrivs"].strip() == "1"
 
 
+def normalize_kernel_context(raw: str) -> str:
+    """Linux proc attr/current may carry trailing NUL(s), not context data."""
+    return raw.rstrip("\x00\n") if type(raw) is str else ""
+
+
 def _proc_cgroup(pid: int) -> str:
     entries = Path(f"/proc/{pid}/cgroup").read_text().splitlines()
     unified = [x.split(":", 2)[2] for x in entries if x.startswith("0::")]
@@ -172,7 +177,8 @@ async def _probe() -> dict:
             "proc_uids": proc_uids,
             "proc_args": args,
             "proc_cgroup": _proc_cgroup(pid),
-            "proc_context": Path(f"/proc/{pid}/attr/current").read_text().strip(),
+            "proc_context": normalize_kernel_context(
+                Path(f"/proc/{pid}/attr/current").read_text()),
             "proc_no_new_privs": nnp,
             "expected_uid": expected_uid,
             "selinux_mode": subprocess.run(

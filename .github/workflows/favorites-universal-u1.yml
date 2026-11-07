@@ -1,0 +1,62 @@
+name: Favorites++ U1 default store and native lifecycle
+
+on:
+  pull_request:
+    paths:
+      - "services/favorites/**"
+      - "components/FavoritesToggleButton.qml"
+      - "components/qmldir"
+      - "tests/favorites/**"
+      - "scripts/favorites/**"
+      - ".github/workflows/favorites-universal-u1.yml"
+  push:
+    paths:
+      - "services/favorites/**"
+      - "components/FavoritesToggleButton.qml"
+      - "components/qmldir"
+      - "tests/favorites/**"
+      - "scripts/favorites/**"
+      - ".github/workflows/favorites-universal-u1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pure-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: U0 provider-neutral, owner-preserving contract
+        run: node --test tests/favorites/test_favorites_universal_u0.cjs
+      - name: U1 default writer and UI contract
+        run: node --test tests/favorites/test_favorites_universal_u1.cjs
+      - name: Clock WORLD and Weather HOME legacy favorites
+        run: |
+          node tests/time/test_world_favorites_policy.cjs
+          node --test tests/weather/test_home_favorites_w2b.js
+      - name: Radio, saved places and Notifications legacy favorites
+        run: |
+          node tests/weather/test_station_radio_memory.js
+          node tests/location/test_place_registry_policy.cjs
+          python3 tests/notifications/test_notification_policy_contracts.py
+
+  native-favorites:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 20
+    steps:
+      - name: Install Fedora Quickshell and Xvfb
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xdotool xorg-x11-server-Xvfb
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: Native button click, rapid queue, restart, and corrupt-file refusal
+        run: bash scripts/favorites/verify_default_store_fedora_u1.sh

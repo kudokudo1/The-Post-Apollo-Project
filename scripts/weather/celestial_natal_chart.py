@@ -106,12 +106,15 @@ def angles_from_frame(latitude_deg, longitude_deg, gast_hours, equator_to_eclipt
     latitude = math.radians(_number(latitude_deg, -90, 90, "latitude"))
     longitude = _number(longitude_deg, -180, 180, "longitude")
     gast = _number(gast_hours, 0, 24, "Greenwich apparent sidereal time")
-    if not isinstance(equator_to_ecliptic, (list, tuple)) or len(equator_to_ecliptic) != 3:
-        raise ContractError("equinox/ecliptic rotation required")
-    for row in equator_to_ecliptic:
-        if len(row) != 3 or any(not isinstance(x, (float, int)) or
-                               not math.isfinite(x) for x in row):
-            raise ContractError("invalid celestial frame rotation")
+    try:
+        # Skyfield returns numpy arrays, while pure tests provide tuples.
+        matrix = tuple(tuple(float(v) for v in row) for row in equator_to_ecliptic)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ContractError("equinox/ecliptic rotation required") from exc
+    if len(matrix) != 3 or any(len(row) != 3 or
+                               any(not math.isfinite(v) for v in row)
+                               for row in matrix):
+        raise ContractError("invalid celestial frame rotation")
     theta = math.radians((gast * 15 + longitude) % 360)
     zenith_equator = (
         math.cos(latitude) * math.cos(theta),
@@ -120,9 +123,9 @@ def angles_from_frame(latitude_deg, longitude_deg, gast_hours, equator_to_eclipt
     )
     east_equator = (-math.sin(theta), math.cos(theta), 0.0)
     upper_meridian_equator = (math.cos(theta), math.sin(theta), 0.0)
-    zenith = _rotate(equator_to_ecliptic, zenith_equator)
-    east = _rotate(equator_to_ecliptic, east_equator)
-    upper = _rotate(equator_to_ecliptic, upper_meridian_equator)
+    zenith = _rotate(matrix, zenith_equator)
+    east = _rotate(matrix, east_equator)
+    upper = _rotate(matrix, upper_meridian_equator)
 
     north_ecliptic = (0.0, 0.0, 1.0)
     rise = _cross(north_ecliptic, zenith)

@@ -48,7 +48,10 @@ test("Moon selection opens reference text but cannot overwrite real source data"
   assert.match(qml,/REFERENCE \/\/ /);
   assert.match(qml,/label: "CURRENT"/);
   assert.match(qml,/onClicked: visual\.inspectedPhaseId = ""/);
-  assert.match(qml,/anchors\.fill: moonCanvas/);
+  // The phase hit target is a child of Canvas, not an illegally anchored
+  // sibling of a QtQuick Row; selecting the Moon still inspects the phase.
+  assert.match(qml,/id: moonCanvas[\s\S]*?MouseArea \{\s*anchors\.fill: parent/);
+  assert.doesNotMatch(qml,/anchors\.fill: moonCanvas/);
   assert.match(qml,/visual\.inspectedPhaseId === visual\.moonData\.phaseId/);
   assert.match(qml,/CURRENT PHASE UNAVAILABLE/);
 });

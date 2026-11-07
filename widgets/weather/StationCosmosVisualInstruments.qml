@@ -78,7 +78,8 @@ Rectangle {
     Row {
         id: visualRow
         anchors.fill: parent
-        anchors.margins: visual.compactMode ? 5 : 10
+        anchors.margins: visual.prominentMoon
+            ? 2 : (visual.compactMode ? 5 : 10)
         spacing: visual.compactMode ? 5 : 12
 
         Rectangle {
@@ -90,11 +91,17 @@ Rectangle {
             color: Colors.dark
             border.width: 1
             border.color: Colors.magenta
+            // Tight geometry puts controls immediately beneath the disk,
+            // rather than stretching the image ROW to the whole hero height.
+            readonly property real heroDiskSize: Math.max(73,Math.min(
+                180,width*0.63,height-(visual.compactMode ? 26 : 40)))
 
             Column {
                 anchors.fill: parent
-                anchors.margins: visual.compactMode ? 5 : 9
-                spacing: visual.compactMode ? 3 : 5
+                anchors.margins: visual.prominentMoon
+                    ? 2 : (visual.compactMode ? 5 : 9)
+                spacing: visual.prominentMoon
+                    ? 1 : (visual.compactMode ? 3 : 5)
 
                 GohuText {
                     width: parent.width
@@ -107,10 +114,11 @@ Rectangle {
 
                 Row {
                     id: moonHeroRow
-                    // In the Moon-only hero, phase buttons remain beneath the
-                    // image, but the disk consumes almost the entire panel.
+                    // Keep this row as tall as the rendered Moon itself.
+                    // C21 used nearly the full parent height, leaving a large
+                    // gap between the drawing and its phase buttons.
                     height: visual.prominentMoon
-                        ? Math.max(75,moonBay.height-(visual.compactMode ? 36 : 49))
+                        ? moonBay.heroDiskSize
                         : (visual.compactMode ? 75 : 124)
                     width: parent.width
                     spacing: visual.compactMode ? 7 : 12
@@ -119,8 +127,7 @@ Rectangle {
                         id: moonCanvas
                         objectName: "cosmos-c21-moon-hero-disk"
                         width: visual.prominentMoon
-                            ? Math.max(73,Math.min(180,moonHeroRow.height,
-                                moonHeroRow.width*0.63))
+                            ? moonBay.heroDiskSize
                             : (visual.compactMode ? 73 : 120)
                         height: width
                         onPaint: {
@@ -154,17 +161,16 @@ Rectangle {
                                              Math.max(0,row.right-row.left),1);
                             }
                         }
-                    }
-
-                    MouseArea {
-                        anchors.fill: moonCanvas
-                        enabled: visual.moonData.phaseId !== ""
-                        preventStealing: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            visual.inspectedPhaseId =
-                                visual.inspectedPhaseId === visual.moonData.phaseId
-                                ? "" : visual.moonData.phaseId;
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: visual.moonData.phaseId !== ""
+                            preventStealing: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                visual.inspectedPhaseId =
+                                    visual.inspectedPhaseId === visual.moonData.phaseId
+                                    ? "" : visual.moonData.phaseId;
+                            }
                         }
                     }
 
@@ -207,17 +213,21 @@ Rectangle {
 
                 Row {
                     id: phaseButtonRow
+                    objectName: "cosmos-c22-moon-phase-buttons"
                     width: parent.width
-                    height: visual.compactMode ? 23 : 33
+                    height: visual.prominentMoon ? 21
+                        : (visual.compactMode ? 23 : 33)
                     spacing: 2
 
                     Repeater {
                         model: VisualPolicy.PHASES
                         delegate: ActionButton {
+                            objectName: "cosmos-c22-moon-phase-choice"
                             required property var modelData
                             width: Math.max(1,
                                 (phaseButtonRow.width-7*phaseButtonRow.spacing)/8)
-                            height: visual.compactMode ? 22 : 31
+                            height: visual.prominentMoon ? 20
+                                : (visual.compactMode ? 22 : 31)
                             label: modelData.short
                             labelPixelSize: visual.compactMode ? 9 : 10
                             contentPadding: 1

@@ -1,0 +1,38 @@
+name: CPU++ ID Management Main Rail
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/CpuPlusW.qml'
+      - 'widgets/cpuplus/CpuPlusIdManagementPane.qml'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'tests/cpuplus/test_cpuplus_id_management_main_mode.py'
+      - 'tests/messaging/test_identity_center_settings_sections.py'
+      - '.github/workflows/cpuplus-id-management-main-rail.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/CpuPlusW.qml'
+      - 'widgets/cpuplus/CpuPlusIdManagementPane.qml'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'tests/cpuplus/test_cpuplus_id_management_main_mode.py'
+      - 'tests/messaging/test_identity_center_settings_sections.py'
+      - '.github/workflows/cpuplus-id-management-main-rail.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  id-management:
+    name: CPU++ fixed rail / three-bay ID mode contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify CPU++ ID mode and regressions
+        run: |
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_management_main_mode.py' -v
+          python3 tests/components/test_cpuplus_settings_mode_contracts.py
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_time_three_bay_contract.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_settings_sections.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_settings_workspace.py' -v

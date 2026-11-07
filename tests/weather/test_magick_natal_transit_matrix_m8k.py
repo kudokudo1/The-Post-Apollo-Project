@@ -135,7 +135,7 @@ class M8kTests(unittest.TestCase):
         for natals in ({},{ "sun":float("nan")},{"sun":400}):
             with self.assertRaises(ContractError):
                 mx.aggregate(req,natals,moving,ZERO,ZERO+timedelta(days=1))
-        rapid=lambda body:lambda t:(hour(t)*20)%360
+        rapid=lambda body:lambda t:(hour(t)*100)%360
         with self.assertRaises(ContractError):
             mx.aggregate(req,{"sun":10},rapid,ZERO,
                          ZERO+timedelta(days=1))

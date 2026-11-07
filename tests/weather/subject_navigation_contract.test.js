@@ -72,7 +72,7 @@ test("breadcrumbs and nested navigation are stable", () => {
   assert.deepEqual(plain(context.breadcrumbs("weather/water/rivers/hydrograph").map(x => x.path)),
     ["weather","weather/water","weather/water/rivers","weather/water/rivers/hydrograph"]);
   assert.deepEqual(plain(context.childrenOf("cosmos/moon").map(x => x.path)),
-    ["cosmos/moon/ephemeris","cosmos/moon/position","cosmos/moon/year"]);
+    ["cosmos/moon/ephemeris","cosmos/moon/position","cosmos/moon/year","cosmos/moon/forecast"]);
   assert.deepEqual(plain(context.breadcrumbs("not-real")), []);
 });
 

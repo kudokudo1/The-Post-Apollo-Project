@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationMagickTransitMatrixPolicy.js" as Matrix
+import "StationMagickTransitMatrixVisualPolicy.js" as Visual
 import "StationMagickDateLocationPolicy.js" as Defaults
 
 // M8k // Source-verified natal x moving-body pair counts and UTC events.
@@ -23,12 +24,22 @@ Rectangle {
     property string filterKind:"ALL"
     property int pageIndex:0
     property string selectedEventKey:""
+    property bool inspectorOpen:false
+    property string inspectedEventKey:""
+    property real detailZoom:1
     signal eventRequested(string exactUtc,string natalBody,
                           string transitBody,string kind)
     readonly property bool busy:!!finder&&finder.loading
     readonly property var model:finder&&finder.ready?finder.result:null
     readonly property var eventPage:Matrix.page(
         model,filterNatal,filterTransit,filterKind,false,pageIndex)
+    readonly property var timelineEvents:Matrix.filtered(
+        model,filterNatal,filterTransit,filterKind,false)
+    readonly property var timelineModel:Visual.timeline(
+        model,timelineEvents,eventAxis.width,eventAxis.height)
+    readonly property var inspectedEvent:Visual.inspect(model,inspectedEventKey)
+    readonly property var detailGeometry:Visual.trajectory(
+        model,inspectedEvent,detailCanvas.width,detailCanvas.height,detailZoom)
     readonly property var workload:Matrix.budget(
         spanDays,natalBodies.length,transitBodies.length,sampleMinutes)
     readonly property int suggestedSpan:Matrix.fittingSpan(
@@ -39,11 +50,42 @@ Rectangle {
 
     function invalidate(){
         selectedEventKey="";filterNatal="";filterTransit="";pageIndex=0;
+        inspectedEventKey="";inspectorOpen=false;detailZoom=1;
         if(finder&&finder.ready)finder.clearState();
     }
     function resetFilterPage(){
         pageIndex=0;
         resultList.contentY=0;
+        eventAxis.requestPaint();
+    }
+    function cellTier(natal,moving){
+        const item=Visual.cell(model,natal,moving);
+        return item?item.tier:0;
+    }
+    function cellFill(natal,moving){
+        const tier=cellTier(natal,moving);
+        return tier===3?Qt.rgba(Colors.orange.r,Colors.orange.g,Colors.orange.b,.26)
+            :tier===2?Qt.rgba(Colors.yellow.r,Colors.yellow.g,Colors.yellow.b,.21)
+            :tier===1?Qt.rgba(Colors.cyan.r,Colors.cyan.g,Colors.cyan.b,.15)
+            :Colors.black;
+    }
+    function cellAccent(natal,moving){
+        const tier=cellTier(natal,moving);
+        return tier===3?Colors.orange:tier===2?Colors.yellow:
+            tier===1?Colors.cyan:Colors.blue;
+    }
+    function inspectEvent(event){
+        if(!model||!event)return;
+        const key=Visual.eventKey(event);
+        if(!model.events.some(function(row){return Visual.eventKey(row)===key;}))
+            return;
+        inspectedEventKey=key;
+        detailZoom=1;
+        inspectorOpen=true;
+    }
+    function closeInspector(){
+        inspectorOpen=false;
+        detailZoom=1;
     }
     onStartDateChanged:invalidate()
     onSpanDaysChanged:invalidate()
@@ -58,7 +100,13 @@ Rectangle {
     onModelChanged:{
         filterNatal="";filterTransit="";filterKind="ALL";
         pageIndex=0;selectedEventKey="";
+        inspectedEventKey="";inspectorOpen=false;detailZoom=1;
+        eventAxis.requestPaint();
     }
+    onTimelineModelChanged:eventAxis.requestPaint()
+    onDetailGeometryChanged:detailCanvas.requestPaint()
+    onDetailZoomChanged:detailCanvas.requestPaint()
+    onInspectedEventChanged:detailCanvas.requestPaint()
     onVisibleChanged:{
         if(visible&&!startDate)startDate=Defaults.utcDay();
         if(!visible)dateField.releaseFocus();
@@ -88,6 +136,7 @@ Rectangle {
         if(!finder||!canSearch)return;
         selectedEventKey="";filterNatal="";filterTransit="";
         filterKind="ALL";pageIndex=0;
+        inspectedEventKey="";inspectorOpen=false;detailZoom=1;
         finder.search(startDate,spanDays,natalBodies,
                       transitBodies,aspectAngles,sampleMinutes);
     }

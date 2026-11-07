@@ -117,7 +117,7 @@ ShellRoot {
                 root.phase = 2;
                 focused.subjectRoute = "cosmos/sun/position";
             } else if (root.phase === 2) {
-                if (focused.kind !== "solar-path" || focused.family !== "sun")
+                if (focused.kind !== "sun-position" || focused.family !== "sun")
                     return root.fail("WRONG_SUN_ROUTE");
                 if (focused.sourceStatus === "")
                     return root.fail("EMPTY_SOLAR_STATUS");

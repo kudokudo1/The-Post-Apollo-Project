@@ -134,7 +134,7 @@ test("M8c is manual, source-bounded, privacy-preserving and keeps M8b paths",()=
     assert.match(astro,/astrology\.requestTransit\(instant\)/);
     assert.match(astro,/StationMagickNatalChartWheelPane\s*\{/);
     assert.match(astro,/StationMagickCelestialInstrument\s*\{/);
-    assert.match(ui,/label:"TRANSIT UTC"/);
+    assert.match(ui,/label:transits\.loading\?"WAIT":"TRANSIT UTC"/);
     assert.match(ui,/Transit\.utc\(instant\)/);
     assert.match(ui,/Transit\.build\(/);
     assert.match(ui,/onWheel:function\(wheelEvent\)/);

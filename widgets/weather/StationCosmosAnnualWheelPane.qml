@@ -31,23 +31,24 @@ Rectangle {
         anchors.leftMargin: annualFocus.contentInset
         anchors.rightMargin: annualFocus.contentInset
         anchors.topMargin: visible ? annualFocus.contentInset : 0
-        height: visible ? 22 : 0
+        height: visible ? 27 : 0
         spacing: 4
 
         ActionButton {
             objectName: "cosmos-c11-back-to-moon"
             width: Math.max(1,(lunarModeRail.width-2*lunarModeRail.spacing)/3)
-            height: 21
+            height: 27
             label: "PHASE + POSITION"
             labelPixelSize: 9
             contentPadding: 1
+            selected: false
             accentColor: Colors.cyan
             onClicked: annualFocus.routeRequested("cosmos/moon/ephemeris")
         }
         ActionButton {
             objectName: "cosmos-c17-moon-wheel-tab"
             width: Math.max(1,(lunarModeRail.width-2*lunarModeRail.spacing)/3)
-            height: 21
+            height: 27
             label: "LUNAR WHEEL"
             labelPixelSize: 9
             contentPadding: 1
@@ -58,7 +59,7 @@ Rectangle {
         ActionButton {
             objectName: "cosmos-c17-moon-forecast-tab"
             width: Math.max(1,(lunarModeRail.width-2*lunarModeRail.spacing)/3)
-            height: 21
+            height: 27
             label: "FORECAST"
             labelPixelSize: 9
             contentPadding: 1

@@ -73,15 +73,15 @@ test("Moon C10 matches the six-pixel COSMOS overview and mode-page stage gutter"
  assert.match(moon,/readonly property int contentInset: 6/);
  for(const objectName of [
    "cosmos-c9-moon-free-header",
-   "cosmos-c9-moon-hero-row",
-   "cosmos-c8-moon-readings"
+   "cosmos-c9-moon-hero-row"
  ]) {
    const start=moon.indexOf('objectName: "'+objectName+'"');
    assert.ok(start>0,objectName);
-   const next=moon.slice(start,start+450);
+   const next=moon.slice(start,start+580);
    assert.match(next,/anchors\.leftMargin: moonPane\.contentInset/);
    assert.match(next,/anchors\.rightMargin: moonPane\.contentInset/);
  }
+ assert.match(moon,/id: compactReadings[\s\S]*?width: Math\.max\(1,heroRow\.width-moonMain\.width-heroRow\.spacing\)/);
  assert.match(moon,/anchors\.topMargin: moonPane\.contentInset/);
  assert.match(moon,/anchors\.bottomMargin: moonPane\.contentInset/);
 });
@@ -91,7 +91,8 @@ test("C19 MOON overview and year share top modes above source-backed forecast",(
  assert.match(moon,/id: moonModeRail/);
  assert.match(moon,/anchors\.top: titleRail\.bottom/);
  assert.match(moon,/anchors\.top: moonModeRail\.bottom/);
- assert.match(moon,/height: Math\.min\(166,Math\.max\(95,Math\.round\(moonPane\.height\*0\.39\)\)\)/);
+ assert.match(moon,/objectName: "cosmos-c20-moon-primary-instruments"/);
+ assert.match(moon,/anchors\.bottom: parent\.bottom/);
  for(const name of [
    "cosmos-c18-moon-observation-tab",
    "cosmos-c11-open-moon-year"
@@ -102,10 +103,33 @@ test("C19 MOON overview and year share top modes above source-backed forecast",(
  assert.match(moon,/onClicked: moonPane\.routeRequested\("cosmos\/moon\/year"\)/);
  assert.doesNotMatch(moon,/onClicked: moonPane\.routeRequested\("cosmos\/moon\/forecast"\)/);
  assert.match(moon,/StationCosmosMoonForecastStrip\s*\{/);
- assert.match(moon,/anchors\.top: moonForecastStrip\.bottom/);
- assert.match(moon,/height: Math\.max\(43,Math\.min\(80,Math\.round\(moonPane\.height\*0\.17\)\)\)/);
+ assert.match(moon,/verticalMode: true/);
+ assert.match(moon,/id: compactReadings[\s\S]*?id: moonForecastStrip/);
+ assert.match(moon,/id: provenanceRow/);
+ assert.match(moon,/id: eventRibbon/);
  const title=moon.slice(moon.indexOf('id: titleRail'),moon.indexOf('id: moonModeRail'));
  assert.doesNotMatch(title,/ActionButton/);
  assert.match(title,/USNO /);
  assert.doesNotMatch(moon,/Flickable\s*\{|ScrollView\s*\{/);
+});
+
+test("C20 instrument-first Moon overview has separate visual, forecast and event hierarchies",()=>{
+ const strip=read("widgets/weather/StationCosmosMoonForecastStrip.qml");
+ for(const name of ["cosmos-c20-moon-primary-instruments",
+   "cosmos-c9-moon-tall-position","cosmos-c9-moon-free-provenance",
+   "cosmos-c20-moon-event-ledger","cosmos-c8-moon-source-note"])
+   assert.ok(moon.includes(name),name);
+ assert.match(moon,/moonMain\.height-2\*moonMain\.spacing\)\*0\.62/);
+ assert.match(moon,/compactReadings\.height-2\*compactReadings\.spacing\)\*0\.65/);
+ assert.match(strip,/property bool verticalMode: false/);
+ assert.match(strip,/objectName: "cosmos-c20-moon-vertical-forecast"/);
+ assert.match(strip,/objectName: "cosmos-c20-forecast-day-row"/);
+ assert.match(strip,/objectName: "cosmos-c20-forecast-selected-daylight"/);
+ assert.match(strip,/modelData\.illumination\/100/);
+ assert.match(strip,/modelData\.dayFraction/);
+ assert.match(strip,/ForecastCalendar\.build/);
+ assert.match(strip,/onClicked: forecastStrip\.selectedDate=modelData\.date/);
+ assert.match(moon,/verticalMode: true/);
+ assert.equal((moon.match(/objectName: "cosmos-c8-moon-fact"/g)||[]).length,3);
+ assert.doesNotMatch(moon,/Flickable\s*\{|ScrollView\s*\{|Process\s*\{/);
 });

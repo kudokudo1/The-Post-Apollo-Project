@@ -82,7 +82,15 @@ ShellRoot {
                     {date:"2026-11-07",moonPhase:"new moon",
                      moonIllumination:3,sunrise:"6:46 AM",sunset:"5:03 PM"},
                     {date:"2026-11-08",moonPhase:"waxing crescent",
-                     moonIllumination:9,sunrise:"6:47 AM",sunset:"5:02 PM"}
+                     moonIllumination:9,sunrise:"6:47 AM",sunset:"5:02 PM"},
+                    {date:"2026-11-09",moonPhase:"waxing crescent",
+                     moonIllumination:17,sunrise:"6:48 AM",sunset:"5:01 PM"},
+                    {date:"2026-11-10",moonPhase:"waxing crescent",
+                     moonIllumination:26,sunrise:"6:49 AM",sunset:"5:00 PM"},
+                    {date:"2026-11-11",moonPhase:"first quarter",
+                     moonIllumination:49,sunrise:"6:50 AM",sunset:"4:59 PM"},
+                    {date:"2026-11-12",moonPhase:"waxing gibbous",
+                     moonIllumination:63,sunrise:"6:51 AM",sunset:"4:58 PM"}
                 ];
                 fakeWeather.forecastReady=true;
                 root.step=1;
@@ -132,53 +140,70 @@ ShellRoot {
                 const phaseTab=find(moon,"cosmos-c18-moon-observation-tab");
                 const yearTab=find(moon,"cosmos-c11-open-moon-year");
                 const forecastStrip=find(moon,"cosmos-c19-moon-forecast-strip");
-                const forecastDay=find(moon,"cosmos-c19-forecast-day");
+                const forecastDay=find(moon,"cosmos-c20-forecast-day-row");
+                const verticalForecast=find(moon,"cosmos-c20-moon-vertical-forecast");
+                const forecastDaylight=find(moon,"cosmos-c20-forecast-selected-daylight");
+                const board=find(moon,"cosmos-c9-moon-hero-row");
                 const railAt=rail ? rail.mapToItem(moon,0,0) : null;
+                const forecastAt=forecastStrip
+                    ? forecastStrip.mapToItem(moon,0,0) : null;
                 const inset=moon.contentInset;
-                if(inset!==6 || !headerAt
-                   || headerAt.x<inset || headerAt.y<inset
-                   || headerAt.x+header.width>moon.width-inset+1
-                   || phaseAt.x<inset || positionAt.x+position.width>moon.width-inset+1
-                   || ribbonAt.x<inset || ribbonAt.x+ribbon.width>moon.width-inset+1
-                   || provenanceAt.x<inset
-                   || provenanceAt.x+provenance.width>moon.width-inset+1
-                   || rack.x<inset || rack.x+rack.width>moon.width-inset+1
-                   || rack.y+rack.height>moon.height-inset+1)
-                    return root.fail("MOON_C10_STAGE_GUTTER_NOT_PRESERVED");
-                // All three MOON modes occupy a single full-width top rail.
-                if(!railAt || !phaseTab || !yearTab || !forecastStrip || !forecastDay
-                    || railAt.x<inset || railAt.y<headerAt.y+header.height
+                if(inset!==6 || !headerAt || !board || !forecastAt
+                    || !verticalForecast || !forecastDaylight
+                    || headerAt.x<inset || headerAt.y<inset
+                    || headerAt.x+header.width>moon.width-inset+1
+                    || railAt===null || railAt.x<inset
                     || railAt.x+rail.width>moon.width-inset+1
+                    || phaseAt.x<inset
+                    || phaseAt.y<railAt.y+rail.height
+                    || phaseAt.x+phase.width>moon.width-inset+1
+                    || positionAt.x<inset
+                    || provenanceAt.x<inset
+                    || forecastAt.x<phaseAt.x+phase.width+2
+                    || forecastAt.x+forecastStrip.width>moon.width-inset+1
+                    || ribbonAt.x<forecastAt.x
+                    || ribbonAt.x+ribbon.width>moon.width-inset+1
+                    || rack.y+rack.height>moon.height+1)
+                    return root.fail("C20_SPLIT_STAGE_GUTTER_OR_BOUNDS_FAILED");
+
+                // Keep exactly the same Moon two-mode controls and source
+                // facts. The phase now gets more screen space than C19.
+                if(!phaseTab || !yearTab
                     || rail.height!==27
                     || phaseTab.height!==27 || yearTab.height!==27
                     || phaseTab.width<200 || yearTab.width<200
                     || !phaseTab.selected
-                    || phaseAt.y<railAt.y+rail.height)
-                    return root.fail("MOON_SUN_STYLE_MODE_RAIL_FAILED");
+                    || phase.height<125
+                    || phase.height<=position.height
+                    || provenanceAt.y<positionAt.y+position.height-1
+                    || provenanceAt.y+provenance.height>moon.height-inset+1
+                    || forecastAt.y<railAt.y+rail.height
+                    || forecastStrip.height<120
+                    || ribbonAt.y<forecastAt.y+forecastStrip.height-1
+                    || ribbonAt.y+ribbon.height>moon.height-inset+1)
+                    return root.fail("C20_INSTRUMENT_PROPORTION_OR_OVERFLOW");
+
                 yearTab.clicked(null);
                 if(root.lastMoonRoute!=="cosmos/moon/year")
                     return root.fail("MOON_YEAR_MODE_ROUTE_BROKEN");
-                if(!forecastStrip.model.ready
-                    || forecastStrip.rows.length!==3
+
+                if(!forecastStrip.verticalMode || !forecastStrip.model.ready
+                    || forecastStrip.rows.length!==7
                     || forecastStrip.focusedDay.date!=="2026-11-06"
                     || forecastStrip.focusedDay.illumination!==23
-                    || forecastStrip.height<43
-                    || forecastStrip.y<phaseAt.y+phase.height
-                    || forecastStrip.y+forecastStrip.height>ribbonAt.y)
-                    return root.fail("C19_MOON_FORECAST_STRIP_MISSING");
+                    || forecastDay.height<13
+                    || forecastDay.width<140
+                    || verticalForecast.height<90
+                    || forecastDaylight.height<10)
+                    return root.fail("C20_VERTICAL_FORECAST_NOT_MOUNTED");
                 forecastStrip.selectedDate="2026-11-07";
-                if(positionAt.x < phaseAt.x+phase.width-1
-                    || Math.abs(positionAt.y-phaseAt.y)>1
-                    || ribbonAt.y<phaseAt.y+phase.height-1
-                    || ribbon.width<position.width*2
-                    || provenanceAt.y<ribbonAt.y+ribbon.height-1
-                    || rack.y+rack.height>moon.height+1
-                    || rack.height<50)
-                    return root.fail("C9_ASYMMETRIC_VIEWPORT_OVERFLOW");
-                if(count(position,"cosmos-c8-moon-fact")!==3
-                   || count(ribbon,"cosmos-c8-moon-fact")!==3
-                   || count(provenance,"cosmos-c8-moon-fact")!==3)
-                    return root.fail("C9_FACT_GROUPING_LOST");
+
+                if(count(phase,"cosmos-c8-moon-fact")!==0
+                    || count(moon,"cosmos-c8-moon-fact")!==9
+                    || count(position,"cosmos-c8-moon-fact")!==3
+                    || count(ribbon,"cosmos-c8-moon-fact")!==3
+                    || count(provenance,"cosmos-c8-moon-fact")!==3)
+                    return root.fail("C20_SOURCE_FACTS_OR_SEPARATE_LEDGER_LOST");
                 root.step=3;
             } else if(root.step===3) {
                 const forecast=find(moon,"cosmos-c19-moon-forecast-strip");

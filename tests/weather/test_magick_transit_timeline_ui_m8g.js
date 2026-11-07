@@ -165,7 +165,7 @@ test("M8g offscreen timeline and private Process integration preserve old JPL/na
  assert.match(pane,/StationMagickUtcDateField\s*\{/);
  assert.match(pane,/Timeline\.plot\(model,curve\.width,curve\.height\)/);
  assert.match(pane,/label:timeline\.busy\?"WAIT":"SEARCH"/);
- assert.match(pane,/onContactRequested/);
+ assert.match(astro,/onContactRequested: function\(exactUtc\)/);
  assert.match(pane,/signal contactRequested\(string exactUtc\)/);
  assert.match(pane,/onWheel:function\(wheel\)/);
  assert.match(pane,/timeline\.chooseEvent\(modelData\.utc\)/);

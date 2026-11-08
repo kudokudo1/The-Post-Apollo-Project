@@ -2,6 +2,8 @@
 """Social W's compositor-native handoff and exact-identity fallback contract."""
 import importlib.util
 from pathlib import Path
+import os
+import subprocess
 import sys
 import time
 import unittest
@@ -127,6 +129,38 @@ class NativePairTests(unittest.TestCase):
         self.bridge.fast_follow(snap)
         self.assertEqual(snap["fastLeader"],"discord")
         self.assertIn("social",self.bridge.pending_sync)
+
+    def test_helper_exits_after_quickshell_pipe_closes(self):
+        # The production Quickshell restart intentionally SIGKILLs the old
+        # owner. Its stdin pipe closes even though the child has no signal.
+        # Without the EOF -> stop_event fix, Bridge.poll_loop survives
+        # indefinitely and each restart leaks another 8ms polling worker.
+        for watching in (False, True):
+            with self.subTest(watching=watching):
+                child = subprocess.Popen(
+                    [sys.executable, "-B", str(SOURCE), "--interval-ms", "8"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    cwd=ROOT,
+                )
+                try:
+                    self.assertIsNotNone(child.stdin)
+                    if watching:
+                        child.stdin.write(b'{"op":"watch","enabled":true}\\n'.replace(b"\\n", b"\n"))
+                        child.stdin.flush()
+                    time.sleep(0.08)
+                    self.assertIsNone(child.poll(), "helper exited before EOF")
+                    child.stdin.close()
+                    self.assertEqual(
+                        child.wait(timeout=3), 0,
+                        "helper did not stop after its owner's pipe closed")
+                finally:
+                    if child.stdin and not child.stdin.closed:
+                        child.stdin.close()
+                    if child.poll() is None:
+                        child.kill()
+                    child.wait(timeout=3)
 
     def test_social_qml_does_not_reintroduce_polling(self):
         qml=(ROOT/"widgets/messanger/MessagingW.qml").read_text()

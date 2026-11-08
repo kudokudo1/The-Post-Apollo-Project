@@ -18,13 +18,15 @@ function project(observation) {
         return base;
     const privateMode = observation.privateMode === true;
     const scope = privateMode ? "PRIVATE SESSION" : "SHARED SESSION";
-    if (privateMode && observation.scopeMatches !== true)
+    if (observation.scopeMatches !== true)
         return {
-            status: "PRIVATE IDENTITY CHANGED // NOT CHECKED",
-            scope: "PRIVATE SESSION // IDENTITY NOT VERIFIED",
+            status: privateMode ? "PRIVATE IDENTITY CHANGED // NOT CHECKED"
+                                : "SHARED SESSION SCOPE CHANGED // NOT CHECKED",
+            scope: privateMode ? "PRIVATE SESSION // IDENTITY NOT VERIFIED"
+                               : "SHARED SESSION // ADAPTER SCOPE NOT VERIFIED",
             canRecheck: false,
             authorizedAtLastCheck: false,
-            detail: "OPEN TELEGRAM TO VERIFY THE SELECTED PRIVATE IDENTITY"
+            detail: "OPEN TELEGRAM TO VERIFY THE CORRECT SESSION SCOPE"
         };
     if (observation.nativeSelected !== true
             || observation.adapterActive !== true)

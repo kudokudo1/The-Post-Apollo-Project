@@ -2484,7 +2484,7 @@ PanelWindow {
             const kind=kinds.indexOf(rawKind)>=0?rawKind:"activity";
             const value=event.recordedAt;
             const at=typeof value==="string"
-                && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\\.\d{3}Z$/.test(value)
+                && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
                 && !Number.isNaN(Date.parse(value)) ? value : "";
             const base=source+"|"+kind+"|"+(at || "undated");
             const serial=(used[base] || 0)+1;

@@ -37,13 +37,15 @@ test("M26 does not require M25's Qt plugin for ordinary Company startup", () => 
 
 test("M26 uses real panel and map rectangles in distinct coordinate frames", () => {
     assert.match(company, /readonly property rect activeVectorFrameInHostRect:/);
-    assert.match(company, /companyFrame\.mapToItem\(root,\s*0,\s*0\)/);
+    assert.match(company, /companyFrame\.mapToItem\(null,\s*0,\s*0\)/);
+    assert.doesNotMatch(company, /companyFrame\.mapToItem\(root,\s*0,\s*0\)/);
     assert.match(company, /companyFrame\.width,\s*companyFrame\.height/);
     assert.match(company, /VectorViewportPolicy\.within\(candidate,\s*root\.width,\s*root\.height\)/);
     assert.match(company, /frameRect:\s*root\.activeVectorFrameInHostRect/);
     assert.match(company, /mapRect:\s*root\.activeVectorViewportRect/);
     assert.match(company, /!root\.menuOpen \|\| !companyFrame\.visible/);
-    assert.match(coverage, /mapCanvas\.mapToItem\(root,\s*0,\s*0\)/);
+    assert.match(coverage, /column\.x \+ mapRow\.x \+ mapSurface\.x \+ mapCanvas\.x/);
+    assert.match(coverage, /mapCanvas\.parent !== mapSurface/);
     assert.match(company, /coverage\.mapToItem\(companyFrame,\s*local\.x,\s*local\.y\)/);
     assert.match(link, /object\.frameRect = frameRect/);
     assert.match(link, /object\.mapRect = mapRect/);

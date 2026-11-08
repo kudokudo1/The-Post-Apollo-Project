@@ -18,7 +18,7 @@ const financePolicy = read("widgets/FinanceChassisPolicy.js");
 const policy = vm.createContext({});
 vm.runInContext(financePolicy.replace(/^\s*\.pragma library\s*$/m, ""), policy);
 
-test("Camera compact retains its size; Zoom expanded reserves deck height beyond Finance's 1000x900 content baseline", () => {
+test("Zoom-only frame fit preserves guest height without the black bottom gutter", () => {
     assert.match(camera, /property string chassisLevel: "compact"/);
     assert.match(camera, /chassisLevel === "compact"\s*\? Math\.max\(1, Math\.min\(784,/);
     assert.match(camera, /chassisLevel === "compact"\s*\? Math\.max\(1, Math\.min\(699, availableFrameHeight\)\)/);
@@ -57,23 +57,35 @@ test("Camera compact retains its size; Zoom expanded reserves deck height beyond
     assert.equal(699 - compactBrowserTop - 1, 603);
     assert.match(camera, /readonly property int zoomDeckGap: 3/);
     assert.match(camera, /readonly property int zoomBrowserRise: 13/);
-    assert.match(camera, /readonly property int zoomWebBottomTrim: 5/);
+    assert.match(camera, /readonly property int zoomFrameBottomFit: 10/);
+    assert.match(camera, /readonly property int frameHeightBase:/);
+    assert.match(camera, /camera\.activeView === "zoom" \? zoomFrameBottomFit : 0/);
+    assert.doesNotMatch(camera, /zoomWebBottomTrim/);
     assert.match(camera, /y: camera\.zoomControlDeckBottom \+ camera\.zoomDeckGap\s*- camera\.zoomBrowserRise/);
-    assert.match(camera, /frame\.height - y - camera\.zoomBayBottom\s*- camera\.zoomWebBottomTrim/);
+    assert.match(camera, /height: Math\.max\(0, frame\.height - y - camera\.zoomBayBottom\)/);
     assert.match(camera, /height: Math\.max\(0, camera\.zoomControlDeckBottom - y \+ 1\)/);
-    // Native operator feedback: 10px trim left a visible gap. Use 5px.
-    // The browser's origin and Camera frame remain completely unchanged.
+    // A browser-only 10px trim exposed a black backing rectangle. Move the
+    // 10px onto Zoom's frame height itself and let the browser fill its bay.
+    // The browser keeps #1536's smaller dimensions, but its border follows
+    // the guest at a normal 1px inset. Non-Zoom frames do not change.
     const raisedTop = compactBrowserTop - 13;
     const inputTop = Math.max(raisedTop, compactDeckEnd);
-    const bottomTrim = 5;
+    const frameFit = 10;
+    const compactZoomFrame = 699 - frameFit;
+    const expandedFittedFrame = expandedZoomFrame - frameFit;
+    const fullscreenFittedFrame = 1345 - frameFit;
     assert.equal(raisedTop, 82);
-    assert.equal(699 - raisedTop - 1 - bottomTrim, 611);
+    assert.equal(compactZoomFrame, 689);
+    assert.equal(compactZoomFrame - raisedTop - 1, 606);
     assert.equal(inputTop, compactDeckEnd);
-    assert.equal(611 - (inputTop - raisedTop), 601);
-    assert.equal(expandedZoomFrame - (reserve - 13) - bottomTrim, 908);
-    assert.equal(expandedZoomFrame, 1013);
-    assert.equal(1345 - 99 - 1 - bottomTrim, 1240);
-    assert.equal(699 - (raisedTop + 611), 6);
+    assert.equal(606 - (inputTop - raisedTop), 596);
+    assert.equal(expandedFittedFrame, 1003);
+    assert.equal(expandedFittedFrame - (reserve - 13), 903);
+    assert.equal(fullscreenFittedFrame, 1335);
+    assert.equal(fullscreenFittedFrame - 99 - 1, 1235);
+    assert.equal(compactZoomFrame - (raisedTop + 606), 1);
+    assert.equal(expandedFittedFrame - (99 + 903), 1);
+    assert.equal(fullscreenFittedFrame - (99 + 1235), 1);
     assert.doesNotMatch(camera, /zoomTopNudge/);
     assert.equal(policy.step("compact", 1), "expanded");
     assert.equal(policy.step("expanded", 1), "fullscreen");
@@ -101,17 +113,20 @@ test("Camera uses Finance's baseline fullscreen width/height outside Zoom; Zoom 
     for (const [width, height] of [[2560,1440],[1920,1080],[1360,768]]) {
         const base = policy.frame("fullscreen", width, height, 12, 9, 8);
         const available = height - 9 - 8;
-        const zoomFrame = base.height;
-        assert.equal(zoomFrame, base.height);
+        const zoomFrame = Math.max(1, base.height - 10);
+        assert.equal(zoomFrame, base.height - 10);
         assert.ok(zoomFrame <= available);
     }
     const workareaTop = 82; // DP-3's operator-verified Sway workarea origin
-    const safeBrowserBottom = workareaTop + 9 + full.height - 1;
-    assert.equal(safeBrowserBottom, 1435);
+    const baselineBrowserBottom = workareaTop + 9 + full.height - 1;
+    assert.equal(baselineBrowserBottom, 1435);
+    // The Zoom-only 10px frame fit makes this even safer.
+    const fittedZoomBottom = workareaTop + 9 + (full.height - 10) - 1;
+    assert.equal(fittedZoomBottom, 1425);
     const rejectedFrame = Math.min(1440 - 9 - 8, full.height + reserve);
     assert.equal(rejectedFrame, 1423);
     assert.equal(workareaTop + 9 + rejectedFrame - 1, 1513);
-    assert.ok(safeBrowserBottom <= 1440);
+    assert.ok(fittedZoomBottom <= 1440);
     assert.match(camera, /: financeSize\.height/);
     assert.match(camera, /FinanceChassisPolicy\.leftMargin\(/);
     assert.match(camera, /top: 0/);
@@ -138,11 +153,11 @@ test("Camera's transparent Zoom frame seals its inner 2px perimeter but leaves d
     assert.ok(right.includes("x: camera.zoomActorLeft + camera.zoomActorWidth"));
     assert.ok(left.includes("visible: camera.zoomWebVisualHeld"));
     assert.ok(right.includes("visible: camera.zoomWebVisualHeld"));
-    for (const [width, height, top] of [[784,699,82],[1000,1013,99],[2536,1345,99]]) {
+    for (const [width, height, top] of [[784,689,82],[1000,1003,99],[2536,1335,99]]) {
         const inset = 2, browserWidth = width - 2 * inset;
-        const browserBottom = height - 1 - 5;
+        const browserBottom = height - 1;
         assert.equal(inset + browserWidth + inset, width);
-        assert.equal(top + (browserBottom - top) + 6, height);
+        assert.equal(top + (browserBottom - top) + 1, height);
     }
     assert.match(camera, /readonly property int zoomBrowserRise: 13/);
     assert.match(camera, /intersection: Intersection\.Subtract/);

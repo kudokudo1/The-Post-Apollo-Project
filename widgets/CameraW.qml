@@ -71,14 +71,13 @@ PanelWindow {
     readonly property int zoomWebEdgeInset: 2
     readonly property int zoomBayInset: Math.max(0, Math.round(zoomViewport.x))
     readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))
-    // The existing 1px frame budget is not the browser's physical bottom.
-    // A 10px bottom-only trim left too much empty space in native compact.
-    // Reduce it to 5px in all sizes, preserving the existing browser top,
-    // Camera frame, mode buttons, and 13px rise.
-    // Keep this independent from zoomDeckReserve so expanded's frame height
-    // does not grow and silently cancel the trim.
+    // Zoom's measured physical browser target fits 10px shorter than the
+    // original Camera frame, but a browser-only trim exposed a black strip
+    // from the existing bottom backing Rectangle. Shorten the Zoom MODE
+    // chassis itself instead; the guest still fills to the 1px frame inset.
+    // Non-Zoom chassis and the already-raised top controls do not change.
     readonly property int zoomBayBottom: 1
-    readonly property int zoomWebBottomTrim: 5
+    readonly property int zoomFrameBottomFit: 10
     // Keep #1505's raised compact controls and common 3px deck spacing.
     // The first 8px rise improved all three sizes; a subsequent native screenshot
     // calls for another 5px. Rise is now 13px total from the #1505 deck.
@@ -287,13 +286,20 @@ PanelWindow {
     // Extending the 1345px Finance fullscreen frame to 1423px made
     // ZoomWebHost reject its physical rectangle as OUTSIDE_WORKAREA.
     // Preserve Finance's fullscreen budget; keep expanded's deck reserve.
-    readonly property int frameHeight:
+    // Finance/chassis baseline is unchanged for Capture, Gallery, Cleanup.
+    // In Zoom only, shorten the OUTER frame by the same 10px once applied
+    // to the browser alone. This preserves the smaller native guest while
+    // eliminating the exposed black band between it and Camera's border.
+    readonly property int frameHeightBase:
         chassisLevel === "compact"
         ? Math.max(1, Math.min(699, availableFrameHeight))
         : camera.activeView === "zoom" && chassisLevel === "expanded"
           ? Math.min(availableFrameHeight,
                      financeSize.height + zoomDeckReserve)
           : financeSize.height
+    readonly property int frameHeight: Math.max(
+        1, frameHeightBase
+           - (camera.activeView === "zoom" ? zoomFrameBottomFit : 0))
     readonly property int gutter: glowGutter
     function expandChassis() {
         chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1);
@@ -993,15 +999,14 @@ PanelWindow {
             // and keep the actual browser, mask and host on this one rect.
             // Keep controls in their #1505 positions. Lift the physical
             // browser 13px total (8px previous + 5px additional) in all three
-            // sizes while keeping the viewport's bottom edge unchanged.
+            // sizes. Its bottom follows the Zoom-mode Camera frame itself.
             // The opaque deck covers its small overlap and the input mask
             // stays clamped below the buttons. Follower uses this same rect.
             x: camera.zoomWebEdgeInset
             y: camera.zoomControlDeckBottom + camera.zoomDeckGap
                - camera.zoomBrowserRise
             width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)
-            height: Math.max(0, frame.height - y - camera.zoomBayBottom
-                             - camera.zoomWebBottomTrim)
+            height: Math.max(0, frame.height - y - camera.zoomBayBottom)
             visible: camera.menuOpen && camera.activeView === "zoom"
 
             Flickable {

@@ -73,6 +73,22 @@ def _target_from_outputs(outputs, message, workspaces=None):
     return ((output["x"] + x, output["y"] + y + top, width, height), output)
 
 
+def _ipc_success(result):
+    return (isinstance(result, list) and bool(result)
+            and all(isinstance(value, dict)
+                    and value.get("success") is True for value in result))
+
+
+def _set_verified_opacity(ipc, actor_id, value):
+    """Per-actor SwayPX opacity; never a global compositor command."""
+    if type(actor_id) is not int or actor_id <= 0:
+        raise ValueError("INVALID_ACTOR")
+    if value not in (0, 1):
+        raise ValueError("INVALID_OPACITY")
+    return _ipc_success(ipc.request(
+        0, f"[con_id={actor_id}] opacity set {value}"))
+
+
 def _sync_command(node, geometry, output_rect, setup):
     """Bounded, numeric con_id only. No generic title/class Sway criteria."""
     if type(node.get("id")) is not int or node["id"] <= 0:
@@ -107,6 +123,8 @@ class ZoomFollower:
         self.last_command_time = -1e6
         self.commands_for_target = 0
         self.actor_id = None
+        self.concealed_actor_id = None
+        self.revealed_actor_id = None
 
     def emit(self, state, aligned=False):
         key = (self.revision, state, aligned)
@@ -151,11 +169,31 @@ class ZoomFollower:
             if actor.get("visible") is not True:
                 self.emit("UNVERIFIED")
                 return
+            actor_id = actor["id"]
             if host._near(actor, geometry):
-                self.actor_id = actor["id"]
+                # Restore pixels only after a fresh physical-client check.
+                # Also re-reveal after a follower restart if its predecessor
+                # was interrupted while this same guest was concealed.
+                if self.revealed_actor_id != actor_id:
+                    if not _set_verified_opacity(self.ipc, actor_id, 1):
+                        self.emit("FAILED")
+                        return
+                    self.revealed_actor_id = actor_id
+                    self.concealed_actor_id = None
+                self.actor_id = actor_id
                 self.emit("ALIGNED", True)
                 return
             self.emit("MISALIGNED")
+            # A detached XWayland client is a separate real desktop window.
+            # QML's input mask cannot clip it. Conceal the EXACT verified
+            # browser before issuing resize/move, so it cannot flash over
+            # neighboring windows while a Camera transition is in flight.
+            if self.concealed_actor_id != actor_id:
+                if not _set_verified_opacity(self.ipc, actor_id, 0):
+                    self.emit("FAILED")
+                    return
+                self.concealed_actor_id = actor_id
+                self.revealed_actor_id = None
             if self.commands_for_target >= MAX_COMMANDS_PER_TARGET:
                 self.emit("FAILED")
                 return
@@ -163,14 +201,12 @@ class ZoomFollower:
             if now - self.last_command_time < COMMAND_COOLDOWN_SECONDS:
                 return
             command = _sync_command(actor, geometry, output,
-                                    setup=self.actor_id != actor["id"])
+                                    setup=self.actor_id != actor_id)
             result = self.ipc.request(0, command)
-            if not isinstance(result, list) or not result or not all(
-                    isinstance(v, dict) and v.get("success") is True
-                    for v in result):
+            if not _ipc_success(result):
                 self.emit("FAILED")
                 return
-            self.actor_id = actor["id"]
+            self.actor_id = actor_id
             self.last_command_time = now
             self.commands_for_target += 1
             # Next compositor observation, not an optimistic command return,

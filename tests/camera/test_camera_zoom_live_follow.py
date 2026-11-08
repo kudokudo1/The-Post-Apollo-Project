@@ -106,28 +106,67 @@ class FollowTests(unittest.TestCase):
         with patch.object(follow.host,"_unique_actor",
                           side_effect=lambda profile,tree: (ipc.actor,"")):
             f.tick()
-            self.assertEqual(len(ipc.commands),1)
-            self.assertIn('[con_id=321] floating enable',ipc.commands[0])
-            self.assertIn('[con_id=321] border none',ipc.commands[0])
-            self.assertIn('resize set width 734 px height 540 px',ipc.commands[0])
-            self.assertIn('move absolute position 45 px 120 px',ipc.commands[0])
+            self.assertEqual(len(ipc.commands),2)
+            self.assertEqual(ipc.commands[0],'[con_id=321] opacity set 0')
+            self.assertIn('[con_id=321] floating enable',ipc.commands[1])
+            self.assertIn('[con_id=321] border none',ipc.commands[1])
+            self.assertIn('resize set width 734 px height 540 px',ipc.commands[1])
+            self.assertIn('move absolute position 45 px 120 px',ipc.commands[1])
             # A queued move is not a verified dock.
             self.assertNotEqual(f.latest_state,(1,"ALIGNED",True))
             ipc.actor=node(x=45,y=120,w=734,h=540)
             f.tick()
+            self.assertEqual(ipc.commands[-1],'[con_id=321] opacity set 1')
             self.assertEqual(f.latest_state,(1,"ALIGNED",True))
             f.set_target({"op":"target","revision":2,"output":"DP-5",
                           "x":62,"y":119,"width":1100,"height":650})
             clock[0]=11.0
             f.tick()
-            self.assertEqual(len(ipc.commands),2)
+            self.assertEqual(len(ipc.commands),5)
+            self.assertEqual(ipc.commands[3],'[con_id=321] opacity set 0')
             # Same actor, Social-style resize/move with no new launch.
-            self.assertNotIn('floating enable',ipc.commands[1])
-            self.assertIn('resize set width 1100 px height 650 px',ipc.commands[1])
-            self.assertIn('move absolute position 62 px 119 px',ipc.commands[1])
+            self.assertNotIn('floating enable',ipc.commands[4])
+            self.assertIn('resize set width 1100 px height 650 px',ipc.commands[4])
+            self.assertIn('move absolute position 62 px 119 px',ipc.commands[4])
             ipc.actor=node(x=62,y=119,w=1100,h=650)
             f.tick()
+            self.assertEqual(ipc.commands[-1],'[con_id=321] opacity set 1')
             self.assertEqual(f.latest_state,(2,"ALIGNED",True))
+
+    def test_escape_is_concealed_until_the_verified_browser_fits(self):
+        ipc=IPC()
+        f=follow.ZoomFollower(Path("/test/zoom"),ipc)
+        f.set_target({"op":"target","revision":1,"output":"DP-5",
+                      "x":45,"y":120,"width":734,"height":540})
+        with patch.object(follow.host,"_unique_actor",
+                          side_effect=lambda profile,tree:(ipc.actor,"")):
+            f.tick()
+            self.assertEqual(ipc.commands[0],"[con_id=321] opacity set 0")
+            self.assertIn("resize set width",ipc.commands[1])
+            # A command success does not visually reveal the client.
+            self.assertNotEqual(f.latest_state,(1,"ALIGNED",True))
+            # Even errors small enough for the old +/-4px comparator must
+            # not count as success if the physical browser bottom is low.
+            ipc.actor=node(x=45,y=123,w=734,h=544)
+            f.tick()
+            self.assertEqual(f.latest_state,(1,"MISALIGNED",False))
+            self.assertNotIn("[con_id=321] opacity set 1",ipc.commands)
+            ipc.actor=node(x=45,y=120,w=734,h=540)
+            f.tick()
+            self.assertEqual(ipc.commands[-1],"[con_id=321] opacity set 1")
+            self.assertEqual(f.latest_state,(1,"ALIGNED",True))
+
+    def test_opacity_commands_target_only_verified_zoom_id(self):
+        source=HELPER.read_text()
+        self.assertIn('f"[con_id={actor_id}] opacity set {value}"',source)
+        self.assertIn("host._unique_actor(self.profile, tree=tree)",source)
+        self.assertIn("self.concealed_actor_id = actor_id",source)
+        self.assertIn("self.revealed_actor_id = actor_id",source)
+        self.assertNotIn("opacity set 0; for_window",source)
+        with self.assertRaises(ValueError):
+            follow._set_verified_opacity(IPC(),0,0)
+        with self.assertRaises(ValueError):
+            follow._set_verified_opacity(IPC(),321,2)
 
     def test_runtime_coalesces_pending_resize_lines_before_sway_tick(self):
         source = HELPER.read_text()

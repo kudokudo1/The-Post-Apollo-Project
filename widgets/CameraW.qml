@@ -71,15 +71,16 @@ PanelWindow {
     readonly property int zoomWebEdgeInset: 2
     readonly property int zoomBayInset: Math.max(0, Math.round(zoomViewport.x))
     readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))
-    // #1546 reduced Zoom and Camera by the SAME 2px, so their relative
-    // bottom gap remained one pixel and could not correct guest overfill.
-    // Keep that Zoom-only frame size, but inset the physical Sway guest by
-    // two more pixels at the bottom. This is independently applied to the
-    // guest viewport and thus also to its verified follower/input mask.
-    // Preserve the raised top/buttons and all non-Zoom Camera sizes.
+    // The 12px Zoom-only frame fit is retained, but the physical browser
+    // needs two additional pixels of bottom clearance after native review.
+    // This applies ONLY to the guest; Camera's frame, top, width, header and
+    // mode controls remain unchanged. The target bottom stays 5px inside
+    // the Camera frame (one frame pixel plus four guest-clearance pixels).
+    // The host/follower must verify the actual client bottom, not merely
+    // accept separate +/-4px height and position errors.
     readonly property int zoomBayBottom: 1
     readonly property int zoomFrameBottomFit: 12
-    readonly property int zoomGuestBottomClearance: 2
+    readonly property int zoomGuestBottomClearance: 4
     // Keep #1505's raised compact controls and common 3px deck spacing.
     // The first 8px rise improved all three sizes; a subsequent native screenshot
     // calls for another 5px. Rise is now 13px total from the #1505 deck.
@@ -1008,10 +1009,10 @@ PanelWindow {
             y: camera.zoomControlDeckBottom + camera.zoomDeckGap
                - camera.zoomBrowserRise
             width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)
-            // The physical browser sits three pixels from Camera's
-            // bottom (original 1px + 2px clearance). Only these pixels are
-            // backed by the existing opaque frame seal. Never enlarge the
-            // outer frame to cancel this independent guest clearance.
+            // The native browser ends 5px before Camera's frame bottom
+            // (one standard inset + four guest-clearance pixels). The
+            // visible frame does NOT shrink with this change. Its physical
+            // bottom is separately bounded by ZoomWebHost's verifier.
             height: Math.max(0, frame.height - y - camera.zoomBayBottom
                              - camera.zoomGuestBottomClearance)
             visible: camera.menuOpen && camera.activeView === "zoom"

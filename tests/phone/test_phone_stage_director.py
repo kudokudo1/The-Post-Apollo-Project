@@ -229,5 +229,44 @@ class PhoneStageTests(unittest.TestCase):
                 self.assertNotIn(name, script)
 
 
+class InstallerFocusTests(unittest.TestCase):
+    def test_installer_focus_is_user_requested_and_exact_actor(self):
+        executed = Mock()
+        result = stage.operation(
+            "focus-installer", app_id=stage.INSTALL_APP_ID,
+            tree=tree(app_id=stage.INSTALL_APP_ID),
+            executable=lambda _: "foot", execute=executed)
+        self.assertEqual(result["state"], "FOCUS_REQUESTED")
+        self.assertIs(result["verifiedHole"], False)
+        executed.assert_called_once_with("[con_id=9901] focus")
+
+    def test_installer_focus_refuses_other_actors_and_missing_visibility(self):
+        for data, appid in (
+            (tree(), stage.STAGE_APP_ID),
+            (tree(app_id=stage.INSTALL_APP_ID, foot_visible=False), stage.INSTALL_APP_ID),
+            (tree(app_id=stage.INSTALL_APP_ID), stage.STAGE_APP_ID),
+            (tree(app_id=stage.INSTALL_APP_ID, duplicate=True), stage.INSTALL_APP_ID),
+        ):
+            with self.subTest(appid=appid, data=data):
+                execute = Mock()
+                output = stage.operation(
+                    "focus-installer", app_id=appid, tree=data,
+                    executable=lambda _: "foot", execute=execute)
+                self.assertNotEqual(output["state"], "FOCUS_REQUESTED")
+                execute.assert_not_called()
+
+    def test_cli_focus_installer_never_moves_or_closes_window(self):
+        from unittest.mock import patch
+        with patch.object(stage, "operation",
+                          return_value=stage._result("FOCUS_REQUESTED")) as op:
+            with patch("builtins.print"):
+                self.assertEqual(stage.main(["--focus-installer"]), 0)
+            op.assert_called_once_with("focus-installer", app_id=stage.INSTALL_APP_ID)
+        with patch.object(stage, "operation") as op:
+            with patch("builtins.print"):
+                self.assertEqual(stage.main(["--focus"]), 2)
+            op.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

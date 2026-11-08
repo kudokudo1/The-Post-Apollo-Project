@@ -90,7 +90,59 @@ class C2vRollbackEvidenceContract(unittest.TestCase):
         self.assertIn('C2V_PASS // ACTUAL_SILVERBLUE_BOOTED_LAYER_AND_ROLLBACK_SEQUENCE', self.host)
         self.assertIn('C4B_PASS // REAL_SILVERBLUE_SIGNED_FAKE_SERVICE_OS_ORIGIN_AND_ROLLBACK', self.host)
 
-    def test_04_no_diagnostics_can_create_a_success_signal(self):
+    def test_04_independent_c4b_observer_samples_a_nonreturning_command(self):
+        src = self.guest
+        self.assertEqual(src.count("c2v_rollback_observer_start() {"), 1)
+        self.assertIn('[[ -f "$c4b_mode" && -c /dev/ttyS1 ]] || return 0', src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_TICK //", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_PROCESSES_BEGIN", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_UNIT_BEGIN", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_OSTREE_BEGIN", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_RPM_OSTREE_BEGIN", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_JOURNAL_BEGIN", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_COMMAND_OUTPUT_BEGIN", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_EXIT //", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_STARTED // non-authoritative", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_START_FAILED // non-authoritative", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_NOT_READY // non-authoritative", src)
+        self.assertIn("systemd-run --quiet", src)
+        self.assertIn("--unit=c2v-rpm-rollback-observer", src)
+        self.assertIn("--property=Type=exec", src)
+        self.assertIn(">/dev/ttyS1 2>&1 || true", src)
+        self.assertIn('touch /run/c2v-rpm-rollback-observer-finished', src)
+        self.assertIn("timeout --signal=TERM --kill-after=2s 5s rpm-ostree status --json", src)
+        self.assertIn("timeout --signal=TERM --kill-after=2s 5s ostree admin status", src)
+        self.assertIn("timeout --signal=TERM --kill-after=2s 5s journalctl -b", src)
+        self.assertIn("for n in $(seq 1 55); do", src)
+        self.assertIn("sleep 20", src)
+        stage = src.index('echo rollback_pending > "$stagefile"')
+        start = src.index("c2v_rollback_observer_start", stage)
+        begin = src.index("C2V_ROLLBACK_COMMAND_BEGIN // actual", start)
+        command = src.index('if rpm-ostree rollback --reboot > "$rollback_output" 2>&1; then', begin)
+        self.assertLess(stage, start)
+        self.assertLess(start, begin)
+        self.assertLess(begin, command)
+        observer = src[
+            src.index("c2v_rollback_observer_start() {"):
+            src.index("stagefile=/var/lib/c2v-transaction-stage")
+        ]
+        for forbidden in (
+            "systemctl reboot",
+            "systemctl poweroff",
+            "rpm-ostree rollback --reboot",
+            "rpm-ostree install ",
+            "C2V_PASS //",
+            "C4B_PASS //",
+            'echo complete > "$stagefile"',
+            "setenforce",
+            "curl ",
+            "wget ",
+            "shutdown -",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, observer)
+
+    def test_05_no_diagnostics_can_create_a_success_signal(self):
         source = self.guest
         begin = source.index("c2v_rollback_failure_diagnostic() {")
         end = source.index("\ntrap 'rc=$?;", begin)

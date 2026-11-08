@@ -109,7 +109,7 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('height: 42', QML)
         self.assertIn('height: 34', QML)
         self.assertIn('Math.min(784, viewportWidth - 2 * glowGutter)', QML)
-        self.assertIn('Math.min(699, viewportHeight', QML)
+        self.assertIn('Math.min(699, availableFrameHeight)', QML)
         self.assertIn(
             'height: Math.max(0, frame.height - y - camera.zoomBayBottom)', QML)
         self.assertIn('readonly property int zoomBayBottom: 1', QML)
@@ -187,8 +187,8 @@ class ZoomWebHostTests(unittest.TestCase):
         # this does not assert native Sway placement or browser page zoom.
         for frame_width, frame_height, top, expect_width, expect_height in (
                 (784, 699, 116, 780, 582),
-                (1000, 900, 116, 996, 783),
-                (1920, 1080, 116, 1916, 963)):
+                (1000, 1010, 110, 996, 899),
+                (2536, 1423, 110, 2532, 1312)):
             self.assertEqual(frame_width - 2 * 2, expect_width)
             self.assertEqual(frame_height - top - 1, expect_height)
         # Preserve all four controls and the same header navigation.
@@ -200,7 +200,9 @@ class ZoomWebHostTests(unittest.TestCase):
     def test_native_measured_top_nudge_only_moves_zoom_actor_not_button_input(self):
         # Operator-supplied native screenshot and Sway rectangle measured the
         # *remaining* 13px gap AFTER the previous 4px nudge. Thus total is 17.
-        self.assertIn('readonly property int zoomTopNudge: 17',QML)
+        self.assertIn(
+            'readonly property int zoomTopNudge: chassisLevel === "compact" ? 17 : 0',
+            QML)
         self.assertIn(
             'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height',QML)
         self.assertIn('               - camera.zoomTopNudge',QML)
@@ -223,6 +225,43 @@ class ZoomWebHostTests(unittest.TestCase):
             self.assertEqual(original_top+original_height,new_top+new_height)
             self.assertEqual(max(new_top,original_top),original_top)
             self.assertEqual(new_height-(original_top-new_top),original_height)
+
+    def test_expanded_zoom_reserves_real_deck_above_finance_content(self):
+        # Expanded (1000x900 Finance baseline) used to squeeze the page into
+        # 900px *including* Camera's header, divider and 42px buttons.
+        # Zoom gets a measured 110px chrome allowance on a 1440px output,
+        # so the browser is ~900px tall without being pushed behind buttons.
+        self.assertIn('readonly property int zoomDeckReserve: Math.max(0, Math.round(', QML)
+        self.assertIn(
+            'cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
+        self.assertIn('+ zoomBayBottom))', QML)
+        self.assertIn('readonly property int availableFrameHeight: Math.max(', QML)
+        self.assertIn('viewportHeight - frameTopInset - bottomScreenGap', QML)
+        self.assertIn('financeSize.height + zoomDeckReserve', QML)
+        self.assertIn('camera.activeView === "zoom"', QML)
+        self.assertIn('Math.min(availableFrameHeight,', QML)
+        self.assertIn('chassisLevel === "compact" ? 17 : 0', QML)
+        self.assertIn('height: 42', QML)
+        self.assertIn('height: 34', QML)
+        self.assertIn(
+            'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
+        self.assertIn('               - camera.zoomTopNudge', QML)
+        self.assertIn(
+            'zoomActorTop, cameraBodyColumn.y + cameraModes.y + cameraModes.height)',
+            QML)
+        header = 12 + 37 + 8 + 2 + 8 + 42
+        bottom = 1
+        chrome = header + bottom
+        self.assertEqual(chrome,110)
+        expanded = min(1440 - 9 - 8, 900 + chrome)
+        self.assertEqual(expanded,1010)
+        self.assertEqual(expanded - header - bottom,900)
+        # A short monitor never overshoots usable screen height.
+        for screen_height, base_height in ((768,751),(1080,900),(1440,900)):
+            available=screen_height-9-8
+            self.assertLessEqual(min(available,base_height+chrome), available)
+        # Existing compact geometry and calibrated placement stay unchanged.
+        self.assertEqual(699 - (header-17) - bottom,606)
 
     def test_resize_retains_verified_visual_without_exposing_unverified_input(self):
         self.assertIn('property bool zoomWebVisualHeld: false', QML)

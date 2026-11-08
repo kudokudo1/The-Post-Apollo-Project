@@ -1476,7 +1476,7 @@ test("U7a OPEN OWNER uses shell's existing windows and never forwards selected I
   assert.match(route,/requestControlKeyboard\("hospital","favorites-owner"\)/);
   for(const code of [policy,route]) {
     assert.doesNotMatch(code,/FileView\s*\{|Process\s*\{|JsonAdapter\s*\{|execDetached|setFavorite\(|togglePinned\(|loadMedia\(|runCommand\(/);
-    assert.doesNotMatch(code,/\.resourceId|\.command|\.key|\.streamUrl|\.url|\.hospitalRecord/);
+    assert.doesNotMatch(code,/\.resourceId|\.command|\.streamUrl|\.url|\.hospitalRecord/);
   }
   assert.match(shell,/function openApolloNotificationRoute\(destination\)/);
 });

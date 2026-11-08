@@ -448,6 +448,10 @@ if os.path.isfile("/var/lib/c4a-signed-service-test"):
         "postapollo-connections-c2t-fixture-0.1-1.fc44.noarch",
         "postapollo-connections-c3d-ci-status-0.1-1.fc44.noarch",
     )
+    # C4b opts into one more independently signed local policy package.
+    # A staged C2t+C3d deployment without it is NOT C4b authority.
+    if os.path.isfile("/var/lib/c4b-runtime-ci-only"):
+        expected += ("postapollo-connections-c4b-policy-ci-0.1-1.fc44.noarch",)
     if not isinstance(local_refs,list) or not all(
         any(isinstance(ref,str) and (
             ref==nevra or
@@ -554,6 +558,13 @@ if [[ -f /var/lib/c4a-signed-service-test ]]; then
     printf '2\n' > /run/c2v-rpm-layer-worker-exit
     exit 2
   fi
+fi
+if [[ -f /var/lib/c4b-runtime-ci-only ]]; then
+  if [[ ! -s /mnt/c2v-offline/c4b-policy.rpm ]]; then
+    printf '2\n' > /run/c2v-rpm-layer-worker-exit
+    exit 2
+  fi
+  set -- "$@" /mnt/c2v-offline/c4b-policy.rpm
 fi
 if timeout --signal=TERM --kill-after=20s 480s rpm-ostree install --cache-only "$@" >> "$log" 2>&1; then
   printf "0\n" > /run/c2v-rpm-layer-worker-exit

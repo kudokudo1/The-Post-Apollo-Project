@@ -95,6 +95,47 @@ function modeIdentity(raw) {
     const match=/^mode:([0-8]):(.+)$/.exec(raw);
     return match ? {menu:modeMenu(Number(match[1])),label:match[2]} : null;
 }
+// FileService.recordFromFields produces these exact presentation prefixes,
+// followed by the file's basename. AppControl's legacy FILES favorite key
+// stored that *label* as mode:2:<label>, not the canonical path/id.
+// Reconstruct the original label without reading or claiming filesystem state.
+function safeSavedFileName(name) {
+    if (typeof name!=="string") return "";
+    const value=name.trim();
+    if (!value || value.length>120 || value==="." || value===".."
+            || /[\u0000-\u001f\u007f\u2028\u2029\/\\|<>]/.test(value)
+            || /%(?:2f|5c|00|0a|0d)/i.test(value)
+            || /^(?:file:|https?:|smb:|ssh:)/i.test(value))
+        return "";
+    return value;
+}
+function savedFileDescription(raw) {
+    const mode=modeIdentity(raw);
+    if (!mode || mode.menu!=="FILES") return null;
+    let label=mode.label;
+    let kind="FAVORITE"; // No inferred filesystem kind for older labels.
+    const prefixes=[
+        ["⌯🗁๋࣭⭑  ","DIRECTORY FAVORITE"],
+        ["◇  ","FILE FAVORITE"],
+        ["↗  ","SYMLINK FAVORITE"]
+    ];
+    for(const prefix of prefixes) {
+        if(label.indexOf(prefix[0])===0) {
+            label=label.slice(prefix[0].length);
+            kind=prefix[1];
+            break;
+        }
+    }
+    // A trailing slash is FileService's presentation for a directory, not
+    // proof that the directory currently exists.
+    if(label.endsWith("/") && label.indexOf("/")===label.length-1) {
+        label=label.slice(0,-1);
+        kind="DIRECTORY FAVORITE";
+    }
+    const name=safeSavedFileName(label);
+    return name ? {menu:"FILES",item:name,type:kind} : null;
+}
+
 function stableOwnerWindowName(models, label) {
     // Only repeat an actual matching AppControl window/tab row.
     for(const field of ["swayWindows","appTabs"]) {
@@ -139,7 +180,7 @@ function build(saved, models) {
     }
     function put(kind,raw,menu,item,type) {
         if (!permitted[kind][raw]) return;
-        const label=visibleName(item);
+        const label=menu==="FILES" ? safeSavedFileName(item) : visibleName(item);
         const key=Resource.identityKey("appcontrol",kind,raw);
         if (!key || !label || Object.prototype.hasOwnProperty.call(out,key)) return;
         out[key]={menu:menu,item:label,type:type};
@@ -276,6 +317,9 @@ function build(saved, models) {
                     && !/(?:password|secret|token|credential|private|auth|keyring)/i.test(command))
                 put("item",raw,"APPS",command+" [CLI]","FAVORITE");
         } else {
+            const savedFile=savedFileDescription(raw);
+            if (savedFile)
+                put("item",raw,savedFile.menu,savedFile.item,savedFile.type);
             const desktop=savedDesktopIdentity(raw);
             if (desktop)
                 put("item",raw,"APPS",desktop,"FAVORITE");

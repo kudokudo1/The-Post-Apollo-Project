@@ -94,11 +94,28 @@ ShellRoot {
         id: win
         title: "CPU-FAVORITES-NATIVE"
         visible: true
-        implicitWidth: 700
+        implicitWidth: 930
         implicitHeight: 480
         Row {
             anchors.fill: parent
             spacing: 12
+            CpuPlusFavoritesHubPane {
+                id: dossier
+                area: "overview"
+                width: 208
+                height: parent.height
+                candidates: root.options
+                selectedResource: root.selection
+                timeOwner: time
+                placesOwner: places
+                defaultOwner: defaults
+                collectionsOwner: collections
+                onIndexSelectionRequested: function(key, category) {
+                    selector.filterMode=category;
+                    root.selectedKey=key;
+                    console.log("U4_INDEX // NAVIGATED "+category);
+                }
+            }
             CpuPlusFavoritesHubPane {
                 id: selector
                 area: "selector"
@@ -169,7 +186,19 @@ ShellRoot {
                        && item.item==="Active Contract.pdf"
                        && item.favoriteType==="SYMLINK FAVORITE";
             });
+            const fileGroup=dossier.dossier.groups.find(function(group) {
+                return group.key==="APP CTRL|FILES";
+            });
+            const processGroup=dossier.dossier.groups.find(function(group) {
+                return group.key==="CPU++|KILL";
+            });
             if(!root.options || root.options.total!==11
+               || dossier.dossier.total!==root.options.rows.length
+               || !fileGroup || fileGroup.count!==3
+               || !processGroup || processGroup.count!==1
+               || fileGroup.items[0].name!=="budget-2026.xlsx"
+               || fileGroup.items[1].name!=="Properties"
+               || fileGroup.items[2].name!=="Active Contract.pdf"
                || !run || !winItem || !cli || !unavailable
                || !file || !folder || !link
                || selector.favoriteRowLabel(file)

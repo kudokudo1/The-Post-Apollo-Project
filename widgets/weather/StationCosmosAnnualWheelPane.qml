@@ -59,14 +59,14 @@ Rectangle {
     }
 
     // C23 // All MOON views show the same cyan rule beneath the mode tabs.
-    // Reuse the original four-pixel YEAR gap: 2px spacing + 2px rule.
-    // SUN's original annual renderer still starts at y=0.
+    // Match COSMOS SUN's 5px tab-to-divider gap, and keep 3px
+    // between the divider and the wheel. SUN remains at y=0.
     Rectangle {
         id: moonHeaderDivider
         objectName: "cosmos-c23-moon-year-divider"
         visible: annualFocus.isMoon
         anchors.top: lunarModeRail.bottom
-        anchors.topMargin: visible ? 2 : 0
+        anchors.topMargin: visible ? 5 : 0
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: annualFocus.contentInset
@@ -92,7 +92,7 @@ Rectangle {
         anchors.leftMargin: annualFocus.contentInset
         anchors.rightMargin: annualFocus.contentInset
         anchors.bottomMargin: annualFocus.contentInset
-        anchors.topMargin: 0
+        anchors.topMargin: annualFocus.isMoon ? 3 : 0
 
         view: annualFocus.annualView
         lockedView: annualFocus.annualView

@@ -186,9 +186,9 @@ test("C23 MOON overview has a cyan two-pixel divider beneath its header tabs",()
  assert.match(modes,/height: 2\s*color: Colors\.cyan/);
  assert.match(moon,/id: moonHeaderDivider[\s\S]*?objectName: "cosmos-c23-moon-overview-divider"/);
  assert.match(moon,/id: moonHeaderDivider[\s\S]*?anchors\.top: moonModeRail\.bottom/);
- assert.match(moon,/id: moonHeaderDivider[\s\S]*?anchors\.topMargin: 2/);
+ assert.match(moon,/id: moonHeaderDivider[\s\S]*?anchors\.topMargin: 5/);
  assert.match(moon,/id: moonHeaderDivider[\s\S]*?height: 2\s*color: Colors\.cyan/);
- assert.match(moon,/anchors\.top: moonHeaderDivider\.bottom/);
+ assert.match(moon,/anchors\.top: moonHeaderDivider\.bottom[\s\S]*?anchors\.topMargin: 3/);
  assert.match(moon,/anchors\.leftMargin: moonPane\.contentInset/);
  assert.match(moon,/anchors\.rightMargin: moonPane\.contentInset/);
  assert.doesNotMatch(moon,/Flickable\s*\{|ScrollView\s*\{/);

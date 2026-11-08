@@ -93,7 +93,9 @@ Rectangle {
         anchors.leftMargin: moonPane.contentInset
         anchors.rightMargin: moonPane.contentInset
         anchors.topMargin: moonPane.contentInset
-        height: 16
+        // 13px remains readable at 10px font while preserving the compact
+        // Moon disk size below the new 5/2/3 divider spacing.
+        height: 13
         spacing: 4
         GohuText {
             id: moonHeading
@@ -160,7 +162,8 @@ Rectangle {
         id: moonHeaderDivider
         objectName: "cosmos-c23-moon-overview-divider"
         anchors.top: moonModeRail.bottom
-        anchors.topMargin: 2
+        // Match SUN's five-pixel tab-to-rule breathing room.
+        anchors.topMargin: 5
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: moonPane.contentInset
@@ -178,6 +181,8 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: moonHeaderDivider.bottom
+        // Keep the first instrument off the cyan rule.
+        anchors.topMargin: 3
         anchors.bottom: parent.bottom
         anchors.leftMargin: moonPane.contentInset
         anchors.rightMargin: moonPane.contentInset
@@ -191,7 +196,9 @@ Rectangle {
             // Right-side forecast logic and rendering remain unchanged.
             width: Math.max(1,Math.round((heroRow.width-heroRow.spacing)*0.65))
             height: heroRow.height
-            spacing: 4
+            // Restore the pre-divider Moon canvas and lower-box sizes by
+            // reclaiming 2px from the gaps between the three left instruments.
+            spacing: 3
 
             // One large interactive MAGICK phase instrument; no copied canvas.
             StationCosmosVisualInstruments {

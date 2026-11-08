@@ -1,0 +1,47 @@
+name: Hospital Guided Room Recovery
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "widgets/HospitalRoomContinuityView.qml"
+      - "widgets/HospitalRoomSuccessorView.qml"
+      - "services/hospital/HospitalRoomSuccessorPreviewPolicy.js"
+      - "tests/hospital/test_room_successor_preview_policy.js"
+      - "tests/hospital/test_room_successor_ui_contracts.py"
+      - ".github/workflows/hospital-guided-room-recovery.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "widgets/HospitalRoomContinuityView.qml"
+      - "widgets/HospitalRoomSuccessorView.qml"
+      - "services/hospital/HospitalRoomSuccessorPreviewPolicy.js"
+      - "tests/hospital/test_room_successor_preview_policy.js"
+      - "tests/hospital/test_room_successor_ui_contracts.py"
+      - ".github/workflows/hospital-guided-room-recovery.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  successor-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pure successor selection, conflict and continuation checks
+        run: |
+          node --check services/hospital/HospitalRoomSuccessorPreviewPolicy.js
+          node tests/hospital/test_room_successor_preview_policy.js
+      - name: Scoped Room UI, no writes and existing worker gates
+        run: |
+          python3 tests/hospital/test_room_successor_ui_contracts.py
+          node tests/hospital/test_room_continuity_policy.js
+          python3 tests/hospital/test_room_continuity_ui_contracts.py
+          python3 tests/hospital/test_registered_worker_routes.py
+          python3 tests/hospital/test_worker_connection_ui_contracts.py
+          python3 tests/hospital/test_worker_atomic_attach_ui_contracts.py
+          python3 tests/hospital/test_worker_attach_capability_ui_contracts.py
+          python3 tests/hospital/test_main_mode_keyboard_contracts.py

@@ -221,3 +221,45 @@ test("C16 image math clamps zoom/pan and keeps the zoom cursor fixed",()=>{
  const out=viewportMath.zoomAt(5,2,0,0,60,60,120,120,120,120);
  assert.equal(out.zoom,5);
 });
+
+
+test("C34 SUN OBSERVATION SUVI FULL uses shared subject-stage viewer and keeps live source semantics",()=>{
+  const viewer=read("widgets/weather/StationCosmosPhotoFocus.qml");
+  assert.match(terminal,/id: observationBoard\s*Item\s*\{/);
+  assert.match(terminal,/objectName: "cosmos-c14-observation-board"/);
+  assert.match(terminal,/property bool expandedSuvi: false/);
+  assert.match(terminal,/objectName: "cosmos-c14-suvi-hero"[\s\S]*?imageInteractive: true/);
+  assert.match(terminal,/stageImageExpand: true/);
+  assert.match(terminal,/onStageImageRequested: observation\.expandedSuvi = true/);
+  assert.match(terminal,/StationCosmosPhotoFocus\s*\{/);
+  assert.match(terminal,/objectName: "cosmos-c34-sun-suvi-photo-focus"/);
+  assert.match(terminal,/anchors\.fill: parent\s*z: 10/);
+  assert.match(terminal,/visible: observation\.expandedSuvi/);
+  assert.match(terminal,/archival: false/);
+  assert.match(terminal,/sourceUrl: sunTerminal\.sourceSpace\s*\? sunTerminal\.sourceSpace\.solarImageUrl : ""/);
+  assert.match(terminal,/sunTerminal\.sourceSpace\.solarImageInfo\.title/);
+  assert.match(terminal,/credit: "NOAA SWPC \/\/ GOES SUVI"/);
+  assert.match(terminal,/onCloseRequested: observation\.expandedSuvi = false/);
+  assert.match(old,/property bool stageImageExpand: false/);
+  assert.match(old,/signal stageImageRequested\(\)/);
+  assert.match(old,/label: solarFocus\.stageImageExpand \? "FULL"/);
+  assert.match(old,/if \(solarFocus\.stageImageExpand\)\s*solarFocus\.stageImageRequested\(\)/);
+  assert.match(old,/solarFocus\.imageExpanded = !solarFocus\.imageExpanded/);
+  assert.match(viewer,/property bool archival: true/);
+  assert.match(viewer,/cache: photoFocus\.archival/);
+  assert.match(viewer,/NOAA IMAGE UNAVAILABLE/);
+  assert.match(viewer,/NOAA SOURCE SNAPSHOT, NOT CONTINUOUS VIDEO/);
+  assert.match(viewer,/objectName: "cosmos-c33-photo-back"/);
+  assert.match(viewer,/onClicked: photoFocus\.closeRequested\(\)/);
+  assert.match(viewer,/Keys\.onEscapePressed/);
+  assert.match(viewer,/fillMode: Image\.PreserveAspectFit/);
+  assert.match(viewer,/function resetView\(\)/);
+  assert.match(viewer,/function clampPan\(\)/);
+  // This reuses the original NOAA source. No secondary network collector,
+  // nested scrolling, video player or external window.
+  for(const text of [terminal,viewer]) {
+    for(const forbidden of ["Process {","FileView {","XMLHttpRequest","Flickable {","ScrollView {","PanelWindow {","MediaPlayer {"]) {
+      assert.ok(!text.includes(forbidden),forbidden);
+    }
+  }
+});

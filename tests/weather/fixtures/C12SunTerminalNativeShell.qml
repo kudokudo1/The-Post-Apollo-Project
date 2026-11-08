@@ -191,6 +191,9 @@ ShellRoot {
             const liveSuviViewport=fixture.locate(live,"cosmos-c16-suvi-viewport");
             const obsZoomButtons=fixture.locate(observation,"cosmos-c16-suvi-zoom-controls");
             const obsExpandButton=fixture.locate(observation,"cosmos-c16-suvi-expand");
+            const obsFull=fixture.locate(observation,"cosmos-c34-sun-suvi-photo-focus");
+            const obsFullImage=fixture.locate(observation,"cosmos-c33-photo-image");
+            const obsFullBack=fixture.locate(observation,"cosmos-c33-photo-back");
             const metrics=fixture.locate(activity,"cosmos-c12-activity-metrics");
             const trend=fixture.locate(activity,"cosmos-c12-xray-trend");
             const xray=fixture.locate(activity,"cosmos-c12-xray-facts");
@@ -208,7 +211,8 @@ ShellRoot {
                 ||!obsBoard||!obsImage||!obsArc||!obsLive||!obsSky||!obsLight
                 ||!obsMeters||!obsTimeline||!obsTwilightGroups
                 ||!obsSingleRow||!obsRowTime||!obsSuviViewport
-                ||!liveSuviViewport||!obsZoomButtons||!obsExpandButton)return;
+                ||!liveSuviViewport||!obsZoomButtons||!obsExpandButton
+                ||!obsFull||!obsFullImage||!obsFullBack)return;
             if(fixture.phase===0){
                 if(position.positionRows.length!==8||position.positionStrip.length!==5)
                     return fixture.stop("POSITION_DATA_MISSING");
@@ -258,6 +262,34 @@ ShellRoot {
                     ||obsSuviViewport.currentZoom!==1
                     ||liveSuviViewport.currentZoom!==1)
                     return fixture.stop("SUVI_CONTROLS_NOT_SCOPED");
+                // C34 // OBSERVATION reuses the shared full subject-area viewer
+                // with the true NOAA source. The blank source is intentional;
+                // native CI must not require a remote NOAA connection.
+                if (!obsImage.stageImageExpand || obsBoard.expandedSuvi
+                    || obsFull.visible || obsFull.archival
+                    || obsFullImage.cache
+                    || obsFull.photoTitle !== "SUVI // 195 Å")
+                    return fixture.stop("C34_SUVI_STAGE_FOCUS_DEFAULT_INVALID");
+                obsImage.stageImageRequested();
+                if (!obsBoard.expandedSuvi || !obsFull.visible
+                    || obsFull.width !== obsBoard.width
+                    || obsFull.height !== obsBoard.height
+                    || obsFull.sourceUrl !== noaa.solarImageUrl
+                    || obsFullImage.source.toString() !== ""
+                    || !obsFullBack.visible)
+                    return fixture.stop("C34_SUVI_FULL_NOT_SAME_SUBJECT_STAGE");
+                obsFull.setZoom(9);
+                if (obsFull.zoom !== 4)
+                    return fixture.stop("C34_SUVI_FOCUS_ZOOM_NOT_BOUNDED");
+                obsFull.resetView();
+                if (obsFull.zoom !== 1 || obsFull.panX !== 0
+                    || obsFull.panY !== 0)
+                    return fixture.stop("C34_SUVI_FOCUS_FIT_NOT_RESET");
+                obsFull.closeRequested();
+                if (obsBoard.expandedSuvi || obsFull.visible
+                    || obsSuviViewport.currentZoom !== 1
+                    || observation.width !== 450 || observation.height !== 254)
+                    return fixture.stop("C34_SUVI_BACK_DID_NOT_RESTORE_OBSERVATION");
                 liveSuviViewport.zoomAt(2,25,25);
                 if(liveSuviViewport.currentZoom!==1)
                     return fixture.stop("LEGACY_SUVI_ZOOM_UNEXPECTED");

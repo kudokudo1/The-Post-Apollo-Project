@@ -27,6 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           bash -n tests/connections/c4b_silverblue/guest_confined_runtime.sh
+          bash -n tests/connections/c4b_silverblue/guest_signed_policy_gate.sh
           bash -n tests/connections/c4b_silverblue/build_signed_composed_policy.sh
           bash -n tests/connections/c2v_silverblue/boot_official_silverblue.sh
           bash -n tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh

@@ -44,9 +44,13 @@ const socials = {
     tasksDraftHostWriteAuthorized: false
 };
 let rows = policy.build(socials);
-assert.equal(rows.length, 8);
+assert.equal(rows.length, 9);
 assert.equal(new Set(rows.map(x=>x.id)).size, 8);
 assert.equal(policy.find(rows,"social").status,"LAYOUT READY");
+assert.equal(policy.find(rows,"telegram").title,"TELEGRAM // NATIVE");
+assert.equal(policy.find(rows,"telegram").status,"CHECK SESSION IN SOCIAL");
+assert.equal(policy.find(rows,"telegram").action,"OPEN TELEGRAM");
+assert.match(policy.find(rows,"telegram").context,/SOCIAL OPT-IN/);
 assert.match(policy.find(rows,"social").detail,/Research/);
 assert.equal(policy.find(rows,"social").context,"SAVED ACCOUNT NAMES // 3");
 assert.equal(policy.find(rows,"notifications").status,"LOCAL ENGINE READY");

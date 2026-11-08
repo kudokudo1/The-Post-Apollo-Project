@@ -261,13 +261,13 @@ Item {
         anchors.fill: parent
         spacing: 7
 
-        // Six categories fit the existing 260px middle bay in two rows.
+        // Seven categories use three compact rows within the middle bay.
         Flow {
             width: parent.width
-            height: 59
+            height: 90
             spacing: 4
             Repeater {
-                model: ["ALL","CPU++","APP CTRL","CLOCK","PLACES","NEW"]
+                model: ["ALL","CPU++","APP CTRL","WEATHER","CLOCK","PLACES","NEW"]
                 ActionButton {
                     required property string modelData
                     width: Math.max(1,(selector.width-8)/3)
@@ -297,7 +297,7 @@ Item {
         Flickable {
             id: listScroll
             width: parent.width
-            height: Math.max(0,selector.height-136)
+            height: Math.max(0,selector.height-167)
             clip: true
             contentWidth: width
             contentHeight: listRows.implicitHeight
@@ -313,7 +313,7 @@ Item {
                     Rectangle {
                         id: favoriteRow
                         width: listRows.width
-                        height: modelData.owner==="appcontrol" ? 58 : 46
+                        height: modelData.readOnly ? 58 : 46
                         border.width: 1
                         border.color: pane.selectedResource
                             && pane.selectedResource.key===modelData.key
@@ -327,18 +327,18 @@ Item {
                             spacing: 1
                             GohuText {
                                 width: parent.width
-                                height: modelData.owner==="appcontrol" ? 30 : 15
+                                height: modelData.readOnly ? 30 : 15
                                 text: pane.favoriteRowLabel(modelData)
                                 textFormat: Text.PlainText
                                 color: Colors.white
                                 font.pixelSize: 10
                                 wrapMode: Text.Wrap
-                                maximumLineCount: modelData.owner==="appcontrol" ? 2 : 1
+                                maximumLineCount: modelData.readOnly ? 2 : 1
                                 elide: Text.ElideRight
                             }
                             GohuText {
                                 width: parent.width
-                                text: modelData.owner==="appcontrol"
+                                text: modelData.readOnly
                                     ? modelData.favoriteType+" // READ ONLY"
                                     : modelData.category
                                       +" // "+(modelData.readOnly?"READ ONLY":modelData.isPinned?"PINNED":"SAVED")
@@ -413,7 +413,9 @@ Item {
             text: pane.selectedResource
                 ? pane.selectedResource.category+" // "
                     +(pane.selectedResource.readOnly
-                      ? "APP CONTROL-OWNED // READ ONLY"
+                      ? (pane.selectedResource.owner==="weather-home"
+                         ? "WEATHER HOME-OWNED // READ ONLY"
+                         : "APP CONTROL-OWNED // READ ONLY")
                       : "SAVED IDENTITY")
                 : "CHOOSE AN ITEM IN THE CENTER BAY"
             font.pixelSize: 10
@@ -424,12 +426,15 @@ Item {
         Column {
             id: appControlOrigin
             visible: pane.selectedResource !== null
-                     && pane.selectedResource.owner==="appcontrol"
+                     && (pane.selectedResource.owner==="appcontrol"
+                         || pane.selectedResource.owner==="weather-home")
             width: parent.width
             spacing: 3
             GohuText {
                 width: parent.width
-                text: "SOURCE // APP CONTROL"
+                text: pane.selectedResource
+                    && pane.selectedResource.owner==="weather-home"
+                    ? "SOURCE // WEATHER STATION" : "SOURCE // APP CONTROL"
                 font.pixelSize: 10
                 color: Colors.cyan
             }
@@ -564,7 +569,9 @@ Item {
             width: parent.width
             font.pixelSize: 9
             text: pane.selectedResource && pane.selectedResource.readOnly
-                ? "APP CONTROL REMAINS OWNER // NO EXECUTION"
+                ? (pane.selectedResource.owner==="weather-home"
+                   ? "WEATHER STATION REMAINS OWNER // NO RECALL"
+                   : "APP CONTROL REMAINS OWNER // NO EXECUTION")
                 : "GROUPING ≠ AUTHORITY // ORIGINAL OWNERS KEEP CONTROL"
             elide: Text.ElideRight
         }

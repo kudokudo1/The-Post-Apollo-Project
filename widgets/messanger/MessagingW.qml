@@ -1317,6 +1317,15 @@ PanelWindow {
             return;
         }
 
+        // A confirmed native Stage Director pair updates both Sway windows
+        // before one compositor transaction. Observe the shared outer frame,
+        // but NEVER send a second QML/Python follower command during a drag.
+        if (payload.nativeStageDirector === true) {
+            if (socialChanged)
+                adoptSocialGeometry(socialRect);
+            return;
+        }
+
         // Only after confirmed docking can focused Discord lead geometry.
         if (payload.fastLeader && payload.shared) {
             sharedPanelX = Math.round(Number(payload.shared.x));

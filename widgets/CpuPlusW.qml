@@ -17,6 +17,8 @@ PanelWindow {
 
     // Fixed provider navigation only. Shell owns Social instance and routing.
     signal telegramAccessRequested()
+    signal telegramRecheckRequested()
+    property var telegramConnectionObservation: null
     property var appControlWindow
     required property var systemTelemetry
     required property var fanControl
@@ -2613,11 +2615,19 @@ PanelWindow {
             visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
             selectedId: cpuPlusWindow.selectedConnectionId
+            telegramObservation: cpuPlusWindow.telegramConnectionObservation
             onTelegramOpenRequested: {
                 if (cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 6
                         && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                         && cpuPlusWindow.selectedConnectionId === "telegram")
                     cpuPlusWindow.telegramAccessRequested();
+            }
+            onTelegramRecheckRequested: {
+                if (cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 6
+                        && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+                        && cpuPlusWindow.selectedConnectionId === "telegram"
+                        && settingsConnectionsDetails.telegramStatus.canRecheck)
+                    cpuPlusWindow.telegramRecheckRequested();
             }
             anchors.left: parent.left
             anchors.right: parent.right

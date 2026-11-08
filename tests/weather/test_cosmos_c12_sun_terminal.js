@@ -230,7 +230,7 @@ test("C34 SUN OBSERVATION SUVI FULL uses shared subject-stage viewer and keeps l
   assert.match(terminal,/property bool expandedSuvi: false/);
   assert.match(terminal,/objectName: "cosmos-c14-suvi-hero"[\s\S]*?imageInteractive: true/);
   assert.match(terminal,/stageImageExpand: true/);
-  assert.match(terminal,/onStageImageRequested: observation\.expandedSuvi = true/);
+  assert.match(terminal,/onStageImageRequested: \{[\s\S]*?observation\.expandedSuvi = true;/);
   assert.match(terminal,/StationCosmosPhotoFocus\s*\{/);
   assert.match(terminal,/objectName: "cosmos-c34-sun-suvi-photo-focus"/);
   assert.match(terminal,/anchors\.fill: parent\s*z: 10/);

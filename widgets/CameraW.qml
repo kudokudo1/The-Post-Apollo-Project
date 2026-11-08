@@ -72,13 +72,13 @@ PanelWindow {
     readonly property int zoomBayInset: Math.max(0, Math.round(zoomViewport.x))
     readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))
     // The existing 1px frame budget is not the browser's physical bottom.
-    // The native Zoom client was reported to overrun Camera by the same
-    // amount in all sizes. Trim the guest from the BOTTOM only; do not
-    // move its top, expand Camera or alter the mode row and browser rise.
+    // A 10px bottom-only trim left too much empty space in native compact.
+    // Reduce it to 5px in all sizes, preserving the existing browser top,
+    // Camera frame, mode buttons, and 13px rise.
     // Keep this independent from zoomDeckReserve so expanded's frame height
     // does not grow and silently cancel the trim.
     readonly property int zoomBayBottom: 1
-    readonly property int zoomWebBottomTrim: 10
+    readonly property int zoomWebBottomTrim: 5
     // Keep #1505's raised compact controls and common 3px deck spacing.
     // The first 8px rise improved all three sizes; a subsequent native screenshot
     // calls for another 5px. Rise is now 13px total from the #1505 deck.

@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import qs.services.connections
+import qs.services.social
 import "../../services/connections/ConnectionsReviewPolicy.js" as ReviewPolicy
 import "../../services/connections/ConnectionsRequestDisplayPolicy.js" as RequestDisplayPolicy
 
@@ -21,6 +22,9 @@ Item {
         ? RequestDisplayPolicy.project(syntheticStatusPreview, selectedId)
         : ConnectionsRequestStatus.display(selectedId)
     readonly property var source: ConnectionsRegistry.entry(selectedId)
+    // The original local account-name editor owns its own input focus.
+    readonly property bool editingText: details.selectedId === "social"
+        && connectedAccountNamesEditor.editingText
     readonly property var keyRequirement: ConnectionsBroker.requirement(selectedId)
     readonly property var permissionPreview: ReviewPolicy.preview(keyRequirement)
     onSelectedIdChanged: {
@@ -28,6 +32,8 @@ Item {
         permissionReviewOpen = false;
         requestStatusOpen = false;
         reviewFeedback = "";
+        // Switching services must never leave an armed local-label removal.
+        connectedAccountNamesEditor.resetEditor();
     }
 
     Flickable {
@@ -463,6 +469,41 @@ Item {
                 labelPixelSize: 10
                 accentColor: Colors.cyan
                 onClicked: ConnectionsRegistry.refreshSocial()
+            }
+            // CPU++ Connected Accounts // REAL local label management.
+            // Reuse the original Social writer; this never signs into a
+            // provider or converts a saved nickname into verified access.
+            Column {
+                id: localAccountManagement
+                visible: details.selectedId === "social"
+                width: parent.width
+                spacing: 8
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Colors.cyan
+                }
+                GohuText {
+                    width: parent.width
+                    text: "CONNECTED ACCOUNTS // SAVED NAMES"
+                    color: Colors.magenta
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: "EDIT LOCAL ACCOUNT LABELS FOR THE ACTIVE SOCIAL ID. PROVIDER AUTHENTICATION IS SEPARATE."
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                CpuPlusIdAccountEditor {
+                    id: connectedAccountNamesEditor
+                    width: parent.width
+                    height: implicitHeight
+                    identityId: SocialIdentityStore.snapshot
+                        ? String(SocialIdentityStore.snapshot.activeId || "") : ""
+                }
             }
             QuietText {
                 width: parent.width

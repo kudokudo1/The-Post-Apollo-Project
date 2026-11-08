@@ -86,7 +86,10 @@ trap 'rc=$?; if [[ "$rc" -ne 0 ]]; then c4b_controller_failure_relay "SCRIPT_EXI
 c2v_rollback_observer_start() {
   [[ -f "$c4b_mode" && -c /dev/ttyS1 ]] || return 0
   local observer=/run/c2v-rpm-rollback-observer.sh
-  cat > "$observer" <<'C2V_ROLLBACK_OBSERVER'
+  cat > "$observer" <<'C2V_ROLLBACK_OBSERVER' || {
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_FILE_CREATE_FAILED // non-authoritative'
+    return 0
+  }
 #!/usr/bin/bash
 set -u
 printf 'ready\n' > /run/c2v-rpm-rollback-observer-ready
@@ -129,9 +132,15 @@ for n in $(seq 1 55); do
   sleep 20
 done
 C2V_ROLLBACK_OBSERVER
-  chmod 0700 "$observer"
-  rm -f /run/c2v-rpm-rollback-observer-ready \
-    /run/c2v-rpm-rollback-observer-finished
+  if ! chmod 0700 "$observer"; then
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_CHMOD_FAILED // non-authoritative'
+    return 0
+  fi
+  if ! rm -f /run/c2v-rpm-rollback-observer-ready \
+      /run/c2v-rpm-rollback-observer-finished; then
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_RESET_FAILED // non-authoritative'
+    return 0
+  fi
   if ! timeout --signal=TERM --kill-after=2s 14s systemd-run --quiet \
       --unit=c2v-rpm-rollback-observer --property=Type=exec \
       --property=TimeoutStartSec=1240 /usr/bin/bash "$observer"; then
@@ -731,7 +740,8 @@ C2V_WORKER
     rollback_output=/run/c2v-rpm-ostree-rollback-command.log
     if rpm-ostree rollback --reboot > "$rollback_output" 2>&1; then
       echo "C2V_ROLLBACK_COMMAND_RETURNED_ZERO // second_boot_still_required"
-      touch /run/c2v-rpm-rollback-observer-finished
+      touch /run/c2v-rpm-rollback-observer-finished ||
+        echo 'C2V_DIAG_ROLLBACK_OBSERVER_FINISH_MARK_FAILED // non-authoritative'
     else
       rollback_rc="$?"
       c2v_rollback_failure_diagnostic "$rollback_rc"

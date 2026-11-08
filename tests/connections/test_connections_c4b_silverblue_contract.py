@@ -276,7 +276,7 @@ class C4bContracts(unittest.TestCase):
             script,
         )
         self.assertIn(
-            'check_accounts_absent\\n  echo "C4B_PASS // TEST_USERS_AND_GROUPS_FULLY_ABSENT"',
+            'check_accounts_absent\n  echo "C4B_PASS // TEST_USERS_AND_GROUPS_FULLY_ABSENT"',
             script,
         )
         self.assertNotIn(
@@ -286,7 +286,7 @@ class C4bContracts(unittest.TestCase):
         # The skip is only valid AFTER all three userdel operations;
         # test-owned reader groups still require explicit successful delete.
         begin = script.index('userdel c4b-reader && userdel c4b-outsider &&')
-        last_check = script.index('  check_accounts_absent\\n  echo "C4B_PASS // TEST_USERS_AND_GROUPS_FULLY_ABSENT"')
+        last_check = script.index('  check_accounts_absent\n  echo "C4B_PASS // TEST_USERS_AND_GROUPS_FULLY_ABSENT"')
         self.assertLess(begin, script.index('  if getent group postapollo-connections', begin))
         self.assertLess(script.index('groupdel c4b-clients', begin), last_check)
         self.assertLess(script.index('groupdel postapollo-status-readers', begin), last_check)

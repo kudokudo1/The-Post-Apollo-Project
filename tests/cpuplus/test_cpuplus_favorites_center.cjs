@@ -391,7 +391,7 @@ test("CPU++ Favorites entries select from their entire row with // breadcrumb se
     "Accessible.role: Accessible.Button",
     "Keys.onPressed:",
     '"APP CTRL // "+modelData.menu',
-    '"+ " // "+'
+    '+" // "+(modelData.resolved'
   ]) assert.ok(pane.includes(required),required);
   assert.doesNotMatch(pane,/label:\s*"VIEW"/);
   assert.ok(fixture.includes("16,row.height/2"));

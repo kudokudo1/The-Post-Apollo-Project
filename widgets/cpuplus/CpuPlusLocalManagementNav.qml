@@ -1,7 +1,7 @@
 import QtQuick
 import "../../components"
 
-// Compact navigation inside the EXISTING CPU++ left bay. None of these
+// Compact category filters in the EXISTING CPU++ middle selector bay. None of these
 // local-editing sections switches a verified company or provider account.
 Item {
     id: nav
@@ -23,16 +23,9 @@ Item {
 
         GohuText {
             width: parent.width
-            text: "SOCIAL // LOCAL MANAGEMENT"
-            color: Colors.magenta
-            font.pixelSize: 11
-            wrapMode: Text.WordWrap
-        }
-        QuietText {
-            width: parent.width
-            text: "EDIT SAVED RECORDS // DOES NOT SWITCH LOGIN OR COMPANY ACCESS"
-            color: Colors.orange
-            font.pixelSize: 9
+            text: "FILTER // LOCAL RECORDS"
+            color: Colors.cyan
+            font.pixelSize: 10
             wrapMode: Text.WordWrap
         }
         Grid {
@@ -44,9 +37,9 @@ Item {
                 delegate: ActionButton {
                     required property var modelData
                     width: Math.floor((navigation.width - 5) / 2)
-                    height: 33
+                    height: 31
                     label: modelData.title
-                    labelPixelSize: 9
+                    labelPixelSize: 8
                     selected: nav.section === modelData.id
                     accentColor: selected ? Colors.magenta : Colors.cyan
                     onClicked: nav.sectionRequested(modelData.id)

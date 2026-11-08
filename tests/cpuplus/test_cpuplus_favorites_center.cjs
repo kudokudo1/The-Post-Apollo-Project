@@ -25,6 +25,8 @@ const Radio={Adapters};
 load("services/favorites/FavoritesRadioProjection.js",Radio);
 const Hospital={Adapters};
 load("services/favorites/FavoritesHospitalProjection.js",Hospital);
+const CollectionView={CollectionRules:Collections};
+load("services/favorites/FavoritesCollectionsViewPolicy.js",CollectionView);
 const Hub={Resource,Default,Collections,Adapters,WeatherHome,NotificationsProjection:Notifications,RadioProjection:Radio,HospitalProjection:Hospital};
 load("services/favorites/FavoritesManagementPolicy.js",Hub);
 const plain=v=>JSON.parse(JSON.stringify(v));
@@ -242,7 +244,7 @@ test("CPU++ imports all AppControl owner lists, with seven source filters and re
     "FavoritesStore.favoriteTaskMetricKeys"
   ]) assert.ok(cpu.includes(field),field);
   assert.match(cpu,/FavoritesManagement\.list\(/);
-  assert.match(panel,/model: \["ALL","CPU\+\+","APP CTRL","WEATHER","NOTIFS","RADIO","HOSPITAL","CLOCK","PLACES","NEW"\]/);
+  assert.match(panel,/model: \["ALL","GROUP","CPU\+\+","APP CTRL","WEATHER","NOTIFS","RADIO","HOSPITAL","CLOCK","PLACES","NEW"\]/);
   assert.match(panel,/height: 121/);
   assert.match(panel,/modelData\.readOnly\?"READ ONLY"/);
   assert.match(panel,/pane\.selectedResource && !pane\.selectedResource\.readOnly/);
@@ -1243,4 +1245,105 @@ test("U5d Hospital owner emits sanitized refs and shell routes only metadata to 
   assert.doesNotMatch(projection+cpu,
        /FileView\s*\{|JsonAdapter\s*\{|Process\s*\{|setPinned\(|togglePinned\(|exportArchive\(/);
   assert.doesNotMatch(projection,/\.title|\.detail|\.context|\.route|\.message|\.body/);
+});
+
+
+test("U6b collections join matching owner candidates in saved member order without exposing keys",()=>{
+  const keys=[
+    k("weather-home","panel","home/auto"),
+    k("radio","station","123e4567-e89b-42d3-a456-000000000001"),
+    k("weather-home","panel","home/history")
+  ];
+  let doc=Collections.change(Collections.empty(),{type:"create",name:"Daily Operations"}).document;
+  for(const key of keys)
+    doc=Collections.change(doc,{type:"set-member",
+      collectionId:"c1",key,enabled:true}).document;
+  const original=plain(doc);
+  const candidates={rows:[
+    {key:keys[1],label:"RADIO // FAVORITES // Jazz Station",item:"Jazz Station",
+     resolved:true,category:"RADIO",owner:"radio",readOnly:true},
+    {key:keys[0],label:"WEATHER // HOME // AUTO",item:"AUTO",
+     resolved:true,category:"WEATHER",owner:"weather-home",readOnly:true},
+    {key:k("appcontrol","item","run:kitty:private"),label:"PRIVATE COMMAND",
+     resolved:false,category:"APP CTRL",owner:"appcontrol",readOnly:true}
+  ]};
+  const view=CollectionView.build(doc.collections,candidates,"ready");
+  assert.equal(view.state,"ready");
+  assert.equal(view.count,1);
+  assert.equal(view.memberCount,3);
+  assert.equal(view.missingCount,1);
+  const group=CollectionView.section(view,"c1");
+  assert.equal(group.name,"Daily Operations");
+  assert.equal(group.count,3);
+  assert.equal(group.available,2);
+  assert.equal(group.missing,1);
+  assert.deepEqual(plain(group.items.map(x=>x.name)),[
+    "AUTO","Jazz Station","SAVED MEMBER UNAVAILABLE"
+  ]);
+  assert.equal(group.items[2].key,"");
+  assert.equal(group.items[2].missing,true);
+  assert.deepEqual(plain(CollectionView.rowsFor(view,"c1").map(x=>x.key)),
+                   keys.slice(0,2));
+  assert.equal(CollectionView.rowsFor(view,"c9").length,0);
+  assert.equal(JSON.stringify(view).includes("PRIVATE COMMAND"),false);
+  assert.equal(JSON.stringify(group.items).includes("home%2Fhistory"),false);
+  assert.deepEqual(plain(doc),original);
+  const updated=CollectionView.build(doc.collections,
+    {rows:candidates.rows.concat([{
+      key:keys[2],item:"HISTORY",label:"WEATHER // HOME // HISTORY",
+      category:"WEATHER",owner:"weather-home",resolved:true
+    }])},"saving");
+  assert.equal(updated.groups[0].available,3);
+  assert.equal(updated.missingCount,0);
+  assert.equal(updated.groups[0].items[2].name,"HISTORY");
+  assert.equal(JSON.stringify(updated).includes("PRIVATE COMMAND"),false);
+});
+
+test("U6b collections fail closed on bad storage state and invalid metadata",()=>{
+  const key=k("weather-home","panel","home/auto");
+  const good={id:"c1",name:"Daily Operations",members:[key]};
+  const snapshot={rows:[{key,label:"WEATHER // HOME // AUTO",
+    item:"AUTO",category:"WEATHER",resolved:true}]};
+  for(const state of ["loading","error","unsupported","disconnected"]) {
+    const view=CollectionView.build([good],snapshot,state);
+    assert.equal(view.count,0);
+    assert.equal(view.state,state);
+  }
+  for(const groups of [
+    null,Array(25).fill(good),[good,good],
+    [{...good,members:[key,key]}],
+    [{...good,id:"../../private"}],
+    [{...good,name:"Bad\nName"}],
+    [{...good,members:[k("appcontrol","item","run:secret")]}],
+    [{...good,members:Array(81).fill(key)}]
+  ]) {
+    const view=CollectionView.build(groups,snapshot,"ready");
+    assert.equal(view.state,"invalid");
+    assert.equal(view.count,0);
+  }
+  assert.equal(CollectionView.section(null,"c1"),null);
+  assert.equal(CollectionView.rowsFor(null,"c1").length,0);
+});
+
+test("U6b CPU++ index routes a collection across all three bays, without owner actions",()=>{
+  const cpu=read("widgets/CpuPlusW.qml");
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const projection=read("services/favorites/FavoritesCollectionsViewPolicy.js");
+  const store=read("services/favorites/FavoritesCollectionsStore.qml");
+  assert.match(cpu,/property string selectedFavoriteCollectionId: ""/);
+  assert.equal((cpu.match(/selectedCollectionId: cpuPlusWindow\.selectedFavoriteCollectionId/g)||[]).length,3);
+  assert.match(cpu,/onCollectionRequested: function\(collectionId\)/);
+  assert.match(cpu,/onCollectionMemberRequested: function\(collectionId,key\)/);
+  assert.match(cpu,/favoritesSelectorPane\.filterMode="GROUP"/);
+  assert.match(pane,/import "\.\.\/\.\.\/services\/favorites\/FavoritesCollectionsViewPolicy\.js" as CollectionView/);
+  assert.match(pane,/signal collectionRequested\(string collectionId\)/);
+  assert.match(pane,/signal collectionMemberRequested\(string collectionId, string key\)/);
+  assert.match(pane,/pane\.filterMode==="GROUP"/);
+  assert.match(pane,/CollectionView\.rowsFor\(pane\.collectionView,pane\.selectedCollectionId\)/);
+  assert.match(projection,/SAVED MEMBER UNAVAILABLE/);
+  assert.match(pane,/pane\.collectionView\.groups/);
+  assert.match(store,/favorites-collections-v1\.json/);
+  for(const src of [projection,pane]) {
+    assert.doesNotMatch(src,/FileView\s*\{|Process\s*\{|JsonAdapter\s*\{|setFavorite\(|togglePinned\(|loadMedia\(/);
+  }
 });

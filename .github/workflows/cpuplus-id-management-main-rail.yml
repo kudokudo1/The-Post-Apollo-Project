@@ -13,6 +13,10 @@ on:
       - 'widgets/messanger/IdentityCenterLocalArchiveTray.qml'
       - 'tests/cpuplus/test_cpuplus_social_local_management_bays.py'
       - 'tests/cpuplus/test_cpuplus_social_relationship_editors.py'
+      - 'tests/cpuplus/test_cpuplus_social_link_modifiers.py'
+      - 'widgets/messanger/IdentityCenterLocalRelationshipModifiers.qml'
+      - 'tests/messaging/test_identity_center_inline_modifiers_v1.py'
+      - 'MODEL/contracts/cpuplus-social-link-modifiers-v0.md'
       - 'widgets/messanger/IdentityCenterLocalBranchLocationsEditor.qml'
       - 'widgets/messanger/IdentityCenterLocalUnitLocationsEditor.qml'
       - 'widgets/messanger/IdentityCenterLocalFunctionalReportingEditor.qml'
@@ -60,6 +64,10 @@ on:
       - 'widgets/messanger/IdentityCenterLocalArchiveTray.qml'
       - 'tests/cpuplus/test_cpuplus_social_local_management_bays.py'
       - 'tests/cpuplus/test_cpuplus_social_relationship_editors.py'
+      - 'tests/cpuplus/test_cpuplus_social_link_modifiers.py'
+      - 'widgets/messanger/IdentityCenterLocalRelationshipModifiers.qml'
+      - 'tests/messaging/test_identity_center_inline_modifiers_v1.py'
+      - 'MODEL/contracts/cpuplus-social-link-modifiers-v0.md'
       - 'widgets/messanger/IdentityCenterLocalBranchLocationsEditor.qml'
       - 'widgets/messanger/IdentityCenterLocalUnitLocationsEditor.qml'
       - 'widgets/messanger/IdentityCenterLocalFunctionalReportingEditor.qml'
@@ -116,6 +124,8 @@ jobs:
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_organization_links.py' -v
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_social_local_management_bays.py' -v
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_social_relationship_editors.py' -v
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_social_link_modifiers.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_inline_modifiers_v1.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_local_branch_locations_v1.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_local_unit_locations_v1.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_local_functional_reporting_v1.py' -v

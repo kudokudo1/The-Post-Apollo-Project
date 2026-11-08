@@ -167,7 +167,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 label: "VIEW"
                                 labelPixelSize: 10
-                                selected: pane.selectedResource
+                                selected: pane.selectedResource !== null
                                     && pane.selectedResource.key===modelData.key
                                 accentColor: Colors.magenta
                                 onLeftClicked: pane.selectionRequested(modelData.key)

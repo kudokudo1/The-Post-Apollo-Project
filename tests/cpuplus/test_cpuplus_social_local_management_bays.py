@@ -96,9 +96,12 @@ class CpuPlusSocialManagementBays(unittest.TestCase):
         )
         self.assertIn("id: idManagementOverviewPane", left)
         self.assertIn("id: localManagementOverviewPane", left)
-        self.assertEqual(
-            left.count("anchors.top: sharedStateHeader.bottom"), 3
-        )
+        id_overview = left.split("id: idManagementOverviewPane", 1)[1].split(
+            "id: localManagementOverviewPane", 1
+        )[0]
+        local_overview = left.split("id: localManagementOverviewPane", 1)[1]
+        self.assertIn("anchors.top: sharedStateHeader.bottom", id_overview)
+        self.assertIn("anchors.top: sharedStateHeader.bottom", local_overview)
         self.assertIn("id: idManagementDetailsPane", right)
         self.assertIn("id: localManagementDetailsPane", right)
         self.assertIn('text: "FILTER // LOCAL RECORDS"', NAV)

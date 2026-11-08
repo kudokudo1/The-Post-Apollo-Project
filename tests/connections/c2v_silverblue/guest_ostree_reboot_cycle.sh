@@ -7,9 +7,23 @@ exec >/dev/ttyS0 2>&1
 c4b_controller_failure_relay() {
   [[ -f /var/lib/c4b-runtime-ci-only && -c /dev/ttyS1 ]] || return 0
   local reason="$1"
-  timeout --signal=TERM --kill-after=1s 5s \
-    /usr/bin/bash -c 'printf "C4B_DIAG_CONTROLLER_FATAL // %s\n" "$1" >/dev/ttyS1' \
-    _ "$reason" || true
+  # This relay is read-only and bounded. The runtime already records a stage
+  # and complete failure details under /var/tmp; the original console lost
+  # them when the controller requested poweroff after a failed check.
+  {
+    printf 'C4B_DIAG_CONTROLLER_FATAL // %s\n' "$reason"
+    if [[ "$reason" == C4B_RUNTIME_* ||
+          "$reason" == C4B_CONFINED_RUNTIME_NOT_VERIFIED ]]; then
+      printf 'C4B_DIAG_RUNTIME_LAST_STAGE // %s\n' \
+        "$(cat /var/tmp/c4b-runtime-stage 2>/dev/null || echo missing)"
+      printf 'C4B_DIAG_RUNTIME_LOG_BEGIN\n'
+      tail -n 100 /var/tmp/c4b-runtime.log 2>/dev/null || true
+      printf 'C4B_DIAG_RUNTIME_LOG_END\n'
+    fi
+  } >/var/tmp/c4b-controller-fatal.log 2>&1 || true
+  timeout --signal=TERM --kill-after=2s 12s \
+    cat /var/tmp/c4b-controller-fatal.log >/dev/ttyS1 2>&1 || true
+  return 0
 }
 failure() {
   c4b_controller_failure_relay "$*"

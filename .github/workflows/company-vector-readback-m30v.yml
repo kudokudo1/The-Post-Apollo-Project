@@ -6,6 +6,7 @@ on:
     paths:
       - 'experiments/company-vector-qt/CompanyVectorReadbackEvidence.h'
       - 'experiments/company-vector-qt/main.cpp'
+      - '.github/workflows/company-network-vector-probe-m5.yml'
       - 'tests/company/native/test_company_vector_readback_m30v.cpp'
       - 'tests/company/test_company_vector_readback_m30v.py'
       - '.github/workflows/company-vector-readback-m30v.yml'

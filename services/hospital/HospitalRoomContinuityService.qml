@@ -18,6 +18,7 @@ Scope {
     property string readStage: ""
     property int stageIndex: 0
     property bool refreshPending: false
+    property bool refreshScheduled: false
     property var pendingSnapshot: ({})
     readonly property var stages: [
         "room", "assignments", "checkpoints", "reports",
@@ -40,6 +41,17 @@ Scope {
         snapshot = ({});
         loaded = false;
         lastError = "";
+    }
+
+    function scheduleRefresh() {
+        if (root.refreshScheduled)
+            return;
+        root.refreshScheduled = true;
+        Qt.callLater(function() {
+            root.refreshScheduled = false;
+            if (root.enabled && root.roomId)
+                root.refresh();
+        });
     }
 
     function refresh() {
@@ -145,13 +157,13 @@ Scope {
     onRoomIdChanged: {
         clearVisible();
         if (enabled && roomId)
-            Qt.callLater(root.refresh);
+            root.scheduleRefresh();
     }
     onEnabledChanged: {
         if (!enabled)
             clearVisible();
         else if (roomId)
-            Qt.callLater(root.refresh);
+            root.scheduleRefresh();
     }
 
     Process {

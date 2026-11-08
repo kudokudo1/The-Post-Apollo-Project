@@ -4,6 +4,7 @@ import "components"
 import "widgets/cpuplus"
 import "widgets/appcontrol"
 import "services/favorites/FavoritesManagementPolicy.js" as Management
+import "services/favorites/FavoritesCollectionsPolicy.js" as CollectionRules
 
 // Disposable native UI test. Original owners are mocked, no real user stores.
 ShellRoot {
@@ -149,8 +150,12 @@ ShellRoot {
         property string storageState: "empty"
         property string errorCode: ""
         property bool busy: false
-        property var collections: []
-        function acceptsKey(key) { return !!key; }
+        property var collections: [
+            {id:"c1",name:"Daily Operations",members:[]}
+        ]
+        function acceptsKey(key) {
+            return CollectionRules.checkMemberKey(key).ok;
+        }
         function hasMember(id,key) {return false;}
         function createCollection(name) { return ""; }
         function toggleMember(id,key) { return false; }
@@ -398,8 +403,36 @@ ShellRoot {
                 if(time.removals || places.removals || defaults.mutations) {
                     root.fail("DOSSIER_OWNER_ACTION");return;
                 }
-                root.done=true;
                 console.log("U4_PASS // DOSSIER_FILE_NAVIGATION_READ_ONLY");
+                const weather=root.options.rows.find(function(item) {
+                    return item.owner==="weather-home" && item.menu==="HOME";
+                });
+                if(!weather) { root.fail("U6_NO_WEATHER_KEY");return; }
+                root.testStage=2;
+                root.selectedKey=weather.key;
+            } else if(root.testStage===2) {
+                if(!root.selection || root.selection.owner!=="weather-home"
+                        || detail.collectionPanel.resourceKey!==root.selection.key
+                        || !detail.collectionPanel.canUseResource) {
+                    root.fail("U6_SAFE_WEATHER_COLLECTION_REJECTED");return;
+                }
+                const unsafe=root.options.rows.find(function(item) {
+                    return item.owner==="appcontrol" && item.menu==="RUN";
+                });
+                if(!unsafe) { root.fail("U6_NO_UNSAFE_APP");return; }
+                root.testStage=3;
+                root.selectedKey=unsafe.key;
+            } else if(root.testStage===3) {
+                if(!root.selection || root.selection.owner!=="appcontrol"
+                        || root.selection.menu!=="RUN"
+                        || detail.collectionPanel.canUseResource) {
+                    root.fail("U6_UNSAFE_APP_COLLECTION_ACCEPTED");return;
+                }
+                if(time.removals || places.removals || defaults.mutations) {
+                    root.fail("U6_PROVIDER_MUTATION");return;
+                }
+                console.log("U6_PASS // SAFE_MEMBER_ONLY_NO_PROVIDER_WRITES");
+                root.done=true;
                 Qt.quit();
             }
         }

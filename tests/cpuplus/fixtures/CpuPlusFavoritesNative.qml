@@ -11,6 +11,8 @@ ShellRoot {
     property string selectedKey: ""
     property bool ready: false
     property bool selectedByClick: false
+    property bool indexClicked: false
+    property int testStage: 0
     property bool done: false
     QtObject {
         id: fakeAppControl
@@ -113,6 +115,7 @@ ShellRoot {
                 onIndexSelectionRequested: function(key, category) {
                     selector.filterMode=category;
                     root.selectedKey=key;
+                    root.indexClicked=true;
                     console.log("U4_INDEX // NAVIGATED "+category);
                 }
             }
@@ -234,15 +237,40 @@ ShellRoot {
         running: root.ready && !root.done
         repeat: true
         onTriggered: {
-            if(root.selectedByClick && root.selection
+            if(root.testStage===0 && root.selectedByClick && root.selection
                     && root.selection.category==="CPU++"
                     && root.selection.owner==="appcontrol"
                     && root.selection.readOnly) {
                 if(time.removals || places.removals || defaults.mutations) {
                     root.fail("UNEXPECTED_PROVIDER_ACTION");return;
                 }
-                root.done=true;
                 console.log("U4_PASS // SELECTED_PROCESS_READ_ONLY");
+                const fileGroupIndex=dossier.dossier.groups.findIndex(function(g) {
+                    return g.key==="APP CTRL|FILES";
+                });
+                const group=dossier.dossierGroupItems.itemAt(fileGroupIndex);
+                const fileRow=group ? group.entryItems.itemAt(0) : null;
+                if(!fileRow) {
+                    root.fail("DOSSIER_ROW_MISSING");return;
+                }
+                const pt=fileRow.mapToItem(win.contentItem,
+                    16,fileRow.height/2);
+                root.testStage=1;
+                console.log("U4_SECOND_READY // x="+Math.round(pt.x)
+                    +" y="+Math.round(pt.y));
+            } else if(root.testStage===1 && root.indexClicked) {
+                if(!root.selection || root.selection.menu!=="FILES"
+                        || root.selection.item!=="budget-2026.xlsx"
+                        || root.selection.category!=="APP CTRL"
+                        || selector.filterMode!=="APP CTRL"
+                        || !root.selection.readOnly) {
+                    root.fail("DOSSIER_NAVIGATION");return;
+                }
+                if(time.removals || places.removals || defaults.mutations) {
+                    root.fail("DOSSIER_OWNER_ACTION");return;
+                }
+                root.done=true;
+                console.log("U4_PASS // DOSSIER_FILE_NAVIGATION_READ_ONLY");
                 Qt.quit();
             }
         }

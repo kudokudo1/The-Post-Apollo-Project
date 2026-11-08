@@ -719,6 +719,7 @@ PanelWindow {
         if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
                 || (!huntRoundComplete && huntTargets.length > 0))
             return false;
+        huntAutoPending = false;
         if (batchPaths.length >= 500) {
             feedback = "HUNT // QUEUE FULL // REVIEW OR CLEAR";
             return false;
@@ -3394,6 +3395,18 @@ PanelWindow {
                                 }
                             }
                             Timer {
+                                id: huntAutoNextTimer
+                                interval: 1250
+                                repeat: false
+                                running: camera.menuOpen && camera.huntAutoRounds
+                                         && camera.huntAutoPending
+                                         && !camera.huntSettingsOpen
+                                         && camera.activeView === "cleanup"
+                                         && camera.cleanupTechnique === "hunt"
+                                         && !camera.busy
+                                onTriggered: camera.huntAutoStartNext()
+                            }
+                            Timer {
                                 id: huntClock
                                 interval: 100
                                 repeat: true
@@ -3437,6 +3450,7 @@ PanelWindow {
                                                ? Colors.red : Colors.yellow
                                         text: "ROUND " + camera.huntRound
                                               + " // " + camera.huntSecondsLeft + " SEC"
+                                              + " // " + camera.huntRoundSpeed.toFixed(2) + "X"
                                     }
                                 }
 
@@ -3446,7 +3460,7 @@ PanelWindow {
                                     height: 27
                                     spacing: 6
                                     ActionButton {
-                                        width: Math.max(72, parent.width * 0.28)
+                                        width: (parent.width - 18) * 0.22
                                         height: 26
                                         label: "SPAWN -"
                                         labelPixelSize: 10
@@ -3456,8 +3470,7 @@ PanelWindow {
                                                            camera.huntSpawnCount - 1)
                                     }
                                     GohuText {
-                                        width: parent.width - 2 * Math.max(72, parent.width * 0.28)
-                                               - 12
+                                        width: (parent.width - 18) * 0.34
                                         height: 26
                                         verticalAlignment: Text.AlignVCenter
                                         horizontalAlignment: Text.AlignHCenter
@@ -3467,7 +3480,7 @@ PanelWindow {
                                               + " / 10"
                                     }
                                     ActionButton {
-                                        width: Math.max(72, parent.width * 0.28)
+                                        width: (parent.width - 18) * 0.22
                                         height: 26
                                         label: "SPAWN +"
                                         labelPixelSize: 10
@@ -3475,6 +3488,15 @@ PanelWindow {
                                         available: !camera.busy && camera.huntSpawnCount < 10
                                         onLeftClicked: camera.huntSetSpawnCount(
                                                            camera.huntSpawnCount + 1)
+                                    }
+                                    ActionButton {
+                                        width: (parent.width - 18) * 0.22
+                                        height: 26
+                                        label: "SETTINGS"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.yellow
+                                        selected: camera.huntSettingsOpen
+                                        onLeftClicked: camera.huntToggleSettings()
                                     }
                                 }
 
@@ -3502,6 +3524,7 @@ PanelWindow {
                                     MouseArea {
                                         anchors.fill: parent
                                         enabled: !camera.huntPaused && !camera.busy
+                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
                                         hoverEnabled: true
                                         cursorShape: Qt.CrossCursor
                                         onPositionChanged: function(mouse) {
@@ -3513,9 +3536,23 @@ PanelWindow {
                                             camera.huntMouseActive = false;
                                             camera.huntMouseMovingTicks = 0;
                                         }
-                                        onClicked: {
+                                        onPressed: function(mouse) {
                                             huntArena.forceActiveFocus();
-                                            camera.huntFire("");
+                                            if (mouse.button === Qt.RightButton) {
+                                                camera.huntSetPointer(mouse.x, mouse.y,
+                                                                      huntArena.width,
+                                                                      huntArena.height);
+                                                camera.huntSetScoped(true);
+                                            }
+                                        }
+                                        onReleased: function(mouse) {
+                                            if (mouse.button === Qt.RightButton)
+                                                camera.huntSetScoped(false);
+                                        }
+                                        onCanceled: camera.huntSetScoped(false)
+                                        onClicked: function(mouse) {
+                                            if (mouse.button === Qt.LeftButton)
+                                                camera.huntFire("");
                                         }
                                     }
                                     Repeater {
@@ -3532,19 +3569,35 @@ PanelWindow {
                                             readonly property real crowdScale: Math.max(
                                                 0.63, Math.min(1, Math.sqrt(
                                                     3 / Math.max(3, camera.huntTargets.length))))
-                                            width: Math.min(Math.max(40, huntArena.width - 16),
+                                            readonly property real unscopedWidth: Math.min(
+                                                Math.max(40, huntArena.width - 16),
                                                 Math.min(170, Math.max(90,
                                                     huntArena.width / 4.6))
                                                 * target.sizeScale * crowdScale)
-                                            height: Math.min(Math.max(30, huntArena.height - 12),
+                                            readonly property real unscopedHeight: Math.min(
+                                                Math.max(30, huntArena.height - 12),
                                                 Math.min(88, Math.max(51,
                                                     huntArena.height / 4.3))
                                                 * target.sizeScale * crowdScale)
+                                            readonly property real unscopedX: 8 + Math.max(
+                                                0, huntArena.width - unscopedWidth - 16)
+                                                * target.xNorm
+                                            readonly property real unscopedY: 6 + Math.max(
+                                                0, huntArena.height - unscopedHeight - 12)
+                                                * target.yNorm
+                                            width: unscopedWidth * camera.huntScopeScale
+                                            height: unscopedHeight * camera.huntScopeScale
                                             z: target.profile === "ox" ? 40 : 2
-                                            x: 8 + Math.max(0, huntArena.width - width - 16)
-                                               * target.xNorm
-                                            y: 6 + Math.max(0, huntArena.height - height - 12)
-                                               * target.yNorm
+                                            // The magnified *hitbox* follows the actual
+                                            // magnified thumbnail, not the old world rect.
+                                            x: (unscopedX - huntArena.width * camera.huntMouseX)
+                                               * camera.huntScopeScale
+                                               + huntArena.width * camera.huntMouseX
+                                               + camera.huntScopeSwayX
+                                            y: (unscopedY - huntArena.height * camera.huntMouseY)
+                                               * camera.huntScopeScale
+                                               + huntArena.height * camera.huntMouseY
+                                               + camera.huntScopeSwayY
                                             Behavior on x {
                                                 NumberAnimation {
                                                     duration: 100
@@ -3607,6 +3660,7 @@ PanelWindow {
                                                 MouseArea {
                                                     anchors.fill: parent
                                                     enabled: !camera.huntPaused && !camera.busy
+                                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                                                     hoverEnabled: true
                                                     cursorShape: Qt.CrossCursor
                                                     onPositionChanged: function(mouse) {
@@ -3616,11 +3670,77 @@ PanelWindow {
                                                             position.x, position.y,
                                                             huntArena.width, huntArena.height);
                                                     }
-                                                    onPressed: huntArena.forceActiveFocus()
-                                                    onClicked: camera.huntFire(
-                                                                   huntTargetItem.target.path)
+                                                    onPressed: function(mouse) {
+                                                        huntArena.forceActiveFocus();
+                                                        if (mouse.button === Qt.RightButton) {
+                                                            const pos = mapToItem(
+                                                                huntArena, mouse.x, mouse.y);
+                                                            camera.huntSetPointer(
+                                                                pos.x, pos.y,
+                                                                huntArena.width, huntArena.height);
+                                                            camera.huntSetScoped(true);
+                                                        }
+                                                    }
+                                                    onReleased: function(mouse) {
+                                                        if (mouse.button === Qt.RightButton)
+                                                            camera.huntSetScoped(false);
+                                                    }
+                                                    onCanceled: camera.huntSetScoped(false)
+                                                    onClicked: function(mouse) {
+                                                        if (mouse.button === Qt.LeftButton)
+                                                            camera.huntFire(
+                                                                huntTargetItem.target.path);
+                                                    }
                                                 }
                                             }
+                                        }
+                                    }
+                                    Item {
+                                        id: huntScopeReticle
+                                        anchors.fill: parent
+                                        z: 90
+                                        visible: camera.huntScoped
+                                        // Non-interactive optical overlay. Target
+                                        // MouseAreas underneath keep their exact bounds.
+                                        Rectangle {
+                                            x: parent.width * camera.huntMouseX - width / 2
+                                               + camera.huntScopeSwayX
+                                            y: parent.height * camera.huntMouseY - height / 2
+                                               + camera.huntScopeSwayY
+                                            width: 122
+                                            height: 122
+                                            radius: 61
+                                            color: "transparent"
+                                            border.width: 2
+                                            border.color: Colors.cyan
+                                            Rectangle {
+                                                anchors.centerIn: parent
+                                                width: 1
+                                                height: 110
+                                                color: Colors.cyan
+                                                opacity: 0.65
+                                            }
+                                            Rectangle {
+                                                anchors.centerIn: parent
+                                                width: 110
+                                                height: 1
+                                                color: Colors.cyan
+                                                opacity: 0.65
+                                            }
+                                            Rectangle {
+                                                anchors.centerIn: parent
+                                                width: 7
+                                                height: 7
+                                                radius: 4
+                                                color: Colors.magenta
+                                            }
+                                        }
+                                        GohuText {
+                                            x: 6
+                                            y: 5
+                                            color: Colors.yellow
+                                            font.pixelSize: 10
+                                            text: "SCOPE // 1.85X // HOLD RIGHT"
                                         }
                                     }
                                     GohuText {
@@ -3695,7 +3815,7 @@ PanelWindow {
                                     elide: Text.ElideRight
                                     text: camera.huntLastEvent
                                           + " // " + camera.batchPaths.length
-                                          + " MARKED FOR REVIEW"
+                                          + " MARKED // RIGHT-HOLD SCOPE"
                                 }
                             }
                         }

@@ -133,6 +133,7 @@ Item {
         viewMode = "attachPreview";
         assignmentPreview.refresh();
         refreshRequested();
+        attachmentAction.probeCapability();
         return true;
     }
 
@@ -140,8 +141,12 @@ Item {
         if (!root.active || !root.roomMatches
                 || root.viewMode !== "attachPreview"
                 || !root.attachmentPreview.reviewable
-                || attachmentAction.running) {
-            attachmentOutcome = "ARM REFUSED // REVIEW CONNECTION BLOCKERS";
+                || attachmentAction.running
+                || attachmentAction.capabilityChecking
+                || !attachmentAction.capabilityChecked
+                || !attachmentAction.capabilityAvailable) {
+            attachmentOutcome = attachmentAction.capabilityReason
+                + " // REVIEW CONNECTION BLOCKERS";
             return false;
         }
         attachmentSessionId = root.attachmentPreview.sessionMode
@@ -158,8 +163,11 @@ Item {
         if (!root.attachmentArmed || !root.active || !root.roomMatches
                 || root.viewMode !== "attachPreview"
                 || !root.attachmentPreview.reviewable
-                || attachmentAction.running) {
-            attachmentOutcome = "CONFIRM REFUSED // PREVIEW CHANGED OR BLOCKED";
+                || attachmentAction.running
+                || attachmentAction.capabilityChecking
+                || !attachmentAction.capabilityChecked
+                || !attachmentAction.capabilityAvailable) {
+            attachmentOutcome = "CONFIRM REFUSED // PREVIEW OR PX CAPABILITY CHANGED";
             attachmentArmKey = "";
             return false;
         }
@@ -253,6 +261,8 @@ Item {
 
     HospitalWorkerAttachmentActionService {
         id: attachmentAction
+        onCapabilityCheckingChanged: root.attachmentArmKey = ""
+        onCapabilityAvailableChanged: root.attachmentArmKey = ""
         onAttached: function(result) {
             // A registration is not a provider turn or browser connection.
             if (root.active && String(result.roomId || "") === root.pinnedRoomId) {
@@ -986,6 +996,36 @@ Item {
                 }
                 GohuText {
                     width: parent.width
+                    text: attachmentAction.capabilityReason
+                    font.pixelSize: 9
+                    color: attachmentAction.capabilityAvailable
+                        ? Colors.green : Colors.orange
+                    wrapMode: Text.Wrap
+                }
+                GohuText {
+                    width: parent.width
+                    visible: !attachmentAction.capabilityAvailable
+                        && !!attachmentAction.capabilityDetail
+                    text: attachmentAction.capabilityDetail
+                    font.pixelSize: 9
+                    color: Colors.orange
+                    wrapMode: Text.Wrap
+                }
+                HospitalActionButton {
+                    width: parent.width
+                    height: 27
+                    label: "RECHECK PX ATTACH SUPPORT"
+                    compactIcon: "LINK"
+                    accent: Colors.cyan
+                    enabledAction: !attachmentAction.capabilityChecking
+                        && !attachmentAction.running
+                    onTriggered: {
+                        root.attachmentArmKey = "";
+                        attachmentAction.probeCapability();
+                    }
+                }
+                GohuText {
+                    width: parent.width
                     text: root.attachmentOutcome || attachmentAction.lastError
                         || (attachmentAction.running
                             ? "PX ATTACH IN PROGRESS // WAITING FOR VERIFICATION"
@@ -1013,6 +1053,9 @@ Item {
                     accent: Colors.orange
                     enabledAction: root.active && root.roomMatches
                         && root.attachmentPreview.reviewable
+                        && attachmentAction.capabilityChecked
+                        && attachmentAction.capabilityAvailable
+                        && !attachmentAction.capabilityChecking
                         && !attachmentAction.running
                     onTriggered: root.armAttachment()
                 }
@@ -1024,6 +1067,9 @@ Item {
                     accent: Colors.green
                     enabledAction: root.attachmentArmed
                         && root.attachmentPreview.reviewable
+                        && attachmentAction.capabilityChecked
+                        && attachmentAction.capabilityAvailable
+                        && !attachmentAction.capabilityChecking
                         && !attachmentAction.running
                     onTriggered: root.confirmAttachment()
                 }

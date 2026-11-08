@@ -77,8 +77,8 @@ class ZoomWebHostTests(unittest.TestCase):
         # Compact now makes room for its full-size control deck. The frame
         # grows by 24px; the browser starts 16px lower (no 12px overlap
         # and a 4px taller mode row), leaving MORE browser height than before.
-        compact_height, page_start, bottom = 699, 133 - 4, 1
-        self.assertEqual(compact_height - page_start - bottom, 569)
+        compact_height, page_start, bottom = 699, 133 - 17, 1
+        self.assertEqual(compact_height - page_start - bottom, 582)
         self.assertGreater(compact_height - page_start - bottom,
                            compact_height - 169)
 
@@ -99,9 +99,9 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebVisualHeld', QML)
 
     def test_deck_containment_keeps_default_buttons_and_browser_input_below_them(self):
-        # Four logical pixels of *visual* browser overlap close the small
-        # seam. Input remains below the mode row; button sizes and framing
-        # are unchanged.
+        # Native screenshot measured an additional 13px top gap after the
+        # earlier 4px adjustment. The 17px browser overlap remains visual;
+        # the cutout still stops below the full mode row.
         self.assertNotIn('zoomVisualTopOverlap', QML)
         self.assertIn(
             'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
@@ -118,13 +118,14 @@ class ZoomWebHostTests(unittest.TestCase):
             'width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)', QML)
         self.assertIn('readonly property int zoomActorTop: zoomBayTop', QML)
         self.assertIn('readonly property int zoomActorHeight: zoomBayHeight', QML)
-        # The current 780px width stays exactly as-is. Top moves 4px up
-        # and height grows 4px, leaving the previous lower edge unchanged.
-        old_top, old_height, old_width = 133, 565, 780
-        new_top = old_top - 4
-        new_height = old_height + 4
+        # Compared with the current deployed 4px correction, the measured
+        # adjustment changes only Y and height: 129 -> 116, 569 -> 582.
+        # Width remains 780 and the bottom remains at frame-local 698.
+        old_top, old_height, old_width = 129, 569, 780
+        new_top = old_top - 13
+        new_height = old_height + 13
         new_width = old_width
-        self.assertEqual((new_top,new_height,new_width), (129,569,780))
+        self.assertEqual((new_top,new_height,new_width), (116,582,780))
         self.assertEqual(new_top + new_height,old_top + old_height)
         self.assertGreaterEqual(42,34)
         self.assertIn('anchors.margins: camera.activeView === "zoom" ? 12 : 18', QML)
@@ -135,8 +136,8 @@ class ZoomWebHostTests(unittest.TestCase):
             'width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)', QML)
 
     def test_opaque_zoom_deck_seals_spare_row_pixels_without_moving_browser(self):
-        # The matte still keeps spare mode-row pixels opaque as the physical
-        # actor is nudged up by 4px. The cutout remains clamped below buttons.
+        # The matte keeps the mode row opaque while the physical actor rises
+        # the measured 13px. Its input cutout remains clamped below buttons.
         self.assertIn('id: zoomModeDeckMatte', QML)
         self.assertEqual(QML.count('id: zoomModeDeckMatte'), 1)
         view = QML.index('id: zoomViewport')
@@ -185,9 +186,9 @@ class ZoomWebHostTests(unittest.TestCase):
         # Representative panels all obey the same fitted rectangle rule;
         # this does not assert native Sway placement or browser page zoom.
         for frame_width, frame_height, top, expect_width, expect_height in (
-                (784, 699, 129, 780, 569),
-                (1000, 900, 129, 996, 770),
-                (1920, 1080, 129, 1916, 950)):
+                (784, 699, 116, 780, 582),
+                (1000, 900, 116, 996, 783),
+                (1920, 1080, 116, 1916, 963)):
             self.assertEqual(frame_width - 2 * 2, expect_width)
             self.assertEqual(frame_height - top - 1, expect_height)
         # Preserve all four controls and the same header navigation.
@@ -196,10 +197,10 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('label: "↓ DOWNLOAD"',QML)
         self.assertNotIn('--force-device-scale-factor',QML)
 
-    def test_small_top_nudge_only_moves_zoom_actor_not_mode_button_input(self):
-        # Live screenshot: Zoom already fits the horizontal and bottom edges;
-        # only a few logical pixels are needed above the web header.
-        self.assertIn('readonly property int zoomTopNudge: 4',QML)
+    def test_native_measured_top_nudge_only_moves_zoom_actor_not_button_input(self):
+        # Operator-supplied native screenshot and Sway rectangle measured the
+        # *remaining* 13px gap AFTER the previous 4px nudge. Thus total is 17.
+        self.assertIn('readonly property int zoomTopNudge: 17',QML)
         self.assertIn(
             'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height',QML)
         self.assertIn('               - camera.zoomTopNudge',QML)
@@ -211,10 +212,14 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('height: camera.zoomWebDocked ? camera.zoomInputHeight : 0',QML)
         self.assertIn('height: 34',QML)
         self.assertIn('height: 42',QML)
-        # Both the actor and clickthrough remain inside the expected frame.
-        for original_top, original_height in ((133,565),(133,766),(133,946)):
-            new_top=original_top-4
-            new_height=original_height+4
+        # The current deployed rectangle is X=68, Y=196, width=780,
+        # height=593. After the native-measured 13px rise, the target is
+        # X=68, Y=183, width=780, height=606 and bottom Y=789.
+        self.assertEqual((196-13, 593+13, 780), (183,606,780))
+        self.assertEqual(196+593,183+606)
+        for original_top, original_height in ((129,569),(129,770),(129,950)):
+            new_top=original_top-13
+            new_height=original_height+13
             self.assertEqual(original_top+original_height,new_top+new_height)
             self.assertEqual(max(new_top,original_top),original_top)
             self.assertEqual(new_height-(original_top-new_top),original_height)

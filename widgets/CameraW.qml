@@ -73,9 +73,12 @@ PanelWindow {
     readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))
     // Keep a 1px border while using the full remaining physical frame height.
     readonly property int zoomBayBottom: 1
-    // Small visual alignment from the Nov 7 compact screenshot. Keep this
-    // separate from the Sway workarea transform and the panel's dimensions.
-    readonly property int zoomTopNudge: 4
+    // Nov 8 native screenshot and Sway readback: Zoom X=68 Y=196
+    // 780x593, while the mode-row border ends 13 logical px above the
+    // visible browser top. Increase the existing 4px correction by 13px:
+    // expected Y=183, height=606, with the same X/width/bottom (789).
+    // Keep this separate from workarea positioning and input containment.
+    readonly property int zoomTopNudge: 17
     readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))
     readonly property int zoomBayHeight: Math.max(0, Math.round(zoomViewport.height))
     // Sway measured the browser at 92,126 718x514, exactly the old

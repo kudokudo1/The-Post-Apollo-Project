@@ -32,6 +32,53 @@ failure() {
   systemctl poweroff --no-block || true
   exit 1
 }
+# C2v-owned, failure-only rollback evidence. This function never changes a
+# deployment, selects a reboot, weakens the next-boot gate or grants success.
+# The command's exact output and numeric rc are captured before the existing
+# fail-closed poweroff path. Use root-owned /run, not writable /var/tmp aliases.
+c2v_rollback_failure_diagnostic() {
+  local rollback_rc="$1"
+  local rollback_output=/run/c2v-rpm-ostree-rollback-command.log
+  local evidence=/run/c2v-rpm-ostree-rollback-failure.log
+  {
+    printf 'C2V_DIAG_ROLLBACK_COMMAND_RC // %s\n' "$rollback_rc"
+    echo 'C2V_DIAG_ROLLBACK_STDOUT_STDERR_BEGIN'
+    if [[ -r "$rollback_output" ]]; then
+      tail -c 6000 "$rollback_output" || true
+    else
+      echo 'C2V_DIAG_ROLLBACK_COMMAND_OUTPUT_UNREADABLE'
+    fi
+    echo 'C2V_DIAG_ROLLBACK_STDOUT_STDERR_END'
+    echo 'C2V_DIAG_ROLLBACK_RPM_OSTREE_JSON_BEGIN'
+    timeout --signal=TERM --kill-after=2s 8s rpm-ostree status --json || true
+    echo 'C2V_DIAG_ROLLBACK_RPM_OSTREE_JSON_END'
+    echo 'C2V_DIAG_ROLLBACK_OSTREE_ADMIN_BEGIN'
+    timeout --signal=TERM --kill-after=2s 8s ostree admin status || true
+    echo 'C2V_DIAG_ROLLBACK_OSTREE_ADMIN_END'
+    echo 'C2V_DIAG_ROLLBACK_SYSTEMD_UNITS_BEGIN'
+    timeout --signal=TERM --kill-after=2s 6s systemctl show \
+      c2v-ostree-cycle.service rpm-ostreed.service \
+      --property=ActiveState --property=SubState --property=Result \
+      --property=ExecMainCode --property=ExecMainStatus \
+      --property=MainPID --no-pager || true
+    echo 'C2V_DIAG_ROLLBACK_SYSTEMD_UNITS_END'
+    echo 'C2V_DIAG_ROLLBACK_RPM_OSTREE_JOURNAL_BEGIN'
+    timeout --signal=TERM --kill-after=2s 6s journalctl -b \
+      -u rpm-ostreed.service -u c2v-ostree-cycle.service \
+      --no-pager -n 45 || true
+    echo 'C2V_DIAG_ROLLBACK_RPM_OSTREE_JOURNAL_END'
+  } > "$evidence" 2>&1 || true
+  # Neither serial channel is authoritative. Emit a bounded report before
+  # failure() powers off this networkless CI guest.
+  echo 'C2V_DIAG_ROLLBACK_FAILURE_REPORT_BEGIN'
+  timeout --signal=TERM --kill-after=2s 8s \
+    head -c 15000 "$evidence" >/dev/ttyS0 2>&1 || true
+  echo 'C2V_DIAG_ROLLBACK_FAILURE_REPORT_END'
+  if [[ -f "$c4b_mode" && -c /dev/ttyS1 ]]; then
+    timeout --signal=TERM --kill-after=2s 8s \
+      head -c 15000 "$evidence" >/dev/ttyS1 2>&1 || true
+  fi
+}
 trap 'rc=$?; if [[ "$rc" -ne 0 ]]; then c4b_controller_failure_relay "SCRIPT_EXIT_$rc-line-$LINENO"; echo "C2V_FAIL // SCRIPT_EXIT_$rc line $LINENO"; systemctl poweroff --no-block || true; fi' EXIT
 stagefile=/var/lib/c2v-transaction-stage
 pkg=postapollo-connections-c2t-fixture
@@ -604,7 +651,18 @@ C2V_WORKER
     fi
     echo "C2V_PASS // LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT"
     echo rollback_pending > "$stagefile"
-    rpm-ostree rollback --reboot || failure "RPM_OSTREE_ROLLBACK_FAILED"
+    echo "C2V_ROLLBACK_COMMAND_BEGIN // actual rpm-ostree rollback --reboot"
+    # Keep this exact authoritative OS rollback command and the independent
+    # second real boot/absence checks. The diagnostics are a failure-only
+    # recorder, never a substitute success path or a simulated reboot.
+    rollback_output=/run/c2v-rpm-ostree-rollback-command.log
+    if rpm-ostree rollback --reboot > "$rollback_output" 2>&1; then
+      echo "C2V_ROLLBACK_COMMAND_RETURNED_ZERO // second_boot_still_required"
+    else
+      rollback_rc="$?"
+      c2v_rollback_failure_diagnostic "$rollback_rc"
+      failure "RPM_OSTREE_ROLLBACK_FAILED"
+    fi
     ;;
   rollback_pending)
     if rpm -q "$pkg" >/dev/null 2>&1; then

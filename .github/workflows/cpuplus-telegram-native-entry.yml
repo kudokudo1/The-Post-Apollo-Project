@@ -1,0 +1,60 @@
+name: CPU++ native Telegram provider entrypoint
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/ConnectionsPolicy.js'
+      - 'widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml'
+      - 'widgets/CpuPlusW.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'shell.qml'
+      - 'tests/cpuplus/test_cpuplus_telegram_connection_entry.cjs'
+      - 'tests/cpuplus/test_cpuplus_connections_c1.js'
+      - 'docs/cpuplus-telegram-native-connection-entry-v0.md'
+      - '.github/workflows/cpuplus-telegram-native-entry.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/connections/ConnectionsPolicy.js'
+      - 'widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml'
+      - 'widgets/CpuPlusW.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'shell.qml'
+      - 'tests/cpuplus/test_cpuplus_telegram_connection_entry.cjs'
+      - 'tests/cpuplus/test_cpuplus_connections_c1.js'
+      - '.github/workflows/cpuplus-telegram-native-entry.yml'
+permissions:
+  contents: read
+
+jobs:
+  telegram-navigation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Native Telegram service and real Social navigation contract
+        run: node tests/cpuplus/test_cpuplus_telegram_connection_entry.cjs
+      - name: Existing shared Connections inventory and account edit regression
+        run: |
+          node tests/cpuplus/test_cpuplus_connections_c1.js
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_connections_local_account_editor.py' -v
+      - name: Telegram native login, session-scoping, privacy and Social status regressions
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_adapter_contracts.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_login_ui_contracts.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_identity_scopes.py' -v
+          node tests/messaging/test_social_telegram_shared_status.cjs
+      - name: Connections broker deny-only and CPU++ main layout
+        run: |
+          node tests/cpuplus/test_connections_broker_c2a.js
+          python3 tests/components/test_cpuplus_settings_mode_contracts.py
+      - name: Qt QML parser and format checks for live route
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          for q in widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml widgets/CpuPlusW.qml widgets/messanger/MessagingW.qml shell.qml; do
+            QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat "$q" >/dev/null
+          done

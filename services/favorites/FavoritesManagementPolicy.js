@@ -52,7 +52,41 @@ function approvedOwnerLabel(labels, key) {
     return trimmed.length>=2 ? trimmed : "";
 }
 
-function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels) {
+// Only AppControl's source resolver may supply structured presentation facts.
+// These are NOT executable references, liveness proofs or save permissions.
+function approvedOwnerDescription(descriptions,key) {
+    if (!descriptions || typeof descriptions!=="object"
+            || !Object.prototype.hasOwnProperty.call(descriptions,key))
+        return null;
+    const value=descriptions[key];
+    if (!value || typeof value!=="object") return null;
+    if (["APPS","KILL","THERMAL","SYSTEM"].indexOf(value.menu)<0
+            || ["FAVORITE","PROCESS FAVORITE","PREFERRED ACTION",
+                "METRIC WATCH"].indexOf(value.type)<0
+            || typeof value.item!=="string") return null;
+    const item=value.item.trim();
+    if (!item || item.length>64
+            || /[\u0000-\u001f\u007f\/\\|<>@]/.test(item)
+            || /:\/\/|--(?:password|token|secret|key)/i.test(item))
+        return null;
+    return {menu:value.menu,item:item,type:value.type};
+}
+function appControlMenu(record) {
+    const id=record.resourceId;
+    if (record.kind==="task-watch" || id.indexOf("task|")===0)
+        return "KILL";
+    if (id.indexOf("thermal|")===0 || id.indexOf("watchbox|thermal|")===0)
+        return "THERMAL";
+    if (id.indexOf("system|")===0 || id.indexOf("watchbox|system|")===0)
+        return "SYSTEM";
+    if (id.indexOf("run:")===0 || id.indexOf("run|")===0)
+        return "RUN";
+    if (record.kind==="preferred-action" && id.indexOf("app|")===0)
+        return "APPS";
+    return "OTHER";
+}
+
+function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions) {
     const out=[], seen=Object.create(null);
     let rejected=0,total=0;
     function accept(record) {
@@ -109,14 +143,21 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
             for(const entry of items.items) {
                 const classification=appControlClassification(entry);
                 const type=classification.label;
+                const descriptor=approvedOwnerDescription(appControlDescriptions,entry.key);
                 ordinalByType[type]=(ordinalByType[type] || 0)+1;
+                const fallback=approvedOwnerLabel(appControlDisplayLabels,entry.key)
+                    || (type+" #"+ordinalByType[type]);
                 accept({
                     key:entry.key,
                     provider:"appcontrol",kind:entry.kind,
-                    // The raw donor identity is intentionally NOT exported
-                    // to the CPU++ management record or collection controls.
-                    // Number duplicate display types without exposing commands.
-                    label:approvedOwnerLabel(appControlDisplayLabels,entry.key) || (type+" #"+ordinalByType[type]),
+                    // Identity stays private within the in-memory key. It is
+                    // never printed or forwarded to a generic action/collection.
+                    label:descriptor ? descriptor.menu+" // "+descriptor.item : fallback,
+                    sourceName:"APP CONTROL",
+                    menu:descriptor ? descriptor.menu : appControlMenu(entry),
+                    item:descriptor ? descriptor.item : "NAME UNAVAILABLE",
+                    favoriteType:descriptor ? descriptor.type : type,
+                    resolved:!!descriptor,
                     category:classification.category,
                     owner:"appcontrol",readOnly:true,
                     isFavorite:true,isPinned:false,

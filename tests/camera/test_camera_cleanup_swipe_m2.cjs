@@ -9,6 +9,11 @@ const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "../..");
 const qml = fs.readFileSync(path.join(root, "widgets/CameraW.qml"), "utf8");
+const motionSource = fs.readFileSync(
+    path.join(root, "widgets/CameraHuntMotion.js"), "utf8");
+const motion = {};
+vm.createContext(motion);
+vm.runInContext(motionSource.replace(/^\s*\.pragma library\s*$/m,""),motion);
 const from = qml.indexOf("    function batchContains(path) {");
 const to = qml.indexOf("    function prepareCapture(mode) {", from);
 if (from < 0 || to <= from)
@@ -47,6 +52,10 @@ function createState() {
         huntPaused:true,
         huntRoundComplete:false,
         huntLastEvent:"READY // NEW ROUND",
+        huntMouseX:0.5,
+        huntMouseY:0.5,
+        huntMouseActive:false,
+        HuntMotion:motion,
         feedback:"",
         called:[],
         run(action,args) {
@@ -84,6 +93,14 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /id: cleanupHuntView/);
     assert.match(cleanup, /id: huntArena/);
     assert.match(cleanup, /id: huntTargetRepeater/);
+    assert.match(cleanup, /model: camera\.huntTargets\.length/);
+    assert.match(cleanup, /property var target: camera\.huntTargets\[index\]/);
+    assert.match(cleanup, /target\.xNorm/);
+    assert.match(cleanup, /target\.yNorm/);
+    assert.match(cleanup, /target\.sizeScale/);
+    assert.match(cleanup, /Behavior on x/);
+    assert.match(cleanup, /Behavior on y/);
+    assert.match(cleanup, /camera\.huntSetPointer\(/);
     assert.match(cleanup, /onClicked: camera\.huntFire\(/);
     assert.match(cleanup, /onTriggered: camera\.huntAdvance\(\)/);
     assert.match(cleanup, /cursorShape: Qt\.CrossCursor/);
@@ -187,10 +204,15 @@ test("Hunt draws exactly 3 random eligible loaded files without touching Trash",
     assert.equal(s.huntSecondsLeft,25);
     assert.equal(s.huntTargets.length,3);
     assert.equal(new Set(s.huntTargets.map(t=>t.path)).size,3);
+    assert.equal(new Set(s.huntTargets.map(t=>t.profile)).size,3);
     for (const target of s.huntTargets) {
         assert.ok(files.some(f=>f.path===target.path));
-        assert.ok(target.lane>=0 && target.lane<3);
-        assert.ok(target.speed>0);
+        assert.ok(motion.PROFILES.includes(target.profile));
+        assert.ok(target.xNorm>=0 && target.xNorm<=1);
+        assert.ok(target.yNorm>=0 && target.yNorm<=1);
+        assert.ok(target.sizeScale>0);
+        assert.ok(Number.isFinite(target.vx));
+        assert.ok(Number.isFinite(target.vy));
     }
     assert.equal(s.batchPaths.length,0);
     assert.equal(s.called.length,0);
@@ -304,4 +326,139 @@ test("Mutating Batch selection invalidates Hunt undo history", () => {
     s.cleanupTechnique="hunt";
     assert.equal(s.huntUndo(),false);
     assert.equal(s.called.length,0);
+});
+
+
+test("Movement profiles are distinct, normalized, and do not alter file paths", () => {
+    assert.deepEqual(Array.from(motion.PROFILES), ["bird","frog","deer","ox","fox"]);
+    const record = {path:"/tmp/Example.png",name:"Example.png",mediaType:"image"};
+    const targets = motion.PROFILES.map(profile =>
+        motion.createTarget(record,profile,()=>0.6));
+    for (let t of targets) {
+        const before = {...t};
+        let moved2D = false;
+        for (let i=0;i<210;i++) {
+            const next = motion.advanceTarget(t,{active:false,x:0.5,y:0.5});
+            assert.equal(next.path,record.path);
+            assert.equal(next.name,record.name);
+            assert.equal(next.profile,before.profile);
+            assert.ok(next.xNorm>=0 && next.xNorm<=1,t.profile+" x");
+            assert.ok(next.yNorm>=0 && next.yNorm<=1,t.profile+" y");
+            assert.ok(Number.isFinite(next.vx) && Number.isFinite(next.vy));
+            if (Math.abs(next.xNorm-before.xNorm)>0.02
+                 && Math.abs(next.yNorm-before.yNorm)>0.02)
+                moved2D = true;
+            t = next;
+        }
+        assert.equal(moved2D,true,"Expected 2D travel for "+before.profile);
+    }
+    assert.ok(targets.find(t=>t.profile==="ox").sizeScale >
+              targets.find(t=>t.profile==="fox").sizeScale);
+    const ox = targets.find(t=>t.profile==="ox");
+    const deer = targets.find(t=>t.profile==="deer");
+    assert.ok(Math.abs(ox.vx) < Math.abs(deer.vx));
+});
+
+test("Bird bounces in X and Y without leaving arena", () => {
+    const t = motion.createTarget({path:"/tmp/bird.png"}, "bird",()=>0.6);
+    t.xNorm=0.997; t.vx=0.020;
+    t.yNorm=0.997; t.vy=0.020;
+    const moved = motion.advanceTarget(t,{active:false});
+    assert.ok(moved.xNorm<=1 && moved.xNorm>=0);
+    assert.ok(moved.yNorm<=1 && moved.yNorm>=0);
+    assert.ok(moved.vx<0, "bird should reverse horizontal velocity");
+    assert.ok(moved.vy<0, "bird should reverse vertical velocity");
+    assert.equal(t.vx,0.020,"motion must not mutate history snapshots");
+});
+
+test("Frog rests then makes an airborne arc and returns to landing level", () => {
+    let t = motion.createTarget({path:"/tmp/frog.png"}, "frog",()=>0.6);
+    const floor = t.baseY;
+    const initial = t.xNorm;
+    let sawAir = false, sawRest = false;
+    for (let i=0;i<100;i++) {
+        t = motion.advanceTarget(t,{active:false});
+        if (t.state==="hop" && t.yNorm < floor-0.06) sawAir = true;
+        if (i>20 && t.state==="idle" &&
+            Math.abs(t.yNorm-floor)<0.00001) sawRest=true;
+    }
+    assert.equal(sawAir,true);
+    assert.equal(sawRest,true);
+    assert.ok(Math.abs(t.xNorm-initial)>0.001);
+});
+
+test("Deer runs fast, leaps diagonally and settles back to its baseline", () => {
+    let t = motion.createTarget({path:"/tmp/deer.png"}, "deer",()=>0.6);
+    const floor = t.baseY;
+    let sawRun=false, sawLeap=false, sawAir=false, landed=false;
+    for(let i=0;i<120;i++) {
+        const previous = t;
+        t=motion.advanceTarget(t,{active:false});
+        if(t.state==="run")sawRun=true;
+        if(t.state==="leap")sawLeap=true;
+        if(t.yNorm<floor-0.07)sawAir=true;
+        if(sawLeap && t.state==="run" && Math.abs(t.yNorm-floor)<0.03)
+            landed=true;
+        assert.equal(t.path,previous.path);
+    }
+    assert.ok(sawRun && sawLeap && sawAir && landed);
+});
+
+test("Fox gently dodges nearby pointer but has a strict speed cap", () => {
+    const f = motion.createTarget({path:"/tmp/fox.png"}, "fox",()=>0.6);
+    f.xNorm=0.60; f.yNorm=0.60; f.vx=0.006; f.vy=0.002;
+    const noCursor=motion.advanceTarget(f,{active:false,x:0.45,y:0.55});
+    const nearby=motion.advanceTarget(f,{active:true,x:0.45,y:0.55});
+    assert.ok(nearby.xNorm > noCursor.xNorm,"fox should drift away from cursor");
+    let t=nearby;
+    for(let i=0;i<600;i++) {
+        t=motion.advanceTarget(t,{
+            active:true,x:Math.max(0,t.xNorm-0.06),
+            y:Math.max(0,t.yNorm-0.06)
+        });
+        assert.ok(Math.abs(t.vx)<=0.022001);
+        assert.ok(Math.abs(t.vy)<=0.018001);
+        assert.ok(t.xNorm>=0 && t.xNorm<=1);
+        assert.ok(t.yNorm>=0 && t.yNorm<=1);
+    }
+});
+
+test("Hunt clock advances actual 2D target coordinates and keeps immutable Undo", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.huntStartRound();
+    const before=s.huntTargets.map(t=>({path:t.path,x:t.xNorm,y:t.yNorm}));
+    const historyStart = s.huntTargets[0];
+    s.huntAdvance();
+    assert.equal(s.huntTick,1);
+    assert.equal(s.huntTargets.length,3);
+    assert.notEqual(s.huntTargets[0],historyStart);
+    assert.ok(s.huntTargets.some((t,i)=>
+        t.xNorm!==before[i].x || t.yNorm!==before[i].y));
+    assert.equal(s.called.length,0);
+    const shotPath=s.huntTargets[0].path;
+    const shotSnapshot=s.huntTargets.find(t=>t.path===shotPath);
+    s.huntFire(shotPath);
+    for(let i=0;i<4;i++) s.huntAdvance();
+    s.huntUndo();
+    const restored=s.huntTargets.find(t=>t.path===shotPath);
+    assert.ok(restored);
+    assert.equal(restored.xNorm,shotSnapshot.xNorm);
+    assert.equal(restored.yNorm,shotSnapshot.yNorm);
+    assert.equal(s.batchPaths.length,0);
+    assert.equal(s.called.length,0);
+});
+
+test("Only Hunt mode accepts pointer tracking; normalized mouse coordinates are clamped", () => {
+    const s=createState();
+    assert.equal(s.huntSetPointer(33,45,100,100),false);
+    s.cleanupTechnique="hunt";
+    assert.equal(s.huntSetPointer(33,45,100,100),true);
+    assert.equal(s.huntMouseX,0.33);
+    assert.equal(s.huntMouseY,0.45);
+    assert.equal(s.huntMouseActive,true);
+    s.huntSetPointer(400,-20,100,100);
+    assert.equal(s.huntMouseX,1);
+    assert.equal(s.huntMouseY,0);
+    assert.equal(s.huntSetPointer(40,50,0,100),false);
 });

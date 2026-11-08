@@ -334,6 +334,8 @@ ShellRoot {
                     body:"LUNAR",phase:"PENUMBRAL",daysUntil:106
                 }];
                 focused.eclipseSource.eventCount = 2;
+                focused.eclipseSource.nextSolar = focused.eclipseSource.events[0];
+                focused.eclipseSource.nextLunar = focused.eclipseSource.events[1];
                 focused.eclipseSource.ready = true;
                 root.phase = 8;
             } else if (root.phase === 8) {

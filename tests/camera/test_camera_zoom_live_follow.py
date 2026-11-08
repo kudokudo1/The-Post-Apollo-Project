@@ -77,7 +77,10 @@ class FollowTests(unittest.TestCase):
         self.assertNotIn('zoomVisualTopOverlap', QML)
         self.assertIn('id: zoomWebFollowTargetDebounce', QML)
         self.assertIn('onTriggered: camera.sendZoomFollowTarget()', QML)
-        self.assertIn('zoomActorTop, cameraBodyColumn.y + cameraModes.y + cameraModes.height)', QML)
+        self.assertIn('zoomActorTop, zoomControlDeckBottom)', QML)
+        self.assertIn('cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
+        self.assertIn('y: camera.zoomControlDeckBottom + camera.zoomDeckGap', QML)
+        self.assertNotIn('zoomTopNudge', QML)
         self.assertIn('zoomFollowProcess.running = true;', QML)
 
     def test_direct_ipc_reuses_social_bridge_and_existing_actor_validation(self):

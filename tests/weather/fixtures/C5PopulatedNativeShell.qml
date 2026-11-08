@@ -136,6 +136,51 @@ ShellRoot {
                     || firstMarker.eventData.minute !== clock.events[0].minute
                     || clock.events.some(e => e.date !== focused.civilDate))
                     return root.fail("C28_USNO_EVENT_PROVENANCE_LOST");
+                // C35 // LIVE only uses the existing verified source minute.
+                // REPLAY is explicitly triggered, paused at entry, and uses
+                // that same dated provider event list without changing it.
+                const controls = findNamed(clock,"cosmos-c35-time-controls");
+                const scrub = findNamed(clock,"cosmos-c35-time-scrub-track");
+                const progress = findNamed(clock,"cosmos-c35-sweep-progress");
+                const replay = findNamed(clock,"cosmos-c35-live-replay");
+                const play = findNamed(clock,"cosmos-c35-replay-play-pause");
+                const upcoming = findNamed(clock,"cosmos-c35-upcoming-event");
+                if (!controls || !scrub || !progress || !replay || !play
+                    || !upcoming || clock.replayMode || clock.replayRunning
+                    || clock.displayMinute !==
+                         (clock.validLocalClock ? clock.localCivilMinute : -1))
+                    return root.fail("C35_LIVE_TIME_SWEEP_NOT_SOURCE_VALIDATED");
+                clock.startReplay();
+                if (!clock.replayMode || clock.replayPlaying || clock.replayRunning
+                    || clock.displayMinute !==
+                        (clock.validLocalClock ? clock.localCivilMinute : 0)
+                    || scrub.height < 8)
+                    return root.fail("C35_REPLAY_NOT_INITIALIZED");
+                clock.seekPreview(375);
+                if (clock.displayMinute !== 375
+                    || !clock.upcomingEvent || clock.upcomingEvent.minute !== 375
+                    || !firstMarker.nearHand)
+                    return root.fail("C35_REPLAY_DID_NOT_HIGHLIGHT_REAL_USNO_RISE");
+                clock.stepPreview(60);
+                if (clock.displayMinute !== 435
+                    || !clock.upcomingEvent || clock.upcomingEvent.minute !== 720
+                    || firstMarker.nearHand)
+                    return root.fail("C35_REPLAY_ADVANCE_INCORRECT");
+                clock.seekPreview(1439);
+                if (clock.upcomingEvent !== null)
+                    return root.fail("C35_REPLAY_INVENTED_NEXT_DAY_EVENT");
+                clock.seekPreview(375);
+                clock.replayPlaying = true;
+                if (!clock.replayRunning)
+                    return root.fail("C35_REPLAY_DRIVER_NOT_RUNNING");
+                clock.replayPlaying = false;
+                if (clock.replayRunning)
+                    return root.fail("C35_REPLAY_PAUSE_FAILED");
+                clock.returnLive();
+                if (clock.replayMode || clock.replayPlaying || clock.replayRunning
+                    || clock.displayMinute !==
+                        (clock.validLocalClock ? clock.localCivilMinute : -1))
+                    return root.fail("C35_LIVE_RETURN_NOT_RESTORED");
                 clock.pickKind("rise");
                 if (clock.events.length !== 1
                     || clock.events[0].kind !== "rise")

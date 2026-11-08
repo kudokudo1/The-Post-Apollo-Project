@@ -191,7 +191,12 @@ class C3eHOperatorRecoveryGateTests(unittest.TestCase):
 
     def test_06_replayed_approval_for_other_pending_intent_refuses(self):
         self.prepare()
-        self.sign_approval(changes={"pending_intent_sha256": "0"*64})
+        # A once-valid signed approval must be bound to the exact pending
+        # journal; simulate a modified pending row without resigning.
+        with sqlite3.connect(self.fx.fx.location) as db:
+            db.execute(
+                "UPDATE split_intent SET prior_artifact_hash=? WHERE id=1",
+                ("a"*64,))
         self.refuses("SIGNED_APPROVAL_CONTEXT_MISMATCH")
 
     def test_07_wrong_node_root_anchor_and_scope_refuse(self):
@@ -261,7 +266,23 @@ class C3eHOperatorRecoveryGateTests(unittest.TestCase):
                        ("b"*64,))
         self.refuses("CLIENT_PENDING_STATE_CONFLICT")
 
-    def test_15_real_broker_and_authority_remain_unmodified(self):
+    def test_15_actual_checkpoint_fds_are_readonly(self):
+        self.prepare()
+        witness_path = self.fx.fx.location
+        client_path = self.fx.fx.fx.client_db
+        witness_path.chmod(0o400)
+        client_path.chmod(0o400)
+        try:
+            # This will fail if a read/write SQLite connection (or journal
+            # mutation) is introduced into the C3e-H gate.
+            self.assertEqual(self.check(), gate.SUCCESS)
+            self.assertEqual(gate._open_read_only(witness_path, "WITNESS").
+                             execute("PRAGMA query_only").fetchone()[0], 1)
+        finally:
+            witness_path.chmod(0o600)
+            client_path.chmod(0o600)
+
+    def test_16_real_broker_and_authority_remain_unmodified(self):
         self.prepare()
         base = ROOT / "services/connections"
         self.assertIn("readonly property bool hostAuthenticated: false",

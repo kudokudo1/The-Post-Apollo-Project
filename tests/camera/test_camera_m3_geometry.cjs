@@ -18,10 +18,10 @@ const financePolicy = read("widgets/FinanceChassisPolicy.js");
 const policy = vm.createContext({});
 vm.runInContext(financePolicy.replace(/^\s*\.pragma library\s*$/m, ""), policy);
 
-test("Camera compact contains full-size deck, expanded uses Finance's 1000x900", () => {
+test("Camera compact retains its size; Zoom expanded reserves deck height beyond Finance's 1000x900 content baseline", () => {
     assert.match(camera, /property string chassisLevel: "compact"/);
     assert.match(camera, /chassisLevel === "compact"\s*\? Math\.max\(1, Math\.min\(784,/);
-    assert.match(camera, /chassisLevel === "compact"\s*\? Math\.max\(1, Math\.min\(699,/);
+    assert.match(camera, /chassisLevel === "compact"\s*\? Math\.max\(1, Math\.min\(699, availableFrameHeight\)\)/);
     assert.match(camera, /FinanceChassisPolicy\.frame\(\s*chassisLevel, viewportWidth, viewportHeight,/);
     assert.match(camera, /: financeSize\.width/);
     assert.match(camera, /: financeSize\.height/);
@@ -30,12 +30,30 @@ test("Camera compact contains full-size deck, expanded uses Finance's 1000x900",
     const medium = policy.frame("expanded", 2560, 1440, 12, 9, 8);
     assert.equal(medium.width, 1000);
     assert.equal(medium.height, 900);
+    // Camera preserves Finance's 900px *browser content* baseline when
+    // there is screen room. Its fixed-height deck is reserved separately.
+    for (const token of [
+        'readonly property int zoomDeckReserve: Math.max(0, Math.round(',
+        'cameraBodyColumn.y + cameraModes.y + cameraModes.height',
+        '+ zoomBayBottom))',
+        'readonly property int availableFrameHeight: Math.max(',
+        'financeSize.height + zoomDeckReserve',
+        'camera.activeView === "zoom"',
+        'Math.min(availableFrameHeight,'
+    ]) assert.ok(camera.includes(token), 'missing zoom deck budget: ' + token);
+    const reserve = 12 + 37 + 2 + (8 * 2) + 42 + 1;
+    const maxFrame = 1440 - 9 - 8;
+    const expandedZoomFrame = Math.min(maxFrame, medium.height + reserve);
+    assert.equal(reserve, 110);
+    assert.equal(expandedZoomFrame, 1010);
+    assert.equal(expandedZoomFrame - reserve, 900);
+    assert.match(camera, /zoomTopNudge: chassisLevel === "compact" \? 17 : 0/);
     assert.equal(policy.step("compact", 1), "expanded");
     assert.equal(policy.step("expanded", 1), "fullscreen");
     assert.equal(policy.step("fullscreen", -1), "expanded");
 });
 
-test("Camera fullscreen reuses Finance's exact dimensions at 1440 and smaller outputs", () => {
+test("Camera uses Finance's baseline fullscreen width/height outside Zoom; Zoom extra deck is bounded to output", () => {
     assert.match(finance, /FinanceChassisPolicy\.frame\(/);
     assert.match(camera, /FinanceChassisPolicy\.frame\(/);
     assert.match(camera, /readonly property int glowGutter: 12/);
@@ -49,6 +67,15 @@ test("Camera fullscreen reuses Finance's exact dimensions at 1440 and smaller ou
     const full = policy.frame("fullscreen", 2560, 1440, 12, 9, 8);
     assert.equal(full.width, 2536);
     assert.equal(full.height, 1345);
+    const reserve = 110;
+    for (const [width, height] of [[2560,1440],[1920,1080],[1360,768]]) {
+        const base=policy.frame("fullscreen",width,height,12,9,8);
+        const available=height-9-8;
+        const zoomFrame=Math.min(available,base.height+reserve);
+        assert.ok(zoomFrame>=base.height);
+        assert.ok(zoomFrame<=available);
+    }
+    assert.match(camera, /: financeSize\.height/);
     assert.match(camera, /FinanceChassisPolicy\.leftMargin\(/);
     assert.match(camera, /top: 0/);
     assert.doesNotMatch(camera, /top: 94/);

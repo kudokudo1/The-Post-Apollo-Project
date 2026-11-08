@@ -78,7 +78,10 @@ PanelWindow {
     // visible browser top. Increase the existing 4px correction by 13px:
     // expected Y=183, height=606, with the same X/width/bottom (789).
     // Keep this separate from workarea positioning and input containment.
-    readonly property int zoomTopNudge: 17
+    // Compact keeps its native-measured adjustment. Expanded/fullscreen
+    // reserve the whole deck above Zoom, so the guest never needs to hide
+    // underneath any of the four mode buttons.
+    readonly property int zoomTopNudge: chassisLevel === "compact" ? 17 : 0
     readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))
     readonly property int zoomBayHeight: Math.max(0, Math.round(zoomViewport.height))
     // Sway measured the browser at 92,126 718x514, exactly the old
@@ -262,11 +265,23 @@ PanelWindow {
         chassisLevel === "compact"
         ? Math.max(1, Math.min(784, viewportWidth - 2 * glowGutter))
         : financeSize.width
+    // Finance supplies the expanded/fullscreen *content* height. Camera's
+    // Zoom mode also contains a header, divider and four-button deck; it
+    // previously deducted that chrome from the browser's 900px budget.
+    // Measure the actual live deck rather than stacking guessed Y offsets.
+    // Only Zoom gets the extra height; other modes retain Finance sizing.
+    readonly property int zoomDeckReserve: Math.max(0, Math.round(
+        cameraBodyColumn.y + cameraModes.y + cameraModes.height
+        + zoomBayBottom))
+    readonly property int availableFrameHeight: Math.max(
+        1, viewportHeight - frameTopInset - bottomScreenGap)
     readonly property int frameHeight:
         chassisLevel === "compact"
-        ? Math.max(1, Math.min(699, viewportHeight
-                               - frameTopInset - bottomScreenGap))
-        : financeSize.height
+        ? Math.max(1, Math.min(699, availableFrameHeight))
+        : camera.activeView === "zoom"
+          ? Math.min(availableFrameHeight,
+                     financeSize.height + zoomDeckReserve)
+          : financeSize.height
     readonly property int gutter: glowGutter
     function expandChassis() {
         chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1);
@@ -937,10 +952,10 @@ PanelWindow {
             // Zoom is a separate physical Sway guest. Fit its client to the
             // frame's inner edges rather than the narrower content Column,
             // and keep the actual browser, mask and host on this one rect.
-            // The guest starts just behind the lower mode-row chrome to
-            // close a narrow top seam. The input cutout remains clamped to
-            // the row's true bottom; buttons never become click-through.
-            // Height is frame-relative, so the lower edge stays fixed.
+            // Compact retains its measured correction; expanded/fullscreen
+            // allocate additional frame height for their entire mode deck.
+            // The web guest then starts below the real buttons instead of
+            // overlapping their click area. Its size follows Camera's frame.
             x: camera.zoomWebEdgeInset
             y: cameraBodyColumn.y + cameraModes.y + cameraModes.height
                - camera.zoomTopNudge

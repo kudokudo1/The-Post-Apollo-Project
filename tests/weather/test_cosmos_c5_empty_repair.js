@@ -115,3 +115,36 @@ test("C5 populated source-to-render contracts use actual provider fields",()=>{
   ]) assert.ok(focus.includes(anchor),anchor);
   assert.match(focus,/StationCosmosDetailPane\s*\{/);
 });
+
+
+test("C25 Meteors pins IAU next peaks outside the only inner catalog scroll",()=>{
+  assert.match(focus,/id: meteorList\s*[\s\S]*?objectName: "cosmos-c25-meteor-board"/);
+  assert.match(focus,/objectName: "cosmos-c25-meteor-sticky-header"/);
+  assert.match(focus,/objectName: "cosmos-c25-meteor-next-peaks-row"/);
+  assert.match(focus,/objectName: "cosmos-c25-meteor-peak-card"/);
+  assert.match(focus,/readonly property int featuredCount: width >= 650 \? 5 : 3/);
+  assert.match(focus,/meteorSource\.upcomingShowers \|\| \[\]/);
+  assert.match(focus,/daysToPeak/);
+  assert.match(focus,/peakUtc/);
+  assert.match(focus,/solarLongitude/);
+  assert.match(focus,/objectName: "cosmos-c25-meteor-catalog-frame"/);
+  assert.match(focus,/anchors\.top: pinnedMeteorHeader\.bottom/);
+  assert.match(focus,/anchors\.bottom: meteorCaveat\.top/);
+  assert.match(focus,/objectName: "cosmos-c25-meteor-catalog-scroll"/);
+  assert.match(focus,/contentHeight: meteorCards\.implicitHeight/);
+  assert.match(focus,/boundsBehavior: Flickable\.StopAtBounds/);
+  assert.match(focus,/NeonScrollBar\s*\{[\s\S]*?flickable: meteorScroll/);
+  assert.match(focus,/function jumpToShower\(name\)/);
+  assert.match(focus,/meteorScroll\.contentY = Math\.max\(0,Math\.min/);
+  assert.match(focus,/onClicked: meteorBoard\.jumpToShower\(peakCard\.showerName\)/);
+  assert.match(focus,/selectedShowerName === cardData\.name/);
+  assert.match(focus,/CATALOG CONTEXT \/\/ NOT OBSERVED LOCAL RATE OR ZHR/);
+  // Do not introduce any additional source host or page-wide scroll.
+  assert.match(focus,/kind === "meteors" \? meteorList/);
+  const scope=focus.slice(focus.indexOf("    Component {\n        id: meteorList"));
+  assert.equal((scope.match(/\bFlickable\s*\{/g)||[]).length,1);
+  assert.doesNotMatch(scope,/StationSky\s*\{|Process\s*\{|ScrollView\s*\{/);
+  const reference=read("widgets/weather/StationSky.qml");
+  assert.match(reference,/id: meteorUpcomingRow/);
+  assert.match(reference,/meteorService\.upcomingShowers\.slice\(0, 5\)/);
+});

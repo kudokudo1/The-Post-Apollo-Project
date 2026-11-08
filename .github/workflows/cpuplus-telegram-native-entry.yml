@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'services/connections/ConnectionsPolicy.js'
+      - 'services/connections/ConnectionsTelegramStatusPolicy.js'
+      - 'tests/cpuplus/test_cpuplus_telegram_status_projection.cjs'
+      - 'docs/cpuplus-telegram-session-recheck-v0.md'
       - 'widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml'
       - 'widgets/CpuPlusW.qml'
       - 'widgets/messanger/MessagingW.qml'
@@ -16,6 +19,9 @@ on:
     branches: [main]
     paths:
       - 'services/connections/ConnectionsPolicy.js'
+      - 'services/connections/ConnectionsTelegramStatusPolicy.js'
+      - 'tests/cpuplus/test_cpuplus_telegram_status_projection.cjs'
+      - 'docs/cpuplus-telegram-session-recheck-v0.md'
       - 'widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml'
       - 'widgets/CpuPlusW.qml'
       - 'widgets/messanger/MessagingW.qml'
@@ -37,6 +43,8 @@ jobs:
           node-version: '22'
       - name: Native Telegram service and real Social navigation contract
         run: node tests/cpuplus/test_cpuplus_telegram_connection_entry.cjs
+      - name: Live native session projection and safe owner-gated recheck
+        run: node --test tests/cpuplus/test_cpuplus_telegram_status_projection.cjs
       - name: Existing shared Connections inventory and account edit regression
         run: |
           node tests/cpuplus/test_cpuplus_connections_c1.js

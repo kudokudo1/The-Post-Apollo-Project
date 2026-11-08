@@ -408,6 +408,25 @@ PanelWindow {
         && !messageRouter.telegramBackend.sending
         && !messageRouter.telegramBackend.appKeyStatusBusy
 
+    // Read-only status to the CPU++ Connections view. No credentials, provider
+    // detail text, identity names or session-file paths cross this boundary.
+    readonly property var telegramConnectionObservation: ({
+        nativeSelected: messagingWindow.activeAppIndex === 2,
+        adapterActive: messageRouter.telegramBackend.active,
+        backendMode: messageRouter.telegramBackend.backendMode,
+        privateMode: messagingWindow.telegramIsolationEnabled,
+        scopeMatches: messagingWindow.telegramIsolationEnabled
+            ? (messagingWindow.telegramActiveIdentityId !== ""
+               && messagingWindow.telegramActiveIdentityId
+                  === appSelector.identitySnapshot.activeId
+               && messageRouter.telegramBackend.identityId
+                  === messagingWindow.telegramActiveIdentityId)
+            : messageRouter.telegramBackend.identityId === "",
+        loginInProgress: messageRouter.telegramBackend.loginInProgress,
+        operationBusy: messageRouter.telegramBackend.sending
+            || messageRouter.telegramBackend.appKeyStatusBusy
+    })
+
     // The universal / identity app-key editor is hosted in the existing
     // Telegram chat pane, not an external browser, terminal or new window.
     // Scope is cleared when Telegram or the Social widget is left.
@@ -632,6 +651,20 @@ PanelWindow {
         browserConnectionNavigationPending = false;
         return true;
     }
+    // Recheck the EXISTING Social Telegram adapter only; no second client,
+    // new login, session switch or credential is created by CPU++.
+    function recheckTelegramFromConnections() {
+        const adapter = messageRouter.telegramBackend;
+        const state = telegramConnectionObservation;
+        if (activeAppIndex !== 2 || !adapter.active || !adapter.scopeValid
+                || !state.scopeMatches || adapter.loginInProgress
+                || adapter.sending || adapter.appKeyStatusBusy
+                || adapter.backendMode === "PROBING")
+            return false;
+        adapter.probe();
+        return adapter.backendMode === "PROBING";
+    }
+
     // CPU++ can open the SAME native Telegram pane. Social keeps ownership
     // of the current shared/private identity scope, process and login wizard.
     // This is navigation + the existing provider health probe, NOT pairing.

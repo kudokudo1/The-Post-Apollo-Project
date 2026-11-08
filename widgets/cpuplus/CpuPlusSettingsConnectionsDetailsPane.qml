@@ -4,6 +4,7 @@ import qs.services.connections
 import qs.services.social
 import "../../services/connections/ConnectionsReviewPolicy.js" as ReviewPolicy
 import "../../services/connections/ConnectionsRequestDisplayPolicy.js" as RequestDisplayPolicy
+import "../../services/connections/ConnectionsTelegramStatusPolicy.js" as TelegramStatus
 
 // CPU++ actuator bay. All "setup" guidance is in-world, but C1 has no
 // credential editor, adapter handoff, permission grant or session mutation.
@@ -11,6 +12,9 @@ Item {
     id: details
     // Route fixed provider intent to shell-owned Social. No credential data.
     signal telegramOpenRequested()
+    signal telegramRecheckRequested()
+    property var telegramObservation: null
+    readonly property var telegramStatus: TelegramStatus.project(telegramObservation)
     property string selectedId: "social"
     property bool guideOpen: false
     property bool permissionReviewOpen: false
@@ -493,6 +497,27 @@ Item {
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap
                 }
+                GohuText {
+                    width: parent.width
+                    text: "NATIVE SESSION // " + details.telegramStatus.scope
+                    color: Colors.cyan
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: details.telegramStatus.status
+                    color: details.telegramStatus.authorizedAtLastCheck
+                           ? Colors.green : Colors.orange
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: details.telegramStatus.detail
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
                 ActionButton {
                     width: Math.min(parent.width, 186)
                     height: 32
@@ -500,6 +525,16 @@ Item {
                     labelPixelSize: 10
                     accentColor: Colors.cyan
                     onClicked: details.telegramOpenRequested()
+                }
+                ActionButton {
+                    visible: details.telegramStatus.canRecheck
+                    width: Math.min(parent.width, 186)
+                    height: 32
+                    label: "RECHECK SESSION"
+                    labelPixelSize: 10
+                    accentColor: Colors.magenta
+                    interactive: details.telegramStatus.canRecheck
+                    onClicked: details.telegramRecheckRequested()
                 }
             }
             // CPU++ Connected Accounts // REAL local label management.

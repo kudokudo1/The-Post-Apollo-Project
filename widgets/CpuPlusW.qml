@@ -73,9 +73,17 @@ PanelWindow {
                     FavoritesStore.favoriteMonitorBoxKeys),
                 favoriteTaskMetricKeys:cpuFavoritesCatalog.copyValues(
                     FavoritesStore.favoriteTaskMetricKeys)
-            }), FavoritesStore.favoriteDisplayLabels)
+            }), FavoritesStore.favoriteDisplayLabels,
+            cpuAppFavoriteDescriptions.records)
     readonly property var selectedFavoriteResource:
         FavoritesManagement.recordFor(favoriteCandidates,selectedFavoriteKey)
+    // Original AppControl provides display-only menu/item/type descriptors.
+    // Its persisted favorites and process control permissions remain untouched.
+    AppControlFavoriteDisplaySource {
+        id: cpuAppFavoriteDescriptions
+        appControlOwner: cpuPlusWindow.appControlWindow
+        favoritesStore: FavoritesStore
+    }
     FavoritesUnifiedCatalog {
         id: cpuFavoritesCatalog
         appControlSource: FavoritesStore

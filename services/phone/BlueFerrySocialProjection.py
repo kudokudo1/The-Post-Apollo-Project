@@ -182,6 +182,51 @@ def normalize_threads(payload: object, *, profile_id: str) -> dict[str, object]:
             "messageSets": message_sets}
 
 
+def normalize_legacy_contact_page(payload: object, *, profile_id: str,
+                                  read_epoch: str) -> dict[str, object]:
+    """Read-only first-page view of BlueFerry 0.9.1 ListContacts(uu).
+
+    The wire records contain name, phones and emails, but *no* stable card
+    identifier, photos, organization, cache epoch or total-card count. Never
+    reinterpret an address as a permanent contact key or chat target.
+    Every caller must provide a fresh per-read random epoch; the resulting
+    IDs are display-only and intentionally change on a subsequent read.
+    """
+    _profile(profile_id)
+    _text(read_epoch, MAX_EPOCH)
+    if type(payload) is not list or len(payload) > MAX_CARDS:
+        raise _error()
+    cards: list[dict[str, object]] = []
+    for i, item in enumerate(payload):
+        if type(item) is not dict:
+            raise _error()
+        name = _text(item.get("name"), MAX_DISPLAY, empty=True)
+        phones = item.get("phones")
+        emails = item.get("emails")
+        if (type(phones) is not list or type(emails) is not list
+                or len(phones) > 64 or len(emails) > 64):
+            raise _error()
+        checked_phones = [_text(value, MAX_SENDER) for value in phones]
+        checked_emails = [_text(value, MAX_SENDER) for value in emails]
+        primary = (checked_phones[0] if checked_phones else
+                   checked_emails[0] if checked_emails else "")
+        cards.append({
+            "id": f"legacy-row-{i}", "name": name, "organization": "",
+            "primary": primary, "phone_count": len(checked_phones),
+            "email_count": len(checked_emails), "has_photo": False,
+        })
+    # The legacy ListContacts endpoint has no total and no paging metadata.
+    # Treat this page's count as a *returned record count*, not the full
+    # iPhone address-book size (141 cached destinations may be fewer people).
+    result = normalize_contact_page(
+        {"contacts": cards, "total": len(cards), "offset": 0, "query": ""},
+        profile_id=profile_id, daemon_epoch=read_epoch,
+    )
+    result["historyPartial"] = len(cards) == MAX_CARDS
+    result["legacyReadOnly"] = True
+    return result
+
+
 def normalize_contact_page(payload: object, *, profile_id: str,
                            daemon_epoch: object) -> dict[str, object]:
     """Convert one already-authorized ListContactCards page.

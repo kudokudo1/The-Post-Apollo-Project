@@ -618,73 +618,295 @@ Rectangle {
     }
     Component {
         id: meteorList
-        Column {
+        // C25 // Only the shower catalog scrolls. The NEXT PEAKS instrument
+        // and source status are fixed above it within the existing stage.
+        Item {
+            id: meteorBoard
             anchors.fill: parent
-            spacing: 7
-            GohuText {
-                height:20
-                text:"METEOR SHOWERS // IAU MDC"
-                color:Colors.magenta
-                font.pixelSize:12
+            clip: true
+            objectName: "cosmos-c25-meteor-board"
+            property string selectedShowerName: ""
+            readonly property int featuredCount: width >= 650 ? 5 : 3
+            readonly property var upcomingShowers:
+                cosmosModePane.meteorSource && cosmosModePane.meteorSource.ready
+                ? (cosmosModePane.meteorSource.upcomingShowers || []) : []
+
+            function jumpToShower(name) {
+                if (!name) return;
+                selectedShowerName = name;
+                const rows = cosmosModePane.cards || [];
+                for (let i=0;i<rows.length;i++) {
+                    if (rows[i] && rows[i].name === name) {
+                        // All rows remain in the same bounded inner catalog.
+                        const target = i * (47 + meteorCards.spacing);
+                        meteorScroll.contentY = Math.max(0,Math.min(
+                            Math.max(0,meteorScroll.contentHeight-meteorScroll.height),
+                            target));
+                        break;
+                    }
+                }
             }
-            QuietText {
-                width: parent.width
-                visible: !cosmosModePane.cards || cosmosModePane.cards.length === 0
-                text: cosmosModePane.sourceStatus === "SOURCE RECEIVED"
-                    ? "NO ACTIVE OR UPCOMING SHOWER IN THE SOURCE WINDOW"
-                    : (cosmosModePane.sourceStatus || "SOURCE WAITING")
-                color: Colors.orange
-                font.pixelSize: 10
-                wrapMode: Text.WordWrap
-            }
-            Flickable {
-                id: meteorScroll
-                width: parent.width
-                height: Math.max(0,parent.height-48)
-                clip: true
-                contentWidth: width
-                contentHeight: meteorCards.implicitHeight
-                boundsBehavior: Flickable.StopAtBounds
-                Column {
-                    id: meteorCards
-                    width: meteorScroll.width
+
+            Column {
+                id: pinnedMeteorHeader
+                objectName: "cosmos-c25-meteor-sticky-header"
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                spacing: 4
+
+                GohuText {
+                    width: parent.width
+                    height: 17
+                    text: "METEOR SHOWERS // NEXT PEAKS"
+                    font.pixelSize: 11
+                    color: Colors.magenta
+                    elide: Text.ElideRight
+                }
+                Row {
+                    width: parent.width
+                    height: 13
+                    spacing: 6
+                    QuietText {
+                        width: Math.max(1,(parent.width-6)*0.52)
+                        text: "IAU MDC // " + cosmosModePane.sourceStatus
+                        color: cosmosModePane.sourceStatus === "SOURCE RECEIVED"
+                            ? Colors.cyan : Colors.orange
+                        font.pixelSize: 8
+                        elide: Text.ElideRight
+                    }
+                    QuietText {
+                        width: Math.max(1,(parent.width-6)*0.48)
+                        text: cosmosModePane.meteorSource && cosmosModePane.meteorSource.ready
+                            ? "ACTIVE " + cosmosModePane.meteorSource.activeCount
+                              + " // λ☉ " +
+                              (cosmosModePane.meteorSource.solarLongitude >= 0
+                               ? cosmosModePane.meteorSource.solarLongitude.toFixed(1)+"°"
+                               : "--")
+                            : "PEAK DATES // APPROXIMATE UTC"
+                        color: Colors.cyan
+                        font.pixelSize: 8
+                        elide: Text.ElideRight
+                        horizontalAlignment: Text.AlignRight
+                    }
+                }
+
+                // Three readable cards at current compact size, five at
+                // user-selected wider sizes. Missing data stays explicitly
+                // missing; source ownership remains with IauMeteorShowerService.
+                Row {
+                    id: meteorUpcomingRow
+                    objectName: "cosmos-c25-meteor-next-peaks-row"
+                    width: parent.width
+                    height: 75
                     spacing: 5
                     Repeater {
-                        model: cosmosModePane.cards ? cosmosModePane.cards.length : 0
+                        model: meteorBoard.featuredCount
                         delegate: Rectangle {
-                            objectName: "cosmos-c5-meteor-card"
+                            id: peakCard
+                            objectName: "cosmos-c25-meteor-peak-card"
                             required property int index
-                            readonly property var cardData: cosmosModePane.cards[index]
-                            width: meteorCards.width
-                            height: 47
+                            readonly property var shower:
+                                index < meteorBoard.upcomingShowers.length
+                                ? meteorBoard.upcomingShowers[index] : null
+                            readonly property string showerName:
+                                shower && shower.name ? String(shower.name) : ""
+                            width: Math.max(1,(meteorUpcomingRow.width
+                                -(meteorBoard.featuredCount-1)*meteorUpcomingRow.spacing)
+                                /meteorBoard.featuredCount)
+                            height: meteorUpcomingRow.height
                             color: Colors.dark
                             border.width: 1
-                            border.color: Colors.magenta
+                            border.color: showerName !== ""
+                                && meteorBoard.selectedShowerName === showerName
+                                ? Colors.yellow
+                                : shower && shower.active ? Colors.magenta : Colors.cyan
+
                             Column {
-                                anchors.fill:parent
-                                anchors.margins:6
-                                spacing:4
+                                anchors.fill: parent
+                                anchors.margins: 5
+                                spacing: 2
+                                SecondaryText {
+                                    width: parent.width
+                                    height: 10
+                                    text: "NEXT " + (peakCard.index+1)
+                                    font.pixelSize: 8
+                                    color: Colors.orange
+                                }
                                 GohuText {
-                                    width:parent.width
-                                    text:cardData.name+" // "+cardData.info
-                                    color:Colors.white
-                                    font.pixelSize:10
-                                    elide:Text.ElideRight
+                                    width: parent.width
+                                    height: 12
+                                    text: peakCard.showerName !== ""
+                                        ? peakCard.showerName : "AWAITING SOURCE"
+                                    font.pixelSize: 9
+                                    color: Colors.white
+                                    elide: Text.ElideRight
                                 }
                                 QuietText {
-                                    text:cardData.detail
-                                    color:Colors.cyan
-                                    font.pixelSize:9
+                                    width: parent.width
+                                    height: 11
+                                    text: peakCard.shower && peakCard.shower.peakUtc
+                                        ? "PEAK " + String(peakCard.shower.peakUtc).slice(0,10)
+                                        : "PEAK --"
+                                    font.pixelSize: 8
+                                    color: Colors.orange
+                                    elide: Text.ElideRight
+                                }
+                                QuietText {
+                                    width: parent.width
+                                    height: 10
+                                    text: peakCard.shower
+                                        && peakCard.shower.daysToPeak !== null
+                                        && peakCard.shower.daysToPeak !== undefined
+                                        ? "IN " + Number(peakCard.shower.daysToPeak).toFixed(1)+" D"
+                                        : "DAYS --"
+                                    font.pixelSize: 8
+                                    color: Colors.cyan
+                                    elide: Text.ElideRight
+                                }
+                                QuietText {
+                                    width: parent.width
+                                    height: 10
+                                    text: peakCard.shower
+                                        && peakCard.shower.ra !== null
+                                        && peakCard.shower.ra !== undefined
+                                        && peakCard.shower.dec !== null
+                                        && peakCard.shower.dec !== undefined
+                                        ? "RA " + Number(peakCard.shower.ra).toFixed(0)
+                                          + "° / DEC " + Number(peakCard.shower.dec).toFixed(0)+"°"
+                                        : "RADIANT --"
+                                    font.pixelSize: 8
+                                    color: Colors.cyan
+                                    elide: Text.ElideRight
+                                }
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: peakCard.showerName !== ""
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: meteorBoard.jumpToShower(peakCard.showerName)
+                            }
+                        }
+                    }
+                }
+                QuietText {
+                    width: parent.width
+                    height: visible ? 12 : 0
+                    visible: !cosmosModePane.cards || cosmosModePane.cards.length === 0
+                    text: cosmosModePane.sourceStatus === "SOURCE RECEIVED"
+                        ? "NO ACTIVE OR UPCOMING SHOWER IN THE SOURCE WINDOW"
+                        : (cosmosModePane.sourceStatus || "SOURCE WAITING")
+                    color: Colors.orange
+                    font.pixelSize: 8
+                    elide: Text.ElideRight
+                }
+            }
+
+            // A real contained scroll viewport with its own physical border
+            // and scrollbar. Neither the cards nor page header move.
+            Rectangle {
+                id: meteorCatalogFrame
+                objectName: "cosmos-c25-meteor-catalog-frame"
+                anchors.top: pinnedMeteorHeader.bottom
+                anchors.topMargin: 5
+                anchors.bottom: meteorCaveat.top
+                anchors.bottomMargin: 4
+                anchors.left: parent.left
+                anchors.right: parent.right
+                color: Colors.black
+                border.width: 1
+                border.color: Colors.cyan
+                clip: true
+                GohuText {
+                    id: meteorCatalogTitle
+                    anchors.top: parent.top
+                    anchors.topMargin: 4
+                    anchors.left: parent.left
+                    anchors.leftMargin: 6
+                    height: 13
+                    text: "SHOWER CATALOG // ACTIVE + UPCOMING"
+                    color: Colors.magenta
+                    font.pixelSize: 9
+                    elide: Text.ElideRight
+                }
+                Flickable {
+                    id: meteorScroll
+                    objectName: "cosmos-c25-meteor-catalog-scroll"
+                    anchors.top: meteorCatalogTitle.bottom
+                    anchors.topMargin: 3
+                    anchors.left: parent.left
+                    anchors.leftMargin: 5
+                    anchors.right: parent.right
+                    anchors.rightMargin: 12
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 5
+                    clip: true
+                    contentWidth: width
+                    contentHeight: meteorCards.implicitHeight
+                    boundsBehavior: Flickable.StopAtBounds
+                    Column {
+                        id: meteorCards
+                        width: meteorScroll.width
+                        spacing: 5
+                        Repeater {
+                            model: cosmosModePane.cards ? cosmosModePane.cards.length : 0
+                            delegate: Rectangle {
+                                objectName: "cosmos-c5-meteor-card"
+                                required property int index
+                                readonly property var cardData: cosmosModePane.cards[index]
+                                width: meteorCards.width
+                                height: 47
+                                color: Colors.dark
+                                border.width: 1
+                                border.color: cardData
+                                    && meteorBoard.selectedShowerName === cardData.name
+                                    ? Colors.yellow : Colors.magenta
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 6
+                                    spacing: 4
+                                    GohuText {
+                                        width: parent.width
+                                        text: cardData.name+" // "+cardData.info
+                                        color: Colors.white
+                                        font.pixelSize: 10
+                                        elide: Text.ElideRight
+                                    }
+                                    QuietText {
+                                        width: parent.width
+                                        text: cardData.detail
+                                        color: Colors.cyan
+                                        font.pixelSize: 9
+                                        elide: Text.ElideRight
+                                    }
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: meteorBoard.selectedShowerName = parent.cardData.name
                                 }
                             }
                         }
                     }
                 }
+                NeonScrollBar {
+                    flickable: meteorScroll
+                    geometryHost: meteorCatalogFrame
+                    handleStyle: "star"
+                    visible: scrollable
+                }
             }
+
             QuietText {
-                text:"CATALOG CONTEXT // NOT OBSERVED LOCAL RATE OR ZHR"
-                color:Colors.orange
-                font.pixelSize:9
+                id: meteorCaveat
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 12
+                text: "IAU MDC // CATALOG CONTEXT // NOT OBSERVED LOCAL RATE OR ZHR"
+                color: Colors.orange
+                font.pixelSize: 8
+                elide: Text.ElideRight
             }
         }
     }

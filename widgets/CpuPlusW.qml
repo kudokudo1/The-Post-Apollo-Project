@@ -60,6 +60,17 @@ PanelWindow {
     // Local editor action filter only, never a real account/tenant switch.
     property string idManagementTask: "EDITOR"
     property string selectedFavoriteKey: ""
+    // U5a injection point only. WeatherStationW owns the sole bookmark
+    // writer and must explicitly expose its existing store before live use.
+    property var weatherHomeFavoritesSource: null
+    readonly property var weatherHomeFavoritesSnapshot:
+        weatherHomeFavoritesSource ? ({
+            storageState:String(weatherHomeFavoritesSource.storageState || "unknown"),
+            panelRoutes:cpuFavoritesCatalog.copyValues(
+                weatherHomeFavoritesSource.panelRoutes),
+            cardKeys:cpuFavoritesCatalog.copyValues(
+                weatherHomeFavoritesSource.cardKeys)
+        }) : null
     readonly property var favoriteCandidates:
         FavoritesManagement.list(
             TimeSettings.worldFavoriteZones,
@@ -78,7 +89,8 @@ PanelWindow {
                 favoriteTaskMetricKeys:cpuFavoritesCatalog.copyValues(
                     FavoritesStore.favoriteTaskMetricKeys)
             }), FavoritesStore.favoriteDisplayLabels,
-            cpuAppFavoriteDescriptions.records)
+            cpuAppFavoriteDescriptions.records,
+            cpuPlusWindow.weatherHomeFavoritesSnapshot)
     readonly property var selectedFavoriteResource:
         FavoritesManagement.recordFor(favoriteCandidates,selectedFavoriteKey)
     // Original AppControl provides display-only menu/item/type descriptors.

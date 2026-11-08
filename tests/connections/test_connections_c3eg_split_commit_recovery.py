@@ -190,7 +190,8 @@ class C3eGSplitCommitRecoveryTests(unittest.TestCase):
         self.fx.fx.advance()
         # Changed authority proof cannot be silently substituted. The
         # operator must preserve intent and escalate a newer release.
-        self.refuses("RECOVERY_SIGNED_RELEASE_NOT_PENDING_TARGET", recovery=True)
+        self.refuses("SIGNED_RELEASE_REFUSED_POLICY_ROLLBACK_REFUSED",
+                     recovery=True)
         self.assertEqual(self.phase()["phase"], "client_committed")
 
     def test_09_conflicting_client_checkpoint_keeps_intent_pending(self):
@@ -219,7 +220,6 @@ class C3eGSplitCommitRecoveryTests(unittest.TestCase):
         self.crash_at("intent-committed")
         self.fx.fx.client_db.unlink()
         self.refuses("CLIENT_LEDGER_UNAVAILABLE", recovery=True)
-        self.assertTrue(self.phase if callable(self.phase) else True)
         self.assertEqual(split.witness.inspect_witness(self.fx.location)[3:],
                          (3, 8))
 

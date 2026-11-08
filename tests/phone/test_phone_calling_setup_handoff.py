@@ -43,6 +43,7 @@ class CallingSetupGuiTests(unittest.TestCase):
                          len(set(result["missingTools"])))
         self.assertTrue(set(result["missingTools"]).issubset({
             "FOOT", "PYTHON3", "INSTALLER_HELPER", "PKCON", "PKEXEC", "DNF5",
+            "RPM_OSTREE",
         }))
         self.assertFalse(result["packageInstalled"])
         self.assertFalse(result["hfpVerified"])

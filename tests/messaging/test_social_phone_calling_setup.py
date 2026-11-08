@@ -156,11 +156,11 @@ class CallingSetupUiTests(unittest.TestCase):
     def test_exact_missing_tools_are_sanitized_and_shown_in_same_menu(self):
         self.assertIn('property var callSetupMissingTools: ([])', self.ui)
         self.assertIn('function callingMissingToolText()', self.ui)
-        self.assertIn('r.missingTools.length > 6', self.ui)
+        self.assertIn('r.missingTools.length > 7', self.ui)
         self.assertIn('!Array.isArray(r.missingTools)', self.ui)
         self.assertIn('r.missingTools.indexOf(v) !== i;', self.ui)
         for item in ('FOOT', 'PYTHON3', 'INSTALLER_HELPER',
-                     'PKCON', 'PKEXEC', 'DNF5'):
+                     'PKCON', 'PKEXEC', 'DNF5', 'RPM_OSTREE'):
             with self.subTest(item=item):
                 self.assertIn('"' + item + '"', self.ui)
         self.assertIn('phonePane.callSetupMissingTools = r.missingTools;', self.ui)

@@ -40,6 +40,11 @@ def _fedora() -> bool:
         return False
 
 
+def _ostree_host() -> bool:
+    """An atomic Fedora host must not be sent through a DNF/PackageKit path."""
+    return Path("/run/ostree-booted").exists()
+
+
 def _installer_active() -> bool:
     """Already-running exact foot actor, not another user's terminal/window."""
     try:
@@ -51,7 +56,7 @@ def _installer_active() -> bool:
 
 # Fixed identifiers only: do not return command paths, environment variables,
 # subprocess output, host usernames, or other local system details.
-TOOL_IDS = ("FOOT", "PYTHON3", "INSTALLER_HELPER", "PKCON", "PKEXEC", "DNF5")
+TOOL_IDS = ("FOOT", "PYTHON3", "INSTALLER_HELPER", "PKCON", "PKEXEC", "DNF5", "RPM_OSTREE")
 
 
 def _result(status: str, missing: tuple[str, ...] = ()) -> dict[str, object]:
@@ -83,6 +88,7 @@ def open_support(
     find: Callable[[str], str | None] = find_os_program,
     launcher: Callable[..., Any] = subprocess.Popen,
     already_open: Callable[[], bool] = _installer_active,
+    is_ostree: Callable[[], bool] | None = None,
 ) -> dict[str, object]:
     """Launch only after exact missing-package diagnosis and an explicit click."""
     try:
@@ -106,6 +112,13 @@ def open_support(
     except Exception:
         return _result("UNSUPPORTED_HOST")
 
+    try:
+        atomic = _ostree_host() if is_ostree is None else is_ostree()
+        if type(atomic) is not bool:
+            return _result("UNSUPPORTED_HOST")
+    except Exception:
+        return _result("UNSUPPORTED_HOST")
+
     # Never launch a second PackageKit transaction while the original exact
     # installer actor remains open, including after navigating away from PHONE.
     try:
@@ -125,6 +138,9 @@ def open_support(
     # The alternate is a *user-authorized* Polkit + DNF5 transaction in the
     # SAME embedded foot terminal, never an automatic installation.
     backend_ready = bool(pkcon or (pkexec and dnf5))
+    if atomic:
+        # Never fall back to mutable-host DNF/PackageKit on Silverblue.
+        backend_ready = bool(trusted_program("rpm-ostree", find=find))
     if not (foot and python and session_script.is_file()):
         absent = tuple(
             name for name, ready in (
@@ -138,7 +154,7 @@ def open_support(
         # A failed installation should explain which executable paths were
         # unavailable in the running PHONE environment. Not a package audit:
         # this is only a sanitized executable-discovery result.
-        absent = tuple(
+        absent = ("RPM_OSTREE",) if atomic else tuple(
             name for name, ready in (
                 ("PKCON", bool(pkcon)),
                 ("PKEXEC", bool(pkexec)),

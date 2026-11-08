@@ -661,6 +661,137 @@ class DiscordDockingTests(TestCase):
         self.assertFalse(bridge.discord_ready)
         self.assertFalse(bridge.discord_docked)
 
+    def test_restart_recovers_real_sway_nested_scratchpad_parent(self):
+        # Live Fedora SwayPX: con_id 37 is the inner Vesktop XDG child,
+        # scratchpad_state=none and floating=auto_off. Its outer floating_con
+        # owns scratchpad_state=fresh under __i3_scratch. A former fixture
+        # incorrectly put fresh on the XDG leaf and missed this recovery bug.
+        rect = {"x": 1003, "y": 60, "width": 1098, "height": 1344}
+        leaf = {
+            "type": "con", "id": 37, "name": "Vesktop",
+            "app_id": "dev.vencord.Vesktop", "shell": "xdg_shell",
+            "visible": False, "focused": False,
+            "scratchpad_state": "none", "floating": "auto_off",
+            "rect": dict(rect), "nodes": [], "floating_nodes": [],
+        }
+        wrapper = {
+            "type": "floating_con", "id": 38,
+            "scratchpad_state": "fresh", "floating": "user_on",
+            "visible": False, "rect": dict(rect),
+            "nodes": [leaf], "floating_nodes": [],
+        }
+        active = {
+            "type": "workspace", "name": "1", "id": 12,
+            "nodes": [{
+                "type": "con", "id": 66, "name": "QS_SOCIAL_MENU",
+                "visible": True, "focused": False, "shell": "xdg_shell",
+                "rect": {"x": 1338, "y": 82, "width": 1210,
+                         "height": 1346},
+                "nodes": [], "floating_nodes": [],
+            }], "floating_nodes": [],
+        }
+        scratch = {
+            "type": "workspace", "name": "__i3_scratch", "id": 13,
+            "nodes": [], "floating_nodes": [wrapper],
+        }
+        tree = {
+            "id": 1, "type": "root", "nodes": [
+                active, {"type": "output", "name": "__i3",
+                         "nodes": [scratch], "floating_nodes": []},
+            ], "floating_nodes": [],
+        }
+        snap = geometry.snapshot_from_tree(tree)
+        self.assertEqual(snap["discord"]["conId"], 37)
+        self.assertEqual(snap["discord"]["scratchpadState"], "fresh")
+        self.assertEqual(snap["discord"]["kind"], "main")
+        self.assertFalse(snap["discord"]["visible"])
+
+        bridge = geometry.Bridge(0.1)
+        bridge.discord_show_requested = True
+        bridge.discord_show_focus = True
+        bridge.poll_ipc.request = Mock(return_value=tree)
+        reveals, docks = [], []
+        bridge.queue_command = reveals.append
+        bridge.queue_sync = docks.append
+        bridge.emit_snapshot(force=True)
+        bridge.emit_snapshot(force=True)
+        self.assertEqual(reveals, ['[con_id="37"] scratchpad show'])
+        self.assertEqual(docks, [])
+        self.assertTrue(bridge.discord_show_requested)
+        self.assertNotIn(37, bridge.discord_main_seen_visible)
+
+        # After Sway moves the same exact parent to the visible workspace,
+        # only then may the helper issue the initial Social-owned dock.
+        scratch["floating_nodes"] = []
+        active["floating_nodes"] = [wrapper]
+        wrapper["visible"] = True
+        leaf["visible"] = True
+        bridge.emit_snapshot(force=True)
+        self.assertEqual(docks, [{
+            "op": "sync", "target": "discord", "x": 1449, "y": 83,
+            "width": 1098, "height": 1344,
+            "focus": True, "setup": True,
+        }])
+        self.assertFalse(bridge.discord_show_requested)
+        self.assertEqual(reveals, ['[con_id="37"] scratchpad show'])
+
+    def test_nested_scratchpad_owner_refuses_ambiguous_or_cold_window(self):
+        for case in ("wrong_workspace", "not_scratchpad", "multi_child",
+                     "splash", "wrong_app"):
+            with self.subTest(case=case):
+                leaf = {
+                    "type": "con", "id": 37, "name": "Vesktop",
+                    "app_id": "dev.vencord.Vesktop", "shell": "xdg_shell",
+                    "visible": False, "focused": False,
+                    "scratchpad_state": "none", "floating": "auto_off",
+                    "rect": {"x": 1003, "y": 60,
+                             "width": 1098, "height": 1344},
+                    "nodes": [], "floating_nodes": [],
+                }
+                if case == "splash":
+                    leaf["rect"] = {"x": 1003, "y": 60,
+                                    "width": 300, "height": 350}
+                if case == "wrong_app":
+                    leaf["app_id"] = "unrelated.client"
+                wrapper = {
+                    "type": "floating_con", "id": 38,
+                    "scratchpad_state": "none" if case == "not_scratchpad"
+                        else "fresh",
+                    "rect": dict(leaf["rect"]),
+                    "nodes": [leaf], "floating_nodes": [],
+                }
+                if case == "multi_child":
+                    wrapper["nodes"].append({
+                        "type": "con", "id": 39, "app_id": "other.app",
+                        "name": "Other", "visible": False,
+                        "rect": dict(leaf["rect"]),
+                        "nodes": [], "floating_nodes": [],
+                    })
+                workspace = {
+                    "type": "workspace",
+                    "name": "1" if case == "wrong_workspace"
+                        else "__i3_scratch",
+                    "nodes": [], "floating_nodes": [wrapper],
+                }
+                tree = {"id": 1, "nodes": [workspace], "floating_nodes": []}
+                snap = geometry.snapshot_from_tree(tree)
+                if case != "wrong_app":
+                    self.assertEqual(snap["discord"]["scratchpadState"],
+                                     "none")
+                    self.assertEqual(snap["discord"]["kind"],
+                                     "splash" if case == "splash" else "main")
+                else:
+                    self.assertIsNone(snap["discord"])
+                bridge = geometry.Bridge(0.1)
+                bridge.discord_show_requested = True
+                bridge.poll_ipc.request = Mock(return_value=tree)
+                bridge.queue_command = Mock()
+                bridge.queue_sync = Mock()
+                bridge.emit_snapshot(force=True)
+                bridge.queue_command.assert_not_called()
+                bridge.queue_sync.assert_not_called()
+                self.assertTrue(bridge.discord_show_requested)
+
     def test_restarted_helper_restores_hidden_sway_scratchpad_main(self):
         # Quickshell restarts, but Vesktop remains hidden in Sway scratchpad.
         # The fresh helper has never seen this main window visible.

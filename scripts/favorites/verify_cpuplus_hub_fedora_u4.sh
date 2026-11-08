@@ -190,7 +190,7 @@ done
 grep -F 'U7B_ITEM_READY // x=' "$log" >/dev/null ||
   { cat "$log"; echo "U7B_FAIL // no available OPEN ITEM button"; exit 1; }
 item_coords="$(grep -F 'U7B_ITEM_READY // x=' "$log" | tail -n 1 |
-  sed -E 's/.*x=([0-9]+) y=([0-9]+).*/\\1 \\2/')"
+  sed -E 's/.*x=([0-9]+) y=([0-9]+).*/\1 \2/')"
 read -r ex ey <<<"$item_coords"
 [ -n "$ex" ] && [ -n "$ey" ] ||
   { cat "$log"; echo "U7B_FAIL // bad item navigation coordinates"; exit 1; }

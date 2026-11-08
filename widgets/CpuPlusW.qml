@@ -73,7 +73,7 @@ PanelWindow {
                     FavoritesStore.favoriteMonitorBoxKeys),
                 favoriteTaskMetricKeys:cpuFavoritesCatalog.copyValues(
                     FavoritesStore.favoriteTaskMetricKeys)
-            }))
+            }), FavoritesStore.favoriteDisplayLabels)
     readonly property var selectedFavoriteResource:
         FavoritesManagement.recordFor(favoriteCandidates,selectedFavoriteKey)
     FavoritesUnifiedCatalog {

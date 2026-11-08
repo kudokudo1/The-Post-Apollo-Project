@@ -401,6 +401,7 @@ Rectangle {
             id: observation
             objectName: "cosmos-c14-observation-board"
             anchors.fill: parent
+            property bool expandedSuvi: false
             readonly property bool roomy: width >= 620 && height >= 330
             readonly property int labelSize: roomy ? 10 : 8
             readonly property int textSize: roomy ? 13 : 10
@@ -456,9 +457,12 @@ Rectangle {
                     width: Math.max(1,Math.round((observationHeroes.width-5)*0.53))
                     height: observationHeroes.height
                     modeRoute: "cosmos/sun/suvi"
-                    // Keep the INDEX inspector unchanged. SUN OBSERVATION owns
-                    // the direct image gestures and explicitly scoped EXP view.
+                    // Keep INDEX and LIVE SUVI unchanged. OBSERVATION's
+                    // existing C16 FULL action now covers this whole
+                    // subject stage rather than only the left hero region.
                     imageInteractive: true
+                    stageImageExpand: true
+                    onStageImageRequested: observation.expandedSuvi = true
                     sourceSpace: sunTerminal.sourceSpace
                     spaceService: sunTerminal.spaceService
                 }
@@ -772,6 +776,25 @@ Rectangle {
                         }
                     }
                 }
+            }
+        }
+            // C34 // Same reusable focus surface as C33 Meteors/Eclipses/
+            // Stars. Both NOAA SUVI channels retain their provider URL,
+            // provenance and source refresh ownership; no new fetcher.
+            StationCosmosPhotoFocus {
+                objectName: "cosmos-c34-sun-suvi-photo-focus"
+                anchors.fill: parent
+                z: 10
+                visible: observation.expandedSuvi
+                archival: false
+                sourceUrl: sunTerminal.sourceSpace
+                    ? sunTerminal.sourceSpace.solarImageUrl : ""
+                photoTitle: sunTerminal.sourceSpace
+                    && sunTerminal.sourceSpace.solarImageInfo
+                    ? sunTerminal.sourceSpace.solarImageInfo.title
+                    : "NOAA GOES SUVI"
+                credit: "NOAA SWPC // GOES SUVI"
+                onCloseRequested: observation.expandedSuvi = false
             }
         }
     }

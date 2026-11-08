@@ -328,6 +328,23 @@ class C5bDurableHostTests(unittest.TestCase):
                 bad.bind()
         finally:
             bad.close(crash=True)
+        # A same-UID attacker must not redirect the database through a
+        # symlink, even inside the disposable test root.
+        database = self.root / "consent.sqlite3"
+        database.unlink()
+        trap = self.root / "trap"
+        trap.write_text("TEST_TARGET_UNCHANGED")
+        trap.chmod(0o600)
+        database.symlink_to(trap)
+        redirected = self.session()
+        try:
+            with self.assertRaises((AssertionError, ValueError, TimeoutError,
+                                    BrokenPipeError, ConnectionResetError,
+                                    OSError)):
+                redirected.bind()
+        finally:
+            redirected.close(crash=True)
+        self.assertEqual(trap.read_text(), "TEST_TARGET_UNCHANGED")
 
 
 class C5bNoProductionTests(unittest.TestCase):

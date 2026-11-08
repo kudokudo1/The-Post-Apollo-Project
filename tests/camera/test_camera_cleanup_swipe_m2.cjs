@@ -61,6 +61,10 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /label: "REVIEW QUEUE/);
     assert.match(cleanup, /label: "CONFIRM TRASH"/);
     assert.match(cleanup, /id: cleanupSwipeView/);
+    assert.match(cleanup, /id: swipeVisualCard/);
+    assert.match(cleanup, /rotation: swipeDeck\.dragX \/ 24/);
+    assert.match(cleanup, /onPositionChanged: function\(mouse\)/);
+    assert.match(cleanup, /onCanceled: \{/);
     assert.match(cleanup, /id: cleanupDesktopView/);
     assert.match(cleanup, /HUNT \/\/ NEXT/);
     assert.match(qml, /readonly property bool batchMode: activeView === "cleanup"/);

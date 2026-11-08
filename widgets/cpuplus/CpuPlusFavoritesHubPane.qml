@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "../../services/favorites/FavoritesDossierIndexPolicy.js" as Dossier
 
 // CPU++ Favorites++ manager. Three instances share one selection/snapshot.
 // No new FileView, owner process, or action authority is created here.
@@ -17,11 +18,40 @@ Item {
     property var collectionsOwner: null
     property string filterMode: "ALL"
     signal selectionRequested(string key)
+    // Overview selects an original candidate and directs the middle bay to
+    // its existing filter, never a new owner action.
+    signal indexSelectionRequested(string key, string category)
+    readonly property var dossier: Dossier.build(pane.candidates)
+    property var collapsedIndexGroups: ({})
+    function toggleIndexGroup(key) {
+        const next=Object.assign({},collapsedIndexGroups);
+        next[key]=!next[key];
+        collapsedIndexGroups=next;
+    }
+    function revealSelectedInSelector() {
+        if (pane.area!=="selector" || !pane.selectedResource) return;
+        const pos=pane.choices.findIndex(function(row) {
+            return row.key===pane.selectedResource.key;
+        });
+        if(pos<0) return;
+        const row=savedItemRows.itemAt(pos);
+        if(!row) return;
+        listScroll.contentY=Math.max(0,Math.min(
+            Math.max(0,listScroll.contentHeight-listScroll.height),
+            row.y-4));
+    }
+    onFilterModeChanged: {
+        if(pane.area==="selector") Qt.callLater(pane.revealSelectedInSelector);
+    }
     readonly property bool editingText:
         area==="details" && collectionManager.visible
         && collectionManager.editingText
     property bool removeArmed: false
-    onSelectedResourceChanged: removeArmed=false
+    onSelectedResourceChanged: {
+        removeArmed=false;
+        if(pane.area==="selector")
+            Qt.callLater(pane.revealSelectedInSelector);
+    }
 
     readonly property var choices:
         candidates && Array.isArray(candidates.rows)
@@ -49,59 +79,176 @@ Item {
         id: overview
         visible: pane.area==="overview"
         anchors.fill: parent
-        spacing: 9
+        spacing: 5
 
         GohuText {
-            text: "UNIVERSAL // SAVED RESOURCES"
             width: parent.width
+            height: 16
+            text: "FAVORITES++ // INDEX"
             color: Colors.magenta
             font.pixelSize: 12
+            elide: Text.ElideRight
         }
-        QuietText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: "READ ORIGINAL SOURCES // MANAGE APPROVED REFERENCES"
-            font.pixelSize: 10
-        }
-        FavoritesUnifiedPreview {
-            width: parent.width
-            height: Math.min(310,Math.max(180,overview.height-170))
-            snapshot: pane.catalogSnapshot
-        }
-        Rectangle {width: parent.width;height: 1;color: Colors.cyan}
         GohuText {
             width: parent.width
-            text: "CPU++ // "
-                +(pane.candidates ? pane.candidates.rows.filter(
-                    function(item) {return item.category==="CPU++";}).length : 0)
-                +"  |  APP CTRL // "
-                +(pane.candidates ? pane.candidates.rows.filter(
-                    function(item) {return item.category==="APP CTRL";}).length : 0)
+            height: 14
+            text: "SAVED "+pane.dossier.total
+                +" // MENUS "+pane.dossier.groupCount
             color: Colors.orange
             font.pixelSize: 10
             elide: Text.ElideRight
         }
-        GohuText {
-            text: "COLLECTIONS // "+(pane.collectionsOwner ? pane.collectionsOwner.collections.length : 0)
-                  +"  |  SAVE "+(pane.collectionsOwner ? pane.collectionsOwner.storageState.toUpperCase() : "UNAVAILABLE")
-            color: Colors.cyan
-            font.pixelSize: 11
-            width: parent.width
-            elide: Text.ElideRight
-        }
-        GohuText {
-            text: "NEW PROVIDERS // "+(pane.defaultOwner ? pane.defaultOwner.favoriteKeys.length : 0)
-                +" FAV  |  "+(pane.defaultOwner ? pane.defaultOwner.pinnedKeys.length : 0)+" PIN"
-            color: Colors.white
-            font.pixelSize: 11
-            width: parent.width
-            elide: Text.ElideRight
-        }
         QuietText {
             width: parent.width
-            wrapMode: Text.WordWrap
-            text: "APP CONTROL ITEMS ARE DISPLAY-ONLY. SAVED DOES NOT MEAN CURRENTLY AVAILABLE."
-            font.pixelSize: 10
+            height: 13
+            text: "SOURCE // MENU // EXACT ITEM"
+            font.pixelSize: 9
+            elide: Text.ElideRight
+        }
+        Rectangle {
+            width: parent.width
+            height: 1
+            color: Colors.cyan
+        }
+        Flickable {
+            id: dossierScroll
+            width: parent.width
+            height: Math.max(0,overview.height-65)
+            clip: true
+            contentWidth: width
+            contentHeight: dossierRows.implicitHeight
+            boundsBehavior: Flickable.StopAtBounds
+
+            Column {
+                id: dossierRows
+                width: dossierScroll.width
+                spacing: 5
+                Repeater {
+                    id: dossierGroupRepeater
+                    model: pane.dossier.groups
+                    Column {
+                        id: dossierGroup
+                        property var section: modelData
+                        width: dossierRows.width
+                        spacing: 2
+                        Rectangle {
+                            width: parent.width
+                            height: 23
+                            color: "#301139"
+                            border.width: 1
+                            border.color: Colors.cyan
+                            GohuText {
+                                anchors.fill: parent
+                                anchors.leftMargin: 5
+                                anchors.rightMargin: 3
+                                verticalAlignment: Text.AlignVCenter
+                                text: (pane.collapsedIndexGroups[dossierGroup.section.key]
+                                       ? "+ " : "− ")
+                                    +dossierGroup.section.title
+                                    +" // "+dossierGroup.section.count
+                                textFormat: Text.PlainText
+                                color: Colors.cyan
+                                font.pixelSize: 9
+                                elide: Text.ElideRight
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: pane.toggleIndexGroup(
+                                    dossierGroup.section.key)
+                            }
+                        }
+                        Column {
+                            id: dossierEntries
+                            width: parent.width
+                            spacing: 2
+                            visible: !pane.collapsedIndexGroups[dossierGroup.section.key]
+                            height: visible ? implicitHeight : 0
+                            Repeater {
+                                id: dossierEntryRepeater
+                                model: dossierGroup.section.items
+                                Rectangle {
+                                    id: dossierItem
+                                    property var entry: modelData
+                                    width: dossierEntries.width
+                                    height: 37
+                                    color: pane.selectedResource
+                                        && pane.selectedResource.key===entry.key
+                                        ? "#341147" : "#1B0623"
+                                    border.width: 1
+                                    border.color: pane.selectedResource
+                                        && pane.selectedResource.key===entry.key
+                                        ? Colors.magenta
+                                        : indexHit.containsMouse || indexHit.activeFocus
+                                          ? Colors.orange : "#3A2447"
+                                    Column {
+                                        anchors.fill: parent
+                                        anchors.margins: 4
+                                        spacing: 1
+                                        GohuText {
+                                            width: parent.width
+                                            height: 16
+                                            text: dossierItem.entry.name
+                                            textFormat: Text.PlainText
+                                            color: Colors.white
+                                            font.pixelSize: 10
+                                            elide: Text.ElideRight
+                                        }
+                                        QuietText {
+                                            width: parent.width
+                                            height: 11
+                                            text: dossierItem.entry.type
+                                                +" // "+(dossierItem.entry.readOnly
+                                                         ? "READ ONLY" : "SAVED")
+                                            textFormat: Text.PlainText
+                                            font.pixelSize: 8
+                                            color: Colors.orange
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+                                    MouseArea {
+                                        id: indexHit
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        activeFocusOnTab: true
+                                        Accessible.role: Accessible.Button
+                                        Accessible.name: dossierGroup.section.title
+                                            +" // "+dossierItem.entry.name
+                                        Accessible.onPressAction:
+                                            pane.indexSelectionRequested(
+                                                dossierItem.entry.key,
+                                                dossierItem.entry.category)
+                                        onClicked: pane.indexSelectionRequested(
+                                            dossierItem.entry.key,
+                                            dossierItem.entry.category)
+                                        onWheel: function(wheel) {
+                                            wheel.accepted=false;
+                                        }
+                                        Keys.onPressed: function(event) {
+                                            if(event.key===Qt.Key_Return
+                                                    || event.key===Qt.Key_Enter
+                                                    || event.key===Qt.Key_Space) {
+                                                pane.indexSelectionRequested(
+                                                    dossierItem.entry.key,
+                                                    dossierItem.entry.category);
+                                                event.accepted=true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                QuietText {
+                    width: parent.width
+                    visible: pane.dossier.total===0
+                    text: "NO SAVED ITEMS IN ORIGINAL SOURCES"
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 10
+                }
+            }
         }
     }
 

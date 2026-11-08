@@ -3,13 +3,22 @@
 # Fedora Silverblue 44 VM. Never invoke on a user's system.
 set -Eeuo pipefail
 exec >/dev/ttyS0 2>&1
+# Separate C4b UART records top-level controller failure. Never acceptance.
+c4b_controller_failure_relay() {
+  [[ -f /var/lib/c4b-runtime-ci-only && -c /dev/ttyS1 ]] || return 0
+  local reason="$1"
+  timeout --signal=TERM --kill-after=1s 5s \
+    /usr/bin/bash -c 'printf "C4B_DIAG_CONTROLLER_FATAL // %s\n" "$1" >/dev/ttyS1' \
+    _ "$reason" || true
+}
 failure() {
+  c4b_controller_failure_relay "$*"
   echo "C2V_FAIL // $*"
   timeout --signal=TERM --kill-after=5s 15s rpm-ostree status 2>&1 | head -n 45 || true
   systemctl poweroff --no-block || true
   exit 1
 }
-trap 'rc=$?; if [[ "$rc" -ne 0 ]]; then echo "C2V_FAIL // SCRIPT_EXIT_$rc line $LINENO"; systemctl poweroff --no-block || true; fi' EXIT
+trap 'rc=$?; if [[ "$rc" -ne 0 ]]; then c4b_controller_failure_relay "SCRIPT_EXIT_$rc-line-$LINENO"; echo "C2V_FAIL // SCRIPT_EXIT_$rc line $LINENO"; systemctl poweroff --no-block || true; fi' EXIT
 stagefile=/var/lib/c2v-transaction-stage
 pkg=postapollo-connections-c2t-fixture
 data=/mnt/c2v-offline
@@ -132,6 +141,63 @@ case "$stage" in
       install -m 0700 "$data/c4b-guest-confined-runtime.sh" "$c4b_gate" ||
         failure "C4B_RUNTIME_SCRIPT_STAGING_FAILED"
       printf '%s\n' C4B_DISPOSABLE_VM_ONLY > "$c4b_mode"
+      # This witness runs only when poweroff is requested inside disposable
+      # C4b. It never initiates shutdown or authorizes a stage transition.
+      cat > /var/lib/c4b-shutdown-witness.sh <<'C4B_SHUTDOWN_WITNESS'
+#!/usr/bin/bash
+set +e
+[[ -f /var/lib/c4b-runtime-ci-only && -c /dev/ttyS1 ]] || exit 0
+# Emit the witness start first, in case systemd disappears during shutdown.
+timeout --signal=TERM --kill-after=1s 3s \
+  /usr/bin/bash -c 'printf "C4B_DIAG_POWEROFF_WITNESS_START\n" >/dev/ttyS1' || true
+{
+  echo "C4B_DIAG_POWEROFF_WITNESS // $(date --iso-8601=seconds)"
+  for unit in c2v-ostree-cycle.service c2v-rpm-layer-monitor.service \
+              c2v-rpm-layer-worker.service rpm-ostreed.service; do
+    echo "C4B_DIAG_POWEROFF_UNIT // $unit"
+    timeout 3s systemctl show "$unit" --no-pager \
+      -p ActiveState -p SubState -p Result -p ExecMainStatus \
+      -p MainPID -p NRestarts || true
+  done
+  echo "C4B_DIAG_POWEROFF_MONITOR_EXIT"
+  tail -n 16 /var/tmp/c2v-monitor-exit.log 2>/dev/null || true
+  echo "C4B_DIAG_POWEROFF_WORKER"
+  cat /run/c2v-rpm-layer-worker-exit 2>/dev/null || echo not-observed
+  echo "C4B_DIAG_POWEROFF_MONITOR_TAIL"
+  tail -n 26 /var/tmp/c2v-monitor-output.log 2>/dev/null || true
+  echo "C4B_DIAG_POWEROFF_WORKER_TAIL"
+  tail -n 26 /var/tmp/c2v-rpm-ostree-install.log 2>/dev/null || true
+  echo "C4B_DIAG_POWEROFF_JOURNAL"
+  timeout 6s journalctl -b --no-pager -n 30 2>&1 || true
+} > /var/tmp/c4b-shutdown-witness.log 2>&1
+timeout --signal=TERM --kill-after=2s 10s \
+  cat /var/tmp/c4b-shutdown-witness.log >/dev/ttyS1 2>&1 || true
+exit 0
+C4B_SHUTDOWN_WITNESS
+      chmod 0700 /var/lib/c4b-shutdown-witness.sh
+      cat > /etc/systemd/system/c4b-shutdown-witness.service <<'C4B_SHUTDOWN_UNIT'
+[Unit]
+Description=Disposable C4b poweroff diagnostic only
+DefaultDependencies=no
+Before=poweroff.target
+ConditionPathExists=/var/lib/c4b-runtime-ci-only
+
+[Service]
+Type=oneshot
+TimeoutStartSec=45
+ExecStart=-/usr/bin/bash /var/lib/c4b-shutdown-witness.sh
+
+[Install]
+WantedBy=poweroff.target
+C4B_SHUTDOWN_UNIT
+      systemctl daemon-reload || failure "C4B_DIAG_WITNESS_SYSTEMD_RELOAD_FAILED"
+      systemctl enable c4b-shutdown-witness.service ||
+        failure "C4B_DIAG_WITNESS_ENABLE_FAILED"
+      # UART1 exists only in C4b's disposable QEMU; diagnostic-only channel.
+      if [[ -c /dev/ttyS1 ]]; then
+        timeout --signal=TERM --kill-after=1s 4s \
+          /usr/bin/bash -c 'printf "%s\n" "C4B_DIAG_UART1_READY // first_boot" >/dev/ttyS1' || true
+      fi
       echo "C4B_PASS // SIGNED_C4A_LAYER_HAS_EXPLICIT_OFFLINE_RUNTIME_OPT_IN"
     fi
     echo "C2V_PASS // REAL_SILVERBLUE_FIRST_BOOT_BASELINE"
@@ -292,15 +358,42 @@ set -x
 # Preserve the exact first failing command and exit status; a successful
 # systemd-run start does not prove its later transient unit stayed healthy.
 trap 'rc=$?; msg="C2V_MONITOR_ERR // rc=$rc line=$LINENO command=$BASH_COMMAND"; echo "$msg"; printf "%s\n" "$msg" >> /var/tmp/c2v-monitor-exit.log' ERR
-trap 'rc=$?; msg="C2V_MONITOR_EXIT // rc=$rc"; echo "$msg"; printf "%s\n" "$msg" >> /var/tmp/c2v-monitor-exit.log' EXIT
+trap 'rc=$?; msg="C2V_MONITOR_EXIT // rc=$rc"; echo "$msg"; printf "%s\n" "$msg" >> /var/tmp/c2v-monitor-exit.log; if [[ "$rc" -ne 0 ]] && declare -F c4b_emergency_relay >/dev/null; then c4b_emergency_relay "MONITOR_ABNORMAL_EXIT_$rc"; fi' EXIT
 echo "C2V_MONITOR_READY // $(date --iso-8601=seconds)"
 echo ready > /run/c2v-monitor-ready
 pkg=postapollo-connections-c2t-fixture
 log=/var/tmp/c2v-rpm-ostree-install.log
 resultfile=/run/c2v-rpm-layer-worker-exit
 staged_json=/run/c2v-ostree-pending.json
+# Opt-in C4b-only evidence relay. The monitor's normal stdout is a private
+# guest-local file; when it intentionally powers off a failed test, the
+# periodic probe may not get another tick to relay the reason.
+# Relay is best-effort, bounded, and NEVER authorizes a reboot or success.
+c4b_emergency_relay() {
+  [[ -f /var/lib/c4b-runtime-ci-only ]] || return 0
+  local reason="$1"
+  {
+    printf 'C4B_DIAG_MONITOR_FATAL // %s\n' "$reason"
+    printf 'C4B_DIAG_WORKER_EXIT // %s\n' \
+      "$(cat /run/c2v-rpm-layer-worker-exit 2>/dev/null || echo unobserved)"
+    echo 'C4B_DIAG_MONITOR_OUTPUT_BEGIN'
+    tail -n 45 /var/tmp/c2v-monitor-output.log 2>/dev/null || true
+    echo 'C4B_DIAG_RPM_OSTREE_WORKER_LOG_BEGIN'
+    tail -n 45 /var/tmp/c2v-rpm-ostree-install.log 2>/dev/null || true
+  } > /var/tmp/c4b-monitor-fatal-summary.log 2>&1 || true
+  # ttyS1 is a second independent C4b-only UART. Its output is NEVER an
+  # acceptance signal. Keep the old ttyS0 best-effort path for comparison.
+  if [[ -c /dev/ttyS1 ]]; then
+    timeout --signal=TERM --kill-after=2s 9s \
+      cat /var/tmp/c4b-monitor-fatal-summary.log >/dev/ttyS1 2>&1 || true
+  fi
+  timeout --signal=TERM --kill-after=2s 9s \
+    cat /var/tmp/c4b-monitor-fatal-summary.log >/dev/ttyS0 2>&1 || true
+  return 0
+}
 fail() {
   echo "C2V_FAIL // INDEPENDENT_MONITOR_$*"
+  c4b_emergency_relay "INDEPENDENT_MONITOR_$*"
   tail -n 45 "$log" 2>/dev/null || true
   timeout --signal=TERM --kill-after=5s 15s rpm-ostree status || true
   systemctl poweroff --no-block || true
@@ -359,6 +452,34 @@ C2V_PENDING_CHECK
       exit 0
     else
       echo "C2V_MONITOR_PENDING_JSON_REJECTED // attempt=$attempt"
+      # Read-only, bounded observation at early denied polls, independent of
+      # the authoritative C2v/C4a pending-deployment check above.
+      if [[ -f /var/lib/c4b-runtime-ci-only && -c /dev/ttyS1 ]] &&
+         (( attempt == 2 || attempt == 3 || attempt % 6 == 0 )); then
+        {
+          echo "C4B_DIAG_PENDING_REJECTED // attempt=$attempt"
+          python3 - "$staged_json" <<'C4B_PENDING_DIAG'
+import json,sys
+try:
+    with open(sys.argv[1],encoding="utf-8") as fp:
+        s=json.load(fp)
+    deployments=s.get("deployments") or []
+    d=deployments[0] if deployments else {}
+    print("C4B_DIAG_PENDING_HEAD // "+
+          json.dumps({"transaction":s.get("transaction"),
+                      "staged":d.get("staged"),"pending":d.get("pending"),
+                      "booted":d.get("booted"),
+                      "requested-local-packages":d.get("requested-local-packages"),
+                      "packages":d.get("packages")},sort_keys=True)[:2500])
+except Exception as exc:
+    print("C4B_DIAG_PENDING_PARSE_FAILED // "+type(exc).__name__)
+C4B_PENDING_DIAG
+          echo "C4B_DIAG_WORKER_EXIT // $(cat "$resultfile" 2>/dev/null || echo unobserved)"
+          tail -n 8 "$log" 2>/dev/null || true
+        } >/var/tmp/c4b-pending-diag.log 2>&1 || true
+        timeout --signal=TERM --kill-after=1s 5s \
+          cat /var/tmp/c4b-pending-diag.log >/dev/ttyS1 2>&1 || true
+      fi
     fi
   else
     echo "C2V_MONITOR_STATUS_QUERY_FAILED // attempt=$attempt"
@@ -475,6 +596,17 @@ C2V_WORKER
       [[ -s "$c4b_gate" ]] || failure "C4B_RUNTIME_GATE_LOST_AFTER_ROLLBACK"
       c4b_execute rolledback ||
         failure "C4B_RUNTIME_CLEANUP_OR_ROLLBACK_NOT_VERIFIED"
+    fi
+    # Remove test-only poweroff witness following successful real rollback.
+    if [[ -e /etc/systemd/system/c4b-shutdown-witness.service ]]; then
+      systemctl disable c4b-shutdown-witness.service ||
+        failure "C4B_DIAG_WITNESS_DISABLE_FAILED"
+      rm -f -- /etc/systemd/system/c4b-shutdown-witness.service \
+        /var/lib/c4b-shutdown-witness.sh
+      systemctl daemon-reload || failure "C4B_DIAG_WITNESS_CLEANUP_RELOAD_FAILED"
+      [[ ! -e /var/lib/c4b-shutdown-witness.sh &&
+         ! -e /etc/systemd/system/c4b-shutdown-witness.service ]] ||
+        failure "C4B_DIAG_WITNESS_CLEANUP_FAILED"
     fi
     echo "C2V_PASS // OFFLINE_REPO_CONFIG_RESTORED_AFTER_ROLLBACK"
     echo "C2V_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER"

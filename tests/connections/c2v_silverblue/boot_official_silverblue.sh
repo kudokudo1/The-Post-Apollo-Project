@@ -184,9 +184,16 @@ echo "C2V_PASS // OFFLINE_SILVERBLUE_INSTALLER_POST_STEP"
 # A real persistent disk boot, not a container and not just a staged tree.
 # The guest itself will perform: baseline boot -> rpm-ostree layer -> reboot
 # -> validate booted layer -> rollback -> reboot -> validate absence -> off.
+# C4b-only second UART is a diagnostic output sink, not a reboot/acceptance
+# signal. It is independent of the primary ttyS0 console/serial-getty.
+c4b_secondary_serial=()
+if [[ "$c4b_requested" == 1 ]]; then
+  c4b_secondary_serial=(-serial "file:$tmp/c4b-diagnostic-serial.log")
+fi
 qemu-system-x86_64 \
   -machine accel=kvm -m 4096 -smp 3 -display none -monitor none \
   -serial "file:$tmp/guest-serial.log" \
+  "${c4b_secondary_serial[@]}" \
   -drive "file=$tmp/silverblue.qcow2,if=virtio,format=qcow2" \
   -drive "file=$tmp/c2v-seed.iso,if=ide,media=cdrom,readonly=on,index=1" \
   -nic none > "$tmp/guest-qemu.log" 2>&1 &
@@ -225,6 +232,15 @@ grep -a -E 'C2V_(MONITOR_|PENDING_DEPLOYMENT_AUTHORITY|INSTALL_FAILED_EXIT|PROBE
 grep -a 'C2V_' "$tmp/guest-serial.log" 2>/dev/null | tail -n 70 || true
 if [[ "$result" != PASS ]]; then
   echo "C2V_BLOCKED // SILVERBLUE_LAYER_REBOOT_ROLLBACK_RESULT=$result"
+  if [[ "$c4b_requested" == 1 ]]; then
+    echo "C4B_HOST_DIAGNOSTIC_UART_BEGIN"
+    if [[ -r "$tmp/c4b-diagnostic-serial.log" ]]; then
+      echo "C4B_HOST_DIAGNOSTIC_UART_BYTES // $(wc -c < "$tmp/c4b-diagnostic-serial.log")"
+      tail -n 130 "$tmp/c4b-diagnostic-serial.log" || true
+    else
+      echo "C4B_HOST_DIAGNOSTIC_UART_MISSING"
+    fi
+  fi
   echo "C2V_HOST_VM_LAST_PROCESS_STATE"
   ps -p "$pid" -o pid=,stat=,etime=,%cpu=,%mem=,rss=,vsz=,comm= || true
   echo "C2V_HOST_MEMORY_STATE"

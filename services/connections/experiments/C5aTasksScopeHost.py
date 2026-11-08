@@ -294,9 +294,10 @@ def main() -> int:
     try:
         fd1 = int(sys.argv[2])
         fd2 = int(sys.argv[3])
-        if fd1 < 3 or (sys.argv[1] == "--host" and
-                       (fd2 < 3 or fd1 == fd2)) or (
-                       sys.argv[1] == "--client" and fd2 != 0)):
+        if (fd1 < 3
+                or (sys.argv[1] == "--host"
+                    and (fd2 < 3 or fd1 == fd2))
+                or (sys.argv[1] == "--client" and fd2 != 0)):
             raise ValueError("BAD_FD")
         if sys.argv[1] == "--host":
             return serve(fd1, fd2)

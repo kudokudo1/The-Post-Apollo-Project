@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "HospitalWorkerAttachmentCapabilityPolicy.js" as CapabilityPolicy
 
 // Operator-click-only mutation against the separately gated PX atomic endpoint.
 // No bind, Session update, launch, browser control or automatic retry.
@@ -10,6 +11,31 @@ Scope {
     property string lastError: ""
     property var lastResult: null
     property var pending: ({})
+    property bool capabilityChecking: false
+    property bool capabilityChecked: false
+    property bool capabilityAvailable: false
+    property string capabilityReason: "PX ATTACH SUPPORT // NOT CHECKED"
+    property string capabilityDetail: ""
+
+    function probeCapability() {
+        if (running || process.running || capabilityProcess.running)
+            return false;
+        capabilityChecked = false;
+        capabilityAvailable = false;
+        capabilityReason = "PX ATTACH SUPPORT // CHECKING";
+        capabilityDetail = "";
+        capabilityChecking = true;
+        capabilityProcess.exec([
+            "bash", "-lc",
+            'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"; '
+                + '[ -x "$px" ] || px="$HOME/.local/bin/px"; '
+                + 'exec "$px" "$@"',
+            "hospital-attach-capability",
+            "agent", "session-attach", "--help"
+        ]);
+        return true;
+    }
+
 
     signal attached(var result)
     signal refused(string reason)
@@ -21,8 +47,13 @@ Scope {
             "roomId", "sessionId", "assignmentId", "doctorId",
             "providerId", "repository", "branch", "bedPath"
         ];
-        if (running || process.running)
+        // Never call a missing/old PX version. This client cannot authorize
+        // execution; the backend must still revalidate exact identities.
+        if (running || process.running || capabilityChecking
+                || !capabilityChecked || !capabilityAvailable) {
+            lastError = "ATTACH REFUSED // PX ATOMIC ENDPOINT NOT VERIFIED";
             return false;
+        }
         if (mode !== "create" && mode !== "reuse") {
             lastError = "ATTACH REFUSED // UNKNOWN MODE";
             return false;
@@ -67,6 +98,30 @@ Scope {
             "--confirm", "--json"
         ]);
         return true;
+    }
+
+    Process {
+        id: capabilityProcess
+        property string outputText: ""
+        property string errorText: ""
+        stdout: StdioCollector {
+            onStreamFinished: capabilityProcess.outputText = String(this.text || "")
+        }
+        stderr: StdioCollector {
+            onStreamFinished: capabilityProcess.errorText = String(this.text || "")
+        }
+        onExited: function(code, exitStatus) {
+            const probe = CapabilityPolicy.evaluate(
+                code, capabilityProcess.outputText, capabilityProcess.errorText
+            );
+            capabilityProcess.outputText = "";
+            capabilityProcess.errorText = "";
+            root.capabilityAvailable = probe.supported;
+            root.capabilityChecked = true;
+            root.capabilityReason = probe.reason;
+            root.capabilityDetail = probe.errorDetail;
+            root.capabilityChecking = false;
+        }
     }
 
     Process {

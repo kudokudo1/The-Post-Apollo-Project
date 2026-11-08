@@ -95,9 +95,9 @@ require('"--room-id", pending.roomId' in actor
         and '"--provider-id", pending.providerId' in actor
         and '"--working-directory", pending.bedPath' in actor,
         "Never guess or substitute a Room, Session, Doctor, Provider or Bed")
-require('if (running || process.running)' in actor
+require('if (running || process.running || capabilityChecking' in actor
         and 'running = true;' in actor,
-        "Repeated click cannot start a second concurrent attachment client")
+        "Repeated click and in-progress PX probe cannot start a concurrent attachment client")
 require('payload.providerLaunched !== false' in actor
         and 'payload.authorityVerified !== false' in actor
         and 'payload.browserChatConnected !== false' in actor,

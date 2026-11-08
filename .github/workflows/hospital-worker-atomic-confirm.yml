@@ -6,6 +6,9 @@ on:
       - "widgets/HospitalRegisteredWorkerView.qml"
       - "widgets/HospitalW.qml"
       - "services/hospital/HospitalWorkerAttachmentActionService.qml"
+      - "services/hospital/HospitalWorkerAttachmentCapabilityPolicy.js"
+      - "tests/hospital/test_worker_attach_capability_policy.js"
+      - "tests/hospital/test_worker_attach_capability_ui_contracts.py"
       - "services/hospital/HospitalWorkerAttachmentPreviewPolicy.js"
       - "tests/hospital/test_worker_attachment_preview_policy.js"
       - "tests/hospital/test_worker_atomic_attach_ui_contracts.py"
@@ -18,6 +21,9 @@ on:
       - "widgets/HospitalRegisteredWorkerView.qml"
       - "widgets/HospitalW.qml"
       - "services/hospital/HospitalWorkerAttachmentActionService.qml"
+      - "services/hospital/HospitalWorkerAttachmentCapabilityPolicy.js"
+      - "tests/hospital/test_worker_attach_capability_policy.js"
+      - "tests/hospital/test_worker_attach_capability_ui_contracts.py"
       - "services/hospital/HospitalWorkerAttachmentPreviewPolicy.js"
       - "tests/hospital/test_worker_attachment_preview_policy.js"
       - "tests/hospital/test_worker_atomic_attach_ui_contracts.py"
@@ -36,6 +42,9 @@ jobs:
         run: |
           node --check services/hospital/HospitalWorkerAttachmentPreviewPolicy.js
           node tests/hospital/test_worker_attachment_preview_policy.js
+          node --check services/hospital/HospitalWorkerAttachmentCapabilityPolicy.js
+          node tests/hospital/test_worker_attach_capability_policy.js
+          python3 tests/hospital/test_worker_attach_capability_ui_contracts.py
           python3 tests/hospital/test_worker_atomic_attach_ui_contracts.py
       - name: Preserve preview, existing worker connections, and Quick controls
         run: |

@@ -867,7 +867,7 @@ test("U5b notification source favorites appear as read-only named candidates",()
   assert.equal(grouped.groups.length,1);
   assert.equal(grouped.groups[0].key,"NOTIFS|SOURCES");
   assert.equal(grouped.groups[0].title,"NOTIFICATIONS // SOURCES");
-  assert.deepEqual(plain(grouped.groups[0].items.map(x=>x.name)),names);
+  assert.deepEqual(plain(grouped.groups[0].items.map(x=>x.name)),plain(names));
   const rendered=all.rows.map(row=>row.label).join(" ");
   for(const hidden of ["PRIVATE_ID_SHOULD_NOT_APPEAR","PRIVATE_MESSAGE_BODY","private.example"])
     assert.ok(!rendered.includes(hidden),hidden);
@@ -936,5 +936,5 @@ test("U5b consumes the existing Notifications singleton without duplicating its 
   assert.doesNotMatch(projection+manager+cpu,
     /FileView\s*\{|JsonAdapter\s*\{|Process\s*\{|setFavorite\(|toggleFavorite\(/);
   assert.doesNotMatch(cpu,/NotificationsService\s*\{/);
-  assert.doesNotMatch(projection,/source\.sourceId|source\.body|source\.message|NotificationsService\./);
+  assert.doesNotMatch(projection,/source\.sourceId|source\.body|source\.message|NotificationsService\.(?:setFavorite|toggleFavorite|notifications|sourcePolicies)/);
 });

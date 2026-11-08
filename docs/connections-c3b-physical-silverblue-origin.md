@@ -1,43 +1,42 @@
-# 🏥💜 Connections // C3b/C3c physical Silverblue origin profile
+# 🏥💜 Connections // C3b/C3c canonical Silverblue /opt origin (CI only)
 
 PATIENT // The-Post-Apollo-Project
-ROOM // Universal Connections · C3b/C3c OS-origin protected service
-STAFF ROLE // Nurse 2 · NRS-2 (external Hospital-compatible)
-ASSIGNMENT // Narrow physical-path test-only response to C4b issue #1532
-STATE // DRAFT · CI ONLY · NO C4B RUNTIME INTEGRATION · PRODUCTION HOLD
+ROOM // C3b/C3c OS service-origin security
+STAFF ROLE // Nurse 2 · NRS-2 (external Hospital-compatible; live registration unverified)
+ASSIGNMENT // Resolve C4b /opt ancestry refusal without altering C3d's signed service
+STATE // DRAFT · C3b SOURCE ONLY · PRODUCTION HOLD
 
 ## IMPLEMENTATION
-The original default Fedora Cloud `--verify-disposable` path and `/opt/postapollo-c2o-venv/bin/python3` constant remain unchanged. The alternative `--verify-disposable-physical` is exclusively for an offline, real Fedora 44 Silverblue C4b guest, not a production policy switch. It requires `GITHUB_ACTIONS=true`, the existing C3b guest marker, an additional C4b guest marker, root execution, an exact test-only on-guest C4b fixture file, OSTree boot marker, Fedora 44 release, the original Silverblue branch ref from `ostree admin status`, and only the loopback network interface.
+The original strict Fedora Cloud `--verify-disposable` path remains unchanged: exact `/opt/postapollo-c2o-venv/bin/python3` argv and root-owned, nonwritable, genuine no-symlink `PROTECTED_DIRS`. The existing signed C3d service has a hardcoded `#!/opt/postapollo-c2o-venv/bin/python3` shebang, so merely relocating C4b's venv to `/var/opt` cannot change its kernel-interpreted process argv without a separate signed-package change.
 
-When this opt-in is explicitly selected, C3b requires exactly `/var/opt/postapollo-c2o-venv/bin/python3` in the running process argv, never the `/opt` alias. The protected ancestor list is the original /usr tree plus the genuine `/var`, `/var/opt` and physical venv parents; every directory must be root-owned, non-symlink, nonsubject-to-group/other writes and consistent across snapshots around D-Bus observation. Directory device/inode/mode/owner/group are checked before and after. The original D-Bus, SELinux, PID, UID, cgroup, NoNewPrivileges, files and all five denied authorization bits remain unchanged.
+A *separate* `--verify-disposable-silverblue-opt` probe accepts the original argv but permits exactly the observed official Silverblue `/opt` symlink inode, with **literal** target `var/opt` and resolved path `/var/opt`. It requires direct guest lstat/readlink evidence, root ownership/group, exact link metadata, root-owned and non-group/other-writable physical `/var`, `/var/opt`, and venv/bin ancestors, with no extra symbolic links. Captured link and directory device/inode/type/UID/GID/mode attributes must be identical across snapshots before and after the original D-Bus owner check. The logical /opt venv/bin directories remain strictly root-owned, nonsymlink, nonwritable; no other C3b path gains an exception.
 
-This PR deliberately does not touch the C4b guest scripts, the RPM, production Connections broker or the synthetic candidate PR #1545. C4b worker must choose the matching physical interpreter in its own signed fake-service testing and keep genuine two-boot rollback acceptance.
+**Opt-in guest boundary:** root-only; `GITHUB_ACTIONS=true`, existing C3b test flag, additional C4b flag, exact C4b guest marker, real OSTree boot marker, Fedora release 44, Silverblue branch reference in `ostree admin status`, and loopback-only network. These identify the disposable experiment; they are **not** production authentication. All original D-Bus, PID/UID, cgroup, SELinux, NoNewPrivileges, protected files and immutable false authorization fields remain mandatory.
+
+No C3d signed host/script, C4b runtime, production Connections QML, credentials or workstation has been changed.
 
 ## HOW TO USE
-Existing Fedora Cloud: `C3bOriginCheck.py --verify-disposable` (unchanged).
-C4b opt-in inside its disposable signed offline Silverblue VM only: pass `POST_APOLLO_C4B_TEST_GUEST=1` alongside existing C3b disposable variables, and invoke `C3bOriginCheck.py --verify-disposable-physical` after its signed, confined service uses the exact physical interpreter path. This is a CI experiment, **not** a command to run on the operator desktop.
+Existing Fedora Cloud test: `C3bOriginCheck.py --verify-disposable` as before.
+C4b offline real Silverblue test: pass the extra `POST_APOLLO_C4B_TEST_GUEST=1` and `--verify-disposable-silverblue-opt` ONLY inside the independently qualified C4b VM. C4b owner should continue using the existing signed /opt shebang, require actual full C3b origin PASS, all unauthorized action refusals, and real two-reboot rollback. Do not run this experimental verifier on the desktop.
 
 ## VERIFY
-- [ ] Exact-head source parser and adversarial C3b tests.
-- [ ] Existing Fedora 44 enforcing C2r guest full regression.
-- [ ] C4b owner implements physical-path runtime transition separately.
-- [ ] Actual C4b signed Silverblue guest pass for C3b origin with both real rollback boots.
-- [ ] Independent security review and operator acceptance.
+- [ ] Exact-head Python unit/security tests pass.
+- [ ] Original C2r Fedora 44 enforcing guest still passes with default strict mode.
+- [ ] Full C4b signed, confined offline Silverblue guest passes *original* signed host origin, exact canonical link and second real rollback reboot.
+- [ ] Independent source/security review and operator acceptance.
 
 ## WATCH OUT FOR
-This is not proof of a signed/installed production host, release authority, human approval, credential access or API capability. Guest marker files and environment are disposable fixture controls, not real-world authentication. Refuse any attempt to pass self-reported path facts from a client, accept arbitrary symlinks, bypass the strict original default, or count a first boot as completed rollback.
+The accepted link is deliberately one exact *test OS layout*, not an acceptance of arbitrary symlinks, user-supplied alleged device/inode facts, writable paths, altered shebangs or production credentials. Direct OS snapshots can still have a race in between reads; root compromise is outside this offline VM model. Do not treat this as a general no-TOCTOU guarantee or a live authentication token. Future production path trust requires a separate threat model and appropriate fd-pinned traversal. All grant flags remain false.
 
 ## CHECKLIST
-- [x] Read current default C3b, actual C4b runtime and verified path facts.
-- [x] Record security-side preferred physical-path design in issue #1532.
-- [x] Add isolated test-only physical argv and directory guard with prior/after snapshots.
-- [x] Add synthetic rejection tests and CLI refusal test.
-- [ ] Confirm exact-head CI and repair proven issues.
-- [ ] C4b owner integration and full VM rollback success.
+- [x] Identify signed C3d shebang dependency and correct physical-relocation proposal.
+- [x] Preserve original Fedora Cloud C3b no-symlink policy.
+- [x] Add independent Silverblue-only opt-in and exact guest identity.
+- [x] Require exact /opt target, trusted physical chain and two stable snapshots.
+- [x] Add adversarial synthetic link/path/race/downgrade tests.
+- [ ] C3b regression CI / source review.
+- [ ] C4b owner guest integration and genuine two-reboot rollback.
 - [ ] Operator final acceptance.
 
-## NEXT
-Wait for exact-head C2r test results. Coordinate the separate C4b-owned runtime modifications; do not alter their active PR #1545. Recheck current `main` and ownership before follow-on edits.
-
-## DECISIONS
-Physical /var/opt interpreter path is the preferred narrow test profile. No blanket /opt symlink exception approved. All production service auth, credentials, API grants, workstation installation and key custody remain disabled.
+## NEXT / DECISIONS
+Continue C3b exact-head CI; notify C4b worker that only its *invocation* needs opt-in, preserving the original signed C3d RPM. Keep C4b owner files separate. Source issue [#1532](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/1532), prior synthetic candidate [#1545](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/1545). Production HOLD until a separate real-host authorization milestone. No merge of failing C4b.

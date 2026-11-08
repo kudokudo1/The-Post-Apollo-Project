@@ -642,7 +642,7 @@ class ZoomWebHostTests(unittest.TestCase):
         too_short = {"rect": {"x": 68, "y": 173, "width": 780, "height": 598}}
         self.assertFalse(host._near(too_short, target))
         self.assertIn('target_bottom - 1 <= actual_bottom <= target_bottom',
-                      HOST.read_text())
+                      (ROOT / "scripts/camera/ZoomWebHost.py").read_text())
 
     def test_browser_client_rect_not_just_outer_frame_must_fill_zoom_bay(self):
         # Sway's window_rect can be smaller than its outer rect. At a 66px

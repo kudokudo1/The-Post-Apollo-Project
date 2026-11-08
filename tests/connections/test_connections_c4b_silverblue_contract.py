@@ -246,6 +246,52 @@ class C4bContracts(unittest.TestCase):
                           "mount -o remount,rw", "POST_APOLLO_FIRMS_MAP_KEY"):
             self.assertNotIn(forbidden, builder + gate + spec)
 
+    def test_048_fedora_service_primary_group_cleanup_fails_closed(self):
+        # Real Silverblue #42508631401 proved origin and client negatives,
+        # but userdel removed postapollo-connections' private primary group
+        # before a later groupdel tried deleting it a second time.
+        script = GUEST.read_text()
+        self.assertIn(
+            'userdel postapollo-connections || fail "TEST_USER_REMOVAL_FAILED"',
+            script,
+        )
+        self.assertIn(
+            'groupdel c4b-clients || fail "CLIENT_GROUP_REMOVAL_FAILED"',
+            script,
+        )
+        self.assertIn(
+            'groupdel postapollo-status-readers || fail "READER_GROUP_REMOVAL_FAILED"',
+            script,
+        )
+        self.assertIn(
+            'if getent group postapollo-connections >/dev/null; then',
+            script,
+        )
+        self.assertIn(
+            'groupdel postapollo-connections || fail "SERVICE_GROUP_REMOVAL_FAILED"',
+            script,
+        )
+        self.assertIn(
+            'C4B_DIAG // SERVICE_PRIMARY_GROUP_ALREADY_ABSENT_AFTER_USERDEL',
+            script,
+        )
+        self.assertIn(
+            'check_accounts_absent\\n  echo "C4B_PASS // TEST_USERS_AND_GROUPS_FULLY_ABSENT"',
+            script,
+        )
+        self.assertNotIn(
+            'groupdel postapollo-connections || fail "TEST_GROUP_REMOVAL_FAILED"',
+            script,
+        )
+        # The skip is only valid AFTER all three userdel operations;
+        # test-owned reader groups still require explicit successful delete.
+        begin = script.index('userdel c4b-reader && userdel c4b-outsider &&')
+        last_check = script.index('  check_accounts_absent\\n  echo "C4B_PASS // TEST_USERS_AND_GROUPS_FULLY_ABSENT"')
+        self.assertLess(begin, script.index('  if getent group postapollo-connections', begin))
+        self.assertLess(script.index('groupdel c4b-clients', begin), last_check)
+        self.assertLess(script.index('groupdel postapollo-status-readers', begin), last_check)
+        self.assertLess(last_check, script.index('stage COMPOSED_POLICY_RETAINED_FOR_ROLLBACK'))
+
     def test_05_fully_disposable_ci_and_production_deny_only(self):
         workflow = WORKFLOW.read_text()
         script = GUEST.read_text()

@@ -9,6 +9,8 @@ Item {
     property var catalogSnapshot: null
     property var candidates: null
     property var selectedResource: null
+    // Expose rendered rows for native selector/a11y testing, not actuation.
+    property alias favoriteRowRepeater: savedItemRows
     property var timeOwner: null
     property var placesOwner: null
     property var defaultOwner: null
@@ -130,6 +132,7 @@ Item {
                 width: listScroll.width
                 spacing: 5
                 Repeater {
+                    id: savedItemRows
                     model: pane.choices
                     Rectangle {
                         width: listRows.width

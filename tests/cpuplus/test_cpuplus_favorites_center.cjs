@@ -901,11 +901,12 @@ test("U5b notifications refuse bad storage state and private-looking names",()=>
   assert.ok(out.invalidCount>=3);
   assert.deepEqual(plain(out.rows.map(row=>row.item)),
     ["GitHub","com.example.notify",
-     "WEBSITE SOURCE NAME UNAVAILABLE","org.fake.password","Weather"]);
+     "WEBSITE SOURCE NAME UNAVAILABLE","SOURCE NAME UNAVAILABLE","Weather"]);
   const visible=out.rows.map(row=>row.label).join(" ");
   assert.ok(!visible.includes("person@example.com"));
   assert.ok(!visible.includes("host.example"));
   assert.ok(!visible.includes("App password token"));
+  assert.ok(!visible.includes("org.fake.password"));
   assert.ok(!visible.includes("https://private.example"));
   assert.equal(out.rows.every(row=>row.readOnly&&row.capabilities.length===0),true);
   assert.equal(Notifications.build({

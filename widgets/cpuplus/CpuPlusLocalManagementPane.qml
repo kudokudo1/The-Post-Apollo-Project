@@ -10,6 +10,7 @@ Item {
     id: pane
     required property string area
     property string section: "ORGANIZATIONS"
+    property string task: "EDITOR"
     property string selectedOrganizationId: ""
     property string selectedPortfolioId: ""
     signal organizationRequested(string id)
@@ -40,22 +41,37 @@ Item {
         section === "PORTFOLIOS" ? "PORTFOLIOS"
         : section === "STRUCTURE" ? "STRUCTURE / UNITS"
         : "ORGANIZATIONS / BRANCHES"
+    readonly property string taskTitle:
+        task === "BRANCH_LOCATIONS" ? "BRANCH LOCATIONS"
+        : task === "UNIT_LOCATIONS" ? "UNIT LOCATIONS"
+        : task === "REPORTING" ? "FUNCTIONAL REPORTING"
+        : title
 
     readonly property string normalizedSearch: searchField.text.trim().toLowerCase()
     readonly property bool editingText: pane.area === "selector" && searchField.editingText
+    function cancelPendingRelationshipRemoval() {
+        if (pane.area !== "details")
+            return;
+        if (archiveTray)
+            archiveTray.cancelDelete();
+        if (branchLocationEditor)
+            branchLocationEditor.confirmationId = "";
+        if (unitLocationEditor)
+            unitLocationEditor.pendingRemovalId = "";
+        if (reportingEditor)
+            reportingEditor.confirmRemovalId = "";
+    }
     onSectionChanged: {
         if (searchField)
             searchField.text = "";
-        if (pane.area === "details" && archiveTray)
-            archiveTray.cancelDelete();
+        pane.cancelPendingRelationshipRemoval();
     }
+    onTaskChanged: pane.cancelPendingRelationshipRemoval()
     onSelectedOrganizationIdChanged: {
-        if (pane.area === "details" && archiveTray)
-            archiveTray.cancelDelete();
+        pane.cancelPendingRelationshipRemoval();
     }
     onSelectedPortfolioIdChanged: {
-        if (pane.area === "details" && archiveTray)
-            archiveTray.cancelDelete();
+        pane.cancelPendingRelationshipRemoval();
     }
 
     function matches(item) {
@@ -152,11 +168,17 @@ Item {
                 }
                 QuietText {
                     width: parent.width
-                    text: pane.section === "STRUCTURE"
-                          ? "EDIT DIVISIONS, DEPARTMENTS, TEAMS AND LOCATION LABELS IN DETAILS."
-                          : pane.section === "PORTFOLIOS"
-                            ? "GROUP SAVED COMPANIES IN PORTFOLIOS. THIS IS A LOCAL VIEW, NOT ACCESS."
-                            : "CREATE, RENAME, ARCHIVE, RESTORE OR DELETE COMPANIES AND BRANCHES."
+                    text: pane.task === "BRANCH_LOCATIONS"
+                          ? "LINK SAVED BRANCHES TO LOCAL LOCATIONS. REMOVE OR REBUILD LINKS IN DETAILS."
+                          : pane.task === "UNIT_LOCATIONS"
+                            ? "LINK DIVISIONS, DEPARTMENTS AND TEAMS TO LOCAL LOCATIONS."
+                            : pane.task === "REPORTING"
+                              ? "EDIT FUNCTIONAL REPORTS-TO LINKS; CYCLES ARE BLOCKED."
+                              : pane.section === "STRUCTURE"
+                                ? "EDIT DIVISIONS, DEPARTMENTS, TEAMS AND LOCATION LABELS IN DETAILS."
+                                : pane.section === "PORTFOLIOS"
+                                  ? "GROUP SAVED COMPANIES IN PORTFOLIOS. THIS IS A LOCAL VIEW, NOT ACCESS."
+                                  : "CREATE, RENAME, ARCHIVE, RESTORE OR DELETE COMPANIES AND BRANCHES."
                     color: Colors.white
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap
@@ -262,7 +284,7 @@ Item {
 
                 GohuText {
                     width: parent.width
-                    text: pane.title + " // EDIT"
+                    text: pane.taskTitle + " // EDIT"
                     color: Colors.magenta
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
@@ -281,6 +303,7 @@ Item {
                 IdentityCenterLocalOrganizationEditor {
                     width: parent.width
                     visible: pane.section === "ORGANIZATIONS"
+                             && pane.task === "EDITOR"
                     height: visible ? implicitHeight : 0
                     directoryStore: SocialOrganizationDirectoryStore
                     removalController: archiveTray
@@ -290,6 +313,7 @@ Item {
                 IdentityCenterLocalStructureEditor {
                     width: parent.width
                     visible: pane.section === "STRUCTURE"
+                             && pane.task === "EDITOR"
                     height: visible ? implicitHeight : 0
                     directoryStore: SocialOrganizationDirectoryStore
                     structureStore: SocialLocalOrganizationStructureStore
@@ -301,6 +325,7 @@ Item {
                 IdentityCenterLocalPortfolioEditor {
                     width: parent.width
                     visible: pane.section === "PORTFOLIOS"
+                             && pane.task === "EDITOR"
                     height: visible ? implicitHeight : 0
                     directoryStore: SocialOrganizationDirectoryStore
                     portfolioStore: SocialLocalPortfoliosStore
@@ -308,9 +333,50 @@ Item {
                     focusedPortfolioId: pane.selectedPortfolioId
                     useSharedArchiveControl: true
                 }
+                // Reuse the three existing Social relationship writers and
+                // their per-link two-click unlink controls without cloning data.
+                IdentityCenterLocalBranchLocationsEditor {
+                    id: branchLocationEditor
+                    width: parent.width
+                    visible: pane.section === "ORGANIZATIONS"
+                             && pane.task === "BRANCH_LOCATIONS"
+                    height: visible ? implicitHeight : 0
+                    directoryStore: SocialOrganizationDirectoryStore
+                    structureStore: SocialLocalOrganizationStructureStore
+                    linkStore: SocialLocalBranchLocationLinksStore
+                    useSharedContext: true
+                    selectedOrgId: pane.selectedOrganizationId
+                }
+                IdentityCenterLocalUnitLocationsEditor {
+                    id: unitLocationEditor
+                    width: parent.width
+                    visible: pane.section === "STRUCTURE"
+                             && pane.task === "UNIT_LOCATIONS"
+                    height: visible ? implicitHeight : 0
+                    directoryStore: SocialOrganizationDirectoryStore
+                    structureStore: SocialLocalOrganizationStructureStore
+                    linkStore: SocialLocalUnitLocationLinksStore
+                    useSharedContext: true
+                    selectedOrgId: pane.selectedOrganizationId
+                }
+                IdentityCenterLocalFunctionalReportingEditor {
+                    id: reportingEditor
+                    width: parent.width
+                    visible: pane.section === "STRUCTURE"
+                             && pane.task === "REPORTING"
+                    height: visible ? implicitHeight : 0
+                    directoryStore: SocialOrganizationDirectoryStore
+                    structureStore: SocialLocalOrganizationStructureStore
+                    reportingStore: SocialLocalFunctionalReportingStore
+                    useSharedContext: true
+                    selectedOrgId: pane.selectedOrganizationId
+                }
                 IdentityCenterLocalArchiveTray {
                     id: archiveTray
                     width: parent.width
+                    // Relationship filters have their own guarded UNLINK.
+                    visible: pane.task === "EDITOR"
+                    directoryStore:
                     directoryStore: SocialOrganizationDirectoryStore
                     portfolioStore: SocialLocalPortfoliosStore
                     structureStore: SocialLocalOrganizationStructureStore

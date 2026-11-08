@@ -1,0 +1,29 @@
+name: Favorites++ U7b Weather HOME exact-item contract
+
+on:
+  pull_request:
+    paths:
+      - "services/favorites/FavoritesExactNavigationPolicy.js"
+      - "services/favorites/FavoritesResourcePolicy.js"
+      - "services/weather/WeatherHomeFavoritesPolicy.js"
+      - "tests/cpuplus/test_favorites_exact_navigation_u7b.cjs"
+      - ".github/workflows/favorites-u7b-weather-home-contract.yml"
+  push:
+    paths:
+      - "services/favorites/FavoritesExactNavigationPolicy.js"
+      - "services/favorites/FavoritesResourcePolicy.js"
+      - "services/weather/WeatherHomeFavoritesPolicy.js"
+      - "tests/cpuplus/test_favorites_exact_navigation_u7b.cjs"
+      - ".github/workflows/favorites-u7b-weather-home-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-item-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Strict Weather HOME route and original-owner revocation checks
+        run: node --test tests/cpuplus/test_favorites_exact_navigation_u7b.cjs

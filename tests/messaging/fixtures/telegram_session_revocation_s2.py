@@ -43,6 +43,23 @@ MAX_PACKETS = 32
 CRED_SIZE = struct.calcsize("3i")
 
 
+def credential_frame(sock: socket.socket, data: object) -> None:
+    """Send per-message SCM_CREDENTIALS, verified by Linux for this process.
+
+    The implicit ancillary credential on inherited socketpairs can contain
+    PID zero in the disposable runner; never accept that as a caller. A
+    nonroot sender cannot forge another process's PID via SCM_CREDENTIALS.
+    """
+    raw = json.dumps(data, ensure_ascii=True, separators=(",", ":"),
+                     allow_nan=False).encode("utf-8")
+    if not 0 < len(raw) <= C5A.MAX_WIRE:
+        raise ValueError("S2_FRAME_SIZE_REFUSED")
+    creds = struct.pack("3i", os.getpid(), os.getuid(), os.getgid())
+    sent = sock.sendmsg([raw], [(socket.SOL_SOCKET, socket.SCM_CREDENTIALS, creds)])
+    if sent != len(raw):
+        raise OSError("S2_SHORT_SEND")
+
+
 def disposable() -> bool:
     return (sys.platform == "linux" and os.geteuid() != 0
             and os.environ.get("GITHUB_ACTIONS") == "true"
@@ -244,7 +261,7 @@ def client_loop(fd: int) -> int:
         for raw in sys.stdin:
             try:
                 payload = json.loads(raw)
-                C5A.exchange(connection, payload)
+                credential_frame(connection, payload)
                 response = C5A.receive(connection)
                 print(json.dumps(response, separators=(",", ":")), flush=True)
             except (OSError, ValueError, TypeError) as exc:

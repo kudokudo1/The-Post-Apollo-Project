@@ -71,14 +71,15 @@ PanelWindow {
     readonly property int zoomWebEdgeInset: 2
     readonly property int zoomBayInset: Math.max(0, Math.round(zoomViewport.x))
     readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))
-    // Zoom's browser and Camera bottom border are fitted together so the
-    // external guest remains physically within its panel without exposing
-    // the black bottom backing strip. After the 10px frame-fit correction,
-    // operator visual review requested a further SMALL 2px reduction in
-    // all three modes. Keep the normal 1px inset and unchanged top/deck.
-    // Capture, Gallery and Cleanup retain their baseline frame heights.
+    // #1546 reduced Zoom and Camera by the SAME 2px, so their relative
+    // bottom gap remained one pixel and could not correct guest overfill.
+    // Keep that Zoom-only frame size, but inset the physical Sway guest by
+    // two more pixels at the bottom. This is independently applied to the
+    // guest viewport and thus also to its verified follower/input mask.
+    // Preserve the raised top/buttons and all non-Zoom Camera sizes.
     readonly property int zoomBayBottom: 1
     readonly property int zoomFrameBottomFit: 12
+    readonly property int zoomGuestBottomClearance: 2
     // Keep #1505's raised compact controls and common 3px deck spacing.
     // The first 8px rise improved all three sizes; a subsequent native screenshot
     // calls for another 5px. Rise is now 13px total from the #1505 deck.
@@ -288,9 +289,9 @@ PanelWindow {
     // ZoomWebHost reject its physical rectangle as OUTSIDE_WORKAREA.
     // Preserve Finance's fullscreen budget; keep expanded's deck reserve.
     // Finance/chassis baseline is unchanged for Capture, Gallery, Cleanup.
-    // In Zoom only, shorten the OUTER frame by 12px total (10px prior and
-    // 2px further). The browser follows its bottom automatically, retaining
-    // the 1px border with no new black band or other-mode size change.
+    // Keep the Zoom-only 12px frame reduction from #1546. Browser's
+    // additional 2px clearance is independent of this frame height so it
+    // actually fits farther inside the enclosure in every chassis.
     readonly property int frameHeightBase:
         chassisLevel === "compact"
         ? Math.max(1, Math.min(699, availableFrameHeight))
@@ -1007,7 +1008,12 @@ PanelWindow {
             y: camera.zoomControlDeckBottom + camera.zoomDeckGap
                - camera.zoomBrowserRise
             width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)
-            height: Math.max(0, frame.height - y - camera.zoomBayBottom)
+            // The physical browser sits three pixels from Camera's
+            // bottom (original 1px + 2px clearance). Only these pixels are
+            // backed by the existing opaque frame seal. Never enlarge the
+            // outer frame to cancel this independent guest clearance.
+            height: Math.max(0, frame.height - y - camera.zoomBayBottom
+                             - camera.zoomGuestBottomClearance)
             visible: camera.menuOpen && camera.activeView === "zoom"
 
             Flickable {

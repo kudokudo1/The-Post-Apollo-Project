@@ -28,13 +28,17 @@ kill -0 "$xpid" || { cat "$work/xvfb.log"; exit 1; }
 wait_for(){
   local marker="$1"
   for ((i=0;i<160;i++)); do
-    if grep -F "U3_FAIL" "$log" >/dev/null 2>&1 ||
-       ! kill -0 "$pid" 2>/dev/null; then
+    if grep -F "U3_FAIL" "$log" >/dev/null 2>&1; then
       cat "$log"
       echo "U3_FAIL // stopped before marker: $marker"
       return 1
     fi
     grep -F "$marker" "$log" >/dev/null 2>&1 && return 0
+    if ! kill -0 "$pid" 2>/dev/null; then
+      cat "$log"
+      echo "U3_FAIL // exited without marker: $marker"
+      return 1
+    fi
     sleep 0.1
   done
   cat "$log"

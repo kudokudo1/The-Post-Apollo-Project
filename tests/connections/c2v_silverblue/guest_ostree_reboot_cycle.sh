@@ -132,6 +132,11 @@ case "$stage" in
       install -m 0700 "$data/c4b-guest-confined-runtime.sh" "$c4b_gate" ||
         failure "C4B_RUNTIME_SCRIPT_STAGING_FAILED"
       printf '%s\n' C4B_DISPOSABLE_VM_ONLY > "$c4b_mode"
+      # UART1 exists only in C4b's disposable QEMU; diagnostic-only channel.
+      if [[ -c /dev/ttyS1 ]]; then
+        timeout --signal=TERM --kill-after=1s 4s \
+          /usr/bin/bash -c 'printf "%s\n" "C4B_DIAG_UART1_READY // first_boot" >/dev/ttyS1' || true
+      fi
       echo "C4B_PASS // SIGNED_C4A_LAYER_HAS_EXPLICIT_OFFLINE_RUNTIME_OPT_IN"
     fi
     echo "C2V_PASS // REAL_SILVERBLUE_FIRST_BOOT_BASELINE"
@@ -315,8 +320,12 @@ c4b_emergency_relay() {
     echo 'C4B_DIAG_RPM_OSTREE_WORKER_LOG_BEGIN'
     tail -n 45 /var/tmp/c2v-rpm-ostree-install.log 2>/dev/null || true
   } > /var/tmp/c4b-monitor-fatal-summary.log 2>&1 || true
-  # Fatal diagnostics may itself be rejected by ttyS0. Never let this
-  # diagnostic channel extend the host's authority or block poweroff.
+  # ttyS1 is a second independent C4b-only UART. Its output is NEVER an
+  # acceptance signal. Keep the old ttyS0 best-effort path for comparison.
+  if [[ -c /dev/ttyS1 ]]; then
+    timeout --signal=TERM --kill-after=2s 9s \
+      cat /var/tmp/c4b-monitor-fatal-summary.log >/dev/ttyS1 2>&1 || true
+  fi
   timeout --signal=TERM --kill-after=2s 9s \
     cat /var/tmp/c4b-monitor-fatal-summary.log >/dev/ttyS0 2>&1 || true
   return 0
@@ -382,6 +391,34 @@ C2V_PENDING_CHECK
       exit 0
     else
       echo "C2V_MONITOR_PENDING_JSON_REJECTED // attempt=$attempt"
+      # Read-only, bounded observation at early denied polls, independent of
+      # the authoritative C2v/C4a pending-deployment check above.
+      if [[ -f /var/lib/c4b-runtime-ci-only && -c /dev/ttyS1 ]] &&
+         (( attempt == 2 || attempt == 3 || attempt % 6 == 0 )); then
+        {
+          echo "C4B_DIAG_PENDING_REJECTED // attempt=$attempt"
+          python3 - "$staged_json" <<'C4B_PENDING_DIAG'
+import json,sys
+try:
+    with open(sys.argv[1],encoding="utf-8") as fp:
+        s=json.load(fp)
+    deployments=s.get("deployments") or []
+    d=deployments[0] if deployments else {}
+    print("C4B_DIAG_PENDING_HEAD // "+
+          json.dumps({"transaction":s.get("transaction"),
+                      "staged":d.get("staged"),"pending":d.get("pending"),
+                      "booted":d.get("booted"),
+                      "requested-local-packages":d.get("requested-local-packages"),
+                      "packages":d.get("packages")},sort_keys=True)[:2500])
+except Exception as exc:
+    print("C4B_DIAG_PENDING_PARSE_FAILED // "+type(exc).__name__)
+C4B_PENDING_DIAG
+          echo "C4B_DIAG_WORKER_EXIT // $(cat "$resultfile" 2>/dev/null || echo unobserved)"
+          tail -n 8 "$log" 2>/dev/null || true
+        } >/var/tmp/c4b-pending-diag.log 2>&1 || true
+        timeout --signal=TERM --kill-after=1s 5s \
+          cat /var/tmp/c4b-pending-diag.log >/dev/ttyS1 2>&1 || true
+      fi
     fi
   else
     echo "C2V_MONITOR_STATUS_QUERY_FAILED // attempt=$attempt"

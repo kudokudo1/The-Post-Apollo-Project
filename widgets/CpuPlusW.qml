@@ -8,6 +8,7 @@ import "cpuplus"
 import qs.services.location
 import qs.services.time
 import qs.services.favorites
+import qs.services.notifications
 import "../services/favorites/FavoritesManagementPolicy.js" as FavoritesManagement
 import qs.services.social
 import "thermal"
@@ -71,6 +72,27 @@ PanelWindow {
             cardKeys:cpuFavoritesCatalog.copyValues(
                 weatherHomeFavoritesSource.cardKeys)
         }) : null
+    // U5b: inspect the existing NotificationsService singleton. Its
+    // favoritesRevision is the reactivity edge for ListModel changes. Never
+    // copy sourceId, message text, history, DND/snooze, URLs or actions.
+    readonly property var notificationFavoritesSnapshot: {
+        const ready=NotificationsService.favoritesReady;
+        const status=NotificationsService.favoritesStatus;
+        const revision=NotificationsService.favoritesRevision;
+        const model=NotificationsService.favoriteSources;
+        const rows=[];
+        if (ready && (status==="ready" || status==="saved") && model) {
+            const bound=Math.min(Number(model.count || 0),129);
+            for(let i=0;i<bound;i++) {
+                const item=model.get(i);
+                rows.push({
+                    appKey:String(item.appKey || ""),
+                    source:String(item.source || "")
+                });
+            }
+        }
+        return ({ready:ready,status:status,revision:revision,sources:rows});
+    }
     readonly property var favoriteCandidates:
         FavoritesManagement.list(
             TimeSettings.worldFavoriteZones,
@@ -90,7 +112,8 @@ PanelWindow {
                     FavoritesStore.favoriteTaskMetricKeys)
             }), FavoritesStore.favoriteDisplayLabels,
             cpuAppFavoriteDescriptions.records,
-            cpuPlusWindow.weatherHomeFavoritesSnapshot)
+            cpuPlusWindow.weatherHomeFavoritesSnapshot,
+            cpuPlusWindow.notificationFavoritesSnapshot)
     readonly property var selectedFavoriteResource:
         FavoritesManagement.recordFor(favoriteCandidates,selectedFavoriteKey)
     // Original AppControl provides display-only menu/item/type descriptors.

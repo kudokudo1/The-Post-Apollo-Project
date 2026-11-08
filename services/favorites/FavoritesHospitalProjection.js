@@ -60,7 +60,7 @@ function build(snapshot) {
             label:"HOSPITAL // "+menu+" // "+item,
             sourceName:"HOSPITAL RECEPTION",menu:menu,item:item,
             favoriteType:"PINNED ACTIVITY",
-            resolved:meta.at!=="",category:"HOSPITAL",owner:"hospital",
+            resolved:true,category:"HOSPITAL",owner:"hospital",
             readOnly:true,isFavorite:true,isPinned:true,
             available:"unresolved",capabilities:[]
         });

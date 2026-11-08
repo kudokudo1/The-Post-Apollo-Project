@@ -91,6 +91,12 @@ class C3eISupervisedSupersessionTests(unittest.TestCase):
         self.assertEqual(p.exitcode, 73)
 
     def test_01_enrollment_explicit_and_no_pending_refused(self):
+        # First construct a real, correctly signed operator request.
+        # A genuine "no pending" refusal must not be masked by a missing
+        # approval file or an unreadable package.
+        self.ready()
+        with sqlite3.connect(self.opts["witness_db"]) as db:
+            db.execute("DELETE FROM split_intent WHERE id=1")
         self.refused("OPERATOR_PREFLIGHT_REFUSED_NO_PENDING_INTENT")
         with self.assertRaises(ci.Refused) as e:
             ci.initialize(
@@ -160,8 +166,8 @@ class C3eISupervisedSupersessionTests(unittest.TestCase):
     def test_08_changed_signed_candidate_cannot_reconcile(self):
         self.ready()
         self.crash("supersession-prepared")
-        self.fx.fx.fx.issue(6, 11, b"fake-signed-release-11")
-        self.fx.fx.fx.advance()
+        self.fx.fx.fx.fx.issue(6, 11, b"fake-signed-release-11")
+        self.fx.fx.fx.fx.advance()
         self.refused(
             "OPERATOR_PREFLIGHT_REFUSED_SIGNED_APPROVAL_CONTEXT_MISMATCH",
             recovery=True,
@@ -231,7 +237,7 @@ class C3eISupervisedSupersessionTests(unittest.TestCase):
     def test_16_new_authority_challenge_required_on_crash_retry(self):
         self.ready()
         self.crash("supersession-prepared")
-        old = self.fx.fx.fx.remote_proof("f" * 64)
+        old = self.fx.fx.fx.fx.remote_proof("f" * 64)
         self.refused(
             "OPERATOR_PREFLIGHT_REFUSED_FRESH_AUTHORITY_REFUSED_INVALID_AUTHORITY_PROOF_REPLAYED_OR_UNSOLICITED_PROOF",
             recovery=True,

@@ -260,7 +260,7 @@ test("C30 Meteors defaults to a moving radiant visualization, with a cycling cre
   assert.match(motion,/readonly property real radiantX:/);
   assert.match(motion,/readonly property real radiantY:/);
   assert.match(motion,/SIMULATED TRAILS/);
-  assert.match(motion,/not a local live sky|NOT a full/i);
+  assert.match(motion,/does not claim to show a local live sky/i);
   assert.match(motion,/Their \*rate is purely decorative\*/);
   assert.equal((motion.match(/Canvas\s*\{/g)||[]).length,1);
   assert.equal((motion.match(/Timer\s*\{/g)||[]).length,1);

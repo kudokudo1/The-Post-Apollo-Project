@@ -206,8 +206,9 @@ test("C31 living ECLIPSES shows solar and lunar moving geometry, optional credit
  assert.equal((scene.match(/Canvas\s*\{/g)||[]).length,1);
  assert.equal((scene.match(/Timer\s*\{/g)||[]).length,1);
  assert.equal((scene.match(/Image\s*\{/g)||[]).length,1);
- for(const forbidden of ["Process {","FileView {","XMLHttpRequest","Flickable {","VideoOutput {","MediaPlayer {"]) {
+ for(const forbidden of ["Process {","FileView {","XMLHttpRequest","VideoOutput {","MediaPlayer {"]) {
    assert.ok(!board.includes(forbidden),forbidden);
    assert.ok(!scene.includes(forbidden),forbidden);
  }
+ assert.ok(!scene.includes("Flickable {"));
 });

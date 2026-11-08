@@ -105,7 +105,7 @@ PanelWindow {
     }
     function selectLocalManagementTask(task) {
         const allowed = idManagementSection === "ORGANIZATIONS"
-            ? ["EDITOR", "BRANCH_LOCATIONS"]
+            ? ["EDITOR", "BRANCH_LOCATIONS", "LINK_MODIFIERS"]
             : idManagementSection === "STRUCTURE"
               ? ["EDITOR", "UNIT_LOCATIONS", "REPORTING"]
               : ["EDITOR"];

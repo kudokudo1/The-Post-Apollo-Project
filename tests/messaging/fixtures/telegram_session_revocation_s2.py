@@ -113,9 +113,14 @@ class S2Host:
 
     def from_client(self, payload, sender):
         bound = self.client_identity
-        if (bound is None or sender != bound[:3]
-                or C5B.process_start_ticks(bound[0]) != bound[3]):
-            return S1.report("CALLER_NOT_BOUND_OR_SENDER_CHANGED")
+        if bound is None:
+            return S1.report("CALLER_NOT_BOUND")
+        if sender is None:
+            return S1.report("KERNEL_SENDER_MISSING")
+        if sender != bound[:3]:
+            return S1.report("KERNEL_SENDER_MISMATCH")
+        if C5B.process_start_ticks(bound[0]) != bound[3]:
+            return S1.report("CALLER_START_TICKS_CHANGED")
         if type(payload) is not dict or type(payload.get("op")) is not str:
             return S1.report("INVALID_CLIENT_FRAME")
         if payload["op"] == "prepare":

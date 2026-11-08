@@ -87,9 +87,9 @@ ShellRoot {
             if(root.phase==="save"){
                 if(root.announced || root.store.storageState!=="empty")
                     return;
+                panel.draftName="Synthetic Group";
                 if(!panel.createControl.available)
                     return;
-                panel.draftName="Synthetic Group";
                 const pt=panel.createControl.mapToItem(
                     win.contentItem,
                     panel.createControl.width/2,

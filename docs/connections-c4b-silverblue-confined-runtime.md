@@ -97,3 +97,26 @@ The same secondary UART showed `C4B_DIAG_CONTROLLER_FATAL // C4B_RUNTIME_PHASE_F
 The new C4b-only recovery branch adds a read-only bounded UART1 relay of the already-existing `/var/tmp/c4b-runtime-stage` and last 100 lines of `/var/tmp/c4b-runtime.log` when the controller's runtime phase fails. These artifacts are test-only and never authorize package installation, reboot or acceptance. Source tests require the exact UART markers. The original C2v/C2x/C4a and full real-VM requirements remain unchanged.
 
 **Next:** inspect the exact full CI runtime failure line. Patch a demonstrated defect only; leave SELinux Enforcing, signed package integrity, original runtime origin check, no-network guest and two real boots mandatory. Merged #1491 is **not** C4b technical acceptance; no production activation is authorized.
+
+
+## C4b COMPOSED POLICY CORRECTION // 2026-11-08
+
+The merged PR #1503 exact-head [C4b VM run 42486693794](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42486693794) produced the **first definitive root-cause failure** after real first boot:
+
+\`\`\`text
+C4B_STAGE // phase=booted step=POLICY_LOAD_RETURNED
+C4B_PASS // SELINUX_POLICY_LOADED_WITH_ENFORCING_KERNEL
+C4B_STAGE // phase=booted step=SIGNED_IMMUTABLE_ENTRYPOINT_RELABEL_BEGIN
+restorecon: Could not set context for /usr/libexec/post-apollo/connections-status-host: Read-only file system
+C4B_FAIL // IMMUTABLE_USR_ENTRYPOINT_LABEL_REFUSED
+\`\`\`
+
+This is not a missing RPM or D-Bus issue. The service RPM was correctly signed and layered in an actual immutable Fedora Silverblue 44 OSTree boot, and the custom module loaded with SELinux enforcing. The bug is attempting to relabel immutable \`/usr\` *after* boot. The proper design is to provide the desired SELinux file context at **OSTree composition** time, before immutable boot, rather than to remount, create an unsigned copy, or permit a fallback context.
+
+This recovery creates a **separate, test-only, disposable-key-signed C4b SELinux policy RPM**, without editing the C3d signed fake-host builder or weakening the C2r module. The C4b builder compiles the existing \`postapollo_connections.te\` and \`.fc\` sources into a \`.pp\`, builds a package with exactly one \`/usr/share/selinux/packages/targeted/postapollo_connections.pp\` payload and explicit bounded-purpose \`semodule\` install/uninstall scriptlets, and signs it with an ephemeral OpenPGP key. An independent isolated \`rpmkeys --dbpath\` keyring proves this test signer was not pre-trusted and validates the RPM signature and exact payload before layering.
+
+The offline \`rpm-ostree install --cache-only\` stages **three** local RPMs in one transaction only when C4b is opted in: inert C2t, signed fake C3d service, and signed C4b policy. The authoritative pre-reboot pending-deployment parser checks all **three exact** local NEVRAs for C4b (two remain mandatory for C4a). On first real boot, C4b checks that both packages are owned by their expected RPMs, the module is loaded in enforcing mode, and the immutable signed executable already carries \`postapollo_connections_exec_t\`. The gate never invokes a runtime \`restorecon\` or \`semodule -i\` to correct a wrongly composed label.
+
+The confined service and negative SELinux/D-Bus tests remain compulsory. After the signed service is stopped and disposable users/venv removed, the composed policy **must stay installed until real OSTree rollback**; runtime \`semodule -r\` would conceal whether rollback restored the previous policy. Following the second reboot, the signed service, policy RPM, context module, local keyring and runtime assets must all be absent before acceptance. This policy RPM is **test-only**, not a production package or release-signing process.
+
+**Status:** The structural correction is proposed on a separate recovery branch. Its custom policy RPM spec/scriptlet behavior, label-on-compose result and rollback semantics are experimentally unverified until exact-head real Silverblue CI runs. If composition refuses the package/scriptlet or does not label the entrypoint, fail closed and record the precise test error. No \`usroverlay\`, SELinux permissive mode, unsigned executable replacement, or production activation is authorized.

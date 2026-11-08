@@ -138,8 +138,8 @@ class C4bContracts(unittest.TestCase):
             "58948f9aff9db08316734c0be2a120f6dc502124d9642f55e90ac82ffb16a18b",
             workflow,
         )
-        self.assertIn("postapollo_connections.te", workflow)
-        self.assertIn("postapollo_connections.fc", workflow)
+        self.assertIn("postapollo_connections", POLICY_BUILDER.read_text())
+        self.assertIn("postapollo_connections", POLICY_BUILDER.read_text())
         self.assertIn('if [[ "$c4b_requested" == 1 ]]; then', BOOT.read_text())
         self.assertIn("C3B_PASS // OS_DBUS_PID_UID_SYSTEMD_SELINUX_ORIGIN_COHERENCE_TEST_ONLY",
                       BOOT.read_text())

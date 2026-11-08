@@ -74,6 +74,21 @@ PanelWindow {
     property string huntLastEvent: "READY // NEW ROUND"
     // Player choice affects NEW rounds, never existing targets.
     property int huntSpawnCount: 3
+    // Hunt M3d progression: baseline +1 target per 5 completed rounds,
+    // movement speed +10% per 5 rounds, bounded at 10 and 2.5x.
+    property int huntTargetsPerTier: 1
+    property int huntTargetsEvery: 5
+    property int huntSpeedGainPercent: 10
+    property int huntSpeedEvery: 5
+    property real huntRoundSpeed: 1.0
+    property int huntRoundSpawnCount: 3
+    property bool huntAutoRounds: true
+    property bool huntAutoPending: false
+    property bool huntSettingsOpen: false
+    property bool huntScoped: false
+    readonly property real huntScopeScale: huntScoped ? 1.85 : 1
+    readonly property real huntScopeSwayX: huntScoped ? 2.2 * Math.sin(huntTick * 0.19) : 0
+    readonly property real huntScopeSwayY: huntScoped ? 1.8 * Math.cos(huntTick * 0.23) : 0
     property real huntMouseX: 0.5
     property real huntMouseY: 0.5
     property bool huntMouseActive: false
@@ -441,6 +456,11 @@ PanelWindow {
             huntCombo = 0;
             huntScore = 0;
             huntLastEvent = "READY // NEW ROUND";
+            huntAutoPending = false;
+            huntScoped = false;
+            huntSettingsOpen = false;
+            huntRoundSpeed = 1.0;
+            huntRoundSpawnCount = huntSpawnCount;
             huntMouseActive = false;
             huntMouseMovingTicks = 0;
             huntMouseVX = 0;
@@ -610,6 +630,68 @@ PanelWindow {
         return true;
     }
 
+    function huntSetProgression(name, value) {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || !Number.isFinite(Number(value)))
+            return false;
+        const numeric = Math.round(Number(value));
+        if (name === "targetGain")
+            huntTargetsPerTier = Math.max(0, Math.min(5, numeric));
+        else if (name === "targetEvery")
+            huntTargetsEvery = Math.max(1, Math.min(50, numeric));
+        else if (name === "speedGain")
+            huntSpeedGainPercent = Math.max(0, Math.min(50, numeric));
+        else if (name === "speedEvery")
+            huntSpeedEvery = Math.max(1, Math.min(50, numeric));
+        else
+            return false;
+        return true;
+    }
+
+    function huntSetAutoRounds(enabled) {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt")
+            return false;
+        huntAutoRounds = enabled === true;
+        if (!huntAutoRounds)
+            huntAutoPending = false;
+        else if (huntRoundComplete && huntTargets.length === 0)
+            huntAutoPending = true;
+        return true;
+    }
+
+    function huntToggleSettings() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt")
+            return false;
+        huntSettingsOpen = !huntSettingsOpen;
+        if (huntSettingsOpen) {
+            huntPaused = true;
+            huntScoped = false;
+        }
+        return true;
+    }
+
+    function huntSetScoped(enabled) {
+        if (activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || busy || huntPaused || huntRoundComplete
+                || huntTargets.length === 0 || huntSettingsOpen) {
+            huntScoped = false;
+            return false;
+        }
+        huntScoped = enabled === true;
+        return true;
+    }
+
+    function huntAutoStartNext() {
+        if (!huntAutoPending || !huntAutoRounds || busy
+                || huntSettingsOpen || activeView !== "cleanup"
+                || cleanupTechnique !== "hunt" || !huntRoundComplete)
+            return false;
+        // One shot only. A depleted library or full queue must NOT start
+        // an endless timer loop attempting to launch again.
+        huntAutoPending = false;
+        return huntStartRound();
+    }
+
     // Cursor motion decays after half a second of inactivity. The fox uses
     // moving vs. stationary state, not absolute pointer coordinates alone.
     function huntSetPointer(x, y, width, height) {
@@ -665,7 +747,10 @@ PanelWindow {
             eligible[i] = eligible[j];
             eligible[j] = tmp;
         }
-        const picked = eligible.slice(0, Math.min(huntSpawnCount, eligible.length));
+        const nextRound = huntRound + 1;
+        const requested = HuntMotion.spawnForRound(
+            huntSpawnCount, huntTargetsPerTier, huntTargetsEvery, nextRound);
+        const picked = eligible.slice(0, Math.min(requested, eligible.length));
         // Deal shuffled sets of all five profiles before repeating.
         // 1-5 spawns are distinct; 6-10 can repeat in a new shuffle.
         let profiles = [];
@@ -685,7 +770,12 @@ PanelWindow {
         }
         huntTargets = targets;
         huntHistory = [];
-        huntRound += 1;
+        huntAutoPending = false;
+        huntScoped = false;
+        huntRoundSpeed = HuntMotion.speedForRound(
+            huntSpeedGainPercent, huntSpeedEvery, nextRound);
+        huntRoundSpawnCount = targets.length;
+        huntRound = nextRound;
         huntTick = 0;
         huntSecondsLeft = 25;
         huntCombo = 0;
@@ -693,7 +783,8 @@ PanelWindow {
         huntPaused = false;
         huntLastEvent = "ROUND " + huntRound + " // FIRE TO QUEUE";
         feedback = "HUNT // ROUND " + huntRound
-                   + " // " + targets.length + " LOADED MEDIA TARGETS";
+                   + " // " + targets.length + " TARGETS // SPEED "
+                   + huntRoundSpeed.toFixed(2) + "X";
         return true;
     }
 
@@ -714,7 +805,8 @@ PanelWindow {
             huntMouseMovingTicks -= 1;
         const nextTargets = [];
         for (let i = 0; i < huntTargets.length; i++)
-            nextTargets.push(HuntMotion.advanceTarget(huntTargets[i], pointer));
+            nextTargets.push(HuntMotion.advanceTarget(
+                huntTargets[i], pointer, huntRoundSpeed));
         huntTargets = nextTargets;
         huntTick++;
         huntSecondsLeft = Math.max(0, 25 - Math.floor(huntTick / 10));
@@ -725,6 +817,8 @@ PanelWindow {
             huntHistory = [];
             huntPaused = true;
             huntRoundComplete = true;
+            huntAutoPending = huntAutoRounds;
+            huntScoped = false;
             huntCombo = 0;
             huntLastEvent = "TIME UP // UNHIT FILES STAY UNTOUCHED";
             feedback = huntLastEvent;
@@ -737,6 +831,7 @@ PanelWindow {
                 || huntRoundComplete || huntTargets.length === 0)
             return false;
         huntPaused = !huntPaused;
+        if (huntPaused) huntScoped = false;
         huntLastEvent = huntPaused ? "PAUSED // NO SHOTS" : "RESUMED // HUNT";
         return true;
     }
@@ -793,7 +888,9 @@ PanelWindow {
             if (huntTargets.length === 0) {
                 huntRoundComplete = true;
                 huntPaused = true;
-                huntLastEvent = "ROUND CLEARED // REVIEW QUEUE OR NEXT ROUND";
+                huntAutoPending = huntAutoRounds;
+                huntScoped = false;
+                huntLastEvent = "ROUND CLEARED // AUTO NEXT OR REVIEW QUEUE";
             }
         }
         feedback = "HUNT // " + huntLastEvent + " // SCORE " + huntScore;
@@ -807,6 +904,8 @@ PanelWindow {
         const history = huntHistory.slice();
         const last = history.pop();
         huntHistory = history;
+        huntAutoPending = false;
+        huntScoped = false;
         huntTargets = last.targets.slice();
         batchPaths = last.paths.slice();
         huntShots = last.shots;
@@ -1162,6 +1261,8 @@ PanelWindow {
             huntHistory = [];
             huntTargets = [];
             huntPaused = true;
+            huntScoped = false;
+            huntAutoPending = false;
             Qt.callLater(function() { camera.loadGallery(false, "cleanup"); });
         } else if (action === "previewSelected") {
             if (payload.path === selectedPath) {
@@ -2745,8 +2846,12 @@ PanelWindow {
                                 available: !camera.busy
                                 onLeftClicked: {
                                     if (camera.cleanupTechnique === "hunt"
-                                            && modelData.id !== "hunt")
+                                            && modelData.id !== "hunt") {
                                         camera.huntPaused = true;
+                                        camera.huntScoped = false;
+                                        camera.huntAutoPending = false;
+                                        camera.huntSettingsOpen = false;
+                                    }
                                     camera.cleanupTechnique = modelData.id;
                                     camera.huntMouseActive = false;
                                     camera.huntMouseMovingTicks = 0;

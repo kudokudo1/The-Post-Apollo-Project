@@ -68,6 +68,18 @@ function safeRunDisplay(raw) {
     const item=executable+(prefix==="NORMAL" ? "" : " ["+prefix+"]")+suffix;
     return visibleName(item) ? item : null;
 }
+function savedDesktopIdentity(raw) {
+    // AppControl also stores DesktopEntry IDs directly. A missing/uninstalled
+    // desktop entry has no live app name, but a strictly formatted desktop ID
+    // can still supply its final program token without exposing the raw ID.
+    if (typeof raw!=="string" || raw.length>128
+            || !/^(?:[A-Za-z][A-Za-z0-9_-]{0,40}\.){1,6}[A-Za-z][A-Za-z0-9_-]{0,40}(?:\.desktop)?$/.test(raw)
+            || /(?:password|secret|token|credential|private|auth|keyring)/i.test(raw))
+        return "";
+    const segments=raw.replace(/\.desktop$/i,"").split(".");
+    const name=visibleName(segments[segments.length-1]);
+    return name ? name+" [SAVED APP ID]" : "";
+}
 function modeMenu(number) {
     // Source: AppControlW.modes, not the CPU++ category labels.
     return ["FAVORITES","APPS","FILES","RUN","WINDOWS",
@@ -125,7 +137,7 @@ function build(saved, models) {
         if (!permitted[kind][raw]) return;
         const label=visibleName(item);
         const key=Resource.identityKey("appcontrol",kind,raw);
-        if (!key || !label) return;
+        if (!key || !label || Object.prototype.hasOwnProperty.call(out,key)) return;
         out[key]={menu:menu,item:label,type:type};
     }
     function sourceRows(field) {
@@ -260,6 +272,9 @@ function build(saved, models) {
                     && !/(?:password|secret|token|credential|private|auth|keyring)/i.test(command))
                 put("item",raw,"APPS",command+" [CLI]","FAVORITE");
         } else {
+            const desktop=savedDesktopIdentity(raw);
+            if (desktop)
+                put("item",raw,"APPS",desktop,"FAVORITE");
             const mode=modeIdentity(raw);
             if (mode && mode.menu==="WINDOWS") {
                 const safe=stableOwnerWindowName(models,mode.label);

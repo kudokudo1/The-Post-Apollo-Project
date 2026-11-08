@@ -6,6 +6,7 @@ Sway, GIO or real user's pictures are touched by these tests.
 import importlib.util
 import json
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import time
@@ -201,6 +202,20 @@ class GalleryM2Tests(unittest.TestCase):
         self.assertEqual(preview["count"], 1)
         self.assertTrue(old.exists())
         self.assertTrue(innocent.exists())
+
+    def test_cleanup_batch_swipe_queue_and_ui_contracts(self):
+        # The existing Camera CI runs this file. Execute our offline JS
+        # decision tests here without modifying the concurrently owned CI
+        # workflow (PR #1570).
+        script = ROOT / "tests/camera/test_camera_cleanup_swipe_m2.cjs"
+        self.assertTrue(script.is_file())
+        result = subprocess.run(
+            ["node", "--test", str(script)],
+            capture_output=True, text=True, timeout=20,
+            cwd=ROOT, check=False)
+        self.assertEqual(result.returncode, 0,
+                         "Cleanup Swipe/Batch JS contract failed:\n"
+                         + result.stdout + "\n" + result.stderr)
 
 
 if __name__ == "__main__":

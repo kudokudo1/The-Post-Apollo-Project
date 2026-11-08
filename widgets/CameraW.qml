@@ -41,11 +41,21 @@ PanelWindow {
     property string lastTrashReceipt: ""
     // One Camera deletion queue used by Batch now and future Swipe/Hunt
     // presentations. Marking files is never equivalent to moving them.
-    property bool batchMode: false
+    // Mass deletion belongs to CLEANUP. BATCH and SWIPE share this queue;
+    // neither input mode can move files without an explicit backend plan.
+    property string cleanupTechnique: "batch"
+    readonly property bool batchMode: activeView === "cleanup"
+                                      && cleanupTechnique !== "desktop"
+    property string cleanupSearchQuery: ""
+    property string cleanupCustomFolder: ""
+    property string cleanupMediaFilter: "all"
+    property string galleryRequestedView: "gallery"
     property var batchPaths: []
     property var batchPreview: null
     property string batchReviewKey: ""
     property string batchReceipt: ""
+    property int swipeIndex: 0
+    property var swipeHistory: []
     property string captureMode: "region"
     // Read Social's active identity and provider alias metadata, not login state.
     readonly property var zoomSocialIdentity: SocialIdentityStore.snapshot
@@ -372,10 +382,16 @@ PanelWindow {
         return true;
     }
 
-    function loadGallery(append) {
+    function loadGallery(append, targetView) {
         if (busy)
             return false;
-        activeView = "gallery";
+        // The same bounded inventory is displayed independently in Gallery
+        // (viewing) or Cleanup (mass selection). Do not force navigation.
+        const destination = targetView === "cleanup" || targetView === "gallery"
+                            ? targetView
+                            : activeView === "cleanup" ? "cleanup" : "gallery";
+        activeView = destination;
+        const cleaning = destination === "cleanup";
         const nextPage = append === true ? galleryPageIndex + 1 : 0;
         if (append !== true) {
             selectedPath = "";
@@ -384,21 +400,25 @@ PanelWindow {
             batchPaths = [];
             batchPreview = null;
             batchReviewKey = "";
+            swipeIndex = 0;
+            swipeHistory = [];
             galleryFiles = [];
         } else if (!galleryHasMore) {
             return false;
         }
-        galleryRequestedQuery = gallerySearch.text.trim();
-        galleryRequestedFolder = galleryCustomFolder;
-        galleryRequestedShotsOnly = galleryShotsOnly;
-        galleryRequestedMediaFilter = galleryMediaFilter;
+        galleryRequestedView = destination;
+        galleryRequestedQuery = cleaning ? cleanupSearchQuery.trim()
+                                         : gallerySearch.text.trim();
+        galleryRequestedFolder = cleaning ? cleanupCustomFolder : galleryCustomFolder;
+        galleryRequestedShotsOnly = cleaning ? false : galleryShotsOnly;
+        galleryRequestedMediaFilter = cleaning ? cleanupMediaFilter : galleryMediaFilter;
         return run("gallery", [
             "gallery",
             "--page", String(nextPage),
             "--query", galleryRequestedQuery,
-            "--folder", galleryCustomFolder,
-            "--media-filter", galleryMediaFilter
-        ].concat(galleryShotsOnly ? ["--shots-only"] : []));
+            "--folder", galleryRequestedFolder,
+            "--media-filter", galleryRequestedMediaFilter
+        ].concat(galleryRequestedShotsOnly ? ["--shots-only"] : []));
     }
 
     function selectImage(record) {
@@ -447,6 +467,7 @@ PanelWindow {
         batchPaths = next;
         batchPreview = null;
         batchReviewKey = "";
+        swipeHistory = [];
         return true;
     }
 
@@ -471,6 +492,7 @@ PanelWindow {
         batchPaths = next;
         batchPreview = null;
         batchReviewKey = "";
+        swipeHistory = [];
         return true;
     }
 
@@ -479,6 +501,54 @@ PanelWindow {
         batchPaths = [];
         batchPreview = null;
         batchReviewKey = "";
+        swipeHistory = [];
+        return true;
+    }
+
+    function swipeDecide(action) {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "swipe"
+                || swipeIndex >= galleryFiles.length
+                || ["trash", "keep", "skip"].indexOf(action) < 0)
+            return false;
+        const record = galleryFiles[swipeIndex];
+        if (!record || !record.path)
+            return false;
+        const previousQueue = batchPaths.slice();
+        const next = previousQueue.slice();
+        const index = next.indexOf(record.path);
+        if (action === "trash" && index < 0) {
+            if (next.length >= 500) {
+                feedback = "SWIPE // 500 FILE LIMIT // REVIEW OR CLEAR";
+                return false;
+            }
+            next.push(record.path);
+        } else if (action === "keep" && index >= 0)
+            next.splice(index, 1);
+        const history = swipeHistory.slice();
+        history.push({index: swipeIndex, paths: previousQueue, decision: action});
+        swipeHistory = history;
+        swipeIndex += 1;
+        batchPaths = next;
+        batchPreview = null;
+        batchReviewKey = "";
+        feedback = "SWIPE // " + action.toUpperCase()
+                   + " // " + swipeIndex + "/" + galleryFiles.length
+                   + " // QUEUED " + batchPaths.length;
+        return true;
+    }
+
+    function swipeUndo() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "swipe"
+                || swipeHistory.length === 0)
+            return false;
+        const history = swipeHistory.slice();
+        const last = history.pop();
+        swipeHistory = history;
+        swipeIndex = last.index;
+        batchPaths = last.paths.slice();
+        batchPreview = null;
+        batchReviewKey = "";
+        feedback = "SWIPE // UNDID " + last.decision.toUpperCase();
         return true;
     }
 
@@ -488,7 +558,7 @@ PanelWindow {
         batchPreview = null;
         batchReviewKey = JSON.stringify(batchPaths);
         return run("previewBatch", ["preview-batch", batchReviewKey,
-                                    "--folder", galleryCustomFolder]);
+                                    "--folder", cleanupCustomFolder]);
     }
 
     function confirmBatchTrash() {
@@ -791,15 +861,19 @@ PanelWindow {
             feedback = "GALLERY // " + galleryFiles.length + "/" + galleryTotal
                        + (galleryScanTruncated ? " // SCAN LIMIT REACHED" : "");
             // If the user typed while scanning, run the newest query next.
-            if (gallerySearch.text.trim() !== galleryRequestedQuery
-                    || galleryCustomFolder !== galleryRequestedFolder
-                    || galleryShotsOnly !== galleryRequestedShotsOnly
-                    || galleryMediaFilter !== galleryRequestedMediaFilter)
+            if ((galleryRequestedView === "cleanup"
+                  ? cleanupSearchQuery.trim() !== galleryRequestedQuery
+                     || cleanupCustomFolder !== galleryRequestedFolder
+                     || cleanupMediaFilter !== galleryRequestedMediaFilter
+                  : gallerySearch.text.trim() !== galleryRequestedQuery
+                     || galleryCustomFolder !== galleryRequestedFolder
+                     || galleryShotsOnly !== galleryRequestedShotsOnly
+                     || galleryMediaFilter !== galleryRequestedMediaFilter))
                 gallerySearchDebounce.restart();
         } else if (action === "previewBatch") {
-            if (batchMode && activeView === "gallery"
+            if (batchMode && activeView === "cleanup"
                     && batchReviewKey === JSON.stringify(batchPaths)
-                    && galleryCustomFolder === galleryRequestedFolder) {
+                    && cleanupCustomFolder === galleryRequestedFolder) {
                 batchPreview = payload;
                 feedback = "BATCH // REVIEW " + payload.count
                            + " FILES // NO FILES MOVED";
@@ -812,7 +886,9 @@ PanelWindow {
             batchPaths = [];
             batchReviewKey = "";
             batchPreview = null;
-            Qt.callLater(function() { camera.loadGallery(false); });
+            swipeIndex = 0;
+            swipeHistory = [];
+            Qt.callLater(function() { camera.loadGallery(false, "cleanup"); });
         } else if (action === "previewSelected") {
             if (payload.path === selectedPath) {
                 selectedTrashPreview = payload;
@@ -1006,7 +1082,8 @@ PanelWindow {
         interval: 330
         repeat: false
         onTriggered: {
-            if (camera.activeView === "gallery" && !camera.busy)
+            if ((camera.activeView === "gallery"
+                    || camera.activeView === "cleanup") && !camera.busy)
                 camera.loadGallery(false);
         }
     }
@@ -1018,7 +1095,8 @@ PanelWindow {
         interval: 120
         repeat: false
         onTriggered: {
-            if (camera.activeView === "gallery" && !camera.busy
+            if ((camera.activeView === "gallery"
+                    || camera.activeView === "cleanup") && !camera.busy
                     && camera.galleryHasMore)
                 camera.loadGallery(true);
         }
@@ -1734,8 +1812,12 @@ PanelWindow {
                                     camera.hideZoomWeb();
                             }
                             if (modelData.id === "gallery")
-                                camera.loadGallery();
-                            else if (modelData.id === "zoom")
+                                camera.loadGallery(false, "gallery");
+                            else if (modelData.id === "cleanup") {
+                                camera.activeView = "cleanup";
+                                camera.cleanupTechnique = "batch";
+                                camera.loadGallery(false, "cleanup");
+                            } else if (modelData.id === "zoom")
                                 camera.openZoomMode();
                             else
                                 camera.activeView = modelData.id;
@@ -1963,7 +2045,7 @@ PanelWindow {
                             height: 34
                             spacing: 8
                             GohuText {
-                                width: parent.width - 172
+                                width: parent.width - 92
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
                                 color: Colors.white
@@ -1971,20 +2053,6 @@ PanelWindow {
                                 text: "LIBRARY // " + camera.galleryFiles.length
                                       + "/" + camera.galleryTotal
                                 elide: Text.ElideRight
-                            }
-                            ActionButton {
-                                width: 72
-                                height: 32
-                                label: camera.batchMode ? "BATCH ON" : "BATCH"
-                                labelPixelSize: 9
-                                accentColor: camera.batchMode ? Colors.magenta : Colors.cyan
-                                selected: camera.batchMode
-                                onLeftClicked: {
-                                    if (!camera.busy) {
-                                        camera.batchMode = !camera.batchMode;
-                                        camera.batchPreview = null;
-                                    }
-                                }
                             }
                             ActionButton {
                                 width: 84
@@ -2121,76 +2189,9 @@ PanelWindow {
                             }
                         }
 
-                        Column {
-                            width: parent.width
-                            spacing: 4
-                            visible: camera.batchMode
-                            GohuText {
-                                width: parent.width
-                                height: 20
-                                color: Colors.magenta
-                                font.pixelSize: 9
-                                text: "QUEUED // " + camera.batchPaths.length
-                                      + " · LOADED " + camera.galleryFiles.length
-                            }
-                            Row {
-                                width: parent.width
-                                height: 30
-                                spacing: 5
-                                ActionButton {
-                                    width: (parent.width - 5) / 2
-                                    height: 29
-                                    label: "SELECT LOADED"
-                                    labelPixelSize: 8
-                                    accentColor: Colors.cyan
-                                    available: !camera.busy && camera.galleryFiles.length > 0
-                                    onLeftClicked: camera.batchSelectLoaded("")
-                                }
-                                ActionButton {
-                                    width: (parent.width - 5) / 2
-                                    height: 29
-                                    label: "CLEAR QUEUE"
-                                    labelPixelSize: 8
-                                    accentColor: Colors.yellow
-                                    available: !camera.busy && camera.batchPaths.length > 0
-                                    onLeftClicked: camera.batchClear()
-                                }
-                            }
-                            Row {
-                                width: parent.width
-                                height: 30
-                                spacing: 5
-                                TextField {
-                                    id: batchNameNeedle
-                                    width: parent.width - 79
-                                    height: 29
-                                    placeholderText: "NAME CONTAINS..."
-                                    placeholderTextColor: Colors.cyan
-                                    color: Colors.white
-                                    font.pixelSize: 10
-                                    selectByMouse: true
-                                    background: Rectangle {
-                                        color: Colors.black
-                                        border.width: 1
-                                        border.color: Colors.cyan
-                                    }
-                                }
-                                ActionButton {
-                                    width: 74
-                                    height: 29
-                                    label: "MATCH"
-                                    labelPixelSize: 9
-                                    accentColor: Colors.magenta
-                                    available: !camera.busy && batchNameNeedle.text.trim().length > 0
-                                    onLeftClicked: camera.batchSelectLoaded(batchNameNeedle.text)
-                                }
-                            }
-                        }
-
                         Item {
                             width: parent.width
-                            height: Math.max(120, galleryPage.height
-                                               - (camera.batchMode ? 341 : 241))
+                            height: Math.max(120, galleryPage.height - 241)
 
                             ListView {
                                 id: photoList
@@ -2215,27 +2216,10 @@ PanelWindow {
                                     contentPadding: 6
                                     accentColor: Colors.white
                                     selected: camera.selectedPath === modelData.path
-                                              || (camera.batchMode
-                                                  && camera.batchContains(modelData.path))
                                     selectedFillColor: Colors.yellow
                                     selectedForegroundColor: Colors.magenta
                                     selectedBorderColor: Colors.magenta
                                     onLeftClicked: camera.selectImage(modelData)
-
-                                    ActionButton {
-                                        z: 4
-                                        visible: camera.batchMode
-                                        x: parent.width - width - 3
-                                        y: 8
-                                        width: 63
-                                        height: 30
-                                        label: camera.batchContains(modelData.path) ? "QUEUED" : "+ QUEUE"
-                                        labelPixelSize: 9
-                                        selected: camera.batchContains(modelData.path)
-                                        accentColor: Colors.magenta
-                                        available: !camera.busy
-                                        onLeftClicked: camera.batchToggle(modelData)
-                                    }
 
                                     Image {
                                         width: 35
@@ -2310,7 +2294,7 @@ PanelWindow {
                         CameraImageViewer {
                             id: zoomViewer
                             width: parent.width
-                            height: galleryPage.height - (camera.batchMode ? 306 : 230)
+                            height: galleryPage.height - 230
                             source: camera.selectedPath && camera.selectedRecord
                                     && camera.selectedRecord.mediaType.indexOf("video") < 0
                                     ? camera.fileUrl(camera.selectedPath) : ""
@@ -2388,7 +2372,6 @@ PanelWindow {
                             width: parent.width
                             height: 36
                             label: "MOVE SELECTED TO TRASH"
-                            visible: !camera.batchMode
                             labelPixelSize: 11
                             accentColor: Colors.red
                             destructive: true
@@ -2399,8 +2382,7 @@ PanelWindow {
                         Row {
                             width: parent.width
                             height: 34
-                            visible: !camera.batchMode
-                                     && camera.selectedTrashPreview !== null
+                            visible: camera.selectedTrashPreview !== null
                             spacing: 8
                             ActionButton {
                                 width: (parent.width - parent.spacing) / 2
@@ -2426,7 +2408,6 @@ PanelWindow {
                             width: parent.width
                             height: 24
                             font.pixelSize: 9
-                            visible: !camera.batchMode
                             color: camera.selectedTrashPreview
                                    ? Colors.red : Colors.cyan
                             wrapMode: Text.WordWrap
@@ -2436,55 +2417,6 @@ PanelWindow {
                                   ? camera.lastTrashReceipt
                                   : "TRASH IS REVERSIBLE // NOT PERMANENT DELETE"
                         }
-                        ActionButton {
-                            width: parent.width
-                            height: 36
-                            visible: camera.batchMode
-                            label: "REVIEW BATCH // " + camera.batchPaths.length
-                            labelPixelSize: 11
-                            accentColor: Colors.yellow
-                            available: !camera.busy && camera.batchPaths.length > 0
-                            onLeftClicked: camera.previewBatchTrash()
-                        }
-                        GohuText {
-                            width: parent.width
-                            height: 49
-                            visible: camera.batchMode
-                            wrapMode: Text.WrapAnywhere
-                            font.pixelSize: 10
-                            color: camera.batchPreview ? Colors.yellow : Colors.cyan
-                            text: camera.batchPreview
-                                ? "REVIEW // " + camera.batchPreview.count
-                                  + " FILES // " + camera.batchPreview.bytes
-                                  + " BYTES\n" + camera.batchPreview.sample.join(" · ")
-                                : camera.batchReceipt
-                                  ? camera.batchReceipt
-                                  : "BATCH // QUEUE FILES FIRST. NO AUTOMATIC DELETION."
-                        }
-                        Row {
-                            width: parent.width
-                            height: 34
-                            visible: camera.batchMode && camera.batchPreview !== null
-                            spacing: 8
-                            ActionButton {
-                                width: (parent.width - 8) / 2
-                                height: 33
-                                label: "CANCEL"
-                                labelPixelSize: 10
-                                accentColor: Colors.cyan
-                                onLeftClicked: camera.batchPreview = null
-                            }
-                            ActionButton {
-                                width: (parent.width - 8) / 2
-                                height: 33
-                                label: "CONFIRM TRASH"
-                                labelPixelSize: 10
-                                destructive: true
-                                accentColor: Colors.red
-                                available: !camera.busy
-                                onLeftClicked: camera.confirmBatchTrash()
-                            }
-                        }
                     }
                 }
 
@@ -2492,75 +2424,713 @@ PanelWindow {
                     id: cleanupPage
                     anchors.fill: parent
                     visible: camera.activeView === "cleanup"
-                    spacing: 18
+                    spacing: 7
 
-                    GohuText {
+                    Row {
                         width: parent.width
-                        font.pixelSize: 14
-                        color: Colors.white
-                        text: "DESKTOP // SCREENSHOT CLEANUP"
+                        height: 24
+                        spacing: 12
+                        GohuText {
+                            width: parent.width - 182
+                            height: parent.height
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 13
+                            color: Colors.white
+                            text: "CLEANUP // FILE REVIEW"
+                        }
+                        GohuText {
+                            width: 170
+                            height: parent.height
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 10
+                            color: Colors.magenta
+                            text: "TRASH QUEUE // " + camera.batchPaths.length + "/500"
+                        }
                     }
 
-                    GohuText {
+                    Row {
+                        id: cleanupModeRow
                         width: parent.width
-                        wrapMode: Text.WordWrap
-                        font.pixelSize: 11
-                        color: Colors.cyan
-                        text: "This first cleanup identifies PNG/JPEG/WEBP files on Desktop whose names include Screenshot, Screen Shot, grim, or other screenshot-tool names. Ordinary photos are excluded. No subfolders are scanned."
+                        height: 33
+                        spacing: 6
+                        Repeater {
+                            model: [
+                                {id: "batch", label: "BATCH"},
+                                {id: "swipe", label: "SWIPE"},
+                                {id: "desktop", label: "DESKTOP"},
+                                {id: "hunt", label: "HUNT // NEXT"}
+                            ]
+                            ActionButton {
+                                width: (cleanupModeRow.width - 3 * cleanupModeRow.spacing) / 4
+                                height: 32
+                                label: modelData.label
+                                labelPixelSize: 10
+                                selected: camera.cleanupTechnique === modelData.id
+                                accentColor: modelData.id === "hunt"
+                                             ? Colors.white : Colors.magenta
+                                available: !camera.busy && modelData.id !== "hunt"
+                                onLeftClicked: {
+                                    camera.cleanupTechnique = modelData.id;
+                                    camera.batchPreview = null;
+                                    camera.batchReviewKey = "";
+                                    if (modelData.id === "swipe")
+                                        Qt.callLater(function() {
+                                            swipeDeck.forceActiveFocus();
+                                        });
+                                }
+                            }
+                        }
                     }
 
-                    ActionButton {
-                        width: 210
-                        height: 43
-                        label: "PREVIEW MATCHES"
-                        labelPixelSize: 12
-                        accentColor: Colors.white
-                        available: !camera.busy
-                        onLeftClicked: camera.previewCleanup()
+                    Row {
+                        width: parent.width
+                        height: 32
+                        spacing: 6
+                        visible: camera.cleanupTechnique !== "desktop"
+                        TextField {
+                            id: cleanupSearch
+                            width: parent.width * 0.52
+                            height: 30
+                            text: camera.cleanupSearchQuery
+                            placeholderText: "SEARCH MEDIA BY NAME"
+                            placeholderTextColor: Colors.cyan
+                            color: Colors.white
+                            font.pixelSize: 10
+                            selectByMouse: true
+                            background: Rectangle {
+                                color: Colors.black
+                                border.width: 1
+                                border.color: cleanupSearch.activeFocus
+                                              ? Colors.magenta : Colors.cyan
+                            }
+                            onTextChanged: {
+                                camera.cleanupSearchQuery = text;
+                                if (camera.activeView === "cleanup")
+                                    gallerySearchDebounce.restart();
+                            }
+                        }
+                        TextField {
+                            id: cleanupFolderInput
+                            width: parent.width * 0.30
+                            height: 30
+                            text: camera.cleanupCustomFolder
+                            placeholderText: "OPTIONAL FOLDER"
+                            placeholderTextColor: Colors.cyan
+                            color: Colors.white
+                            font.pixelSize: 9
+                            selectByMouse: true
+                            background: Rectangle {
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.cyan
+                            }
+                            onAccepted: {
+                                camera.cleanupCustomFolder = text.trim();
+                                camera.loadGallery(false, "cleanup");
+                            }
+                        }
+                        ActionButton {
+                            width: Math.max(45, parent.width * 0.18 - 12)
+                            height: 30
+                            label: "SCAN"
+                            labelPixelSize: 9
+                            accentColor: Colors.cyan
+                            available: !camera.busy
+                            onLeftClicked: {
+                                camera.cleanupCustomFolder = cleanupFolderInput.text.trim();
+                                camera.loadGallery(false, "cleanup");
+                            }
+                        }
                     }
 
-                    GohuText {
+                    Row {
+                        id: cleanupFilterRow
                         width: parent.width
-                        font.pixelSize: 13
-                        color: Colors.white
-                        text: camera.trashPreview
-                            ? "MATCHES // " + camera.trashPreview.count
-                              + " // BYTES " + camera.trashPreview.bytes
-                            : "MATCHES // NOT PREVIEWED"
+                        height: 28
+                        spacing: 5
+                        visible: camera.cleanupTechnique !== "desktop"
+                        Repeater {
+                            model: [
+                                {id: "all", label: "ALL"},
+                                {id: "screenshots", label: "SHOTS"},
+                                {id: "webcam", label: "WEBCAM"},
+                                {id: "videos", label: "VIDEOS"},
+                                {id: "screen-recordings", label: "SCREEN VIDEO"}
+                            ]
+                            ActionButton {
+                                width: (cleanupFilterRow.width - 4 * cleanupFilterRow.spacing) / 5
+                                height: 27
+                                label: modelData.label
+                                labelPixelSize: 9
+                                accentColor: Colors.white
+                                selected: camera.cleanupMediaFilter === modelData.id
+                                available: !camera.busy
+                                onLeftClicked: {
+                                    camera.cleanupMediaFilter = modelData.id;
+                                    camera.loadGallery(false, "cleanup");
+                                }
+                            }
+                        }
                     }
 
+                    Item {
+                        id: cleanupWorkArea
+                        width: parent.width
+                        height: camera.cleanupTechnique === "desktop"
+                                ? Math.max(170, cleanupPage.height - 135)
+                                : Math.max(145, cleanupPage.height - 260)
+
+                        Row {
+                            id: cleanupBatchView
+                            anchors.fill: parent
+                            spacing: 9
+                            visible: camera.cleanupTechnique === "batch"
+
+                            Column {
+                                width: Math.floor(parent.width * 0.53)
+                                height: parent.height
+                                spacing: 5
+                                Row {
+                                    width: parent.width
+                                    height: 28
+                                    spacing: 5
+                                    ActionButton {
+                                        width: (parent.width - 5) / 2
+                                        height: 27
+                                        label: "SELECT LOADED"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.cyan
+                                        available: !camera.busy && camera.galleryFiles.length > 0
+                                        onLeftClicked: camera.batchSelectLoaded("")
+                                    }
+                                    ActionButton {
+                                        width: (parent.width - 5) / 2
+                                        height: 27
+                                        label: "CLEAR QUEUE"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.yellow
+                                        available: !camera.busy && camera.batchPaths.length > 0
+                                        onLeftClicked: camera.batchClear()
+                                    }
+                                }
+                                Row {
+                                    width: parent.width
+                                    height: 29
+                                    spacing: 5
+                                    TextField {
+                                        id: batchNameNeedle
+                                        width: parent.width - 83
+                                        height: 28
+                                        placeholderText: "NAME CONTAINS..."
+                                        placeholderTextColor: Colors.cyan
+                                        color: Colors.white
+                                        font.pixelSize: 9
+                                        selectByMouse: true
+                                        background: Rectangle {
+                                            color: Colors.black
+                                            border.width: 1
+                                            border.color: Colors.cyan
+                                        }
+                                    }
+                                    ActionButton {
+                                        width: 78
+                                        height: 28
+                                        label: "MATCH"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.magenta
+                                        available: !camera.busy && batchNameNeedle.text.trim().length > 0
+                                        onLeftClicked: camera.batchSelectLoaded(batchNameNeedle.text)
+                                    }
+                                }
+                                Item {
+                                    width: parent.width
+                                    height: Math.max(75, cleanupWorkArea.height - 101)
+                                    ListView {
+                                        id: cleanupBatchList
+                                        anchors.fill: parent
+                                        anchors.rightMargin: 12
+                                        model: camera.galleryFiles
+                                        spacing: 4
+                                        clip: true
+                                        boundsBehavior: Flickable.StopAtBounds
+                                        delegate: Row {
+                                            width: cleanupBatchList.width
+                                            height: 44
+                                            spacing: 5
+                                            ActionButton {
+                                                width: parent.width * 0.75 - 5
+                                                height: 43
+                                                label: "      " + modelData.name
+                                                labelPixelSize: 9
+                                                labelHorizontalAlignment: Text.AlignLeft
+                                                contentPadding: 5
+                                                selected: camera.selectedPath === modelData.path
+                                                accentColor: Colors.white
+                                                onLeftClicked: camera.selectImage(modelData)
+                                                Image {
+                                                    width: 30
+                                                    height: 30
+                                                    x: 3
+                                                    y: 6
+                                                    source: modelData.mediaType
+                                                            && modelData.mediaType.indexOf("video") >= 0
+                                                            ? "" : camera.fileUrl(modelData.path)
+                                                    fillMode: Image.PreserveAspectFit
+                                                    asynchronous: true
+                                                    cache: false
+                                                }
+                                            }
+                                            ActionButton {
+                                                width: parent.width * 0.25
+                                                height: 43
+                                                label: camera.batchContains(modelData.path)
+                                                       ? "QUEUED" : "+ QUEUE"
+                                                labelPixelSize: 9
+                                                selected: camera.batchContains(modelData.path)
+                                                accentColor: Colors.magenta
+                                                available: !camera.busy
+                                                onLeftClicked: camera.batchToggle(modelData)
+                                            }
+                                        }
+                                    }
+                                    NeonScrollBar {
+                                        flickable: cleanupBatchList
+                                        x: parent.width - width - 1
+                                        height: parent.height
+                                        geometryMode: "viewport"
+                                        handleStyle: "star"
+                                        visible: scrollable
+                                    }
+                                }
+                                Row {
+                                    width: parent.width
+                                    height: 29
+                                    spacing: 7
+                                    GohuText {
+                                        width: parent.width - 120
+                                        height: parent.height
+                                        verticalAlignment: Text.AlignVCenter
+                                        font.pixelSize: 9
+                                        color: Colors.cyan
+                                        text: camera.galleryFiles.length + "/"
+                                              + camera.galleryTotal + " LOADED"
+                                    }
+                                    ActionButton {
+                                        width: 112
+                                        height: 28
+                                        label: "LOAD 120 MORE"
+                                        labelPixelSize: 8
+                                        accentColor: Colors.cyan
+                                        available: !camera.busy && camera.galleryHasMore
+                                        onLeftClicked: camera.loadGallery(true, "cleanup")
+                                    }
+                                }
+                            }
+                            Column {
+                                width: parent.width - Math.floor(parent.width * 0.53)
+                                       - parent.spacing
+                                height: parent.height
+                                spacing: 5
+                                GohuText {
+                                    width: parent.width
+                                    height: 16
+                                    font.pixelSize: 10
+                                    color: Colors.cyan
+                                    text: "SELECTED PREVIEW"
+                                }
+                                CameraImageViewer {
+                                    id: cleanupViewer
+                                    width: parent.width
+                                    height: Math.max(65, cleanupWorkArea.height - 88)
+                                    source: camera.selectedRecord
+                                            && camera.selectedRecord.mediaType.indexOf("video") < 0
+                                            ? camera.fileUrl(camera.selectedPath) : ""
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    height: 20
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 9
+                                    color: Colors.white
+                                    text: camera.selectedRecord
+                                          ? camera.selectedRecord.name
+                                          : "SELECT MEDIA ON THE LEFT"
+                                }
+                                ActionButton {
+                                    width: parent.width
+                                    height: 29
+                                    visible: camera.selectedRecord
+                                             && camera.selectedRecord.mediaType.indexOf("video") >= 0
+                                    label: "PLAY VIDEO"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.cyan
+                                    onLeftClicked: Qt.openUrlExternally(
+                                                       camera.fileUrl(camera.selectedPath))
+                                }
+                            }
+                        }
+
+                        Column {
+                            id: cleanupSwipeView
+                            anchors.fill: parent
+                            spacing: 6
+                            visible: camera.cleanupTechnique === "swipe"
+
+                            GohuText {
+                                width: parent.width
+                                height: 17
+                                font.pixelSize: 10
+                                color: Colors.magenta
+                                text: "SWIPE // LEFT TRASH QUEUE · RIGHT KEEP · DOWN SKIP · Z UNDO"
+                            }
+                            Item {
+                                id: swipeDeck
+                                width: parent.width
+                                height: Math.max(90, cleanupWorkArea.height - 91)
+                                focus: camera.activeView === "cleanup"
+                                       && camera.cleanupTechnique === "swipe"
+                                property var currentRecord:
+                                    camera.swipeIndex < camera.galleryFiles.length
+                                    ? camera.galleryFiles[camera.swipeIndex] : null
+                                property real dragX: 0
+                                property real dragY: 0
+                                Keys.onPressed: function(event) {
+                                    if (event.key === Qt.Key_Left) {
+                                        camera.swipeDecide("trash");
+                                        event.accepted = true;
+                                    } else if (event.key === Qt.Key_Right) {
+                                        camera.swipeDecide("keep");
+                                        event.accepted = true;
+                                    } else if (event.key === Qt.Key_Down) {
+                                        camera.swipeDecide("skip");
+                                        event.accepted = true;
+                                    } else if (event.key === Qt.Key_Z
+                                               || event.key === Qt.Key_Backspace) {
+                                        camera.swipeUndo();
+                                        event.accepted = true;
+                                    }
+                                }
+
+                                Item {
+                                    id: swipeVisualCard
+                                    anchors.fill: parent
+                                    transform: Translate {
+                                        x: swipeDeck.dragX
+                                        y: swipeDeck.dragY
+                                    }
+                                    rotation: swipeDeck.dragX / 24
+
+                                Rectangle {
+                                    anchors.centerIn: parent
+                                    width: Math.min(parent.width - 20, 580)
+                                    height: parent.height - 2
+                                    radius: 8
+                                    color: Colors.black
+                                    border.color: Colors.magenta
+                                    border.width: 1
+                                }
+                                Image {
+                                    anchors.centerIn: parent
+                                    width: Math.min(parent.width - 36, 550)
+                                    height: Math.max(40, parent.height - 55)
+                                    visible: swipeDeck.currentRecord !== null
+                                             && swipeDeck.currentRecord.mediaType.indexOf("video") < 0
+                                    source: visible
+                                            ? camera.fileUrl(swipeDeck.currentRecord.path) : ""
+                                    fillMode: Image.PreserveAspectFit
+                                    cache: false
+                                    asynchronous: true
+                                }
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    visible: swipeDeck.currentRecord === null
+                                             || swipeDeck.currentRecord.mediaType.indexOf("video") >= 0
+                                    font.pixelSize: 13
+                                    color: Colors.cyan
+                                    text: swipeDeck.currentRecord === null
+                                          ? camera.galleryHasMore
+                                            ? "END OF LOADED PAGE // LOAD MORE"
+                                            : "ROUND COMPLETE"
+                                          : "VIDEO // USE BATCH PREVIEW TO PLAY"
+                                }
+                                GohuText {
+                                    anchors.bottom: parent.bottom
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    width: Math.min(parent.width - 35, 540)
+                                    height: 28
+                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideMiddle
+                                    font.pixelSize: 10
+                                    color: Colors.white
+                                    text: swipeDeck.currentRecord !== null
+                                          ? swipeDeck.currentRecord.name
+                                          : "NO MORE LOADED FILES"
+                                }
+                                GohuText {
+                                    anchors.top: parent.top
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    height: 24
+                                    visible: Math.abs(swipeDeck.dragX) > 35
+                                             || swipeDeck.dragY > 40
+                                    font.pixelSize: 14
+                                    color: swipeDeck.dragX < -35 ? Colors.red
+                                           : swipeDeck.dragX > 35 ? Colors.cyan
+                                           : Colors.yellow
+                                    text: swipeDeck.dragX < -35 ? "QUEUE FOR TRASH"
+                                          : swipeDeck.dragX > 35 ? "KEEP"
+                                          : "SKIP"
+                                }
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: swipeDeck.currentRecord !== null && !camera.busy
+                                    property real startX: 0
+                                    property real startY: 0
+                                    onPressed: function(mouse) {
+                                        startX = mouse.x;
+                                        startY = mouse.y;
+                                        swipeDeck.dragX = 0;
+                                        swipeDeck.dragY = 0;
+                                        swipeDeck.forceActiveFocus();
+                                    }
+                                    onPositionChanged: function(mouse) {
+                                        if (pressed) {
+                                            swipeDeck.dragX = Math.max(-180, Math.min(
+                                                180, mouse.x - startX));
+                                            swipeDeck.dragY = Math.max(-120, Math.min(
+                                                120, mouse.y - startY));
+                                        }
+                                    }
+                                    onReleased: function(mouse) {
+                                        const dx = mouse.x - startX;
+                                        const dy = mouse.y - startY;
+                                        swipeDeck.dragX = 0;
+                                        swipeDeck.dragY = 0;
+                                        if (Math.abs(dx) >= 65 && Math.abs(dx) > Math.abs(dy))
+                                            camera.swipeDecide(dx < 0 ? "trash" : "keep");
+                                        else if (dy >= 65)
+                                            camera.swipeDecide("skip");
+                                    }
+                                    onCanceled: {
+                                        swipeDeck.dragX = 0;
+                                        swipeDeck.dragY = 0;
+                                    }
+                                }
+                            }
+                            Row {
+                                width: parent.width
+                                height: 32
+                                spacing: 6
+                                ActionButton {
+                                    width: (parent.width - 18) / 4
+                                    height: 31
+                                    label: "LEFT · QUEUE"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.red
+                                    available: !camera.busy
+                                               && camera.swipeIndex < camera.galleryFiles.length
+                                    onLeftClicked: camera.swipeDecide("trash")
+                                }
+                                ActionButton {
+                                    width: (parent.width - 18) / 4
+                                    height: 31
+                                    label: "RIGHT · KEEP"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.cyan
+                                    available: !camera.busy
+                                               && camera.swipeIndex < camera.galleryFiles.length
+                                    onLeftClicked: camera.swipeDecide("keep")
+                                }
+                                ActionButton {
+                                    width: (parent.width - 18) / 4
+                                    height: 31
+                                    label: "DOWN · SKIP"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.yellow
+                                    available: !camera.busy
+                                               && camera.swipeIndex < camera.galleryFiles.length
+                                    onLeftClicked: camera.swipeDecide("skip")
+                                }
+                                ActionButton {
+                                    width: (parent.width - 18) / 4
+                                    height: 31
+                                    label: "UNDO"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.magenta
+                                    available: !camera.busy && camera.swipeHistory.length > 0
+                                    onLeftClicked: camera.swipeUndo()
+                                }
+                            }
+                            Row {
+                                width: parent.width
+                                height: 22
+                                spacing: 8
+                                GohuText {
+                                    width: parent.width - 130
+                                    height: parent.height
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                    text: "CARD " + Math.min(camera.swipeIndex + 1,
+                                                              camera.galleryFiles.length)
+                                          + "/" + camera.galleryFiles.length
+                                          + " // QUEUED " + camera.batchPaths.length
+                                }
+                                ActionButton {
+                                    width: 122
+                                    height: 22
+                                    label: "LOAD 120 MORE"
+                                    labelPixelSize: 8
+                                    accentColor: Colors.white
+                                    available: !camera.busy && camera.galleryHasMore
+                                               && camera.swipeIndex >= camera.galleryFiles.length
+                                    onLeftClicked: camera.loadGallery(true, "cleanup")
+                                }
+                            }
+                        }
+
+                        Flickable {
+                            id: cleanupDesktopView
+                            anchors.fill: parent
+                            visible: camera.cleanupTechnique === "desktop"
+                            clip: true
+                            contentHeight: desktopCleanupContent.implicitHeight
+                            boundsBehavior: Flickable.StopAtBounds
+                            Column {
+                                id: desktopCleanupContent
+                                width: cleanupWorkArea.width - 18
+                                spacing: 12
+                                GohuText {
+                                    width: parent.width
+                                    font.pixelSize: 14
+                                    color: Colors.white
+                                    text: "DESKTOP // SCREENSHOT CLEANUP"
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    wrapMode: Text.WordWrap
+                                    font.pixelSize: 11
+                                    color: Colors.cyan
+                                    text: "Matches Desktop screenshot-like PNG/JPEG/WEBP only. Other photos and subfolders remain untouched."
+                                }
+                                ActionButton {
+                                    width: 210
+                                    height: 40
+                                    label: "PREVIEW MATCHES"
+                                    labelPixelSize: 11
+                                    accentColor: Colors.white
+                                    available: !camera.busy
+                                    onLeftClicked: camera.previewCleanup()
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    font.pixelSize: 12
+                                    color: Colors.white
+                                    text: camera.trashPreview
+                                          ? "MATCHES // " + camera.trashPreview.count
+                                            + " // BYTES " + camera.trashPreview.bytes
+                                          : "MATCHES // NOT PREVIEWED"
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    height: 95
+                                    wrapMode: Text.WrapAnywhere
+                                    color: Colors.cyan
+                                    font.pixelSize: 10
+                                    text: camera.trashPreview && camera.trashPreview.sample
+                                          ? "EXAMPLES // " + camera.trashPreview.sample.join(" // ")
+                                          : "Preview before moving screenshot files to Trash."
+                                }
+                                ActionButton {
+                                    width: 225
+                                    height: 43
+                                    label: camera.trashPreview
+                                           ? "MOVE " + camera.trashPreview.count + " TO TRASH"
+                                           : "TRASH REQUIRES PREVIEW"
+                                    labelPixelSize: 11
+                                    accentColor: Colors.red
+                                    destructive: true
+                                    available: !camera.busy && camera.trashPreview !== null
+                                               && Number(camera.trashPreview.count) > 0
+                                               && !!camera.trashPreview.planId
+                                    onLeftClicked: camera.confirmCleanup()
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    wrapMode: Text.WordWrap
+                                    font.pixelSize: 10
+                                    color: Colors.red
+                                    text: "RECOVERABLE TRASH ONLY // NO PERMANENT DELETE // PLAN EXPIRES IN 10 MINUTES"
+                                }
+                            }
+                        }
+                    }
+
+                    Row {
+                        width: parent.width
+                        height: 34
+                        visible: camera.cleanupTechnique !== "desktop"
+                        spacing: 8
+                        ActionButton {
+                            width: (parent.width - 8) * 0.46
+                            height: 33
+                            label: "REVIEW QUEUE // " + camera.batchPaths.length
+                            labelPixelSize: 11
+                            accentColor: Colors.yellow
+                            available: !camera.busy && camera.batchPaths.length > 0
+                            onLeftClicked: camera.previewBatchTrash()
+                        }
+                        GohuText {
+                            width: (parent.width - 8) * 0.54
+                            height: 33
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 10
+                            color: camera.galleryScanTruncated ? Colors.red : Colors.cyan
+                            text: camera.galleryScanTruncated
+                                  ? "SCAN LIMIT // SELECT A FOLDER"
+                                  : camera.batchPreview
+                                    ? "READY TO CONFIRM // " + camera.batchPreview.count
+                                    : "NO FILES MOVED // TRASH IS REVERSIBLE"
+                        }
+                    }
                     GohuText {
                         width: parent.width
-                        height: 132
+                        height: 31
+                        visible: camera.cleanupTechnique !== "desktop"
                         wrapMode: Text.WrapAnywhere
-                        color: Colors.cyan
                         font.pixelSize: 10
-                        text: camera.trashPreview && camera.trashPreview.sample
-                              ? "EXAMPLES // " + camera.trashPreview.sample.join(" // ")
-                              : "Preview before any cleanup. Photos outside the matching Desktop list remain untouched."
+                        color: camera.batchPreview ? Colors.yellow : Colors.cyan
+                        text: camera.batchPreview
+                              ? "REVIEW // " + camera.batchPreview.count + " FILES // "
+                                + camera.batchPreview.bytes + " BYTES // "
+                                + camera.batchPreview.sample.join(" · ")
+                              : camera.batchReceipt
+                                ? camera.batchReceipt
+                                : "SELECT OR SWIPE TO QUEUE // FINAL CONFIRMATION REQUIRED"
                     }
-
-                    ActionButton {
-                        width: 235
-                        height: 45
-                        label: camera.trashPreview
-                               ? "MOVE " + camera.trashPreview.count + " TO TRASH"
-                               : "TRASH REQUIRES PREVIEW"
-                        labelPixelSize: 11
-                        accentColor: Colors.red
-                        destructive: true
-                        available: !camera.busy && camera.trashPreview !== null
-                                   && Number(camera.trashPreview.count) > 0
-                                   && !!camera.trashPreview.planId
-                        onLeftClicked: camera.confirmCleanup()
-                    }
-
-                    GohuText {
+                    Row {
                         width: parent.width
-                        wrapMode: Text.WordWrap
-                        font.pixelSize: 10
-                        color: Colors.red
-                        text: "TRASH IS REVERSIBLE // NO PERMANENT DELETE. Files changed after preview are skipped. The plan expires after 10 minutes."
+                        height: 33
+                        visible: camera.cleanupTechnique !== "desktop"
+                                 && camera.batchPreview !== null
+                        spacing: 8
+                        ActionButton {
+                            width: (parent.width - 8) / 2
+                            height: 32
+                            label: "CANCEL"
+                            labelPixelSize: 10
+                            accentColor: Colors.cyan
+                            onLeftClicked: camera.batchPreview = null
+                        }
+                        ActionButton {
+                            width: (parent.width - 8) / 2
+                            height: 32
+                            label: "CONFIRM TRASH"
+                            labelPixelSize: 10
+                            accentColor: Colors.red
+                            destructive: true
+                            available: !camera.busy
+                            onLeftClicked: camera.confirmBatchTrash()
+                        }
                     }
                 }
 

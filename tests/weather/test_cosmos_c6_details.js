@@ -163,3 +163,51 @@ test("C27 SKY NOW uses real USNO positions with pinned compass and bounded star 
  for(const forbidden of ["Process {","FileView {","XMLHttpRequest","ScrollView {"])
    assert.ok(!sky.includes(forbidden),forbidden);
 });
+
+
+test("C31 living ECLIPSES shows solar and lunar moving geometry, optional credited NASA archive, and immutable NASA calendar",()=>{
+ const board=read("widgets/weather/StationCosmosEclipseBoard.qml");
+ const scene=read("widgets/weather/StationCosmosEclipseMotion.qml");
+ assert.match(board,/objectName: "cosmos-c31-eclipse-visual-controls"/);
+ assert.match(board,/objectName: "cosmos-c31-archive-toggle"/);
+ assert.match(board,/objectName: "cosmos-c31-motion-play-pause"/);
+ assert.match(board,/property bool motionPlaying: true/);
+ assert.match(board,/property bool showArchive: false/);
+ assert.match(board,/StationCosmosEclipseMotion\s*\{/);
+ assert.match(board,/objectName: "cosmos-c31-featured-eclipse-motion"/);
+ assert.match(board,/body: eclipseHighlight\.index === 0 \? "SOLAR" : "LUNAR"/);
+ assert.match(board,/eventRecord: eclipseHighlight\.record/);
+ assert.match(board,/playing: eclipseBoard\.motionPlaying && !eclipseBoard\.inspecting/);
+ assert.match(board,/showArchive: eclipseBoard\.showArchive/);
+ assert.match(board,/onClicked: eclipseBoard\.showArchive = !eclipseBoard\.showArchive/);
+ assert.match(board,/onClicked: eclipseBoard\.motionPlaying = !eclipseBoard\.motionPlaying/);
+ assert.match(board,/onClicked: eclipseBoard\.inspectFeatured\(eclipseHighlight\.record\)/);
+ assert.match(board,/id: eclipseCatalogFrame/);
+ assert.match(board,/anchors\.top: fixedEclipseHeader\.bottom/);
+ assert.match(board,/id: eclipseScroll/);
+ assert.equal((board.match(/Flickable\s*\{/g)||[]).length,1);
+ assert.match(scene,/objectName: "cosmos-c31-eclipse-live-canvas"/);
+ assert.match(scene,/objectName: "cosmos-c31-eclipse-motion-driver"/);
+ assert.match(scene,/running: visual\.visible && visual\.playing && !visual\.showArchive/);
+ assert.match(scene,/onTriggered: visual\.demoPhase = \(visual\.demoPhase\+0\.005\)%1/);
+ assert.match(scene,/function seek\(nextPhase\)/);
+ assert.match(scene,/onClicked: function\(mouse\)/);
+ assert.match(scene,/readonly property string eventKind:/);
+ assert.match(scene,/eventRecord && eventRecord\.phase/);
+ assert.match(scene,/penumbral/);
+ assert.match(scene,/annular/);
+ assert.match(scene,/partial/);
+ assert.match(scene,/DEMO \/\/ NOT PREDICTED/);
+ assert.match(scene,/objectName: "cosmos-c31-nasa-eclipse-archive"/);
+ assert.match(scene,/source: visual\.showArchive \? visual\.archiveUrl : ""/);
+ assert.match(scene,/NASA \/ AUBREY GEMIGNANI/);
+ assert.match(scene,/NASA \/ ISS/);
+ assert.match(scene,/NASA ARCHIVE OFFLINE/);
+ assert.equal((scene.match(/Canvas\s*\{/g)||[]).length,1);
+ assert.equal((scene.match(/Timer\s*\{/g)||[]).length,1);
+ assert.equal((scene.match(/Image\s*\{/g)||[]).length,1);
+ for(const forbidden of ["Process {","FileView {","XMLHttpRequest","Flickable {","VideoOutput {","MediaPlayer {"]) {
+   assert.ok(!board.includes(forbidden),forbidden);
+   assert.ok(!scene.includes(forbidden),forbidden);
+ }
+});

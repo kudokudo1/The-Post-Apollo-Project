@@ -195,11 +195,18 @@ def serve(review_fd: int, client_fd: int, reviewer_pid: int,
                 except (OSError, EOFError):
                     return 0
                 if event.data == "reviewer":
-                    reply = (host.from_reviewer(payload)
-                             if sender == reviewer_identity
-                             and C5B.process_start_ticks(reviewer_pid)
-                                 == reviewer_ticks
-                             else S1.report("REVIEWER_ORIGIN_MISMATCH"))
+                    if sender is None:
+                        reply = S1.report("REVIEWER_KERNEL_CREDENTIALS_MISSING")
+                    elif sender[0] != reviewer_pid:
+                        reply = S1.report("REVIEWER_KERNEL_PID_MISMATCH")
+                    elif sender[1] != reviewer_uid:
+                        reply = S1.report("REVIEWER_KERNEL_UID_MISMATCH")
+                    elif sender[2] != reviewer_gid:
+                        reply = S1.report("REVIEWER_KERNEL_GID_MISMATCH")
+                    elif C5B.process_start_ticks(reviewer_pid) != reviewer_ticks:
+                        reply = S1.report("REVIEWER_KERNEL_START_MISMATCH")
+                    else:
+                        reply = host.from_reviewer(payload)
                 else:
                     reply = host.from_client(payload, sender)
                 C5A.exchange(sock, reply)

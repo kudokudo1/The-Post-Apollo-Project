@@ -211,7 +211,13 @@ def client_loop(fd: int) -> int:
                 C5A.exchange(connection, payload)
                 response = C5A.receive(connection)
                 print(json.dumps(response, separators=(",", ":")), flush=True)
-            except (OSError, ValueError, TypeError):
+            except (OSError, ValueError, TypeError) as exc:
+                # Safe test-only diagnostic: exception class/errno, NEVER
+                # wire packet contents or session state.
+                print("TELEGRAM_S2_CLIENT_IO_REFUSED "
+                      + type(exc).__name__ + " "
+                      + str(getattr(exc, "errno", "")), file=sys.stderr,
+                      flush=True)
                 return 2
     return 0
 

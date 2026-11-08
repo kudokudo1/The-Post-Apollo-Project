@@ -1750,8 +1750,6 @@ PanelWindow {
             defaultOwner: FavoritesDefaultStore
             collectionsOwner: FavoritesCollectionsStore
             selectedCollectionId: cpuPlusWindow.selectedFavoriteCollectionId
-            selectedCollectionId: cpuPlusWindow.selectedFavoriteCollectionId
-            selectedCollectionId: cpuPlusWindow.selectedFavoriteCollectionId
             onIndexSelectionRequested: function(key, category) {
                 // The left dossier navigates only existing candidates.
                 // The middle selector keeps the actual filter/selection UI.
@@ -2232,6 +2230,7 @@ PanelWindow {
             placesOwner: PlaceRegistry
             defaultOwner: FavoritesDefaultStore
             collectionsOwner: FavoritesCollectionsStore
+            selectedCollectionId: cpuPlusWindow.selectedFavoriteCollectionId
             onSelectionRequested: function(key) {
                 cpuPlusWindow.selectedFavoriteKey = key;
             }
@@ -2786,6 +2785,7 @@ PanelWindow {
             placesOwner: PlaceRegistry
             defaultOwner: FavoritesDefaultStore
             collectionsOwner: FavoritesCollectionsStore
+            selectedCollectionId: cpuPlusWindow.selectedFavoriteCollectionId
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: actuatorHeader.bottom

@@ -104,6 +104,8 @@ grep -F 'U4_PASS // SELECTED_PROCESS_READ_ONLY' "$log" >/dev/null ||
   { echo "U4_FAIL // click did not select row"; exit 1; }
 grep -F 'U4_PASS // DOSSIER_FILE_NAVIGATION_READ_ONLY' "$log" >/dev/null ||
   { echo "U4_FAIL // left dossier click did not reach right details"; exit 1; }
+grep -F 'U6_PASS // SAFE_MEMBER_ONLY_NO_PROVIDER_WRITES' "$log" >/dev/null ||
+  { echo "U6_FAIL // cross-widget collection gate was not verified"; exit 1; }
 if find "$work/data" -type f | grep -q .; then
   echo "U4_FAIL // manager created a writer file"; exit 1
 fi

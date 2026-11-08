@@ -1,0 +1,69 @@
+name: Connections C3e-H operator-signed recovery permission gate (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eOperatorRecoveryGate.py"
+      - "tests/connections/test_connections_c3eh_operator_recovery_gate.py"
+      - ".github/workflows/connections-c3eh-operator-recovery-authorization.yml"
+      - "docs/connections-c3eh-operator-recovery-gate.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-operator-recovery-authorization:
+    # CI-only synthetic operator key; no real authorization, production keys or tokens.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Syntax and deny-only production contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v gpg
+          command -v gpgv
+          python3 -m py_compile \
+            tests/connections/c3e_release_trust/C3eOperatorRecoveryGate.py \
+            tests/connections/test_connections_c3eh_operator_recovery_gate.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path("services/connections")
+          assert "readonly property bool hostAuthenticated: false" in (base/"ConnectionsRequestStatus.qml").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in (base/"ConnectionsBroker.qml").read_text()
+          for f in (*base.glob("*.qml"),*base.glob("*.js"),base/"qmldir"):
+              assert "C3eOperatorRecoveryGate" not in f.read_text(), f
+          print("C3EH_PASS // PRODUCTION_AUTHORITY_REMAINS_DENY_ONLY")
+          PY
+      - name: Verify real operator OpenPGP signature and pending-release context
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3eh_operator_recovery_gate.py
+          echo "C3EH_PASS // OPERATOR_APPROVAL_CONTEXT_PINNED_TEST_ONLY"
+          echo "C3EH_LIMITATION // READ_ONLY_NO_RECOVERY_COMMIT_NO_PRODUCTION_OPERATOR_ROOT"
+      - name: Preserve C3e-G through C3e-A and C2n regression behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3eg_split_commit_recovery.py
+          python3 -B tests/connections/test_connections_c3ef_rollback_witness.py
+          python3 -B tests/connections/test_connections_c3ee_authority_owned_floor.py
+          python3 -B tests/connections/test_connections_c3ed_signed_floor.py
+          python3 -B tests/connections/test_connections_c3ec_durable_floor.py
+          python3 -B tests/connections/test_connections_c3e_release_trust.py
+          echo "C3EH_PASS // PREVIOUS_RELEASE_CRASH_AND_SIGNATURE_REGRESSIONS"
+      - name: Keep actual supersession and remote trust out of scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'READ-ONLY' docs/connections-c3eh-operator-recovery-gate.md
+          grep -Fq 'no real operator-enrolled trust' docs/connections-c3eh-operator-recovery-gate.md
+          grep -Fq 'NO_PENDING_INTENT' tests/connections/c3e_release_trust/C3eOperatorRecoveryGate.py
+          echo "C3EH_LIMITATION // SIGNATURE_VALIDATION_IS_NOT_OPERATOR_ENROLLMENT"

@@ -54,16 +54,16 @@ Item {
         }
         Rectangle {width: parent.width;height: 1;color: Colors.cyan}
         GohuText {
-            text: "COLLECTIONS // "+pane.collectionsOwner.collections.length
-                  +"  |  SAVE "+pane.collectionsOwner.storageState.toUpperCase()
+            text: "COLLECTIONS // "+(pane.collectionsOwner ? pane.collectionsOwner.collections.length : 0)
+                  +"  |  SAVE "+(pane.collectionsOwner ? pane.collectionsOwner.storageState.toUpperCase() : "UNAVAILABLE")
             color: Colors.cyan
             font.pixelSize: 11
             width: parent.width
             elide: Text.ElideRight
         }
         GohuText {
-            text: "NEW PROVIDERS // "+pane.defaultOwner.favoriteKeys.length
-                +" FAV  |  "+pane.defaultOwner.pinnedKeys.length+" PIN"
+            text: "NEW PROVIDERS // "+(pane.defaultOwner ? pane.defaultOwner.favoriteKeys.length : 0)
+                +" FAV  |  "+(pane.defaultOwner ? pane.defaultOwner.pinnedKeys.length : 0)+" PIN"
             color: Colors.white
             font.pixelSize: 11
             width: parent.width
@@ -233,12 +233,12 @@ Item {
                     const item=pane.selectedResource;
                     if (!item) return false;
                     if(item.category==="CLOCK")
-                        return pane.timeOwner.worldFavoriteCanEdit
+                        return pane.timeOwner !== null && pane.timeOwner.worldFavoriteCanEdit
                             && pane.timeOwner.zoneCatalogLoaded;
                     if(item.category==="PLACES")
-                        return pane.placesOwner.canSaveHome;
+                        return pane.placesOwner !== null && pane.placesOwner.canSaveHome;
                     if(item.category==="NEW")
-                        return pane.defaultOwner.canEdit && item.isFavorite;
+                        return pane.defaultOwner !== null && pane.defaultOwner.canEdit && item.isFavorite;
                     return false;
                 }
                 onLeftClicked: {
@@ -261,7 +261,7 @@ Item {
                 height: 30
                 label: pane.selectedResource
                     && pane.selectedResource.category==="CLOCK"
-                    && !pane.timeOwner.zoneCatalogLoaded
+                    && pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
                     ? "CHECK ZONES"
                     : pane.selectedResource
                         && pane.selectedResource.category==="NEW"
@@ -271,10 +271,10 @@ Item {
                 accentColor: Colors.cyan
                 available: pane.selectedResource !== null &&
                     (pane.selectedResource.category==="CLOCK"
-                       ? !pane.timeOwner.zoneCatalogLoaded
+                       ? pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
                           && !pane.timeOwner.zoneCatalogLoading
                        : pane.selectedResource.category==="NEW"
-                         && pane.defaultOwner.canEdit)
+                         && pane.defaultOwner !== null && pane.defaultOwner.canEdit)
                 onLeftClicked: {
                     if(!available || !pane.selectedResource) return;
                     if(pane.selectedResource.category==="CLOCK")

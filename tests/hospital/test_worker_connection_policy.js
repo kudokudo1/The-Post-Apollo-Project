@@ -59,7 +59,16 @@ check({assignmentId: ""}, "NO_ASSIGNMENT");
 check({assignmentStatus: "DRAFT"}, "ASSIGNMENT_INACTIVE");
 check({assignmentStatus: "READY"}, "ASSIGNMENT_INACTIVE");
 check({assignmentStatus: "CANCELLED"}, "ASSIGNMENT_INACTIVE");
-check({sessionStatus: "WAITING"}, "SESSION_HOLD");
+check({sessionStatus: "WAITING"}, "SESSION_HOLD"); // No completion evidence
+check({sessionStatus: "WAITING", sessionLastExitCode: 0}, "WAITING_READY", true);
+check({sessionStatus: "WAITING", sessionLastExitCode: "0"}, "WAITING_READY", true);
+check({sessionStatus: "WAITING", sessionLastExitCode: 0,
+       sessionActivePid: 42123}, "SESSION_BUSY");
+check({sessionStatus: "WAITING", sessionLastExitCode: 0,
+       sessionLastError: "provider returned error"}, "RECORDED_FAILURE");
+check({sessionStatus: "WAITING", sessionLastExitCode: 124}, "RECORDED_FAILURE");
+check({sessionStatus: "IDLE", sessionLastError: "stale failure"}, "RECORDED_FAILURE");
+check({sessionStatus: "IDLE", sessionLastExitCode: 5}, "RECORDED_FAILURE");
 check({sessionStatus: "REVIEW"}, "SESSION_HOLD");
 check({sessionStatus: "PAUSED"}, "SESSION_PAUSED");
 check({sessionStatus: "OPERATING"}, "SESSION_BUSY");
@@ -71,4 +80,4 @@ assert.equal(ctx.allowsCommand({...base, sessionId: ""}, "PAUSE"), false);
 assert.equal(ctx.countPending([base, {...base, sessionId:""},
     {...base, sessionProviderId:""}, {...base, sessionStatus:"PAUSED"}]), 3);
 assert.equal(ctx.countPending(null), 0);
-console.log("HOSPITAL WORKER CONNECTION POLICY // PASS // identity, provider, assignment, Bed and exact Session holds");
+console.log("HOSPITAL WORKER CONNECTION POLICY // PASS // explicit clean WAITING continuation, PAUSED/REVIEW/error/PID holds and exact identity");

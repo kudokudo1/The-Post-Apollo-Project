@@ -8,15 +8,21 @@ Rectangle {
     id: panel
     property var collectionStore: null
     property var resource: null
+    // Optional normalized candidate key for an external read-only owner.
+    // No raw provider object, FileView or callback enters this panel.
+    property string collectionKey: ""
     property alias draftName: nameInput.text
     property alias createControl: createButton
     readonly property bool editingText: nameInput.activeFocus
     readonly property var normalized: Resource.normalize(resource)
     readonly property string resourceKey:
-        normalized.ok ? normalized.record.key : ""
+        collectionKey !== "" ? collectionKey
+        : normalized.ok ? normalized.record.key : ""
     readonly property bool canUseResource:
-        collectionStore !== null && normalized.ok
-        && normalized.record.capabilities.indexOf("collection") >= 0
+        collectionStore !== null && resourceKey !== ""
+        && (collectionKey !== ""
+            || (normalized.ok
+                && normalized.record.capabilities.indexOf("collection") >= 0))
         && collectionStore.acceptsKey(resourceKey)
     readonly property var groups:
         collectionStore ? collectionStore.collections : []
@@ -152,6 +158,7 @@ Rectangle {
                                 collectionStore: panel.collectionStore
                                 collectionId: modelData.id
                                 resource: panel.resource
+                                collectionKey: panel.collectionKey
                             }
 
                             ActionButton {

@@ -45,17 +45,33 @@ test("versioned local collection file retains only names and canonical refs",()=
                    clone(save.document));
 });
 
-test("existing legacy owners remain protected; safe time and places IDs allowed",()=>{
+test("legacy owners retain write authority; only approved safe collection IDs are allowed",()=>{
   for(const good of [clock,place,newWidget,
-      key("time","timezone","UTC"),key("places","saved-place","1")]) {
+      key("time","timezone","UTC"),key("places","saved-place","1"),
+      key("weather-home","panel","home/auto"),
+      key("weather-home","card","sky|next-hours"),
+      key("radio","station","123e4567-e89b-42d3-a456-000000000001"),
+      key("notifications","source","org.mozilla.firefox"),
+      key("appcontrol","item","org.mozilla.firefox.desktop")]) {
     assert.equal(C.checkMemberKey(good).ok,true,good);
   }
   const denied=[
     key("appcontrol","item","run|secret-command"),
+    key("appcontrol","item","run:firefox"),
+    key("appcontrol","item","mode:2:◇  private.txt"),
+    key("appcontrol","item","task|hidden-process"),
+    key("appcontrol","item","org.example.secret-vault.desktop"),
+    key("appcontrol","preferred-action","run|firefox|kitty"),
+    key("hospital","activity","pinned|reports|report|2026-11-08T18:12:05.000Z|1"),
     key("hospital","activity","room-24"),
-    key("radio","station","123e4567-e89b-42d3-a456-000000000001"),
-    key("notifications","source","org.mozilla.firefox"),
-    key("weather-home","card","space|geomagnetic"),
+    key("radio","station","not-a-uuid"),
+    key("radio","station","123e4567-e89b-72d3-a456-000000000001"),
+    key("notifications","source","website:my-private-site"),
+    key("notifications","source","https://example.com/account"),
+    key("notifications","source","private-mail"),
+    key("weather-home","card","sky|next-hours/../secret"),
+    key("weather-home","panel","home/admin"),
+    key("weather-home","card","space|geomagnetic\nsecret"),
     key("time","timezone","Not A Zone"),
     key("time","timezone","a/b/../x"),
     key("places","saved-place","-2"),
@@ -119,7 +135,7 @@ test("invalid names, duplicate names and invalid actions fail closed",()=>{
   assert.equal(C.change(doc,{type:"set-member",collectionId:"c1",
       key:clock,enabled:1}).reason,"INVALID_ACTION");
   assert.equal(C.change(doc,{type:"set-member",collectionId:"c1",
-      key:key("appcontrol","item","app-1"),enabled:true}).ok,false);
+      key:key("appcontrol","item","run:app-1 --private-token"),enabled:true}).ok,false);
   assert.equal(C.change(doc,{type:"move-member",collectionId:"c1",
       key:clock,direction:0}).reason,"INVALID_DIRECTION");
   assert.equal(C.change(doc,{type:"share"}).reason,"INVALID_ACTION");
@@ -241,4 +257,84 @@ test("legacy stores remain separate and unmodified",()=>{
   assert.match(defaultStore,/favorites-default-v1\.json/);
   assert.match(world,/time-world-favorites-v1\.json/);
   assert.match(places,/places-v1\.json/);
+});
+
+
+test("U6a collection grouping persists approved cross-widget IDs without owner mutation",()=>{
+  const keys=[
+    key("weather-home","panel","home/history"),
+    key("weather-home","card","space|geomagnetic"),
+    key("radio","station","123e4567-e89b-42d3-a456-000000000002"),
+    key("notifications","source","github"),
+    key("appcontrol","item","org.mozilla.firefox.desktop"),
+    clock,place
+  ];
+  let doc=C.change(C.empty(),{type:"create",name:"Daily Operations"}).document;
+  for(const item of keys) {
+    const result=C.change(doc,{type:"set-member",collectionId:"c1",
+                                key:item,enabled:true});
+    assert.equal(result.ok,true,item);
+    assert.equal(result.changed,true,item);
+    doc=result.document;
+  }
+  const serialized=JSON.stringify(doc);
+  const persisted=C.parse(serialized);
+  assert.equal(persisted.ok,true);
+  assert.deepEqual(clone(persisted.document.collections[0].members),keys);
+  assert.equal(persisted.document.revision,keys.length+1);
+  assert.equal(C.change(persisted.document,{type:"set-member",collectionId:"c1",
+      key:keys[0],enabled:true}).changed,false);
+  const moved=C.change(persisted.document,{type:"move-member",
+      collectionId:"c1",key:keys[4],direction:-1});
+  assert.equal(moved.ok,true);
+  assert.equal(C.memberOf(moved.document,"c1",keys[4]),true);
+  const removed=C.change(moved.document,{type:"set-member",
+      collectionId:"c1",key:keys[2],enabled:false});
+  assert.equal(removed.ok,true);
+  assert.equal(C.memberOf(removed.document,"c1",keys[2]),false);
+  assert.equal(C.memberOf(persisted.document,"c1",keys[2]),true);
+  // Only the local collection document changed, never any owner snapshot.
+  assert.equal(serialized.includes("https://"),false);
+  assert.equal(serialized.includes("private"),false);
+});
+
+test("U6a rejected owner identities cannot enter even a previously valid document",()=>{
+  const unsafe=[
+    key("appcontrol","item","mode:2:◇  /home/private/report.pdf"),
+    key("appcontrol","item","hidden:btop"),
+    key("appcontrol","monitor-watch","watchbox|system|CPU"),
+    key("notifications","source","website:session:example.org"),
+    key("notifications","source","org.example.secret-app"),
+    key("radio","station","123e4567-e89b-72d3-a456-000000000002"),
+    key("hospital","activity","pinned|reports|report|2026-11-08T18:12:05.000Z|1"),
+    key("weather-home","panel","home/../../credentials")
+  ];
+  const doc=C.change(C.empty(),{type:"create",name:"Safe"}).document;
+  for(const member of unsafe) {
+    const change=C.change(doc,{type:"set-member",collectionId:"c1",
+        key:member,enabled:true});
+    assert.equal(change.ok,false,member);
+    assert.equal(C.parse(JSON.stringify({...doc,collections:[
+      {...doc.collections[0],members:[member]}]})).ok,false,member);
+  }
+  assert.equal(doc.collections[0].members.length,0);
+});
+
+test("U6a read-only collection controls use selected key, still enforce store policy",()=>{
+  const panel=read("components/FavoritesCollectionPanel.qml");
+  const toggle=read("components/FavoritesCollectionToggleButton.qml");
+  const cpu=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const store=read("services/favorites/FavoritesCollectionsStore.qml");
+  assert.match(panel,/property string collectionKey: ""/);
+  assert.match(toggle,/property string collectionKey: ""/);
+  assert.match(panel,/collectionStore\.acceptsKey\(resourceKey\)/);
+  assert.match(toggle,/collectionStore\.acceptsKey\(resourceKey\)/);
+  assert.match(panel,/collectionKey: panel\.collectionKey/);
+  assert.match(cpu,/collectionKey: pane\.selectedResource/);
+  assert.match(toggle,/collectionStore\.toggleMember\(collectionId,resourceKey\)/);
+  assert.match(store,/Policy\.checkMemberKey\(key\)\.ok/);
+  assert.match(store,/favorites-collections-v1\.json/);
+  for(const source of [panel,toggle,cpu]) {
+    assert.doesNotMatch(source,/execDetached|Process\s*\{|FileView\s*\{|loadMedia\(/);
+  }
 });

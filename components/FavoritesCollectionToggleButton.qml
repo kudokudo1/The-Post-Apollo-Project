@@ -8,12 +8,13 @@ ActionButton {
     property var collectionStore: null
     property string collectionId: ""
     property var resource: null
+    property string collectionKey: ""
     readonly property var normalized: Resource.normalize(resource)
-    readonly property string resourceKey: normalized.ok
-        ? normalized.record.key : ""
+    readonly property string resourceKey: collectionKey !== ""
+        ? collectionKey : normalized.ok ? normalized.record.key : ""
     readonly property bool supportsCollection:
-        normalized.ok
-        && normalized.record.capabilities.indexOf("collection") >= 0
+        collectionKey !== "" || (normalized.ok
+        && normalized.record.capabilities.indexOf("collection") >= 0)
     readonly property bool canChange: collectionStore !== null
         && collectionStore.canEdit && supportsCollection
         && collectionStore.acceptsKey(resourceKey)

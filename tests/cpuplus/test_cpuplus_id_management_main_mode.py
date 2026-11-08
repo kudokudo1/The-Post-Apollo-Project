@@ -1,4 +1,4 @@
-"""CPU++ ID Management lives beside SYSTEM/SETTINGS on the main rail."""
+"""CPU++ ID Management follows Favorites and precedes Settings on the main rail."""
 from pathlib import Path
 import unittest
 
@@ -11,11 +11,11 @@ SOCIAL = (ROOT / "widgets/messanger/IdentityCenterSettingsSections.qml").read_te
 
 
 class CpuPlusIdManagementMainModeContracts(unittest.TestCase):
-    def test_sixth_main_mode_after_settings_on_cpuplus_rail(self):
+    def test_seven_main_modes_favorites_id_management_settings_order(self):
         segment = CPU.split("readonly property var modes: [", 1)[1].split(
             "function open()", 1)[0]
-        names = ["FAVORITES", "PROCESS", "THERMAL", "SYSTEM",
-                 "SETTINGS", "ID MANAGEMENT"]
+        names = ["OVERVIEW", "PROCESS", "THERMAL", "SYSTEM",
+                 "FAVORITES", "ID MANAGEMENT", "SETTINGS"]
         positions = [segment.index('name: "' + item + '"') for item in names]
         self.assertEqual(positions, sorted(positions))
         self.assertEqual(segment.count('name: "ID MANAGEMENT"'), 1)
@@ -34,7 +34,7 @@ class CpuPlusIdManagementMainModeContracts(unittest.TestCase):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, CPU)
         self.assertIn("TimeSettings.cancelResync()", CPU)
-        self.assertIn('selectedModeIndex === 4', CPU)
+        self.assertIn('selectedModeIndex === 6', CPU)
         self.assertIn('settingsSubMode === "CONNECTIONS"', CPU)
 
     def test_id_mode_reuses_three_existing_bays_not_a_new_window(self):

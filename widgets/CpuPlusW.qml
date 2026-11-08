@@ -7,6 +7,8 @@ import "appcontrol"
 import "cpuplus"
 import qs.services.location
 import qs.services.time
+import qs.services.favorites
+import "../services/favorites/FavoritesManagementPolicy.js" as FavoritesManagement
 import qs.services.social
 import "thermal"
 
@@ -51,6 +53,21 @@ PanelWindow {
     property string selectedLocalIdForManagement: ""
     // UI section and local editing focus, never provider login or tenant switch.
     property string idManagementSection: "IDS"
+    property string selectedFavoriteKey: ""
+    readonly property var favoriteCandidates:
+        FavoritesManagement.list(
+            TimeSettings.worldFavoriteZones,
+            PlaceRegistry.savedPlaces,
+            FavoritesDefaultStore.favoriteKeys,
+            FavoritesDefaultStore.pinnedKeys)
+    readonly property var selectedFavoriteResource:
+        FavoritesManagement.recordFor(favoriteCandidates,selectedFavoriteKey)
+    FavoritesUnifiedCatalog {
+        id: cpuFavoritesCatalog
+        appControlSource: FavoritesStore
+        worldSource: TimeSettings
+        placesSource: PlaceRegistry
+    }
     property string selectedLocalOrganizationForManagement: ""
     property string selectedLocalPortfolioForManagement: ""
     readonly property var availableLocalManagementOrganizations:
@@ -95,12 +112,12 @@ PanelWindow {
     // A prepared resync is an explicit, view-scoped confirmation request.
     // Closing or leaving this CPU++ TIME surface must not leave it armed.
     onMenuOpenChanged: {
-        if (!menuOpen && selectedModeIndex === 4
+        if (!menuOpen && selectedModeIndex === 6
                 && settingsSubMode === "TIME")
             TimeSettings.cancelResync();
     }
     onSelectedModeIndexChanged: {
-        if (selectedModeIndex !== 4 && settingsSubMode === "TIME")
+        if (selectedModeIndex !== 6 && settingsSubMode === "TIME")
             TimeSettings.cancelResync();
     }
     onSettingsSubModeChanged: {
@@ -153,37 +170,15 @@ PanelWindow {
         ? systemTelemetry.systemRows
         : []
 
+    // Legacy THERMAL / SYSTEM indices 2/3 retain existing IPC compatibility.
     readonly property var modes: [
-        {
-            name: "FAVORITES",
-            symbol: "(˵✧ᴗ✧˵)",
-            kind: "text"
-        },
-        {
-            name: "PROCESS",
-            symbol: "(-_•)︻デ═一",
-            kind: "text"
-        },
-        {
-            name: "THERMAL",
-            symbol: "",
-            kind: "thermal"
-        },
-        {
-            name: "SYSTEM",
-            symbol: "🖳",
-            kind: "text"
-        },
-        {
-            name: "SETTINGS",
-            symbol: "⚙",
-            kind: "text"
-        },
-        {
-            name: "ID MANAGEMENT",
-            symbol: "󰀄",
-            kind: "text"
-        }
+        { name: "OVERVIEW", symbol: "(˵✧ᴗ✧˵)", kind: "text" },
+        { name: "PROCESS", symbol: "(-_•)︻デ═一", kind: "text" },
+        { name: "THERMAL", symbol: "", kind: "thermal" },
+        { name: "SYSTEM", symbol: "🖳", kind: "text" },
+        { name: "FAVORITES", symbol: "★", kind: "text" },
+        { name: "ID MANAGEMENT", symbol: "󰀄", kind: "text" },
+        { name: "SETTINGS", symbol: "⚙", kind: "text" }
     ]
 
     function open() {
@@ -241,8 +236,9 @@ PanelWindow {
     // window-local and cannot take over another visible widget's controls.
     readonly property bool standardKeysAvailable:
         menuOpen && (!relationshipFocusModeActive || relationshipFocused)
-        && !(selectedModeIndex === 4 && settingsLocationPane.editingText)
-        && !(selectedModeIndex === 4 && settingsSubMode === "TIME"
+        && !(selectedModeIndex === 6 && settingsLocationPane.editingText)
+        && !(selectedModeIndex === 4 && favoritesDetailsPane.editingText)
+        && !(selectedModeIndex === 6 && settingsSubMode === "TIME"
              && settingsTimeBasicsPane.zoneSearchFocused)
         && !(selectedModeIndex === 5
              && (idManagementSection !== "IDS"
@@ -262,7 +258,7 @@ PanelWindow {
             ? thermalSubModes
             : selectedModeIndex === 3
             ? systemSubModes.filter(function(choice) { return !choice.spacer; })
-            : selectedModeIndex === 4 ? settingsSubModes : [];
+            : selectedModeIndex === 6 ? settingsSubModes : [];
         if (choices.length < 2)
             return;
         const value = selectedModeIndex === 2
@@ -278,7 +274,7 @@ PanelWindow {
             selectThermalSubMode(choice.key);
         else if (selectedModeIndex === 3)
             selectSystemSubMode(choice.key);
-        else if (selectedModeIndex === 4)
+        else if (selectedModeIndex === 6)
             selectSettingsSubMode(choice.key);
     }
 
@@ -908,7 +904,7 @@ PanelWindow {
                     }
 
                     onTriggered: {
-                        if (modelData.name === "FAVORITES") {
+                        if (index === 0) {
                             cpuPlusWindow.favoritesFaceClickPulse = true;
                             favoritesFaceClickPulseTimer.restart();
                         }
@@ -1124,11 +1120,13 @@ PanelWindow {
                 ? "THERMAL MONITOR"
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? "SYSTEM MONITOR"
-                : cpuPlusWindow.selectedModeIndex === 4
+                : cpuPlusWindow.selectedModeIndex === 6
                 ? (cpuPlusWindow.settingsSubMode === "TIME"
                    ? "TIME // BASIC CONTROLS"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                      ? "CONNECTIONS // OVERVIEW" : "SETTINGS // OVERVIEW")
+                : cpuPlusWindow.selectedModeIndex === 4
+                ? "FAVORITES++ // SOURCES"
                 : cpuPlusWindow.selectedModeIndex === 5
                 ? (cpuPlusWindow.idManagementSection === "IDS"
                    ? "ID MANAGEMENT // OVERVIEW"
@@ -1429,11 +1427,13 @@ PanelWindow {
                     ? "THERMAL STATE"
                     : cpuPlusWindow.selectedModeIndex === 3
                     ? "SYSTEM STATE"
-                    : cpuPlusWindow.selectedModeIndex === 4
+                    : cpuPlusWindow.selectedModeIndex === 6
                     ? (cpuPlusWindow.settingsSubMode === "TIME"
                        ? "CLOCK // CONTROL"
                        : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                          ? "SHARED // STATUS" : "SETTINGS STATE")
+                    : cpuPlusWindow.selectedModeIndex === 4
+                    ? "FAVORITES // SAVED STATE"
                     : cpuPlusWindow.selectedModeIndex === 5
                     ? "IDENTITY // LOCAL STATUS" : "INSTRUMENT STATE"
 
@@ -1482,10 +1482,11 @@ PanelWindow {
 
             // SETTINGS/TIME owns this left slot with the shared Clock basic
             // control pane, not the inert instrument placeholder.
-            visible: !(cpuPlusWindow.selectedModeIndex === 4
+            visible: !(cpuPlusWindow.selectedModeIndex === 6
                        && (cpuPlusWindow.settingsSubMode === "TIME"
                            || cpuPlusWindow.settingsSubMode === "CONNECTIONS"))
                      && cpuPlusWindow.selectedModeIndex !== 5
+                     && cpuPlusWindow.selectedModeIndex !== 4
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom
@@ -1539,7 +1540,7 @@ PanelWindow {
 
                     text:
                         cpuPlusWindow.selectedModeIndex === 0
-                        ? "FAVORITES BAY"
+                        ? "OVERVIEW BAY"
                         : cpuPlusWindow.selectedModeIndex === 1
                         ? "PROCESS BAY"
                         : "LOCATION // SETTINGS"
@@ -1557,7 +1558,7 @@ PanelWindow {
 
         CpuPlusSettingsConnectionsOverviewPane {
             id: settingsConnectionsOverview
-            visible: cpuPlusWindow.selectedModeIndex === 4
+            visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
             anchors.left: parent.left
             anchors.right: parent.right
@@ -1573,7 +1574,7 @@ PanelWindow {
         // Keep it entirely inside the existing left instrument bay.
         TimeSettingsPane {
             id: settingsTimeBasicsPane
-            visible: cpuPlusWindow.selectedModeIndex === 4
+            visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "TIME"
             panelVisible: visible && cpuPlusWindow.menuOpen
             showClockPreview: false
@@ -1607,6 +1608,26 @@ PanelWindow {
             anchors.rightMargin: 12
             anchors.topMargin: 7
             anchors.bottomMargin: 9
+        }
+        CpuPlusFavoritesHubPane {
+            id: favoritesOverviewPane
+            area: "overview"
+            visible: cpuPlusWindow.selectedModeIndex === 4
+            catalogSnapshot: cpuFavoritesCatalog.snapshot
+            candidates: cpuPlusWindow.favoriteCandidates
+            selectedResource: cpuPlusWindow.selectedFavoriteResource
+            timeOwner: TimeSettings
+            placesOwner: PlaceRegistry
+            defaultOwner: FavoritesDefaultStore
+            collectionsOwner: FavoritesCollectionsStore
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedStateHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 8
+            anchors.bottomMargin: 10
         }
         CpuPlusLocalManagementPane {
             id: localManagementOverviewPane
@@ -1667,11 +1688,13 @@ PanelWindow {
                 ? "THERMAL TARGET"
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? "SYSTEM TARGET"
-                : cpuPlusWindow.selectedModeIndex === 4
+                : cpuPlusWindow.selectedModeIndex === 6
                 ? (cpuPlusWindow.settingsSubMode === "TIME"
                    ? "TIME // ACTIVE"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                      ? "CONNECTIONS // SOURCES" : "SETTINGS // CATEGORIES")
+                : cpuPlusWindow.selectedModeIndex === 4
+                ? "FAVORITES // SELECT"
                 : cpuPlusWindow.selectedModeIndex === 5
                 ? (cpuPlusWindow.idManagementSection === "IDS"
                    ? "ID MANAGEMENT // IDS"
@@ -1723,13 +1746,13 @@ PanelWindow {
                 ? 52
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? 92
-                : cpuPlusWindow.selectedModeIndex === 4
+                : cpuPlusWindow.selectedModeIndex === 6
                 ? 52 : 0
 
             visible:
                 cpuPlusWindow.selectedModeIndex === 2
                 || cpuPlusWindow.selectedModeIndex === 3
-                || cpuPlusWindow.selectedModeIndex === 4
+                || cpuPlusWindow.selectedModeIndex === 6
 
             Flow {
                 anchors.fill: parent
@@ -1768,13 +1791,13 @@ PanelWindow {
                         width:
                             cpuPlusWindow.selectedModeIndex === 2
                             ? (targetSubModeStrip.width - 4) / 2
-                            : cpuPlusWindow.selectedModeIndex === 4
+                            : cpuPlusWindow.selectedModeIndex === 6
                              ? (targetSubModeStrip.width - 8) / 3
                             : (targetSubModeStrip.width - 8) / 3
 
                         height:
                             cpuPlusWindow.selectedModeIndex === 2
-                            || cpuPlusWindow.selectedModeIndex === 4
+                            || cpuPlusWindow.selectedModeIndex === 6
                             ? 38 : 27
 
                         color:
@@ -1919,7 +1942,7 @@ PanelWindow {
                                     cpuPlusWindow.selectThermalSubMode(modelData.key);
                                 else if (cpuPlusWindow.selectedModeIndex === 3)
                                     cpuPlusWindow.selectSystemSubMode(modelData.key);
-                                else if (cpuPlusWindow.selectedModeIndex === 4)
+                                else if (cpuPlusWindow.selectedModeIndex === 6)
                                     cpuPlusWindow.selectSettingsSubMode(modelData.key);
                             }
                         }
@@ -1948,7 +1971,7 @@ PanelWindow {
 
         Column {
             id: settingsCategorySummary
-            visible: cpuPlusWindow.selectedModeIndex === 4
+            visible: cpuPlusWindow.selectedModeIndex === 6
                       && cpuPlusWindow.settingsSubMode === "LOCATION"
             anchors.top: targetSubModeStrip.bottom
             anchors.left: parent.left
@@ -1986,7 +2009,7 @@ PanelWindow {
 
         CpuPlusSettingsConnectionsListPane {
             id: settingsConnectionsList
-            visible: cpuPlusWindow.selectedModeIndex === 4
+            visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
             selectedId: cpuPlusWindow.selectedConnectionId
             onProviderSelected: function(providerId) {
@@ -2004,7 +2027,7 @@ PanelWindow {
 
         CpuPlusSettingsTimeActivePane {
             id: settingsTimeActivePane
-            visible: cpuPlusWindow.selectedModeIndex === 4
+            visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "TIME"
             panelVisible: visible && cpuPlusWindow.menuOpen
             anchors.left: parent.left
@@ -2033,6 +2056,29 @@ PanelWindow {
             anchors.rightMargin: 9
             anchors.topMargin: 8
             height: implicitHeight
+        }
+        CpuPlusFavoritesHubPane {
+            id: favoritesSelectorPane
+            area: "selector"
+            visible: cpuPlusWindow.selectedModeIndex === 4
+            catalogSnapshot: cpuFavoritesCatalog.snapshot
+            candidates: cpuPlusWindow.favoriteCandidates
+            selectedResource: cpuPlusWindow.selectedFavoriteResource
+            timeOwner: TimeSettings
+            placesOwner: PlaceRegistry
+            defaultOwner: FavoritesDefaultStore
+            collectionsOwner: FavoritesCollectionsStore
+            onSelectionRequested: function(key) {
+                cpuPlusWindow.selectedFavoriteKey = key;
+            }
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: targetHeaderLine.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 10
+            anchors.bottomMargin: 9
         }
         CpuPlusIdManagementPane {
             id: idManagementSelectorPane
@@ -2468,11 +2514,13 @@ PanelWindow {
             anchors.top: parent.top
             anchors.topMargin: 16
 
-            text: cpuPlusWindow.selectedModeIndex === 4
+            text: cpuPlusWindow.selectedModeIndex === 6
                   ? (cpuPlusWindow.settingsSubMode === "TIME"
                      ? "TIME // ADVANCED"
                      : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                        ? "CONNECTIONS // ACCESS" : "LOCATION // SETTINGS")
+                  : cpuPlusWindow.selectedModeIndex === 4
+                  ? "FAVORITES // MANAGE"
                   : cpuPlusWindow.selectedModeIndex === 5
                   ? (cpuPlusWindow.idManagementSection === "IDS"
                      ? "ID MANAGEMENT // DETAILS" : "LOCAL // EDIT")
@@ -2504,7 +2552,7 @@ PanelWindow {
         CpuPlusSettingsLocationPane {
             id: settingsLocationPane
             registry: PlaceRegistry
-            visible: cpuPlusWindow.selectedModeIndex === 4
+            visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "LOCATION"
             anchors.left: parent.left
             anchors.right: parent.right
@@ -2518,7 +2566,7 @@ PanelWindow {
 
         CpuPlusSettingsConnectionsDetailsPane {
             id: settingsConnectionsDetails
-            visible: cpuPlusWindow.selectedModeIndex === 4
+            visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
             selectedId: cpuPlusWindow.selectedConnectionId
             anchors.left: parent.left
@@ -2535,7 +2583,7 @@ PanelWindow {
         // basic control interactions, while the middle owns live state.
         CpuPlusSettingsTimeAdvancedPane {
             id: settingsTimeAdvancedPane
-            visible: cpuPlusWindow.selectedModeIndex === 4
+            visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "TIME"
             panelVisible: visible && cpuPlusWindow.menuOpen
             anchors.left: parent.left
@@ -2548,6 +2596,26 @@ PanelWindow {
             anchors.bottomMargin: 10
         }
 
+        CpuPlusFavoritesHubPane {
+            id: favoritesDetailsPane
+            area: "details"
+            visible: cpuPlusWindow.selectedModeIndex === 4
+            catalogSnapshot: cpuFavoritesCatalog.snapshot
+            candidates: cpuPlusWindow.favoriteCandidates
+            selectedResource: cpuPlusWindow.selectedFavoriteResource
+            timeOwner: TimeSettings
+            placesOwner: PlaceRegistry
+            defaultOwner: FavoritesDefaultStore
+            collectionsOwner: FavoritesCollectionsStore
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 19
+            anchors.bottomMargin: 9
+        }
         CpuPlusIdManagementPane {
             id: idManagementDetailsPane
             area: "details"

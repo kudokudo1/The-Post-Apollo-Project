@@ -32,7 +32,7 @@ SOCIAL = (
 
 
 class CpuPlusSocialManagementBays(unittest.TestCase):
-    def test_current_six_mode_rail_and_three_existing_bays_unchanged(self):
+    def test_seven_mode_rail_keeps_three_existing_bays(self):
         for expected in (
             "implicitWidth: 1000", "implicitHeight: 834",
             'name: "ID MANAGEMENT"', "id: modeRail", "height: 110",

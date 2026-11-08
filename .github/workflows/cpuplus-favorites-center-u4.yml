@@ -1,0 +1,69 @@
+name: CPU++ Favorites++ seven-mode center
+
+on:
+  pull_request:
+    paths:
+      - "widgets/CpuPlusW.qml"
+      - "widgets/cpuplus/CpuPlusFavoritesHubPane.qml"
+      - "components/FavoritesCollectionPanel.qml"
+      - "services/favorites/FavoritesManagementPolicy.js"
+      - "tests/cpuplus/**"
+      - "tests/components/test_cpuplus_*"
+      - "scripts/favorites/verify_cpuplus_hub_fedora_u4.sh"
+      - ".github/workflows/cpuplus-favorites-center-u4.yml"
+  push:
+    paths:
+      - "widgets/CpuPlusW.qml"
+      - "widgets/cpuplus/CpuPlusFavoritesHubPane.qml"
+      - "components/FavoritesCollectionPanel.qml"
+      - "services/favorites/FavoritesManagementPolicy.js"
+      - "tests/cpuplus/**"
+      - "tests/components/test_cpuplus_*"
+      - "scripts/favorites/verify_cpuplus_hub_fedora_u4.sh"
+      - ".github/workflows/cpuplus-favorites-center-u4.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Safe owner projections and seven-mode CPU++ structure
+        run: node --test tests/cpuplus/test_cpuplus_favorites_center.cjs
+      - name: Existing Favorites++ U0/U1/U2/U3 contracts
+        run: |
+          node --test tests/favorites/test_favorites_universal_u0.cjs
+          node --test tests/favorites/test_favorites_universal_u1.cjs
+          node --test tests/favorites/test_favorites_universal_u2.cjs
+          node --test tests/favorites/test_favorites_universal_u3.cjs
+      - name: Existing CPU++ settings, identity, three-bay and glow contracts
+        run: |
+          python3 tests/components/test_cpuplus_settings_mode_contracts.py
+          python3 tests/components/test_cpuplus_glow_ab_contracts.py
+          python3 tests/components/test_cpuplus_caption_slot_contracts.py
+          python3 tests/cpuplus/test_cpuplus_id_management_main_mode.py
+          python3 tests/cpuplus/test_cpuplus_id_management_editor.py
+          python3 tests/cpuplus/test_cpuplus_social_local_management_bays.py
+          python3 tests/cpuplus/test_cpuplus_time_three_bay_contract.py
+
+  native-selector:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 20
+    steps:
+      - name: Install native Fedora Quickshell with Xvfb
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xdotool xorg-x11-server-Xvfb
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: Synthetic selector click and owner isolation
+        run: bash scripts/favorites/verify_cpuplus_hub_fedora_u4.sh

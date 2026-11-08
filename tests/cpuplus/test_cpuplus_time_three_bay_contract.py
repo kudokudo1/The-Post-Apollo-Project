@@ -98,7 +98,7 @@ class CpuPlusTimeThreeBayContracts(unittest.TestCase):
         self.assertIn("settingsLocationPane.editingText", CPU)
         self.assertNotIn("TimeSettings.", LOCATION)
         self.assertIn("showTimezoneDetails: true", CPU)
-        self.assertIn("visible: !(cpuPlusWindow.selectedModeIndex === 4", CPU)
+        self.assertIn("visible: !(cpuPlusWindow.selectedModeIndex === 6", CPU)
 
     def test_focus_guard_keeps_timezone_search_editable(self):
         self.assertIn("settingsTimeBasicsPane.zoneSearchFocused", CPU)

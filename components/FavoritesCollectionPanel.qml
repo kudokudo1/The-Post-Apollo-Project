@@ -10,6 +10,7 @@ Rectangle {
     property var resource: null
     property alias draftName: nameInput.text
     property alias createControl: createButton
+    readonly property bool editingText: nameInput.activeFocus
     readonly property var normalized: Resource.normalize(resource)
     readonly property string resourceKey:
         normalized.ok ? normalized.record.key : ""

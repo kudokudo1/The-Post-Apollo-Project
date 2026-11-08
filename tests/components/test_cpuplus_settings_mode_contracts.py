@@ -8,10 +8,11 @@ location = (root / "widgets/cpuplus/CpuPlusSettingsLocationPane.qml").read_text(
 explore = (root / "widgets/cpuplus/CpuPlusExploreLocationPanel.qml").read_text(encoding="utf-8")
 saved = (root / "widgets/cpuplus/CpuPlusSavedPlacesPanel.qml").read_text(encoding="utf-8")
 
-# Preserve all original mode positions and add SETTINGS only at the end.
+# Preserve the thermal/system IPC positions; FAVORITES manager precedes ID and SETTINGS.
 modes = cpu[cpu.index("readonly property var modes: ["):cpu.index("function open()")]
 offsets = [modes.index('name: "' + name + '"') for name in (
-    "FAVORITES", "PROCESS", "THERMAL", "SYSTEM", "SETTINGS"
+    "OVERVIEW", "PROCESS", "THERMAL", "SYSTEM", "FAVORITES",
+    "ID MANAGEMENT", "SETTINGS"
 )]
 assert offsets == sorted(offsets)
 assert modes.count('name: "SETTINGS"') == 1
@@ -86,7 +87,7 @@ assert "LOCATION ROUTING" not in explore
 
 assert "import qs.services.location" in cpu
 assert "registry: PlaceRegistry" in cpu
-assert '!(selectedModeIndex === 4 && settingsLocationPane.editingText)' in cpu
+assert '!(selectedModeIndex === 6 && settingsLocationPane.editingText)' in cpu
 assert "readonly property bool editingText:" in location
 assert location.count("Keys.onEscapePressed:") == 3
 assert "awaitingSave = true" in location

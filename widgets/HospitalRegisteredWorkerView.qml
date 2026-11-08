@@ -15,8 +15,8 @@ Item {
     property var roomData: ({})
     property string pinnedRoomId: ""
     property string pinnedSessionId: ""
-    property string initialMode: "chat"
-    property string viewMode: "chat"
+    property string initialMode: "continuity"
+    property string viewMode: "continuity"
     property bool runtimeStatusVerified: false
     property string actionError: ""
 
@@ -111,6 +111,8 @@ Item {
         actionError = "";
         if (pinnedRoomId)
             transcript.refresh();
+        if (root.viewMode === "continuity")
+            continuityView.refresh();
         if (sessionMatches)
             runtime.refresh();
         refreshRequested();
@@ -221,7 +223,8 @@ Item {
     onActiveChanged: {
         if (active) {
             viewMode = initialMode === "connections" ? "connections"
-                : initialMode === "quick" ? "quick" : "chat";
+                : initialMode === "quick" ? "quick"
+                : initialMode === "chat" ? "chat" : "continuity";
             previewAssignmentId = "";
             previewDoctorId = "";
             previewProviderId = "";
@@ -453,7 +456,16 @@ Item {
         height: 30
         spacing: 7
         HospitalActionButton {
-            width: (parent.width - 14) / 3
+            width: (parent.width - 21) / 4
+            height: parent.height
+            label: "ROOM // STATUS"
+            compactIcon: "ROOM"
+            selectedAction: root.viewMode === "continuity"
+            accent: Colors.magenta
+            onTriggered: root.viewMode = "continuity"
+        }
+        HospitalActionButton {
+            width: (parent.width - 21) / 4
             height: parent.height
             label: "CHAT // SAVED" 
             compactIcon: "CHAT"
@@ -462,7 +474,7 @@ Item {
             onTriggered: root.viewMode = "chat"
         }
         HospitalActionButton {
-            width: (parent.width - 14) / 3
+            width: (parent.width - 21) / 4
             height: parent.height
             label: "QUICK // PX" 
             compactIcon: "QUICK"
@@ -471,7 +483,7 @@ Item {
             onTriggered: root.viewMode = "quick"
         }
         HospitalActionButton {
-            width: (parent.width - 14) / 3
+            width: (parent.width - 21) / 4
             height: parent.height
             label: "CONNECTIONS"
             compactIcon: "LINK"
@@ -492,6 +504,17 @@ Item {
             right: parent.right
             leftMargin: 11
             rightMargin: 11
+        }
+
+        HospitalRoomContinuityView {
+            id: continuityView
+            anchors.fill: parent
+            active: root.active && root.viewMode === "continuity"
+                && root.roomMatches
+            roomId: active ? root.pinnedRoomId : ""
+            roomData: root.roomData
+            allSessions: root.allSessions
+            sessionsLoaded: root.sessionsSnapshotLoaded
         }
 
         Flickable {

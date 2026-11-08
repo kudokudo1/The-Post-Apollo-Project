@@ -105,6 +105,15 @@ class C2vRollbackEvidenceContract(unittest.TestCase):
         self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_STARTED // non-authoritative", src)
         self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_START_FAILED // non-authoritative", src)
         self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_NOT_READY // non-authoritative", src)
+        for error in (
+            "C2V_DIAG_ROLLBACK_OBSERVER_FILE_CREATE_FAILED // non-authoritative",
+            "C2V_DIAG_ROLLBACK_OBSERVER_CHMOD_FAILED // non-authoritative",
+            "C2V_DIAG_ROLLBACK_OBSERVER_RESET_FAILED // non-authoritative",
+            "C2V_DIAG_ROLLBACK_OBSERVER_FINISH_MARK_FAILED // non-authoritative",
+        ):
+            with self.subTest(error=error):
+                self.assertIn(error, src)
+        self.assertIn("touch /run/c2v-rpm-rollback-observer-finished ||", src)
         self.assertIn("systemd-run --quiet", src)
         self.assertIn("--unit=c2v-rpm-rollback-observer", src)
         self.assertIn("--property=Type=exec", src)

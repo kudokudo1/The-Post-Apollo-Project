@@ -15,10 +15,10 @@ This small **C4b-only experiment** defines `opt_link_profile_candidate.py`, a pu
 The candidate requires:
 1. An explicit offline Silverblue 44 test-only profile, the exact Fedora Silverblue OSTree ref, booted OSTree marker, Fedora release 44 and no network interfaces.
 2. Exactly `/opt -> var/opt`, resolving to `/var/opt`; the link itself must be root-owned with root group, a genuine symlink and a stable positive device/inode identity across two snapshots. Nominal symlink mode 0777 is treated as *link mode*, never as the target directory's mode.
-3. Two matching snapshots of every guarded real directory: `/`, `/var`, `/var/opt`, physical venv parents under `/var/opt`, and the logical venv parents under `/opt`. Every directory must be root-owned, nonsymlink, a genuine directory and not group/other writable.
+3. Two matching snapshots of every guarded real directory: `/`, `/var`, `/var/opt`, physical venv parents under `/var/opt`, and the logical venv parents under `/opt`. Every directory must be root-owned, nonsymlink, a genuine directory and not group/other writable. The before/after observations must also preserve each directory's exact device/inode identity, and each logical `/opt/postapollo-c2o-venv` and `/opt/postapollo-c2o-venv/bin` path must be identical in device/inode to its physical `/var/opt/...` counterpart; matching UID/mode alone is insufficient.
 4. No missing, additional, swapped or malformed evidence fields. All five grant/authentication flags remain `false`, even for a coherent candidate.
 
-The adversarial tests reject altered link text, alternate absolute/relative targets, redirected resolved paths, changed inode, wrong UID/GID, unsafe/writable or symlinked ancestor directories, missing/extra paths, changed directory facts and wrong OS/profile/network context.
+The adversarial tests reject altered link text, alternate absolute/relative targets, redirected resolved paths, changed inode, wrong UID/GID, unsafe/writable or symlinked ancestor directories, missing/extra paths, changed directory facts, inode replacement with identical mode/owner, mismatched logical-versus-physical alias identity, nested symlinks and wrong OS/profile/network context.
 
 ## HOW TO USE
 

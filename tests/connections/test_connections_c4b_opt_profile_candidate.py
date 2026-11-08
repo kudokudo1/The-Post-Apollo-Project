@@ -26,8 +26,20 @@ def valid() -> dict:
         "target": "var/opt", "resolved": "/var/opt",
         "device": 2049, "inode": 500,
     }
+    # Inode identity is part of the proposed trust boundary. Logical
+    # /opt/venv paths must describe the same real inodes as /var/opt/venv.
+    physical_ids = {
+        "/": 900, "/var": 901, "/var/opt": 902,
+        "/var/opt/postapollo-c2o-venv": 903,
+        "/var/opt/postapollo-c2o-venv/bin": 904,
+        "/opt/postapollo-c2o-venv": 903,
+        "/opt/postapollo-c2o-venv/bin": 904,
+    }
     dirs = {
-        path: {"owner": 0, "mode": 0o755, "directory": True, "symlink": False}
+        path: {
+            "owner": 0, "mode": 0o755, "directory": True,
+            "symlink": False, "device": 2049, "inode": physical_ids[path],
+        }
         for path in m.GUARDED_PATHS
     }
     return {
@@ -159,6 +171,8 @@ class C4bSilverblueCandidateTests(unittest.TestCase):
             "mode": [0o777, 0o775, 0o757, 0o733, True, "0755", -1],
             "directory": [False, 1, None],
             "symlink": [True, 1, None],
+            "device": [0, -1, True, "2049", None],
+            "inode": [0, -1, True, "904", None],
         }
         for field in ("dirs_before", "dirs_after"):
             for path in m.GUARDED_PATHS:
@@ -183,6 +197,37 @@ class C4bSilverblueCandidateTests(unittest.TestCase):
             data = valid()
             data["dirs_after"][path]["mode"] = 0o750
             self.check(data, "C4B_CANDIDATE_DIRECTORY_CHAIN_CHANGED")
+
+    def test_09b_replaced_inodes_refused_even_with_same_owner_mode(self) -> None:
+        # Swapping a directory inode may leave UID, mode and type unchanged.
+        for path in m.GUARDED_PATHS:
+            for identity_field in ("inode", "device"):
+                with self.subTest(path=path, identity_field=identity_field):
+                    data = valid()
+                    data["dirs_after"][path][identity_field] += 1
+                    self.check(data, "C4B_CANDIDATE_DIRECTORY_CHAIN_CHANGED")
+
+    def test_09c_logical_opt_alias_must_match_physical_inode(self) -> None:
+        for physical, alias in m.PHYSICAL_ALIAS_PAIRS:
+            for swapped in ("device", "inode"):
+                for path in (physical, alias):
+                    with self.subTest(path=path, field=swapped):
+                        data = valid()
+                        # Keep BEFORE and AFTER internally stable to isolate
+                        # the mismatch between the real and alias paths.
+                        data["dirs_before"][path][swapped] += 1
+                        data["dirs_after"][path][swapped] += 1
+                        self.check(data, "C4B_CANDIDATE_ALIAS_IDENTITY_MISMATCH")
+
+    def test_09d_no_second_symlink_is_allowed_on_alias_target(self) -> None:
+        for physical, alias in m.PHYSICAL_ALIAS_PAIRS:
+            for path in (physical, alias):
+                for snapshot in ("dirs_before", "dirs_after"):
+                    with self.subTest(path=path, snapshot=snapshot):
+                        data = valid()
+                        data[snapshot][path]["symlink"] = True
+                        data[snapshot][path]["directory"] = False
+                        self.check(data, "C4B_CANDIDATE_UNPROTECTED_DIRECTORY")
 
     def test_10_no_os_access_or_grant_authority_in_candidate(self) -> None:
         source = SOURCE.read_text()

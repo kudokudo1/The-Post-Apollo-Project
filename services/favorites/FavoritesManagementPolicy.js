@@ -103,8 +103,12 @@ function safeUnresolvedLabel(menu,classification,ordinal) {
         "SYSTEM":"SAVED METRIC",
         "FAVORITES":"SAVED ITEM"
     };
-    return menu==="OTHER" ? classification+" #"+ordinal
-        : menu+" // "+(type[menu] || "SAVED ITEM")+" #"+ordinal;
+    if (menu==="OTHER") return classification+" #"+ordinal;
+    if (classification==="PREFERRED ACTION")
+        return menu+" // PREFERRED ACTION #"+ordinal;
+    if (classification.indexOf("METRIC WATCH")!==-1)
+        return menu+" // METRIC WATCH #"+ordinal;
+    return menu+" // "+(type[menu] || "SAVED ITEM")+" #"+ordinal;
 }
 
 function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions) {

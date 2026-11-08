@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "../../services/favorites/FavoritesDossierIndexPolicy.js" as Dossier
+import "../../services/favorites/FavoritesCollectionsViewPolicy.js" as CollectionView
 
 // CPU++ Favorites++ manager. Three instances share one selection/snapshot.
 // No new FileView, owner process, or action authority is created here.
@@ -13,6 +14,8 @@ Item {
     // Expose rendered rows for native selector/a11y testing, not actuation.
     property alias favoriteRowRepeater: savedItemRows
     property alias dossierGroupItems: dossierGroupRepeater
+    property alias dossierScrollArea: dossierScroll
+    property alias collectionGroupItems: collectionGroupRepeater
     // Native fixture inspection of the existing group editor (no new action).
     property alias collectionPanel: collectionManager
     property var timeOwner: null
@@ -20,11 +23,21 @@ Item {
     property var defaultOwner: null
     property var collectionsOwner: null
     property string filterMode: "ALL"
+    // Shared between all three CPU++ bays; selection alone never modifies an owner.
+    property string selectedCollectionId: ""
     signal selectionRequested(string key)
     // Overview selects an original candidate and directs the middle bay to
     // its existing filter, never a new owner action.
     signal indexSelectionRequested(string key, string category)
+    signal collectionRequested(string collectionId)
+    signal collectionMemberRequested(string collectionId, string key)
     readonly property var dossier: Dossier.build(pane.candidates)
+    readonly property var collectionView: CollectionView.build(
+        pane.collectionsOwner ? pane.collectionsOwner.collections : [],
+        pane.candidates,
+        pane.collectionsOwner ? pane.collectionsOwner.storageState : "disconnected")
+    readonly property var selectedCollection:
+        CollectionView.section(pane.collectionView,pane.selectedCollectionId)
     property var collapsedIndexGroups: ({})
     function toggleIndexGroup(key) {
         const next=Object.assign({},collapsedIndexGroups);
@@ -56,11 +69,14 @@ Item {
             Qt.callLater(pane.revealSelectedInSelector);
     }
 
-    readonly property var choices:
-        candidates && Array.isArray(candidates.rows)
-        ? candidates.rows.filter(function(row) {
-            return filterMode==="ALL" || row.category===filterMode;
-        }) : []
+    readonly property var choices: {
+        if (pane.filterMode==="GROUP")
+            return CollectionView.rowsFor(pane.collectionView,pane.selectedCollectionId);
+        return candidates && Array.isArray(candidates.rows)
+            ? candidates.rows.filter(function(row) {
+                return filterMode==="ALL" || row.category===filterMode;
+            }) : [];
+    }
     readonly property var groupRecords:
         collectionsOwner ? collectionsOwner.collections : []
 
@@ -113,10 +129,170 @@ Item {
             height: 1
             color: Colors.cyan
         }
+        // U6b: collections are a second VIEW of original owner resources,
+        // placed above the unchanged source/menu dossier. No raw member key
+        // is ever rendered if the owner candidate is missing.
+        Column {
+            id: collectionSection
+            width: parent.width
+            spacing: 3
+            height: pane.collectionView.groups.length
+                ? Math.max(92,Math.min(228,overview.height*0.36))
+                : 20
+            GohuText {
+                width: parent.width
+                height: 16
+                text: "COLLECTIONS // "+pane.collectionView.count
+                color: Colors.magenta
+                font.pixelSize: 11
+                elide: Text.ElideRight
+            }
+            Flickable {
+                id: collectionScroll
+                width: parent.width
+                height: Math.max(0,collectionSection.height-19)
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                contentWidth: width
+                contentHeight: collectionRows.implicitHeight
+                Column {
+                    id: collectionRows
+                    width: collectionScroll.width
+                    spacing: 3
+                    Repeater {
+                        id: collectionGroupRepeater
+                        model: pane.collectionView.groups
+                        Column {
+                            id: collectionGroup
+                            required property var modelData
+                            readonly property var section: modelData
+                            // Native testing uses the real button, not an action.
+                            property alias memberItems: collectionMemberRepeater
+                            width: collectionRows.width
+                            spacing: 2
+                            Rectangle {
+                                id: collectionHeading
+                                width: parent.width
+                                height: 29
+                                color: pane.selectedCollectionId===collectionGroup.section.id
+                                    ? "#341147" : "#301139"
+                                border.width: 1
+                                border.color: pane.selectedCollectionId===collectionGroup.section.id
+                                    ? Colors.magenta : Colors.cyan
+                                GohuText {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 5
+                                    anchors.rightMargin: 3
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: collectionGroup.section.name+" // "
+                                        +collectionGroup.section.available
+                                        +"/"+collectionGroup.section.count
+                                    textFormat: Text.PlainText
+                                    font.pixelSize: 10
+                                    color: Colors.white
+                                    elide: Text.ElideRight
+                                }
+                                MouseArea {
+                                    id: collectionHit
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    hoverEnabled: true
+                                    activeFocusOnTab: true
+                                    Accessible.role: Accessible.Button
+                                    Accessible.name: "Collection "+collectionGroup.section.name
+                                    Accessible.onPressAction:
+                                        pane.collectionRequested(collectionGroup.section.id)
+                                    onClicked: pane.collectionRequested(collectionGroup.section.id)
+                                    onWheel: function(wheel) { wheel.accepted=false; }
+                                    Keys.onPressed: function(event) {
+                                        if(event.key===Qt.Key_Return
+                                                || event.key===Qt.Key_Enter
+                                                || event.key===Qt.Key_Space) {
+                                            pane.collectionRequested(collectionGroup.section.id);
+                                            event.accepted=true;
+                                        }
+                                    }
+                                }
+                            }
+                            Column {
+                                width: parent.width
+                                spacing: 2
+                                visible: pane.selectedCollectionId===collectionGroup.section.id
+                                height: visible ? implicitHeight : 0
+                                Repeater {
+                                    id: collectionMemberRepeater
+                                    model: collectionGroup.section.items
+                                    Rectangle {
+                                        id: collectionMember
+                                        required property var modelData
+                                        width: collectionGroup.width
+                                        height: 29
+                                        color: !modelData.missing && pane.selectedResource
+                                            && pane.selectedResource.key===modelData.key
+                                            ? "#341147" : "#1B0623"
+                                        border.width: 1
+                                        border.color: modelData.missing ? "#3A2447" : Colors.cyan
+                                        Column {
+                                            anchors.fill: parent
+                                            anchors.margins: 3
+                                            spacing: 1
+                                            GohuText {
+                                                width: parent.width
+                                                text: collectionMember.modelData.name
+                                                textFormat: Text.PlainText
+                                                color: collectionMember.modelData.missing
+                                                    ? Colors.orange : Colors.white
+                                                font.pixelSize: 9
+                                                elide: Text.ElideRight
+                                            }
+                                            QuietText {
+                                                width: parent.width
+                                                text: collectionMember.modelData.type
+                                                textFormat: Text.PlainText
+                                                font.pixelSize: 8
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            enabled: !collectionMember.modelData.missing
+                                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                            activeFocusOnTab: enabled
+                                            Accessible.role: Accessible.Button
+                                            Accessible.name: collectionGroup.section.name
+                                                +" // "+collectionMember.modelData.name
+                                            Accessible.onPressAction:
+                                                pane.collectionMemberRequested(
+                                                    collectionGroup.section.id,
+                                                    collectionMember.modelData.key)
+                                            onClicked: pane.collectionMemberRequested(
+                                                collectionGroup.section.id,
+                                                collectionMember.modelData.key)
+                                            onWheel: function(wheel) { wheel.accepted=false; }
+                                            Keys.onPressed: function(event) {
+                                                if(enabled && (event.key===Qt.Key_Return
+                                                        || event.key===Qt.Key_Enter
+                                                        || event.key===Qt.Key_Space)) {
+                                                    pane.collectionMemberRequested(
+                                                        collectionGroup.section.id,
+                                                        collectionMember.modelData.key);
+                                                    event.accepted=true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Flickable {
             id: dossierScroll
             width: parent.width
-            height: Math.max(0,overview.height-65)
+            height: Math.max(0,overview.height-65-collectionSection.height-5)
             clip: true
             contentWidth: width
             contentHeight: dossierRows.implicitHeight
@@ -269,7 +445,7 @@ Item {
             height: 121
             spacing: 4
             Repeater {
-                model: ["ALL","CPU++","APP CTRL","WEATHER","NOTIFS","RADIO","HOSPITAL","CLOCK","PLACES","NEW"]
+                model: ["ALL","GROUP","CPU++","APP CTRL","WEATHER","NOTIFS","RADIO","HOSPITAL","CLOCK","PLACES","NEW"]
                 ActionButton {
                     required property string modelData
                     width: Math.max(1,(selector.width-8)/3)
@@ -284,14 +460,20 @@ Item {
         }
         QuietText {
             width: parent.width
-            text: "OWNER-SAVED ITEMS // SELECT TO INSPECT"
+            text: pane.filterMode==="GROUP"
+                ? pane.selectedCollection
+                    ? "COLLECTION // "+pane.selectedCollection.name
+                    : "COLLECTION // CHOOSE ONE IN LEFT INDEX"
+                : "OWNER-SAVED ITEMS // SELECT TO INSPECT"
             font.pixelSize: 9
             elide: Text.ElideRight
         }
         GohuText {
             width: parent.width
             text: "LISTED "+pane.choices.length
-                +" / "+(pane.candidates ? pane.candidates.total : 0)
+                +" / "+(pane.filterMode==="GROUP"
+                    ? pane.selectedCollection ? pane.selectedCollection.count : 0
+                    : pane.candidates ? pane.candidates.total : 0)
             color: Colors.orange
             font.pixelSize: 11
         }
@@ -381,7 +563,11 @@ Item {
                 QuietText {
                     width: parent.width
                     visible: pane.choices.length===0
-                    text: "NO SUPPORTED SAVED ITEMS IN THIS FILTER"
+                    text: pane.filterMode==="GROUP"
+                        ? pane.selectedCollection
+                          ? "NO LOADED MEMBERS // ORIGINAL SOURCES MAY BE UNAVAILABLE"
+                          : "SELECT A COLLECTION IN THE LEFT INDEX"
+                        : "NO SUPPORTED SAVED ITEMS IN THIS FILTER"
                     wrapMode: Text.WordWrap
                     font.pixelSize: 10
                 }

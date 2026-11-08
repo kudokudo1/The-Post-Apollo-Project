@@ -89,6 +89,28 @@ read -r ix iy <<<"$second_coords"
 [ -n "$ix" ] && [ -n "$iy" ] ||
   { cat "$log"; echo "U4_FAIL // invalid dossier coordinates"; exit 1; }
 xdotool mousemove --window "$window" "$ix" "$iy" click 1
+# U6b: the QML fixture next verifies prior U6a controls and exposes the
+# real left collection heading's mouse coordinates. Click it as a user would.
+for ((i=0;i<100;i++)); do
+  if grep -F "U4_FAIL" "$log" >/dev/null; then
+    cat "$log"; echo "U6B_FAIL // fixture before collection click"; exit 1
+  fi
+  if grep -F 'U6B_GROUP_READY // x=' "$log" >/dev/null; then
+    break
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    cat "$log"; echo "U6B_FAIL // exited before group click"; exit 1
+  fi
+  sleep 0.1
+done
+grep -F 'U6B_GROUP_READY // x=' "$log" >/dev/null ||
+  { cat "$log"; echo "U6B_FAIL // missing collection heading"; exit 1; }
+group_coords="$(grep -F 'U6B_GROUP_READY // x=' "$log" | tail -n 1 |
+  sed -E 's/.*x=([0-9]+) y=([0-9]+).*/\1 \2/')"
+read -r gx gy <<<"$group_coords"
+[ -n "$gx" ] && [ -n "$gy" ] ||
+  { cat "$log"; echo "U6B_FAIL // bad group coordinates"; exit 1; }
+xdotool mousemove --window "$window" "$gx" "$gy" click 1
 set +e
 wait "$pid"
 rc="$?"
@@ -106,6 +128,8 @@ grep -F 'U4_PASS // DOSSIER_FILE_NAVIGATION_READ_ONLY' "$log" >/dev/null ||
   { echo "U4_FAIL // left dossier click did not reach right details"; exit 1; }
 grep -F 'U6_PASS // SAFE_MEMBER_ONLY_NO_PROVIDER_WRITES' "$log" >/dev/null ||
   { echo "U6_FAIL // cross-widget collection gate was not verified"; exit 1; }
+grep -F 'U6B_PASS // COLLECTION_TO_SELECTOR_AND_DETAILS_NO_WRITES' "$log" >/dev/null ||
+  { echo "U6B_FAIL // live left collection click did not route to center"; exit 1; }
 if find "$work/data" -type f | grep -q .; then
   echo "U4_FAIL // manager created a writer file"; exit 1
 fi

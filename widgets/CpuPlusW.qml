@@ -61,6 +61,9 @@ PanelWindow {
     // Local editor action filter only, never a real account/tenant switch.
     property string idManagementTask: "EDITOR"
     property string selectedFavoriteKey: ""
+    // U6b presentation state shared by the three Favorites bays. The v1
+    // CollectionsStore remains the only grouping writer.
+    property string selectedFavoriteCollectionId: ""
     // U5a injection point only. WeatherStationW owns the sole bookmark
     // writer and must explicitly expose its existing store before live use.
     property var weatherHomeFavoritesSource: null
@@ -1746,11 +1749,33 @@ PanelWindow {
             placesOwner: PlaceRegistry
             defaultOwner: FavoritesDefaultStore
             collectionsOwner: FavoritesCollectionsStore
+            selectedCollectionId: cpuPlusWindow.selectedFavoriteCollectionId
             onIndexSelectionRequested: function(key, category) {
                 // The left dossier navigates only existing candidates.
                 // The middle selector keeps the actual filter/selection UI.
                 favoritesSelectorPane.filterMode = category;
                 cpuPlusWindow.selectedFavoriteKey = key;
+            }
+            onCollectionRequested: function(collectionId) {
+                const section=favoritesOverviewPane.collectionView.groups.find(
+                    function(group) { return group.id===collectionId; });
+                if(!section) return;
+                cpuPlusWindow.selectedFavoriteCollectionId=collectionId;
+                favoritesSelectorPane.filterMode="GROUP";
+                // A former selected resource must not falsely appear to
+                // belong to the newly selected group.
+                cpuPlusWindow.selectedFavoriteKey=section.rows.length
+                    ? section.rows[0].key : "";
+            }
+            onCollectionMemberRequested: function(collectionId,key) {
+                const section=favoritesOverviewPane.collectionView.groups.find(
+                    function(group) { return group.id===collectionId; });
+                if(!section || !section.rows.some(function(row) {
+                    return row.key===key;
+                })) return;
+                cpuPlusWindow.selectedFavoriteCollectionId=collectionId;
+                favoritesSelectorPane.filterMode="GROUP";
+                cpuPlusWindow.selectedFavoriteKey=key;
             }
             anchors.left: parent.left
             anchors.right: parent.right
@@ -2205,6 +2230,7 @@ PanelWindow {
             placesOwner: PlaceRegistry
             defaultOwner: FavoritesDefaultStore
             collectionsOwner: FavoritesCollectionsStore
+            selectedCollectionId: cpuPlusWindow.selectedFavoriteCollectionId
             onSelectionRequested: function(key) {
                 cpuPlusWindow.selectedFavoriteKey = key;
             }
@@ -2759,6 +2785,7 @@ PanelWindow {
             placesOwner: PlaceRegistry
             defaultOwner: FavoritesDefaultStore
             collectionsOwner: FavoritesCollectionsStore
+            selectedCollectionId: cpuPlusWindow.selectedFavoriteCollectionId
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: actuatorHeader.bottom

@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "StationCosmosPlanetEventPolicy.js" as PlanetPolicy
 import "StationCosmosPlanetDayWheelPolicy.js" as Day
+import "StationCosmosPlanetChronographPolicy.js" as Chronograph
 
 // C28 // Compact COSMOS CLOCK. Reuses the V3d validated USNO 24-hour
 // event/ring math, not the obsolete five linear timelines.
@@ -20,6 +21,52 @@ Item {
     property string selectedKind: "ALL"
     property var hoveredEvent: null
     property var lockedEvent: null
+
+    // C35 // LIVE is the existing validated source-local clock.
+    // REPLAY is an explicitly selected *civil-day demonstration*.
+    // It never rewrites source events, or simulates orbital motion.
+    property bool replayMode: false
+    property bool replayPlaying: false
+    property int previewMinute: 0
+    readonly property int displayMinute: replayMode
+        ? (Chronograph.validMinute(previewMinute) ? previewMinute : -1)
+        : (validLocalClock ? localCivilMinute : -1)
+    readonly property var upcomingEvent: Chronograph.futureEvent(events,displayMinute)
+    readonly property bool replayRunning: replayDriver.running
+
+    function startReplay() {
+        if (!sourceReady || !Day.dateValid(civilDate)) return;
+        replayPlaying = false;
+        previewMinute = validLocalClock ? localCivilMinute : 0;
+        replayMode = true;
+    }
+    function returnLive() {
+        replayPlaying = false;
+        replayMode = false;
+    }
+    function seekPreview(minute) {
+        if (!replayMode || !sourceReady || !Chronograph.validMinute(minute))
+            return;
+        previewMinute = minute;
+    }
+    function stepPreview(delta) {
+        if (!replayMode || !sourceReady) return;
+        const next = Chronograph.advance(previewMinute,delta);
+        if (next !== null) seekPreview(next);
+    }
+
+    Timer {
+        id: replayDriver
+        objectName: "cosmos-c35-day-replay-driver"
+        interval: 80
+        repeat: true
+        running: face.visible && face.sourceReady
+            && face.replayMode && face.replayPlaying
+            && Day.dateValid(face.civilDate)
+        // Eight civil minutes per tick ~ 14.4 seconds per preview day.
+        // User-requested replay only; no fake live-time advancement.
+        onTriggered: face.stepPreview(8)
+    }
 
     // Compatibility: five planet sources remain mounted even when empty.
     readonly property int renderedRowCount: Day.PLANETS.length
@@ -51,15 +98,24 @@ Item {
         lockedEvent = PlanetPolicy.stepEvent(events,selectedEvent,direction);
     }
     onDatedRowsChanged: { lockedEvent = null; hoveredEvent = null; }
-    onCivilDateChanged: { lockedEvent = null; hoveredEvent = null; }
+    onCivilDateChanged: {
+        lockedEvent = null;
+        hoveredEvent = null;
+        returnLive();
+    }
     onSourceReadyChanged: {
-        if (!sourceReady) { lockedEvent = null; hoveredEvent = null; }
+        if (!sourceReady) {
+            lockedEvent = null;
+            hoveredEvent = null;
+            returnLive();
+        }
     }
     onEventsChanged: wheelCanvas.requestPaint()
     onSelectedPlanetChanged: wheelCanvas.requestPaint()
     onSelectedEventChanged: wheelCanvas.requestPaint()
     onValidLocalClockChanged: wheelCanvas.requestPaint()
     onLocalCivilMinuteChanged: wheelCanvas.requestPaint()
+    onDisplayMinuteChanged: wheelCanvas.requestPaint()
 
     Row {
         id: clockHeader
@@ -173,26 +229,52 @@ Item {
                             }
                         }
 
-                        // Current local civil minute is a small outer tick,
-                        // never a fabricated path through the inner planets.
-                        if(face.validLocalClock) {
-                            const a=Day.timeAngle(face.localCivilMinute);
-                            if(a!==null) {
-                                ctx.globalAlpha=1;
-                                ctx.strokeStyle=String(Colors.yellow);
-                                ctx.lineWidth=2;
+                        // C35 // Progress and sweep use the same validated
+                        // civil-minute timeAngle() as the existing USNO dots.
+                        // The painted beam is a clock hand, not an orbit.
+                        if (face.displayMinute >= 0) {
+                            const a = Day.timeAngle(face.displayMinute);
+                            if (a !== null) {
+                                ctx.globalAlpha=0.19;
+                                ctx.strokeStyle=String(face.replayMode
+                                    ? Colors.magenta : Colors.yellow);
+                                ctx.lineWidth=4;
                                 ctx.beginPath();
-                                ctx.moveTo(g.x+Math.sin(a)*(g.radius-3),
-                                           g.y-Math.cos(a)*(g.radius-3));
-                                ctx.lineTo(g.x+Math.sin(a)*(g.radius+7),
-                                           g.y-Math.cos(a)*(g.radius+7));
+                                ctx.arc(g.x,g.y,g.radius+3,-Math.PI/2,
+                                    -Math.PI/2+a,false);
                                 ctx.stroke();
+                                ctx.globalAlpha=0.30;
+                                ctx.lineWidth=5;
+                                ctx.beginPath();
+                                ctx.moveTo(g.x,g.y);
+                                ctx.lineTo(g.x+Math.sin(a)*(g.radius-2),
+                                           g.y-Math.cos(a)*(g.radius-2));
+                                ctx.stroke();
+                                ctx.globalAlpha=1;
+                                ctx.lineWidth=1.5;
+                                ctx.beginPath();
+                                ctx.moveTo(g.x,g.y);
+                                ctx.lineTo(g.x+Math.sin(a)*(g.radius-1),
+                                           g.y-Math.cos(a)*(g.radius-1));
+                                ctx.stroke();
+                                ctx.fillStyle=String(face.replayMode
+                                    ? Colors.magenta : Colors.yellow);
+                                ctx.beginPath();
+                                ctx.arc(g.x+Math.sin(a)*(g.radius+1),
+                                        g.y-Math.cos(a)*(g.radius+1),
+                                        2.6,0,Math.PI*2);
+                                ctx.fill();
                             }
                         }
                         ctx.globalAlpha=1;
-                        ctx.fillStyle=String(Colors.magenta);
+                        ctx.fillStyle=String(face.replayMode
+                            ? Colors.magenta : Colors.yellow);
                         ctx.font="bold 9px monospace";
-                        ctx.fillText("24H",g.x,g.y);
+                        ctx.fillText(face.displayMinute >= 0
+                            ? Day.timeLabel(face.displayMinute) : "24H",g.x,g.y);
+                        ctx.font="7px monospace";
+                        ctx.fillText(face.replayMode ? "REPLAY" : "LIVE",
+                            g.x,g.y+12);
                         if(face.events.length===0) {
                             ctx.fillStyle=String(Colors.orange);
                             ctx.font="8px monospace";
@@ -216,15 +298,18 @@ Item {
                             eventData,wheelCanvas.width,wheelCanvas.height)
                         readonly property bool focused: face.selectedEvent
                             && eventData && face.selectedEvent.id===eventData.id
-                        width: focused ? 15 : 13
+                        readonly property bool nearHand:
+                            Chronograph.atSweep(face.displayMinute,eventData,12)
+                        width: focused || nearHand ? 16 : 13
                         height: width
                         radius: width/2
                         x: wheelCanvas.x+(pos ? pos.x : 0)-width/2
                         y: wheelCanvas.y+(pos ? pos.y : 0)-height/2
                         visible: pos!==null
-                        color: face.eventInk(eventData.kind)
-                        border.width: focused ? 2 : 1
-                        border.color: focused ? Colors.yellow : Colors.black
+                        color: nearHand ? Colors.yellow : face.eventInk(eventData.kind)
+                        border.width: focused || nearHand ? 2 : 1
+                        border.color: focused ? Colors.white : Colors.black
+                        Behavior on color { ColorAnimation { duration: 160 } }
                         GohuText {
                             anchors.centerIn: parent
                             text: clockEvent.eventData.kind==="rise"?"R"
@@ -275,7 +360,7 @@ Item {
             Column {
                 anchors.fill: parent
                 anchors.margins: 5
-                spacing: 3
+                spacing: 2
                 GohuText {
                     width: parent.width
                     height: 12
@@ -402,6 +487,85 @@ Item {
                         }
                     }
                 }
+                // C35 // Two-state clock: source LIVE versus an
+                // explicitly accelerated 24h playback of the same date.
+                Row {
+                    id: replayControls
+                    objectName: "cosmos-c35-time-controls"
+                    width: parent.width
+                    height: 19
+                    spacing: 4
+                    ActionButton {
+                        objectName: "cosmos-c35-live-replay"
+                        width: Math.max(1,(replayControls.width-4)/2)
+                        height: 19
+                        label: face.replayMode ? "LIVE" : "REPLAY"
+                        labelPixelSize: 8
+                        contentPadding: 0
+                        accentColor: Colors.magenta
+                        available: face.sourceReady
+                        onClicked: {
+                            if (face.replayMode) face.returnLive();
+                            else face.startReplay();
+                        }
+                    }
+                    ActionButton {
+                        objectName: "cosmos-c35-replay-play-pause"
+                        width: Math.max(1,(replayControls.width-4)/2)
+                        height: 19
+                        label: face.replayPlaying ? "PAUSE" : "PLAY"
+                        labelPixelSize: 8
+                        contentPadding: 0
+                        accentColor: Colors.cyan
+                        available: face.replayMode && face.sourceReady
+                        onClicked: face.replayPlaying = !face.replayPlaying
+                    }
+                }
+                Rectangle {
+                    id: previewTrack
+                    objectName: "cosmos-c35-time-scrub-track"
+                    width: parent.width
+                    height: face.replayMode ? 11 : 0
+                    visible: face.replayMode
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.cyan
+                    Rectangle {
+                        id: trackProgress
+                        objectName: "cosmos-c35-sweep-progress"
+                        width: parent.width*Math.max(0,face.displayMinute)/1439
+                        height: parent.height
+                        color: Colors.magenta
+                        opacity: 0.63
+                    }
+                    MouseArea {
+                        objectName: "cosmos-c35-scrub-input"
+                        anchors.fill: parent
+                        enabled: face.replayMode && face.sourceReady
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: function(mouse) {
+                            const next = Chronograph.fractionToMinute(
+                                mouse.x/Math.max(1,width));
+                            if (next !== null) face.seekPreview(next);
+                        }
+                    }
+                }
+                QuietText {
+                    objectName: "cosmos-c35-upcoming-event"
+                    width: parent.width
+                    height: 11
+                    text: face.displayMinute < 0 ? "LOCAL TIME UNAVAILABLE"
+                        : face.upcomingEvent
+                            ? (face.replayMode ? "REPLAY" : "NEXT") + " // "
+                              + String(face.upcomingEvent.planet) + " "
+                              + String(face.upcomingEvent.kind).toUpperCase()
+                              + " " + String(face.upcomingEvent.clock)
+                            : "NO LATER DATED USNO EVENT"
+                    font.pixelSize: 8
+                    color: Colors.yellow
+                    elide: Text.ElideRight
+                }
+
                 QuietText {
                     width: parent.width
                     height: 11

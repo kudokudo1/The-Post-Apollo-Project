@@ -31,6 +31,20 @@ Item {
     readonly property var groupRecords:
         collectionsOwner ? collectionsOwner.collections : []
 
+    function favoriteRowLabel(item) {
+        if (!item) return "";
+        if (item.owner!=="appcontrol") return item.label;
+        const menu=String(item.menu || "OTHER");
+        const prefix=menu+" // ";
+        const fallback=String(item.label || "");
+        // Fallback labels already include the menu to make details useful.
+        // Avoid printing that same menu twice in the middle selector.
+        const text=item.resolved ? item.item
+            : fallback.indexOf(prefix)===0
+              ? fallback.slice(prefix.length) : fallback;
+        return "APP CTRL // "+menu+" // "+text;
+    }
+
     Column {
         id: overview
         visible: pane.area==="overview"
@@ -164,12 +178,7 @@ Item {
                             GohuText {
                                 width: parent.width
                                 height: modelData.owner==="appcontrol" ? 30 : 15
-                                text: modelData.owner==="appcontrol"
-                                    ? ("APP CTRL // "+modelData.menu
-                                       +" // "+(modelData.resolved
-                                               ? modelData.item
-                                               : modelData.label))
-                                    : modelData.label
+                                text: pane.favoriteRowLabel(modelData)
                                 textFormat: Text.PlainText
                                 color: Colors.white
                                 font.pixelSize: 10

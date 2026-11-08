@@ -251,6 +251,13 @@ class LogindSeatGuard:
             manager.on_session_removed(self._on_removed)
             session.on_lock(self._on_lock)
             self._properties.on_properties_changed(self._on_properties_changed)
+            # The session ID is supplied by logind for the PID-bound object,
+            # not by XDG_SESSION_ID, an environment variable or the widget.
+            self._session_id = await asyncio.wait_for(
+                session.get_id(), timeout=self._stale,
+            )
+            if type(self._session_id) is not str or not self._session_id:
+                raise ValueError("Host logind session ID unavailable")
             self._disconnect = asyncio.create_task(self._watch_disconnect())
             await self._get_all()
             if not self.is_active():

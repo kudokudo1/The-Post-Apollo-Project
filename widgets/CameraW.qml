@@ -558,7 +558,7 @@ PanelWindow {
         batchPreview = null;
         batchReviewKey = JSON.stringify(batchPaths);
         return run("previewBatch", ["preview-batch", batchReviewKey,
-                                    "--folder", galleryCustomFolder]);
+                                    "--folder", cleanupCustomFolder]);
     }
 
     function confirmBatchTrash() {

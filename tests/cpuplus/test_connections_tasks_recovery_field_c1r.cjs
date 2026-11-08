@@ -24,9 +24,9 @@ function row(data={}) {
 }
 test("TASKS uses the identical Connections tile + details data schema",()=>{
     const all=JSON.parse(JSON.stringify(policy.build(off)));
-    assert.equal(all.length,8);
+    assert.equal(all.length,9);
     assert.deepEqual(all.map(x=>x.id),[
-        "social","notifications","tasks-recovery","proton-mail",
+        "social","telegram","notifications","tasks-recovery","proton-mail",
         "nasa-firms","bbc-world","al-jazeera-english","gdelt"
     ]);
     for(const x of all) {

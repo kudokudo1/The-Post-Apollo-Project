@@ -292,6 +292,19 @@ def enter(identity, output, x, y, width, height):
     # All commands still target ONLY the verified, positive con_id.
     _sway_command(criteria, "floating", "enable")
     _sway_command(criteria, "border", "none")
+    # SwayFX draws window drop shadows OUTSIDE the measured client/outer
+    # rectangles. Camera's QML clipping and 2px frame seals cannot suppress
+    # that compositor-owned glow, which can extend below compact/expanded/
+    # fullscreen even when the Zoom rectangle and input cutout are correct.
+    # Disable ONLY this already-origin-verified Zoom actor's shadow; never
+    # toggle SwayFX shadows globally or affect another app/window.
+    # Vanilla Sway does not support the SwayFX extension. If unavailable,
+    # preserve functional Zoom docking and report the limitation explicitly.
+    shadow_contained = True
+    try:
+        _sway_command(criteria, "shadows", "disable")
+    except RuntimeError:
+        shadow_contained = False
     # Border changes can change the reported client rect. Measure *after*
     # removing decorations, and fit the browser content rather than its
     # containing frame. Do not change other windows or Zoom's web page CSS.
@@ -346,6 +359,7 @@ def enter(identity, output, x, y, width, height):
             delta = [max(-5000, min(5000, actual - expected))
                      for actual, expected in zip(rect, geometry)]
     return {"ok": docked, "kind": "zoom-web-enter", "docked": docked,
+            "shadowContained": shadow_contained,
             "state": "DOCKED" if docked else "NOT_ALIGNED",
             "error": "" if docked else (
                 "WINDOW_NOT_VISIBLE" if after and after["id"] == actor["id"]

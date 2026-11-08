@@ -168,7 +168,7 @@ done
 grep -F 'U7A_OWNER_READY // x=' "$log" >/dev/null ||
   { cat "$log"; echo "U7A_FAIL // no available OPEN OWNER button"; exit 1; }
 nav_coords="$(grep -F 'U7A_OWNER_READY // x=' "$log" | tail -n 1 |
-  sed -E 's/.*x=([0-9]+) y=([0-9]+).*/\\1 \\2/')"
+  sed -E 's/.*x=([0-9]+) y=([0-9]+).*/\1 \2/')"
 read -r ox oy <<<"$nav_coords"
 [ -n "$ox" ] && [ -n "$oy" ] ||
   { cat "$log"; echo "U7A_FAIL // bad owner navigation coordinates"; exit 1; }

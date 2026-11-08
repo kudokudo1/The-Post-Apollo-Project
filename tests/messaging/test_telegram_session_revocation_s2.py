@@ -43,7 +43,9 @@ class TelegramS2Transport(unittest.TestCase):
         self.requester_peer.settimeout(8)
         self.host = subprocess.Popen(
             [sys.executable, str(FIXTURE), "--host",
-             str(reviewer_host.fileno()), str(requester_host.fileno())],
+             str(reviewer_host.fileno()), str(requester_host.fileno()),
+             str(os.getpid()), str(os.geteuid()), str(os.getegid()),
+             str(S2.C5B.process_start_ticks(os.getpid()))],
             pass_fds=(reviewer_host.fileno(), requester_host.fileno()),
             env=self.env, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

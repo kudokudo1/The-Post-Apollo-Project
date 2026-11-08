@@ -27,7 +27,8 @@ ActionButton {
     implicitHeight: 28
     acceptedButtons: Qt.LeftButton
     accentColor: Colors.magenta
-    label: inCollection ? "SAVED" : "ADD"
+    // Action labels describe only the local collection link, not a favorite delete.
+    label: inCollection ? "UNLINK" : "ADD"
     labelPixelSize: 10
     selected: inCollection
     available: canChange

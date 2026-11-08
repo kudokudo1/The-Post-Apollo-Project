@@ -9,6 +9,7 @@
 #include <QUrl>
 #include <QFileInfo>
 #include <QImage>
+#include "CompanyVectorReadbackEvidence.h"
 #include <QStringList>
 #include <QDebug>
 #include <QColor>
@@ -40,6 +41,8 @@ int main(int argc, char **argv) {
     const bool styledOnline = args.contains("--styled-online");
     const bool anyOnline = online || styledOnline;
     const bool capture = args.contains("--capture");
+    // M30v: one-shot QT-ONLY CPU readback metadata; no file or compositor claim.
+    const bool readbackEvidence = args.contains("--readback-evidence");
     const bool mockHub = args.contains("--mock-hub");
     const bool fixtureHubs = args.contains("--fixture-hubs");
     const bool benchMotion = args.contains("--bench-pan-zoom");
@@ -77,6 +80,18 @@ int main(int argc, char **argv) {
             || (!sample.isEmpty() && !anyOnline)) {
         qCritical() << "INVALID_OR_OFFLINE_SAMPLE" << sample;
         return 6;
+    }
+    // Explicit offline-only, sole-argument probe: never combine readback
+    // metadata with user-local hubs, fixture identities, online tiles, motion
+    // benchmark, screenshots, arbitrary paths or other Qt probe modes.
+    // The existing Quickshell sidecar launcher does not pass this flag.
+    if (readbackEvidence &&
+            (args.size() != 2 ||
+             args.at(1) != QStringLiteral("--readback-evidence") ||
+             anyOnline || capture || mockHub || fixtureHubs ||
+             benchMotion || ownerLocalHubs || !sample.isEmpty())) {
+        qCritical() << "M30V_READBACK_ARGUMENTS_REFUSED";
+        return 16;
     }
     const QString localPath = QStringLiteral(COMPANY_PROBE_STYLE_PATH);
     const QString styledPath = QStringLiteral(COMPANY_PROBE_ONLINE_STYLE_PATH);
@@ -314,6 +329,21 @@ int main(int argc, char **argv) {
                 qCritical() << "BENCH_MOTION_TIMEOUT_BEFORE_150_UPDATES";
                 app.exit(12);
             }
+        });
+    }
+    if (readbackEvidence) {
+        // This is an actual QQuickWindow CPU readback, NOT a wl_buffer
+        // allocation, dmabuf format/pitch or authorized selected host.
+        // Output ONLY bounded metadata; never pixels or Company records.
+        QTimer::singleShot(5500, &app, [&app, window]() {
+            const QImage pixels = window->grabWindow();
+            const auto evidence = CompanyVectorReadbackEvidence::inspect(
+                pixels, window->size(), window->devicePixelRatio());
+            qInfo().noquote() << "COMPANY_M30V_QT_READBACK_EVIDENCE"
+                << QString::fromUtf8(
+                    QJsonDocument(evidence).toJson(QJsonDocument::Compact));
+            app.exit(evidence.value("status").toString() ==
+                     QStringLiteral("OBSERVED_QT_READBACK") ? 0 : 17);
         });
     }
     if (capture) {

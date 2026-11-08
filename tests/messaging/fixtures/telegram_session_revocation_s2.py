@@ -163,7 +163,15 @@ class S2Host:
         return S1.report("UNSUPPORTED_REVIEW_OPERATION")
 
 
-def serve(review_fd: int, client_fd: int) -> int:
+def serve(review_fd: int, client_fd: int, reviewer_pid: int,
+          reviewer_uid: int, reviewer_gid: int, reviewer_ticks: int) -> int:
+    # Test harness pins the reviewer separately from the client. Descriptor
+    # SO_PEERCRED reflects socket creation/transfer provenance, not a signed
+    # human identity or necessarily its current packet sender.
+    if (reviewer_pid < 2 or reviewer_uid <= 0 or reviewer_gid < 0
+            or C5B.process_start_ticks(reviewer_pid) != reviewer_ticks):
+        return 2
+    reviewer_identity = (reviewer_pid, reviewer_uid, reviewer_gid)
     host = S2Host()
     with (socket.socket(fileno=review_fd) as reviewer,
           socket.socket(fileno=client_fd) as client,
@@ -174,8 +182,6 @@ def serve(review_fd: int, client_fd: int) -> int:
                     != socket.SOCK_SEQPACKET):
                 return 2
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
-        reviewer_origin = struct.unpack("3i", reviewer.getsockopt(
-            socket.SOL_SOCKET, socket.SO_PEERCRED, CRED_SIZE))
         events.register(reviewer, selectors.EVENT_READ, "reviewer")
         events.register(client, selectors.EVENT_READ, "client")
         while host.count < MAX_PACKETS:
@@ -190,13 +196,17 @@ def serve(review_fd: int, client_fd: int) -> int:
                     return 0
                 if event.data == "reviewer":
                     reply = (host.from_reviewer(payload)
-                             if sender == reviewer_origin
+                             if sender == reviewer_identity
+                             and C5B.process_start_ticks(reviewer_pid)
+                                 == reviewer_ticks
                              else S1.report("REVIEWER_ORIGIN_MISMATCH"))
                 else:
                     reply = host.from_client(payload, sender)
                 C5A.exchange(sock, reply)
                 host.count += 1
-                if (event.data == "reviewer" and sender == reviewer_origin
+                if (event.data == "reviewer" and sender == reviewer_identity
+                        and C5B.process_start_ticks(reviewer_pid)
+                            == reviewer_ticks
                         and type(payload) is dict
                         and payload.get("op") == "shutdown"
                         and reply["status"] == "SYNTHETIC_HOST_SHUTDOWN"):
@@ -235,8 +245,8 @@ def main() -> int:
     if not disposable():
         print("TELEGRAM_S2_REFUSED_OUTSIDE_NONROOT_DISPOSABLE_CI")
         return 2
-    if len(sys.argv) == 4 and sys.argv[1] == "--host":
-        return serve(int(sys.argv[2]), int(sys.argv[3]))
+    if len(sys.argv) == 8 and sys.argv[1] == "--host":
+        return serve(*(int(s) for s in sys.argv[2:]))
     if len(sys.argv) == 3 and sys.argv[1] == "--client":
         return client_loop(int(sys.argv[2]))
     return 2

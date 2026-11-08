@@ -9,10 +9,11 @@ var ORDER=[
     "APP CTRL|WINDOWS","APP CTRL|REMOTE","APP CTRL|FAVORITES",
     "CPU++|KILL","CPU++|THERMAL","CPU++|SYSTEM",
     "WEATHER|HOME","WEATHER|CARD",
+    "NOTIFS|SOURCES",
     "CLOCK|CLOCK","PLACES|PLACES","NEW|NEW"
 ];
 function itemLabel(row,menu) {
-    if (row.owner==="weather-home")
+    if (row.owner==="weather-home" || row.owner==="notifications")
         return String(row.item || "NAME UNAVAILABLE");
     if (row.owner!=="appcontrol")
         return String(row.label || "NAME UNAVAILABLE");
@@ -31,15 +32,16 @@ function build(candidates) {
         if (!row || typeof row.key!=="string" || !row.key
                 || seen[row.key]) continue;
         const category=String(row.category || "");
-        if (["APP CTRL","CPU++","WEATHER","CLOCK","PLACES","NEW"].indexOf(category)<0)
+        if (["APP CTRL","CPU++","WEATHER","NOTIFS","CLOCK","PLACES","NEW"].indexOf(category)<0)
             continue;
         const menu=row.owner==="appcontrol" || row.owner==="weather-home"
+            || row.owner==="notifications"
             ? String(row.menu || "OTHER") : category;
         const key=category+"|"+menu;
         if (!byKey[key]) {
             const group={
                 key:key,category:category,menu:menu,
-                title:category+" // "+menu,
+                title:(category==="NOTIFS" ? "NOTIFICATIONS" : category)+" // "+menu,
                 count:0,unresolved:0,items:[]
             };
             byKey[key]=group;

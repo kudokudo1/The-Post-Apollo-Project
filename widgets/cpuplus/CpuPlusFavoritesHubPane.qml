@@ -9,6 +9,8 @@ Item {
     property var catalogSnapshot: null
     property var candidates: null
     property var selectedResource: null
+    // Expose rendered rows for native selector/a11y testing, not actuation.
+    property alias favoriteRowRepeater: savedItemRows
     property var timeOwner: null
     property var placesOwner: null
     property var defaultOwner: null
@@ -54,6 +56,18 @@ Item {
         }
         Rectangle {width: parent.width;height: 1;color: Colors.cyan}
         GohuText {
+            width: parent.width
+            text: "CPU++ // "
+                +(pane.candidates ? pane.candidates.rows.filter(
+                    function(item) {return item.category==="CPU++";}).length : 0)
+                +"  |  APP CTRL // "
+                +(pane.candidates ? pane.candidates.rows.filter(
+                    function(item) {return item.category==="APP CTRL";}).length : 0)
+            color: Colors.orange
+            font.pixelSize: 10
+            elide: Text.ElideRight
+        }
+        GohuText {
             text: "COLLECTIONS // "+(pane.collectionsOwner ? pane.collectionsOwner.collections.length : 0)
                   +"  |  SAVE "+(pane.collectionsOwner ? pane.collectionsOwner.storageState.toUpperCase() : "UNAVAILABLE")
             color: Colors.cyan
@@ -83,16 +97,17 @@ Item {
         anchors.fill: parent
         spacing: 7
 
-        Row {
+        // Six categories fit the existing 260px middle bay in two rows.
+        Flow {
             width: parent.width
-            height: 31
+            height: 59
             spacing: 4
             Repeater {
-                model: ["ALL","CLOCK","PLACES","NEW"]
+                model: ["ALL","CPU++","APP CTRL","CLOCK","PLACES","NEW"]
                 ActionButton {
                     required property string modelData
-                    width: Math.max(1,(selector.width-12)/4)
-                    height: 30
+                    width: Math.max(1,(selector.width-8)/3)
+                    height: 27
                     label: modelData
                     labelPixelSize: 9
                     selected: pane.filterMode===modelData
@@ -103,7 +118,7 @@ Item {
         }
         QuietText {
             width: parent.width
-            text: "SELECT A SAFE FAVORITE TO MANAGE"
+            text: "OWNER-SAVED ITEMS // SELECT TO INSPECT"
             font.pixelSize: 9
             elide: Text.ElideRight
         }
@@ -118,7 +133,7 @@ Item {
         Flickable {
             id: listScroll
             width: parent.width
-            height: Math.max(0,selector.height-108)
+            height: Math.max(0,selector.height-136)
             clip: true
             contentWidth: width
             contentHeight: listRows.implicitHeight
@@ -129,6 +144,7 @@ Item {
                 width: listScroll.width
                 spacing: 5
                 Repeater {
+                    id: savedItemRows
                     model: pane.choices
                     Rectangle {
                         width: listRows.width
@@ -157,7 +173,7 @@ Item {
                                 GohuText {
                                     width: parent.width
                                     text: modelData.category
-                                        +" // "+(modelData.isPinned?"PINNED":"SAVED")
+                                        +" // "+(modelData.readOnly?"READ ONLY":modelData.isPinned?"PINNED":"SAVED")
                                     color: Colors.orange
                                     font.pixelSize: 9
                                 }
@@ -211,7 +227,10 @@ Item {
         QuietText {
             width: parent.width
             text: pane.selectedResource
-                ? pane.selectedResource.category+" // SAVED IDENTITY"
+                ? pane.selectedResource.category+" // "
+                    +(pane.selectedResource.readOnly
+                      ? "APP CONTROL-OWNED // READ ONLY"
+                      : "SAVED IDENTITY")
                 : "CHOOSE AN ITEM IN THE CENTER BAY"
             font.pixelSize: 10
             elide: Text.ElideRight
@@ -225,7 +244,9 @@ Item {
                 id: remove
                 width: 128
                 height: 30
-                label: pane.removeArmed ? "CONFIRM REMOVE" : "REMOVE FAVORITE"
+                label: pane.selectedResource && pane.selectedResource.readOnly
+                    ? "OWNER CONTROL"
+                    : pane.removeArmed ? "CONFIRM REMOVE" : "REMOVE FAVORITE"
                 labelPixelSize: 9
                 accentColor: Colors.red
                 destructive: pane.removeArmed
@@ -296,7 +317,7 @@ Item {
             width: parent.width
             height: Math.max(0,details.height-143)
             collectionStore: pane.collectionsOwner
-            resource: pane.selectedResource
+            resource: pane.selectedResource && !pane.selectedResource.readOnly
                 ? ({
                     provider:pane.selectedResource.provider,
                     kind:pane.selectedResource.kind,
@@ -308,7 +329,9 @@ Item {
         QuietText {
             width: parent.width
             font.pixelSize: 9
-            text: "GROUPING ≠ AUTHORITY // ORIGINAL OWNERS KEEP CONTROL"
+            text: pane.selectedResource && pane.selectedResource.readOnly
+                ? "APP CONTROL REMAINS OWNER // NO EXECUTION"
+                : "GROUPING ≠ AUTHORITY // ORIGINAL OWNERS KEEP CONTROL"
             elide: Text.ElideRight
         }
     }

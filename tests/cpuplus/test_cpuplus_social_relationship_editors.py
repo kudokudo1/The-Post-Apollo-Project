@@ -46,7 +46,7 @@ class CpuPlusSocialRelationshipEditors(unittest.TestCase):
         self.assertIn("cpuPlusWindow.selectLocalManagementTask(task);", middle)
         self.assertIn("columns: 2", NAV)
         for expected in (
-            '{id:"EDITOR", title:"COMPANIES / BRANCHES"}',
+            '{id:"EDITOR", title:"EDIT ORGS"}',
             '{id:"BRANCH_LOCATIONS", title:"BRANCH LOCATIONS"}',
             '{id:"EDITOR", title:"EDIT UNITS"}',
             '{id:"UNIT_LOCATIONS", title:"UNIT LOCATIONS"}',

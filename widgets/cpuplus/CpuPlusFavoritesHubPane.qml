@@ -261,13 +261,13 @@ Item {
         anchors.fill: parent
         spacing: 7
 
-        // Seven categories use three compact rows within the middle bay.
+        // Nine compact categories occupy three rows within the middle bay.
         Flow {
             width: parent.width
             height: 90
             spacing: 4
             Repeater {
-                model: ["ALL","CPU++","APP CTRL","WEATHER","NOTIFS","CLOCK","PLACES","NEW"]
+                model: ["ALL","CPU++","APP CTRL","WEATHER","NOTIFS","RADIO","CLOCK","PLACES","NEW"]
                 ActionButton {
                     required property string modelData
                     width: Math.max(1,(selector.width-8)/3)
@@ -417,6 +417,8 @@ Item {
                          ? "WEATHER HOME-OWNED // READ ONLY"
                          : pane.selectedResource.owner==="notifications"
                          ? "NOTIFICATIONS-OWNED // READ ONLY"
+                         : pane.selectedResource.owner==="radio"
+                         ? "RADIO-OWNED // READ ONLY"
                          : "APP CONTROL-OWNED // READ ONLY")
                       : "SAVED IDENTITY")
                 : "CHOOSE AN ITEM IN THE CENTER BAY"
@@ -430,7 +432,8 @@ Item {
             visible: pane.selectedResource !== null
                      && (pane.selectedResource.owner==="appcontrol"
                          || pane.selectedResource.owner==="weather-home"
-                         || pane.selectedResource.owner==="notifications")
+                         || pane.selectedResource.owner==="notifications"
+                         || pane.selectedResource.owner==="radio")
             width: parent.width
             spacing: 3
             GohuText {
@@ -441,6 +444,9 @@ Item {
                     : pane.selectedResource
                       && pane.selectedResource.owner==="notifications"
                     ? "SOURCE // NOTIFICATIONS"
+                    : pane.selectedResource
+                      && pane.selectedResource.owner==="radio"
+                    ? "SOURCE // WEATHER STATION RADIO"
                     : "SOURCE // APP CONTROL"
                 font.pixelSize: 10
                 color: Colors.cyan
@@ -580,7 +586,9 @@ Item {
                    ? "WEATHER STATION REMAINS OWNER // NO RECALL"
                    : pane.selectedResource.owner==="notifications"
                      ? "NOTIFICATIONS REMAINS OWNER // NO MESSAGE ACCESS"
-                     : "APP CONTROL REMAINS OWNER // NO EXECUTION")
+                     : pane.selectedResource.owner==="radio"
+                       ? "RADIO REMAINS OWNER // NO PLAYBACK"
+                       : "APP CONTROL REMAINS OWNER // NO EXECUTION")
                 : "GROUPING ≠ AUTHORITY // ORIGINAL OWNERS KEEP CONTROL"
             elide: Text.ElideRight
         }

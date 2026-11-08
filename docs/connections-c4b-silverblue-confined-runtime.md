@@ -66,3 +66,14 @@ Open draft PR and inspect the earliest C4b CI failure. If the Silverblue immutab
 ## DECISIONS
 
 Proposed C4b CI-only work accepted via operator "continue" after C4a technical results. GitHub-only test modifications; no local machine write, production activation, merge, credentials, provider traffic, security relaxation or ownership transfer.
+
+
+## RECOVERY ADDENDUM // C4b runtime attribution, November 8, 2026
+
+PR #1480 merged at commit d9e52f49abe8ffb7dc9343d9f04f1177e5574317 **without a passing C4b runtime VM test**. This is not a verified runtime acceptance. The exact-head CI [42453662818](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42453662818) passed the source contracts, isolated signed RPM builders, SELinux policy build, QEMU provisioning, pinned Python wheel, and official offline Silverblue installation. Its guest successfully booted C4a's signed fake status package, validating C4A_PASS // SIGNED_FAKE_SERVICE_BOOTED_FILES_OWNED_AND_INTACT. The additional C4b phase did not emit any C4B_PASS or C4B_FAIL in the available host log. After roughly 23 minutes of guest runtime, the host reported C2V_BLOCKED // SILVERBLUE_LAYER_REBOOT_ROLLBACK_RESULT= with no C4b rollback evidence.
+
+**Unresolved:** There is insufficient evidence to attribute the silence specifically to SELinux policy loading, immutable /usr relabeling, systemd, D-Bus, guest serial writes, or another runtime command. Do not infer the cause from the presence of SELinux kernel messages or the final missing markers.
+
+Recovery adds test-only, bounded C4b command execution, phase/stage markers in a guest-local /var/tmp log, an independent systemd-run observer that relays only disposable VM diagnostics to serial, and explicit host-side last-stage/result logs. The original signed package checks, no-network/SELinux Enforcing, exact pending-OSTree deployment, two real reboot checks, and production deny-only flags remain mandatory. Failure to load the custom policy or relabel immutable /usr is still a hard failure; neither may trigger an overlay/permissive fallback.
+
+**Next verification:** Review the recovery PR's exact-head C4b CI, identify the first failing or timed-out stage, and make no further implementation decisions until that evidence is available. C4a/C2v/C2x regressions must pass again. No production activation, local installation, PR merge, or operator final acceptance is implied.

@@ -18,6 +18,60 @@ c4a_gate=/var/lib/c4a-guest-signed-status-gate.sh
 c4b_mode=/var/lib/c4b-runtime-ci-only
 c4b_gate=/var/lib/c4b-guest-confined-runtime.sh
 c4b_assets=/var/lib/c4b-runtime-assets
+
+# Independently observe C4b without controlling package/reboot authorization.
+c4b_execute() {
+  local phase="$1" rc
+  [[ -s "$c4b_gate" ]] || failure "C4B_RUNTIME_GATE_MISSING_$phase"
+  cat > /run/c4b-runtime-observer.sh <<'C4B_OBSERVER'
+#!/usr/bin/bash
+set -u
+printf 'ready\n' > /run/c4b-runtime-observer-ready
+for n in $(seq 1 65); do
+  {
+    echo "C4B_OBSERVER_TICK // n=$n $(date --iso-8601=seconds)"
+    if [[ -r /var/tmp/c4b-runtime-stage ]]; then
+      echo "C4B_OBSERVER_STAGE // $(cat /var/tmp/c4b-runtime-stage)"
+    fi
+    if [[ -r /var/tmp/c4b-runtime.log ]]; then
+      echo "C4B_OBSERVER_GUEST_LOG_BEGIN"
+      tail -n 12 /var/tmp/c4b-runtime.log || true
+    fi
+    timeout 4s ps -eo pid,stat,etime,comm |
+      grep -E '[s]emodule|[r]estorecon|[s]ystemctl|[r]pm-ostree|PID' |
+      head -n 12 || true
+  } >/dev/ttyS0 2>&1 || true
+  [[ -e /run/c4b-runtime-observer-finished ]] && break
+  sleep 10
+done
+C4B_OBSERVER
+  chmod 0700 /run/c4b-runtime-observer.sh
+  rm -f /run/c4b-runtime-observer-finished /run/c4b-runtime-observer-ready
+  echo "C4B_CONTROLLER_START // phase=$phase bounded=560s"
+  timeout --signal=TERM --kill-after=5s 20s systemd-run --quiet \
+    --unit=c4b-runtime-observer --property=Type=exec \
+    /usr/bin/bash /run/c4b-runtime-observer.sh ||
+    failure "C4B_INDEPENDENT_OBSERVER_START_FAILED"
+  local observer_ready=0
+  for _ in $(seq 1 8); do
+    [[ -e /run/c4b-runtime-observer-ready ]] && { observer_ready=1; break; }
+    sleep 1
+  done
+  [[ "$observer_ready" == 1 ]] ||
+    failure "C4B_INDEPENDENT_OBSERVER_NOT_RUNNING"
+  if timeout --signal=TERM --kill-after=15s 560s \
+      /usr/bin/bash "$c4b_gate" "$phase"; then
+    rc=0
+  else
+    rc="$?"
+  fi
+  echo complete > /run/c4b-runtime-observer-finished
+  echo "C4B_CONTROLLER_EXIT // phase=$phase rc=$rc"
+  echo "C4B_CONTROLLER_LAST_STAGE // $(cat /var/tmp/c4b-runtime-stage 2>/dev/null || echo absent)"
+  echo "C4B_CONTROLLER_GUEST_LOG_BEGIN"
+  tail -n 110 /var/tmp/c4b-runtime.log 2>/dev/null || true
+  [[ "$rc" == 0 ]] || failure "C4B_RUNTIME_PHASE_FAILED_OR_TIMED_OUT_$rc"
+}
 echo "C2V_GUEST_BOOT // $(cat /etc/fedora-release) kernel=$(uname -r)"
 [[ -e /run/ostree-booted ]] || failure "NOT_BOOTED_OSTREE"
 [[ "$(getenforce)" == Enforcing ]] || failure "SELINUX_NOT_ENFORCING"
@@ -389,7 +443,7 @@ C2V_WORKER
     fi
     if [[ -f "$c4b_mode" ]]; then
       [[ -s "$c4b_gate" ]] || failure "C4B_RUNTIME_GATE_LOST_AFTER_REBOOT"
-      /usr/bin/bash "$c4b_gate" booted ||
+      c4b_execute booted ||
         failure "C4B_CONFINED_RUNTIME_NOT_VERIFIED"
     fi
     echo "C2V_PASS // LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT"
@@ -419,7 +473,7 @@ C2V_WORKER
     fi
     if [[ -f "$c4b_mode" ]]; then
       [[ -s "$c4b_gate" ]] || failure "C4B_RUNTIME_GATE_LOST_AFTER_ROLLBACK"
-      /usr/bin/bash "$c4b_gate" rolledback ||
+      c4b_execute rolledback ||
         failure "C4B_RUNTIME_CLEANUP_OR_ROLLBACK_NOT_VERIFIED"
     fi
     echo "C2V_PASS // OFFLINE_REPO_CONFIG_RESTORED_AFTER_ROLLBACK"

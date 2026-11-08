@@ -64,6 +64,28 @@ read -r x y <<<"$coords"
 [ -n "$x" ] && [ -n "$y" ] ||
   { cat "$log"; echo "U4_FAIL // no click coordinates"; exit 1; }
 xdotool mousemove --window "$window" "$x" "$y" click 1
+# Then click a real FILES row in the left dossier. This validates the whole
+# routing chain: left index -> center category -> selected right-side details.
+for ((i=0;i<100;i++)); do
+  if grep -F "U4_FAIL" "$log" >/dev/null; then
+    cat "$log"; echo "U4_FAIL // native dossier event"; exit 1
+  fi
+  if grep -F 'U4_SECOND_READY // x=' "$log" >/dev/null; then
+    break
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    cat "$log"; echo "U4_FAIL // exited before dossier route"; exit 1
+  fi
+  sleep 0.1
+done
+grep -F 'U4_SECOND_READY // x=' "$log" >/dev/null ||
+  { cat "$log"; echo "U4_FAIL // no dossier row coordinate"; exit 1; }
+second_coords="$(grep -F 'U4_SECOND_READY // x=' "$log" | tail -n 1 |
+  sed -E 's/.*x=([0-9]+) y=([0-9]+).*/\1 \2/')"
+read -r ix iy <<<"$second_coords"
+[ -n "$ix" ] && [ -n "$iy" ] ||
+  { cat "$log"; echo "U4_FAIL // invalid dossier coordinates"; exit 1; }
+xdotool mousemove --window "$window" "$ix" "$iy" click 1
 set +e
 wait "$pid"
 rc="$?"
@@ -77,6 +99,8 @@ if grep -F "U4_FAIL" "$log" >/dev/null; then
 fi
 grep -F 'U4_PASS // SELECTED_PROCESS_READ_ONLY' "$log" >/dev/null ||
   { echo "U4_FAIL // click did not select row"; exit 1; }
+grep -F 'U4_PASS // DOSSIER_FILE_NAVIGATION_READ_ONLY' "$log" >/dev/null ||
+  { echo "U4_FAIL // left dossier click did not reach right details"; exit 1; }
 if find "$work/data" -type f | grep -q .; then
   echo "U4_FAIL // manager created a writer file"; exit 1
 fi

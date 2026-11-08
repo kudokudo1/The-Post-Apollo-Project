@@ -312,14 +312,12 @@ Item {
                 height: 30
                 label: "CANCEL ACCOUNT EDIT"
                 labelPixelSize: 9
-                accentColor: Colors.white
+                accentColor: Colors.red
+                destructive: true
                 interactive: accountEditor.pendingAction === ""
-                onClicked: {
-                    accountEditor.selectedAccountId = "";
-                    accountEditor.confirmRemoveId = "";
-                    labelField.text = "";
-                    accountEditor.feedback = "";
-                }
+                // Cancel the whole account editor, not just its text field.
+                // This also exits the selected service and closes its form.
+                onClicked: accountEditor.resetEditor()
             }
             ActionButton {
                 width: parent.width

@@ -25,6 +25,14 @@ C4b's source contracts additionally require the exact independently owned C3b se
 3. Run the complete C4b CI workflow using the **unchanged original C3d signed RPM** in the real offline Fedora Silverblue VM, with first reboot, exact service-origin PID/UID/SELinux/D-Bus/cgroup/argv check, strict negative file and client permissions, explicit service shutdown/cleanup and second real OSTree rollback reboot.
 4. Prove original package, custom SELinux policy/module, keyrings, service files and test accounts were removed on rollback. Only then seek final operator technical acceptance.
 
+## VERIFIED REAL-VM FAILURE / CLEANUP CORRECTION
+
+The first integrated [C4b run #42508631401](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42508631401) passed the independently observed **C3b OS D-Bus/PID/UID/systemd/SELinux origin** proof (`C3B_PASS // OS_DBUS_PID_UID_SYSTEMD_SELINUX_ORIGIN_COHERENCE_TEST_ONLY`), exact read-only and rejected-client calls, SELinux Enforcing, signed confined host, negative dummy-file denial, and explicit service stop/D-Bus-name release. This **resolves the original `/opt` ancestry security blocker** in the real official Silverblue 44 VM, but the complete C4b workflow failed later with `C4B_FAIL // TEST_GROUP_REMOVAL_FAILED`.
+
+The actual guest console line was `groupdel: group 'postapollo-connections' does not exist`. Fedora's `userdel postapollo-connections` had already automatically removed that account's private primary group. This is a cleanup idempotence problem, not an origin-authentication failure. C4b now requires the two other explicitly created test groups to be deleted successfully, conditionally deletes the service primary group **only when still present**, and immediately calls `check_accounts_absent` to reject any surviving service user or test group before marking the guest runtime complete. New source regression tests lock this sequence in place; no source/security checks or default policy are weakened.
+
+**Not yet verified:** this corrected source must pass exact-head CI, then the real guest must finish runtime cleanup and its **second real OSTree rollback reboot**, including removal of the signed policy/service RPMs, custom SELinux module, test keyrings and users. The earlier failing VM does not prove that rollback.
+
 ## VERIFY
 
 - [x] Confirm exact C3b owner CLI, environment flags and strict path policy in draft #1553.

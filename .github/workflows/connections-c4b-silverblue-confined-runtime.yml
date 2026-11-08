@@ -34,6 +34,7 @@ jobs:
           bash -n tests/connections/c3d_provenance/build_signed_ci_status.sh
           bash -n tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
           python3 -B tests/connections/test_connections_c4b_silverblue_contract.py
+          python3 -B tests/connections/test_connections_c4b_physical_host.py
           python3 -B tests/connections/test_connections_c4a_silverblue_contract.py
           python3 -B tests/connections/test_connections_c3b_origin.py
           python3 -B tests/connections/test_connections_c3d_provenance_contract.py
@@ -67,8 +68,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/c4b-status-rpm"
+          # C4b-owned, single-line physical shebang variant is generated in
+          # ephemeral RUNNER_TEMP, then overlaid ONLY inside this disposable
+          # signing container. C3d and C2r version-controlled files untouched.
+          POST_APOLLO_C4B_CI_SOURCE=1 python3 -B \
+            tests/connections/c4b_silverblue/prepare_physical_status_host.py \
+            "$RUNNER_TEMP/c4b-physical-status-host.py"
           docker run --rm \
             --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c4b-physical-status-host.py,dst=/src/tests/connections/c2r_selinux_domain/C2rStatusHost.py,readonly" \
             --mount "type=bind,src=$RUNNER_TEMP/c4b-status-rpm,dst=/out" \
             fedora:44 /usr/bin/bash /src/tests/connections/c3d_provenance/build_signed_ci_status.sh
           (cd "$RUNNER_TEMP/c4b-status-rpm" && sha256sum --check --status c3d-artifact-manifest.sha256)
@@ -133,5 +141,6 @@ jobs:
         run: |
           set -euo pipefail
           python3 -B tests/connections/test_connections_c4b_silverblue_contract.py
+          python3 -B tests/connections/test_connections_c4b_physical_host.py
           python3 -B tests/connections/test_connections_c2n_policy_contract.py
           echo "C4B_PASS // PRODUCTION_CREDENTIALS_GRANTS_AND_HOST_AUTH_DISABLED"

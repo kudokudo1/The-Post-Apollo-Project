@@ -25,7 +25,7 @@ function visibleName(input) {
     const name=input.trim();
     // Never interpret a command, path, URL, address or raw launch argument
     // as a cross-widget display name. The owner has a richer detail view.
-    if (!name || name.length>64 || /[\u0000-\u001f\u007f/\\|<>@]/.test(name)
+    if (!name || name.length>64 || /[\u0000-\u001f\u007f\/\\|<>@]/.test(name)
             || /:\/\/|--(?:password|token|secret|key)/i.test(name))
         return "";
     return name;

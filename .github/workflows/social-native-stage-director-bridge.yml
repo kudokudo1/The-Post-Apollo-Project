@@ -1,0 +1,30 @@
+name: Social W native Stage Director handoff and fallback
+
+on:
+  pull_request:
+    paths:
+      - "widgets/messanger/DiscordGeometry.py"
+      - "widgets/messanger/MessagingW.qml"
+      - "tests/messaging/test_social_native_stage_director_bridge.py"
+      - ".github/workflows/social-native-stage-director-bridge.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile Python helper and verify native+legacy handshake
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile widgets/messanger/DiscordGeometry.py \
+            tests/messaging/test_social_native_stage_director_bridge.py
+          python3 -B tests/messaging/test_social_native_stage_director_bridge.py
+          git status --porcelain
+          test -z "$(git status --porcelain)"

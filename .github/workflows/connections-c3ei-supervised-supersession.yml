@@ -1,0 +1,73 @@
+name: Connections C3e-I operator-supervised supersession recovery (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eSupervisedSupersession.py"
+      - "tests/connections/c3e_release_trust/C3eOperatorRecoveryGate.py"
+      - "tests/connections/test_connections_c3ei_supervised_supersession.py"
+      - ".github/workflows/connections-c3ei-supervised-supersession.yml"
+      - "docs/connections-c3ei-supervised-supersession.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-supervised-recovery:
+    # Synthetic keys and all ledgers are only in isolated GitHub test directories.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Parse source and preserve production deny-only policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v gpg
+          command -v gpgv
+          python3 -m py_compile \
+            tests/connections/c3e_release_trust/C3eSupervisedSupersession.py \
+            tests/connections/c3e_release_trust/C3eOperatorRecoveryGate.py \
+            tests/connections/test_connections_c3ei_supervised_supersession.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          base = Path("services/connections")
+          assert "readonly property bool credentialActionsEnabled: false" in (base/"ConnectionsBroker.qml").read_text()
+          assert "readonly property bool hostAuthenticated: false" in (base/"ConnectionsRequestStatus.qml").read_text()
+          for p in (*base.glob("*.qml"),*base.glob("*.js"),base/"qmldir"):
+              assert "C3eSupervisedSupersession" not in p.read_text(), p
+          print("C3EI_PASS // PRODUCTION_CREDENTIALS_AND_HOST_REMAIN_DISABLED")
+          PY
+      - name: Real GPG operator approval, prepared supersession and child crash retries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ei_supervised_supersession.py
+          echo "C3EI_PASS // SIGNED_SUPERSESSION_REQUIRES_EXPLICIT_RECOVERY"
+          echo "C3EI_LIMITATION // NO_REAL_OPERATOR_ENROLLMENT_OR_HARDWARE_ROLLBACK"
+      - name: Retain read-only approval, prior crash recovery and release signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3eh_operator_recovery_gate.py
+          python3 -B tests/connections/test_connections_c3eg_split_commit_recovery.py
+          python3 -B tests/connections/test_connections_c3ef_rollback_witness.py
+          python3 -B tests/connections/test_connections_c3ee_authority_owned_floor.py
+          python3 -B tests/connections/test_connections_c3ed_signed_floor.py
+          python3 -B tests/connections/test_connections_c3ec_durable_floor.py
+          python3 -B tests/connections/test_connections_c3e_release_trust.py
+          echo "C3EI_PASS // EXISTING_GPG_WITNESS_CRASH_AND_POLICY_REGRESSIONS"
+      - name: Require explicit production boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'not a distributed' docs/connections-c3ei-supervised-supersession.md
+          grep -Fq 'not operator-enrolled' docs/connections-c3ei-supervised-supersession.md
+          grep -Fq 'SUPERSESSION_PENDING_REQUIRES_EXPLICIT_RECOVERY' tests/connections/c3e_release_trust/C3eSupervisedSupersession.py
+          grep -Fq 'DELETE FROM split_intent' tests/connections/c3e_release_trust/C3eSupervisedSupersession.py
+          echo "C3EI_LIMITATION // SYNTHETIC_KEYS_AND_WITNESS_NO_NATIVE_INSTALL"

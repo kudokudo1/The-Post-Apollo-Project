@@ -175,7 +175,7 @@ class TelegramS2Transport(unittest.TestCase):
         # Parent retained a copy of the child's client socket only for this
         # malicious-forwarded-FD test; packet origin must be the bound child.
         unauth = self.reviewer(self.request(), sock=self.requester_peer)
-        self.assertEqual(unauth["status"], "CALLER_NOT_BOUND_OR_SENDER_CHANGED")
+        self.assertEqual(unauth["status"], "KERNEL_SENDER_MISMATCH")
         self.denied_power(unauth)
         self.assertEqual(self.client_request(self.request())["status"],
                          "SYNTHETIC_REVIEW_REQUIRED_NO_GRANT")

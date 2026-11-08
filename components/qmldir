@@ -19,6 +19,8 @@ DockButton 1.0 DockButton.qml
 ActionButton 1.0 ActionButton.qml
 FavoritesToggleButton 1.0 FavoritesToggleButton.qml
 FavoritesUnifiedPreview 1.0 FavoritesUnifiedPreview.qml
+FavoritesCollectionToggleButton 1.0 FavoritesCollectionToggleButton.qml
+FavoritesCollectionPanel 1.0 FavoritesCollectionPanel.qml
 HospitalActionButton 1.0 HospitalActionButton.qml
 SafeDropShadow 1.0 SafeDropShadow.qml
 CameraGlyph 1.0 CameraGlyph.qml

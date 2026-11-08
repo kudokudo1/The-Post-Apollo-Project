@@ -4,7 +4,7 @@
 // This is deliberately NOT a secret store, an authenticated session registry,
 // or a new Social account/identity writer. No raw credential may enter rows.
 var IDS = [
-    "social", "notifications", "tasks-recovery", "proton-mail", "nasa-firms",
+    "social", "telegram", "notifications", "tasks-recovery", "proton-mail", "nasa-firms",
     "bbc-world", "al-jazeera-english", "gdelt"
 ];
 
@@ -94,6 +94,20 @@ function build(input) {
          permissions:"LOCAL IDENTITY LAYOUT AND ACCOUNT DISPLAY NAMES ONLY",
          setup:"SOCIAL OWNS IDENTITY ORGANIZATION. THESE ARE NOT LOGINS, COOKIES OR AUTHENTICATED MAIL SESSIONS.",
          action:"RELOAD SOCIAL"},
+        // Telegram is a real existing native adapter, but its session health
+        // is owned by Social. CPU++ never copies a READY result across scopes,
+        // starts a second Telethon client, or treats labels as a login.
+        {id:"telegram",title:"TELEGRAM // NATIVE",
+         status:"CHECK SESSION IN SOCIAL",kind:"account",accent:"yellow",
+         detail:"NATIVE TELEGRAM // AUTHORIZATION CHECK OWNED BY SOCIAL",
+         context:"SHARED DEFAULT // PRIVATE ID SESSIONS REQUIRE SOCIAL OPT-IN",
+         consumers:"SOCIAL // TELEGRAM NATIVE ADAPTER",
+         permissions:"QR OR PHONE SIGN-IN // PROVIDER HEALTH CHECK IN SOCIAL",
+         setup:"OPEN TELEGRAM switches to the existing Social Telegram pane. "
+             + "Its owned adapter checks the actual selected shared/private session. "
+             + "Pairing requires a further explicit QR or phone action. "
+             + "CPU++ does not see credentials or prove a signed-in account.",
+         action:"OPEN TELEGRAM"},
         {id:"notifications", title:"NOTIFICATIONS",
          status:notificationsActive ? "LOCAL ENGINE READY" : "LOCAL ENGINE WAITING",
          kind:"local", accent:notificationsActive?"cyan":"orange",

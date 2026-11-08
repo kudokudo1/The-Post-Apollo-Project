@@ -378,3 +378,19 @@ test("CPU++ source renders real AppControl metadata without crossing authority",
   assert.doesNotMatch(qml+policy,/FileView\s*\{|execDetached|Process\s*\{/);
   assert.doesNotMatch(pane,/AppControlW\.execute|appControlWindow\.kill/);
 });
+
+test("CPU++ Favorites entries select from their entire row with // breadcrumb separators",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const fixture=read("tests/cpuplus/fixtures/CpuPlusFavoritesNative.qml");
+  assert.match(pane,/\\?id: favoriteRow/);
+  assert.match(pane,/MouseArea \\{/);
+  assert.match(pane,/anchors\.fill: parent/);
+  assert.match(pane,/onClicked: pane\.selectionRequested\(modelData\.key\)/);
+  assert.match(pane,/Accessible\.role: Accessible\.Button/);
+  assert.match(pane,/Keys\.onPressed/);
+  assert.match(pane,/"APP CTRL \\/\\/ "\+modelData\.menu/);
+  assert.match(pane,/\+" \\/\\/ "\+\(modelData\.resolved/);
+  assert.doesNotMatch(pane,/label: "VIEW"/);
+  assert.match(fixture,/16,row\.height\\/2/);
+  assert.doesNotMatch(fixture,/row\.width-33/);
+});

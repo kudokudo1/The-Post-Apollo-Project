@@ -86,7 +86,7 @@ test("M30u must refuse unknown dimensions, types and pixel pitch",()=>{
     }
     for(const [bpp,align] of [
         [1,8],[2,8],[3,8],[8,8],[4,0],[4,4],
-        [4,16],[4,32],["4",8],[4,"8"],[undefined,8],
+        [4,16],[4,32],["4",8],[4,"8"],[NaN,8],
         [4,null]
     ]) {
         const result=choose(1493,788,bpp,align);

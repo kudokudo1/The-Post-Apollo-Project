@@ -12,7 +12,7 @@
 
 No new stores, Python write paths, password providers or floating windows are introduced. The existing CPU++ **1000×834** chassis remains: **390px left overview**, **260px middle filters/selector**, remainder right editor.
 
-The middle-bay `CpuPlusLocalManagementNav.qml` retains its four primary category filters `IDS / PROFILES`, `ORGS / BRANCHES`, `STRUCTURE / UNITS`, `PORTFOLIOS`. Under **ORGS / BRANCHES**, a second compact row selects **COMPANIES / BRANCHES** or **BRANCH LOCATIONS**. Under **STRUCTURE / UNITS**, it selects **EDIT UNITS**, **UNIT LOCATIONS**, or **REPORTING**. The middle-bay record list below continues selecting which local organization is in scope. These are *editor filters*, not company-session switches.
+The middle-bay `CpuPlusLocalManagementNav.qml` retains its four primary category filters `IDS / PROFILES`, `ORGS / BRANCHES`, `STRUCTURE / UNITS`, `PORTFOLIOS`. Under **ORGS / BRANCHES**, a second compact row selects **EDIT ORGS** or **BRANCH LOCATIONS**. Under **STRUCTURE / UNITS**, it selects **EDIT UNITS**, **UNIT LOCATIONS**, or **REPORTING**. The middle-bay record list below continues selecting which local organization is in scope. These are *editor filters*, not company-session switches.
 
 ```text
 CPU++ → ID MANAGEMENT

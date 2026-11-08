@@ -575,6 +575,11 @@ Item {
             width: parent.width
             height: Math.max(0,details.height-(appControlOrigin.visible ? 255 : 143))
             collectionStore: pane.collectionsOwner
+            // U6a: grouping does not grant commands/recall/mutation rights.
+            // Only identifiers approved by the existing CollectionsStore
+            // may be persisted; unsafe external keys stay unavailable.
+            collectionKey: pane.selectedResource
+                ? pane.selectedResource.key : ""
             resource: pane.selectedResource && !pane.selectedResource.readOnly
                 ? ({
                     provider:pane.selectedResource.provider,

@@ -415,12 +415,13 @@ PanelWindow {
         adapterActive: messageRouter.telegramBackend.active,
         backendMode: messageRouter.telegramBackend.backendMode,
         privateMode: messagingWindow.telegramIsolationEnabled,
-        scopeMatches: !messagingWindow.telegramIsolationEnabled
-            || (messagingWindow.telegramActiveIdentityId !== ""
-                && messagingWindow.telegramActiveIdentityId
-                   === appSelector.identitySnapshot.activeId
-                && messageRouter.telegramBackend.identityId
-                   === messagingWindow.telegramActiveIdentityId),
+        scopeMatches: messagingWindow.telegramIsolationEnabled
+            ? (messagingWindow.telegramActiveIdentityId !== ""
+               && messagingWindow.telegramActiveIdentityId
+                  === appSelector.identitySnapshot.activeId
+               && messageRouter.telegramBackend.identityId
+                  === messagingWindow.telegramActiveIdentityId)
+            : messageRouter.telegramBackend.identityId === "",
         loginInProgress: messageRouter.telegramBackend.loginInProgress,
         operationBusy: messageRouter.telegramBackend.sending
             || messageRouter.telegramBackend.appKeyStatusBusy

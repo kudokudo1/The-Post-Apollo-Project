@@ -231,7 +231,7 @@ class C4bContracts(unittest.TestCase):
         # The C3b owner's opt profile must use the ORIGINAL C3d-signed host,
         # not C4b's now-closed physical-shebang derivative experiment #1551.
         self.assertTrue(SIGNED_C2R_HOST_SOURCE.read_bytes().startswith(
-            b"#!/opt/postapollo-c2o-venv/bin/python3\\n"
+            b"#!/opt/postapollo-c2o-venv/bin/python3\n"
         ))
         self.assertIn(
             "ExecStart=/usr/libexec/post-apollo/connections-status-host --read-only",

@@ -156,7 +156,7 @@ def inspect_operator_supersession(*, witness_db: Path, client_db: Path,
     node_id: str, release_root_pin: str, request_proof,
     release_root_public: Path, policy: Path, policy_signature: Path,
     delegated_public: Path, manifest: Path, manifest_signature: Path,
-    artifact: Path) -> str:
+    artifact: Path, allow_supersession_target: bool = False) -> str:
     """Fail-closed PRE-EXECUTION authorization, not a transaction executor.
 
     All signatures and source bytes are snapshotted before validation.
@@ -182,8 +182,10 @@ def inspect_operator_supersession(*, witness_db: Path, client_db: Path,
         split._identity(saved, node_id, root_pin, authority_pin)
         if saved[3:] != pending[:2]:
             deny("WITNESS_PENDING_BASELINE_CONFLICT")
-        if client[0] != root_pin or client[1:] not in (
-                pending[:4], pending[4:8]):
+        if client[0] != root_pin:
+            deny("CLIENT_PENDING_STATE_CONFLICT")
+        was_legacy_state = client[1:] in (pending[:4], pending[4:8])
+        if not was_legacy_state and not allow_supersession_target:
             deny("CLIENT_PENDING_STATE_CONFLICT")
         pending_hash = intent_digest(saved, pending)
     except split.Refused as exc:
@@ -252,6 +254,11 @@ def inspect_operator_supersession(*, witness_db: Path, client_db: Path,
             deny("SIGNED_APPROVAL_CONTEXT_MISMATCH")
         if target[0] <= pending[4] or target[1] <= pending[5]:
             deny("NEW_RELEASE_MUST_SUPERSEDE_PENDING")
+        # A crash after C3e-I's client commit legitimately leaves the client
+        # at the *new* root-signed target while both witness intents remain
+        # pending. Only explicit recovery may authorize this exact state.
+        if not was_legacy_state and client[1:] != target:
+            deny("RECOVERY_CLIENT_NOT_AT_SIGNED_TARGET")
         # Detect changed local ledgers while doing expensive GPG checks.
         # Still read-only: a later writer must recheck under a real lock.
         try:

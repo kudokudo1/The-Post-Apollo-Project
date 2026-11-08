@@ -159,9 +159,13 @@ if [[ "$phase" == booted ]]; then
     fail "CONFINED_SERVICE_DID_NOT_REFUSE_DUMMY_FILE"
   echo "C4B_PASS // REAL_SELINUX_SERVICE_DOMAIN_AND_NEGATIVE_FILE_DENIAL"
   stage C3B_OS_ORIGIN_VERIFICATION_BEGIN
-  if ! GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1 \
+  # The C3b owner controls this exact physical-path test-only selector.
+  # No local profile override or fabricated directory evidence is accepted.
+  # The existing guest marker, official Silverblue 44, enforced SELinux and
+  # no-network checks must also pass inside C3b's independent entry gate.
+  if ! GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1 POST_APOLLO_C4B_TEST_GUEST=1 \
       timeout --signal=TERM --kill-after=5s 60s \
-        "$python" -I -B "$assets/C3bOriginCheck.py" --verify-disposable; then
+        "$python" -I -B "$assets/C3bOriginCheck.py" --verify-disposable-physical; then
     # Read-only diagnostic on rejection. Import the exact staged C3b probe
     # rather than inventing a second list of protected directories. Report
     # only ancestor attributes that violate its existing strict predicate.

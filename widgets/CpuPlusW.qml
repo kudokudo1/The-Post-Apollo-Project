@@ -1125,6 +1125,8 @@ PanelWindow {
                    ? "TIME // BASIC CONTROLS"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                      ? "CONNECTIONS // OVERVIEW" : "SETTINGS // OVERVIEW")
+                : cpuPlusWindow.selectedModeIndex === 4
+                ? "FAVORITES++ // SOURCES"
                 : cpuPlusWindow.selectedModeIndex === 5
                 ? (cpuPlusWindow.idManagementSection === "IDS"
                    ? "ID MANAGEMENT // OVERVIEW"
@@ -1430,6 +1432,8 @@ PanelWindow {
                        ? "CLOCK // CONTROL"
                        : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                          ? "SHARED // STATUS" : "SETTINGS STATE")
+                    : cpuPlusWindow.selectedModeIndex === 4
+                    ? "FAVORITES // SAVED STATE"
                     : cpuPlusWindow.selectedModeIndex === 5
                     ? "IDENTITY // LOCAL STATUS" : "INSTRUMENT STATE"
 
@@ -1482,6 +1486,7 @@ PanelWindow {
                        && (cpuPlusWindow.settingsSubMode === "TIME"
                            || cpuPlusWindow.settingsSubMode === "CONNECTIONS"))
                      && cpuPlusWindow.selectedModeIndex !== 5
+                     && cpuPlusWindow.selectedModeIndex !== 4
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom
@@ -1604,6 +1609,22 @@ PanelWindow {
             anchors.topMargin: 7
             anchors.bottomMargin: 9
         }
+        CpuPlusFavoritesHubPane {
+            id: favoritesOverviewPane
+            area: "overview"
+            visible: cpuPlusWindow.selectedModeIndex === 4
+            catalogSnapshot: cpuFavoritesCatalog.snapshot
+            candidates: cpuPlusWindow.favoriteCandidates
+            selectedResource: cpuPlusWindow.selectedFavoriteResource
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedStateHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 8
+            anchors.bottomMargin: 10
+        }
         CpuPlusLocalManagementPane {
             id: localManagementOverviewPane
             area: "overview"
@@ -1668,6 +1689,8 @@ PanelWindow {
                    ? "TIME // ACTIVE"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                      ? "CONNECTIONS // SOURCES" : "SETTINGS // CATEGORIES")
+                : cpuPlusWindow.selectedModeIndex === 4
+                ? "FAVORITES // SELECT"
                 : cpuPlusWindow.selectedModeIndex === 5
                 ? (cpuPlusWindow.idManagementSection === "IDS"
                    ? "ID MANAGEMENT // IDS"
@@ -2029,6 +2052,25 @@ PanelWindow {
             anchors.rightMargin: 9
             anchors.topMargin: 8
             height: implicitHeight
+        }
+        CpuPlusFavoritesHubPane {
+            id: favoritesSelectorPane
+            area: "selector"
+            visible: cpuPlusWindow.selectedModeIndex === 4
+            catalogSnapshot: cpuFavoritesCatalog.snapshot
+            candidates: cpuPlusWindow.favoriteCandidates
+            selectedResource: cpuPlusWindow.selectedFavoriteResource
+            onSelectionRequested: function(key) {
+                cpuPlusWindow.selectedFavoriteKey = key;
+            }
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: targetHeaderLine.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 10
+            anchors.bottomMargin: 9
         }
         CpuPlusIdManagementPane {
             id: idManagementSelectorPane
@@ -2469,6 +2511,8 @@ PanelWindow {
                      ? "TIME // ADVANCED"
                      : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                        ? "CONNECTIONS // ACCESS" : "LOCATION // SETTINGS")
+                  : cpuPlusWindow.selectedModeIndex === 4
+                  ? "FAVORITES // MANAGE"
                   : cpuPlusWindow.selectedModeIndex === 5
                   ? (cpuPlusWindow.idManagementSection === "IDS"
                      ? "ID MANAGEMENT // DETAILS" : "LOCAL // EDIT")
@@ -2544,6 +2588,22 @@ PanelWindow {
             anchors.bottomMargin: 10
         }
 
+        CpuPlusFavoritesHubPane {
+            id: favoritesDetailsPane
+            area: "details"
+            visible: cpuPlusWindow.selectedModeIndex === 4
+            catalogSnapshot: cpuFavoritesCatalog.snapshot
+            candidates: cpuPlusWindow.favoriteCandidates
+            selectedResource: cpuPlusWindow.selectedFavoriteResource
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 19
+            anchors.bottomMargin: 9
+        }
         CpuPlusIdManagementPane {
             id: idManagementDetailsPane
             area: "details"

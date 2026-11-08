@@ -29,9 +29,17 @@ check('source: "PX ROOM / SESSION RECORDS"' in policy,
 check("isProviderReachable: false" in policy
       and "isBrowserChatConnected: false" in policy,
       "Saved PX records must not claim provider/browser connectivity")
-check("status === \"REVIEW\" || status === \"WAITING\"" in policy
-      and 'code = "SESSION_PAUSED"' in policy,
-      "Paused or held workers must not accept blind continuation")
+check('status === "REVIEW"' in policy
+      and 'code = "SESSION_PAUSED"' in policy
+      and 'code = "SESSION_BUSY"' in policy
+      and 'code = "RECORDED_FAILURE"' in policy,
+      "Paused, review-held, busy or failed workers cannot be continued")
+check('status === "WAITING"' in policy
+      and 'valueOf(room.sessionLastExitCode) === "0"' in policy
+      and 'code = "WAITING_READY"' in policy,
+      "Completed WAITING must support a new explicit operator turn")
+check('code === "STRUCTURED" || code === "WAITING_READY"' in policy,
+      "WAITING readiness must never bypass the rest of connection identity checks")
 check('provider === "int1-fake"' in policy,
       "Fake-only provider must not enter standard Quick path")
 check("roomBed !== sessionBed" in policy,

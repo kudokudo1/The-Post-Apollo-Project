@@ -334,6 +334,8 @@ ShellRoot {
                     body:"LUNAR",phase:"PENUMBRAL",daysUntil:106
                 }];
                 focused.eclipseSource.eventCount = 2;
+                focused.eclipseSource.nextSolar = focused.eclipseSource.events[0];
+                focused.eclipseSource.nextLunar = focused.eclipseSource.events[1];
                 focused.eclipseSource.ready = true;
                 root.phase = 8;
             } else if (root.phase === 8) {
@@ -357,6 +359,34 @@ ShellRoot {
                     || highlights.height < 70 || scroll.height < 30
                     || frame.y <= featured.height)
                     return root.fail("C26_ECLIPSE_PINNED_HIGHLIGHTS_MISSING");
+                const solarMotion = findNamed(details,
+                    "cosmos-c31-featured-eclipse-motion");
+                const archiveToggle = findNamed(details,
+                    "cosmos-c31-archive-toggle");
+                const playToggle = findNamed(details,
+                    "cosmos-c31-motion-play-pause");
+                if (!solarMotion || !archiveToggle || !playToggle
+                    || countNamed(details,"cosmos-c31-featured-eclipse-motion") !== 2
+                    || countNamed(details,"cosmos-c31-eclipse-live-canvas") !== 2
+                    || countNamed(details,"cosmos-c31-nasa-eclipse-archive") !== 2
+                    || solarMotion.body !== "SOLAR"
+                    || !solarMotion.eventRecord
+                    || solarMotion.eventRecord.phase !== "TOTAL"
+                    || solarMotion.width < 60
+                    || !solarMotion.motionRunning)
+                    return root.fail("C31_ECLIPSE_DUAL_MOVING_VISUALS_MISSING");
+                solarMotion.seek(0.7);
+                if (Math.abs(solarMotion.demoPhase-0.7)>0.001)
+                    return root.fail("C31_ECLIPSE_SEEK_BROKEN");
+                details.motionPlaying = false;
+                if (solarMotion.motionRunning)
+                    return root.fail("C31_ECLIPSE_PAUSE_FAILED");
+                details.showArchive = true;
+                if (!solarMotion.showArchive || solarMotion.motionRunning
+                    || solarMotion.archiveCredit.indexOf("NASA")<0)
+                    return root.fail("C31_ECLIPSE_PHOTO_MODE_FAILED");
+                details.showArchive = false;
+                details.motionPlaying = true;
                 // C6 inspector still exposes all source facts when explicitly opened.
                 details.inspectRecord(1);
                 if (!details.inspecting || details.selectedIndex !== 1

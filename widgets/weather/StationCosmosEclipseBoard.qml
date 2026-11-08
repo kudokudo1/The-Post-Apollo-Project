@@ -11,6 +11,8 @@ Item {
     property var eclipseSource: null
     property string sourceStatus: "SOURCE WAITING"
     property bool inspecting: false
+    property bool motionPlaying: true
+    property bool showArchive: false
 
     StationCosmosDetailPane {
         id: eclipseDetails
@@ -55,25 +57,45 @@ Item {
         spacing: 5
 
         Row {
+            objectName: "cosmos-c31-eclipse-visual-controls"
             width: parent.width
-            height: 15
+            height: 18
             spacing: 5
             GohuText {
                 text: "ECLIPSES // NASA GSFC"
-                width: Math.max(1,(parent.width-5)*0.47)
+                width: Math.max(1,parent.width-199)
                 color: Colors.magenta
                 font.pixelSize: 10
                 elide: Text.ElideRight
             }
             QuietText {
-                width: Math.max(1,(parent.width-5)*0.53)
+                width: 100
                 text: eclipseBoard.eclipseSource && eclipseBoard.eclipseSource.ready
                     ? "GLOBAL UTC // " + eclipseBoard.recordCount + " EVENTS"
                     : eclipseBoard.sourceStatus
                 color: Colors.cyan
                 font.pixelSize: 8
                 elide: Text.ElideRight
-                horizontalAlignment: Text.AlignRight
+            }
+            ActionButton {
+                objectName: "cosmos-c31-archive-toggle"
+                width: 42
+                height: 18
+                contentPadding: 0
+                labelPixelSize: 8
+                label: eclipseBoard.showArchive ? "SCENE" : "PHOTO"
+                accentColor: Colors.orange
+                onClicked: eclipseBoard.showArchive = !eclipseBoard.showArchive
+            }
+            ActionButton {
+                objectName: "cosmos-c31-motion-play-pause"
+                width: 42
+                height: 18
+                contentPadding: 0
+                labelPixelSize: 8
+                label: eclipseBoard.motionPlaying ? "PAUSE" : "PLAY"
+                accentColor: Colors.cyan
+                onClicked: eclipseBoard.motionPlaying = !eclipseBoard.motionPlaying
             }
         }
 
@@ -81,7 +103,7 @@ Item {
             id: eclipseFeaturedRow
             objectName: "cosmos-c26-eclipse-highlight-row"
             width: parent.width
-            height: 82
+            height: 103
             spacing: 6
             Repeater {
                 model: 2
@@ -99,54 +121,79 @@ Item {
                     color: Colors.dark
                     border.width: 1
                     border.color: index === 0 ? Colors.orange : Colors.cyan
+                    clip: true
 
-                    // The reference's two long cards become actual instrument
-                    // anchors. No fake eclipse photos or local visibility data.
-                    Column {
+                    Row {
                         anchors.fill: parent
-                        anchors.margins: 6
+                        anchors.margins: 5
                         spacing: 4
-                        SecondaryText {
-                            width: parent.width
-                            text: eclipseHighlight.index === 0 ? "NEXT SOLAR" : "NEXT LUNAR"
-                            color: Colors.cyan
-                            font.pixelSize: 9
+                        StationCosmosEclipseMotion {
+                            objectName: "cosmos-c31-featured-eclipse-motion"
+                            width: Math.min(87, Math.max(1,parent.width*0.43))
+                            height: parent.height
+                            body: eclipseHighlight.index === 0 ? "SOLAR" : "LUNAR"
+                            eventRecord: eclipseHighlight.record
+                            playing: eclipseBoard.motionPlaying && !eclipseBoard.inspecting
+                            showArchive: eclipseBoard.showArchive
                         }
-                        GohuText {
-                            width: parent.width
-                            text: eclipseHighlight.record
-                                ? String(eclipseHighlight.record.event || "ECLIPSE")
-                                : "NO EVENT IN WINDOW"
-                            color: eclipseHighlight.index === 0 ? Colors.orange : Colors.white
-                            font.pixelSize: 11
-                            elide: Text.ElideRight
+                        Item {
+                            width: Math.max(1,parent.width-Math.min(87,parent.width*0.43)-4)
+                            height: parent.height
+                            Column {
+                                anchors.fill: parent
+                                spacing: 5
+                                SecondaryText {
+                                    width: parent.width
+                                    text: eclipseHighlight.index === 0 ? "NEXT SOLAR" : "NEXT LUNAR"
+                                    color: Colors.cyan
+                                    font.pixelSize: 9
+                                    elide: Text.ElideRight
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: eclipseHighlight.record
+                                        ? String(eclipseHighlight.record.event || "ECLIPSE")
+                                        : "NO EVENT IN WINDOW"
+                                    color: eclipseHighlight.index === 0
+                                        ? Colors.orange : Colors.white
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: eclipseHighlight.record
+                                        ? String(eclipseHighlight.record.date || "--") + " UTC"
+                                        : "DATE --"
+                                    color: Colors.white
+                                    font.pixelSize: 9
+                                    elide: Text.ElideRight
+                                }
+                                QuietText {
+                                    width: parent.width
+                                    text: eclipseHighlight.record
+                                        && eclipseHighlight.record.daysUntil !== undefined
+                                        && eclipseHighlight.record.daysUntil !== null
+                                        ? "IN " + eclipseHighlight.record.daysUntil + " DAYS"
+                                        : "DAYS --"
+                                    color: Colors.cyan
+                                    font.pixelSize: 9
+                                    elide: Text.ElideRight
+                                }
+                                QuietText {
+                                    width: parent.width
+                                    text: "CLICK TO INSPECT"
+                                    color: Colors.orange
+                                    font.pixelSize: 8
+                                    elide: Text.ElideRight
+                                }
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: eclipseHighlight.record !== null
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: eclipseBoard.inspectFeatured(eclipseHighlight.record)
+                            }
                         }
-                        GohuText {
-                            width: parent.width
-                            text: eclipseHighlight.record
-                                ? String(eclipseHighlight.record.date || "--") + " UTC"
-                                : "DATE --"
-                            color: Colors.white
-                            font.pixelSize: 10
-                            elide: Text.ElideRight
-                        }
-                        QuietText {
-                            width: parent.width
-                            text: eclipseHighlight.record
-                                && eclipseHighlight.record.daysUntil !== undefined
-                                && eclipseHighlight.record.daysUntil !== null
-                                ? "IN " + eclipseHighlight.record.daysUntil + " DAYS"
-                                : "DAYS --"
-                            color: Colors.cyan
-                            font.pixelSize: 9
-                            elide: Text.ElideRight
-                        }
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: eclipseHighlight.record !== null
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: eclipseBoard.inspectFeatured(eclipseHighlight.record)
                     }
                 }
             }

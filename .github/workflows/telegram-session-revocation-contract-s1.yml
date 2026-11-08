@@ -1,0 +1,50 @@
+name: Telegram S1 synthetic revocation boundary (no production sign-out)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/messaging/fixtures/telegram_session_revocation_m1.py'
+      - 'tests/messaging/test_telegram_session_revocation_contract_m1.py'
+      - 'docs/telegram-session-revocation-contract-s1.md'
+      - '.github/workflows/telegram-session-revocation-contract-s1.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/messaging/fixtures/telegram_session_revocation_m1.py'
+      - 'tests/messaging/test_telegram_session_revocation_contract_m1.py'
+      - '.github/workflows/telegram-session-revocation-contract-s1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-telegram-revoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Synthetic Telegram sign-out contract and denials
+        run: python3 -m unittest discover -s tests/messaging -p 'test_telegram_session_revocation_contract_m1.py' -v
+      - name: Existing native Telegram identity and fake Telethon subprocess contracts
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_identity_scopes.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_bridge_cli_contracts.py' -v
+      - name: Real CPU++ navigation, scope-stale refusal and current adapter status
+        run: |
+          node tests/cpuplus/test_cpuplus_telegram_connection_entry.cjs
+          node --test tests/cpuplus/test_cpuplus_telegram_status_projection.cjs
+      - name: Connections broker closed, one TASKS writer and no production sign-out
+        run: |
+          node tests/cpuplus/test_connections_broker_c2a.js
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          ! grep -q 'sub.add_parser("logout")' services/messaging/bridges/telegram/bridge.py
+          ! grep -q 'sub.add_parser("revoke")' services/messaging/bridges/telegram/bridge.py
+          ! grep -R -F 'telegram_session_revocation_m1' widgets services shell.qml
+          grep -q 'readonly property bool credentialActionsEnabled: false' services/connections/ConnectionsBroker.qml
+          python3 -m py_compile tests/messaging/fixtures/telegram_session_revocation_m1.py tests/messaging/test_telegram_session_revocation_contract_m1.py

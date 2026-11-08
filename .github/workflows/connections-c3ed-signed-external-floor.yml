@@ -1,0 +1,64 @@
+name: Connections C3e-D signed external floor challenge (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eExternalFloorProof.py"
+      - "tests/connections/test_connections_c3ed_signed_floor.py"
+      - ".github/workflows/connections-c3ed-signed-external-floor.yml"
+      - "docs/connections-c3ed-signed-external-floor.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-independent-freshness-signer:
+    # This creates temporary TEST signing identities, not an enrolled root.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify source and production deny-only boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v gpg
+          command -v gpgv
+          python3 -m py_compile \
+            tests/connections/c3e_release_trust/C3eExternalFloorProof.py \
+            tests/connections/test_connections_c3ed_signed_floor.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path("services/connections")
+          assert "readonly property bool credentialActionsEnabled: false" in (base/"ConnectionsBroker.qml").read_text()
+          assert "readonly property bool hostAuthenticated: false" in (base/"ConnectionsRequestStatus.qml").read_text()
+          for item in (*base.glob("*.qml"), *base.glob("*.js"), base/"qmldir"):
+              assert "C3eExternalFloorProof" not in item.read_text(), item
+          print("C3ED_PASS // PRODUCTION_HOST_AND_CREDENTIAL_GRANTS_STILL_FALSE")
+          PY
+      - name: Verify real GPG signed independent challenge-bound floor proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ed_signed_floor.py
+          echo "C3ED_PASS // SIGNED_NODE_ROOT_CHALLENGE_FLOOR_BINDING_TEST_ONLY"
+      - name: Verify durable rollback and prior release signer authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ec_durable_floor.py
+          python3 -B tests/connections/test_connections_c3e_release_trust.py
+          echo "C3ED_PASS // EXISTING_GPG_SQLITE_FLOOR_AND_REVOCATION_UNCHANGED"
+      - name: Preserve nonproduction limitations
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'no protected independent release history' tests/connections/test_connections_c3ed_signed_floor.py
+          grep -Fq 'not provision' tests/connections/c3e_release_trust/C3eExternalFloorProof.py
+          grep -Fq 'production' docs/connections-c3ed-signed-external-floor.md
+          echo "C3ED_LIMITATION // CI_SIGNER_IS_NOT_OPERATOR_PROVISIONED_FRESHNESS_ROOT"

@@ -1,0 +1,69 @@
+name: Connections C3e-G split client/witness commit recovery (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eSplitCommitRecovery.py"
+      - "tests/connections/test_connections_c3eg_split_commit_recovery.py"
+      - ".github/workflows/connections-c3eg-split-commit-recovery.yml"
+      - "docs/connections-c3eg-split-commit-recovery.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-crash-and-signed-recovery:
+    # Test-only disposable keys and ledgers, never an installed service.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate syntax and production deny-only baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v gpg
+          command -v gpgv
+          python3 -m py_compile \
+            tests/connections/c3e_release_trust/C3eSplitCommitRecovery.py \
+            tests/connections/test_connections_c3eg_split_commit_recovery.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          base = Path("services/connections")
+          assert "readonly property bool hostAuthenticated: false" in (base / "ConnectionsRequestStatus.qml").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in (base / "ConnectionsBroker.qml").read_text()
+          for p in (*base.glob("*.qml"), *base.glob("*.js"), base / "qmldir"):
+              assert "C3eSplitCommitRecovery" not in p.read_text(), p
+          print("C3EG_PASS // PRODUCTION_CREDENTIAL_AND_HOST_GRANTS_REMAIN_DISABLED")
+          PY
+      - name: Real process crash at prepare, client commit and witness commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3eg_split_commit_recovery.py
+          echo "C3EG_PASS // EXPLICIT_SIGNED_RECONCILIATION_OF_SPLIT_CLIENT_WITNESS_COMMIT"
+          echo "C3EG_LIMITATION // NO_DISTRIBUTED_ATOMIC_COMMIT_OR_PROTECTED_EXTERNAL_WITNESS"
+      - name: Revalidate witness, authority, signature and durable-state behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ef_rollback_witness.py
+          python3 -B tests/connections/test_connections_c3ee_authority_owned_floor.py
+          python3 -B tests/connections/test_connections_c3ed_signed_floor.py
+          python3 -B tests/connections/test_connections_c3ec_durable_floor.py
+          python3 -B tests/connections/test_connections_c3e_release_trust.py
+          echo "C3EG_PASS // PREVIOUS_RELEASE_TRUST_REGRESSIONS"
+      - name: Preserve explicit fail-closed recovery and production limitations
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'NO_PENDING_INTENT_FOR_RECOVERY' tests/connections/c3e_release_trust/C3eSplitCommitRecovery.py
+          grep -Fq 'PENDING_INTENT_REQUIRES_EXPLICIT_RECOVERY' tests/connections/c3e_release_trust/C3eSplitCommitRecovery.py
+          grep -Fq 'SIGNED_RELEASE_REFUSED_' tests/connections/c3e_release_trust/C3eSplitCommitRecovery.py
+          grep -Fq 'not a distributed atomic' docs/connections-c3eg-split-commit-recovery.md
+          echo "C3EG_LIMITATION // NO_TRUSTED_PRODUCTION_RECOVERY_OR_ANTI_ROLLBACK"

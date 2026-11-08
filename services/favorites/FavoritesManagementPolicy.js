@@ -5,6 +5,7 @@
 .import "FavoritesReadOnlyAdapters.js" as Adapters
 .import "FavoritesWeatherHomeProjection.js" as WeatherHome
 .import "FavoritesNotificationsProjection.js" as NotificationsProjection
+.import "FavoritesRadioProjection.js" as RadioProjection
 
 // CPU++ candidate projection. The original AppControl store remains the ONLY
 // owner of its four favorite/watch lists. This view never executes, writes or
@@ -124,7 +125,7 @@ function safeUnresolvedLabel(menu,classification,ordinal) {
     return menu+" // "+(type[menu] || "SAVED ITEM")+" #"+ordinal;
 }
 
-function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions, weatherHomeSnapshot, notificationsSnapshot) {
+function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions, weatherHomeSnapshot, notificationsSnapshot, radioSnapshot) {
     const out=[], seen=Object.create(null);
     let rejected=0,total=0;
     function accept(record) {
@@ -219,6 +220,12 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
     rejected+=notifications.invalidCount;
     for(const item of notifications.rows) accept(item);
 
+    // Original Weather Station RADIO memory is optional and read-only here.
+    // Never construct an extra FileView or delegate recall/playback to CPU++.
+    const radio=RadioProjection.build(radioSnapshot);
+    rejected+=radio.invalidCount;
+    for(const item of radio.rows) accept(item);
+
     const zones=Array.isArray(clockZones)?clockZones:[];
     for (const zone of zones.slice(0,9)) {
         if(typeof zone!=="string") {rejected++;continue;}
@@ -258,7 +265,7 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
 
 function filterRows(records,category) {
     const rows=records && Array.isArray(records.rows)?records.rows:[];
-    if(["CLOCK","PLACES","NEW","CPU++","APP CTRL","WEATHER","NOTIFS"].indexOf(category)<0)
+    if(["CLOCK","PLACES","NEW","CPU++","APP CTRL","WEATHER","NOTIFS","RADIO"].indexOf(category)<0)
         return rows;
     return rows.filter(item=>item.category===category);
 }

@@ -13,7 +13,10 @@ Rectangle {
     property string collectionKey: ""
     property alias draftName: nameInput.text
     property alias createControl: createButton
+    property alias groupRowItems: collectionGroupRepeater
+    property string activeRenameId: ""
     readonly property bool editingText: nameInput.activeFocus
+        || activeRenameId!==""
     readonly property var normalized: Resource.normalize(resource)
     readonly property string resourceKey:
         collectionKey !== "" ? collectionKey
@@ -27,6 +30,8 @@ Rectangle {
     readonly property var groups:
         collectionStore ? collectionStore.collections : []
     signal createAccepted(string collectionId)
+    // UI-only navigation. The source CollectionsStore stays the sole writer.
+    signal collectionRequested(string collectionId)
 
     function createFromInput() {
         if (collectionStore === null || !collectionStore.canEdit)
@@ -90,8 +95,8 @@ Rectangle {
             width: parent.width
             height: 15
             text: panel.canUseResource
-                ? "SELECTED ITEM // ADD TO ANY COLLECTION"
-                : "NO SUPPORTED ITEM SELECTED // CREATE GROUPS"
+                ? "MEMBERSHIP ONLY // ORIGINAL FAVORITES UNCHANGED"
+                : "NO SUPPORTED ITEM // EDIT GROUP NAMES BELOW"
             font.pixelSize: 9
             color: Colors.cyan
             elide: Text.ElideRight
@@ -112,99 +117,234 @@ Rectangle {
                 spacing: 4
 
                 Repeater {
+                    id: collectionGroupRepeater
                     model: panel.groups
                     Rectangle {
                         id: groupRow
                         property bool confirmDelete: false
+                        property string renameError: ""
+                        readonly property bool renaming:
+                            panel.activeRenameId===modelData.id
+                        // Native test seam, not an authority-bearing control.
+                        property alias editControl: editButton
+                        property alias editField: renameInput
                         width: groupRows.width
-                        height: 32
+                        height: renaming ? 82 : 60
                         color: "#1B0623"
-                        border.color: Colors.cyan
+                        border.color: renaming ? Colors.magenta : Colors.cyan
                         border.width: 1
 
-                        Row {
+                        function beginRename() {
+                            if(panel.collectionStore===null
+                                    || !panel.collectionStore.canEdit) return;
+                            panel.activeRenameId=modelData.id;
+                        }
+                        function cancelRename() {
+                            if(panel.activeRenameId===modelData.id)
+                                panel.activeRenameId="";
+                            renameError="";
+                        }
+                        function saveRename() {
+                            if(!renaming || panel.collectionStore===null
+                                    || !panel.collectionStore.canEdit) return;
+                            const accepted=panel.collectionStore.renameCollection(
+                                modelData.id,renameInput.text);
+                            if(accepted) cancelRename();
+                            else renameError=String(
+                                panel.collectionStore.lastResultCode || "RENAME REJECTED");
+                        }
+                        onRenamingChanged: {
+                            if(!renaming) return;
+                            renameError="";
+                            renameInput.text=modelData.name;
+                            Qt.callLater(function() {
+                                if(groupRow.renaming) {
+                                    renameInput.forceActiveFocus();
+                                    renameInput.selectAll();
+                                }
+                            });
+                        }
+
+                        Column {
                             anchors.fill: parent
                             anchors.margins: 3
-                            spacing: 4
+                            spacing: 3
 
-                            GohuText {
-                                width: Math.max(0,parent.width
-                                    - groupToggle.width - upButton.width
-                                    - downButton.width - deleteButton.width
-                                    - memberCount.width - parent.spacing*5)
-                                height: parent.height
-                                verticalAlignment: Text.AlignVCenter
-                                text: modelData.name
-                                textFormat: Text.PlainText
-                                font.pixelSize: 10
-                                color: Colors.white
-                                elide: Text.ElideRight
-                            }
-
-                            GohuText {
-                                id: memberCount
-                                width: 20
-                                height: parent.height
-                                verticalAlignment: Text.AlignVCenter
-                                text: String(modelData.members.length)
-                                font.pixelSize: 9
-                                color: Colors.orange
-                            }
-
-                            FavoritesCollectionToggleButton {
-                                id: groupToggle
-                                width: 57
-                                height: parent.height
-                                collectionStore: panel.collectionStore
-                                collectionId: modelData.id
-                                resource: panel.resource
-                                collectionKey: panel.collectionKey
-                            }
-
-                            ActionButton {
-                                id: upButton
-                                width: 24
-                                height: parent.height
-                                label: "↑"
-                                labelPixelSize: 12
-                                accentColor: Colors.cyan
-                                available: groupToggle.inCollection
-                                    && panel.collectionStore.canEdit
-                                onLeftClicked: panel.collectionStore.moveMember(
-                                    modelData.id,panel.resourceKey,-1)
-                            }
-
-                            ActionButton {
-                                id: downButton
-                                width: 24
-                                height: parent.height
-                                label: "↓"
-                                labelPixelSize: 12
-                                accentColor: Colors.cyan
-                                available: groupToggle.inCollection
-                                    && panel.collectionStore.canEdit
-                                onLeftClicked: panel.collectionStore.moveMember(
-                                    modelData.id,panel.resourceKey,1)
-                            }
-
-                            ActionButton {
-                                id: deleteButton
-                                width: 50
-                                height: parent.height
-                                label: groupRow.confirmDelete ? "SURE?" : "DELETE"
-                                labelPixelSize: 9
-                                accentColor: Colors.red
-                                destructive: groupRow.confirmDelete
-                                available: panel.collectionStore !== null
-                                    && panel.collectionStore.canEdit
-                                onLeftClicked: {
-                                    if (!groupRow.confirmDelete) {
-                                        groupRow.confirmDelete=true;
-                                        return;
+                            Row {
+                                width: parent.width
+                                height: 25
+                                spacing: 4
+                                Item {
+                                    width: Math.max(0,parent.width-editButton.width
+                                        - cancelButton.width-parent.spacing*2)
+                                    height: parent.height
+                                    GohuText {
+                                        anchors.fill: parent
+                                        visible: !groupRow.renaming
+                                        verticalAlignment: Text.AlignVCenter
+                                        text: modelData.name
+                                        textFormat: Text.PlainText
+                                        font.pixelSize: 10
+                                        color: Colors.white
+                                        elide: Text.ElideRight
                                     }
-                                    panel.collectionStore.deleteCollection(modelData.id);
-                                    groupRow.confirmDelete=false;
+                                    // Click the collection name to browse its
+                                    // existing members. No extra VIEW button.
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        visible: !groupRow.renaming
+                                        enabled: !groupRow.renaming
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        activeFocusOnTab: true
+                                        Accessible.role: Accessible.Button
+                                        Accessible.name: "Open collection "+modelData.name
+                                        Accessible.onPressAction:
+                                            panel.collectionRequested(modelData.id)
+                                        onClicked: panel.collectionRequested(modelData.id)
+                                        Keys.onPressed: function(event) {
+                                            if(event.key===Qt.Key_Return
+                                                    || event.key===Qt.Key_Enter
+                                                    || event.key===Qt.Key_Space) {
+                                                panel.collectionRequested(modelData.id);
+                                                event.accepted=true;
+                                            }
+                                        }
+                                    }
+                                    TextField {
+                                        id: renameInput
+                                        anchors.fill: parent
+                                        visible: groupRow.renaming
+                                        color: Colors.white
+                                        selectionColor: Colors.magenta
+                                        placeholderText: "COLLECTION NAME"
+                                        placeholderTextColor: Colors.cyan
+                                        font.family: "GohuFont 11 Nerd Font Mono"
+                                        font.pixelSize: 10
+                                        leftPadding: 5
+                                        rightPadding: 5
+                                        selectByMouse: true
+                                        background: Rectangle {
+                                            color: Colors.black
+                                            border.width: 1
+                                            border.color: Colors.magenta
+                                        }
+                                        onAccepted: groupRow.saveRename()
+                                        Keys.onEscapePressed: groupRow.cancelRename()
+                                    }
                                 }
+                                ActionButton {
+                                    id: editButton
+                                    width: 55
+                                    height: parent.height
+                                    label: groupRow.renaming ? "SAVE" : "RENAME"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.magenta
+                                    available: panel.collectionStore!==null
+                                        && panel.collectionStore.canEdit
+                                    onLeftClicked: {
+                                        if(groupRow.renaming) groupRow.saveRename();
+                                        else groupRow.beginRename();
+                                    }
+                                }
+                                ActionButton {
+                                    id: cancelButton
+                                    visible: groupRow.renaming
+                                    width: visible ? 49 : 0
+                                    height: parent.height
+                                    label: "CANCEL"
+                                    labelPixelSize: 8
+                                    accentColor: Colors.cyan
+                                    onLeftClicked: groupRow.cancelRename()
+                                }
+                            }
+
+                            Row {
+                                width: parent.width
+                                height: 26
+                                spacing: 3
+                                GohuText {
+                                    id: memberCount
+                                    width: 62
+                                    height: parent.height
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: modelData.members.length+" ITEMS"
+                                    font.pixelSize: 9
+                                    color: Colors.orange
+                                    elide: Text.ElideRight
+                                }
+                                Item {
+                                    width: Math.max(0,parent.width
+                                        - memberCount.width - groupToggle.width
+                                        - upButton.width - downButton.width
+                                        - deleteButton.width - parent.spacing*5)
+                                    height: parent.height
+                                }
+                                FavoritesCollectionToggleButton {
+                                    id: groupToggle
+                                    width: 61
+                                    height: parent.height
+                                    collectionStore: panel.collectionStore
+                                    collectionId: modelData.id
+                                    resource: panel.resource
+                                    collectionKey: panel.collectionKey
+                                }
+                                ActionButton {
+                                    id: upButton
+                                    width: 24
+                                    height: parent.height
+                                    label: "↑"
+                                    labelPixelSize: 12
+                                    accentColor: Colors.cyan
+                                    available: groupToggle.inCollection
+                                        && panel.collectionStore.canEdit
+                                    onLeftClicked: panel.collectionStore.moveMember(
+                                        modelData.id,panel.resourceKey,-1)
+                                }
+                                ActionButton {
+                                    id: downButton
+                                    width: 24
+                                    height: parent.height
+                                    label: "↓"
+                                    labelPixelSize: 12
+                                    accentColor: Colors.cyan
+                                    available: groupToggle.inCollection
+                                        && panel.collectionStore.canEdit
+                                    onLeftClicked: panel.collectionStore.moveMember(
+                                        modelData.id,panel.resourceKey,1)
+                                }
+                                ActionButton {
+                                    id: deleteButton
+                                    width: 46
+                                    height: parent.height
+                                    label: groupRow.confirmDelete ? "SURE?" : "DELETE"
+                                    labelPixelSize: 8
+                                    accentColor: Colors.red
+                                    destructive: groupRow.confirmDelete
+                                    available: panel.collectionStore!==null
+                                        && panel.collectionStore.canEdit
+                                    onLeftClicked: {
+                                        if(!groupRow.confirmDelete) {
+                                            groupRow.confirmDelete=true;
+                                            return;
+                                        }
+                                        if(panel.collectionStore.deleteCollection(modelData.id)) {
+                                            groupRow.confirmDelete=false;
+                                            groupRow.cancelRename();
+                                        }
+                                    }
+                                }
+                            }
+                            QuietText {
+                                width: parent.width
+                                height: visible ? 13 : 0
+                                visible: groupRow.renaming
+                                text: groupRow.renameError!=="" ?
+                                    "RENAME REJECTED // "+groupRow.renameError
+                                    : "ENTER TO SAVE // ESC TO CANCEL"
+                                font.pixelSize: 9
+                                elide: Text.ElideRight
+                                color: Colors.orange
                             }
                         }
                     }

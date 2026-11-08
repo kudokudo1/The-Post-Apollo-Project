@@ -1593,21 +1593,6 @@ PanelWindow {
             anchors.bottomMargin: 9
         }
 
-        CpuPlusLocalManagementNav {
-            id: idManagementLocalNavigation
-            visible: cpuPlusWindow.selectedModeIndex === 5
-            section: cpuPlusWindow.idManagementSection
-            onSectionRequested: function(section) {
-                cpuPlusWindow.selectLocalManagementSection(section);
-            }
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: sharedStateHeader.bottom
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-            anchors.topMargin: 9
-            height: implicitHeight
-        }
         CpuPlusIdManagementPane {
             id: idManagementOverviewPane
             area: "overview"
@@ -1616,7 +1601,7 @@ PanelWindow {
                      && cpuPlusWindow.idManagementSection === "IDS"
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: idManagementLocalNavigation.bottom
+            anchors.top: sharedStateHeader.bottom
             anchors.bottom: parent.bottom
             anchors.leftMargin: 12
             anchors.rightMargin: 12
@@ -1633,7 +1618,7 @@ PanelWindow {
                      && cpuPlusWindow.idManagementSection !== "IDS"
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: idManagementLocalNavigation.bottom
+            anchors.top: sharedStateHeader.bottom
             anchors.bottom: parent.bottom
             anchors.leftMargin: 12
             anchors.rightMargin: 12
@@ -2032,6 +2017,23 @@ PanelWindow {
             anchors.bottomMargin: 9
         }
 
+        // As with CPU++'s other modes, section filters belong to the
+        // middle target/selector bay, never the left overview.
+        CpuPlusLocalManagementNav {
+            id: idManagementLocalNavigation
+            visible: cpuPlusWindow.selectedModeIndex === 5
+            section: cpuPlusWindow.idManagementSection
+            onSectionRequested: function(section) {
+                cpuPlusWindow.selectLocalManagementSection(section);
+            }
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: targetHeaderLine.bottom
+            anchors.leftMargin: 9
+            anchors.rightMargin: 9
+            anchors.topMargin: 8
+            height: implicitHeight
+        }
         CpuPlusIdManagementPane {
             id: idManagementSelectorPane
             area: "selector"
@@ -2043,7 +2045,7 @@ PanelWindow {
             }
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: targetHeaderLine.bottom
+            anchors.top: idManagementLocalNavigation.bottom
             anchors.bottom: parent.bottom
             anchors.leftMargin: 10
             anchors.rightMargin: 10
@@ -2066,7 +2068,7 @@ PanelWindow {
             }
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: targetHeaderLine.bottom
+            anchors.top: idManagementLocalNavigation.bottom
             anchors.bottom: parent.bottom
             anchors.leftMargin: 10
             anchors.rightMargin: 10

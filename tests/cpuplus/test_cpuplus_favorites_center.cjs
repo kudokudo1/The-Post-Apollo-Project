@@ -545,3 +545,95 @@ test("saved freedesktop identifiers remain recognizable without installed app mo
     assert.ok(!row.label.includes("org.example."));
   }
 });
+
+
+test("FILES favorites recover original filenames and file kinds without filesystem access",()=>{
+  const Display={Resource};
+  load("services/favorites/FavoritesAppControlDisplayPolicy.js",Display);
+  const saved={favoriteKeys:[
+    "mode:2:◇  quarterly review (2026).pdf",
+    "mode:2:⌯🗁๋࣭⭑  Agreements/",
+    "mode:2:↗  latest-contract.pdf",
+    "mode:2:◇  résumé — signed.pdf",
+    "mode:2:◇  inbox@company.eml",
+    "mode:2:report-v3.txt",
+    "mode:2:◇  #3",
+    "mode:2:◇  report.txt",
+    "mode:2:⌯🗁๋࣭⭑  report.txt/"
+  ],favoriteDetailActionKeys:[],favoriteMonitorBoxKeys:[],
+  favoriteTaskMetricKeys:[]};
+  const projected=Hub.list([],[],[],[],saved,{},Display.build(saved,{}));
+  assert.equal(projected.rows.length,saved.favoriteKeys.length);
+  const expected=[
+    ["quarterly review (2026).pdf","FILE FAVORITE"],
+    ["Agreements","DIRECTORY FAVORITE"],
+    ["latest-contract.pdf","SYMLINK FAVORITE"],
+    ["résumé — signed.pdf","FILE FAVORITE"],
+    ["inbox@company.eml","FILE FAVORITE"],
+    ["report-v3.txt","FAVORITE"],
+    ["#3","FILE FAVORITE"],
+    ["report.txt","FILE FAVORITE"],
+    ["report.txt","DIRECTORY FAVORITE"]
+  ];
+  for(let i=0;i<expected.length;i++){
+    const row=projected.rows[i];
+    assert.equal(row.provider,"appcontrol");
+    assert.equal(row.menu,"FILES");
+    assert.equal(row.item,expected[i][0]);
+    assert.equal(row.label,"FILES // "+expected[i][0]);
+    assert.equal(row.favoriteType,expected[i][1]);
+    assert.equal(row.resolved,true);
+    assert.equal(row.available,"unresolved");
+    assert.equal(row.readOnly,true);
+    assert.equal(row.capabilities.length,0);
+    assert.equal("resourceId" in row,false);
+  }
+  assert.notEqual(projected.rows[7].key,projected.rows[8].key);
+});
+
+test("file name recovery rejects navigation, paths and encoded path escapes",()=>{
+  const Display={Resource};
+  load("services/favorites/FavoritesAppControlDisplayPolicy.js",Display);
+  const saved={favoriteKeys:[
+    "mode:2:⌯🗁๋࣭⭑  ..",
+    "mode:2:◇  ../notes.txt",
+    "mode:2:◇  /home/secret/file.txt",
+    "mode:2:◇  notes%2Fprivate.txt",
+    "mode:2:file:/home/secret.txt",
+    "mode:2:◇  report|command.txt",
+    "mode:2:◇  report\nhidden.txt",
+    "mode:2:◇  "
+  ],favoriteDetailActionKeys:[],favoriteMonitorBoxKeys:[],
+  favoriteTaskMetricKeys:[]};
+  const out=Hub.list([],[],[],[],saved,{},Display.build(saved,{}));
+  assert.equal(out.rows.length,6); // control/newline and trailing-whitespace keys rejected by U0
+  for(const row of out.rows) {
+    assert.equal(row.menu,"FILES");
+    assert.equal(row.resolved,false);
+    assert.equal(row.item,"NAME UNAVAILABLE");
+    assert.ok(row.label.startsWith("FILES // SAVED FILE #"));
+    assert.equal(row.readOnly,true);
+    assert.equal(row.capabilities.length,0);
+  }
+  const visible=out.rows.map(x=>x.label).join(" ");
+  for(const value of ["notes.txt","secret.txt","file.txt","private.txt",
+                      "command.txt","hidden.txt"])
+    assert.equal(visible.includes(value),false);
+});
+
+test("FILES view labels retain actual names and original owner without executable actions",()=>{
+  const source=read("services/favorites/FavoritesAppControlDisplayPolicy.js");
+  const manager=read("services/favorites/FavoritesManagementPolicy.js");
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const fixture=read("tests/cpuplus/fixtures/CpuPlusFavoritesNative.qml");
+  assert.match(source,/function savedFileDescription\(/);
+  assert.match(source,/safeSavedFileName/);
+  assert.match(source,/DIRECTORY FAVORITE/);
+  assert.match(source,/SYMLINK FAVORITE/);
+  assert.match(manager,/"FILES".*"RUN"|"RUN".*"FILES"/);
+  assert.match(pane,/pane.favoriteRowLabel\(modelData\)/);
+  assert.ok(fixture.includes("mode:2:◇  budget-2026.xlsx"));
+  assert.ok(fixture.includes("mode:2:⌯🗁๋࣭⭑  Properties/"));
+  assert.ok(fixture.includes("mode:2:↗  Active Contract.pdf"));
+  assert.doesNotMatch(source+manager,/execDetached|Qt\.openUrlExternally|FileView\s*\{|Process\s*\{/);
+});

@@ -60,12 +60,21 @@ function approvedOwnerDescription(descriptions,key) {
         return null;
     const value=descriptions[key];
     if (!value || typeof value!=="object") return null;
-    if (["APPS","KILL","THERMAL","SYSTEM","RUN","WINDOWS"].indexOf(value.menu)<0
+    if (["APPS","KILL","THERMAL","SYSTEM","RUN","WINDOWS","FILES"].indexOf(value.menu)<0
             || ["FAVORITE","PROCESS FAVORITE","PREFERRED ACTION",
-                "METRIC WATCH"].indexOf(value.type)<0
+                "METRIC WATCH","FILE FAVORITE","DIRECTORY FAVORITE",
+                "SYMLINK FAVORITE"].indexOf(value.type)<0
             || typeof value.item!=="string") return null;
     const item=value.item.trim();
-    if (!item || item.length>64
+    if (value.menu==="FILES") {
+        if (["FILE FAVORITE","DIRECTORY FAVORITE","SYMLINK FAVORITE",
+             "FAVORITE"].indexOf(value.type)<0
+                || !item || item.length>120 || item==="." || item===".."
+                || /[\u0000-\u001f\u007f\u2028\u2029\/\\|<>]/.test(item)
+                || /%(?:2f|5c|00|0a|0d)/i.test(item)
+                || /^(?:file:|https?:|smb:|ssh:)/i.test(item))
+            return null;
+    } else if (!item || item.length>64
             || /[\u0000-\u001f\u007f\/\\|<>@]/.test(item)
             || /:\/\/|--(?:password|token|secret|key)/i.test(item))
         return null;

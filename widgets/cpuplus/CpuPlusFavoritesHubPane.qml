@@ -19,6 +19,8 @@ Item {
     property alias collectionGroupItems: collectionGroupRepeater
     // Native fixture inspection of the existing group editor (no new action).
     property alias collectionPanel: collectionManager
+    // Test seam for the original read-only owner-navigation button.
+    property alias ownerNavigationControl: remove
     property var timeOwner: null
     property var placesOwner: null
     property var defaultOwner: null

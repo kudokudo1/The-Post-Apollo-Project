@@ -1,0 +1,70 @@
+name: Company M30x native buffer evidence reconciliation (candidate only)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'widgets/CompanyVectorBufferReconciliation.js'
+      - 'tests/company/test_company_vector_buffer_reconciliation_m30x.test.js'
+      - '.github/workflows/company-vector-buffer-m30x.yml'
+      - 'docs/company-m30x-native-buffer-reconciliation-20261108.md'
+      - 'widgets/CompanyVectorPhysicalBackingPolicy.js'
+      - 'widgets/CompanyNetworkW.qml'
+      - 'services/company/CompanyVectorSidecarController.qml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-buffer-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out source without retaining credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconcile observed RGB565 SHM vs Qt CPU RGBA and fail unknowns
+        run: |
+          set -euo pipefail
+          node --test tests/company/test_company_vector_buffer_reconciliation_m30x.test.js
+          node --test tests/company/test_company_vector_physical_backing_m30u.test.js
+      - name: Preserve native child and candidate QML geometry contracts
+        run: |
+          set -euo pipefail
+          node --test tests/company/test_company_map_geometry_m30q.test.js
+          node --test tests/company/test_company_vector_bridge_m26.test.js
+          node --test tests/company/test_company_vector_attached_pidfd_m28c.test.js
+      - name: Refuse native scene, focus, input, network and launch authority
+        run: |
+          set -euo pipefail
+          test "$(head -n 1 widgets/CompanyVectorBufferReconciliation.js)" = '.pragma library'
+          grep -Fq 'productionAuthority: false' widgets/CompanyVectorBufferReconciliation.js
+          grep -Fq 'selectedNativeActorAuthorized: false' widgets/CompanyVectorBufferReconciliation.js
+          grep -Fq 'metadataTrust: "CALLER_SUPPLIED_NOT_AUTHENTICATED"' widgets/CompanyVectorBufferReconciliation.js
+          grep -Fq 'originalUnpaddedNativeStrideBytes: null' widgets/CompanyVectorBufferReconciliation.js
+          grep -Fq 'property bool vectorBridgeOptIn: false' widgets/CompanyNetworkW.qml
+          if grep -Fq 'CompanyVectorBufferReconciliation.js' widgets/CompanyNetworkW.qml; then
+            echo 'M30X_EVIDENCE_INTEGRATED_INTO_LIVE_COMPANY_WITHOUT_ADMISSION' >&2
+            exit 1
+          fi
+          echo 'COMPANY_M30X source_only=YES production_authority=OFF PASS'
+      - name: Record narrow boundary for future SwayPX owner
+        if: always()
+        run: |
+          {
+            echo '## Company M30x // isolated imported-buffer comparison'
+            echo 'M30w sampled SHM RGB565 native pitch 2988; M30v separately'
+            echo 'measured 5976 for an RGBA QImage, not that Wayland buffer.'
+            echo 'Only 1494x788 physical and 1493x788 visible were observed'
+            echo 'with 0px drift in the pinned headless-Mesa CI run.'
+            echo 'No proof of the original 1493-width native pitch, other'
+            echo 'GPUs, production actor admission, clipped input or Fedora.'
+            echo 'Original Company UI, sidecar, Social and sway production'
+            echo 'remain unchanged. Final operator acceptance pending.'
+          } >> "$GITHUB_STEP_SUMMARY"

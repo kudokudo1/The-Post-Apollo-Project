@@ -57,36 +57,36 @@ test("Zoom-only frame fit preserves guest height without the black bottom gutter
     assert.equal(699 - compactBrowserTop - 1, 603);
     assert.match(camera, /readonly property int zoomDeckGap: 3/);
     assert.match(camera, /readonly property int zoomBrowserRise: 13/);
-    assert.match(camera, /readonly property int zoomFrameBottomFit: 12/);
-    assert.match(camera, /readonly property int zoomGuestBottomClearance: 4/);
+    assert.match(camera, /readonly property int zoomFrameBottomFit: 16/);
+    assert.match(camera, /readonly property int zoomGuestBottomClearance: 0/);
     assert.match(camera, /readonly property int frameHeightBase:/);
     assert.match(camera, /camera\.activeView === "zoom" \? zoomFrameBottomFit : 0/);
     assert.doesNotMatch(camera, /zoomWebBottomTrim/);
     assert.match(camera, /y: camera\.zoomControlDeckBottom \+ camera\.zoomDeckGap\s*- camera\.zoomBrowserRise/);
     assert.match(camera, /frame\.height - y - camera\.zoomBayBottom\s*- camera\.zoomGuestBottomClearance/);
     assert.match(camera, /height: Math\.max\(0, camera\.zoomControlDeckBottom - y \+ 1\)/);
-    // A shared frame+guest reduction cannot fix relative overflow.
-    // Preserve existing Camera frames, and reserve another two pixels
-    // of guest-only clearance (5px total including the 1px frame inset).
+    // The painted black gutter came from four extra guest-only pixels.
+    // Moving those pixels to the Zoom frame-fit preserves browser heights
+    // while restoring the normal one-pixel Camera bottom inset.
     const raisedTop = compactBrowserTop - 13;
     const inputTop = Math.max(raisedTop, compactDeckEnd);
-    const frameFit = 12;
-    const clearance = 4;
+    const frameFit = 16;
+    const clearance = 0;
     const compactZoomFrame = 699 - frameFit;
     const expandedFittedFrame = expandedZoomFrame - frameFit;
     const fullscreenFittedFrame = 1345 - frameFit;
     assert.equal(raisedTop, 82);
-    assert.equal(compactZoomFrame, 687);
+    assert.equal(compactZoomFrame, 683);
     assert.equal(compactZoomFrame - raisedTop - 1 - clearance, 600);
     assert.equal(inputTop, compactDeckEnd);
     assert.equal(600 - (inputTop - raisedTop), 590);
-    assert.equal(expandedFittedFrame, 1001);
+    assert.equal(expandedFittedFrame, 997);
     assert.equal(expandedFittedFrame - (reserve - 13) - clearance, 897);
-    assert.equal(fullscreenFittedFrame, 1333);
+    assert.equal(fullscreenFittedFrame, 1329);
     assert.equal(fullscreenFittedFrame - 99 - 1 - clearance, 1229);
-    assert.equal(compactZoomFrame - (raisedTop + 600), 5);
-    assert.equal(expandedFittedFrame - (99 + 897), 5);
-    assert.equal(fullscreenFittedFrame - (99 + 1229), 5);
+    assert.equal(compactZoomFrame - (raisedTop + 600), 1);
+    assert.equal(expandedFittedFrame - (99 + 897), 1);
+    assert.equal(fullscreenFittedFrame - (99 + 1229), 1);
     assert.doesNotMatch(camera, /zoomTopNudge/);
     assert.equal(policy.step("compact", 1), "expanded");
     assert.equal(policy.step("expanded", 1), "fullscreen");

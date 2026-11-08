@@ -122,7 +122,7 @@ class C3eCDurableFloorTests(unittest.TestCase):
         opts.update(overrides)
         return floor.admit_and_record(self.db, **opts)
 
-    def fail(self, code, **overrides):
+    def expect_refusal(self, code, **overrides):
         with self.assertRaises(floor.Refused) as e:
             self.admit(**overrides)
         self.assertEqual(str(e.exception), code)
@@ -133,7 +133,7 @@ class C3eCDurableFloorTests(unittest.TestCase):
             floor.bootstrap(self.db, trusted_root_pin=self.fingerprints["root"],
                             initial_epoch=3, initial_sequence=8)
         absent = self.work / "missing.db"
-        self.fail("LEDGER_MISSING_REQUIRES_EXPLICIT_BOOTSTRAP", db_path=absent)
+        self.expect_refusal("LEDGER_MISSING_REQUIRES_EXPLICIT_BOOTSTRAP", db_path=absent)
         self.assertFalse(absent.exists())
 
     def test_02_signed_release_commits_and_survives_new_connection(self):
@@ -151,19 +151,19 @@ class C3eCDurableFloorTests(unittest.TestCase):
         self.assertEqual(floor.inspect(self.db)[1:3], (4, 9))
         # Reissue an old but valid root-signed policy. The ledger refuses it.
         self.issue(3, 8, b"synthetic package 8")
-        self.fail("POLICY_ROLLBACK_REFUSED")
+        self.expect_refusal("POLICY_ROLLBACK_REFUSED")
         self.assertEqual(floor.inspect(self.db)[1:3], (4, 9))
 
     def test_04_same_epoch_cannot_silently_replace_signed_policy(self):
         self.admit()
         self.issue(3, 9, b"synthetic package 9")
-        self.fail("EQUIVOCAL_POLICY_AT_SAME_EPOCH")
+        self.expect_refusal("EQUIVOCAL_POLICY_AT_SAME_EPOCH")
         self.assertEqual(floor.inspect(self.db)[1:3], (3, 8))
 
     def test_05_same_sequence_cannot_be_rebound_to_other_artifact(self):
         self.admit()
         self.issue(4, 8, b"replaced package same sequence")
-        self.fail("EQUIVOCAL_RELEASE_AT_SAME_SEQUENCE")
+        self.expect_refusal("EQUIVOCAL_RELEASE_AT_SAME_SEQUENCE")
         self.assertEqual(floor.inspect(self.db)[1:3], (3, 8))
 
     def test_06_root_signed_rotation_revokes_old_manifest_signer(self):
@@ -176,26 +176,26 @@ class C3eCDurableFloorTests(unittest.TestCase):
         self.assertEqual(self.admit(), floor.SUCCESS)
         self.assertEqual(floor.inspect(self.db)[1:3], (4, 9))
         self.issue(5, 10, b"synthetic package 10", signer="a", signers=signers)
-        self.fail("CRYPTO_REFUSED_REVOKED_SIGNER")
+        self.expect_refusal("CRYPTO_REFUSED_REVOKED_SIGNER")
         self.assertEqual(floor.inspect(self.db)[1:3], (4, 9))
 
     def test_07_different_external_root_fails_before_db_update(self):
-        self.fail("ENROLLED_ROOT_PIN_MISMATCH",
-                  external_root_pin=self.fingerprints["b"])
+        self.expect_refusal("CRYPTO_REFUSED_ROOT_PIN_MISMATCH",
+                            external_root_pin=self.fingerprints["b"])
         self.assertEqual(floor.inspect(self.db)[1:3], (3, 8))
 
     def test_08_tampered_signed_policy_does_not_change_checkpoint(self):
         self.admit()
         prior = floor.inspect(self.db)
         self.policy.write_text(self.policy.read_text() + " ")
-        self.fail("CRYPTO_REFUSED_INVALID_DETACHED_SIGNATURE")
+        self.expect_refusal("CRYPTO_REFUSED_INVALID_DETACHED_SIGNATURE")
         self.assertEqual(floor.inspect(self.db), prior)
 
     def test_09_symlinked_manifest_is_rejected_even_with_valid_signature(self):
         victim = self.work / "manifest-real.json"
         self.manifest.rename(victim)
         self.manifest.symlink_to(victim)
-        self.fail("UNSAFE_SNAPSHOT_INPUT")
+        self.expect_refusal("UNSAFE_SNAPSHOT_INPUT")
         self.assertEqual(floor.inspect(self.db)[1:3], (3, 8))
 
     def test_10_truncated_and_corrupted_sqlite_refuses_without_recovery(self):
@@ -217,15 +217,15 @@ class C3eCDurableFloorTests(unittest.TestCase):
         self.assertEqual(floor.inspect(self.db)[1:3], (3, 8))
         self.external_epoch, self.external_sequence = 4, 9
         self.issue(3, 8, b"synthetic package 8")
-        self.fail("CRYPTO_REFUSED_POLICY_ROLLBACK_REFUSED")
+        self.expect_refusal("CRYPTO_REFUSED_POLICY_ROLLBACK_REFUSED")
         self.issue(4, 9, b"synthetic package 9")
         self.admit()
         self.assertEqual(floor.inspect(self.db)[1:3], (4, 9))
 
     def test_12_external_floor_must_not_be_missing_or_zero(self):
-        self.fail("EXTERNAL_ANCHOR_INVALID", external_epoch_floor=0)
-        self.fail("EXTERNAL_ANCHOR_INVALID", external_sequence_floor=0)
-        self.fail("EXTERNAL_ANCHOR_INVALID", external_root_pin="")
+        self.expect_refusal("EXTERNAL_ANCHOR_INVALID", external_epoch_floor=0)
+        self.expect_refusal("EXTERNAL_ANCHOR_INVALID", external_sequence_floor=0)
+        self.expect_refusal("EXTERNAL_ANCHOR_INVALID", external_root_pin="")
         self.assertEqual(floor.inspect(self.db)[1:3], (3, 8))
 
     def test_13_uncommitted_sqlite_write_rolls_back_after_process_loss(self):
@@ -239,11 +239,11 @@ class C3eCDurableFloorTests(unittest.TestCase):
 
     def test_14_ledger_file_cannot_be_world_readable_or_symlinked(self):
         self.db.chmod(0o644)
-        self.fail("UNSAFE_LEDGER_FILE")
+        self.expect_refusal("UNSAFE_LEDGER_FILE")
         self.db.chmod(0o600)
         proxy = self.work / "ledger-link"
         proxy.symlink_to(self.db)
-        self.fail("INVALID_LEDGER_PATH", db_path=proxy)
+        self.expect_refusal("INVALID_LEDGER_PATH", db_path=proxy)
 
     def test_15_competing_updates_converge_monotonically(self):
         self.admit()

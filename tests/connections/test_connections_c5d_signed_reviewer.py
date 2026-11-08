@@ -82,18 +82,13 @@ class Session:
                             "uid": os.getuid(), "gid": os.getgid()})
 
     def attack_reviewer(self, data):
-        # An unauthorized process receives a duplicate of the reviewer FD.
-        # Per-packet kernel sender PID must still reject the forged approval.
-        snippet = ("import json,socket,sys\n"
-                   "sock=socket.socket(fileno=int(sys.argv[1]));sock.settimeout(6);"
-                   "sock.send(json.dumps(json.loads(sys.argv[2])).encode());"
-                   "print(sock.recv(2048).decode())")
-        proc = subprocess.run([sys.executable, "-I", "-B", "-c", snippet,
-                               str(self.attack_fd), json.dumps(data)],
-                              pass_fds=(self.attack_fd,), capture_output=True,
-                              text=True, timeout=12)
-        assert proc.returncode == 0, proc.stderr[-300:]
-        result = json.loads(proc.stdout.strip())
+        # The harness itself has a duplicate reviewer FD, but its kernel PID
+        # differs from the signed reviewer. No child needs to be created or
+        # destroyed, avoiding a closing-handle race with the genuine peer.
+        with socket.socket(fileno=os.dup(self.attack_fd)) as forged:
+            forged.settimeout(6)
+            A.exchange(forged, data)
+            result = A.receive(forged)
         T.no_real_grants(result)
         return result
 
@@ -106,7 +101,10 @@ class Session:
                 pass
         for proc in (self.client_process, self.reviewer_process):
             if proc.stdin:
-                proc.stdin.close()
+                try:
+                    proc.stdin.close()
+                except BrokenPipeError:
+                    pass
         os.close(self.attack_fd)
         for proc in (self.client_process, self.reviewer_process, self.host):
             try:

@@ -36,6 +36,8 @@ jobs:
         run: python3 -m py_compile scripts/camera/camera_cli.py
       - name: Camera gallery, capture argv, preview and Trash offline tests
         run: python3 -m unittest discover -s tests/camera -p 'test_camera_cli.py' -v
+      - name: Camera Batch M1 selection, plan and replay safety contracts
+        run: python3 -m unittest discover -s tests/camera -p 'test_camera_batch_m1.py' -v
       - name: Camera Zoom mode and Social account-label safety contracts
         run: python3 -m unittest discover -s tests/camera -p 'test_camera_zoom_social.py' -v
       - name: Camera Zoom launch process and Sway window validation

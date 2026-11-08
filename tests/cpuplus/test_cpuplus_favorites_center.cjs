@@ -305,11 +305,11 @@ test("AppControl original models resolve actual menu, exact item and type",()=>{
     ["item","system|memory","SYSTEM","Memory Usage","FAVORITE"],
     ["item","task|firefox","KILL","firefox","PROCESS FAVORITE"],
     ["preferred-action","app|org.mozilla.firefox.desktop|launch",
-      "APPS","Firefox / Launch","PREFERRED ACTION"],
+      "APPS","Firefox - Launch","PREFERRED ACTION"],
     ["monitor-watch","watchbox|thermal|sensor-a|temp",
-      "THERMAL","CPU Temperature / TEMP","METRIC WATCH"],
+      "THERMAL","CPU Temperature - TEMP","METRIC WATCH"],
     ["task-watch","taskmetric|firefox|cpu",
-      "KILL","firefox / CPU","METRIC WATCH"]
+      "KILL","firefox - CPU","METRIC WATCH"]
   ]) {
     const row=get(kind,raw);
     assert.ok(row,kind+" "+raw);

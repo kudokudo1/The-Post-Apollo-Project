@@ -35,6 +35,9 @@ SCREENSHOT_NAME = re.compile(
 PLAN_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 PLAN_TTL = 600
 MAX_TRASH = 20000
+# M1 Batch: explicit selected Gallery records, never unrestricted bulk globbing.
+MAX_BATCH_TRASH = 500
+MAX_BATCH_ARG_BYTES = 100000
 GALLERY_PAGE_SIZE = 120
 MAX_SCAN_FILES = 60000
 MAX_SCAN_DIRS = 1600
@@ -589,6 +592,160 @@ def trash_selected(token, confirmation):
         "name": target.name, "recoverable": True, "destination": "Freedesktop Trash",
     }
 
+
+
+
+def preview_batch_trash(raw_paths, extra_folder=""):
+    """Prepare an explicit Gallery selection. Nothing is moved in preview."""
+    if not isinstance(raw_paths, str) or len(raw_paths.encode("utf-8")) > MAX_BATCH_ARG_BYTES:
+        return {"ok": False, "kind": "preview-batch", "error": "SELECTION_TOO_LARGE"}
+    try:
+        paths = json.loads(raw_paths)
+    except (TypeError, ValueError):
+        return {"ok": False, "kind": "preview-batch", "error": "INVALID_SELECTION"}
+    if not isinstance(paths, list) or not 1 <= len(paths) <= MAX_BATCH_TRASH:
+        return {"ok": False, "kind": "preview-batch", "error": "INVALID_SELECTION_SIZE"}
+    if (not all(isinstance(raw, str) and raw.startswith("/")
+                and len(raw) <= 4096 for raw in paths)
+            or len(set(paths)) != len(paths)):
+        return {"ok": False, "kind": "preview-batch", "error": "INVALID_OR_DUPLICATE_PATH"}
+
+    roots, gallery_records, truncated = scan_gallery(extra_folder)
+    if roots is None:
+        return {"ok": False, "kind": "preview-batch", "error": "FOLDER_NOT_PERMITTED"}
+    if truncated:
+        return {"ok": False, "kind": "preview-batch", "error": "SCAN_TRUNCATED"}
+    inventory = {row["path"]: row for row in gallery_records}
+    records = []
+    total_bytes = 0
+    sample = []
+    # Every candidate must have been discovered in the current bounded
+    # Gallery scan. Reject the whole preview on any stale/invalid selection.
+    for raw in paths:
+        if raw not in inventory:
+            return {"ok": False, "kind": "preview-batch", "error": "NOT_IN_GALLERY"}
+        target = Path(raw)
+        if (target.suffix.lower() not in MEDIA_EXTS or
+                safe_user_folder(str(target.parent)) != target.parent):
+            return {"ok": False, "kind": "preview-batch", "error": "FOLDER_NOT_PERMITTED"}
+        try:
+            st = target.lstat()
+        except OSError:
+            return {"ok": False, "kind": "preview-batch", "error": "FILE_CHANGED"}
+        if not stat.S_ISREG(st.st_mode) or target.is_symlink():
+            return {"ok": False, "kind": "preview-batch", "error": "FILE_CHANGED"}
+        records.append({"path": raw, "signature": [
+            st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns]})
+        total_bytes += st.st_size
+        if len(sample) < 12:
+            sample.append(target.name)
+
+    directory = plan_dir()
+    if directory.is_symlink():
+        return {"ok": False, "kind": "preview-batch", "error": "PLAN_DIR_SYMLINK"}
+    try:
+        directory.mkdir(parents=True, mode=0o700, exist_ok=True)
+        token = secrets.token_hex(16)
+        plan = {"version": 3, "root": str(home()), "createdAt": time.time(),
+                "source": "gallery-batch", "records": records}
+        fd = os.open(directory / (token + ".json"),
+                     os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as out:
+            json.dump(plan, out, separators=(",", ":"))
+            out.flush()
+            os.fsync(out.fileno())
+        return {"ok": True, "kind": "preview-batch", "planId": token,
+                "count": len(records), "bytes": total_bytes,
+                "sample": sample, "expiresSeconds": PLAN_TTL,
+                "warning": "REVIEW FIRST // Only unchanged selected originals move to recoverable Trash."}
+    except OSError:
+        return {"ok": False, "kind": "preview-batch", "error": "PLAN_SAVE_FAILED"}
+
+
+def trash_batch(token, confirmation):
+    """Consume one short-lived plan and move verified items to GIO Trash."""
+    if confirmation != "MOVE_TO_TRASH" or not PLAN_PATTERN.fullmatch(token or ""):
+        return {"ok": False, "kind": "trash-batch", "error": "CONFIRMATION_REQUIRED"}
+    gio = shutil.which("gio")
+    if not gio:
+        return {"ok": False, "kind": "trash-batch", "error": "GIO_NOT_INSTALLED"}
+    directory = plan_dir()
+    if directory.is_symlink():
+        return {"ok": False, "kind": "trash-batch", "error": "PLAN_DIR_SYMLINK"}
+    source = directory / (token + ".json")
+    claimed = directory / (token + ".claimed")
+    if (source.is_symlink() or not source.is_file() or
+            claimed.exists() or claimed.is_symlink()):
+        return {"ok": False, "kind": "trash-batch", "error": "PLAN_NOT_FOUND"}
+    # Atomically claim before any side effects. Concurrent/replayed actions
+    # cannot use the same plan twice. Aborted claims are never replayed.
+    try:
+        os.rename(source, claimed)
+    except OSError:
+        return {"ok": False, "kind": "trash-batch", "error": "PLAN_NOT_FOUND"}
+    try:
+        if claimed.is_symlink() or claimed.stat().st_size > MAX_OUTPUT_BYTES * 5:
+            return {"ok": False, "kind": "trash-batch", "error": "PLAN_INVALID"}
+        try:
+            plan = json.loads(claimed.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {"ok": False, "kind": "trash-batch", "error": "PLAN_INVALID"}
+        if (not isinstance(plan, dict) or plan.get("version") != 3
+                or plan.get("source") != "gallery-batch"
+                or plan.get("root") != str(home())
+                or not isinstance(plan.get("createdAt"), (int, float))
+                or not 0 <= time.time() - plan["createdAt"] <= PLAN_TTL
+                or not isinstance(plan.get("records"), list)
+                or not 1 <= len(plan["records"]) <= MAX_BATCH_TRASH):
+            return {"ok": False, "kind": "trash-batch",
+                    "error": "PLAN_EXPIRED_OR_INVALID"}
+
+        seen = set()
+        targets = []
+        # Validate the COMPLETE plan before moving any files. A corrupted
+        # plan cannot trick the backend into processing arbitrary paths.
+        for row in plan["records"]:
+            if not isinstance(row, dict) or not isinstance(row.get("signature"), list):
+                return {"ok": False, "kind": "trash-batch", "error": "PLAN_INVALID"}
+            raw = row.get("path")
+            if not isinstance(raw, str) or raw in seen:
+                return {"ok": False, "kind": "trash-batch", "error": "PLAN_INVALID"}
+            target = Path(raw)
+            if (not target.is_absolute() or target.suffix.lower() not in MEDIA_EXTS
+                    or safe_user_folder(str(target.parent)) != target.parent):
+                return {"ok": False, "kind": "trash-batch", "error": "FOLDER_NOT_PERMITTED"}
+            seen.add(raw)
+            targets.append((target, row["signature"]))
+
+        moved = 0
+        skipped = 0
+        failed = 0
+        for target, signature in targets:
+            try:
+                st = target.lstat()
+                current = [st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns]
+                if (not stat.S_ISREG(st.st_mode) or target.is_symlink()
+                        or current != signature):
+                    skipped += 1
+                    continue
+                proc = subprocess.run([gio, "trash", str(target)], timeout=18,
+                                      capture_output=True, check=False)
+                if proc.returncode:
+                    failed += 1
+                else:
+                    moved += 1
+            except FileNotFoundError:
+                skipped += 1
+            except (OSError, subprocess.SubprocessError):
+                failed += 1
+        return {"ok": True, "kind": "trash-batch", "moved": moved,
+                "skipped": skipped, "failed": failed,
+                "recoverable": True, "destination": "Freedesktop Trash"}
+    finally:
+        try:
+            claimed.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def media_type(path, source):
@@ -1183,6 +1340,12 @@ def main(argv=None):
     selected_trash = command.add_parser("trash-selected")
     selected_trash.add_argument("plan_id")
     selected_trash.add_argument("confirmation")
+    batch_preview = command.add_parser("preview-batch")
+    batch_preview.add_argument("paths_json")
+    batch_preview.add_argument("--folder", default="")
+    batch_trash = command.add_parser("trash-batch")
+    batch_trash.add_argument("plan_id")
+    batch_trash.add_argument("confirmation")
     options = parser.parse_args(argv)
 
     if options.action == "status":
@@ -1220,6 +1383,10 @@ def main(argv=None):
         result = preview_selected_trash(options.path)
     elif options.action == "trash-selected":
         result = trash_selected(options.plan_id, options.confirmation)
+    elif options.action == "preview-batch":
+        result = preview_batch_trash(options.paths_json, options.folder)
+    elif options.action == "trash-batch":
+        result = trash_batch(options.plan_id, options.confirmation)
     else:
         result = trash_plan(options.plan_id, options.confirmation)
     print(json.dumps(result, ensure_ascii=True, separators=(",", ":")))

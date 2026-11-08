@@ -58,9 +58,13 @@ function build(snapshot) {
         const key=sourceKey(source.appKey);
         if (!key || seen[key]) {rejected++;continue;}
         // sourceId is deliberately never read, copied, or used for display.
-        const label=safeName(source.source) || fallbackName(key);
+        const originalName=safeName(source.source);
+        const label=originalName || fallbackName(key);
+        const named=!!originalName ||
+            (label!=="SOURCE NAME UNAVAILABLE"
+             && label!=="WEBSITE SOURCE NAME UNAVAILABLE");
         seen[key]=true;
-        clean.push({appKey:key,source:label});
+        clean.push({appKey:key,source:label,named:named});
     }
     const normalized=Adapters.notifications(clean);
     rejected+=normalized.invalidCount;
@@ -75,7 +79,7 @@ function build(snapshot) {
             label:"NOTIFICATIONS // SOURCES // "+saved.source,
             sourceName:"NOTIFICATIONS",menu:"SOURCES",
             item:saved.source,favoriteType:"SOURCE FAVORITE",
-            resolved:saved.source.indexOf("UNAVAILABLE")<0,
+            resolved:!!saved.named,
             category:"NOTIFS",owner:"notifications",
             readOnly:true,isFavorite:true,isPinned:false,
             available:"unresolved",capabilities:[]

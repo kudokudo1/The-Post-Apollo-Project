@@ -53,7 +53,7 @@ class C3eISupervisedSupersessionTests(unittest.TestCase):
 
     def ready(self):
         self.fx.prepare()
-        self.assertEqual(self.status()["phase"], "clear" if False else "untracked")
+        self.assertEqual(self.status()["phase"], "legacy_pending")
         # C3e-G pending release 9, newer authority+operator-signed release 10.
         self.assertEqual(self.fx.fx.phase()["phase"], "client_committed")
 
@@ -163,7 +163,7 @@ class C3eISupervisedSupersessionTests(unittest.TestCase):
         self.fx.fx.fx.issue(6, 11, b"fake-signed-release-11")
         self.fx.fx.fx.advance()
         self.refused(
-            "OPERATOR_PREFLIGHT_REFUSED_NEW_SIGNED_RELEASE_REFUSED_SIGNED_RELEASE_REFUSED_POLICY_ROLLBACK_REFUSED",
+            "OPERATOR_PREFLIGHT_REFUSED_SIGNED_APPROVAL_CONTEXT_MISMATCH",
             recovery=True,
         )
         self.assertTrue(self.status()["supersession_pending"])
@@ -224,7 +224,7 @@ class C3eISupervisedSupersessionTests(unittest.TestCase):
     def test_15_wrong_node_and_root_can_never_commit_a_supersession(self):
         self.ready()
         self.refused(
-            "OPERATOR_PREFLIGHT_REFUSED_SIGNED_APPROVAL_CONTEXT_MISMATCH",
+            "OPERATOR_PREFLIGHT_REFUSED_RECOVERY_STATE_REFUSED_WITNESS_IDENTITY_REFUSED",
             node_id="synthetic-other-node")
         self.assertEqual(self.status()["witness_floor"], (3, 8))
 

@@ -1343,7 +1343,15 @@ test("U6b CPU++ index routes a collection across all three bays, without owner a
   assert.match(projection,/SAVED MEMBER UNAVAILABLE/);
   assert.match(pane,/pane\.collectionView\.groups/);
   assert.match(store,/favorites-collections-v1\.json/);
-  for(const src of [projection,pane]) {
-    assert.doesNotMatch(src,/FileView\s*\{|Process\s*\{|JsonAdapter\s*\{|setFavorite\(|togglePinned\(|loadMedia\(/);
-  }
+  // The existing right-side pane intentionally still owns the pre-U6b
+  // Clock/NEW controls. Test the new projection and navigation seam, not
+  // unrelated original owner actions already present in the component.
+  assert.doesNotMatch(projection,
+    /FileView\s*\{|Process\s*\{|JsonAdapter\s*\{|setFavorite\(|togglePinned\(|loadMedia\(/);
+  assert.doesNotMatch(pane,
+    /FileView\s*\{|Process\s*\{|JsonAdapter\s*\{/);
+  const navigation=pane.slice(pane.indexOf("// U6b: collections"),
+    pane.indexOf("id: dossierScroll"));
+  assert.doesNotMatch(navigation,
+    /setFavorite\(|togglePinned\(|loadMedia\(/);
 });

@@ -147,11 +147,22 @@ Rectangle {
                         function saveRename() {
                             if(!renaming || panel.collectionStore===null
                                     || !panel.collectionStore.canEdit) return;
+                            const id=modelData.id;
+                            const draft=renameInput.text;
+                            // The original store immediately publishes its
+                            // pending document. That replaces this Repeater
+                            // delegate, so NEVER call a row method afterward.
+                            panel.activeRenameId="";
                             const accepted=panel.collectionStore.renameCollection(
-                                modelData.id,renameInput.text);
-                            if(accepted) cancelRename();
-                            else renameError=String(
-                                panel.collectionStore.lastResultCode || "RENAME REJECTED");
+                                id,draft);
+                            if(!accepted) {
+                                // Rejected edit never changed the owner list;
+                                // restore the user's draft and error message.
+                                panel.activeRenameId=id;
+                                renameInput.text=draft;
+                                renameError=String(
+                                    panel.collectionStore.lastResultCode || "RENAME REJECTED");
+                            }
                         }
                         onRenamingChanged: {
                             if(!renaming) return;

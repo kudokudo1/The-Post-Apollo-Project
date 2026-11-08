@@ -92,6 +92,10 @@ class Session:
         return result
 
     def bind(self):
+        # Wait for the host to finish SO_PASSCRED setup via a deliberately
+        # denied client packet. Do not race reviewer consent against startup.
+        ready = self.tasks(submit())
+        assert ready["status"] == "CALLER_NOT_BOUND_OR_SENDER_CHANGED", ready
         return self.reviewer({"op": "bindClient", "pid": self.client.pid,
                               "uid": os.getuid(), "gid": os.getgid()})
 
@@ -137,11 +141,26 @@ class Session:
         if not crash:
             assert self.client.returncode == 0, "C5B_CLIENT_NOT_CLEAN"
             assert self.host.returncode == 0, "C5B_HOST_NOT_CLEAN"
-        assert self.client.stdout and self.client.stdout.read() == ""
-        assert self.client.stderr and self.client.stderr.read() == ""
-        if not crash:
-            assert self.host.stdout and self.host.stdout.read() == ""
-            assert self.host.stderr and self.host.stderr.read() == ""
+        if self.client.stdout:
+            output = self.client.stdout.read()
+            self.client.stdout.close()
+            if not crash:
+                assert output == "", "C5B_CLIENT_STDOUT_TAIL"
+        if self.client.stderr:
+            errors = self.client.stderr.read()
+            self.client.stderr.close()
+            if not crash:
+                assert errors == "", "C5B_CLIENT_STDERR"
+        if self.host.stdout:
+            output = self.host.stdout.read()
+            self.host.stdout.close()
+            if not crash:
+                assert output == "", "C5B_HOST_STDOUT"
+        if self.host.stderr:
+            errors = self.host.stderr.read()
+            self.host.stderr.close()
+            if not crash:
+                assert errors == "", "C5B_HOST_STDERR"
 
 
 @unittest.skipIf(os.geteuid() == 0 or not sys.platform.startswith("linux"),

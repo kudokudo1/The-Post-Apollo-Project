@@ -827,6 +827,18 @@ class Bridge:
         self.command_event.set()
 
     def stdin_loop(self) -> None:
+        # Quickshell owns the write end of stdin. Its crash-safe restart
+        # deliberately SIGKILLs the old shell, which closes that pipe.
+        # EOF is therefore an owner-lifetime event, not an invitation for
+        # this helper's independent 8 ms poll loop to run forever.
+        try:
+            self._read_stdin_commands()
+        finally:
+            self.stop_event.set()
+            self.watch_event.clear()
+            self.command_event.set()
+
+    def _read_stdin_commands(self) -> None:
         for raw_line in sys.stdin:
             if self.stop_event.is_set():
                 break

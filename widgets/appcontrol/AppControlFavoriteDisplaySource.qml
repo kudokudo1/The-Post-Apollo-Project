@@ -37,6 +37,12 @@ QtObject {
         systemRows: root.appControlOwner
             ? copyValues(root.appControlOwner.systemRows) : [],
         taskRows: root.appControlOwner
-            ? copyValues(root.appControlOwner.taskRows) : []
+            ? copyValues(root.appControlOwner.taskRows) : [],
+        // Use original live WINDOWS/TABS labels only for an exact saved match.
+        // Neither full window metadata nor private tabs reach CPU++.
+        swayWindows: root.appControlOwner
+            ? copyValues(root.appControlOwner.swayWindows) : [],
+        appTabs: root.appControlOwner
+            ? copyValues(root.appControlOwner.appTabs) : []
     })
 }

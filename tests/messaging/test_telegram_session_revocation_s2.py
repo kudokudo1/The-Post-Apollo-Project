@@ -57,10 +57,13 @@ class TelegramS2Transport(unittest.TestCase):
             stderr=subprocess.PIPE, text=True, bufsize=1)
         self.track = [self.host, self.client]
         self.addCleanup(self.cleanup)
-        self.assertFalse(self.reviewer({
+        bound = self.reviewer({
             "op": "bind", "pid": self.client.pid,
             "uid": os.geteuid(), "gid": os.getegid()
-        })["callerAuthenticated"])
+        })
+        self.assertEqual(bound["status"],
+                         "SYNTHETIC_KERNEL_SENDER_BOUND_NO_REAL_GRANT")
+        self.assertFalse(bound["callerAuthenticated"])
 
     def cleanup(self):
         try:

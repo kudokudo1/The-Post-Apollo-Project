@@ -86,10 +86,7 @@ trap 'rc=$?; if [[ "$rc" -ne 0 ]]; then c4b_controller_failure_relay "SCRIPT_EXI
 c2v_rollback_observer_start() {
   [[ -f "$c4b_mode" && -c /dev/ttyS1 ]] || return 0
   local observer=/run/c2v-rpm-rollback-observer.sh
-  cat > "$observer" <<'C2V_ROLLBACK_OBSERVER' || {
-    echo 'C2V_DIAG_ROLLBACK_OBSERVER_FILE_CREATE_FAILED // non-authoritative'
-    return 0
-  }
+  if ! cat > "$observer" <<'C2V_ROLLBACK_OBSERVER'
 #!/usr/bin/bash
 set -u
 printf 'ready\n' > /run/c2v-rpm-rollback-observer-ready
@@ -132,6 +129,10 @@ for n in $(seq 1 55); do
   sleep 20
 done
 C2V_ROLLBACK_OBSERVER
+  then
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_FILE_CREATE_FAILED // non-authoritative'
+    return 0
+  fi
   if ! chmod 0700 "$observer"; then
     echo 'C2V_DIAG_ROLLBACK_OBSERVER_CHMOD_FAILED // non-authoritative'
     return 0

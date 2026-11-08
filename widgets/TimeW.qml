@@ -2609,6 +2609,18 @@ PanelWindow {
                                 height: 226
                                 visible: timew.universalFavoritesOpen
                                 snapshot: unifiedFavoritesCatalog.snapshot
+                                collectionStore: FavoritesCollectionsStore
+                                // The selected installed timezone is the only
+                                // CLOCK-owned resource offered for grouping.
+                                collectionResource:
+                                    WorldZoneSearch.contains(
+                                        timew.worldZoneCatalog,
+                                        timew.selectedWorldZone)
+                                    ? ({provider:"time",kind:"timezone",
+                                        resourceId:timew.selectedWorldZone,
+                                        label:timew.selectedWorldZone,
+                                        capabilities:["collection"]})
+                                    : null
                                 onCloseRequested:
                                     timew.universalFavoritesOpen = false
                             }

@@ -359,6 +359,57 @@ ShellRoot {
                 if (details.recordCount !== 1
                         || details.facts[3].value !== "CANIS MAJOR")
                     return root.fail("STAR_NAVIGATION_DETAILS_MISSING");
+                // Now exercise the new fixed plot and one contained catalog,
+                // not just the backwards-compatible twelve-fact inspector.
+                details.starsAsNav = false;
+                const header = findNamed(details,"cosmos-c27-sky-now-sticky-header");
+                const plot = findNamed(details,"cosmos-c27-sky-position-plot");
+                const starPoint = findNamed(details,"cosmos-c27-plotted-usno-star");
+                const anchor = findNamed(details,"cosmos-c27-featured-star-reading");
+                const frame = findNamed(details,"cosmos-c27-star-catalog-frame");
+                const scroll = findNamed(details,"cosmos-c27-star-catalog-scroll");
+                if (!header || !plot || !starPoint || !anchor
+                    || !frame || !scroll || plot.width < 70
+                    || scroll.height < 20
+                    || countNamed(details,"cosmos-c27-star-catalog-record") !== 1
+                    || frame.y <= header.height)
+                    return root.fail("C27_SKY_NOW_FIXED_INSTRUMENT_MISSING");
+                details.inspectStar(0);
+                if (!details.inspecting || details.recordCount !== 1
+                    || details.facts[0].value !== "42.1°")
+                    return root.fail("C27_USNO_STAR_PLOT_INSPECTOR_MISSING");
+                details.inspecting = false;
+                const s = focused.celnav.snapshot;
+                const extra = [];
+                for (let k=0;k<11;k++)
+                    extra.push({name:"NAV SAMPLE "+k,
+                        altitude:12+k,azimuth:(k*31)%360,direction:"NE",
+                        constellation:"SAMPLE GROUP",navStarNumber:110+k});
+                focused.celnav.snapshot = {
+                    date:s.date,time:s.time,planets:s.planets,
+                    constellations:s.constellations,
+                    stars:s.stars.concat(extra)
+                };
+                root.phase = 12;
+            } else if (root.phase === 12) {
+                const details = focused.instrumentItem;
+                const header = findNamed(details,"cosmos-c27-sky-now-sticky-header");
+                const scroll = findNamed(details,"cosmos-c27-star-catalog-scroll");
+                const dots = countNamed(details,"cosmos-c27-plotted-usno-star");
+                if (!header || !scroll || dots !== 12
+                    || countNamed(details,"cosmos-c27-star-catalog-record") !== 12
+                    || scroll.contentHeight <= scroll.height)
+                    return root.fail("C27_USNO_PLOT_CATALOG_NOT_POPULATED");
+                const fixedY = header.mapToItem(details,0,0).y;
+                scroll.contentY = Math.min(90,scroll.contentHeight-scroll.height);
+                if (scroll.contentY < 20
+                    || header.mapToItem(details,0,0).y !== fixedY)
+                    return root.fail("C27_USNO_PLOT_HEADER_SCROLLED");
+                details.inspectStar(8);
+                if (!details.inspecting || details.selectedIndex !== 8
+                    || details.facts[0].value !== "19.0°"
+                    || countNamed(details,"cosmos-c6-observation-cell") !== 12)
+                    return root.fail("C27_USNO_SAMPLE_CLICK_DETAILS_BROKEN");
                 root.succeed();
             }
         }

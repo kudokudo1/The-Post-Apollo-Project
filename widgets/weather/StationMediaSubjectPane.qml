@@ -16,6 +16,13 @@ Rectangle {
     readonly property string kind:
         MediaPanelPolicy.kindForRoute(subjectRoute)
 
+    // Optional read-only window onto whichever Radio component is actually
+    // loaded. A different MEDIA route exposes nothing, not a stale snapshot.
+    readonly property var radioFavoritesSnapshot:
+        mediaLoader.active && mediaLoader.item
+        && (mediaPane.kind==="radio" || mediaPane.kind==="overview")
+        ? mediaLoader.item.favoritesBridgeSnapshot || null : null
+
     // Only the actually loaded NEWS player may publish host-local geometry.
     // A RADIO route and an unloaded/hidden pane return an empty rectangle.
     // On MEDIA overview the NEWS hub is NESTED inside the overview Item.
@@ -79,6 +86,8 @@ Rectangle {
         Item {
             id: mediaOverview
 
+            readonly property var favoritesBridgeSnapshot:
+                overviewRadio.favoritesBridgeSnapshot
             readonly property string activeWatchSourceId:
                 activePlayerViewportRect.width > 0
                 ? overviewNewsHub.activeWatchSourceId : ""
@@ -130,6 +139,7 @@ Rectangle {
                 color: Colors.black
 
                 StationRadio {
+                    id: overviewRadio
                     anchors.fill: parent
                     stationOpen: mediaPane.visible
                     subjectRoute: "media/overview"

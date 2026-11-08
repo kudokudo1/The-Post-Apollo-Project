@@ -777,7 +777,7 @@ class DiscordDockingTests(TestCase):
                 snap = geometry.snapshot_from_tree(tree)
                 if case != "wrong_app":
                     self.assertEqual(snap["discord"]["scratchpadState"],
-                                     "none")
+                                     "fresh" if case == "splash" else "none")
                     self.assertEqual(snap["discord"]["kind"],
                                      "splash" if case == "splash" else "main")
                 else:

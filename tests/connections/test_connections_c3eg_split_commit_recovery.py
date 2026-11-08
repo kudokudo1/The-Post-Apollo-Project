@@ -186,12 +186,30 @@ class C3eGSplitCommitRecoveryTests(unittest.TestCase):
     def test_08_changed_authority_floor_blocks_old_recovery(self):
         self.prepare_nine()
         self.crash_at("client-committed")
+        # Preserve the *original* valid signed release 9. A newer authority
+        # now knows 10, so a fresh signed floor must reject release 9.
+        prior = self.fx.fx.folder / "signed-nine"
+        prior.mkdir()
+        preserved = {}
+        for source in (
+            self.fx.fx.policy, self.fx.fx.policy_sig,
+            self.fx.fx.manifest, self.fx.fx.manifest_sig,
+            self.fx.fx.artifact,
+        ):
+            path = prior / source.name
+            shutil.copy2(source, path)
+            preserved[source.name] = path
         self.fx.fx.issue(5, 10, b"fake-signed-release-10")
         self.fx.fx.advance()
-        # Changed authority proof cannot be silently substituted. The
-        # operator must preserve intent and escalate a newer release.
-        self.refuses("SIGNED_RELEASE_REFUSED_POLICY_ROLLBACK_REFUSED",
-                     recovery=True)
+        self.refuses(
+            "SIGNED_RELEASE_REFUSED_POLICY_ROLLBACK_REFUSED",
+            recovery=True,
+            policy=preserved[self.fx.fx.policy.name],
+            policy_signature=preserved[self.fx.fx.policy_sig.name],
+            manifest=preserved[self.fx.fx.manifest.name],
+            manifest_signature=preserved[self.fx.fx.manifest_sig.name],
+            artifact=preserved[self.fx.fx.artifact.name],
+        )
         self.assertEqual(self.phase()["phase"], "client_committed")
 
     def test_09_conflicting_client_checkpoint_keeps_intent_pending(self):

@@ -566,6 +566,7 @@ Rectangle {
             clip: true
             objectName: "cosmos-c25-meteor-board"
             property string selectedShowerName: ""
+            property bool imageExpanded: false
             readonly property int featuredCount: width >= 650 ? 5 : 3
             readonly property var upcomingShowers:
                 cosmosModePane.meteorSource && cosmosModePane.meteorSource.ready
@@ -773,6 +774,7 @@ Rectangle {
                         && cosmosModePane.meteorSource.ready
                     upcomingShowers: meteorBoard.upcomingShowers
                     selectedShowerName: meteorBoard.selectedShowerName
+                    onExpandRequested: meteorBoard.imageExpanded = true
                 }
                 GohuText {
                     id: meteorCatalogTitle
@@ -854,6 +856,27 @@ Rectangle {
                     handleStyle: "star"
                     visible: scrollable
                 }
+            }
+
+            // C33 // Photo focus uses the existing Meteors stage, not a
+            // new window or global fullscreen. Catalogue scroll and chosen
+            // peak remain mounted underneath and are restored by BACK.
+            StationCosmosPhotoFocus {
+                objectName: "cosmos-c33-meteor-photo-focus"
+                anchors.fill: parent
+                z: 10
+                visible: meteorBoard.imageExpanded && meteorVisual.showArchive
+                sourceUrl: meteorVisual.archiveFrame ? meteorVisual.archiveFrame.url : ""
+                photoTitle: meteorVisual.archiveFrame
+                    ? meteorVisual.archiveFrame.name : "NASA METEOR ARCHIVE"
+                credit: meteorVisual.archiveFrame
+                    ? meteorVisual.archiveFrame.credit : "NASA"
+                canNext: true
+                canPlay: true
+                playing: meteorVisual.playing
+                onCloseRequested: meteorBoard.imageExpanded = false
+                onNextRequested: meteorVisual.nextArchive()
+                onPlayRequested: meteorVisual.playing = !meteorVisual.playing
             }
 
             QuietText {

@@ -13,6 +13,13 @@ Item {
     property bool inspecting: false
     property bool motionPlaying: true
     property bool showArchive: false
+    property int expandedImageIndex: -1
+    readonly property var expandedImageCard:
+        expandedImageIndex >= 0 && expandedImageIndex < 2
+        ? eclipseHighlightRepeater.itemAt(expandedImageIndex) : null
+    onShowArchiveChanged: {
+        if (!showArchive) expandedImageIndex = -1;
+    }
 
     StationCosmosDetailPane {
         id: eclipseDetails
@@ -106,6 +113,7 @@ Item {
             height: 103
             spacing: 6
             Repeater {
+                id: eclipseHighlightRepeater
                 model: 2
                 delegate: Rectangle {
                     id: eclipseHighlight
@@ -116,6 +124,8 @@ Item {
                         ? (index === 0 ? eclipseBoard.eclipseSource.nextSolar
                                        : eclipseBoard.eclipseSource.nextLunar)
                         : null
+                    readonly property string archiveUrl: eclipseScene.archiveUrl
+                    readonly property string archiveCredit: eclipseScene.archiveCredit
                     width: Math.max(1,(eclipseFeaturedRow.width-eclipseFeaturedRow.spacing)/2)
                     height: eclipseFeaturedRow.height
                     color: Colors.dark
@@ -128,6 +138,7 @@ Item {
                         anchors.margins: 5
                         spacing: 4
                         StationCosmosEclipseMotion {
+                            id: eclipseScene
                             objectName: "cosmos-c31-featured-eclipse-motion"
                             width: Math.min(87, Math.max(1,parent.width*0.43))
                             height: parent.height
@@ -194,6 +205,21 @@ Item {
                                 onClicked: eclipseBoard.inspectFeatured(eclipseHighlight.record)
                             }
                         }
+                    }
+                    ActionButton {
+                        objectName: "cosmos-c33-eclipse-expand"
+                        visible: eclipseBoard.showArchive
+                        z: 3
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 2
+                        width: 44
+                        height: 17
+                        label: "FULL"
+                        labelPixelSize: 8
+                        contentPadding: 0
+                        accentColor: Colors.yellow
+                        onClicked: eclipseBoard.expandedImageIndex = eclipseHighlight.index
                     }
                 }
             }
@@ -349,6 +375,26 @@ Item {
         color: Colors.orange
         font.pixelSize: 8
         elide: Text.ElideRight
+    }
+
+    // C33 // Expand either NASA archive photo over the same subject stage.
+    // Both highlight cards and the event catalog retain their state below.
+    StationCosmosPhotoFocus {
+        objectName: "cosmos-c33-eclipse-photo-focus"
+        anchors.fill: parent
+        z: 4
+        visible: eclipseBoard.showArchive && eclipseBoard.expandedImageIndex >= 0
+        sourceUrl: eclipseBoard.expandedImageCard
+            ? eclipseBoard.expandedImageCard.archiveUrl : ""
+        photoTitle: eclipseBoard.expandedImageIndex === 0
+            ? "SOLAR ECLIPSE // NASA ARCHIVE"
+            : "LUNAR ECLIPSE // NASA ARCHIVE"
+        credit: eclipseBoard.expandedImageCard
+            ? eclipseBoard.expandedImageCard.archiveCredit : "NASA"
+        canNext: true
+        onCloseRequested: eclipseBoard.expandedImageIndex = -1
+        onNextRequested: eclipseBoard.expandedImageIndex =
+            eclipseBoard.expandedImageIndex === 0 ? 1 : 0
     }
 
     ActionButton {

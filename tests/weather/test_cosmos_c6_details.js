@@ -261,3 +261,64 @@ test("C32 SKY NOW animates decorative stars while preserving actual USNO plots a
     assert.ok(!visual.includes(forbidden),forbidden);
  }
 });
+
+
+test("C33 shared photo focus occupies current subject stage, with zoom/pan/back and no external window",()=>{
+ const focus=read("widgets/weather/StationCosmosPhotoFocus.qml");
+ assert.match(focus,/objectName: "cosmos-c33-photo-focus"/);
+ assert.match(focus,/objectName: "cosmos-c33-photo-toolbar"/);
+ assert.match(focus,/objectName: "cosmos-c33-photo-back"/);
+ assert.match(focus,/objectName: "cosmos-c33-photo-viewport"/);
+ assert.match(focus,/objectName: "cosmos-c33-photo-image"/);
+ assert.match(focus,/objectName: "cosmos-c33-photo-fit"/);
+ assert.match(focus,/objectName: "cosmos-c33-photo-next"/);
+ assert.match(focus,/objectName: "cosmos-c33-photo-play"/);
+ assert.match(focus,/objectName: "cosmos-c33-photo-credit"/);
+ assert.match(focus,/signal closeRequested\(\)/);
+ assert.match(focus,/signal nextRequested\(\)/);
+ assert.match(focus,/signal playRequested\(\)/);
+ assert.match(focus,/Keys\.onEscapePressed/);
+ assert.match(focus,/photoFocus\.closeRequested\(\)/);
+ assert.match(focus,/photoFocus\.setZoom\(photoFocus\.zoom\+0\.5\)/);
+ assert.match(focus,/function clampPan\(\)/);
+ assert.match(focus,/onWheel: function\(wheel\)/);
+ assert.match(focus,/onDoubleClicked: photoFocus\.resetView\(\)/);
+ assert.match(focus,/source: photoFocus\.visible \? photoFocus\.sourceUrl : ""/);
+ assert.match(focus,/fillMode: Image\.PreserveAspectFit/);
+ assert.match(focus,/ARCHIVAL, NOT LIVE/);
+ for (const bad of ["PanelWindow {","Window {","Process {","FileView {","Flickable {","XMLHttpRequest","VideoOutput {"]) {
+     assert.ok(!focus.includes(bad),bad);
+ }
+});
+
+test("C33 STARS & ECLIPSES expand active archive inside existing boards without losing records",()=>{
+ const stars=read("widgets/weather/StationCosmosStarsBoard.qml");
+ const eclipse=read("widgets/weather/StationCosmosEclipseBoard.qml");
+ assert.match(stars,/property bool expandedArchive: false/);
+ assert.match(stars,/objectName: "cosmos-c33-stars-expand"/);
+ assert.match(stars,/onClicked: starBoard\.expandedArchive = true/);
+ assert.match(stars,/objectName: "cosmos-c33-stars-photo-focus"/);
+ assert.match(stars,/anchors\.fill: parent\s*z: 4/);
+ assert.match(stars,/visible: starBoard\.expandedArchive && starBoard\.showArchive/);
+ assert.match(stars,/sourceUrl: skyMotion\.archiveFrame \? skyMotion\.archiveFrame\.url : ""/);
+ assert.match(stars,/onCloseRequested: starBoard\.expandedArchive = false/);
+ assert.match(stars,/onNextRequested: skyMotion\.nextArchive\(\)/);
+ assert.match(stars,/onPlayRequested: starBoard\.visualPlaying = !starBoard\.visualPlaying/);
+ assert.match(stars,/onShowArchiveChanged: \{\s*if \(!showArchive\) expandedArchive = false/);
+ assert.equal((stars.match(/Flickable\s*\{/g)||[]).length,1);
+
+ assert.match(eclipse,/property int expandedImageIndex: -1/);
+ assert.match(eclipse,/id: eclipseHighlightRepeater/);
+ assert.match(eclipse,/readonly property string archiveUrl: eclipseScene\.archiveUrl/);
+ assert.match(eclipse,/readonly property string archiveCredit: eclipseScene\.archiveCredit/);
+ assert.match(eclipse,/objectName: "cosmos-c33-eclipse-expand"/);
+ assert.match(eclipse,/onClicked: eclipseBoard\.expandedImageIndex = eclipseHighlight\.index/);
+ assert.match(eclipse,/objectName: "cosmos-c33-eclipse-photo-focus"/);
+ assert.match(eclipse,/anchors\.fill: parent\s*z: 4/);
+ assert.match(eclipse,/visible: eclipseBoard\.showArchive && eclipseBoard\.expandedImageIndex >= 0/);
+ assert.match(eclipse,/sourceUrl: eclipseBoard\.expandedImageCard/);
+ assert.match(eclipse,/onCloseRequested: eclipseBoard\.expandedImageIndex = -1/);
+ assert.match(eclipse,/onNextRequested: eclipseBoard\.expandedImageIndex =/);
+ assert.match(eclipse,/onShowArchiveChanged: \{\s*if \(!showArchive\) expandedImageIndex = -1/);
+ assert.equal((eclipse.match(/Flickable\s*\{/g)||[]).length,1);
+});

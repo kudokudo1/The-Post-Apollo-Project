@@ -15,6 +15,7 @@ Rectangle {
     property var upcomingShowers: []
     property string selectedShowerName: ""
     property bool sourceReady: false
+    signal expandRequested()
 
     property bool showArchive: false
     property bool playing: true
@@ -184,7 +185,7 @@ Rectangle {
                 spacing: 2
                 QuietText {
                     width: Math.max(1,parent.width
-                        - (visual.showArchive ? 157 : 64))
+                        - (visual.showArchive ? 191 : 64))
                     text: visual.showArchive ? "NASA ARCHIVE" : "SIMULATED SKY"
                     color: Colors.yellow
                     font.pixelSize: 8
@@ -221,6 +222,17 @@ Rectangle {
                     accentColor: Colors.orange
                     onClicked: visual.nextArchive()
                 }
+                ActionButton {
+                    objectName: "cosmos-c33-meteor-expand"
+                    visible: visual.showArchive
+                    width: visible ? 34 : 0
+                    height: 16
+                    label: "FULL"
+                    labelPixelSize: 7
+                    contentPadding: 0
+                    accentColor: Colors.yellow
+                    onClicked: visual.expandRequested()
+                }
                 Repeater {
                     model: [
                         {label:"+",delta:0.5},
@@ -230,7 +242,7 @@ Rectangle {
                     delegate: ActionButton {
                         required property var modelData
                         visible: visual.showArchive
-                        width: visible ? (modelData.delta===0 ? 26 : 19) : 0
+                        width: visible ? (modelData.delta===0 ? 23 : 17) : 0
                         height: 16
                         label: modelData.label
                         labelPixelSize: 8

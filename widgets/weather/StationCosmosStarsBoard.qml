@@ -13,6 +13,10 @@ Item {
     property bool inspecting: false
     property bool visualPlaying: true
     property bool showArchive: false
+    property bool expandedArchive: false
+    onShowArchiveChanged: {
+        if (!showArchive) expandedArchive = false;
+    }
 
     readonly property var snapshot:
         celestialSource && celestialSource.ready ? celestialSource.snapshot : null
@@ -67,7 +71,7 @@ Item {
             width: parent.width
             spacing: 4
             GohuText {
-                width: Math.max(1,parent.width-228)
+                width: Math.max(1,parent.width-(starBoard.showArchive ? 286 : 228))
                 text: "SKY NOW // USNO NAV STARS"
                 font.pixelSize: 10
                 color: Colors.magenta
@@ -114,6 +118,17 @@ Item {
                 accentColor: Colors.magenta
                 label: "NEXT"
                 onClicked: skyMotion.nextArchive()
+            }
+            ActionButton {
+                objectName: "cosmos-c33-stars-expand"
+                visible: starBoard.showArchive
+                width: visible ? 54 : 0
+                height: 18
+                contentPadding: 0
+                labelPixelSize: 8
+                accentColor: Colors.yellow
+                label: "EXPAND"
+                onClicked: starBoard.expandedArchive = true
             }
         }
 
@@ -492,6 +507,25 @@ Item {
         font.pixelSize: 8
         text: "USNO NAV STAR SAMPLE // NOT FULL SKY OR OPTICAL VISIBILITY"
         elide: Text.ElideRight
+    }
+
+    // C33 // Image-focus overlay occupies only the existing subject stage.
+    // The regular constellation readouts and scrolled catalog stay mounted
+    // underneath, preserving their state when BACK returns.
+    StationCosmosPhotoFocus {
+        objectName: "cosmos-c33-stars-photo-focus"
+        anchors.fill: parent
+        z: 4
+        visible: starBoard.expandedArchive && starBoard.showArchive
+        sourceUrl: skyMotion.archiveFrame ? skyMotion.archiveFrame.url : ""
+        photoTitle: skyMotion.archiveFrame ? skyMotion.archiveFrame.name : "HUBBLE ARCHIVE"
+        credit: skyMotion.archiveFrame ? skyMotion.archiveFrame.credit : "NASA / ESA"
+        canNext: true
+        canPlay: true
+        playing: starBoard.visualPlaying
+        onCloseRequested: starBoard.expandedArchive = false
+        onNextRequested: skyMotion.nextArchive()
+        onPlayRequested: starBoard.visualPlaying = !starBoard.visualPlaying
     }
 
     ActionButton {

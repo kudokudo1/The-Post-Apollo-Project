@@ -263,6 +263,33 @@ ShellRoot {
                 if (visual.archiveIndex !== 1
                     || visual.archiveFrame.name !== "SPRUCE KNOB 2016")
                     return root.fail("C30_GALLERY_NEXT_BROKEN");
+                const meteorFocus = findNamed(instrument,
+                    "cosmos-c33-meteor-photo-focus");
+                const meteorExpand = findNamed(instrument,
+                    "cosmos-c33-meteor-expand");
+                if (!meteorFocus || !meteorExpand)
+                    return root.fail("C33_METEOR_EXPAND_ACTION_MISSING");
+                visual.expandRequested();
+                if (!meteorFocus.visible
+                    || meteorFocus.width !== instrument.width
+                    || meteorFocus.height !== instrument.height
+                    || meteorFocus.sourceUrl !== visual.archiveFrame.url)
+                    return root.fail("C33_METEOR_PHOTO_NOT_IN_STAGE");
+                meteorFocus.setZoom(6);
+                if (meteorFocus.zoom !== 4)
+                    return root.fail("C33_PHOTO_STAGE_ZOOM_NOT_CLAMPED");
+                meteorFocus.resetView();
+                if (meteorFocus.zoom !== 1
+                    || meteorFocus.panX !== 0 || meteorFocus.panY !== 0)
+                    return root.fail("C33_PHOTO_STAGE_RESET_FAILED");
+                meteorFocus.nextRequested();
+                if (visual.archiveIndex !== 0)
+                    return root.fail("C33_METEOR_EXPANDED_NEXT_FAILED");
+                meteorFocus.closeRequested();
+                if (meteorFocus.visible
+                    || !visual.showArchive
+                    || scroll.contentY !== 0)
+                    return root.fail("C33_METEOR_BACK_DID_NOT_RESTORE_CATALOG");
                 visual.showArchive = false;
                 visual.playing = true;
                 // Populate a long bounded catalog after the old two-card
@@ -385,6 +412,25 @@ ShellRoot {
                 if (!solarMotion.showArchive || solarMotion.motionRunning
                     || solarMotion.archiveCredit.indexOf("NASA")<0)
                     return root.fail("C31_ECLIPSE_PHOTO_MODE_FAILED");
+                const eclipseFocus = findNamed(details,
+                    "cosmos-c33-eclipse-photo-focus");
+                if (!eclipseFocus
+                    || countNamed(details,"cosmos-c33-eclipse-expand") !== 2)
+                    return root.fail("C33_ECLIPSE_EXPAND_ACTIONS_MISSING");
+                details.expandedImageIndex = 0;
+                if (!eclipseFocus.visible
+                    || eclipseFocus.width !== details.width
+                    || eclipseFocus.height !== details.height
+                    || eclipseFocus.sourceUrl !== solarMotion.archiveUrl)
+                    return root.fail("C33_ECLIPSE_SOLAR_FOCUS_NOT_IN_STAGE");
+                eclipseFocus.nextRequested();
+                if (details.expandedImageIndex !== 1
+                    || eclipseFocus.sourceUrl === solarMotion.archiveUrl)
+                    return root.fail("C33_ECLIPSE_LUNAR_GALLERY_SWITCH_FAILED");
+                eclipseFocus.closeRequested();
+                if (eclipseFocus.visible
+                    || details.expandedImageIndex !== -1)
+                    return root.fail("C33_ECLIPSE_BACK_DID_NOT_RESTORE_CALENDAR");
                 details.showArchive = false;
                 details.motionPlaying = true;
                 // C6 inspector still exposes all source facts when explicitly opened.
@@ -494,6 +540,38 @@ ShellRoot {
                 if (skyVisual.archiveIndex !== 1
                     || skyVisual.archiveFrame.name !== "MESSIER 28")
                     return root.fail("C32_SKY_ARCHIVE_NEXT_FAILED");
+                const starFocus = findNamed(details,
+                    "cosmos-c33-stars-photo-focus");
+                const starExpand = findNamed(details,
+                    "cosmos-c33-stars-expand");
+                if (!starFocus || !starExpand)
+                    return root.fail("C33_STARS_EXPAND_ACTION_MISSING");
+                details.expandedArchive = true;
+                if (!starFocus.visible
+                    || starFocus.width !== details.width
+                    || starFocus.height !== details.height
+                    || starFocus.sourceUrl !== skyVisual.archiveFrame.url)
+                    return root.fail("C33_STARS_PHOTO_NOT_IN_STAGE");
+                starFocus.setZoom(7);
+                if (starFocus.zoom !== 4)
+                    return root.fail("C33_STARS_PHOTO_ZOOM_LIMIT_BROKEN");
+                starFocus.resetView();
+                if (starFocus.zoom !== 1
+                    || starFocus.panX !== 0 || starFocus.panY !== 0)
+                    return root.fail("C33_STARS_PHOTO_FIT_BROKEN");
+                starFocus.nextRequested();
+                if (skyVisual.archiveIndex !== 0
+                    || starFocus.photoTitle !== "MESSIER 3")
+                    return root.fail("C33_STARS_EXPANDED_NEXT_BROKEN");
+                starFocus.playRequested();
+                if (!details.visualPlaying)
+                    return root.fail("C33_STARS_EXPANDED_PLAY_BROKEN");
+                starFocus.playRequested();
+                starFocus.closeRequested();
+                if (starFocus.visible
+                    || details.expandedArchive
+                    || !details.showArchive)
+                    return root.fail("C33_STARS_BACK_DID_NOT_RESTORE_SKY");
                 skyVisual.zoomTo(4);
                 if (skyVisual.zoom !== 3)
                     return root.fail("C32_SKY_PHOTO_ZOOM_BOUND_BROKEN");

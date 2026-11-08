@@ -271,3 +271,27 @@ test("C30 Meteors defaults to a moving radiant visualization, with a cycling cre
     assert.ok(!motion.includes(forbidden),forbidden);
   }
 });
+
+
+test("C33 Meteors expands the selected NASA archive photo within the existing bounded subject stage",()=>{
+  const visual=read("widgets/weather/StationCosmosMeteorVisual.qml");
+  const focus=read("widgets/weather/StationCosmosPhotoFocus.qml");
+  assert.match(visual,/signal expandRequested\(\)/);
+  assert.match(visual,/objectName: "cosmos-c33-meteor-expand"/);
+  assert.match(visual,/onClicked: visual\.expandRequested\(\)/);
+  assert.match(focus,/function setZoom\(next\)/);
+  assert.match(focus,/function resetView\(\)/);
+  assert.match(focus,/objectName: "cosmos-c33-photo-gesture"/);
+  assert.match(focus,/ARCHIVAL, NOT LIVE/);
+  assert.match(focus,/function clampPan\(\)/);
+  assert.match(focus,/fillMode: Image\.PreserveAspectFit/);
+  assert.match(focus,/source: photoFocus\.visible \? photoFocus\.sourceUrl : ""/);
+  const modes=read("widgets/weather/StationCosmosModesPane.qml");
+  assert.match(modes,/objectName: "cosmos-c33-meteor-photo-focus"/);
+  assert.match(modes,/property bool imageExpanded: false/);
+  assert.match(modes,/onExpandRequested: meteorBoard\.imageExpanded = true/);
+  assert.match(modes,/visible: meteorBoard\.imageExpanded && meteorVisual\.showArchive/);
+  assert.match(modes,/onCloseRequested: meteorBoard\.imageExpanded = false/);
+  assert.match(modes,/onNextRequested: meteorVisual\.nextArchive\(\)/);
+  assert.match(modes,/onPlayRequested: meteorVisual\.playing = !meteorVisual\.playing/);
+});

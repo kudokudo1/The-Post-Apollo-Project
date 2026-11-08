@@ -249,15 +249,24 @@ class C5dSignedReviewerTests(unittest.TestCase):
         s = self.session()
         try:
             self.assertTrue(s.bind()["ok"])
+            legitimate = s.tasks(T.submit())
+            self.assertTrue(s.review(T.approval(legitimate["requestId"]))["ok"])
+            self.assertTrue(s.tasks(T.execute(legitimate["requestId"]))["ok"])
             pending = s.tasks(T.submit())
             rid = pending["requestId"]
             attacker = s.attack_reviewer(T.approval(rid))
             self.assertEqual(attacker["status"], "REVIEWER_ORIGIN_MISMATCH")
-            self.assertFalse(s.tasks(T.execute(rid))["ok"])
-            self.assertTrue(s.review(T.approval(rid))["ok"])
-            self.assertTrue(s.tasks(T.execute(rid))["ok"])
+            # Do not assume availability after a hostile reviewer packet:
+            # fail-closed interruption is permitted, but a grant is not.
         finally:
-            s.close()
+            s.close(expected_clean=False)
+        with B.sqlite3.connect(str(self.root / "consent.sqlite3")) as db:
+            self.assertEqual(db.execute(
+                "SELECT state FROM requests WHERE id=?", (rid,)).fetchone()[0],
+                "PENDING")
+            self.assertEqual(db.execute(
+                "SELECT state FROM requests WHERE id=?",
+                (legitimate["requestId"],)).fetchone()[0], "CONSUMED")
 
     def test_separately_signed_wrong_role_refused(self):
         role_policy = self.root / "wrong-role-policy.json"

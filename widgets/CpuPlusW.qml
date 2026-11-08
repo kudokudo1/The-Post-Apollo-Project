@@ -19,6 +19,8 @@ PanelWindow {
     // Fixed provider navigation only. Shell owns Social instance and routing.
     signal telegramAccessRequested()
     signal telegramRecheckRequested()
+    // U7a shell-owned widget navigation, never a provider action.
+    signal favoriteOwnerNavigationRequested(string owner,string view)
     property var telegramConnectionObservation: null
     property var appControlWindow
     required property var systemTelemetry
@@ -2788,6 +2790,9 @@ PanelWindow {
             selectedCollectionId: cpuPlusWindow.selectedFavoriteCollectionId
             onCollectionRequested: function(collectionId) {
                 cpuPlusWindow.openFavoriteCollection(collectionId,"");
+            }
+            onOwnerNavigationRequested: function(owner,view) {
+                cpuPlusWindow.favoriteOwnerNavigationRequested(owner,view);
             }
             anchors.left: parent.left
             anchors.right: parent.right

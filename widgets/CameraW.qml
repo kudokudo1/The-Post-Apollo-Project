@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import qs.services.social
 import "FinanceChassisPolicy.js" as FinanceChassisPolicy
+import "CameraHuntMotion.js" as HuntMotion
 import "../components"
 
 // CAMERA M1 // Screenshot shutter + read-only picture gallery + a reversible,
@@ -71,6 +72,9 @@ PanelWindow {
     property bool huntPaused: true
     property bool huntRoundComplete: false
     property string huntLastEvent: "READY // NEW ROUND"
+    property real huntMouseX: 0.5
+    property real huntMouseY: 0.5
+    property bool huntMouseActive: false
     property string captureMode: "region"
     // Read Social's active identity and provider alias metadata, not login state.
     readonly property var zoomSocialIdentity: SocialIdentityStore.snapshot
@@ -432,6 +436,7 @@ PanelWindow {
             huntCombo = 0;
             huntScore = 0;
             huntLastEvent = "READY // NEW ROUND";
+            huntMouseActive = false;
             galleryFiles = [];
         } else if (!galleryHasMore) {
             return false;
@@ -587,6 +592,18 @@ PanelWindow {
         return true;
     }
 
+    // Fox cursor tracking is only visual gameplay state. Target positions
+    // are normalized to arena space and never used as filesystem authority.
+    function huntSetPointer(x, y, width, height) {
+        if (activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || width <= 0 || height <= 0)
+            return false;
+        huntMouseX = Math.max(0, Math.min(1, x / width));
+        huntMouseY = Math.max(0, Math.min(1, y / height));
+        huntMouseActive = true;
+        return true;
+    }
+
     // Duck Hunt-style Cleanup game. Targets come only from the already-loaded
     // safe gallery inventory. Hits mark paths; no game code calls GIO/Trash.
     function huntStartRound() {
@@ -622,15 +639,18 @@ PanelWindow {
             eligible[j] = tmp;
         }
         const picked = eligible.slice(0, Math.min(3, eligible.length));
-        const targets = [];
-        for (let i = 0; i < picked.length; i++) {
-            targets.push({
-                path: picked[i].path, name: String(picked[i].name || ""),
-                mediaType: String(picked[i].mediaType || ""),
-                lane: i, phase: Math.random() * Math.PI * 2,
-                speed: 0.032 + Math.random() * 0.027
-            });
+        // Draw different animal behavior profiles for each round. Each
+        // profile has its own size, 2D speed, bounce and/or hop pattern.
+        const profiles = HuntMotion.PROFILES.slice();
+        for (let i = profiles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = profiles[i];
+            profiles[i] = profiles[j];
+            profiles[j] = tmp;
         }
+        const targets = [];
+        for (let i = 0; i < picked.length; i++)
+            targets.push(HuntMotion.createTarget(picked[i], profiles[i], Math.random));
         huntTargets = targets;
         huntHistory = [];
         huntRound += 1;
@@ -649,6 +669,17 @@ PanelWindow {
         if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
                 || huntPaused || huntTargets.length === 0)
             return false;
+        // Immutable per-tick snapshots keep shot/Undo history safe. The
+        // Repeater binds to the LENGTH so steady motion keeps delegates
+        // and image sources alive instead of re-creating every 100ms.
+        const pointer = {
+            active: huntMouseActive,
+            x: huntMouseX, y: huntMouseY
+        };
+        const nextTargets = [];
+        for (let i = 0; i < huntTargets.length; i++)
+            nextTargets.push(HuntMotion.advanceTarget(huntTargets[i], pointer));
+        huntTargets = nextTargets;
         huntTick++;
         huntSecondsLeft = Math.max(0, 25 - Math.floor(huntTick / 10));
         if (huntTick >= 250) {
@@ -2681,6 +2712,7 @@ PanelWindow {
                                             && modelData.id !== "hunt")
                                         camera.huntPaused = true;
                                     camera.cleanupTechnique = modelData.id;
+                                    camera.huntMouseActive = false;
                                     camera.batchPreview = null;
                                     camera.batchReviewKey = "";
                                     if (modelData.id === "swipe")
@@ -3290,7 +3322,14 @@ PanelWindow {
                                     MouseArea {
                                         anchors.fill: parent
                                         enabled: !camera.huntPaused && !camera.busy
+                                        hoverEnabled: true
                                         cursorShape: Qt.CrossCursor
+                                        onPositionChanged: function(mouse) {
+                                            camera.huntSetPointer(mouse.x, mouse.y,
+                                                                  huntArena.width,
+                                                                  huntArena.height);
+                                        }
+                                        onExited: camera.huntMouseActive = false
                                         onClicked: {
                                             huntArena.forceActiveFocus();
                                             camera.huntFire("");
@@ -3298,20 +3337,36 @@ PanelWindow {
                                     }
                                     Repeater {
                                         id: huntTargetRepeater
-                                        model: camera.huntTargets
+                                        // Count-only model preserves QML delegates and
+                                        // thumbnails while huntTargets changes 10x/sec.
+                                        model: camera.huntTargets.length
                                         delegate: Item {
                                             id: huntTargetItem
-                                            property var target: modelData
-                                            width: Math.min(170, Math.max(90,
-                                                huntArena.width / 4.6))
-                                            height: Math.min(88, Math.max(51,
-                                                huntArena.height / 4.3))
+                                            property var target: camera.huntTargets[index]
+                                            width: Math.min(Math.max(40, huntArena.width - 16),
+                                                Math.min(170, Math.max(90,
+                                                    huntArena.width / 4.6))
+                                                * target.sizeScale)
+                                            height: Math.min(Math.max(30, huntArena.height - 12),
+                                                Math.min(88, Math.max(51,
+                                                    huntArena.height / 4.3))
+                                                * target.sizeScale)
                                             x: 8 + Math.max(0, huntArena.width - width - 16)
-                                               * (0.50 + 0.44 * Math.sin(
-                                                   camera.huntTick * target.speed
-                                                   + target.phase))
+                                               * target.xNorm
                                             y: 6 + Math.max(0, huntArena.height - height - 12)
-                                               * ((target.lane + 0.5) / 3)
+                                               * target.yNorm
+                                            Behavior on x {
+                                                NumberAnimation {
+                                                    duration: 100
+                                                    easing.type: Easing.Linear
+                                                }
+                                            }
+                                            Behavior on y {
+                                                NumberAnimation {
+                                                    duration: 100
+                                                    easing.type: Easing.Linear
+                                                }
+                                            }
 
                                             Rectangle {
                                                 anchors.fill: parent
@@ -3342,6 +3397,13 @@ PanelWindow {
                                                     text: "VIDEO"
                                                 }
                                                 GohuText {
+                                                    x: 3
+                                                    y: 2
+                                                    font.pixelSize: 9
+                                                    color: Colors.yellow
+                                                    text: huntTargetItem.target.profile.toUpperCase()
+                                                }
+                                                GohuText {
                                                     anchors.bottom: parent.bottom
                                                     anchors.horizontalCenter: parent.horizontalCenter
                                                     width: parent.width - 6
@@ -3355,7 +3417,15 @@ PanelWindow {
                                                 MouseArea {
                                                     anchors.fill: parent
                                                     enabled: !camera.huntPaused && !camera.busy
+                                                    hoverEnabled: true
                                                     cursorShape: Qt.CrossCursor
+                                                    onPositionChanged: function(mouse) {
+                                                        const position = mapToItem(
+                                                            huntArena, mouse.x, mouse.y);
+                                                        camera.huntSetPointer(
+                                                            position.x, position.y,
+                                                            huntArena.width, huntArena.height);
+                                                    }
                                                     onPressed: huntArena.forceActiveFocus()
                                                     onClicked: camera.huntFire(
                                                                    huntTargetItem.target.path)

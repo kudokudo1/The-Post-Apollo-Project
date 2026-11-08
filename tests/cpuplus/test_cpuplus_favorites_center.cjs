@@ -514,14 +514,15 @@ test("saved freedesktop identifiers remain recognizable without installed app mo
   const saved={favoriteKeys:[
       "org.example.Galaxy.desktop",
       "com.example.secret-vault.desktop",
-      "com.example.SecureApp.desktop"
+      "com.example.SecureApp.desktop",
+      "Brave Web Browser", "kitty"
     ],
     favoriteDetailActionKeys:[],favoriteMonitorBoxKeys:[],
     favoriteTaskMetricKeys:[]
   };
   const desc=Display.build(saved,{apps:[]});
   const list=Hub.list([],[],[],[],saved,{},desc);
-  assert.equal(list.rows.length,3);
+  assert.equal(list.rows.length,5);
   assert.equal(list.rows[0].menu,"APPS");
   assert.equal(list.rows[0].item,"Galaxy [SAVED APP ID]");
   assert.equal(list.rows[0].label,"APPS // Galaxy [SAVED APP ID]");
@@ -531,6 +532,8 @@ test("saved freedesktop identifiers remain recognizable without installed app mo
   assert.equal(list.rows[1].menu,"APPS");
   assert.equal(list.rows[1].label,"APPS // SAVED APPLICATION #2");
   assert.equal(list.rows[2].item,"SecureApp [SAVED APP ID]");
+  assert.equal(list.rows[3].item,"Brave Web Browser [SAVED APP ID]");
+  assert.equal(list.rows[4].item,"kitty [SAVED APP ID]");
   for(const row of list.rows) {
     assert.equal(row.readOnly,true);
     assert.deepEqual(plain(row.capabilities),[]);

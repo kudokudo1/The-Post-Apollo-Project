@@ -390,8 +390,9 @@ test("CPU++ Favorites entries select from their entire row with // breadcrumb se
     "onClicked: pane.selectionRequested(modelData.key)",
     "Accessible.role: Accessible.Button",
     "Keys.onPressed:",
-    '"APP CTRL // "+modelData.menu',
-    '+" // "+(modelData.resolved'
+    "function favoriteRowLabel(item)",
+    'return "APP CTRL // "+menu+" // "+text',
+    "text: pane.favoriteRowLabel(modelData)"
   ]) assert.ok(pane.includes(required),required);
   assert.doesNotMatch(pane,/label:\s*"VIEW"/);
   assert.ok(fixture.includes("16,row.height/2"));
@@ -503,4 +504,5 @@ test("AppControl display source reads original window and tab models without new
   assert.doesNotMatch(qml+policy,/FileView\s*\{|execDetached|Process\s*\{|Qt\.openUrlExternally/);
   const panel=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
   assert.match(panel,/onClicked: pane\.selectionRequested\(modelData\.key\)/);
+  assert.match(panel,/pane\.favoriteRowLabel\(modelData\)/);
 });

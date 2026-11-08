@@ -239,9 +239,20 @@ def _client_rect(node):
 
 
 def _near(node, geometry):
+    """Verify the client fits its bay, not just its independent dimensions.
+
+    Position and size each permit a small Sway rounding tolerance. Their
+    errors can ADD at the bottom: y+4 and height+4 would have been accepted
+    even though the real client bottom escaped its requested slot by 8px.
+    Never accept a client bottom below the bay, or a 2px+ black gap above it.
+    """
     actual = _client_rect(node)
-    return (actual is not None and all(abs(a - b) <= TOLERANCE
-                                       for a, b in zip(actual, geometry)))
+    if actual is None or not all(abs(a - b) <= TOLERANCE
+                                 for a, b in zip(actual, geometry)):
+        return False
+    actual_bottom = actual[1] + actual[3]
+    target_bottom = geometry[1] + geometry[3]
+    return target_bottom - 1 <= actual_bottom <= target_bottom
 
 
 def status(identity, output, x, y, width, height):
@@ -344,6 +355,11 @@ def enter(identity, output, x, y, width, height):
             docked = True
             break
         time.sleep(0.1)
+    if docked:
+        # A previously aborted follower may have concealed this verified
+        # guest to stop spillover. Reveal only AFTER the exact client bottom
+        # and actor origin have been rechecked by the host.
+        _sway_command(criteria, "opacity", "set", "1")
     if not docked:
         # A failed dock must not leave an undocked login/profile window
         # competing with the operator's desktop.

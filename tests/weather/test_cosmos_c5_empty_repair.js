@@ -186,7 +186,7 @@ test("C28 focused clock is an integrated source-backed circular instrument",()=>
  assert.match(wheel,/Day\.ringRadius\(/);
  assert.match(wheel,/Day\.point\(/);
  for(const forbidden of [
-   "Process {","Timer {","FileView {","XMLHttpRequest","Flickable {",
+   "Process {","FileView {","XMLHttpRequest","Flickable {",
    "StationSky {","UsnoPlanetRiseSetService {"
  ])assert.ok(!face.includes(forbidden),forbidden);
 });
@@ -294,4 +294,80 @@ test("C33 Meteors expands the selected NASA archive photo within the existing bo
   assert.match(modes,/onCloseRequested: meteorBoard\.imageExpanded = false/);
   assert.match(modes,/onNextRequested: meteorVisual\.nextArchive\(\)/);
   assert.match(modes,/onPlayRequested: meteorVisual\.playing = !meteorVisual\.playing/);
+});
+
+
+test("C35 clock civil-time replay math is bounded and does not invent next-day events",()=>{
+  const chrono=run("widgets/weather/StationCosmosPlanetChronographPolicy.js");
+  assert.equal(chrono.validMinute(0),true);
+  assert.equal(chrono.validMinute(1439),true);
+  for(const input of [-1,1440,1.2,NaN,Infinity,null,"12"])
+    assert.equal(chrono.validMinute(input),false,String(input));
+  assert.equal(chrono.advance(1430,20),10);
+  assert.equal(chrono.advance(10,-20),1430);
+  assert.equal(chrono.advance(-1,8),null);
+  assert.equal(chrono.advance(12,1441),null);
+  assert.equal(chrono.advance(12,2.5),null);
+  assert.equal(chrono.fractionToMinute(0),0);
+  assert.equal(chrono.fractionToMinute(0.5),720);
+  assert.equal(chrono.fractionToMinute(1),1439);
+  assert.equal(chrono.fractionToMinute(-4),0);
+  assert.equal(chrono.fractionToMinute(99),1439);
+  assert.equal(chrono.fractionToMinute("0.5"),null);
+  const sample=[
+    {planet:"MERCURY",kind:"rise",minute:375,clock:"06:15"},
+    {planet:"MERCURY",kind:"transit",minute:720,clock:"12:00"},
+    {planet:"MERCURY",kind:"set",minute:1100,clock:"18:20"}
+  ];
+  assert.equal(chrono.futureEvent(sample,0).minute,375);
+  assert.equal(chrono.futureEvent(sample,375).minute,375);
+  assert.equal(chrono.futureEvent(sample,376).minute,720);
+  assert.equal(chrono.futureEvent(sample,1101),null);
+  assert.equal(chrono.futureEvent(sample,-1),null);
+  assert.equal(chrono.atSweep(375,sample[0],12),true);
+  assert.equal(chrono.atSweep(387,sample[0],12),true);
+  assert.equal(chrono.atSweep(388,sample[0],12),false);
+  assert.equal(chrono.atSweep(1439,sample[0],12),false);
+});
+
+test("C35 compact Planet Clock has a real-time hand and explicit opt-in moving replay",()=>{
+ const face=read("widgets/weather/StationCosmosPlanetClockFace.qml");
+ assert.match(face,/StationCosmosPlanetChronographPolicy\.js" as Chronograph/);
+ assert.match(face,/property bool replayMode: false/);
+ assert.match(face,/property bool replayPlaying: false/);
+ assert.match(face,/readonly property int displayMinute: replayMode/);
+ assert.match(face,/validLocalClock \? localCivilMinute : -1/);
+ assert.match(face,/function startReplay\(\)/);
+ assert.match(face,/function returnLive\(\)/);
+ assert.match(face,/function seekPreview\(minute\)/);
+ assert.match(face,/function stepPreview\(delta\)/);
+ assert.match(face,/objectName: "cosmos-c35-day-replay-driver"/);
+ assert.match(face,/running: face\.visible && face\.sourceReady/);
+ assert.match(face,/face\.replayMode && face\.replayPlaying/);
+ assert.match(face,/Day\.dateValid\(face\.civilDate\)/);
+ assert.match(face,/onTriggered: face\.stepPreview\(8\)/);
+ assert.match(face,/onCivilDateChanged: \{\s*lockedEvent = null;[\s\S]*?returnLive\(\)/);
+ assert.match(face,/onSourceReadyChanged: \{[\s\S]*?returnLive\(\)/);
+ assert.match(face,/onDisplayMinuteChanged: wheelCanvas\.requestPaint\(\)/);
+ assert.match(face,/Day\.timeAngle\(face\.displayMinute\)/);
+ assert.match(face,/Day\.timeLabel\(face\.displayMinute\)/);
+ assert.match(face,/readonly property bool nearHand:/);
+ assert.match(face,/Chronograph\.atSweep\(face\.displayMinute,eventData,12\)/);
+ assert.match(face,/objectName: "cosmos-c35-time-controls"/);
+ assert.match(face,/objectName: "cosmos-c35-live-replay"/);
+ assert.match(face,/objectName: "cosmos-c35-replay-play-pause"/);
+ assert.match(face,/objectName: "cosmos-c35-time-scrub-track"/);
+ assert.match(face,/objectName: "cosmos-c35-sweep-progress"/);
+ assert.match(face,/objectName: "cosmos-c35-scrub-input"/);
+ assert.match(face,/Chronograph\.fractionToMinute\(/);
+ assert.match(face,/objectName: "cosmos-c35-upcoming-event"/);
+ assert.match(face,/Chronograph\.futureEvent\(events,displayMinute\)/);
+ assert.match(face,/NO LATER DATED USNO EVENT/);
+ assert.match(face,/ANGLE = LOCAL TIME \/\/ RING = PLANET/);
+ assert.equal((face.match(/Timer\s*\{/g)||[]).length,1);
+ assert.equal((face.match(/Canvas\s*\{/g)||[]).length,1);
+ for(const bad of ["Process {","FileView {","XMLHttpRequest","StationSky {",
+       "Flickable {","UsnoPlanetRiseSetService {","new WebSocket"]) {
+   assert.ok(!face.includes(bad),bad);
+ }
 });

@@ -1,8 +1,27 @@
 .pragma library
 
-// Camera Cleanup Hunt M3c. This module performs visual movement ONLY.
+// Camera Cleanup Hunt M3d. Visual movement + bounded progression only.
 // It never reads a filesystem path, executes a command, or marks Trash.
 var PROFILES = ["bird", "frog", "deer", "ox", "fox"];
+
+// The next round is 1-based: base difficulty applies through round N.
+// Tier 1 begins at round N+1 (e.g., rounds 1-5 are base, round 6 grows).
+// The progression math has no filesystem or Trash authority.
+function spawnForRound(base, add, every, round) {
+    var initial = clamp(Math.round(Number(base) || 1), 1, 10);
+    var gain = clamp(Math.round(Number(add) || 0), 0, 5);
+    var interval = clamp(Math.round(Number(every) || 1), 1, 50);
+    var tier = Math.floor(Math.max(0, Math.round(Number(round) || 1) - 1) / interval);
+    return clamp(initial + gain * tier, 1, 10);
+}
+
+function speedForRound(gainPercent, every, round) {
+    var gain = clamp(Math.round(Number(gainPercent) || 0), 0, 50);
+    var interval = clamp(Math.round(Number(every) || 1), 1, 50);
+    var tier = Math.floor(Math.max(0, Math.round(Number(round) || 1) - 1) / interval);
+    // Compounding is intentionally bounded, even after many rounds.
+    return clamp(Math.pow(1 + gain / 100, tier), 1, 2.5);
+}
 
 function clamp(value, low, high) {
     return Math.max(low, Math.min(high, value));
@@ -97,9 +116,12 @@ function createTarget(record, profile, random) {
     return target;
 }
 
-function advanceTarget(current, pointer) {
+function advanceTarget(current, pointer, speedTier) {
     // Immutable snapshot: existing shot/undo history is not mutated by
-    // subsequent clock ticks.
+    // subsequent clock ticks. Scale position deltas, not stored velocities,
+    // to avoid compounding speed every 100ms.
+    var speed = clamp(Number(speedTier) || 1, 1, 2.5);
+    var originalY = current.yNorm;
     var t = Object.assign({}, current);
     t.age += 1;
 
@@ -237,13 +259,19 @@ function advanceTarget(current, pointer) {
         t.vy = clamp(t.vy, -0.034, 0.034);
     }
 
-    var x = reflect(t.xNorm, t.vx);
+    var x = reflect(t.xNorm, t.vx * speed);
     t.xNorm = x.position;
-    t.vx = x.velocity;
+    t.vx = x.velocity / speed;
     if (t.profile !== "frog" && t.profile !== "deer") {
-        var y = reflect(t.yNorm, t.vy);
+        var y = reflect(t.yNorm, t.vy * speed);
         t.yNorm = y.position;
-        t.vy = y.velocity;
+        t.vy = y.velocity / speed;
+    } else if (t.state === "hop" || t.state === "leap") {
+        // The frog/deer integrates its own vertical ballistic jump before
+        // this point. Speed its visual climb/fall without amplifying the
+        // persistent gravity velocity or moving beyond the arena.
+        t.yNorm = clamp(originalY + (t.yNorm - originalY) * speed,
+                        0, t.baseY);
     }
     t.xNorm = clamp(t.xNorm, 0, 1);
     t.yNorm = clamp(t.yNorm, 0, 1);

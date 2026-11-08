@@ -2,7 +2,7 @@
 
 > STATUS: draft implementation, not operator-accepted. GitHub-only.
 > PATIENT: The-Post-Apollo-Project.
-> DEPENDENCY: CPU++ ID Management filter work PR #1481, in progress.
+> BASELINE: CPU++ ID Management filter work PR #1481 merged November 8, 2026.
 
 ## Operator request
 
@@ -37,7 +37,7 @@ CPU++ → FAVORITES. The top order ends SYSTEM → FAVORITES → ID MANAGEMENT �
 
 ## Existing constraints and watch points
 
-- Because PR #1481 still owns an overlapping CPU++ file, this branch was created directly from its head. Merge #1481 first or update the dependency branch before integrating the Favorites manager; do not overwrite its current edits.
+- This branch was created from PR #1481's head before it merged. PR #1481 is now merged, and current `main` has no overlapping post-merge CPU++ changes. Continue checking current HEAD before eventual integration.
 - Legacy CPU++ tests that assumed a six-mode rail are adjusted to this new operator-approved seven-mode order.
 - Removing a source favorite does not automatically remove its independent U3 collection reference. Orphaned references remain organizational metadata until deliberately removed.
 - Owner save methods may accept a queued operation before it is durably persisted. Do not report success merely because an ActionButton was clicked.

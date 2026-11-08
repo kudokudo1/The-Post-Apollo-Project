@@ -15,6 +15,9 @@ pkg=postapollo-connections-c2t-fixture
 data=/mnt/c2v-offline
 c4a_mode=/var/lib/c4a-signed-service-test
 c4a_gate=/var/lib/c4a-guest-signed-status-gate.sh
+c4b_mode=/var/lib/c4b-runtime-ci-only
+c4b_gate=/var/lib/c4b-guest-confined-runtime.sh
+c4b_assets=/var/lib/c4b-runtime-assets
 echo "C2V_GUEST_BOOT // $(cat /etc/fedora-release) kernel=$(uname -r)"
 [[ -e /run/ostree-booted ]] || failure "NOT_BOOTED_OSTREE"
 [[ "$(getenforce)" == Enforcing ]] || failure "SELINUX_NOT_ENFORCING"
@@ -57,6 +60,25 @@ case "$stage" in
         failure "C4A_SIGNED_STATUS_PRELAYER_VERIFICATION_FAILED"
       printf '%s\n' signed-test-only > "$c4a_mode"
       echo "C4A_PASS // EXPLICIT_SILVERBLUE_SIGNED_SERVICE_MODE_ACCEPTED"
+    fi
+    # C4b only: preserve read-only ISO inputs in /var across the real boots.
+    # The legacy C2v/C2x and signed-but-inactive C4a paths never enter here.
+    if [[ -f "$data/c4b-opt-in.marker" ]]; then
+      [[ -f "$c4a_mode" ]] || failure "C4B_REQUIRES_C4A_SIGNED_MODE"
+      [[ -s "$data/c4b-guest-confined-runtime.sh" ]] ||
+        failure "C4B_RUNTIME_GATE_NOT_STAGED"
+      (cd "$data" && sha256sum --check --status c4b-runtime-manifest.sha256) ||
+        failure "C4B_OFFLINE_ASSETS_FAILED_CHECKSUM"
+      mkdir -m 0700 -p "$c4b_assets"
+      for name in postapollo_connections.pp dbus_next.whl \
+                  C3bOriginCheck.py BusPolicyClient.py; do
+        install -m 0600 "$data/$name" "$c4b_assets/$name" ||
+          failure "C4B_OFFLINE_ASSET_COPY_FAILED"
+      done
+      install -m 0700 "$data/c4b-guest-confined-runtime.sh" "$c4b_gate" ||
+        failure "C4B_RUNTIME_SCRIPT_STAGING_FAILED"
+      printf '%s\n' C4B_DISPOSABLE_VM_ONLY > "$c4b_mode"
+      echo "C4B_PASS // SIGNED_C4A_LAYER_HAS_EXPLICIT_OFFLINE_RUNTIME_OPT_IN"
     fi
     echo "C2V_PASS // REAL_SILVERBLUE_FIRST_BOOT_BASELINE"
     echo staged > "$stagefile"
@@ -365,6 +387,11 @@ C2V_WORKER
       /usr/bin/bash "$c4a_gate" booted ||
         failure "C4A_SIGNED_SERVICE_NOT_VALID_AFTER_REBOOT"
     fi
+    if [[ -f "$c4b_mode" ]]; then
+      [[ -s "$c4b_gate" ]] || failure "C4B_RUNTIME_GATE_LOST_AFTER_REBOOT"
+      /usr/bin/bash "$c4b_gate" booted ||
+        failure "C4B_CONFINED_RUNTIME_NOT_VERIFIED"
+    fi
     echo "C2V_PASS // LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT"
     echo rollback_pending > "$stagefile"
     rpm-ostree rollback --reboot || failure "RPM_OSTREE_ROLLBACK_FAILED"
@@ -389,6 +416,11 @@ C2V_WORKER
       [[ -s "$c4a_gate" ]] || failure "C4A_GATE_LOST_AFTER_ROLLBACK"
       /usr/bin/bash "$c4a_gate" rolledback ||
         failure "C4A_SIGNED_SERVICE_ROLLBACK_NOT_VERIFIED"
+    fi
+    if [[ -f "$c4b_mode" ]]; then
+      [[ -s "$c4b_gate" ]] || failure "C4B_RUNTIME_GATE_LOST_AFTER_ROLLBACK"
+      /usr/bin/bash "$c4b_gate" rolledback ||
+        failure "C4B_RUNTIME_CLEANUP_OR_ROLLBACK_NOT_VERIFIED"
     fi
     echo "C2V_PASS // OFFLINE_REPO_CONFIG_RESTORED_AFTER_ROLLBACK"
     echo "C2V_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER"

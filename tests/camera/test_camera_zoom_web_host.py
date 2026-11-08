@@ -67,18 +67,17 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('id: zoomViewport', QML)
         self.assertIn('id: cameraBodyColumn', QML)
         self.assertIn('cameraModes.y', QML)
-        self.assertIn('y: cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
+        self.assertIn('y: camera.zoomControlDeckBottom + camera.zoomDeckGap', QML)
         self.assertNotIn('cameraModes.height + cameraBodyColumn.spacing', QML)
         self.assertIn('frame.height - y - camera.zoomBayBottom', QML)
         self.assertIn('Math.round(zoomViewport.x)', QML)
         self.assertIn('Math.round(zoomViewport.y)', QML)
         self.assertIn('Math.round(zoomViewport.width)', QML)
         self.assertIn('Math.round(zoomViewport.height)', QML)
-        # The live compact Sway client was 780x606 at X=68,Y=183.
-        # Its local top is 183-(82 workarea)-(9 frame inset)=92.
-        # That agrees with the real 109px deck bottom minus 17px nudge.
-        compact_height, page_start, bottom = 699, 109 - 17, 1
-        self.assertEqual(compact_height - page_start - bottom, 606)
+        # Proposed compact: full deck moves up rather than browser moving
+        # underneath. Full 42px row ends at 92; 3px opaque gap => top 95.
+        compact_height, page_start, bottom = 699, 95, 1
+        self.assertEqual(compact_height - page_start - bottom, 603)
         self.assertGreater(compact_height - page_start - bottom,
                            compact_height - 169)
 
@@ -99,45 +98,37 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebVisualHeld', QML)
 
     def test_deck_containment_keeps_default_buttons_and_browser_input_below_them(self):
-        # Native screenshot measured an additional 13px top gap after the
-        # earlier 4px adjustment. The 17px browser overlap remains visual;
-        # the cutout still stops below the full mode row.
         self.assertNotIn('zoomVisualTopOverlap', QML)
-        self.assertIn(
-            'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
-        self.assertNotIn('cameraModes.height + cameraBodyColumn.spacing', QML)
+        self.assertNotIn('zoomTopNudge', QML)
+        self.assertIn('readonly property int zoomDeckGap: 3', QML)
+        self.assertIn('readonly property int zoomControlDeckBottom: Math.max(', QML)
+        self.assertIn('cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
+        self.assertIn('y: camera.zoomControlDeckBottom + camera.zoomDeckGap', QML)
+        self.assertIn('zoomActorTop, zoomControlDeckBottom)', QML)
         self.assertIn('height: 42', QML)
         self.assertIn('height: 34', QML)
         self.assertIn('Math.min(784, viewportWidth - 2 * glowGutter)', QML)
         self.assertIn('Math.min(699, availableFrameHeight)', QML)
-        self.assertIn(
-            'height: Math.max(0, frame.height - y - camera.zoomBayBottom)', QML)
-        self.assertIn('readonly property int zoomBayBottom: 1', QML)
-        self.assertIn('x: camera.zoomWebEdgeInset', QML)
-        self.assertIn(
-            'width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)', QML)
+        self.assertIn('height: Math.max(0, frame.height - y - camera.zoomBayBottom)', QML)
+        self.assertIn('width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)', QML)
         self.assertIn('readonly property int zoomActorTop: zoomBayTop', QML)
         self.assertIn('readonly property int zoomActorHeight: zoomBayHeight', QML)
-        # Native baseline preceding the 13px correction: frame-local top
-        # 105 and 593px height. Current compact is 92px top and 606px high.
-        # Expanded/fullscreen have no browser overlap after this repair.
-        old_top, old_height, old_width = 105, 593, 780
-        new_top = old_top - 13
-        new_height = old_height + 13
-        new_width = old_width
-        self.assertEqual((new_top,new_height,new_width), (92,606,780))
-        self.assertEqual(new_top + new_height,old_top + old_height)
-        self.assertGreaterEqual(42,34)
         self.assertIn('anchors.margins: camera.activeView === "zoom" ? 12 : 18', QML)
-        self.assertIn('spacing: camera.activeView === "zoom" ? 8 : 12', QML)
-        self.assertIn('readonly property int zoomWebEdgeInset: 2', QML)
-        self.assertIn('x: camera.zoomWebEdgeInset', QML)
-        self.assertIn(
-            'width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)', QML)
+        self.assertIn('anchors.topMargin: compactZoomDeck ? 8', QML)
+        self.assertIn('spacing: compactZoomDeck ? 4', QML)
+        self.assertIn('height: cameraBodyColumn.compactZoomDeck ? 32 : 37', QML)
+        # Compact browser and buttons no longer occupy the same pixels.
+        compact_deck_end = 8 + 32 + 4 + 2 + 4 + 42
+        browser_top = compact_deck_end + 3
+        self.assertEqual((compact_deck_end, browser_top), (92, 95))
+        self.assertEqual(699 - browser_top - 1, 603)
+        self.assertEqual(109 - compact_deck_end, 17) # buttons raised 17px
+        # Expanded/fullscreen retain their original deck height + opaque gap.
+        self.assertEqual(12 + 37 + 8 + 2 + 8 + 42 + 3, 112)
 
     def test_opaque_zoom_deck_seals_spare_row_pixels_without_moving_browser(self):
-        # The matte keeps the mode row opaque while the physical actor rises
-        # the measured 13px. Its input cutout remains clamped below buttons.
+        # The matte covers ALL mode-row pixels plus the deliberate small
+        # gap. Camera's input cutout never includes the mode controls.
         self.assertIn('id: zoomModeDeckMatte', QML)
         self.assertEqual(QML.count('id: zoomModeDeckMatte'), 1)
         view = QML.index('id: zoomViewport')
@@ -162,7 +153,7 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('height: 42', QML)
         self.assertIn('height: 34', QML)
         self.assertIn(
-            'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
+            'y: camera.zoomControlDeckBottom + camera.zoomDeckGap', QML)
         self.assertIn('readonly property int zoomActorTop: zoomBayTop', QML)
         self.assertIn('readonly property int zoomActorHeight: zoomBayHeight', QML)
 
@@ -186,9 +177,9 @@ class ZoomWebHostTests(unittest.TestCase):
         # Representative panels all obey the same fitted rectangle rule;
         # this does not assert native Sway placement or browser page zoom.
         for frame_width, frame_height, top, expect_width, expect_height in (
-                (784, 699, 92, 780, 606),
-                (1000, 1010, 109, 996, 900),
-                (2536, 1345, 109, 2532, 1235)):
+                (784, 699, 95, 780, 603),
+                (1000, 1013, 112, 996, 900),
+                (2536, 1345, 112, 2532, 1232)):
             self.assertEqual(frame_width - 2 * 2, expect_width)
             self.assertEqual(frame_height - top - 1, expect_height)
         # Preserve all four controls and the same header navigation.
@@ -197,79 +188,55 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('label: "↓ DOWNLOAD"',QML)
         self.assertNotIn('--force-device-scale-factor',QML)
 
-    def test_native_measured_top_nudge_only_moves_zoom_actor_not_button_input(self):
-        # Operator-supplied native screenshot and Sway rectangle measured the
-        # *remaining* 13px gap AFTER the previous 4px nudge. Thus total is 17.
-        self.assertIn(
-            'readonly property int zoomTopNudge: chassisLevel === "compact" ? 17 : 0',
-            QML)
-        self.assertIn(
-            'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height',QML)
-        self.assertIn('               - camera.zoomTopNudge',QML)
-        self.assertIn('zoomActorTop, cameraBodyColumn.y + cameraModes.y + cameraModes.height)',QML)
-        self.assertIn('height: Math.max(0, frame.height - y - camera.zoomBayBottom)',QML)
-        self.assertIn('width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)',QML)
-        self.assertIn('readonly property int zoomActorTop: zoomBayTop',QML)
-        self.assertIn('readonly property int zoomActorHeight: zoomBayHeight',QML)
-        self.assertIn('height: camera.zoomWebDocked ? camera.zoomInputHeight : 0',QML)
-        self.assertIn('height: 34',QML)
-        self.assertIn('height: 42',QML)
-        # The current deployed rectangle is X=68, Y=196, width=780,
-        # height=593. After the native-measured 13px rise, the target is
-        # X=68, Y=183, width=780, height=606 and bottom Y=789.
-        self.assertEqual((196-13, 593+13, 780), (183,606,780))
-        self.assertEqual(196+593,183+606)
-        for original_top, original_height in ((129,569),(129,770),(129,950)):
-            new_top=original_top-13
-            new_height=original_height+13
-            self.assertEqual(original_top+original_height,new_top+new_height)
-            self.assertEqual(max(new_top,original_top),original_top)
-            self.assertEqual(new_height-(original_top-new_top),original_height)
+    def test_compact_zoom_deck_moves_chrome_not_browser_under_tabs(self):
+        # Historical operator measurement (92px local top) is preserved as
+        # a comparable baseline, not claimed as current native acceptance.
+        # Compact buttons move up 17px; the browser sits 3px below the deck.
+        self.assertNotIn('zoomTopNudge', QML)
+        self.assertIn('readonly property int zoomDeckGap: 3', QML)
+        self.assertIn('y: camera.zoomControlDeckBottom + camera.zoomDeckGap', QML)
+        self.assertIn('zoomActorTop, zoomControlDeckBottom)', QML)
+        self.assertIn('height: camera.zoomWebDocked ? camera.zoomInputHeight : 0', QML)
+        self.assertIn('height: 34', QML)
+        self.assertIn('height: 42', QML)
+        self.assertEqual(109 - (8+32+4+2+4+42),17)
+        self.assertEqual(8+32+4+2+4+42+3,95)
+        self.assertEqual(699-95-1,603)
 
     def test_expanded_zoom_reserves_real_deck_above_finance_content(self):
-        # Expanded (1000x900 Finance baseline) used to squeeze the page into
-        # 900px *including* Camera's header, divider and 42px buttons.
-        # Zoom gets a measured 110px chrome allowance on a 1440px output,
-        # so the browser is ~900px tall without being pushed behind buttons.
-        self.assertIn('readonly property int zoomDeckReserve: Math.max(0, Math.round(', QML)
-        self.assertIn(
-            'cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
-        self.assertIn('+ zoomBayBottom))', QML)
+        self.assertIn('readonly property int zoomDeckReserve: Math.max(', QML)
+        self.assertIn('zoomControlDeckBottom + zoomDeckGap + zoomBayBottom', QML)
         self.assertIn('readonly property int availableFrameHeight: Math.max(', QML)
         self.assertIn('viewportHeight - frameTopInset - bottomScreenGap', QML)
         self.assertIn('financeSize.height + zoomDeckReserve', QML)
         self.assertIn('camera.activeView === "zoom" && chassisLevel === "expanded"', QML)
         self.assertIn('Math.min(availableFrameHeight,', QML)
-        self.assertIn('chassisLevel === "compact" ? 17 : 0', QML)
+        self.assertNotIn('zoomTopNudge', QML)
         self.assertIn('height: 42', QML)
         self.assertIn('height: 34', QML)
-        self.assertIn(
-            'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
-        self.assertIn('               - camera.zoomTopNudge', QML)
-        self.assertIn(
-            'zoomActorTop, cameraBodyColumn.y + cameraModes.y + cameraModes.height)',
-            QML)
+        self.assertIn('y: camera.zoomControlDeckBottom + camera.zoomDeckGap', QML)
+        self.assertIn('zoomActorTop, zoomControlDeckBottom)', QML)
         header = 12 + 37 + 8 + 2 + 8 + 42
-        bottom = 1
-        chrome = header + bottom
-        self.assertEqual(chrome,110)
+        gap, bottom = 3, 1
+        chrome = header + gap + bottom
+        self.assertEqual(chrome,113)
         expanded = min(1440 - 9 - 8, 900 + chrome)
-        self.assertEqual(expanded,1010)
-        self.assertEqual(expanded - header - bottom,900)
-        # A short monitor never overshoots usable screen height.
+        self.assertEqual(expanded,1013)
+        self.assertEqual(expanded - header - gap - bottom,900)
         for screen_height, base_height in ((768,751),(1080,900),(1440,900)):
             available=screen_height-9-8
             self.assertLessEqual(min(available,base_height+chrome), available)
-        # Fullscreen must retain the tested Finance height rather than
-        # adding 110px into the workarea. DP-3 has an 82px top workarea.
+        # Fullscreen stays Finance-bounded after the earlier workarea fix.
         fullscreen_frame = 1345
         physical_bottom = 82 + 9 + fullscreen_frame - bottom
-        self.assertEqual(physical_bottom, 1435)
-        rejected_frame = min(1440 - 9 - 8, 1345 + chrome)
-        self.assertEqual(rejected_frame, 1423)
-        self.assertGreater(82 + 9 + rejected_frame - bottom, 1440)
-        # Existing compact geometry and calibrated placement stay unchanged.
-        self.assertEqual(699 - (header-17) - bottom,606)
+        self.assertEqual(physical_bottom,1435)
+        rejected_frame = min(1440 - 9 - 8,1345 + chrome)
+        self.assertEqual(rejected_frame,1423)
+        self.assertGreater(82 + 9 + rejected_frame - bottom,1440)
+        # Compact deck moves UP, native viewport is now below buttons.
+        compact_end=8+32+4+2+4+42
+        self.assertEqual(compact_end,92)
+        self.assertEqual(699 - (compact_end + gap) - bottom,603)
 
     def test_resize_retains_verified_visual_without_exposing_unverified_input(self):
         self.assertIn('property bool zoomWebVisualHeld: false', QML)

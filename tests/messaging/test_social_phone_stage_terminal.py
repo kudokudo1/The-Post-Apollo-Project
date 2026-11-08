@@ -138,5 +138,33 @@ class PhoneStageLayoutTests(unittest.TestCase):
         self.assertIn('fillVisible: !phonePane.stageHoleActive', self.social)
 
 
+class FinishedInstallLifecycleTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.ui = PHONE.read_text()
+
+    def test_header_offers_focus_and_return_without_closing_active_install(self):
+        src = self.ui
+        self.assertIn('id: stagedFocusAction', src)
+        self.assertIn('label: "FOCUS TERMINAL"', src)
+        self.assertIn('onTriggered: phonePane.focusStagedInstaller()', src)
+        self.assertIn('id: stageFocusProcess', src)
+        self.assertIn('function focusStagedInstaller()', src)
+        self.assertIn('"--focus-installer"', src)
+        self.assertIn('phonePane.stageState === "ALIGNED"', src)
+        self.assertIn('label: phonePane.stagePurpose === "OFONO"', src)
+        self.assertIn('? "RETURN TO PHONE" : "CLOSE SETUP"', src)
+        self.assertIn('if (installer) {', src)
+        self.assertNotIn('"--close-installer"', src)
+
+    def test_geometry_and_cutout_stay_bound_to_same_live_verified_bay(self):
+        src = self.ui
+        self.assertIn('phoneChatFeed.x + 10', src)
+        self.assertIn('String(Math.round(x + stageHoleX))', src)
+        self.assertIn('String(Math.round(y + stageHoleY))', src)
+        self.assertIn('stageState === "ALIGNED" && stageHoleValid', src)
+        self.assertIn('stagePurpose === "OFONO" ? "--sync-installer" : "--sync"', src)
+
+
 if __name__ == "__main__":
     unittest.main()

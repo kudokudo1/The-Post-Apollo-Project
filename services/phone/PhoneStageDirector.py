@@ -133,7 +133,7 @@ def operation(action: str, *, local: tuple[int, int, int, int] | None = None,
               execute: Callable[[str], None] = _execute,
               app_id: str = STAGE_APP_ID) -> dict[str, object]:
     """One exact foot actor only. Return a hole ONLY after observed fit."""
-    if action not in ("sync", "close"):
+    if action not in ("sync", "close", "focus-installer"):
         return _result("REFUSED")
     # Only the explicitly staged oFono terminal may use the alternate id;
     # closing a package-manager session is forbidden because it could still
@@ -141,6 +141,8 @@ def operation(action: str, *, local: tuple[int, int, int, int] | None = None,
     if app_id not in (STAGE_APP_ID, INSTALL_APP_ID):
         return _result("REFUSED")
     if action == "close" and app_id == INSTALL_APP_ID:
+        return _result("REFUSED")
+    if action == "focus-installer" and app_id != INSTALL_APP_ID:
         return _result("REFUSED")
     if action == "sync":
         if (type(local) is not tuple or len(local) != 4
@@ -160,6 +162,13 @@ def operation(action: str, *, local: tuple[int, int, int, int] | None = None,
         if stage is None:
             return _result("ACTOR_NOT_FOUND")
         selector = f'[con_id={stage["id"]}]'
+        if action == "focus-installer":
+            if stage.get("visible") is not True:
+                return _result("ACTOR_NOT_FOUND")
+            # Only explicit UI request to focus one verified foot window.
+            # No move, resize, close, package operation or generic focus.
+            execute(f"{selector} focus")
+            return _result("FOCUS_REQUESTED")
         if action == "close":
             execute(f"{selector} kill")
             return _result("CLOSE_REQUESTED")
@@ -196,6 +205,8 @@ def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     if args == ["--close"]:
         result = operation("close")
+    elif args == ["--focus-installer"]:
+        result = operation("focus-installer", app_id=INSTALL_APP_ID)
     elif len(args) == 5 and args[0] in ("--sync", "--sync-installer"):
         try:
             local = tuple(int(v) for v in args[1:])

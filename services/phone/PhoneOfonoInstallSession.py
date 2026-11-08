@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import select
 import shutil
 import subprocess
 import sys
@@ -46,12 +47,32 @@ def _ostree_idle(rpm_ostree: str, runner: Callable[..., Any]) -> bool:
         return False
 
 
+# A completed or failed OS transaction must never leave an immortal staged
+# terminal if keyboard ownership returns to the Social widget. The terminal
+# stays visible briefly for error review, or exits immediately on Enter.
+POST_TRANSACTION_REVIEW_SECONDS = 12
+
+
+def _review_then_exit() -> None:
+    print("Transaction ended. Press Enter to close; this terminal also closes automatically.")
+    try:
+        sys.stdout.flush()
+        readable, _, _ = select.select(
+            [sys.stdin], [], [], POST_TRANSACTION_REVIEW_SECONDS
+        )
+        if readable:
+            sys.stdin.readline()
+    except (OSError, ValueError, TypeError):
+        # If the TTY has disappeared (e.g. closing PHONE), do not hang forever.
+        pass
+
+
 def run_session(
     *,
     interactive: Callable[[], bool] = sys.stdin.isatty,
     find: Callable[[str], str | None] = find_os_program,
     runner: Callable[..., Any] = subprocess.run,
-    hold: Callable[[str], str] = input,
+    hold: Callable[[str], str] | None = None,
     is_ostree: Callable[[], bool] | None = None,
     approve: Callable[[str], str] = input,
 ) -> int:
@@ -139,7 +160,11 @@ def run_session(
         print("The package installer did not confirm completion.")
         print("Hands-free calling remains unverified.")
     try:
-        hold("Press Enter to close this terminal and recheck PHONE...")
+        if hold is None:
+            _review_then_exit()
+        else:
+            # Test hook: never require a real stdin or sleep during CI.
+            hold("Press Enter to close this terminal and recheck PHONE...")
     except (EOFError, KeyboardInterrupt):
         pass
     return 0 if code == 0 else 2

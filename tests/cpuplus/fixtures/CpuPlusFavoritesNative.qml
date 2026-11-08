@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import "components"
 import "widgets/cpuplus"
+import "widgets/appcontrol"
 import "services/favorites/FavoritesManagementPolicy.js" as Management
 
 // Disposable native UI test. Original owners are mocked, no real user stores.
@@ -11,15 +12,34 @@ ShellRoot {
     property bool ready: false
     property bool selectedByClick: false
     property bool done: false
+    QtObject {
+        id: fakeAppControl
+        property var thermalRows: []
+        property var fanRows: []
+        property var systemRows: []
+        property var taskRows: [{comm:"hidden-process",name:"Hidden Process"}]
+    }
+    QtObject {
+        id: appFavorites
+        property var favoriteKeys: ["task|hidden-process","run|private-command"]
+        property var favoriteDetailActionKeys: []
+        property var favoriteMonitorBoxKeys: []
+        property var favoriteTaskMetricKeys: []
+    }
+    AppControlFavoriteDisplaySource {
+        id: ownerNames
+        appControlOwner: fakeAppControl
+        favoritesStore: appFavorites
+    }
     readonly property var options:
         Management.list(["UTC"],[{id:12,place:{label:"Example City"}}],
             ["fav1:local:finance:instrument:TEST.01"],[],
             ({
-                favoriteKeys:["task|hidden-process","run|private-command"],
-                favoriteDetailActionKeys:[],
-                favoriteMonitorBoxKeys:[],
-                favoriteTaskMetricKeys:[]
-            }))
+                favoriteKeys:appFavorites.favoriteKeys,
+                favoriteDetailActionKeys:appFavorites.favoriteDetailActionKeys,
+                favoriteMonitorBoxKeys:appFavorites.favoriteMonitorBoxKeys,
+                favoriteTaskMetricKeys:appFavorites.favoriteTaskMetricKeys
+            }),({}),ownerNames.records)
     readonly property var selection: Management.recordFor(options,selectedKey)
 
     QtObject {
@@ -113,7 +133,11 @@ ShellRoot {
                || selector.choices.length!==1
                || selector.choices[0].category!=="CPU++"
                || !selector.choices[0].readOnly
-               || !root.selection || root.selection.category!=="CPU++") {
+               || !root.selection || root.selection.category!=="CPU++"
+               || root.selection.menu!=="KILL"
+               || root.selection.item!=="hidden-process"
+               || root.selection.favoriteType!=="PROCESS FAVORITE"
+               || root.selection.label!=="KILL // hidden-process") {
                 root.fail("INITIAL");
                 return;
             }

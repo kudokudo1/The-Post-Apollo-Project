@@ -91,7 +91,15 @@ class TelegramS2Transport(unittest.TestCase):
         self.client.stdin.write(json.dumps(obj) + "\n")
         self.client.stdin.flush()
         raw = self.client.stdout.readline()
-        self.assertTrue(raw, self.client.stderr.read() if self.client.poll() is not None else "EMPTY_CLIENT_RESPONSE")
+        if not raw:
+            client_status = self.client.poll()
+            host_status = self.host.poll()
+            details = {
+                "clientStatus": client_status, "hostStatus": host_status,
+                "clientError": self.client.stderr.read() if client_status is not None else "still running",
+                "hostError": self.host.stderr.read() if host_status is not None else "still running",
+            }
+            self.fail("EMPTY_CLIENT_RESPONSE " + repr(details))
         return json.loads(raw)
 
     @staticmethod

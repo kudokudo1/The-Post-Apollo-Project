@@ -2792,6 +2792,8 @@ PanelWindow {
                                 property var currentRecord:
                                     camera.swipeIndex < camera.galleryFiles.length
                                     ? camera.galleryFiles[camera.swipeIndex] : null
+                                property real dragX: 0
+                                property real dragY: 0
                                 Keys.onPressed: function(event) {
                                     if (event.key === Qt.Key_Left) {
                                         camera.swipeDecide("trash");
@@ -2808,6 +2810,15 @@ PanelWindow {
                                         event.accepted = true;
                                     }
                                 }
+
+                                Item {
+                                    id: swipeVisualCard
+                                    anchors.fill: parent
+                                    transform: Translate {
+                                        x: swipeDeck.dragX
+                                        y: swipeDeck.dragY
+                                    }
+                                    rotation: swipeDeck.dragX / 24
 
                                 Rectangle {
                                     anchors.centerIn: parent
@@ -2855,6 +2866,21 @@ PanelWindow {
                                           ? swipeDeck.currentRecord.name
                                           : "NO MORE LOADED FILES"
                                 }
+                                GohuText {
+                                    anchors.top: parent.top
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    height: 24
+                                    visible: Math.abs(swipeDeck.dragX) > 35
+                                             || swipeDeck.dragY > 40
+                                    font.pixelSize: 14
+                                    color: swipeDeck.dragX < -35 ? Colors.red
+                                           : swipeDeck.dragX > 35 ? Colors.cyan
+                                           : Colors.yellow
+                                    text: swipeDeck.dragX < -35 ? "QUEUE FOR TRASH"
+                                          : swipeDeck.dragX > 35 ? "KEEP"
+                                          : "SKIP"
+                                }
+                                }
                                 MouseArea {
                                     anchors.fill: parent
                                     enabled: swipeDeck.currentRecord !== null && !camera.busy
@@ -2863,15 +2889,31 @@ PanelWindow {
                                     onPressed: function(mouse) {
                                         startX = mouse.x;
                                         startY = mouse.y;
+                                        swipeDeck.dragX = 0;
+                                        swipeDeck.dragY = 0;
                                         swipeDeck.forceActiveFocus();
+                                    }
+                                    onPositionChanged: function(mouse) {
+                                        if (pressed) {
+                                            swipeDeck.dragX = Math.max(-180, Math.min(
+                                                180, mouse.x - startX));
+                                            swipeDeck.dragY = Math.max(-120, Math.min(
+                                                120, mouse.y - startY));
+                                        }
                                     }
                                     onReleased: function(mouse) {
                                         const dx = mouse.x - startX;
                                         const dy = mouse.y - startY;
+                                        swipeDeck.dragX = 0;
+                                        swipeDeck.dragY = 0;
                                         if (Math.abs(dx) >= 65 && Math.abs(dx) > Math.abs(dy))
                                             camera.swipeDecide(dx < 0 ? "trash" : "keep");
                                         else if (dy >= 65)
                                             camera.swipeDecide("skip");
+                                    }
+                                    onCanceled: {
+                                        swipeDeck.dragX = 0;
+                                        swipeDeck.dragY = 0;
                                     }
                                 }
                             }

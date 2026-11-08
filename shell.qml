@@ -1060,6 +1060,10 @@ PanelWindow {
                     weatherStationWindow.homeFavoritesReadOnlySnapshot
                 radioFavoritesSource:
                     weatherStationWindow.radioFavoritesReadOnlySnapshot
+                // U5d: read Hospital Reception's sanitized, already-saved
+                // pinned identities. Never pass the Reception service QObject.
+                hospitalPinnedFavoritesSource:
+                    hospitalWindow.receptionPinnedReadOnlySnapshot
                 relationshipFocusModeActive: relationshipFocus.active
                 relationshipFocused: relationshipFocus.owner === "cpu"
                 // Read-only Social adapter state: never credentials, login

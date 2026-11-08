@@ -10,6 +10,7 @@ import importlib.util
 import json
 from pathlib import Path
 import shutil
+import sqlite3
 import tempfile
 import unittest
 
@@ -159,13 +160,16 @@ class C3eFRollbackWitnessTests(unittest.TestCase):
 
     def test_08_mismatched_witness_enrolled_identity_fails(self):
         self.fx.advance()
-        self.assert_refused(
-            "WITNESS_ENROLLED_IDENTITY_MISMATCH",
-            authority_anchor_pin=self.fx.fprs["forger"])
-        self.assert_refused(
-            "WITNESS_ENROLLED_IDENTITY_MISMATCH",
-            node_id="other-synthetic-node-01",
-            request_proof=lambda challenge: self.fx.remote_proof(challenge))
+        # A witness with an unexpected stored node/pin cannot silently
+        # migrate to a valid but differently scoped authority response.
+        with sqlite3.connect(self.location) as db:
+            db.execute("UPDATE witness SET node_id=? WHERE id=1",
+                       ("other-synthetic-node-01",))
+        self.assert_refused("WITNESS_ENROLLED_IDENTITY_MISMATCH")
+        with sqlite3.connect(self.location) as db:
+            db.execute("UPDATE witness SET node_id=?, authority_anchor_pin=? WHERE id=1",
+                       (self.node, self.fx.fprs["forger"]))
+        self.assert_refused("WITNESS_ENROLLED_IDENTITY_MISMATCH")
         self.assertEqual(self.stored()[3:], (3, 8))
 
     def test_09_replayed_signature_refused_for_fresh_verifier_challenge(self):

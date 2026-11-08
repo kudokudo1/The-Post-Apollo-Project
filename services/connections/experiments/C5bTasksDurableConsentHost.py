@@ -139,6 +139,11 @@ class DurableBroker:
             os.close(self.lock_fd)
             raise
 
+    def allowed_reviewer(self, sender, original) -> bool:
+        # C5b preserves its original kernel per-packet reviewer check.
+        # CI-only later hosts may require stronger proof of this sender.
+        return sender is not None and sender == original
+
     def close(self):
         self.db.close()
         os.close(self.lock_fd)
@@ -287,12 +292,13 @@ def serve(operator_fd: int, client_fd: int, ledger_factory=None) -> int:
                         data, sender = packet(sock)
                         if key.data == "reviewer":
                             result = (ledger.reviewer(data)
-                                      if sender == reviewer_origin
+                                      if ledger.allowed_reviewer(sender, reviewer_origin)
                                       else C5a.reply("REVIEWER_ORIGIN_MISMATCH"))
                         else:
                             result = ledger.client(data, sender)
                         C5a.exchange(sock, result)
-                        if (key.data == "reviewer" and sender == reviewer_origin
+                        if (key.data == "reviewer"
+                                and result["status"] == "SYNTHETIC_SHUTDOWN"
                                 and type(data) is dict
                                 and data.get("op") == "shutdown"
                                 and result["ok"]):

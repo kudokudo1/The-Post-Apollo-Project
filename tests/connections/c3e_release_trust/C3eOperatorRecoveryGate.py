@@ -15,8 +15,10 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import sqlite3
 import tempfile
 import time
+from urllib.parse import quote
 
 HERE = Path(__file__).parent
 
@@ -91,6 +93,42 @@ def intent_digest(saved: tuple, pending: tuple) -> str:
     return hashlib.sha256(material).hexdigest()
 
 
+
+def _open_read_only(path: Path, label: str):
+    """SQLite file-descriptor is read-only; no PRAGMA journal_mode mutation."""
+    path = Path(path)
+    try:
+        durable._db_path(path)
+        connection = sqlite3.connect(
+            "file:" + quote(str(path)) + "?mode=ro",
+            uri=True, isolation_level=None, timeout=8)
+        connection.execute("PRAGMA query_only=ON")
+        return connection
+    except (durable.Refused, sqlite3.Error):
+        deny(label + "_LEDGER_UNAVAILABLE")
+
+
+def _read_state(witness_db: Path, client_db: Path):
+    w = _open_read_only(witness_db, "WITNESS")
+    try:
+        w.execute("BEGIN")
+        saved = split._witness(w)
+        pending = split._intent(w)
+        w.execute("ROLLBACK")
+    except sqlite3.Error:
+        deny("WITNESS_LEDGER_UNAVAILABLE")
+    finally:
+        w.close()
+    c = _open_read_only(client_db, "CLIENT")
+    try:
+        client = durable._read(c)
+    except durable.Refused:
+        deny("CLIENT_LEDGER_UNAVAILABLE")
+    finally:
+        c.close()
+    return saved, pending, client
+
+
 def _verify_operator(*, public: Path, pin: str, payload: Path,
                      signature: Path, directory: Path):
     try:
@@ -138,26 +176,16 @@ def inspect_operator_supersession(*, witness_db: Path, client_db: Path,
     if type(node_id) is not str or proof.NODE_PATTERN.fullmatch(node_id) is None:
         deny("INVALID_NODE_ID")
     try:
-        db = split._db(witness_db)
-        try:
-            db.execute("BEGIN IMMEDIATE")
-            saved = split._witness(db)
-            pending = split._intent(db)
-            if pending is None:
-                deny("NO_PENDING_INTENT")
-            split._identity(saved, node_id, root_pin, authority_pin)
-            if saved[3:] != pending[:2]:
-                deny("WITNESS_PENDING_BASELINE_CONFLICT")
-            client = split._client(client_db)
-            if client[0] != root_pin or client[1:] not in (
-                    pending[:4], pending[4:8]):
-                deny("CLIENT_PENDING_STATE_CONFLICT")
-            pending_hash = intent_digest(saved, pending)
-            db.execute("COMMIT")
-        finally:
-            if db.in_transaction:
-                db.execute("ROLLBACK")
-            db.close()
+        saved, pending, client = _read_state(witness_db, client_db)
+        if pending is None:
+            deny("NO_PENDING_INTENT")
+        split._identity(saved, node_id, root_pin, authority_pin)
+        if saved[3:] != pending[:2]:
+            deny("WITNESS_PENDING_BASELINE_CONFLICT")
+        if client[0] != root_pin or client[1:] not in (
+                pending[:4], pending[4:8]):
+            deny("CLIENT_PENDING_STATE_CONFLICT")
+        pending_hash = intent_digest(saved, pending)
     except split.Refused as exc:
         deny("RECOVERY_STATE_REFUSED_" + str(exc))
 
@@ -227,10 +255,11 @@ def inspect_operator_supersession(*, witness_db: Path, client_db: Path,
         # Detect changed local ledgers while doing expensive GPG checks.
         # Still read-only: a later writer must recheck under a real lock.
         try:
-            again = split._status(witness_db, client_db)
+            saved_again, pending_again, client_again = _read_state(
+                witness_db, client_db)
         except split.Refused as exc:
             deny("RECOVERY_STATE_CHANGED_" + str(exc))
-        if (again[0] != saved or again[2] != pending or
-                again[1] != client):
+        if (saved_again != saved or pending_again != pending or
+                client_again != client):
             deny("RECOVERY_STATE_CHANGED_DURING_VERIFICATION")
     return SUCCESS

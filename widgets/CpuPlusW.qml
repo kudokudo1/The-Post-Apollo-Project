@@ -59,7 +59,19 @@ PanelWindow {
             TimeSettings.worldFavoriteZones,
             PlaceRegistry.savedPlaces,
             FavoritesDefaultStore.favoriteKeys,
-            FavoritesDefaultStore.pinnedKeys)
+            FavoritesDefaultStore.pinnedKeys,
+            // Four EXISTING AppControl lists, converted from QML list<string>
+            // to plain snapshots. CPU++ never becomes their second writer.
+            ({
+                favoriteKeys:cpuFavoritesCatalog.copyValues(
+                    FavoritesStore.favoriteKeys),
+                favoriteDetailActionKeys:cpuFavoritesCatalog.copyValues(
+                    FavoritesStore.favoriteDetailActionKeys),
+                favoriteMonitorBoxKeys:cpuFavoritesCatalog.copyValues(
+                    FavoritesStore.favoriteMonitorBoxKeys),
+                favoriteTaskMetricKeys:cpuFavoritesCatalog.copyValues(
+                    FavoritesStore.favoriteTaskMetricKeys)
+            }))
     readonly property var selectedFavoriteResource:
         FavoritesManagement.recordFor(favoriteCandidates,selectedFavoriteKey)
     FavoritesUnifiedCatalog {

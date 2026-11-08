@@ -38,7 +38,21 @@ function appControlClassification(record) {
     return {category:"APP CTRL",label:"APP CONTROL FAVORITE"};
 }
 
-function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot) {
+// The AppControl owner may provide volatile display-only names keyed by the
+// existing normalized resource key. No stored key is decoded into a label.
+function approvedOwnerLabel(labels, key) {
+    if (!labels || typeof labels !== "object"
+            || !Object.prototype.hasOwnProperty.call(labels,key))
+        return "";
+    const value=labels[key];
+    if (typeof value !== "string" || value.length>60
+            || !/^[A-Za-z0-9][A-Za-z0-9 ._()+#&-]{0,59}$/.test(value))
+        return "";
+    const trimmed=value.trim();
+    return trimmed.length>=2 ? trimmed : "";
+}
+
+function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels) {
     const out=[], seen=Object.create(null);
     let rejected=0,total=0;
     function accept(record) {
@@ -102,7 +116,7 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot) {
                     // The raw donor identity is intentionally NOT exported
                     // to the CPU++ management record or collection controls.
                     // Number duplicate display types without exposing commands.
-                    label:type+" #"+ordinalByType[type],
+                    label:approvedOwnerLabel(appControlDisplayLabels,entry.key) || (type+" #"+ordinalByType[type]),
                     category:classification.category,
                     owner:"appcontrol",readOnly:true,
                     isFavorite:true,isPinned:false,

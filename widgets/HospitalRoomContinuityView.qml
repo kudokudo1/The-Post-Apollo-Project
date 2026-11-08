@@ -365,7 +365,7 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: "PX READS ARE SEQUENTIAL, NOT A DATABASE-ATOMIC SNAPSHOT. REFRESH AFTER EXTERNAL CHANGES. No browser ChatGPT recovery, automatic Doctor replacement, provider heartbeat, or permission grant."
+                text: "PX READS ARE SEQUENTIAL, NOT A DATABASE-ATOMIC SNAPSHOT. REFRESH AFTER EXTERNAL CHANGES. no browser ChatGPT recovery, automatic Doctor replacement, provider heartbeat, or permission grant."
                 font.pixelSize: 8
                 color: Colors.blue
                 wrapMode: Text.Wrap

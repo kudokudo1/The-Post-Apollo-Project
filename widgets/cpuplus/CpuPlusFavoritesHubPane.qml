@@ -12,6 +12,7 @@ Item {
     property var selectedResource: null
     // Expose rendered rows for native selector/a11y testing, not actuation.
     property alias favoriteRowRepeater: savedItemRows
+    property alias dossierGroupItems: dossierGroupRepeater
     property var timeOwner: null
     property var placesOwner: null
     property var defaultOwner: null
@@ -129,6 +130,8 @@ Item {
                     Column {
                         id: dossierGroup
                         property var section: modelData
+                        // Test/reveal navigation, never actuation.
+                        property alias entryItems: dossierEntryRepeater
                         width: dossierRows.width
                         spacing: 2
                         Rectangle {

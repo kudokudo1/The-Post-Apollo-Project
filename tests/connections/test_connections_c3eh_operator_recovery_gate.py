@@ -259,7 +259,7 @@ class C3eHOperatorRecoveryGateTests(unittest.TestCase):
         with sqlite3.connect(self.fx.fx.fx.client_db) as db:
             db.execute("UPDATE checkpoint SET artifact_digest=? WHERE id=1",
                        ("b"*64,))
-        self.refuses("RECOVERY_STATE_REFUSED_CLIENT_PENDING_STATE_CONFLICT")
+        self.refuses("CLIENT_PENDING_STATE_CONFLICT")
 
     def test_15_real_broker_and_authority_remain_unmodified(self):
         self.prepare()

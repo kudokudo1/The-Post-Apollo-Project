@@ -128,6 +128,7 @@ Rectangle {
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
                                 text: modelData.name
+                                textFormat: Text.PlainText
                                 font.pixelSize: 10
                                 color: Colors.white
                                 elide: Text.ElideRight

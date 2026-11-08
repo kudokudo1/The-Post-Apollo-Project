@@ -15,6 +15,10 @@ Rectangle {
     property var spaceService: null
     // Enabled by OBSERVATION only. Legacy INDEX SUVI remains unchanged.
     property bool imageInteractive: false
+    // C34 // OBSERVATION can lift SUVI into the whole subject stage.
+    // Keep the C16 hero-only expansion fallback for other callers.
+    property bool stageImageExpand: false
+    signal stageImageRequested()
     property bool imageExpanded: false
     property real suviZoom: 1
     property real suviPanX: 0
@@ -239,11 +243,17 @@ Rectangle {
                         anchors.top: parent.top
                         anchors.right: parent.right
                         anchors.margins: 4
-                        label: solarFocus.imageExpanded ? "REST" : "EXP"
+                        label: solarFocus.stageImageExpand ? "FULL"
+                            : solarFocus.imageExpanded ? "REST" : "EXP"
                         labelPixelSize: 9
                         contentPadding: 1
                         accentColor: Colors.magenta
-                        onClicked: solarFocus.imageExpanded = !solarFocus.imageExpanded
+                        onClicked: {
+                            if (solarFocus.stageImageExpand)
+                                solarFocus.stageImageRequested();
+                            else
+                                solarFocus.imageExpanded = !solarFocus.imageExpanded;
+                        }
                     }
                     Row {
                         id: suviZoomControls

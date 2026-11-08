@@ -505,12 +505,39 @@ class ZoomWebHostTests(unittest.TestCase):
                                 result=host.enter("identity-1","HDMI-A-1",40,150,650,420)
         self.assertTrue(result["ok"])
         self.assertTrue(result["docked"])
-        self.assertEqual(len(calls),4)
+        self.assertEqual(len(calls),5)
         self.assertEqual(calls[0],("[con_id=123]","floating","enable"))
         self.assertEqual(calls[1],("[con_id=123]","border","none"))
-        self.assertEqual(calls[2][1:3],("resize","set"))
-        self.assertEqual(calls[3],("[con_id=123]","move","absolute","position",
+        self.assertEqual(calls[2],("[con_id=123]","shadows","disable"))
+        self.assertEqual(calls[3][1:3],("resize","set"))
+        self.assertEqual(calls[4],("[con_id=123]","move","absolute","position",
                                    "2600","px","150","px"))
+        self.assertTrue(result["shadowContained"])
+
+    def test_optional_swayfx_shadows_command_only_targets_verified_zoom(self):
+        actor={"id":123,"pid":333,"visible":True,"window_properties":{"class":host.ZOOM_CLASS},
+               "rect":{"x":2600,"y":150,"width":650,"height":420}}
+        calls=[]
+        def deny_shadows(*args):
+            calls.append(args)
+            if args[1:]==("shadows","disable"):
+                raise RuntimeError("SWAY_COMMAND_DENIED")
+        with patch.object(host, "_target_geometry", return_value=(2600,150,650,420)):
+            with patch.object(host, "_social_browser_prefix", return_value=["/usr/bin/chromium"]):
+                with patch.object(host, "_private_profile", return_value=Path("/tmp/camera_test")):
+                    with patch.object(host, "_unique_actor", return_value=(actor,"")):
+                        with patch.object(host, "_sway_command", side_effect=deny_shadows):
+                            result=host.enter("identity-1","HDMI-A-1",40,150,650,420)
+        # Unsupported vanilla-Sway effects must not break working Zoom
+        # docking or make a false promise that the shadow was suppressed.
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["docked"])
+        self.assertFalse(result["shadowContained"])
+        shadow_calls=[x for x in calls if len(x)>=3 and x[1]=="shadows"]
+        self.assertEqual(shadow_calls,[("[con_id=123]","shadows","disable")])
+        self.assertFalse(any("for_window" in x or "shadows enable" in x for x in calls))
+        self.assertIn(("[con_id=123]","move","absolute","position",
+                       "2600","px","150","px"),calls)
 
     def test_failed_alignment_hides_exact_guest_not_other_windows(self):
         actor={"id":123,"pid":333,"visible":True,"window_properties":{"class":host.ZOOM_CLASS},

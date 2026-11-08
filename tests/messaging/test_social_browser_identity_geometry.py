@@ -286,13 +286,17 @@ class GeometryIdentityBoundary(unittest.TestCase):
         bridge = g.Bridge(0.1)
         bridge.select_browser_scope("x", "identity-1")
         with patch("sys.stdin", io.StringIO('{"op":"focusX"}\n')):
-            bridge.stdin_loop()
+            # Isolated parser inputs are NOT process-owner EOF events.
+            # A real stdin_loop() must terminate the entire helper on EOF.
+            bridge._read_stdin_commands()
         self.assertEqual(list(bridge.immediate_commands), [])
         self.assertTrue(bridge.sample_event.is_set())
         bridge.sample_event.clear()
         bridge.select_browser_scope("x", None)
         with patch("sys.stdin", io.StringIO('{"op":"focusX"}\n')):
-            bridge.stdin_loop()
+            # Isolated parser inputs are NOT process-owner EOF events.
+            # A real stdin_loop() must terminate the entire helper on EOF.
+            bridge._read_stdin_commands()
         self.assertEqual(list(bridge.immediate_commands),
                          ['[class="post-apollo-x"] focus'])
 

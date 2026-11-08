@@ -2664,8 +2664,8 @@ PanelWindow {
                             model: [
                                 {id: "batch", label: "BATCH"},
                                 {id: "swipe", label: "SWIPE"},
-                                {id: "desktop", label: "DESKTOP"},
-                                {id: "hunt", label: "HUNT // NEXT"}
+                                {id: "hunt", label: "HUNT"},
+                                {id: "desktop", label: "DESKTOP"}
                             ]
                             ActionButton {
                                 width: (cleanupModeRow.width - 3 * cleanupModeRow.spacing) / 4
@@ -2674,9 +2674,12 @@ PanelWindow {
                                 labelPixelSize: 10
                                 selected: camera.cleanupTechnique === modelData.id
                                 accentColor: modelData.id === "hunt"
-                                             ? Colors.white : Colors.magenta
-                                available: !camera.busy && modelData.id !== "hunt"
+                                             ? Colors.cyan : Colors.magenta
+                                available: !camera.busy
                                 onLeftClicked: {
+                                    if (camera.cleanupTechnique === "hunt"
+                                            && modelData.id !== "hunt")
+                                        camera.huntPaused = true;
                                     camera.cleanupTechnique = modelData.id;
                                     camera.batchPreview = null;
                                     camera.batchReviewKey = "";
@@ -3191,6 +3194,248 @@ PanelWindow {
                                     available: !camera.busy && camera.galleryHasMore
                                                && camera.swipeIndex >= camera.galleryFiles.length
                                     onLeftClicked: camera.loadGallery(true, "cleanup")
+                                }
+                            }
+                        }
+
+
+                        // Three moving media targets per round. Hits only mark
+                        // Gallery-validated file paths in the common review queue.
+                        Item {
+                            id: cleanupHuntView
+                            anchors.fill: parent
+                            visible: camera.cleanupTechnique === "hunt"
+                            focus: visible && camera.activeView === "cleanup"
+
+                            Keys.onPressed: function(event) {
+                                if (event.key === Qt.Key_N) {
+                                    camera.huntStartRound();
+                                    event.accepted = true;
+                                } else if (event.key === Qt.Key_P) {
+                                    camera.huntTogglePause();
+                                    event.accepted = true;
+                                } else if (event.key === Qt.Key_Z) {
+                                    camera.huntUndo();
+                                    event.accepted = true;
+                                }
+                            }
+                            Timer {
+                                id: huntClock
+                                interval: 100
+                                repeat: true
+                                running: camera.menuOpen
+                                         && camera.activeView === "cleanup"
+                                         && camera.cleanupTechnique === "hunt"
+                                         && !camera.busy && !camera.huntPaused
+                                         && camera.huntTargets.length > 0
+                                         && camera.huntSecondsLeft > 0
+                                onTriggered: camera.huntAdvance()
+                            }
+                            Column {
+                                width: parent.width
+                                height: parent.height
+                                spacing: 6
+
+                                Row {
+                                    width: parent.width
+                                    height: 22
+                                    spacing: 6
+                                    GohuText {
+                                        width: (parent.width - 12) / 3
+                                        height: 22
+                                        font.pixelSize: 10
+                                        color: Colors.magenta
+                                        text: "SCORE // " + camera.huntScore
+                                    }
+                                    GohuText {
+                                        width: (parent.width - 12) / 3
+                                        height: 22
+                                        font.pixelSize: 10
+                                        color: Colors.cyan
+                                        text: "HITS " + camera.huntHits
+                                              + " // MISSES " + camera.huntMisses
+                                    }
+                                    GohuText {
+                                        width: (parent.width - 12) / 3
+                                        height: 22
+                                        font.pixelSize: 10
+                                        color: camera.huntSecondsLeft < 6
+                                               ? Colors.red : Colors.yellow
+                                        text: "ROUND " + camera.huntRound
+                                              + " // " + camera.huntSecondsLeft + " SEC"
+                                    }
+                                }
+
+                                Rectangle {
+                                    id: huntArena
+                                    width: parent.width
+                                    height: Math.max(95, cleanupWorkArea.height - 100)
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.cyan
+                                    radius: 4
+                                    clip: true
+
+                                    Repeater {
+                                        model: 3
+                                        Rectangle {
+                                            x: 4
+                                            y: (index + 1) * huntArena.height / 3
+                                            width: huntArena.width - 8
+                                            height: 1
+                                            color: Colors.cyan
+                                            opacity: 0.18
+                                        }
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        enabled: !camera.huntPaused && !camera.busy
+                                        cursorShape: Qt.CrossCursor
+                                        onClicked: {
+                                            huntArena.forceActiveFocus();
+                                            camera.huntFire("");
+                                        }
+                                    }
+                                    Repeater {
+                                        id: huntTargetRepeater
+                                        model: camera.huntTargets
+                                        delegate: Item {
+                                            id: huntTargetItem
+                                            property var target: modelData
+                                            width: Math.min(170, Math.max(90,
+                                                huntArena.width / 4.6))
+                                            height: Math.min(88, Math.max(51,
+                                                huntArena.height / 4.3))
+                                            x: 8 + Math.max(0, huntArena.width - width - 16)
+                                               * (0.50 + 0.44 * Math.sin(
+                                                   camera.huntTick * target.speed
+                                                   + target.phase))
+                                            y: 6 + Math.max(0, huntArena.height - height - 12)
+                                               * ((target.lane + 0.5) / 3)
+
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                radius: 5
+                                                border.width: 2
+                                                border.color: Colors.magenta
+                                                color: Colors.black
+                                                clip: true
+                                                Image {
+                                                    x: 4
+                                                    y: 3
+                                                    width: parent.width - 8
+                                                    height: parent.height - 21
+                                                    source: huntTargetItem.target.mediaType.indexOf("video") >= 0
+                                                            ? ""
+                                                            : camera.fileUrl(huntTargetItem.target.path)
+                                                    sourceSize.width: 200
+                                                    sourceSize.height: 110
+                                                    fillMode: Image.PreserveAspectFit
+                                                    asynchronous: true
+                                                    cache: false
+                                                }
+                                                GohuText {
+                                                    anchors.centerIn: parent
+                                                    visible: huntTargetItem.target.mediaType.indexOf("video") >= 0
+                                                    font.pixelSize: 12
+                                                    color: Colors.cyan
+                                                    text: "VIDEO"
+                                                }
+                                                GohuText {
+                                                    anchors.bottom: parent.bottom
+                                                    anchors.horizontalCenter: parent.horizontalCenter
+                                                    width: parent.width - 6
+                                                    height: 17
+                                                    horizontalAlignment: Text.AlignHCenter
+                                                    elide: Text.ElideMiddle
+                                                    font.pixelSize: 9
+                                                    color: Colors.white
+                                                    text: huntTargetItem.target.name
+                                                }
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    enabled: !camera.huntPaused && !camera.busy
+                                                    cursorShape: Qt.CrossCursor
+                                                    onPressed: huntArena.forceActiveFocus()
+                                                    onClicked: camera.huntFire(
+                                                                   huntTargetItem.target.path)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    GohuText {
+                                        anchors.centerIn: parent
+                                        visible: camera.huntTargets.length === 0
+                                                 || camera.huntPaused
+                                        font.pixelSize: 13
+                                        color: Colors.yellow
+                                        text: camera.huntTargets.length === 0
+                                              ? "HUNT // PRESS NEW ROUND"
+                                              : camera.huntRoundComplete
+                                                ? "ROUND CLEARED"
+                                                : "PAUSED"
+                                    }
+                                }
+
+                                Row {
+                                    width: parent.width
+                                    height: 30
+                                    spacing: 6
+                                    ActionButton {
+                                        width: (parent.width - 18) / 4
+                                        height: 29
+                                        label: "NEW ROUND"
+                                        labelPixelSize: 10
+                                        accentColor: Colors.magenta
+                                        available: !camera.busy
+                                            && (camera.huntTargets.length === 0
+                                                || camera.huntRoundComplete)
+                                        onLeftClicked: {
+                                            camera.huntStartRound();
+                                            cleanupHuntView.forceActiveFocus();
+                                        }
+                                    }
+                                    ActionButton {
+                                        width: (parent.width - 18) / 4
+                                        height: 29
+                                        label: camera.huntPaused ? "RESUME" : "PAUSE"
+                                        labelPixelSize: 10
+                                        accentColor: Colors.cyan
+                                        available: !camera.busy
+                                            && !camera.huntRoundComplete
+                                            && camera.huntTargets.length > 0
+                                        onLeftClicked: camera.huntTogglePause()
+                                    }
+                                    ActionButton {
+                                        width: (parent.width - 18) / 4
+                                        height: 29
+                                        label: "UNDO SHOT"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.yellow
+                                        available: !camera.busy
+                                            && camera.huntHistory.length > 0
+                                        onLeftClicked: camera.huntUndo()
+                                    }
+                                    ActionButton {
+                                        width: (parent.width - 18) / 4
+                                        height: 29
+                                        label: "LOAD MORE"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.white
+                                        available: !camera.busy && camera.galleryHasMore
+                                            && camera.huntTargets.length === 0
+                                        onLeftClicked: camera.loadGallery(true, "cleanup")
+                                    }
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    height: 19
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                    elide: Text.ElideRight
+                                    text: camera.huntLastEvent
+                                          + " // " + camera.batchPaths.length
+                                          + " MARKED FOR REVIEW"
                                 }
                             }
                         }

@@ -13,7 +13,9 @@ const Resource={};load("services/favorites/FavoritesResourcePolicy.js",Resource)
 const Default={Resource};load("services/favorites/FavoritesDefaultPolicy.js",Default);
 const Collections={Resource,Default};
 load("services/favorites/FavoritesCollectionsPolicy.js",Collections);
-const Hub={Resource,Default,Collections};
+const Adapters={Policy:Resource};
+load("services/favorites/FavoritesReadOnlyAdapters.js",Adapters);
+const Hub={Resource,Default,Collections,Adapters};
 load("services/favorites/FavoritesManagementPolicy.js",Hub);
 const plain=v=>JSON.parse(JSON.stringify(v));
 const k=(provider,kind,id)=>Resource.identityKey(provider,kind,id);
@@ -134,4 +136,106 @@ test("no original provider data is copied into a CPU++ runtime writer",()=>{
   assert.match(places,/places-v1\.json/);
   const collection=read("services/favorites/FavoritesCollectionsStore.qml");
   assert.match(collection,/favorites-collections-v1\.json/);
+});
+
+
+test("AppControl favorites now appear in the CPU++ middle selector",()=>{
+  const app={
+    favoriteKeys:[
+      "task|process-secret",
+      "thermal|sensor-private",
+      "system|cpu-memory-private",
+      "app|some-private-application",
+      "run|hidden-command",
+      "mode:8:PRIVATE_WINDOW"
+    ],
+    favoriteDetailActionKeys:["app|private|command"],
+    favoriteMonitorBoxKeys:[
+      "watchbox|thermal|private-sensor|core-temp",
+      "watchbox|system|private-sensor|cpu"
+    ],
+    favoriteTaskMetricKeys:["taskmetric|private-process|cpu"]
+  };
+  const result=Hub.list(["UTC"],[],[],[],app);
+  assert.equal(result.total,11);
+  const cpu=Hub.filterRows(result,"CPU++");
+  const other=Hub.filterRows(result,"APP CTRL");
+  assert.equal(cpu.length,6);
+  assert.equal(other.length,4);
+  assert.deepEqual(plain(cpu.map(x=>x.label)),[
+    "PROCESS FAVORITE","THERMAL FAVORITE","SYSTEM FAVORITE",
+    "THERMAL METRIC WATCH","SYSTEM METRIC WATCH","PROCESS METRIC WATCH"
+  ]);
+  assert.deepEqual(plain(other.map(x=>x.label)),[
+    "APP CONTROL FAVORITE","APP CONTROL FAVORITE",
+    "APP CONTROL FAVORITE","PREFERRED ACTION"
+  ]);
+  assert.ok(cpu.every(x=>x.owner==="appcontrol" && x.readOnly));
+  assert.ok(other.every(x=>x.owner==="appcontrol" && x.readOnly));
+  assert.ok(cpu.every(x=>x.available==="unresolved"));
+  for (const record of cpu.concat(other)) {
+    assert.equal(Object.prototype.hasOwnProperty.call(record,"resourceId"),false);
+    assert.deepEqual(plain(record.capabilities),[]);
+    for(const text of ["private","hidden-command","PRIVATE_WINDOW"])
+      assert.equal(record.label.includes(text),false);
+  }
+});
+
+test("AppControl membership is source-owned and cannot enter a generic collection or action",()=>{
+  const donor={favoriteKeys:["task|critical-process"],favoriteDetailActionKeys:[],
+    favoriteMonitorBoxKeys:[],favoriteTaskMetricKeys:[]};
+  const items=Hub.list([],[],[],[],donor);
+  assert.equal(items.total,1);
+  const record=items.rows[0];
+  assert.equal(record.category,"CPU++");
+  assert.equal(record.readOnly,true);
+  assert.equal(record.provider,"appcontrol");
+  assert.equal(Collections.checkMemberKey(record.key).ok,false);
+  assert.equal(Hub.filterRows(items,"CPU++").length,1);
+  assert.equal(Hub.filterRows(items,"APP CTRL").length,0);
+});
+
+test("malformed AppControl snapshots are bounded and don't become actions",()=>{
+  const bad={
+    favoriteKeys:["",null,"task|valid","run|secret\u0001control",
+      "a".repeat(2300)],
+    favoriteDetailActionKeys:[],
+    favoriteMonitorBoxKeys:[],
+    favoriteTaskMetricKeys:[]
+  };
+  const out=Hub.list([],[],[],[],bad);
+  assert.equal(out.total,1);
+  assert.equal(out.rows[0].label,"PROCESS FAVORITE");
+  assert.ok(out.rejected>=4);
+  const missing=Hub.list([],[],[],[],{favoriteKeys:["task|ok"]});
+  assert.equal(missing.total,0);
+  assert.ok(missing.rejected>=3);
+  assert.equal(
+    Hub.list([],[],[],[],{
+      favoriteKeys:Array.from({length:530},(_,i)=>"task|pid"+i),
+      favoriteDetailActionKeys:[],
+      favoriteMonitorBoxKeys:[],
+      favoriteTaskMetricKeys:[]
+    }).shown,
+    Math.min(Hub.MAX_ROWS,Hub.MAX_APP_PER_FAMILY)
+  );
+});
+
+test("CPU++ imports all AppControl owner lists, with two-row filters and read-only details",()=>{
+  const cpu=read("widgets/CpuPlusW.qml");
+  const panel=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  for(const field of [
+    "FavoritesStore.favoriteKeys",
+    "FavoritesStore.favoriteDetailActionKeys",
+    "FavoritesStore.favoriteMonitorBoxKeys",
+    "FavoritesStore.favoriteTaskMetricKeys"
+  ]) assert.ok(cpu.includes(field),field);
+  assert.match(cpu,/FavoritesManagement\.list\(/);
+  assert.match(panel,/model: \["ALL","CPU\+\+","APP CTRL","CLOCK","PLACES","NEW"\]/);
+  assert.match(panel,/height: 59/);
+  assert.match(panel,/modelData\.readOnly\?"READ ONLY"/);
+  assert.match(panel,/pane\.selectedResource && !pane\.selectedResource\.readOnly/);
+  assert.match(panel,/APP CONTROL-OWNED \/\/ READ ONLY/);
+  assert.match(panel,/OWNER CONTROL/);
+  assert.doesNotMatch(panel,/pane\.appControlOwner|FavoritesStore\.favoriteKeys\s*=/);
 });

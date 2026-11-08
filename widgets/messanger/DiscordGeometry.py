@@ -283,7 +283,9 @@ def snapshot_from_tree(
             discord_candidates.append(discord_entry)
 
         if visible and social is None and node.get("name") == "QS_SOCIAL_MENU":
-            social = entry
+            social = dict(entry)
+            social["conId"] = node.get("id")
+            social["shell"] = node.get("shell")
 
         # Mark a provider as open only for an existing, exact-class Sway
         # container in the current browser scope. Hidden scratchpad windows
@@ -457,6 +459,10 @@ class Bridge:
         # It stays active when Social is closed, without polling get_tree.
         self.event_ipc = SwayIPC()
         self.focus_verify_ipc = SwayIPC()
+        self.native_pair_ipc = SwayIPC()
+        self.native_pair_key = None
+        self.native_pair_probe_at = 0.0
+        self.native_pair_retry_at = 0.0
         self.stdout_lock = threading.Lock()
 
         self.stop_event = threading.Event()
@@ -596,6 +602,68 @@ class Bridge:
             ),
         }
 
+    def native_command(self, command: str) -> bool:
+        try:
+            result = self.native_pair_ipc.request(IPC_COMMAND, command)
+            return (isinstance(result, list) and len(result) == 1
+                    and isinstance(result[0], dict)
+                    and result[0].get("success") is True)
+        except (OSError, ConnectionError, ValueError, json.JSONDecodeError):
+            self.native_pair_ipc.close()
+            return False
+
+    def update_native_pair(self, snapshot: dict[str, Any]) -> bool:
+        """Only native-pair an already verified, visible, docked XDG main."""
+        social = snapshot.get("social") or {}
+        discord = snapshot.get("discord") or {}
+        hid, gid = social.get("conId"), discord.get("conId")
+        rail = self.app_selector_width + self.discord_gap
+        inset = self.discord_inset
+        ready = (
+            self.discord_selected and self.discord_ready and self.discord_docked
+            and self.discord_kind == "main"
+            and social.get("visible") is True
+            and discord.get("visible") is True
+            and social.get("shell") == "xdg_shell"
+            and discord.get("shell") == "xdg_shell"
+            and type(hid) is int and hid > 0
+            and type(gid) is int and gid > 0 and hid != gid
+            and 40 <= rail <= 500 and 0 <= inset <= 20)
+        key = (hid, gid, rail, inset) if ready else None
+        if self.native_pair_key is not None and key != self.native_pair_key:
+            self.native_command("stage_director_social clear")
+            self.native_pair_key = None
+        if key is None:
+            return False
+        now = time.monotonic()
+        if key == self.native_pair_key:
+            if now >= self.native_pair_probe_at:
+                self.native_pair_probe_at = now + 0.15
+                if not self.native_command("stage_director_social status"):
+                    self.native_pair_key = None
+                    self.native_pair_retry_at = now + 0.35
+                    return False
+            return True
+        if now < self.native_pair_retry_at:
+            return False
+        host_rect = social.get("rect")
+        if not isinstance(host_rect, dict) or not self.rect_equal(
+                discord.get("rect"), self.discord_from_shared(host_rect)):
+            return False
+        if not self.native_command(
+                f"stage_director_social pair {hid} {gid} {rail} {inset}"):
+            # Older SwayPX or XWayland keep the established 8 ms fallback.
+            self.native_pair_retry_at = now + 3.0
+            return False
+        self.native_pair_key = key
+        self.native_pair_probe_at = now + 0.15
+        with self.command_lock:
+            self.pending_sync.pop("social", None)
+            self.pending_sync.pop("discord", None)
+        print("Stage Director Social native pair active", file=sys.stderr,
+              flush=True)
+        return True
+
     def fast_follow(self, snapshot: dict[str, Any]) -> dict[str, Any]:
         """
         Move the follower directly inside the helper.
@@ -609,6 +677,8 @@ class Bridge:
         """
         snapshot["fastLeader"] = None
         snapshot["shared"] = None
+        if snapshot.get("nativeStageDirector") is True:
+            return snapshot
 
         # Only one external app is selected at a time. Keep the Vesktop
         # path unchanged while allowing the same fast-follow for X.
@@ -1088,6 +1158,7 @@ class Bridge:
             # No provider launch happens here. The QML activation path owns
             # start/restore; this helper only waits for and manages Sway nodes.
 
+        snapshot["nativeStageDirector"] = self.update_native_pair(snapshot)
         snapshot = self.fast_follow(snapshot)
 
         if force or snapshot != self.last_snapshot:
@@ -1196,6 +1267,10 @@ class Bridge:
             self.command_ipc.close()
             self.event_ipc.close()
             self.focus_verify_ipc.close()
+            if self.native_pair_key is not None:
+                self.native_command("stage_director_social clear")
+                self.native_pair_key = None
+            self.native_pair_ipc.close()
 
 
 def main() -> int:

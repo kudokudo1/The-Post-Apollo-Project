@@ -145,6 +145,39 @@ def walk_tree(node: dict[str, Any]):
             yield from walk_tree(child)
 
 
+def walk_tree_with_scratchpad_owner(
+    node: dict[str, Any], in_scratch_workspace: bool = False,
+    inherited_scratchpad_owner: bool = False,
+):
+    """Yield Sway tree nodes with exact floating-parent scratchpad context.
+
+    Sway can serialize scratchpad ownership on a floating wrapper instead of
+    its XDG child. Only a single-child `floating_con` with `fresh` in the
+    synthetic `__i3_scratch` workspace may pass that state to descendants.
+    A workspace path or a window title alone must never unlock a cold-start
+    Electron main window.
+    """
+    if node.get("type") == "workspace":
+        in_scratch_workspace = node.get("name") == "__i3_scratch"
+        inherited_scratchpad_owner = False
+
+    children = (node.get("nodes", []) or []) + (
+        node.get("floating_nodes", []) or []
+    )
+    current_owner = (
+        in_scratch_workspace
+        and node.get("type") == "floating_con"
+        and normalized_identity(node.get("scratchpad_state")) == "fresh"
+        and len(children) == 1
+    )
+    owned = inherited_scratchpad_owner or current_owner
+    yield node, owned
+    for child in children:
+        yield from walk_tree_with_scratchpad_owner(
+            child, in_scratch_workspace, owned
+        )
+
+
 def compact_rect(rect: Any) -> dict[str, int] | None:
     if not isinstance(rect, dict):
         return None
@@ -245,7 +278,7 @@ def snapshot_from_tree(
         browser_window_class(site, scoped_identity): site for site in BROWSER_SITES
     }
 
-    for node in walk_tree(tree):
+    for node, inherited_scratchpad_owner in walk_tree_with_scratchpad_owner(tree):
         rect = compact_rect(node.get("rect"))
         if rect is None:
             continue
@@ -267,11 +300,14 @@ def snapshot_from_tree(
             discord_entry["appId"] = node.get("app_id")
             discord_entry["sandboxAppId"] = node.get("sandbox_app_id")
             discord_entry["shell"] = node.get("shell")
-            # Sway retains this across a Quickshell/geometry-helper restart.
-            # Unlike the helper's in-memory seen-visible set, it identifies
-            # a hidden scratchpad main window without guessing from its size.
-            discord_entry["scratchpadState"] = normalized_identity(
+            # The floating parent can own Sway's scratchpad state while the
+            # XDG child reports 'none'. Only an exact single-child wrapper in
+            # __i3_scratch passes that evidence after a helper restart.
+            own_scratchpad_state = normalized_identity(
                 node.get("scratchpad_state")
+            )
+            discord_entry["scratchpadState"] = (
+                "fresh" if inherited_scratchpad_owner else own_scratchpad_state
             )
             discord_entry["kind"] = vesktop_window_kind(
                 rect,

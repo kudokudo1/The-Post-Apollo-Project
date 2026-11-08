@@ -134,7 +134,7 @@ PanelWindow {
     // A matching Git Team must never substitute for the registered Session.
     property string rosterFocusedRoomId: ""
     property string rosterFocusedSessionId: ""
-    property string rosterFocusedMode: "chat"
+    property string rosterFocusedMode: "continuity"
     readonly property var rosterFocusedRoomData: {
         const rooms = root.workforceRosterRows || [];
         for (let i = 0; i < rooms.length; ++i) {
@@ -361,7 +361,8 @@ PanelWindow {
         root.rosterFocusedRoomId = id;
         root.rosterFocusedSessionId = String(current.sessionId || "");
         root.rosterFocusedMode = modeValue === "connections" ? "connections"
-            : modeValue === "quick" ? "quick" : "chat";
+            : modeValue === "quick" ? "quick"
+            : modeValue === "chat" ? "chat" : "continuity";
         root.operationsSurface = "registeredWorker";
         return true;
     }
@@ -3281,6 +3282,16 @@ PanelWindow {
             height: 22
             spacing: 6
 
+            HospitalActionButton {
+                width: 64
+                height: parent.height
+                label: "ROOM"
+                compactIcon: "ROOM"
+                accent: Colors.magenta
+                actionDescription: "Open permanent Room briefing, handoff, decisions and recovery context"
+                onTriggered: root.openRosterSession(
+                    rosterRow.rosterData, "continuity")
+            }
             HospitalActionButton {
                 width: 64
                 height: parent.height

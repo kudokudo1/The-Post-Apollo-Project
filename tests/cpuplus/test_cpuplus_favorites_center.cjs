@@ -116,7 +116,8 @@ test("manager actions are always routed to owning stores with no new writer",()=
   assert.match(pane,/pane\.defaultOwner\.togglePinned\(/);
   assert.match(pane,/collectionStore: pane\.collectionsOwner/);
   assert.match(pane,/pane\.removeArmed/);
-  assert.match(pane,/FavoritesUnifiedPreview \{/);
+  assert.match(pane,/Dossier\.build\(pane\.candidates\)/);
+  assert.doesNotMatch(pane,/FavoritesUnifiedPreview \{/);
   assert.match(pane,/FavoritesCollectionPanel \{/);
   assert.doesNotMatch(pane,/FileView\s*\{|Process\s*\{|execDetached|Qt\.openUrlExternally/);
   assert.doesNotMatch(pane,/AppControlW|FavoritesService\.toggle/);
@@ -636,4 +637,82 @@ test("FILES view labels retain actual names and original owner without executabl
   assert.ok(fixture.includes("mode:2:⌯🗁๋࣭⭑  Properties/"));
   assert.ok(fixture.includes("mode:2:↗  Active Contract.pdf"));
   assert.doesNotMatch(source+manager,/execDetached|Qt\.openUrlExternally|FileView\s*\{|Process\s*\{/);
+});
+
+
+test("left dossier lists every original saved resource exactly once, grouped by source and menu",()=>{
+  const Dossier={};
+  load("services/favorites/FavoritesDossierIndexPolicy.js",Dossier);
+  const saved={favoriteKeys:[
+      "mode:2:◇  budget-2026.xlsx",
+      "mode:2:⌯🗁๋࣭⭑  Properties/",
+      "mode:2:↗  Active Contract.pdf",
+      "run:firefox",
+      "task|kitty"
+    ],favoriteDetailActionKeys:[],favoriteMonitorBoxKeys:[],
+    favoriteTaskMetricKeys:[]};
+  const owner={Resource};
+  load("services/favorites/FavoritesAppControlDisplayPolicy.js",owner);
+  const records=Hub.list(["UTC"],[{id:4,place:{label:"House"}}],
+    [k("finance","instrument","EXAMPLE")],[],saved,{},
+    owner.build(saved,{taskRows:[{comm:"kitty"}]}));
+  const index=Dossier.build(records);
+  assert.equal(index.total,records.rows.length);
+  assert.equal(index.groups.reduce((n,g)=>n+g.count,0),records.rows.length);
+  const file=index.groups.find(g=>g.key==="APP CTRL|FILES");
+  assert.equal(file.count,3);
+  assert.deepEqual(plain(file.items.map(x=>x.name)),
+    ["budget-2026.xlsx","Properties","Active Contract.pdf"]);
+  assert.deepEqual(plain(file.items.map(x=>x.type)),
+    ["FILE FAVORITE","DIRECTORY FAVORITE","SYMLINK FAVORITE"]);
+  assert.ok(index.groups.some(g=>g.key==="CPU++|KILL"));
+  assert.ok(index.groups.some(g=>g.key==="CLOCK|CLOCK"));
+  assert.ok(index.groups.some(g=>g.key==="PLACES|PLACES"));
+  assert.ok(index.groups.some(g=>g.key==="NEW|NEW"));
+  const every=index.groups.flatMap(g=>g.items);
+  assert.equal(new Set(every.map(x=>x.key)).size,every.length);
+  assert.ok(every.every(x=>!Object.prototype.hasOwnProperty.call(x,"resourceId")));
+  assert.ok(every.every(x=>!Object.prototype.hasOwnProperty.call(x,"capabilities")));
+});
+
+test("dossier selection is a navigation request, never a second provider mutation",()=>{
+  const src=read("widgets/CpuPlusW.qml");
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const policy=read("services/favorites/FavoritesDossierIndexPolicy.js");
+  assert.match(src,/onIndexSelectionRequested: function\(key, category\)/);
+  assert.match(src,/favoritesSelectorPane\.filterMode = category;/);
+  assert.match(src,/cpuPlusWindow\.selectedFavoriteKey = key;/);
+  assert.match(pane,/signal indexSelectionRequested\(string key, string category\)/);
+  assert.match(pane,/pane\.indexSelectionRequested\(/);
+  assert.match(pane,/function toggleIndexGroup\(key\)/);
+  assert.match(pane,/dossierGroup\.section\.count/);
+  assert.match(pane,/pane\.revealSelectedInSelector/);
+  assert.doesNotMatch(policy,/execDetached|Process\s*\{|FileView\s*\{|JsonAdapter\s*\{|setFavorite\(/);
+  assert.doesNotMatch(pane,/FavoritesUnifiedPreview\s*\{/);
+});
+
+test("dossier uses only supplied labels and never decodes raw identities",()=>{
+  const Dossier={};
+  load("services/favorites/FavoritesDossierIndexPolicy.js",Dossier);
+  const keys=["opaque-a","opaque-b","opaque-c"];
+  const result=Dossier.build({rows:[
+    {key:keys[0],category:"APP CTRL",owner:"appcontrol",
+     menu:"RUN",label:"RUN // SAVED COMMAND #1",resolved:false,
+     favoriteType:"FAVORITE",readOnly:true},
+    {key:keys[1],category:"APP CTRL",owner:"appcontrol",
+     menu:"FILES",label:"FILES // report.pdf",resolved:true,
+     item:"report.pdf",favoriteType:"FILE FAVORITE",readOnly:true},
+    {key:keys[2],category:"CPU++",owner:"appcontrol",
+     menu:"KILL",label:"KILL // kitty",resolved:true,item:"kitty",
+     favoriteType:"PROCESS FAVORITE",readOnly:true}
+  ]});
+  assert.equal(result.total,3);
+  assert.deepEqual(plain(result.groups.map(g=>g.title)),
+    ["APP CTRL // FILES","APP CTRL // RUN","CPU++ // KILL"]);
+  assert.equal(result.groups[1].unresolved,1);
+  assert.equal(result.groups[1].items[0].name,"SAVED COMMAND #1");
+  assert.equal(result.groups[0].items[0].name,"report.pdf");
+  assert.equal(result.groups[2].items[0].name,"kitty");
+  assert.ok(!JSON.stringify(result).includes("private-command"));
+  assert.ok(!JSON.stringify(result).includes("resourceId"));
 });

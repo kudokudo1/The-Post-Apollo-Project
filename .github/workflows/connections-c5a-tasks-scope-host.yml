@@ -1,0 +1,61 @@
+name: Connections C5a TASKS three-scope descriptor-isolated host
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/experiments/C5aTasksScopeHost.py'
+      - 'tests/connections/test_connections_c5a_tasks_scope_broker.py'
+      - 'docs/connections-c5a-tasks-scope-host.md'
+      - '.github/workflows/connections-c5a-tasks-scope-host.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/connections/experiments/C5aTasksScopeHost.py'
+      - 'tests/connections/test_connections_c5a_tasks_scope_broker.py'
+      - '.github/workflows/connections-c5a-tasks-scope-host.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  descriptor-scoped-host:
+    name: Independent host/client process and three consent scopes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real Linux separate-process descriptor boundary, expiry, revoke, replay and denials
+        run: |
+          python3 -B -m unittest discover -s tests/connections \
+            -p 'test_connections_c5a_tasks_scope_broker.py' -v
+      - name: Existing C2c private descriptor broker contract
+        run: python3 -B tests/connections/test_connections_c2c_descriptor_authority.py
+      - name: Existing C2l host identity caution and status contract
+        run: python3 -B -m unittest discover -s tests/connections -p 'test_connections_c2l_host_trust_boundary.py' -v
+      - name: TASKS M15e single editor source-bound snapshot transaction
+        run: node --test tests/tasks/test_task_editor_snapshot_host_m15e.cjs
+      - name: TASKS M15d editor selection and M15c default-deny controls
+        run: |
+          node --test tests/tasks/test_task_draft_target_selection_m15d.cjs
+          node --test tests/tasks/test_task_encrypted_draft_access_m15c.cjs
+      - name: Existing source-bound encryption and scoped consent refusals
+        run: |
+          node --test tests/tasks/test_task_encrypted_draft_transaction_m13m.cjs
+          node --test tests/tasks/test_task_connections_permission_m13p.cjs
+          node --test tests/tasks/test_task_recovery_consent_source_m13t.cjs
+      - name: Live TASKS writer count and Connections credential prohibition
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: No import of synthetic host, no real grants, no production key release
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile services/connections/experiments/C5aTasksScopeHost.py
+          ! grep -R -F 'C5aTasksScopeHost' services/connections/ConnectionsBroker.qml \
+            services/hub/ApolloHubTodoStore.qml widgets shell.qml
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          grep -q 'readonly property bool credentialActionsEnabled: false' \
+            services/connections/ConnectionsBroker.qml
+          ! grep -Eq 'secret-tool|gnome-keyring|Qt.openUrlExternally|ApolloHubTodoStore' \
+            services/connections/experiments/C5aTasksScopeHost.py
+          printf '%s\n' 'C5A_REAL_DESCRIPTOR_SCOPE_ENFORCEMENT_NO_PRODUCTION_GRANT_PASS'

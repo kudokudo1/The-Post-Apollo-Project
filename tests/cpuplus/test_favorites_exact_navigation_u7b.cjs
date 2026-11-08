@@ -6,8 +6,8 @@ const fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
 const root=path.resolve(__dirname,"../..");
 const read=file=>fs.readFileSync(path.join(root,file),"utf8");
 function load(file,env) {
-    vm.runInNewContext(read(file).replace(/^\\.pragma library\\s*$/m,"")
-        .replace(/^\\.import ".+" as \\w+\\s*$/gm,""),env,{filename:file});
+    vm.runInNewContext(read(file).replace(/^\.pragma library\s*$/m,"")
+        .replace(/^\.import ".+" as \w+\s*$/gm,""),env,{filename:file});
 }
 const Resource={};
 load("services/favorites/FavoritesResourcePolicy.js",Resource);
@@ -84,9 +84,9 @@ test("Weather owner revalidates membership and store freshness before choosing r
 
 test("U7b policy remains a pure navigation contract without filesystem or player APIs",()=>{
     const code=read("services/favorites/FavoritesExactNavigationPolicy.js");
-    assert.doesNotMatch(code,/FileView\\s*\\{|Process\\s*\\{|execDetached|Qt\\.openUrlExternally/);
-    assert.doesNotMatch(code,/favoriteStore\\.|toggleCardFavorite\\(|replacePanelFavorites\\(/);
-    assert.doesNotMatch(code,/playStation\\(|runCommand\\(|deleteFile\\(/);
-    assert.match(code,/ownerAllows\\(/);
-    assert.match(code,/Resource\\.identityKey\\(/);
+    assert.doesNotMatch(code,/FileView\s*\{|Process\s*\{|execDetached|Qt\.openUrlExternally/);
+    assert.doesNotMatch(code,/favoriteStore\.|toggleCardFavorite\(|replacePanelFavorites\(/);
+    assert.doesNotMatch(code,/playStation\(|runCommand\(|deleteFile\(/);
+    assert.match(code,/ownerAllows\(/);
+    assert.match(code,/Resource\.identityKey\(/);
 });

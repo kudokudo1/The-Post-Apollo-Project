@@ -73,15 +73,14 @@ PanelWindow {
     readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))
     // Keep a 1px border while using the full remaining physical frame height.
     readonly property int zoomBayBottom: 1
-    // Nov 8 native screenshot and Sway readback: Zoom X=68 Y=196
-    // 780x593, while the mode-row border ends 13 logical px above the
-    // visible browser top. Increase the existing 4px correction by 13px:
-    // expected Y=183, height=606, with the same X/width/bottom (789).
-    // Keep this separate from workarea positioning and input containment.
-    // Compact keeps its native-measured adjustment. Expanded/fullscreen
-    // reserve the whole deck above Zoom, so the guest never needs to hide
-    // underneath any of the four mode buttons.
-    readonly property int zoomTopNudge: chassisLevel === "compact" ? 17 : 0
+    // The live Zoom browser starts AFTER the whole mode deck, in every size.
+    // Compact previously placed 17px of the real browser behind the controls.
+    // Compress compact's own header/spacing instead of overlapping the guest.
+    // A small, opaque separation between buttons and browser is a deck
+    // design spacing, not an independent Sway/browser positioning correction.
+    readonly property int zoomDeckGap: 3
+    readonly property int zoomControlDeckBottom: Math.max(0, Math.round(
+        cameraBodyColumn.y + cameraModes.y + cameraModes.height))
     readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))
     readonly property int zoomBayHeight: Math.max(0, Math.round(zoomViewport.height))
     // Sway measured the browser at 92,126 718x514, exactly the old
@@ -99,7 +98,7 @@ PanelWindow {
     // The browser can sit behind Camera chrome, but its input cutout must
     // never cut through the row of live Camera mode buttons.
     readonly property int zoomInputTop: Math.max(
-        zoomActorTop, cameraBodyColumn.y + cameraModes.y + cameraModes.height)
+        zoomActorTop, zoomControlDeckBottom)
     readonly property int zoomInputHeight: Math.max(
         0, zoomActorHeight - (zoomInputTop - zoomActorTop))
     property bool zoomWebNeedsRealign: false
@@ -270,9 +269,8 @@ PanelWindow {
     // previously deducted that chrome from the browser's 900px budget.
     // Measure the actual live deck rather than stacking guessed Y offsets.
     // Only Zoom gets the extra height; other modes retain Finance sizing.
-    readonly property int zoomDeckReserve: Math.max(0, Math.round(
-        cameraBodyColumn.y + cameraModes.y + cameraModes.height
-        + zoomBayBottom))
+    readonly property int zoomDeckReserve: Math.max(
+        0, zoomControlDeckBottom + zoomDeckGap + zoomBayBottom)
     readonly property int availableFrameHeight: Math.max(
         1, viewportHeight - frameTopInset - bottomScreenGap)
     // Expanded has room to add the mode deck above Finance's 900px content.
@@ -958,13 +956,11 @@ PanelWindow {
             // Zoom is a separate physical Sway guest. Fit its client to the
             // frame's inner edges rather than the narrower content Column,
             // and keep the actual browser, mask and host on this one rect.
-            // Compact retains its measured correction; expanded/fullscreen
-            // allocate additional frame height for their entire mode deck.
-            // The web guest then starts below the real buttons instead of
-            // overlapping their click area. Its size follows Camera's frame.
+            // All chassis sizes use the same deck-end boundary and a small
+            // opaque seam. Compact moves its CONTROLS up, not Zoom under them.
+            // Host, Sway follower and click-through region use this one rect.
             x: camera.zoomWebEdgeInset
-            y: cameraBodyColumn.y + cameraModes.y + cameraModes.height
-               - camera.zoomTopNudge
+            y: camera.zoomControlDeckBottom + camera.zoomDeckGap
             width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)
             height: Math.max(0, frame.height - y - camera.zoomBayBottom)
             visible: camera.menuOpen && camera.activeView === "zoom"
@@ -1445,19 +1441,17 @@ PanelWindow {
 
         }
 
-        // The Zoom browser is a separate Sway client behind a transparent
-        // Quickshell panel. The 42px MODE row contains 34px ActionButtons;
-        // their remaining 8px must still be opaque, not a view of the
-        // browser/desktop under the frame. A 4px underlap seals the small
-        // compositor rounding seam without moving, resizing or intercepting
-        // input from Zoom. Keep this behind the actual Camera controls.
+        // The Zoom browser is a separate Sway client behind the panel.
+        // Cover ALL of the 42px mode row, plus the 3px deck gap, so unused
+        // button space cannot reveal browser chrome or neighboring windows.
+        // The matte is behind Camera buttons and has no input handlers.
         Rectangle {
             id: zoomModeDeckMatte
             x: 0
             y: cameraBodyColumn.y + cameraModes.y
             width: frame.width
-            // Opaque unused mode-row space, with only a 1px seam seal.
-            // Do not cover the Zoom Workplace header.
+            // The complete row and gap are opaque; the 1px seam seal is
+            // deliberate, never an 17px browser underlap.
             height: Math.max(0, zoomViewport.y - y + 1)
             color: Colors.black
             visible: camera.menuOpen && camera.activeView === "zoom"
@@ -1466,17 +1460,22 @@ PanelWindow {
 
         Column {
             id: cameraBodyColumn
+            readonly property bool compactZoomDeck:
+                camera.activeView === "zoom" && camera.chassisLevel === "compact"
             anchors.fill: parent
-            // Zoom has its own hosted browser body and can reclaim the
-            // unnecessary padding without shrinking any control buttons.
-            // Other Camera modes preserve their original layout.
+            // Keep full-size buttons in the compact deck, but lift the
+            // header + mode row together instead of raising Zoom underneath.
+            // Expanded/fullscreen and non-Zoom modes retain their spacing.
             anchors.margins: camera.activeView === "zoom" ? 12 : 18
-            spacing: camera.activeView === "zoom" ? 8 : 12
+            anchors.topMargin: compactZoomDeck ? 8
+                              : camera.activeView === "zoom" ? 12 : 18
+            spacing: compactZoomDeck ? 4
+                     : camera.activeView === "zoom" ? 8 : 12
 
             Row {
                 id: cameraHeader
                 width: parent.width
-                height: 37
+                height: cameraBodyColumn.compactZoomDeck ? 32 : 37
                 spacing: 8
 
                 GohuText {

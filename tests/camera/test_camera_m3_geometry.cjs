@@ -33,21 +33,30 @@ test("Camera compact retains its size; Zoom expanded reserves deck height beyond
     // Camera preserves Finance's 900px *browser content* baseline when
     // there is screen room. Its fixed-height deck is reserved separately.
     for (const token of [
-        'readonly property int zoomDeckReserve: Math.max(0, Math.round(',
+        'readonly property int zoomControlDeckBottom: Math.max(0, Math.round(',
         'cameraBodyColumn.y + cameraModes.y + cameraModes.height',
-        '+ zoomBayBottom))',
+        'readonly property int zoomDeckReserve: Math.max(',
+        'zoomControlDeckBottom + zoomDeckGap + zoomBayBottom',
         'readonly property int availableFrameHeight: Math.max(',
         'financeSize.height + zoomDeckReserve',
         'camera.activeView === "zoom"',
         'Math.min(availableFrameHeight,'
     ]) assert.ok(camera.includes(token), 'missing zoom deck budget: ' + token);
-    const reserve = 12 + 37 + 2 + (8 * 2) + 42 + 1;
+    const reserve = 12 + 37 + 2 + (8 * 2) + 42 + 3 + 1;
     const maxFrame = 1440 - 9 - 8;
     const expandedZoomFrame = Math.min(maxFrame, medium.height + reserve);
-    assert.equal(reserve, 110);
-    assert.equal(expandedZoomFrame, 1010);
+    assert.equal(reserve, 113);
+    assert.equal(expandedZoomFrame, 1013);
     assert.equal(expandedZoomFrame - reserve, 900);
-    assert.match(camera, /zoomTopNudge: chassisLevel === "compact" \? 17 : 0/);
+    // Compact's header is raised by 4px margin, 5px header, 8px spacing.
+    // The 3px gap below buttons is opaque and the browser is not overlapped.
+    const compactDeckEnd = 8 + 32 + 2 * 4 + 2 + 42;
+    const compactBrowserTop = compactDeckEnd + 3;
+    assert.equal(compactDeckEnd, 92);
+    assert.equal(compactBrowserTop, 95);
+    assert.equal(699 - compactBrowserTop - 1, 603);
+    assert.match(camera, /readonly property int zoomDeckGap: 3/);
+    assert.doesNotMatch(camera, /zoomTopNudge/);
     assert.equal(policy.step("compact", 1), "expanded");
     assert.equal(policy.step("expanded", 1), "fullscreen");
     assert.equal(policy.step("fullscreen", -1), "expanded");
@@ -67,7 +76,7 @@ test("Camera uses Finance's baseline fullscreen width/height outside Zoom; Zoom 
     const full = policy.frame("fullscreen", 2560, 1440, 12, 9, 8);
     assert.equal(full.width, 2536);
     assert.equal(full.height, 1345);
-    const reserve = 110;
+    const reserve = 113;
     // Fullscreen retains Finance's baseline instead of growing into the
     // physical output area reserved by Sway's top panel.
     assert.match(camera, /camera.activeView === "zoom" && chassisLevel === "expanded"/);

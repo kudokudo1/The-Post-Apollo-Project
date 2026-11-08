@@ -10,6 +10,8 @@ import "services/favorites/FavoritesCollectionsPolicy.js" as CollectionRules
 ShellRoot {
     id: root
     property string selectedKey: ""
+    property string selectedCollectionId: ""
+    property bool collectionClicked: false
     property bool ready: false
     property bool selectedByClick: false
     property bool indexClicked: false
@@ -151,7 +153,11 @@ ShellRoot {
         property string errorCode: ""
         property bool busy: false
         property var collections: [
-            {id:"c1",name:"Daily Operations",members:[]}
+            {id:"c1",name:"Daily Operations",members:[
+                "fav1:local:weather-home:panel:home%2Fauto",
+                "fav1:local:radio:station:123e4567-e89b-42d3-a456-000000000002",
+                "fav1:local:weather-home:panel:home%2Fhistory"
+            ]}
         ]
         function acceptsKey(key) {
             return CollectionRules.checkMemberKey(key).ok;
@@ -183,11 +189,34 @@ ShellRoot {
                 placesOwner: places
                 defaultOwner: defaults
                 collectionsOwner: collections
+                selectedCollectionId: root.selectedCollectionId
                 onIndexSelectionRequested: function(key, category) {
                     selector.filterMode=category;
                     root.selectedKey=key;
                     root.indexClicked=true;
                     console.log("U4_INDEX // NAVIGATED "+category);
+                }
+                onCollectionRequested: function(collectionId) {
+                    const section=dossier.collectionView.groups.find(function(g) {
+                        return g.id===collectionId;
+                    });
+                    if(!section) {root.fail("U6B_UNKNOWN_COLLECTION");return;}
+                    root.selectedCollectionId=collectionId;
+                    selector.filterMode="GROUP";
+                    root.selectedKey=section.rows.length?section.rows[0].key:"";
+                    root.collectionClicked=true;
+                    console.log("U6B_INDEX // NAVIGATED "+collectionId);
+                }
+                onCollectionMemberRequested: function(collectionId,key) {
+                    const section=dossier.collectionView.groups.find(function(g) {
+                        return g.id===collectionId;
+                    });
+                    if(!section || !section.rows.some(function(row) {
+                        return row.key===key;
+                    })) {root.fail("U6B_MEMBER_NOT_FOUND");return;}
+                    root.selectedCollectionId=collectionId;
+                    selector.filterMode="GROUP";
+                    root.selectedKey=key;
                 }
             }
             CpuPlusFavoritesHubPane {
@@ -203,6 +232,7 @@ ShellRoot {
                 placesOwner: places
                 defaultOwner: defaults
                 collectionsOwner: collections
+                selectedCollectionId: root.selectedCollectionId
                 onSelectionRequested: function(key) {
                     root.selectedKey=key;
                     root.selectedByClick=true;
@@ -220,6 +250,7 @@ ShellRoot {
                 placesOwner: places
                 defaultOwner: defaults
                 collectionsOwner: collections
+                selectedCollectionId: root.selectedCollectionId
             }
         }
     }
@@ -309,6 +340,12 @@ ShellRoot {
             });
             if(!root.options || root.options.total!==21
                || dossier.dossier.total!==root.options.rows.length
+               || dossier.collectionView.count!==1
+               || dossier.collectionView.groups[0].count!==3
+               || dossier.collectionView.groups[0].available!==2
+               || dossier.collectionView.groups[0].missing!==1
+               || dossier.collectionView.groups[0].items[2].key!==""
+               || dossier.collectionView.groups[0].items[2].name!=="SAVED MEMBER UNAVAILABLE"
                || !hospitalReportGroup || hospitalReportGroup.count!==1
                || !hospitalRoundsGroup || hospitalRoundsGroup.count!==1
                || !hospitalReport || !hospitalReport.readOnly
@@ -387,6 +424,10 @@ ShellRoot {
                 if(!fileRow) {
                     root.fail("DOSSIER_ROW_MISSING");return;
                 }
+                const scroll=dossier.dossierScrollArea;
+                const pos=fileRow.mapToItem(scroll.contentItem,0,0);
+                scroll.contentY=Math.max(0,Math.min(
+                    Math.max(0,scroll.contentHeight-scroll.height),pos.y-10));
                 const pt=fileRow.mapToItem(win.contentItem,
                     16,fileRow.height/2);
                 root.testStage=1;
@@ -432,7 +473,26 @@ ShellRoot {
                     root.fail("U6_PROVIDER_MUTATION");return;
                 }
                 console.log("U6_PASS // SAFE_MEMBER_ONLY_NO_PROVIDER_WRITES");
+                const group=dossier.collectionGroupItems.itemAt(0);
+                if(!group) {root.fail("U6B_GROUP_NOT_RENDERED");return;}
+                const pt=group.mapToItem(win.contentItem,16,14);
+                root.testStage=4;
+                console.log("U6B_GROUP_READY // x="+Math.round(pt.x)
+                    +" y="+Math.round(pt.y));
+            } else if(root.testStage===4 && root.collectionClicked) {
+                if(root.selectedCollectionId!=="c1"
+                        || selector.filterMode!=="GROUP"
+                        || selector.choices.length!==2
+                        || selector.choices[0].owner!=="weather-home"
+                        || selector.choices[1].owner!=="radio"
+                        || !root.selection || root.selection.key!==selector.choices[0].key
+                        || dossier.collectionView.missingCount!==1
+                        || dossier.collectionView.groups[0].items[2].key!==""
+                        || time.removals || places.removals || defaults.mutations) {
+                    root.fail("U6B_GROUP_NAVIGATION");return;
+                }
                 root.done=true;
+                console.log("U6B_PASS // COLLECTION_TO_SELECTOR_AND_DETAILS_NO_WRITES");
                 Qt.quit();
             }
         }

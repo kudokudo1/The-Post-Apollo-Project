@@ -1,0 +1,65 @@
+name: Connections C3e-E authority-owned release floors (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eAuthorityOwnedFloor.py"
+      - "tests/connections/test_connections_c3ee_authority_owned_floor.py"
+      - ".github/workflows/connections-c3ee-authority-owned-release-floor.yml"
+      - "docs/connections-c3ee-authority-owned-release-floor.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-separate-process-authority:
+    # No service, key or state is installed onto any Post-Apollo workstation.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify executable source and deny-only production boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v gpg
+          command -v gpgv
+          python3 -m py_compile \
+            tests/connections/c3e_release_trust/C3eAuthorityOwnedFloor.py \
+            tests/connections/test_connections_c3ee_authority_owned_floor.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          base = Path("services/connections")
+          assert "readonly property bool hostAuthenticated: false" in (base/"ConnectionsRequestStatus.qml").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in (base/"ConnectionsBroker.qml").read_text()
+          for p in (*base.glob("*.qml"), *base.glob("*.js"), base/"qmldir"):
+              assert "C3eAuthorityOwnedFloor" not in p.read_text(), p
+          print("C3EE_PASS // PRODUCTION_AUTHORITY_AND_CREDENTIALS_REMAIN_FALSE")
+          PY
+      - name: Exercise real separate Python processes and independent ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ee_authority_owned_floor.py
+          echo "C3EE_PASS // AUTHORITY_SIGNS_ONLY_OWN_SIGNED_RELEASE_LEDGER_FLOORS"
+      - name: Reconfirm signed response and durable client mechanisms
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ed_signed_floor.py
+          python3 -B tests/connections/test_connections_c3ec_durable_floor.py
+          python3 -B tests/connections/test_connections_c3e_release_trust.py
+          echo "C3EE_PASS // SIGNED_CHALLENGE_REPLAY_AND_SQLITE_ROOT_REGRESSIONS"
+      - name: Require explicit authority rollback limitation
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'not a protected independently' docs/connections-c3ee-authority-owned-release-floor.md
+          grep -Fq 'C3eE' tests/connections/test_connections_c3ee_authority_owned_floor.py
+          grep -Fq 'authority ledger' docs/connections-c3ee-authority-owned-release-floor.md
+          echo "C3EE_LIMITATION // SEPARATE_PROCESS_SAME_CI_HOST_NO_HARDWARE_ANTI_ROLLBACK"

@@ -402,6 +402,10 @@ Rectangle {
             objectName: "cosmos-c14-observation-board"
             anchors.fill: parent
             property bool expandedSuvi: false
+            // C36 // One SDO playback instance. Resizing between hero and
+            // stage changes only its QML geometry, not its media source.
+            property bool movieOpen: false
+            property bool movieFull: false
             readonly property bool roomy: width >= 620 && height >= 330
             readonly property int labelSize: roomy ? 10 : 8
             readonly property int textSize: roomy ? 13 : 10
@@ -462,7 +466,16 @@ Rectangle {
                     // subject stage rather than only the left hero region.
                     imageInteractive: true
                     stageImageExpand: true
-                    onStageImageRequested: observation.expandedSuvi = true
+                    solarMovieEnabled: true
+                    onSolarMovieRequested: {
+                        observation.expandedSuvi = false;
+                        observation.movieFull = false;
+                        observation.movieOpen = true;
+                    }
+                    onStageImageRequested: {
+                        observation.movieOpen = false;
+                        observation.expandedSuvi = true;
+                    }
                     sourceSpace: sunTerminal.sourceSpace
                     spaceService: sunTerminal.spaceService
                 }
@@ -777,6 +790,28 @@ Rectangle {
                     }
                 }
             }
+            // C36 // One bounded SDO movie over the existing left hero,
+            // with FULL switching its GEOMETRY to the subject stage.
+            // No secondary media instance when expanded; NOAA remains under it.
+            StationCosmosSolarMoviePane {
+                id: solarMovie
+                objectName: "cosmos-c36-observation-solar-movie"
+                visible: observation.movieOpen
+                expanded: observation.movieFull
+                x: 0
+                y: 0
+                width: observation.movieFull ? observation.width
+                    : Math.max(1,Math.round((observationHeroes.width-5)*0.53))
+                height: observation.movieFull ? observation.height
+                    : observationHeroes.height
+                z: 11
+                onExpandRequested: observation.movieFull = !observation.movieFull
+                onCloseRequested: {
+                    observation.movieOpen = false;
+                    observation.movieFull = false;
+                }
+            }
+
             // C34 // Same reusable focus surface as C33 Meteors/Eclipses/
             // Stars. Both NOAA SUVI channels retain their provider URL,
             // provenance and source refresh ownership; no new fetcher.

@@ -375,8 +375,11 @@ class LogindSeatGuardTests(unittest.IsolatedAsyncioTestCase):
         self.bus.session.lock()
         self.assertFalse(self.guard.is_active())
         # Host teardown runs in a background notifier thread.
-        for _ in range(50):
-            if not host.started:
+        # Revocation immediately blocks the session probe, even before
+        # socket server shutdown finishes joining its worker thread.
+        self.assertFalse(self.guard.is_active())
+        for _ in range(100):
+            if not host.started and not socket_path.exists():
                 break
             await asyncio.sleep(0.05)
         self.assertFalse(host.started)

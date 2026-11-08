@@ -3,6 +3,7 @@ import "../../components"
 import "../../services/favorites/FavoritesDossierIndexPolicy.js" as Dossier
 import "../../services/favorites/FavoritesCollectionsViewPolicy.js" as CollectionView
 import "../../services/favorites/FavoritesOwnerNavigationPolicy.js" as OwnerNavigation
+import "../../services/favorites/FavoritesExactNavigationPolicy.js" as ExactNavigation
 
 // CPU++ Favorites++ manager. Three instances share one selection/snapshot.
 // No new FileView, owner process, or action authority is created here.
@@ -21,6 +22,7 @@ Item {
     property alias collectionPanel: collectionManager
     // Test seam for the original read-only owner-navigation button.
     property alias ownerNavigationControl: remove
+    property alias exactNavigationControl: openItem
     property var timeOwner: null
     property var placesOwner: null
     property var defaultOwner: null
@@ -37,8 +39,12 @@ Item {
     // U7a: navigation asks the shell to open one of its existing widget views.
     // Never transmit the selected favorite's key/resource ID or command.
     signal ownerNavigationRequested(string owner, string view)
+    // Fixed, non-sensitive exact route only; Weather rechecks its own store.
+    signal exactNavigationRequested(string owner, string route)
     readonly property var ownerNavigation:
         OwnerNavigation.plan(pane.selectedResource)
+    readonly property var exactNavigation:
+        ExactNavigation.plan(pane.selectedResource)
     readonly property var dossier: Dossier.build(pane.candidates)
     readonly property var collectionView: CollectionView.build(
         pane.collectionsOwner ? pane.collectionsOwner.collections : [],
@@ -741,26 +747,37 @@ Item {
             }
 
             ActionButton {
+                id: openItem
                 width: Math.max(0,parent.width-remove.width-parent.spacing)
                 height: 30
-                label: pane.selectedResource
-                    && pane.selectedResource.category==="CLOCK"
-                    && pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
+                label: pane.selectedResource && pane.selectedResource.readOnly
+                    ? (pane.exactNavigation.ok ? "OPEN ITEM" : "NO ACTION")
+                    : pane.selectedResource
+                      && pane.selectedResource.category==="CLOCK"
+                      && pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
                     ? "CHECK ZONES"
                     : pane.selectedResource
-                        && pane.selectedResource.category==="NEW"
+                      && pane.selectedResource.category==="NEW"
                     ? (pane.selectedResource.isPinned?"UNPIN":"PIN")
                     : "NO ACTION"
                 labelPixelSize: 9
                 accentColor: Colors.cyan
                 available: pane.selectedResource !== null &&
-                    (pane.selectedResource.category==="CLOCK"
-                       ? pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
+                    (pane.selectedResource.readOnly
+                      ? pane.exactNavigation.ok
+                      : pane.selectedResource.category==="CLOCK"
+                        ? pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
                           && !pane.timeOwner.zoneCatalogLoading
-                       : pane.selectedResource.category==="NEW"
-                         && pane.defaultOwner !== null && pane.defaultOwner.canEdit)
+                        : pane.selectedResource.category==="NEW"
+                          && pane.defaultOwner !== null && pane.defaultOwner.canEdit)
                 onLeftClicked: {
                     if(!available || !pane.selectedResource) return;
+                    if(pane.selectedResource.readOnly) {
+                        const target=pane.exactNavigation;
+                        if(target.ok)
+                            pane.exactNavigationRequested(target.owner,target.route);
+                        return;
+                    }
                     if(pane.selectedResource.category==="CLOCK")
                         pane.timeOwner.loadZoneCatalog();
                     else if(pane.selectedResource.category==="NEW")

@@ -152,6 +152,8 @@ ShellRoot {
         property string storageState: "empty"
         property string errorCode: ""
         property bool busy: false
+        property int renameCalls: 0
+        property string lastResultCode: ""
         property var collections: [
             {id:"c1",name:"Daily Operations",members:[
                 "fav1:local:weather-home:panel:home%2Fauto",
@@ -164,6 +166,19 @@ ShellRoot {
         }
         function hasMember(id,key) {return false;}
         function createCollection(name) { return ""; }
+        function renameCollection(id,name) {
+            if(id!=="c1" || name!=="Daily Workspace") {
+                lastResultCode="INVALID_NAME";
+                return false;
+            }
+            const existing=collections[0];
+            collections=[{
+                id:existing.id,name:name,members:existing.members.slice()
+            }];
+            renameCalls++;
+            lastResultCode="SAVING";
+            return true;
+        }
         function toggleMember(id,key) { return false; }
         function moveMember(id,key,direction) {return false;}
         function deleteCollection(id) {return false;}
@@ -251,6 +266,15 @@ ShellRoot {
                 defaultOwner: defaults
                 collectionsOwner: collections
                 selectedCollectionId: root.selectedCollectionId
+                onCollectionRequested: function(collectionId) {
+                    const group=dossier.collectionView.groups.find(function(g) {
+                        return g.id===collectionId;
+                    });
+                    if(!group) {root.fail("U6C_NO_COLLECTION");return;}
+                    root.selectedCollectionId=collectionId;
+                    selector.filterMode="GROUP";
+                    root.selectedKey=group.rows.length?group.rows[0].key:"";
+                }
             }
         }
     }
@@ -491,8 +515,39 @@ ShellRoot {
                         || time.removals || places.removals || defaults.mutations) {
                     root.fail("U6B_GROUP_NAVIGATION");return;
                 }
-                root.done=true;
                 console.log("U6B_PASS // COLLECTION_TO_SELECTOR_AND_DETAILS_NO_WRITES");
+                const row=detail.collectionPanel.groupRowItems.itemAt(0);
+                const button=row ? row.editControl : null;
+                if(!button || !button.available) {
+                    root.fail("U6C_RENAME_CONTROL_MISSING");return;
+                }
+                const pt=button.mapToItem(win.contentItem,
+                    button.width/2,button.height/2);
+                root.testStage=5;
+                console.log("U6C_RENAME_READY // x="+Math.round(pt.x)
+                    +" y="+Math.round(pt.y));
+            } else if(root.testStage===5) {
+                const row=detail.collectionPanel.groupRowItems.itemAt(0);
+                if(row && row.renaming && row.editField.activeFocus) {
+                    root.testStage=6;
+                    console.log("U6C_EDIT_READY");
+                }
+            } else if(root.testStage===6 && collections.renameCalls===1) {
+                const group=dossier.collectionView.groups[0];
+                const row=detail.collectionPanel.groupRowItems.itemAt(0);
+                if(!group || group.id!=="c1" || group.name!=="Daily Workspace"
+                        || group.count!==3 || group.available!==2
+                        || !row || row.renaming
+                        || root.selectedCollectionId!=="c1"
+                        || selector.filterMode!=="GROUP"
+                        || selector.choices.length!==2
+                        || !root.selection
+                        || root.selection.owner!=="weather-home"
+                        || time.removals || places.removals || defaults.mutations) {
+                    root.fail("U6C_RENAME_OR_OWNER_BOUNDARY");return;
+                }
+                root.done=true;
+                console.log("U6C_PASS // INLINE_RENAME_UPDATES_INDEX_NO_OWNER_WRITES");
                 Qt.quit();
             }
         }

@@ -11,7 +11,7 @@ Item {
     signal sectionRequested(string section)
     signal taskRequested(string task)
     readonly property var sectionTasks: section === "ORGANIZATIONS" ? [
-        {id:"EDITOR", title:"COMPANIES / BRANCHES"},
+        {id:"EDITOR", title:"EDIT ORGS"},
         {id:"BRANCH_LOCATIONS", title:"BRANCH LOCATIONS"}
     ] : section === "STRUCTURE" ? [
         {id:"EDITOR", title:"EDIT UNITS"},

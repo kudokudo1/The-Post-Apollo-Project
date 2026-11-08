@@ -161,6 +161,51 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('readonly property int zoomActorTop: zoomBayTop', QML)
         self.assertIn('readonly property int zoomActorHeight: zoomBayHeight', QML)
 
+    def test_zoom_opaque_perimeter_seals_only_inside_camera_frame(self):
+        # SurfaceFrame normally uses transparent fill while the external
+        # Sway actor is visually held. Four QML backing regions must cover
+        # the strips outside that actor without painting over Zoom.
+        self.assertIn('fillOpacity: camera.zoomWebVisualHeld ? 0.0 : 0.97', QML)
+        self.assertIn('clipContent: camera.zoomWebVisualHeld', QML)
+        self.assertIn('id: zoomWebLeftEdgeSeal', QML)
+        self.assertIn('id: zoomWebRightEdgeSeal', QML)
+        left = QML.split('id: zoomWebLeftEdgeSeal', 1)[1].split(
+            'id: zoomWebRightEdgeSeal', 1)[0]
+        right = QML.split('id: zoomWebRightEdgeSeal', 1)[1].split(
+            'id: zoomViewport', 1)[0]
+        for region in (left, right):
+            self.assertIn('y: camera.zoomActorTop', region)
+            self.assertIn('height: Math.max(0, camera.zoomActorHeight)', region)
+            self.assertIn('color: Colors.black', region)
+            self.assertIn('visible: camera.zoomWebVisualHeld', region)
+            self.assertNotIn('MouseArea', region)
+            self.assertNotIn('TapHandler', region)
+        self.assertIn('x: 0', left)
+        self.assertIn('width: Math.max(0, camera.zoomActorLeft)', left)
+        self.assertIn('x: camera.zoomActorLeft + camera.zoomActorWidth', right)
+        self.assertIn('width: Math.max(0, frame.width - x)', right)
+        self.assertIn('y: camera.zoomActorTop + camera.zoomActorHeight', QML)
+        self.assertIn('height: Math.max(0, parent.height - y)', QML)
+        # Boundary arithmetic for all three current Camera sizes. The
+        # perimeter fills frame-minus-actor exactly, never outside frame.
+        for frame_w, frame_h, actor_top in (
+                (784, 699, 82), (1000, 1013, 99), (2536, 1345, 99)):
+            actor_left, actor_width = 2, frame_w - 4
+            actor_bottom = frame_h - 1
+            self.assertEqual(actor_left + actor_width + 2, frame_w)
+            self.assertEqual(actor_top + (actor_bottom - actor_top) + 1,
+                             frame_h)
+            self.assertGreaterEqual(actor_top, 0)
+            self.assertLessEqual(actor_bottom, frame_h)
+            self.assertEqual((actor_left, frame_w -
+                              (actor_left + actor_width)), (2, 2))
+        # Keep trusted actor placement, click-through and the compact buttons.
+        self.assertIn('readonly property int zoomBrowserRise: 13', QML)
+        self.assertIn('zoomActorTop, zoomControlDeckBottom)', QML)
+        self.assertIn('intersection: Intersection.Subtract', QML)
+        self.assertIn('height: 34', QML)
+        self.assertIn('height: 42', QML)
+
     def test_zoom_client_fills_frame_and_resizes_from_single_viewport(self):
         # No screen-size-specific hardcoded actor dimensions or browser CSS
         # tricks. This is the one frame-geometry source for host and follower.

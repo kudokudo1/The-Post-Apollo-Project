@@ -146,5 +146,48 @@ class OfonoSessionTests(unittest.TestCase):
                 self.assertNotIn(forbidden, content)
 
 
+class FinishedTerminalExitTests(unittest.TestCase):
+    def test_completed_terminal_has_bounded_read_only_review(self):
+        fake_input = mock.Mock()
+        fake_input.readline.return_value = "\\n"
+        with mock.patch.object(session.sys, "stdin", fake_input), \\
+             mock.patch.object(session.select, "select",
+                               return_value=([fake_input], [], [])) as select_call, \\
+             mock.patch.object(session.sys, "stdout") as output, \\
+             mock.patch("builtins.print") as printed:
+            session._review_then_exit()
+        select_call.assert_called_once_with(
+            [fake_input], [], [], session.POST_TRANSACTION_REVIEW_SECONDS)
+        self.assertLessEqual(session.POST_TRANSACTION_REVIEW_SECONDS, 15)
+        fake_input.readline.assert_called_once()
+        self.assertTrue(any("automatically" in str(c.args[0])
+                            for c in printed.call_args_list))
+        output.flush.assert_called_once()
+
+    def test_missing_focus_exits_without_waiting_forever(self):
+        fake_input = mock.Mock()
+        with mock.patch.object(session.sys, "stdin", fake_input), \\
+             mock.patch.object(session.select, "select",
+                               return_value=([], [], [])):
+            with mock.patch.object(session.sys, "stdout"), \\
+                 mock.patch("builtins.print"):
+                session._review_then_exit()
+        fake_input.readline.assert_not_called()
+
+    def test_unusable_tty_does_not_hold_completed_transaction(self):
+        with mock.patch.object(session.select, "select",
+                               side_effect=OSError("disconnected")), \\
+             mock.patch.object(session.sys, "stdout"), \\
+             mock.patch("builtins.print"):
+            session._review_then_exit()
+
+    def test_default_terminal_review_is_not_infinite_input_hold(self):
+        self.assertIsNone(session.run_session.__kwdefaults__["hold"])
+        src = FILE.read_text()
+        self.assertIn("POST_TRANSACTION_REVIEW_SECONDS", src)
+        self.assertIn("select.select(", src)
+        self.assertNotIn("hold(\"Press Enter to close this terminal", src)
+
+
 if __name__ == "__main__":
     unittest.main()

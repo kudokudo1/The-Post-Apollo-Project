@@ -82,7 +82,9 @@ if [[ -v C4B_RUNTIME_ASSETS_DIR && -n "$C4B_RUNTIME_ASSETS_DIR" ]]; then
   [[ "$c4a_requested" == 1 ]] ||
     { echo "C4B_BLOCKED // C4A_SIGNED_PACKAGE_REQUIRED"; exit 2; }
   c4b_requested=1
-  for name in postapollo_connections.pp dbus_next.whl \
+  for name in postapollo_connections.pp c4b-policy.rpm \
+              c4b-policy-public.asc c4b-policy-fingerprint.txt \
+              c4b-policy-artifact-manifest.sha256 dbus_next.whl \
               C3bOriginCheck.py BusPolicyClient.py c4b-runtime-manifest.sha256; do
     [[ -s "$C4B_RUNTIME_ASSETS_DIR/$name" ]] ||
       { echo "C4B_BLOCKED // RUNTIME_ASSET_MISSING"; exit 2; }
@@ -90,6 +92,8 @@ if [[ -v C4B_RUNTIME_ASSETS_DIR && -n "$C4B_RUNTIME_ASSETS_DIR" ]]; then
   done
   (cd "$seed" && sha256sum --check --status c4b-runtime-manifest.sha256) ||
     { echo "C4B_BLOCKED // RUNTIME_MANIFEST_MISMATCH"; exit 2; }
+  (cd "$seed" && sha256sum --check --status c4b-policy-artifact-manifest.sha256) ||
+    { echo "C4B_BLOCKED // SIGNED_POLICY_RPM_MANIFEST_MISMATCH"; exit 2; }
   cp "$repo/tests/connections/c4b_silverblue/guest_confined_runtime.sh" \
     "$seed/c4b-guest-confined-runtime.sh"
   printf '%s\n' C4B_CI_ONLY_CONFINED_RUNTIME > "$seed/c4b-opt-in.marker"

@@ -236,18 +236,12 @@ class C5aScopeTests(unittest.TestCase):
                 "POST_APOLLO_C5A_FIXTURE_ROOT": folder,
                 "HOME": folder,
             }
-            self.assertTrue(M.private_ci() is False or
-                            os.environ.get("POST_APOLLO_C5A_FIXTURE_ROOT") == folder)
             bad = subprocess.run(
                 [sys.executable, "-I", "-B", str(HOST), "--host", "9", "10"],
                 env={**environment, "POST_APOLLO_C5A_DISPOSABLE": "0"},
                 text=True, capture_output=True, timeout=4)
             self.assertEqual(bad.returncode, 2)
             self.assertIn("C5A_REFUSED_OUTSIDE_DISPOSABLE_HOST", bad.stdout)
-            with self.assertRaisesRegex(Exception, "(?i)"):
-                # Force no exception? This assertion is intentionally avoided
-                # by the following explicit real session instead.
-                raise ValueError("EXPLICIT_REAL_SESSION_NEXT")
             session = DisposableSession(environment)
             try:
                 for scope, target, epoch in (

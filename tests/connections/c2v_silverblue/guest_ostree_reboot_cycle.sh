@@ -80,6 +80,78 @@ c2v_rollback_failure_diagnostic() {
   fi
 }
 trap 'rc=$?; if [[ "$rc" -ne 0 ]]; then c4b_controller_failure_relay "SCRIPT_EXIT_$rc-line-$LINENO"; echo "C2V_FAIL // SCRIPT_EXIT_$rc line $LINENO"; systemctl poweroff --no-block || true; fi' EXIT
+# Observe a possibly non-returning rollback from an independent systemd
+# cgroup. Diagnostic only, C4b disposable offline VM only. No rollback,
+# reboot, transaction or second-boot decision is made by this observer.
+c2v_rollback_observer_start() {
+  [[ -f "$c4b_mode" && -c /dev/ttyS1 ]] || return 0
+  local observer=/run/c2v-rpm-rollback-observer.sh
+  cat > "$observer" <<'C2V_ROLLBACK_OBSERVER'
+#!/usr/bin/bash
+set -u
+printf 'ready\n' > /run/c2v-rpm-rollback-observer-ready
+trap 'rc=$?; printf "C2V_DIAG_ROLLBACK_OBSERVER_EXIT // rc=%s\n" "$rc" >/dev/ttyS1 2>/dev/null || true' EXIT
+for n in $(seq 1 55); do
+  {
+    printf 'C2V_DIAG_ROLLBACK_OBSERVER_TICK // n=%s ts=%s\n' "$n" "$(date --iso-8601=seconds)"
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_PROCESSES_BEGIN'
+    timeout --signal=TERM --kill-after=2s 4s ps -eo pid,ppid,stat,etime,wchan:20,comm |
+      grep -E '(^ *PID|[r]pm-ostree|[r]pm-ostreed)' | head -n 12 || true
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_PROCESSES_END'
+    if (( n == 1 || n % 4 == 0 )); then
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_UNIT_BEGIN'
+      timeout --signal=TERM --kill-after=2s 5s systemctl show \
+        c2v-ostree-cycle.service rpm-ostreed.service --no-pager \
+        -p ActiveState -p SubState -p Result -p MainPID \
+        -p ExecMainCode -p ExecMainStatus || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_UNIT_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_OSTREE_BEGIN'
+      timeout --signal=TERM --kill-after=2s 5s ostree admin status 2>&1 |
+        head -c 1500 || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_OSTREE_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_RPM_OSTREE_BEGIN'
+      timeout --signal=TERM --kill-after=2s 5s rpm-ostree status --json 2>&1 |
+        head -c 1800 || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_RPM_OSTREE_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_JOURNAL_BEGIN'
+      timeout --signal=TERM --kill-after=2s 5s journalctl -b \
+        -u rpm-ostreed.service -u c2v-ostree-cycle.service \
+        --no-pager -n 10 2>&1 | head -c 2000 || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_JOURNAL_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_COMMAND_OUTPUT_BEGIN'
+      if [[ -r /run/c2v-rpm-ostree-rollback-command.log ]]; then
+        tail -c 900 /run/c2v-rpm-ostree-rollback-command.log || true
+      fi
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_COMMAND_OUTPUT_END'
+    fi
+  } >/dev/ttyS1 2>&1 || true
+  [[ -e /run/c2v-rpm-rollback-observer-finished ]] && break
+  sleep 20
+done
+C2V_ROLLBACK_OBSERVER
+  chmod 0700 "$observer"
+  rm -f /run/c2v-rpm-rollback-observer-ready \
+    /run/c2v-rpm-rollback-observer-finished
+  if ! timeout --signal=TERM --kill-after=2s 14s systemd-run --quiet \
+      --unit=c2v-rpm-rollback-observer --property=Type=exec \
+      --property=TimeoutStartSec=1240 /usr/bin/bash "$observer"; then
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_START_FAILED // non-authoritative'
+    return 0
+  fi
+  local ready=0
+  for _ in $(seq 1 8); do
+    if [[ -e /run/c2v-rpm-rollback-observer-ready ]]; then
+      ready=1
+      break
+    fi
+    sleep 1
+  done
+  if [[ "$ready" == 1 ]]; then
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_STARTED // non-authoritative'
+  else
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_NOT_READY // non-authoritative'
+  fi
+}
 stagefile=/var/lib/c2v-transaction-stage
 pkg=postapollo-connections-c2t-fixture
 data=/mnt/c2v-offline
@@ -651,6 +723,7 @@ C2V_WORKER
     fi
     echo "C2V_PASS // LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT"
     echo rollback_pending > "$stagefile"
+    c2v_rollback_observer_start
     echo "C2V_ROLLBACK_COMMAND_BEGIN // actual rpm-ostree rollback --reboot"
     # Keep this exact authoritative OS rollback command and the independent
     # second real boot/absence checks. The diagnostics are a failure-only
@@ -658,6 +731,7 @@ C2V_WORKER
     rollback_output=/run/c2v-rpm-ostree-rollback-command.log
     if rpm-ostree rollback --reboot > "$rollback_output" 2>&1; then
       echo "C2V_ROLLBACK_COMMAND_RETURNED_ZERO // second_boot_still_required"
+      touch /run/c2v-rpm-rollback-observer-finished
     else
       rollback_rc="$?"
       c2v_rollback_failure_diagnostic "$rollback_rc"

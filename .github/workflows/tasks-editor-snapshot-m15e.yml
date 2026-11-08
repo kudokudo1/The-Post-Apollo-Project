@@ -1,0 +1,50 @@
+name: TASKS M15e disposable single-editor snapshot host boundary
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskEditorSnapshotHostM15e.cjs'
+      - 'tests/tasks/test_task_editor_snapshot_host_m15e.cjs'
+      - 'docs/tasks-host-bound-editor-snapshot-m15e.md'
+      - '.github/workflows/tasks-editor-snapshot-m15e.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskEditorSnapshotHostM15e.cjs'
+      - 'tests/tasks/test_task_editor_snapshot_host_m15e.cjs'
+      - '.github/workflows/tasks-editor-snapshot-m15e.yml'
+permissions:
+  contents: read
+
+jobs:
+  disposable-one-editor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Single-editor source/identity and single-use synthetic host boundary
+        run: node --test tests/tasks/test_task_editor_snapshot_host_m15e.cjs
+      - name: Existing M15d selection and M15c deny-only access
+        run: |
+          node --test tests/tasks/test_task_draft_target_selection_m15d.cjs
+          node --test tests/tasks/test_task_encrypted_draft_access_m15c.cjs
+      - name: Existing source-bound crypto and synthetic consent refusals
+        run: |
+          node --test tests/tasks/test_task_encrypted_draft_transaction_m13m.cjs
+          node --test tests/tasks/test_task_recovery_consent_source_m13t.cjs
+          node --test tests/tasks/test_task_connections_permission_m13p.cjs
+      - name: Existing production sole-writer and Connections denial
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Production imports, secrets and authority remain unchanged
+        run: |
+          set -euo pipefail
+          ! grep -R -F 'TaskEditorSnapshotHostM15e' widgets services shell.qml
+          ! grep -R -F 'TaskEditorSnapshotHostM15e' widgets/TasksW.qml services/connections
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          grep -q 'readonly property bool credentialActionsEnabled: false' services/connections/ConnectionsBroker.qml
+          printf '%s\n' 'M15E_DISPOSABLE_SNAPSHOT_NO_PRODUCTION_ACTIVATION_PASS'

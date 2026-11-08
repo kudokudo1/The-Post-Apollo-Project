@@ -5,6 +5,14 @@ on:
     paths:
       - 'widgets/CpuPlusW.qml'
       - 'widgets/cpuplus/CpuPlusIdManagementPane.qml'
+      - 'widgets/cpuplus/CpuPlusLocalManagementNav.qml'
+      - 'widgets/cpuplus/CpuPlusLocalManagementPane.qml'
+      - 'widgets/messanger/IdentityCenterLocalOrganizationEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalPortfolioEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalStructureEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalArchiveTray.qml'
+      - 'tests/cpuplus/test_cpuplus_social_local_management_bays.py'
+      - 'MODEL/contracts/cpuplus-social-local-management-three-bays-v0.md'
       - 'widgets/cpuplus/CpuPlusIdVerifiedContextPane.qml'
       - 'tests/cpuplus/test_cpuplus_identity_host_context_v0.py'
       - 'widgets/messanger/IdentityCenterOrganizationDisplayReader.qml'
@@ -33,6 +41,14 @@ on:
     paths:
       - 'widgets/CpuPlusW.qml'
       - 'widgets/cpuplus/CpuPlusIdManagementPane.qml'
+      - 'widgets/cpuplus/CpuPlusLocalManagementNav.qml'
+      - 'widgets/cpuplus/CpuPlusLocalManagementPane.qml'
+      - 'widgets/messanger/IdentityCenterLocalOrganizationEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalPortfolioEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalStructureEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalArchiveTray.qml'
+      - 'tests/cpuplus/test_cpuplus_social_local_management_bays.py'
+      - 'MODEL/contracts/cpuplus-social-local-management-three-bays-v0.md'
       - 'widgets/cpuplus/CpuPlusIdVerifiedContextPane.qml'
       - 'tests/cpuplus/test_cpuplus_identity_host_context_v0.py'
       - 'widgets/messanger/IdentityCenterOrganizationDisplayReader.qml'
@@ -76,6 +92,12 @@ jobs:
           python3 -m unittest discover -s tests/identity -p 'test_identity_display_reader_cli_v0.py' -v
           python3 -m unittest discover -s tests/identity -p 'test_desktop_context_projection_v0.py' -v
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_organization_links.py' -v
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_social_local_management_bays.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_archive_tray_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_archived_permanent_removal_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_organizations.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_org_structure_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_portfolios_v1.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_org_links_v1.py' -v
           node tests/messaging/test_social_identity_policy.cjs
           python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v

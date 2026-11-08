@@ -10,6 +10,7 @@ Item {
     clip: true
     property var peak: null
     property bool playing: true
+    readonly property bool motionRunning: motionDriver.running
     property real motionPhase: 0
     readonly property bool radiantValid: peak
         && peak.ra !== undefined && peak.ra !== null

@@ -121,6 +121,27 @@ PanelWindow {
             recents:namesOnly(source.recents,8)
         });
     }
+    // U5d // HospitalW injects only an already-sanitized Reception pin
+    // snapshot. The original activity key, report title/body and room context
+    // never enter this CPU++ surface or its normalized resource IDs.
+    property var hospitalPinnedFavoritesSource: null
+    readonly property var hospitalPinnedFavoritesSnapshot: {
+        const source=cpuPlusWindow.hospitalPinnedFavoritesSource;
+        if (!source) return null;
+        const input=source.pins;
+        return ({
+            state:String(source.state || "loading"),
+            pins:Array.isArray(input)
+                ? input.slice(0,6).map(function(item) {
+                    return ({
+                        ref:item && item.ref,
+                        source:item && item.source,
+                        kind:item && item.kind,
+                        recordedAt:item && item.recordedAt
+                    });
+                }) : null
+        });
+    }
     readonly property var favoriteCandidates:
         FavoritesManagement.list(
             TimeSettings.worldFavoriteZones,
@@ -142,7 +163,8 @@ PanelWindow {
             cpuAppFavoriteDescriptions.records,
             cpuPlusWindow.weatherHomeFavoritesSnapshot,
             cpuPlusWindow.notificationFavoritesSnapshot,
-            cpuPlusWindow.radioFavoritesSnapshot)
+            cpuPlusWindow.radioFavoritesSnapshot,
+            cpuPlusWindow.hospitalPinnedFavoritesSnapshot)
     readonly property var selectedFavoriteResource:
         FavoritesManagement.recordFor(favoriteCandidates,selectedFavoriteKey)
     // Original AppControl provides display-only menu/item/type descriptors.

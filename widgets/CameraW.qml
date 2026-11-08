@@ -71,8 +71,14 @@ PanelWindow {
     readonly property int zoomWebEdgeInset: 2
     readonly property int zoomBayInset: Math.max(0, Math.round(zoomViewport.x))
     readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))
-    // Keep a 1px border while using the full remaining physical frame height.
+    // The existing 1px frame budget is not the browser's physical bottom.
+    // The native Zoom client was reported to overrun Camera by the same
+    // amount in all sizes. Trim the guest from the BOTTOM only; do not
+    // move its top, expand Camera or alter the mode row and browser rise.
+    // Keep this independent from zoomDeckReserve so expanded's frame height
+    // does not grow and silently cancel the trim.
     readonly property int zoomBayBottom: 1
+    readonly property int zoomWebBottomTrim: 10
     // Keep #1505's raised compact controls and common 3px deck spacing.
     // The first 8px rise improved all three sizes; a subsequent native screenshot
     // calls for another 5px. Rise is now 13px total from the #1505 deck.
@@ -994,7 +1000,8 @@ PanelWindow {
             y: camera.zoomControlDeckBottom + camera.zoomDeckGap
                - camera.zoomBrowserRise
             width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)
-            height: Math.max(0, frame.height - y - camera.zoomBayBottom)
+            height: Math.max(0, frame.height - y - camera.zoomBayBottom
+                             - camera.zoomWebBottomTrim)
             visible: camera.menuOpen && camera.activeView === "zoom"
 
             Flickable {

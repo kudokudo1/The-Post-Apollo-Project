@@ -64,6 +64,7 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertNotIn('cameraPage.x + cameraPage.parent.x', QML)
         self.assertNotIn('Math.round(cameraPage.width)', QML)
         self.assertIn('readonly property int zoomBayBottom: 1', QML)
+        self.assertIn('readonly property int zoomWebBottomTrim: 10', QML)
         self.assertIn('id: zoomViewport', QML)
         self.assertIn('id: cameraBodyColumn', QML)
         self.assertIn('cameraModes.y', QML)
@@ -74,11 +75,12 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('Math.round(zoomViewport.y)', QML)
         self.assertIn('Math.round(zoomViewport.width)', QML)
         self.assertIn('Math.round(zoomViewport.height)', QML)
-        # #1505 raised controls. Browser rises an extra 5px after #1513,
-        # now 13px total, with its bottom still in the same place.
+        # The top remains at Y=82 after the 13px rise. Shorten only the
+        # guest's physical bottom by 10px in every Camera chassis.
         compact_height, page_start, bottom = 699, 92 + 3 - 13, 1
+        trim = 10
         self.assertEqual(page_start, 82)
-        self.assertEqual(compact_height - page_start - bottom, 616)
+        self.assertEqual(compact_height - page_start - bottom - trim, 606)
         self.assertGreater(compact_height - page_start - bottom,
                            compact_height - 169)
 
@@ -111,7 +113,8 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('height: 34', QML)
         self.assertIn('Math.min(784, viewportWidth - 2 * glowGutter)', QML)
         self.assertIn('Math.min(699, availableFrameHeight)', QML)
-        self.assertIn('height: Math.max(0, frame.height - y - camera.zoomBayBottom)', QML)
+        self.assertIn('height: Math.max(0, frame.height - y - camera.zoomBayBottom', QML)
+        self.assertIn('- camera.zoomWebBottomTrim)', QML)
         self.assertIn('width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)', QML)
         self.assertIn('readonly property int zoomActorTop: zoomBayTop', QML)
         self.assertIn('readonly property int zoomActorHeight: zoomBayHeight', QML)
@@ -125,8 +128,8 @@ class ZoomWebHostTests(unittest.TestCase):
         browser_top = compact_deck_end + 3 - 13
         input_top = max(browser_top, compact_deck_end)
         self.assertEqual((compact_deck_end, browser_top, input_top), (92, 82, 92))
-        self.assertEqual(699 - browser_top - 1, 616)
-        self.assertEqual(616 - (input_top - browser_top), 606)
+        self.assertEqual(699 - browser_top - 1 - 10, 606)
+        self.assertEqual(606 - (input_top - browser_top), 596)
         self.assertEqual(109 - compact_deck_end, 17) # buttons remain raised
         self.assertEqual(12 + 37 + 8 + 2 + 8 + 42 + 3 - 13, 99)
 
@@ -191,9 +194,11 @@ class ZoomWebHostTests(unittest.TestCase):
         for frame_w, frame_h, actor_top in (
                 (784, 699, 82), (1000, 1013, 99), (2536, 1345, 99)):
             actor_left, actor_width = 2, frame_w - 4
-            actor_bottom = frame_h - 1
+            # The physical guest's bottom ends 11px inside the frame:
+            # 1px original inset plus 10px source-specific trim.
+            actor_bottom = frame_h - 1 - 10
             self.assertEqual(actor_left + actor_width + 2, frame_w)
-            self.assertEqual(actor_top + (actor_bottom - actor_top) + 1,
+            self.assertEqual(actor_top + (actor_bottom - actor_top) + 11,
                              frame_h)
             self.assertGreaterEqual(actor_top, 0)
             self.assertLessEqual(actor_bottom, frame_h)
@@ -214,7 +219,9 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn(
             'width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)',QML)
         self.assertIn('readonly property int zoomBayBottom: 1',QML)
-        self.assertIn('height: Math.max(0, frame.height - y - camera.zoomBayBottom)',QML)
+        self.assertIn('readonly property int zoomWebBottomTrim: 10',QML)
+        self.assertIn('height: Math.max(0, frame.height - y - camera.zoomBayBottom',QML)
+        self.assertIn('- camera.zoomWebBottomTrim)',QML)
         self.assertIn('readonly property int zoomActorLeft: zoomBayInset',QML)
         self.assertIn('readonly property int zoomActorTop: zoomBayTop',QML)
         self.assertIn('readonly property int zoomActorWidth: zoomBayWidth',QML)
@@ -226,11 +233,14 @@ class ZoomWebHostTests(unittest.TestCase):
         # Representative panels all obey the same fitted rectangle rule;
         # this does not assert native Sway placement or browser page zoom.
         for frame_width, frame_height, top, expect_width, expect_height in (
-                (784, 699, 82, 780, 616),
-                (1000, 1013, 99, 996, 913),
-                (2536, 1345, 99, 2532, 1245)):
+                (784, 699, 82, 780, 606),
+                (1000, 1013, 99, 996, 903),
+                (2536, 1345, 99, 2532, 1235)):
             self.assertEqual(frame_width - 2 * 2, expect_width)
-            self.assertEqual(frame_height - top - 1, expect_height)
+            self.assertEqual(frame_height - top - 1 - 10, expect_height)
+            # The freed 10px stays inside Camera's existing frame; the
+            # opaque bottom rectangle covers it without hiding neighbors.
+            self.assertEqual(frame_height - (top + expect_height), 11)
         # Preserve all four controls and the same header navigation.
         self.assertIn('height: 34',QML)
         self.assertIn('height: 42',QML)
@@ -251,7 +261,7 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('height: 42', QML)
         self.assertEqual(109 - (8+32+4+2+4+42),17)
         self.assertEqual(8+32+4+2+4+42+3-13,82)
-        self.assertEqual(699-82-1,616)
+        self.assertEqual(699-82-1-10,606)
 
     def test_expanded_zoom_reserves_real_deck_above_finance_content(self):
         self.assertIn('readonly property int zoomDeckReserve: Math.max(', QML)
@@ -273,7 +283,7 @@ class ZoomWebHostTests(unittest.TestCase):
         expanded = min(1440 - 9 - 8, 900 + chrome)
         self.assertEqual(expanded,1013)
         self.assertEqual(expanded - header - gap - bottom,900)
-        self.assertEqual(expanded - (header + gap - 13) - bottom,913)
+        self.assertEqual(expanded - (header + gap - 13) - bottom - 10,903)
         for screen_height, base_height in ((768,751),(1080,900),(1440,900)):
             available=screen_height-9-8
             self.assertLessEqual(min(available,base_height+chrome), available)
@@ -287,7 +297,7 @@ class ZoomWebHostTests(unittest.TestCase):
         # Compact deck moves UP, native viewport is now below buttons.
         compact_end=8+32+4+2+4+42
         self.assertEqual(compact_end,92)
-        self.assertEqual(699 - (compact_end + gap - 13) - bottom,616)
+        self.assertEqual(699 - (compact_end + gap - 13) - bottom - 10,606)
 
     def test_resize_retains_verified_visual_without_exposing_unverified_input(self):
         self.assertIn('property bool zoomWebVisualHeld: false', QML)

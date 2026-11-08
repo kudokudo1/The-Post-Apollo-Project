@@ -57,17 +57,23 @@ test("Camera compact retains its size; Zoom expanded reserves deck height beyond
     assert.equal(699 - compactBrowserTop - 1, 603);
     assert.match(camera, /readonly property int zoomDeckGap: 3/);
     assert.match(camera, /readonly property int zoomBrowserRise: 13/);
+    assert.match(camera, /readonly property int zoomWebBottomTrim: 10/);
     assert.match(camera, /y: camera\.zoomControlDeckBottom \+ camera\.zoomDeckGap\s*- camera\.zoomBrowserRise/);
+    assert.match(camera, /frame\.height - y - camera\.zoomBayBottom\s*- camera\.zoomWebBottomTrim/);
     assert.match(camera, /height: Math\.max\(0, camera\.zoomControlDeckBottom - y \+ 1\)/);
-    // Buttons unchanged; browser now rises 13px in total (another 5px).
-    // Host, follower and mask use this same raised viewport.
+    // Preserve top/button layout; trim only the physical guest's BOTTOM.
+    // Expanded frame reserve stays 113px, not 123px, so the trim survives.
     const raisedTop = compactBrowserTop - 13;
     const inputTop = Math.max(raisedTop, compactDeckEnd);
+    const bottomTrim = 10;
     assert.equal(raisedTop, 82);
-    assert.equal(699 - raisedTop - 1, 616);
+    assert.equal(699 - raisedTop - 1 - bottomTrim, 606);
     assert.equal(inputTop, compactDeckEnd);
-    assert.equal(616 - (inputTop - raisedTop), 606);
-    assert.equal(expandedZoomFrame - (reserve - 13), 913);
+    assert.equal(606 - (inputTop - raisedTop), 596);
+    assert.equal(expandedZoomFrame - (reserve - 13) - bottomTrim, 903);
+    assert.equal(expandedZoomFrame, 1013);
+    assert.equal(1345 - 99 - 1 - bottomTrim, 1235);
+    assert.equal(699 - (raisedTop + 606), 11);
     assert.doesNotMatch(camera, /zoomTopNudge/);
     assert.equal(policy.step("compact", 1), "expanded");
     assert.equal(policy.step("expanded", 1), "fullscreen");
@@ -134,9 +140,9 @@ test("Camera's transparent Zoom frame seals its inner 2px perimeter but leaves d
     assert.ok(right.includes("visible: camera.zoomWebVisualHeld"));
     for (const [width, height, top] of [[784,699,82],[1000,1013,99],[2536,1345,99]]) {
         const inset = 2, browserWidth = width - 2 * inset;
-        const browserBottom = height - 1;
+        const browserBottom = height - 1 - 10;
         assert.equal(inset + browserWidth + inset, width);
-        assert.equal(top + (browserBottom - top) + 1, height);
+        assert.equal(top + (browserBottom - top) + 11, height);
     }
     assert.match(camera, /readonly property int zoomBrowserRise: 13/);
     assert.match(camera, /intersection: Intersection\.Subtract/);

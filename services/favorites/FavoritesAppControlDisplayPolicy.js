@@ -69,17 +69,21 @@ function safeRunDisplay(raw) {
     return visibleName(item) ? item : null;
 }
 function savedDesktopIdentity(raw) {
-    // AppControl also stores DesktopEntry IDs directly. A missing/uninstalled
-    // desktop entry has no live app name, but a strictly formatted desktop ID
-    // can still supply its final program token without exposing the raw ID.
-    if (typeof raw!=="string" || raw.length>128
-            || !/^(?:[A-Za-z][A-Za-z0-9_-]{0,40}\.){1,6}[A-Za-z][A-Za-z0-9_-]{0,40}(?:\.desktop)?$/.test(raw)
-            || /(?:password|secret|token|credential|private|auth|keyring)/i.test(raw))
+    // favoriteKeyFor(APPS) stores DesktopEntry.id or name directly. Once the
+    // known prefixes are excluded, a plain identifier is an original APPS
+    // saved identity, even if the DesktopEntries model no longer has a match.
+    // Show a safe display token, not the raw full desktop ID or app command.
+    if (typeof raw!=="string" || !raw || raw.length>96
+            || !/^[A-Za-z][A-Za-z0-9 ._+()-]{0,95}$/.test(raw)
+            || /(?:password|secret|token|credential|private|confidential|auth|keyring)/i.test(raw))
         return "";
-    const segments=raw.replace(/\.desktop$/i,"").split(".");
-    const name=visibleName(segments[segments.length-1]);
+    const normalized=raw.replace(/\.desktop$/i,"");
+    const pieces=normalized.split(".");
+    const candidate=pieces.length>1 ? pieces[pieces.length-1] : normalized;
+    const name=visibleName(candidate);
     return name ? name+" [SAVED APP ID]" : "";
 }
+
 function modeMenu(number) {
     // Source: AppControlW.modes, not the CPU++ category labels.
     return ["FAVORITES","APPS","FILES","RUN","WINDOWS",

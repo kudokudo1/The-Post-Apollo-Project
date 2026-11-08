@@ -243,8 +243,19 @@ C4B_C3B_DIR_DIAG
   rm -rf -- /opt/postapollo-c2o-venv
   userdel c4b-reader && userdel c4b-outsider &&
     userdel postapollo-connections || fail "TEST_USER_REMOVAL_FAILED"
-  groupdel c4b-clients && groupdel postapollo-status-readers &&
-    groupdel postapollo-connections || fail "TEST_GROUP_REMOVAL_FAILED"
+  # Fedora shadow-utils may automatically remove the user's matching
+  # private primary group during userdel. This is already the desired
+  # result, not a failed cleanup. Other test groups must still be removed
+  # explicitly, and every user/group must be absent after these commands.
+  groupdel c4b-clients || fail "CLIENT_GROUP_REMOVAL_FAILED"
+  groupdel postapollo-status-readers || fail "READER_GROUP_REMOVAL_FAILED"
+  if getent group postapollo-connections >/dev/null; then
+    groupdel postapollo-connections || fail "SERVICE_GROUP_REMOVAL_FAILED"
+  else
+    echo "C4B_DIAG // SERVICE_PRIMARY_GROUP_ALREADY_ABSENT_AFTER_USERDEL"
+  fi
+  check_accounts_absent
+  echo "C4B_PASS // TEST_USERS_AND_GROUPS_FULLY_ABSENT"
   # The custom policy is part of the booted deployment and MUST NOT be
   # removed at runtime. Only the real OSTree rollback may remove it.
   stage COMPOSED_POLICY_RETAINED_FOR_ROLLBACK

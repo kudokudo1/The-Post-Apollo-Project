@@ -18,10 +18,15 @@ ShellRoot {
         property var fanRows: []
         property var systemRows: []
         property var taskRows: [{comm:"hidden-process",name:"Hidden Process"}]
+        property var swayWindows: [{name:"Favorite Window"}]
+        property var appTabs: []
     }
     QtObject {
         id: appFavorites
-        property var favoriteKeys: ["task|hidden-process","run|private-command"]
+        property var favoriteKeys: [
+            "task|hidden-process","run|private-command",
+            "run:kitty:zellij","mode:4:Favorite Window","hidden:btop"
+        ]
         property var favoriteDetailActionKeys: []
         property var favoriteMonitorBoxKeys: []
         property var favoriteTaskMetricKeys: []
@@ -129,7 +134,21 @@ ShellRoot {
         running: !root.ready && !root.done
         repeat: true
         onTriggered: {
-            if(!root.options || root.options.total!==5
+            const named=root.options && root.options.rows
+                ? root.options.rows.filter(function(item) {
+                    return item.owner==="appcontrol" && item.resolved;
+                  }) : [];
+            const run=named.find(function(item) {
+                return item.menu==="RUN" && item.item==="zellij [KITTY]";
+            });
+            const winItem=named.find(function(item) {
+                return item.menu==="WINDOWS" && item.item==="Favorite Window";
+            });
+            const cli=named.find(function(item) {
+                return item.menu==="APPS" && item.item==="btop [CLI]";
+            });
+            if(!root.options || root.options.total!==8
+               || !run || !winItem || !cli
                || selector.choices.length!==1
                || selector.choices[0].category!=="CPU++"
                || !selector.choices[0].readOnly

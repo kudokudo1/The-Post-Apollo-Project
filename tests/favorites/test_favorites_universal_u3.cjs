@@ -338,3 +338,65 @@ test("U6a read-only collection controls use selected key, still enforce store po
     assert.doesNotMatch(source,/execDetached|Process\s*\{|FileView\s*\{|loadMedia\(/);
   }
 });
+
+
+test("U6c rename retains stable group identity, members, order and v1 compatibility",()=>{
+  const first=key("weather-home","panel","home/auto");
+  const second=key("radio","station","123e4567-e89b-42d3-a456-000000000002");
+  let doc=C.change(C.empty(),{type:"create",name:"Daily Operations"}).document;
+  for(const member of [first,second])
+    doc=C.change(doc,{type:"set-member",collectionId:"c1",
+      key:member,enabled:true}).document;
+  const before=clone(doc),revision=doc.revision;
+  const renamed=C.change(doc,{type:"rename",collectionId:"c1",
+    name:"Daily Workspace"});
+  assert.equal(renamed.ok,true);
+  assert.equal(renamed.changed,true);
+  assert.equal(renamed.document.revision,revision+1);
+  assert.equal(renamed.document.collections[0].id,"c1");
+  assert.equal(renamed.document.collections[0].name,"Daily Workspace");
+  assert.deepEqual(clone(renamed.document.collections[0].members),[first,second]);
+  assert.deepEqual(clone(doc),before);
+  const parsed=C.parse(JSON.stringify(renamed.document));
+  assert.equal(parsed.ok,true);
+  assert.equal(parsed.document.collections[0].name,"Daily Workspace");
+  assert.deepEqual(clone(parsed.document.collections[0].members),[first,second]);
+  const unchanged=C.change(parsed.document,{type:"rename",
+    collectionId:"c1",name:"Daily Workspace"});
+  assert.equal(unchanged.ok,true);
+  assert.equal(unchanged.changed,false);
+  for(const candidate of [" Daily Workspace","", "Daily\nWorkspace"]) {
+    const rejected=C.change(parsed.document,{type:"rename",
+      collectionId:"c1",name:candidate});
+    assert.equal(rejected.ok,false);
+    assert.deepEqual(clone(parsed.document.collections[0].members),[first,second]);
+  }
+});
+
+test("U6c collection panel renames through original owner only and has explicit cancel",()=>{
+  const panel=read("components/FavoritesCollectionPanel.qml");
+  const toggle=read("components/FavoritesCollectionToggleButton.qml");
+  const store=read("services/favorites/FavoritesCollectionsStore.qml");
+  assert.match(panel,/property string activeRenameId: ""/);
+  assert.match(panel,/property alias groupRowItems: collectionGroupRepeater/);
+  assert.match(panel,/nameInput\.activeFocus\s*\|\|\s*activeRenameId!==""/);
+  assert.match(panel,/signal collectionRequested\(string collectionId\)/);
+  assert.match(panel,/onClicked: panel\.collectionRequested\(modelData\.id\)/);
+  assert.match(panel,/panel\.collectionStore\.renameCollection\(\s*id,draft\)/);
+  const close=panel.indexOf('panel.activeRenameId="";\n                            const accepted=');
+  const ownerChange=panel.indexOf('panel.collectionStore.renameCollection(\n                                id,draft)');
+  assert.ok(close>=0 && ownerChange>close,
+    "close the Repeater rename delegate before the original writer changes its model");
+  assert.match(panel,/onAccepted: groupRow\.saveRename\(\)/);
+  assert.match(panel,/Keys\.onEscapePressed: groupRow\.cancelRename\(\)/);
+  assert.match(panel,/label: groupRow\.renaming \? "SAVE" : "RENAME"/);
+  assert.match(panel,/label: "CANCEL"/);
+  assert.match(panel,/RENAME REJECTED/);
+  assert.match(store,/function renameCollection\(id,name\)/);
+  assert.match(store,/type:"rename",collectionId:id,name:name/);
+  assert.match(toggle,/label: inCollection \? "UNLINK" : "ADD"/);
+  assert.match(panel,/MEMBERSHIP ONLY \/\/ ORIGINAL FAVORITES UNCHANGED/);
+  for(const text of [panel,toggle]) {
+    assert.doesNotMatch(text,/FileView\s*\{|JsonAdapter\s*\{|Process\s*\{|setFavorite\(|loadMedia\(/);
+  }
+});

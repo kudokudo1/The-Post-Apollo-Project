@@ -763,6 +763,18 @@ Item {
             width: parent.width
             height: Math.max(0,details.height-(appControlOrigin.visible ? 255 : 143))
             collectionStore: pane.collectionsOwner
+            // Titles in the existing editor open the same collection in
+            // the left/middle/right browsing flow. No owner action.
+            onCollectionRequested: function(collectionId) {
+                pane.collectionRequested(collectionId);
+            }
+            onCreateAccepted: function(collectionId) {
+                // The one-writer store's pending/queued document is reactive;
+                // allow the collection view to refresh before navigating.
+                Qt.callLater(function() {
+                    pane.collectionRequested(collectionId);
+                });
+            }
             // U6a: grouping does not grant commands/recall/mutation rights.
             // Only identifiers approved by the existing CollectionsStore
             // may be persisted; unsafe external keys stay unavailable.

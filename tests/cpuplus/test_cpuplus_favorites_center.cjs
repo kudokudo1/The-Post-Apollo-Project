@@ -1355,3 +1355,36 @@ test("U6b CPU++ index routes a collection across all three bays, without owner a
   assert.doesNotMatch(navigation,
     /setFavorite\(|togglePinned\(|loadMedia\(/);
 });
+
+
+test("U6c right collection names navigate to shared GROUP filter without activating owners",()=>{
+  const cpu=read("widgets/CpuPlusW.qml");
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const panel=read("components/FavoritesCollectionPanel.qml");
+  const toggle=read("components/FavoritesCollectionToggleButton.qml");
+  const store=read("services/favorites/FavoritesCollectionsStore.qml");
+  const policy=read("services/favorites/FavoritesCollectionsPolicy.js");
+  assert.match(cpu,/function openFavoriteCollection\(collectionId,memberKey\)/);
+  assert.match(cpu,/if\(key && !section\.rows\.some\(function\(row\)/);
+  assert.match(cpu,/selectedFavoriteCollectionId=collectionId/);
+  assert.match(cpu,/favoritesSelectorPane\.filterMode="GROUP"/);
+  assert.match(cpu,/selectedFavoriteKey=key \|\| \(section\.rows\.length/);
+  assert.match(cpu,/cpuPlusWindow\.openFavoriteCollection\(collectionId,""\)/);
+  assert.match(cpu,/cpuPlusWindow\.openFavoriteCollection\(collectionId,key\)/);
+  assert.match(pane,/onCollectionRequested: function\(collectionId\)/);
+  assert.match(pane,/onCreateAccepted: function\(collectionId\)/);
+  assert.match(pane,/pane\.collectionRequested\(collectionId\)/);
+  assert.match(pane,/Qt\.callLater\(function\(\) \{/);
+  assert.match(panel,/signal collectionRequested\(string collectionId\)/);
+  assert.match(panel,/Accessible\.name: "Open collection "\+modelData\.name/);
+  assert.match(panel,/onClicked: panel\.collectionRequested\(modelData\.id\)/);
+  assert.match(panel,/groupRow\.saveRename\(\)/);
+  assert.match(toggle,/label: inCollection \? "UNLINK" : "ADD"/);
+  assert.match(store,/function renameCollection\(id,name\)/);
+  assert.match(policy,/action\.type==="rename"/);
+  assert.equal((cpu.match(/selectedCollectionId: cpuPlusWindow\.selectedFavoriteCollectionId/g)||[]).length,3);
+  for(const src of [cpu.slice(cpu.indexOf("function openFavoriteCollection"),
+          cpu.indexOf("function openFavoriteCollection")+1100),panel]) {
+    assert.doesNotMatch(src,/FileView\s*\{|Process\s*\{|JsonAdapter\s*\{|setFavorite\(|togglePinned\(|loadMedia\(/);
+  }
+});

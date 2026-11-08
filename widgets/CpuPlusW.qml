@@ -64,6 +64,21 @@ PanelWindow {
     // U6b presentation state shared by the three Favorites bays. The v1
     // CollectionsStore remains the only grouping writer.
     property string selectedFavoriteCollectionId: ""
+    // U6c: one navigation path for the left index, right-side collection
+    // name and newly-created collection. This only changes UI selection.
+    function openFavoriteCollection(collectionId,memberKey) {
+        const section=favoritesOverviewPane.collectionView.groups.find(
+            function(group) { return group.id===collectionId; });
+        if(!section) return;
+        const key=String(memberKey || "");
+        if(key && !section.rows.some(function(row) {
+            return row.key===key;
+        })) return;
+        selectedFavoriteCollectionId=collectionId;
+        favoritesSelectorPane.filterMode="GROUP";
+        selectedFavoriteKey=key || (section.rows.length
+            ? section.rows[0].key : "");
+    }
     // U5a injection point only. WeatherStationW owns the sole bookmark
     // writer and must explicitly expose its existing store before live use.
     property var weatherHomeFavoritesSource: null
@@ -1757,25 +1772,10 @@ PanelWindow {
                 cpuPlusWindow.selectedFavoriteKey = key;
             }
             onCollectionRequested: function(collectionId) {
-                const section=favoritesOverviewPane.collectionView.groups.find(
-                    function(group) { return group.id===collectionId; });
-                if(!section) return;
-                cpuPlusWindow.selectedFavoriteCollectionId=collectionId;
-                favoritesSelectorPane.filterMode="GROUP";
-                // A former selected resource must not falsely appear to
-                // belong to the newly selected group.
-                cpuPlusWindow.selectedFavoriteKey=section.rows.length
-                    ? section.rows[0].key : "";
+                cpuPlusWindow.openFavoriteCollection(collectionId,"");
             }
             onCollectionMemberRequested: function(collectionId,key) {
-                const section=favoritesOverviewPane.collectionView.groups.find(
-                    function(group) { return group.id===collectionId; });
-                if(!section || !section.rows.some(function(row) {
-                    return row.key===key;
-                })) return;
-                cpuPlusWindow.selectedFavoriteCollectionId=collectionId;
-                favoritesSelectorPane.filterMode="GROUP";
-                cpuPlusWindow.selectedFavoriteKey=key;
+                cpuPlusWindow.openFavoriteCollection(collectionId,key);
             }
             anchors.left: parent.left
             anchors.right: parent.right
@@ -2786,6 +2786,9 @@ PanelWindow {
             defaultOwner: FavoritesDefaultStore
             collectionsOwner: FavoritesCollectionsStore
             selectedCollectionId: cpuPlusWindow.selectedFavoriteCollectionId
+            onCollectionRequested: function(collectionId) {
+                cpuPlusWindow.openFavoriteCollection(collectionId,"");
+            }
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: actuatorHeader.bottom

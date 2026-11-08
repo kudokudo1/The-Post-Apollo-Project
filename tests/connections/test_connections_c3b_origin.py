@@ -186,46 +186,101 @@ class C3bOriginPolicyTests(unittest.TestCase):
         for path in (*base.glob("*.qml"), *base.glob("*.js"), base / "qmldir"):
             self.assertNotIn("C3bOriginCheck", path.read_text(), path)
 
-    def test_10a_c4b_physical_profile_is_exact_and_test_only(self):
-        snapshot = valid()
-        snapshot["proc_args"][0] = m.C4B_PHYSICAL_INTERPRETER
-        snapshot["protected_dirs"] = {
-            path: {"owner": 0, "mode": 0o755, "directory": True, "symlink": False}
-            for path in m.C4B_PHYSICAL_DIRS
+    def _c4b_opt_snapshot(self):
+        data = valid()
+        data["protected_dirs"]["/opt"] = {
+            "owner": 0, "mode": 0o777, "directory": False, "symlink": True,
         }
-        self.assertIn("/var/opt", m.C4B_PHYSICAL_DIRS)
-        self.assertNotIn("/opt", m.C4B_PHYSICAL_DIRS)
-        self.denied(snapshot, "C3B_COMMAND_MISMATCH")  # default never changes
-        result = m.evaluate(snapshot, c4b_physical=True)
-        self.assertEqual(result["status"], "C3B_OS_ORIGIN_COHERENT_TEST_ONLY")
-        self.assertTrue(all(value is False for key, value in result.items()
-                            if key != "status"))
-        for path in m.C4B_PHYSICAL_DIRS:
-            for field, bad in (("owner", 1000), ("mode", 0o775),
-                               ("directory", False), ("symlink", True)):
-                changed = {
-                    **snapshot,
-                    "protected_dirs": {k: dict(v) for k, v in snapshot["protected_dirs"].items()},
-                }
-                changed["protected_dirs"][path][field] = bad
-                self.assertEqual(
-                    m.evaluate(changed, c4b_physical=True)["status"],
-                    "C3C_UNPROTECTED_DIRECTORY",
-                )
-        changed = dict(snapshot)
-        changed["proc_args"] = [m.INTERPRETER, m.HOST, "--read-only"]
-        self.assertEqual(m.evaluate(changed, c4b_physical=True)["status"],
-                         "C3B_COMMAND_MISMATCH")
-        changed = dict(snapshot)
-        changed["protected_dirs"] = valid()["protected_dirs"]
-        self.assertEqual(m.evaluate(changed, c4b_physical=True)["status"],
-                         "C3C_DIRECTORIES_MISMATCH")
-        self.assertEqual(m.evaluate(snapshot, c4b_physical=1)["status"],
-                         "C3B_INVALID_EVIDENCE")
+        link = {
+            "owner": 0, "group": 0, "mode": 0o777,
+            "directory": False, "symlink": True,
+            "target": m.C4B_OPT_LINK, "resolved": m.C4B_OPT_REALPATH,
+            "device": 2049, "inode": 500,
+        }
+        dirs = {
+            path: {"owner": 0, "group": 0, "mode": 0o755,
+                   "directory": True, "symlink": False,
+                   "device": 2049, "inode": index + 800}
+            for index, path in enumerate(m.C4B_OPT_REAL_DIRS)
+        }
+        from copy import deepcopy
+        snapshot = {"link": link, "dirs": dirs}
+        return data, {"before": deepcopy(snapshot), "after": deepcopy(snapshot)}
 
-    def test_10b_physical_entry_without_real_guest_is_denied(self):
+    def test_10a_c4b_canonical_opt_is_only_exception(self):
+        data, proof = self._c4b_opt_snapshot()
+        self.denied(data, "C3C_UNPROTECTED_DIRECTORY")
+        result = m.evaluate(data, c4b_opt=True, opt_proof=proof)
+        self.assertEqual(result["status"], "C3B_OS_ORIGIN_COHERENT_TEST_ONLY")
+        self.assertTrue(all(result[name] is False for name in m.DENIED_FLAGS))
+        self.assertEqual(
+            m.evaluate(data, c4b_opt=False, opt_proof=proof)["status"],
+            "C3B_INVALID_EVIDENCE",
+        )
+        self.assertEqual(m.evaluate(data, c4b_opt=1, opt_proof=proof)["status"],
+                         "C3B_INVALID_EVIDENCE")
+        self.assertEqual(m.evaluate(valid(), c4b_opt=True)["status"],
+                         "C3C_UNTRUSTED_C4B_OPT_LINK")
+
+    def test_10b_wrong_opt_link_or_physical_chain_refused(self):
+        from copy import deepcopy
+        data, proof = self._c4b_opt_snapshot()
+        wrong = (
+            ("target", "/var/opt"), ("target", "../var/opt"),
+            ("target", "var/tmp"), ("resolved", "/tmp"),
+            ("owner", 1000), ("group", 1000), ("mode", 0o775),
+            ("symlink", False), ("directory", True),
+            ("device", 0), ("inode", 0),
+        )
+        for side in ("before", "after"):
+            for key, value in wrong:
+                with self.subTest(side=side, key=key, value=value):
+                    changed = deepcopy(proof)
+                    changed[side]["link"][key] = value
+                    self.assertEqual(
+                        m.evaluate(data, c4b_opt=True, opt_proof=changed)["status"],
+                        "C3C_UNTRUSTED_C4B_OPT_LINK")
+            for path in m.C4B_OPT_REAL_DIRS:
+                for key, value in (("owner", 1000), ("group", 1000),
+                                   ("mode", 0o775), ("directory", False),
+                                   ("symlink", True), ("inode", 0)):
+                    with self.subTest(side=side, path=path, key=key):
+                        changed = deepcopy(proof)
+                        changed[side]["dirs"][path][key] = value
+                        self.assertEqual(
+                            m.evaluate(data, c4b_opt=True, opt_proof=changed)["status"],
+                            "C3C_UNTRUSTED_C4B_OPT_LINK")
+            for path in m.C4B_OPT_REAL_DIRS:
+                changed = deepcopy(proof)
+                del changed[side]["dirs"][path]
+                self.assertEqual(
+                    m.evaluate(data, c4b_opt=True, opt_proof=changed)["status"],
+                    "C3C_UNTRUSTED_C4B_OPT_LINK")
+        changed = deepcopy(proof)
+        changed["after"]["link"]["inode"] += 1
+        self.assertEqual(m.evaluate(data, c4b_opt=True, opt_proof=changed)["status"],
+                         "C3C_UNTRUSTED_C4B_OPT_LINK")
+        changed = deepcopy(data)
+        changed["protected_dirs"]["/opt"]["owner"] = 1000
+        self.assertEqual(m.evaluate(changed, c4b_opt=True, opt_proof=proof)["status"],
+                         "C3C_UNTRUSTED_C4B_OPT_LINK")
+        changed = deepcopy(data)
+        changed["protected_dirs"]["/opt/postapollo-c2o-venv"]["symlink"] = True
+        self.assertEqual(m.evaluate(changed, c4b_opt=True, opt_proof=proof)["status"],
+                         "C3C_UNPROTECTED_DIRECTORY")
+        changed = deepcopy(data)
+        changed["proc_args"][0] = "/var/opt/postapollo-c2o-venv/bin/python3"
+        self.assertEqual(m.evaluate(changed, c4b_opt=True, opt_proof=proof)["status"],
+                         "C3B_COMMAND_MISMATCH")
+        changed = deepcopy(proof)
+        changed["unexpected"] = 1
+        self.assertEqual(m.evaluate(data, c4b_opt=True, opt_proof=changed)["status"],
+                         "C3C_UNTRUSTED_C4B_OPT_LINK")
+
+    def test_10c_c4b_opt_entry_without_real_guest_is_denied(self):
         result = subprocess.run(
-            [sys.executable, "-I", "-B", str(SOURCE), "--verify-disposable-physical"],
+            [sys.executable, "-I", "-B", str(SOURCE),
+             "--verify-disposable-silverblue-opt"],
             env={"GITHUB_ACTIONS": "true", "POST_APOLLO_C3B_TEST_GUEST": "1",
                  "POST_APOLLO_C4B_TEST_GUEST": "1"},
             capture_output=True, text=True, timeout=4,

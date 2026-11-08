@@ -93,6 +93,34 @@ PanelWindow {
         }
         return ({ready:ready,status:status,revision:revision,sources:rows});
     }
+    // U5c explicit, owner-approved Radio bridge only. The original
+    // StationRadio FileView and MPD/Hi-Fi controller stay inside Weather.
+    // Input contract: {state, favorites:[{ref,title}], recents:[{ref,title}]}.
+    property var radioFavoritesSource: null
+    readonly property var radioFavoritesSnapshot: {
+        const source=cpuPlusWindow.radioFavoritesSource;
+        if (!source) return null;
+        function namesOnly(items,cap) {
+            if (!Array.isArray(items)) return null;
+            // Preserve overflow evidence (cap+1) so the strict projection
+            // rejects over-limit sources instead of silently truncating them.
+            return items.slice(0,cap+1).map(function(item) {
+                return ({
+                    ref: item && item.ref ? ({
+                        source:item.ref.source,
+                        kind:item.ref.kind,
+                        id:item.ref.id
+                    }) : null,
+                    title:item ? item.title : null
+                });
+            });
+        }
+        return ({
+            state:String(source.state || "loading"),
+            favorites:namesOnly(source.favorites,10),
+            recents:namesOnly(source.recents,8)
+        });
+    }
     readonly property var favoriteCandidates:
         FavoritesManagement.list(
             TimeSettings.worldFavoriteZones,
@@ -113,7 +141,8 @@ PanelWindow {
             }), FavoritesStore.favoriteDisplayLabels,
             cpuAppFavoriteDescriptions.records,
             cpuPlusWindow.weatherHomeFavoritesSnapshot,
-            cpuPlusWindow.notificationFavoritesSnapshot)
+            cpuPlusWindow.notificationFavoritesSnapshot,
+            cpuPlusWindow.radioFavoritesSnapshot)
     readonly property var selectedFavoriteResource:
         FavoritesManagement.recordFor(favoriteCandidates,selectedFavoriteKey)
     // Original AppControl provides display-only menu/item/type descriptors.

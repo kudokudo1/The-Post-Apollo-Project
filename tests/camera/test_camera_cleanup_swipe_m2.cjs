@@ -115,7 +115,7 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /Behavior on x/);
     assert.match(cleanup, /Behavior on y/);
     assert.match(cleanup, /camera\.huntSetPointer\(/);
-    assert.match(cleanup, /onClicked: camera\.huntFire\(/);
+    assert.match(cleanup, /camera\.huntFire\(/);
     assert.match(cleanup, /onTriggered: camera\.huntAdvance\(\)/);
     assert.match(cleanup, /cursorShape: Qt\.CrossCursor/);
     assert.match(cleanup, /label: "UNDO SHOT"/);

@@ -632,6 +632,18 @@ PanelWindow {
         browserConnectionNavigationPending = false;
         return true;
     }
+    // CPU++ can open the SAME native Telegram pane. Social keeps ownership
+    // of the current shared/private identity scope, process and login wizard.
+    // This is navigation + the existing provider health probe, NOT pairing.
+    function openTelegramFromConnections() {
+        if (browserConnectionNavigationPending)
+            return false;
+        menuOpen = true;
+        appSelector.settingsOpen = false;
+        activateApp(2, false);
+        return activeAppIndex === 2;
+    }
+
     // Opening the Telegram pane is explicit. Private login is separately
     // authorized per selected identity, never inferred from an account note.
     function openSharedTelegram() {

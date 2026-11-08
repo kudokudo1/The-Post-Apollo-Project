@@ -34,6 +34,19 @@ function createState() {
         batchReceipt:"",
         swipeIndex:0,
         swipeHistory:[],
+        huntTargets:[],
+        huntHistory:[],
+        huntRound:0,
+        huntTick:0,
+        huntSecondsLeft:25,
+        huntShots:0,
+        huntHits:0,
+        huntMisses:0,
+        huntCombo:0,
+        huntScore:0,
+        huntPaused:true,
+        huntRoundComplete:false,
+        huntLastEvent:"READY // NEW ROUND",
         feedback:"",
         called:[],
         run(action,args) {
@@ -66,7 +79,16 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /onPositionChanged: function\(mouse\)/);
     assert.match(cleanup, /onCanceled: \{/);
     assert.match(cleanup, /id: cleanupDesktopView/);
-    assert.match(cleanup, /HUNT \/\/ NEXT/);
+    assert.match(cleanup, /label: "HUNT"/);
+    assert.doesNotMatch(cleanup, /HUNT \/\/ NEXT/);
+    assert.match(cleanup, /id: cleanupHuntView/);
+    assert.match(cleanup, /id: huntArena/);
+    assert.match(cleanup, /id: huntTargetRepeater/);
+    assert.match(cleanup, /onClicked: camera\.huntFire\(/);
+    assert.match(cleanup, /onTriggered: camera\.huntAdvance\(\)/);
+    assert.match(cleanup, /cursorShape: Qt\.CrossCursor/);
+    assert.match(cleanup, /label: "UNDO SHOT"/);
+    assert.match(cleanup, /label: "NEW ROUND"/);
     assert.match(qml, /readonly property bool batchMode: activeView === "cleanup"/);
     assert.match(qml, /camera\.loadGallery\(false, "cleanup"\)/);
 });
@@ -153,4 +175,133 @@ test("Bad mode, expired view or full queue cannot mark more files", () => {
     assert.equal(s.swipeIndex,0);
     assert.equal(s.swipeHistory.length,0);
     assert.equal(s.batchPaths.length,500);
+});
+
+
+test("Hunt draws exactly 3 random eligible loaded files without touching Trash", () => {
+    const s = createState();
+    s.cleanupTechnique = "hunt";
+    assert.equal(s.huntStartRound(), true);
+    assert.equal(s.huntRound, 1);
+    assert.equal(s.huntPaused, false);
+    assert.equal(s.huntSecondsLeft,25);
+    assert.equal(s.huntTargets.length,3);
+    assert.equal(new Set(s.huntTargets.map(t=>t.path)).size,3);
+    for (const target of s.huntTargets) {
+        assert.ok(files.some(f=>f.path===target.path));
+        assert.ok(target.lane>=0 && target.lane<3);
+        assert.ok(target.speed>0);
+    }
+    assert.equal(s.batchPaths.length,0);
+    assert.equal(s.called.length,0);
+});
+
+test("Hunt hit marks only a displayed target; Undo restores target and selection", () => {
+    const s = createState();
+    s.cleanupTechnique = "hunt";
+    assert.equal(s.huntStartRound(),true);
+    const target = s.huntTargets[0].path;
+    assert.equal(s.huntFire("/tmp/not-an-active-target.png"),false);
+    assert.equal(s.huntShots,0);
+    assert.equal(s.huntFire(target),true);
+    assert.equal(s.huntHits,1);
+    assert.equal(s.huntShots,1);
+    assert.equal(s.huntMisses,0);
+    assert.equal(s.huntScore,100);
+    assert.deepEqual(Array.from(s.batchPaths),[target]);
+    assert.equal(s.huntTargets.length,2);
+    assert.equal(s.called.length,0);
+    assert.equal(s.huntUndo(),true);
+    assert.equal(s.huntHits,0);
+    assert.equal(s.huntShots,0);
+    assert.equal(s.huntScore,0);
+    assert.equal(s.huntTargets.length,3);
+    assert.equal(s.batchPaths.length,0);
+});
+
+test("Hunt misses do not queue media and are undoable", () => {
+    const s = createState();
+    s.cleanupTechnique = "hunt";
+    s.huntStartRound();
+    assert.equal(s.huntFire(""),true);
+    assert.equal(s.huntShots,1);
+    assert.equal(s.huntHits,0);
+    assert.equal(s.huntMisses,1);
+    assert.equal(s.huntScore,0);
+    assert.equal(s.batchPaths.length,0);
+    assert.equal(s.huntTargets.length,3);
+    assert.equal(s.huntUndo(),true);
+    assert.equal(s.huntMisses,0);
+    assert.equal(s.huntShots,0);
+});
+
+test("Hunt pause and timeout leave unhit files eligible for next round", () => {
+    const s = createState();
+    s.cleanupTechnique = "hunt";
+    s.huntStartRound();
+    assert.equal(s.huntTogglePause(),true);
+    assert.equal(s.huntAdvance(),false);
+    assert.equal(s.huntTick,0);
+    assert.equal(s.huntTogglePause(),true);
+    for (let i=0;i<250;i++) assert.equal(s.huntAdvance(),true);
+    assert.equal(s.huntRoundComplete,true);
+    assert.equal(s.huntPaused,true);
+    assert.equal(s.huntSecondsLeft,0);
+    assert.equal(s.huntTargets.length,0);
+    assert.equal(s.batchPaths.length,0);
+    assert.equal(s.huntHistory.length,0);
+    assert.equal(s.huntStartRound(),true);
+    assert.equal(s.huntRound,2);
+    assert.equal(s.huntTargets.length,3);
+    assert.equal(s.huntSecondsLeft,25);
+});
+
+test("Hunt round finishes after all targets, with combo score and no automatic Trash", () => {
+    const s = createState();
+    s.cleanupTechnique = "hunt";
+    s.huntStartRound();
+    while(s.huntTargets.length)
+        assert.equal(s.huntFire(s.huntTargets[0].path),true);
+    assert.equal(s.huntHits,3);
+    assert.equal(s.huntShots,3);
+    assert.equal(s.huntScore,375);
+    assert.equal(s.batchPaths.length,3);
+    assert.equal(s.huntRoundComplete,true);
+    assert.equal(s.huntPaused,true);
+    assert.equal(s.called.length,0);
+    assert.equal(s.huntStartRound(),false); // all loaded files already queued
+    assert.equal(s.called.length,0);
+});
+
+test("Hunt full 500 item queue blocks and mode switching never authorizes deleting", () => {
+    const s = createState();
+    s.cleanupTechnique = "hunt";
+    s.batchPaths = Array.from({length:500},(_,i)=>"/tmp/queued"+i+".png");
+    assert.equal(s.huntStartRound(),false);
+    assert.equal(s.huntTargets.length,0);
+    s.batchPaths = Array.from({length:499},(_,i)=>"/tmp/queued"+i+".png");
+    assert.equal(s.huntStartRound(),true);
+    assert.equal(s.huntFire(s.huntTargets[0].path),true);
+    assert.equal(s.batchPaths.length,500);
+    assert.equal(s.huntFire(s.huntTargets[0].path),false);
+    assert.equal(s.huntPaused,true);
+    assert.equal(s.batchPaths.length,500);
+    assert.equal(s.called.length,0);
+    s.activeView="gallery";
+    assert.equal(s.huntTogglePause(),false);
+    assert.equal(s.huntUndo(),false);
+});
+
+test("Mutating Batch selection invalidates Hunt undo history", () => {
+    const s = createState();
+    s.cleanupTechnique="hunt";
+    s.huntStartRound();
+    s.huntFire(s.huntTargets[0].path);
+    assert.equal(s.huntHistory.length,1);
+    s.cleanupTechnique="batch";
+    assert.equal(s.batchClear(),true);
+    assert.equal(s.huntHistory.length,0);
+    s.cleanupTechnique="hunt";
+    assert.equal(s.huntUndo(),false);
+    assert.equal(s.called.length,0);
 });

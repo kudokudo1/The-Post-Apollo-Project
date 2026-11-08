@@ -148,7 +148,7 @@ Item {
                     model: pane.choices
                     Rectangle {
                         width: listRows.width
-                        height: 46
+                        height: modelData.owner==="appcontrol" ? 58 : 46
                         border.width: 1
                         border.color: pane.selectedResource
                             && pane.selectedResource.key===modelData.key
@@ -164,18 +164,30 @@ Item {
                                 spacing: 1
                                 GohuText {
                                     width: parent.width
-                                    text: modelData.label
+                                    height: modelData.owner==="appcontrol" ? 30 : 15
+                                    text: modelData.owner==="appcontrol"
+                                        ? ("APP CTRL / "+modelData.menu
+                                           +" / "+(modelData.resolved
+                                                   ? modelData.item
+                                                   : modelData.label))
+                                        : modelData.label
                                     textFormat: Text.PlainText
                                     color: Colors.white
                                     font.pixelSize: 10
+                                    wrapMode: Text.Wrap
+                                    maximumLineCount: modelData.owner==="appcontrol" ? 2 : 1
                                     elide: Text.ElideRight
                                 }
                                 GohuText {
                                     width: parent.width
-                                    text: modelData.category
-                                        +" // "+(modelData.readOnly?"READ ONLY":modelData.isPinned?"PINNED":"SAVED")
+                                    text: modelData.owner==="appcontrol"
+                                        ? modelData.favoriteType+" // READ ONLY"
+                                        : modelData.category
+                                          +" // "+(modelData.readOnly?"READ ONLY":modelData.isPinned?"PINNED":"SAVED")
+                                    textFormat: Text.PlainText
                                     color: Colors.orange
                                     font.pixelSize: 9
+                                    elide: Text.ElideRight
                                 }
                             }
                             ActionButton {
@@ -234,6 +246,56 @@ Item {
                 : "CHOOSE AN ITEM IN THE CENTER BAY"
             font.pixelSize: 10
             elide: Text.ElideRight
+        }
+        // AppControl provides the original menu and actual source item.
+        // No raw commands, paths, PIDs or action callbacks are displayed here.
+        Column {
+            id: appControlOrigin
+            visible: pane.selectedResource !== null
+                     && pane.selectedResource.owner==="appcontrol"
+            width: parent.width
+            spacing: 3
+            GohuText {
+                width: parent.width
+                text: "SOURCE // APP CONTROL"
+                font.pixelSize: 10
+                color: Colors.cyan
+            }
+            GohuText {
+                width: parent.width
+                text: "MENU // "+(pane.selectedResource
+                                   ? pane.selectedResource.menu : "")
+                font.pixelSize: 10
+                color: Colors.orange
+                elide: Text.ElideRight
+            }
+            GohuText {
+                width: parent.width
+                text: "ITEM // "+(pane.selectedResource
+                                   ? (pane.selectedResource.resolved
+                                      ? pane.selectedResource.item
+                                      : "NAME UNAVAILABLE") : "")
+                textFormat: Text.PlainText
+                font.pixelSize: 10
+                color: Colors.white
+                wrapMode: Text.Wrap
+                maximumLineCount: 2
+                elide: Text.ElideRight
+            }
+            GohuText {
+                width: parent.width
+                text: "TYPE // "+(pane.selectedResource
+                                   ? pane.selectedResource.favoriteType : "")
+                font.pixelSize: 10
+                color: Colors.magenta
+                elide: Text.ElideRight
+            }
+            QuietText {
+                width: parent.width
+                text: "STATUS // READ ONLY"
+                font.pixelSize: 10
+                color: Colors.white
+            }
         }
         Row {
             width: parent.width
@@ -315,7 +377,7 @@ Item {
         FavoritesCollectionPanel {
             id: collectionManager
             width: parent.width
-            height: Math.max(0,details.height-143)
+            height: Math.max(0,details.height-(appControlOrigin.visible ? 255 : 143))
             collectionStore: pane.collectionsOwner
             resource: pane.selectedResource && !pane.selectedResource.readOnly
                 ? ({

@@ -37,7 +37,9 @@ function createState() {
         feedback:"",
         called:[],
         run(action,args) {
-            this.called.push({action,args});
+            // Camera.qml calls run as a lexical root function rather than
+            // a method. Do not rely on 'this' inside the synthetic harness.
+            state.called.push({action,args});
             return true;
         },
     };

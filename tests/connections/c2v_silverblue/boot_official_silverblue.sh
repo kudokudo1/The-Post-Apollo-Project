@@ -96,6 +96,8 @@ if [[ -v C4B_RUNTIME_ASSETS_DIR && -n "$C4B_RUNTIME_ASSETS_DIR" ]]; then
     { echo "C4B_BLOCKED // SIGNED_POLICY_RPM_MANIFEST_MISMATCH"; exit 2; }
   cp "$repo/tests/connections/c4b_silverblue/guest_confined_runtime.sh" \
     "$seed/c4b-guest-confined-runtime.sh"
+  cp "$repo/tests/connections/c4b_silverblue/guest_signed_policy_gate.sh" \
+    "$seed/c4b-guest-signed-policy-gate.sh"
   printf '%s\n' C4B_CI_ONLY_CONFINED_RUNTIME > "$seed/c4b-opt-in.marker"
   echo "C4B_PASS // OFFLINE_RUNTIME_POLICY_WHEEL_AND_PROBES_STAGED"
 fi
@@ -274,6 +276,7 @@ fi
 # removal are independently mandatory; no marker is inferred from exit=0.
 if [[ "$c4b_requested" == 1 ]]; then
   for evidence in \
+    'C4B_PASS // SIGNED_POLICY_RPM_COMPOSED_ENTRYPOINT_LABEL_BEFORE_REBOOT' \
     'C4B_PASS // SELINUX_POLICY_LOADED_WITH_ENFORCING_KERNEL' \
     'C4B_PASS // SIGNED_SILVERBLUE_EXECUTABLE_CONFINED_ENTRYPOINT' \
     'C4B_PASS // UNAUTHORIZED_DBUS_OWNERSHIP_REFUSED' \
@@ -281,7 +284,8 @@ if [[ "$c4b_requested" == 1 ]]; then
     'C3B_PASS // OS_DBUS_PID_UID_SYSTEMD_SELINUX_ORIGIN_COHERENCE_TEST_ONLY' \
     'C4B_PASS // EXACT_RUNTIME_ORIGIN_AND_DENY_ONLY_CLIENT_CALLS' \
     'C4B_PASS // SERVICE_STOP_RELEASES_DBUS_NAME' \
-    'C4B_PASS // RUNTIME_USERS_VENV_AND_SELINUX_POLICY_CLEANED' \
+    'C4B_PASS // RUNTIME_USERS_VENV_CLEANED_POLICY_RETAINED_FOR_ROLLBACK' \
+    'C4B_PASS // SIGNED_POLICY_RPM_AND_TEST_KEYRING_REMOVED_BY_ROLLBACK' \
     'C4B_PASS // SIGNED_CONFINED_FAKE_HOST_STOPPED_AND_REAL_SILVERBLUE_ROLLBACK'; do
     grep -a -Fq "$evidence" "$tmp/guest-serial.log" ||
       { echo "C4B_BLOCKED // CONFINED_SILVERBLUE_RUNTIME_EVIDENCE_MISSING"; exit 1; }

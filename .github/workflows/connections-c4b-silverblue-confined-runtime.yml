@@ -6,6 +6,7 @@ on:
       - "tests/connections/c4b_silverblue/**"
       - "tests/connections/test_connections_c4b_silverblue_contract.py"
       - "tests/connections/c2v_silverblue/**"
+      - "tests/connections/test_connections_c2v_rollback_evidence_contract.py"
       - ".github/workflows/connections-c4b-silverblue-confined-runtime.yml"
       - "docs/connections-c4b-silverblue-confined-runtime.md"
   workflow_dispatch:
@@ -33,6 +34,7 @@ jobs:
           bash -n tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh
           bash -n tests/connections/c3d_provenance/build_signed_ci_status.sh
           bash -n tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
+          python3 -B tests/connections/test_connections_c2v_rollback_evidence_contract.py
           python3 -B tests/connections/test_connections_c4b_silverblue_contract.py
           python3 -B tests/connections/test_connections_c4a_silverblue_contract.py
           python3 -B tests/connections/test_connections_c3b_origin.py
@@ -132,6 +134,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 -B tests/connections/test_connections_c2v_rollback_evidence_contract.py
           python3 -B tests/connections/test_connections_c4b_silverblue_contract.py
           python3 -B tests/connections/test_connections_c2n_policy_contract.py
           echo "C4B_PASS // PRODUCTION_CREDENTIALS_GRANTS_AND_HOST_AUTH_DISABLED"

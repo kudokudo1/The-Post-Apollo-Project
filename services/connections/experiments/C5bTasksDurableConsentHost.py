@@ -10,6 +10,7 @@ identity, independently authenticated human consent, or key access.
 from __future__ import annotations
 
 import fcntl
+import importlib.util
 import os
 from pathlib import Path
 import re
@@ -22,7 +23,14 @@ import sys
 import time
 from secrets import token_hex
 
-import C5aTasksScopeHost as C5a
+# -I excludes implicit script directories. Load only the exact checked-in
+# sibling contract, not an ambient PYTHONPATH or importable module name.
+_spec = importlib.util.spec_from_file_location(
+    "c5b_pinned_c5a", Path(__file__).with_name("C5aTasksScopeHost.py"))
+if _spec is None or _spec.loader is None:
+    raise RuntimeError("C5A_SCOPE_CONTRACT_MISSING")
+C5a = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(C5a)
 
 MARKER = "C5B_DISPOSABLE_DURABLE_CONSENT_NO_REAL_AUTHORITY"
 MAX_ROWS = 256

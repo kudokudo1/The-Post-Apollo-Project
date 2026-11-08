@@ -144,6 +144,16 @@ class C4bContracts(unittest.TestCase):
         self.assertIn("C3B_PASS // OS_DBUS_PID_UID_SYSTEMD_SELINUX_ORIGIN_COHERENCE_TEST_ONLY",
                       BOOT.read_text())
         self.assertIn("C3B_OS_ORIGIN_COHERENT_TEST_ONLY", C3B.read_text())
+        # These source guards take effect only after the independently
+        # reviewed C3b #1553 reaches main. Never copy that owner source here.
+        c3b = C3B.read_text()
+        self.assertIn("--verify-disposable-silverblue-opt", c3b)
+        self.assertIn('C4B_OPT_LINK = "var/opt"', c3b)
+        self.assertIn('C4B_OPT_REALPATH = "/var/opt"', c3b)
+        self.assertIn("def _verified_c4b_opt_guest()", c3b)
+        self.assertIn("def _valid_opt_proof(", c3b)
+        self.assertIn("os.readlink(\"/opt\")", c3b)
+        self.assertIn("os.lstat(\"/opt\")", c3b)
         self.assertIn("init_daemon_domain", C2R.read_text())
         self.assertIn("stage COMPOSED_POLICY_VERIFICATION_BEGIN", script)
         self.assertIn("stage COMPOSED_IMMUTABLE_EXECUTABLE_LABEL_CHECK", script)
@@ -154,6 +164,15 @@ class C4bContracts(unittest.TestCase):
         self.assertIn("C4B_EXIT // phase=", script)
         self.assertIn('exec >>/var/tmp/c4b-runtime.log 2>&1', script)
         self.assertIn("GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1", script)
+        # C4b requests the C3b-owner's explicit, independently gated
+        # Silverblue-only path. Default --verify-disposable stays untouched.
+        self.assertIn("POST_APOLLO_C4B_TEST_GUEST=1", script)
+        self.assertIn("--verify-disposable-silverblue-opt", script)
+        self.assertIn("C3B_OS_ORIGIN_VERIFICATION_BEGIN", script)
+        self.assertIn("DBUS_SYSTEMD_PID_UID_SELINUX_ORIGIN_REJECTED", script)
+        self.assertNotIn("--verify-disposable-physical", script)
+        self.assertIn('python=/opt/postapollo-c2o-venv/bin/python3', script)
+        self.assertIn('python3 -m venv --without-pip /opt/postapollo-c2o-venv', script)
         self.assertIn("C3B_REJECTED_ORIGIN_ANCESTOR_DIAG_BEGIN", script)
         self.assertIn("C4B_DIAG_C3B_UNPROTECTED_DIRECTORY //", script)
         self.assertIn("C4B_DIAG_C3B_ANCESTOR_VIOLATION_COUNT //", script)

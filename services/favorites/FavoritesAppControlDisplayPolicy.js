@@ -104,7 +104,7 @@ function build(saved, models) {
                     action=builtins[actionName];
             }
             if (action) put("preferred-action",raw,"APPS",
-                            appName+" / "+action,"PREFERRED ACTION");
+                            appName+" - "+action,"PREFERRED ACTION");
         }
     }
 
@@ -123,7 +123,7 @@ function build(saved, models) {
                 catch(error) {continue;}
                 const boxLabel=title(box);
                 if (boxLabel) put("monitor-watch",raw,menu,
-                                  display+" / "+boxLabel,"METRIC WATCH");
+                                  display+" - "+boxLabel,"METRIC WATCH");
             }
         }
     }
@@ -173,7 +173,7 @@ function build(saved, models) {
         const item=safeTaskName(identity);
         if (item && Object.prototype.hasOwnProperty.call(metrics,metric))
             put("task-watch",raw,"KILL",
-                item+" / "+metrics[metric],"METRIC WATCH");
+                item+" - "+metrics[metric],"METRIC WATCH");
     }
     return out;
 }

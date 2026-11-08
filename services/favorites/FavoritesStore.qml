@@ -19,6 +19,11 @@ Scope {
     property alias favoriteMonitorBoxKeys: adapter.favoriteMonitorBoxKeys
     property alias favoriteTaskMetricKeys: adapter.favoriteTaskMetricKeys
 
+    // Volatile, owner-supplied presentation only. AppControl may populate
+    // this after resolving its own models. Never serialize this map or use
+    // it as permission to execute actions.
+    property var favoriteDisplayLabels: ({})
+
     FileView {
         id: favoriteStoreFile
 

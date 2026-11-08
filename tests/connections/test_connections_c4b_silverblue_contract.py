@@ -11,6 +11,8 @@ WORKFLOW = (ROOT / ".github/workflows/connections-c4b-silverblue-confined-runtim
 C4A = (ROOT / "tests/connections/c4a_silverblue/guest_signed_status_gate.sh")
 C3B = (ROOT / "tests/connections/c3b_origin/C3bOriginCheck.py")
 C2R = (ROOT / "tests/connections/c2r_selinux_domain/postapollo_connections.te")
+SIGNED_C2R_HOST_SOURCE = (ROOT / "tests/connections/c2r_selinux_domain/C2rStatusHost.py")
+SIGNED_C3D_UNIT_SOURCE = (ROOT / "services/connections/experiments/c2n_package/postapollo-connections-status.service.template")
 POLICY_GATE = (ROOT / "tests/connections/c4b_silverblue/guest_signed_policy_gate.sh")
 POLICY_BUILDER = (ROOT / "tests/connections/c4b_silverblue/build_signed_composed_policy.sh")
 POLICY_SPEC = (ROOT / "tests/connections/c4b_silverblue/signed-compose-policy.spec")
@@ -226,6 +228,18 @@ class C4bContracts(unittest.TestCase):
         self.assertIn("C4B_POLICY_UNEXPECTED_PAYLOAD", builder)
         self.assertIn("rpmsign --addsign", builder)
         self.assertIn("build_signed_composed_policy.sh", workflow)
+        # The C3b owner's opt profile must use the ORIGINAL C3d-signed host,
+        # not C4b's now-closed physical-shebang derivative experiment #1551.
+        self.assertTrue(SIGNED_C2R_HOST_SOURCE.read_bytes().startswith(
+            b"#!/opt/postapollo-c2o-venv/bin/python3\\n"
+        ))
+        self.assertIn(
+            "ExecStart=/usr/libexec/post-apollo/connections-status-host --read-only",
+            SIGNED_C3D_UNIT_SOURCE.read_text(),
+        )
+        self.assertNotIn("prepare_physical_status_host.py", workflow)
+        self.assertNotIn("c4b-physical-status-host.py", workflow)
+        self.assertIn("build_signed_ci_status.sh", workflow)
         self.assertIn("c4b-policy.rpm", workflow)
         self.assertIn("sha256sum --check --status c4b-policy-artifact-manifest.sha256", workflow)
         for forbidden in ("setenforce ", "rpm-ostree usroverlay",

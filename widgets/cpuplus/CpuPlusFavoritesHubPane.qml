@@ -261,13 +261,13 @@ Item {
         anchors.fill: parent
         spacing: 7
 
-        // Nine compact categories occupy three rows within the middle bay.
+        // Ten compact categories occupy four rows in the middle bay.
         Flow {
             width: parent.width
-            height: 90
+            height: 121
             spacing: 4
             Repeater {
-                model: ["ALL","CPU++","APP CTRL","WEATHER","NOTIFS","RADIO","CLOCK","PLACES","NEW"]
+                model: ["ALL","CPU++","APP CTRL","WEATHER","NOTIFS","RADIO","HOSPITAL","CLOCK","PLACES","NEW"]
                 ActionButton {
                     required property string modelData
                     width: Math.max(1,(selector.width-8)/3)
@@ -297,7 +297,7 @@ Item {
         Flickable {
             id: listScroll
             width: parent.width
-            height: Math.max(0,selector.height-167)
+            height: Math.max(0,selector.height-198)
             clip: true
             contentWidth: width
             contentHeight: listRows.implicitHeight
@@ -419,6 +419,8 @@ Item {
                          ? "NOTIFICATIONS-OWNED // READ ONLY"
                          : pane.selectedResource.owner==="radio"
                          ? "RADIO-OWNED // READ ONLY"
+                         : pane.selectedResource.owner==="hospital"
+                         ? "HOSPITAL RECEPTION-OWNED // READ ONLY"
                          : "APP CONTROL-OWNED // READ ONLY")
                       : "SAVED IDENTITY")
                 : "CHOOSE AN ITEM IN THE CENTER BAY"
@@ -433,7 +435,8 @@ Item {
                      && (pane.selectedResource.owner==="appcontrol"
                          || pane.selectedResource.owner==="weather-home"
                          || pane.selectedResource.owner==="notifications"
-                         || pane.selectedResource.owner==="radio")
+                         || pane.selectedResource.owner==="radio"
+                         || pane.selectedResource.owner==="hospital")
             width: parent.width
             spacing: 3
             GohuText {
@@ -447,6 +450,9 @@ Item {
                     : pane.selectedResource
                       && pane.selectedResource.owner==="radio"
                     ? "SOURCE // WEATHER STATION RADIO"
+                    : pane.selectedResource
+                      && pane.selectedResource.owner==="hospital"
+                    ? "SOURCE // HOSPITAL RECEPTION"
                     : "SOURCE // APP CONTROL"
                 font.pixelSize: 10
                 color: Colors.cyan
@@ -588,7 +594,9 @@ Item {
                      ? "NOTIFICATIONS REMAINS OWNER // NO MESSAGE ACCESS"
                      : pane.selectedResource.owner==="radio"
                        ? "RADIO REMAINS OWNER // NO PLAYBACK"
-                       : "APP CONTROL REMAINS OWNER // NO EXECUTION")
+                       : pane.selectedResource.owner==="hospital"
+                         ? "HOSPITAL REMAINS OWNER // NO ARCHIVE ACCESS"
+                         : "APP CONTROL REMAINS OWNER // NO EXECUTION")
                 : "GROUPING ≠ AUTHORITY // ORIGINAL OWNERS KEEP CONTROL"
             elide: Text.ElideRight
         }

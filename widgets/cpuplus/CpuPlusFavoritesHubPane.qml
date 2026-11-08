@@ -147,59 +147,72 @@ Item {
                     id: savedItemRows
                     model: pane.choices
                     Rectangle {
+                        id: favoriteRow
                         width: listRows.width
                         height: modelData.owner==="appcontrol" ? 58 : 46
                         border.width: 1
                         border.color: pane.selectedResource
                             && pane.selectedResource.key===modelData.key
-                            ? Colors.magenta : Colors.cyan
+                            ? Colors.magenta
+                            : rowHit.containsMouse || rowHit.activeFocus
+                              ? Colors.orange : Colors.cyan
                         color: "#1B0623"
-                        Row {
+                        Column {
                             anchors.fill: parent
-                            anchors.margins: 5
-                            spacing: 4
-                            Column {
-                                width: Math.max(0,parent.width-65)
-                                height: parent.height
-                                spacing: 1
-                                GohuText {
-                                    width: parent.width
-                                    height: modelData.owner==="appcontrol" ? 30 : 15
-                                    text: modelData.owner==="appcontrol"
-                                        ? ("APP CTRL / "+modelData.menu
-                                           +" / "+(modelData.resolved
-                                                   ? modelData.item
-                                                   : modelData.label))
-                                        : modelData.label
-                                    textFormat: Text.PlainText
-                                    color: Colors.white
-                                    font.pixelSize: 10
-                                    wrapMode: Text.Wrap
-                                    maximumLineCount: modelData.owner==="appcontrol" ? 2 : 1
-                                    elide: Text.ElideRight
-                                }
-                                GohuText {
-                                    width: parent.width
-                                    text: modelData.owner==="appcontrol"
-                                        ? modelData.favoriteType+" // READ ONLY"
-                                        : modelData.category
-                                          +" // "+(modelData.readOnly?"READ ONLY":modelData.isPinned?"PINNED":"SAVED")
-                                    textFormat: Text.PlainText
-                                    color: Colors.orange
-                                    font.pixelSize: 9
-                                    elide: Text.ElideRight
-                                }
+                            anchors.margins: 6
+                            spacing: 1
+                            GohuText {
+                                width: parent.width
+                                height: modelData.owner==="appcontrol" ? 30 : 15
+                                text: modelData.owner==="appcontrol"
+                                    ? ("APP CTRL // "+modelData.menu
+                                       +" // "+(modelData.resolved
+                                               ? modelData.item
+                                               : modelData.label))
+                                    : modelData.label
+                                textFormat: Text.PlainText
+                                color: Colors.white
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                                maximumLineCount: modelData.owner==="appcontrol" ? 2 : 1
+                                elide: Text.ElideRight
                             }
-                            ActionButton {
-                                width: 60
-                                height: 29
-                                anchors.verticalCenter: parent.verticalCenter
-                                label: "VIEW"
-                                labelPixelSize: 10
-                                selected: pane.selectedResource !== null
-                                    && pane.selectedResource.key===modelData.key
-                                accentColor: Colors.magenta
-                                onLeftClicked: pane.selectionRequested(modelData.key)
+                            GohuText {
+                                width: parent.width
+                                text: modelData.owner==="appcontrol"
+                                    ? modelData.favoriteType+" // READ ONLY"
+                                    : modelData.category
+                                      +" // "+(modelData.readOnly?"READ ONLY":modelData.isPinned?"PINNED":"SAVED")
+                                textFormat: Text.PlainText
+                                color: Colors.orange
+                                font.pixelSize: 9
+                                elide: Text.ElideRight
+                            }
+                        }
+                        // One full-row selection target. No nested VIEW control,
+                        // writer, process action or permission elevation.
+                        MouseArea {
+                            id: rowHit
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            preventStealing: false
+                            cursorShape: Qt.PointingHandCursor
+                            activeFocusOnTab: true
+                            Accessible.role: Accessible.Button
+                            Accessible.name: modelData.owner==="appcontrol"
+                                ? "AppControl // "+modelData.menu+" // "+modelData.item
+                                : modelData.label
+                            Accessible.onPressAction: pane.selectionRequested(modelData.key)
+                            onClicked: pane.selectionRequested(modelData.key)
+                            // Keep wheel-scrolling owned by the enclosing Flickable.
+                            onWheel: function(wheel) { wheel.accepted=false; }
+                            Keys.onPressed: function(event) {
+                                if (event.key===Qt.Key_Return
+                                        || event.key===Qt.Key_Enter
+                                        || event.key===Qt.Key_Space) {
+                                    pane.selectionRequested(modelData.key);
+                                    event.accepted=true;
+                                }
                             }
                         }
                     }

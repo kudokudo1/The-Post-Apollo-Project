@@ -29,6 +29,37 @@ function normalizedName(name) {
     return name;
 }
 
+// U6a: collections JSON stores canonical member keys in plaintext.
+// Only accept external IDs whose grammar is bounded and non-sensitive.
+// This is grouping metadata, never owner favorite or action authority.
+function safeExternalMember(provider,kind,id) {
+    if (provider==="weather-home") {
+        if(kind==="panel")
+            return /^home\/(?:auto|quick|snapshot|history|runtime|health)$/.test(id);
+        if(kind==="card")
+            return /^(?:weather|sky|ground|space)\|[a-z][a-z0-9-]{0,63}$/.test(id);
+        return false;
+    }
+    if(provider==="radio")
+        return kind==="station"
+            && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id);
+    // Website-origin notification keys contain site identities: do not persist.
+    if(provider==="notifications")
+        return kind==="source"
+            && id.length<=96
+            && /^[A-Za-z][A-Za-z0-9._+-]{0,95}$/.test(id)
+            && !/(?:password|secret|token|credential|private|confidential|auth|keyring)/i.test(id);
+    // AppControl may store commands, files, window titles or process IDs.
+    // Accept ordinary named desktop identifiers only; no run/mode/hidden keys.
+    if(provider==="appcontrol")
+        return kind==="item"
+            && id.length<=96 && id===id.trim() && id!=="." && id!==".."
+            && /^[A-Za-z][A-Za-z0-9 ._+()-]{0,95}$/.test(id)
+            && !/(?:password|secret|token|credential|private|confidential|auth|keyring)/i.test(id);
+    // Hospital U5d pin refs have order-derived slots, not durable identity.
+    return false;
+}
+
 function checkMemberKey(key) {
     if (typeof key !== "string" || key.length > 500)
         return {ok:false,reason:"INVALID_MEMBER_KEY"};
@@ -57,7 +88,8 @@ function checkMemberKey(key) {
                 || !Number.isSafeInteger(Number(id)))
             return {ok:false,reason:"UNSUPPORTED_OWNER"};
     } else if (Default.RESERVED_PROVIDERS.indexOf(match[1]) >= 0) {
-        return {ok:false,reason:"UNSUPPORTED_OWNER"};
+        if (!safeExternalMember(match[1],match[2],id))
+            return {ok:false,reason:"UNSUPPORTED_OWNER"};
     } else {
         if (!Default.checkKey(key).ok
                 || !/^[A-Za-z0-9][A-Za-z0-9_.:@+-]{0,127}$/.test(id))

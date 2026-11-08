@@ -777,7 +777,6 @@ Rectangle {
                     }
                 }
             }
-        }
             // C34 // Same reusable focus surface as C33 Meteors/Eclipses/
             // Stars. Both NOAA SUVI channels retain their provider URL,
             // provenance and source refresh ownership; no new fetcher.

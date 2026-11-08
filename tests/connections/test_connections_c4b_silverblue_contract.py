@@ -63,7 +63,7 @@ class C4bContracts(unittest.TestCase):
             "C4B_PASS // SELINUX_POLICY_LOADED_WITH_ENFORCING_KERNEL",
             "restorecon -F", "SIGNED_OSTREE_EXECUTABLE_NOT_LABELED",
             "postapollo_connections_exec_t", "postapollo_connections_t",
-            "NoNewPrivs:", "SIGNED_FAKE_HOST", "C3bOriginCheck.py",
+            "NoNewPrivs:", "FAKE_SERVICE_DID_NOT_REMAIN_ACTIVE", "C3bOriginCheck.py",
             "POST_APOLLO_C3B_TEST_GUEST=1",
             "C2R_PASS // SELINUX_REFUSED_WORLD_READABLE_PROBE",
             "UNAUTHORIZED_DBUS_OWNERSHIP_REFUSED",

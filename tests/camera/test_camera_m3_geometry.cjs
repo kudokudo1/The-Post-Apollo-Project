@@ -140,9 +140,9 @@ test("Camera's transparent Zoom frame seals its inner 2px perimeter but leaves d
     assert.ok(right.includes("visible: camera.zoomWebVisualHeld"));
     for (const [width, height, top] of [[784,699,82],[1000,1013,99],[2536,1345,99]]) {
         const inset = 2, browserWidth = width - 2 * inset;
-        const browserBottom = height - 1;
+        const browserBottom = height - 1 - 10;
         assert.equal(inset + browserWidth + inset, width);
-        assert.equal(top + (browserBottom - top) + 1, height);
+        assert.equal(top + (browserBottom - top) + 11, height);
     }
     assert.match(camera, /readonly property int zoomBrowserRise: 13/);
     assert.match(camera, /intersection: Intersection\.Subtract/);

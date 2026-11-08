@@ -37,7 +37,7 @@ def find_os_program(name: str) -> str | None:
     shutil.which checks the executable bit. A malicious earlier PATH entry
     must not prevent later discovery of the standard Fedora executable.
     """
-    if name not in ("foot", "python3", "pkcon", "pkexec", "dnf5", "dnf"):
+    if name not in ("foot", "python3", "pkcon", "pkexec", "dnf5", "dnf", "rpm-ostree"):
         return None
     for env in (None, OS_PATH):
         try:

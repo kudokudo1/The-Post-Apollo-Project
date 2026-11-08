@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "../../services/favorites/FavoritesDossierIndexPolicy.js" as Dossier
 import "../../services/favorites/FavoritesCollectionsViewPolicy.js" as CollectionView
+import "../../services/favorites/FavoritesOwnerNavigationPolicy.js" as OwnerNavigation
 
 // CPU++ Favorites++ manager. Three instances share one selection/snapshot.
 // No new FileView, owner process, or action authority is created here.
@@ -31,6 +32,11 @@ Item {
     signal indexSelectionRequested(string key, string category)
     signal collectionRequested(string collectionId)
     signal collectionMemberRequested(string collectionId, string key)
+    // U7a: navigation asks the shell to open one of its existing widget views.
+    // Never transmit the selected favorite's key/resource ID or command.
+    signal ownerNavigationRequested(string owner, string view)
+    readonly property var ownerNavigation:
+        OwnerNavigation.plan(pane.selectedResource)
     readonly property var dossier: Dossier.build(pane.candidates)
     readonly property var collectionView: CollectionView.build(
         pane.collectionsOwner ? pane.collectionsOwner.collections : [],
@@ -691,14 +697,17 @@ Item {
                 width: 128
                 height: 30
                 label: pane.selectedResource && pane.selectedResource.readOnly
-                    ? "OWNER CONTROL"
+                    ? "OPEN OWNER"
                     : pane.removeArmed ? "CONFIRM REMOVE" : "REMOVE FAVORITE"
                 labelPixelSize: 9
-                accentColor: Colors.red
+                accentColor: pane.selectedResource
+                    && pane.selectedResource.readOnly ? Colors.cyan : Colors.red
                 destructive: pane.removeArmed
+                    && !!pane.selectedResource && !pane.selectedResource.readOnly
                 available: {
                     const item=pane.selectedResource;
                     if (!item) return false;
+                    if(item.readOnly) return pane.ownerNavigation.ok;
                     if(item.category==="CLOCK")
                         return pane.timeOwner !== null && pane.timeOwner.worldFavoriteCanEdit
                             && pane.timeOwner.zoneCatalogLoaded;
@@ -710,8 +719,14 @@ Item {
                 }
                 onLeftClicked: {
                     if (!available || !pane.selectedResource) return;
-                    if (!pane.removeArmed) {pane.removeArmed=true;return;}
                     const item=pane.selectedResource;
+                    if(item.readOnly) {
+                        const target=pane.ownerNavigation;
+                        if(target.ok)
+                            pane.ownerNavigationRequested(target.owner,target.view);
+                        return;
+                    }
+                    if (!pane.removeArmed) {pane.removeArmed=true;return;}
                     if (item.category==="CLOCK")
                         pane.timeOwner.toggleWorldFavorite(
                             item.resourceId,pane.timeOwner.zoneCatalog);

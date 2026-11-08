@@ -1,0 +1,52 @@
+name: Telegram S2 separate-process fake provider revocation boundary
+
+on:
+  pull_request:
+    paths:
+      - 'tests/messaging/fixtures/telegram_session_revocation_s2.py'
+      - 'tests/messaging/test_telegram_session_revocation_s2.py'
+      - 'docs/telegram-session-revocation-s2-process-boundary.md'
+      - '.github/workflows/telegram-session-revocation-s2.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/messaging/fixtures/telegram_session_revocation_s2.py'
+      - 'tests/messaging/test_telegram_session_revocation_s2.py'
+      - '.github/workflows/telegram-session-revocation-s2.yml'
+permissions:
+  contents: read
+
+jobs:
+  telegram-linux-process-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Real nonroot Linux SOCK_SEQPACKET kernel sender identity vs fake Telegram logout
+        run: python3 -m unittest discover -s tests/messaging -p 'test_telegram_session_revocation_s2.py' -v
+      - name: Existing S1 fake sign-out scope/replay/ambiguity contract
+        run: python3 -m unittest discover -s tests/messaging -p 'test_telegram_session_revocation_contract_m1.py' -v
+      - name: C5b independent sender/ledger and C5a scope regressions (TASKS unchanged)
+        run: |
+          python3 -m unittest discover -s tests/connections -p 'test_connections_c5b_durable_consent.py' -v
+          python3 -m unittest discover -s tests/connections -p 'test_connections_c5a_tasks_scope_broker.py' -v
+      - name: Existing native Telegram fake provider and scoped session isolation
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_identity_scopes.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_bridge_cli_contracts.py' -v
+      - name: CPU++ route/recheck and original production trust denial
+        run: |
+          node tests/cpuplus/test_cpuplus_telegram_connection_entry.cjs
+          node --test tests/cpuplus/test_cpuplus_telegram_status_projection.cjs
+          node tests/cpuplus/test_connections_broker_c2a.js
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          grep -q 'readonly property bool credentialActionsEnabled: false' services/connections/ConnectionsBroker.qml
+          ! grep -R -F 'telegram_session_revocation_s2' widgets services shell.qml
+          ! grep -q 'sub.add_parser("logout")' services/messaging/bridges/telegram/bridge.py
+          ! grep -q 'sub.add_parser("revoke")' services/messaging/bridges/telegram/bridge.py

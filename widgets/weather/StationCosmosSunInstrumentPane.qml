@@ -19,6 +19,10 @@ Rectangle {
     // Keep the C16 hero-only expansion fallback for other callers.
     property bool stageImageExpand: false
     signal stageImageRequested()
+    // C36 // OBSERVATION's SDO movie is separate from NOAA SUVI.
+    // No movie UI is enabled in INDEX, LIVE or other SUVI consumers.
+    property bool solarMovieEnabled: false
+    signal solarMovieRequested()
     property bool imageExpanded: false
     property real suviZoom: 1
     property real suviPanX: 0
@@ -254,6 +258,21 @@ Rectangle {
                             else
                                 solarFocus.imageExpanded = !solarFocus.imageExpanded;
                         }
+                    }
+                    ActionButton {
+                        objectName: "cosmos-c36-suvi-movie-action"
+                        visible: solarFocus.solarMovieEnabled
+                        width: visible ? 46 : 0
+                        height: 19
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.rightMargin: 46
+                        anchors.topMargin: 4
+                        label: "MOVIE"
+                        labelPixelSize: 8
+                        contentPadding: 1
+                        accentColor: Colors.orange
+                        onClicked: solarFocus.solarMovieRequested()
                     }
                     Row {
                         id: suviZoomControls

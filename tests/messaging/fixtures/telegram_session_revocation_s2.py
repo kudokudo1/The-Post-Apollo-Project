@@ -201,6 +201,10 @@ def serve(review_fd: int, client_fd: int) -> int:
 
 def client_loop(fd: int) -> int:
     with socket.socket(fileno=fd) as connection:
+        # The fixture parent sets a receive timeout on its copy of this
+        # descriptor, which marks the shared open file description O_NONBLOCK.
+        # Reestablish blocking semantics for the child's send/receive pair.
+        connection.setblocking(True)
         if (connection.family != socket.AF_UNIX
                 or connection.getsockopt(socket.SOL_SOCKET, socket.SO_TYPE)
                 != socket.SOCK_SEQPACKET):

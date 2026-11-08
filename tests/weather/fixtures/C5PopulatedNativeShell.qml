@@ -240,6 +240,35 @@ ShellRoot {
                 visual.resetView();
                 if (visual.zoom !== 1 || visual.panX !== 0 || visual.panY !== 0)
                     return root.fail("C29_PHOTO_RESET_BROKEN");
+                const simulatedSky = findNamed(instrument,
+                    "cosmos-c30-simulated-motion-view");
+                const movingCanvas = findNamed(instrument,
+                    "cosmos-c30-meteor-moving-sky");
+                const motionTimer = findNamed(instrument,
+                    "cosmos-c30-meteor-motion-driver");
+                const archiveTimer = findNamed(instrument,
+                    "cosmos-c30-nasa-gallery-timer");
+                if (!simulatedSky || !movingCanvas || !motionTimer || !archiveTimer
+                    || !simulatedSky.visible || !visual.playing
+                    || visual.showArchive
+                    || visual.archiveFrames.length !== 2
+                    || !simulatedSky.radiantValid
+                    || Math.abs(simulatedSky.radiantX-46.8/360) > 0.001
+                    || Math.abs(simulatedSky.radiantY-(90-31.2)/180) > 0.001)
+                    return root.fail("C30_MOVING_SOURCE_RADIANT_NOT_RENDERED");
+                visual.playing = false;
+                if (motionTimer.running || archiveTimer.running)
+                    return root.fail("C30_PAUSE_DID_NOT_STOP_ANIMATION");
+                visual.showArchive = true;
+                if (!visual.showArchive || simulatedSky.visible
+                    || visual.archiveFrame.name !== "PERSEIDS 2016")
+                    return root.fail("C30_GALLERY_SWITCH_BROKEN");
+                visual.nextArchive();
+                if (visual.archiveIndex !== 1
+                    || visual.archiveFrame.name !== "SPRUCE KNOB 2016")
+                    return root.fail("C30_GALLERY_NEXT_BROKEN");
+                visual.showArchive = false;
+                visual.playing = true;
                 // Populate a long bounded catalog after the old two-card
                 // acceptance check. A real scroll must leave the header still.
                 const extra = [];

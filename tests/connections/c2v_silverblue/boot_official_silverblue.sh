@@ -75,6 +75,27 @@ if [[ -v C4A_SERVICE_RPM_DIR && -n "$C4A_SERVICE_RPM_DIR" ]]; then
   echo "C4A_PASS // PUBLIC_SIGNED_TEST_ARTIFACTS_STAGED_WITH_NO_PRIVATE_KEY"
 fi
 
+# C4b runtime assets ONLY when the dedicated CI opted in to BOTH C4a
+# signed service layering and C4b running-service identity verification.
+c4b_requested=0
+if [[ -v C4B_RUNTIME_ASSETS_DIR && -n "$C4B_RUNTIME_ASSETS_DIR" ]]; then
+  [[ "$c4a_requested" == 1 ]] ||
+    { echo "C4B_BLOCKED // C4A_SIGNED_PACKAGE_REQUIRED"; exit 2; }
+  c4b_requested=1
+  for name in postapollo_connections.pp dbus_next.whl \
+              C3bOriginCheck.py BusPolicyClient.py c4b-runtime-manifest.sha256; do
+    [[ -s "$C4B_RUNTIME_ASSETS_DIR/$name" ]] ||
+      { echo "C4B_BLOCKED // RUNTIME_ASSET_MISSING"; exit 2; }
+    cp "$C4B_RUNTIME_ASSETS_DIR/$name" "$seed/$name"
+  done
+  (cd "$seed" && sha256sum --check --status c4b-runtime-manifest.sha256) ||
+    { echo "C4B_BLOCKED // RUNTIME_MANIFEST_MISMATCH"; exit 2; }
+  cp "$repo/tests/connections/c4b_silverblue/guest_confined_runtime.sh" \
+    "$seed/c4b-guest-confined-runtime.sh"
+  printf '%s\n' C4B_CI_ONLY_CONFINED_RUNTIME > "$seed/c4b-opt-in.marker"
+  echo "C4B_PASS // OFFLINE_RUNTIME_POLICY_WHEEL_AND_PROBES_STAGED"
+fi
+
 payload="$(base64 -w0 "$repo/tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh")"
 cat > "$seed/ks.cfg" <<EOF
 # C2u fully disposable, offline Fedora Silverblue 44 VM only.
@@ -227,6 +248,25 @@ if [[ "$c4a_requested" == 1 ]]; then
       { echo "C4A_BLOCKED // SIGNED_SILVERBLUE_BOOT_ROLLBACK_EVIDENCE_MISSING"; exit 1; }
   done
   echo "C4A_PASS // SIGNED_FAKE_SERVICE_SILVERBLUE_TWO_REBOOT_SEQUENCE"
+fi
+# The C4b claim is separate from C4a's signed-package two-boot proof.
+# A running confined process, D-Bus origin, negative access and service
+# removal are independently mandatory; no marker is inferred from exit=0.
+if [[ "$c4b_requested" == 1 ]]; then
+  for evidence in \
+    'C4B_PASS // SELINUX_POLICY_LOADED_WITH_ENFORCING_KERNEL' \
+    'C4B_PASS // SIGNED_SILVERBLUE_EXECUTABLE_CONFINED_ENTRYPOINT' \
+    'C4B_PASS // UNAUTHORIZED_DBUS_OWNERSHIP_REFUSED' \
+    'C4B_PASS // REAL_SELINUX_SERVICE_DOMAIN_AND_NEGATIVE_FILE_DENIAL' \
+    'C3B_PASS // OS_DBUS_PID_UID_SYSTEMD_SELINUX_ORIGIN_COHERENCE_TEST_ONLY' \
+    'C4B_PASS // EXACT_RUNTIME_ORIGIN_AND_DENY_ONLY_CLIENT_CALLS' \
+    'C4B_PASS // SERVICE_STOP_RELEASES_DBUS_NAME' \
+    'C4B_PASS // RUNTIME_USERS_VENV_AND_SELINUX_POLICY_CLEANED' \
+    'C4B_PASS // SIGNED_CONFINED_FAKE_HOST_STOPPED_AND_REAL_SILVERBLUE_ROLLBACK'; do
+    grep -a -Fq "$evidence" "$tmp/guest-serial.log" ||
+      { echo "C4B_BLOCKED // CONFINED_SILVERBLUE_RUNTIME_EVIDENCE_MISSING"; exit 1; }
+  done
+  echo "C4B_PASS // REAL_SILVERBLUE_SIGNED_FAKE_SERVICE_OS_ORIGIN_AND_ROLLBACK"
 fi
 echo "C2V_PASS // ACTUAL_SILVERBLUE_BOOTED_LAYER_AND_ROLLBACK_SEQUENCE"
 echo "C2V_LIMITATION // EPHEMERAL_SELF_SIGNED_INERT_PACKAGE_NOT_PRODUCTION"

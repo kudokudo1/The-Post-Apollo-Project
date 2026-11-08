@@ -917,7 +917,10 @@ PanelWindow {
         focus: camera.menuOpen
         fillColor: Colors.black
         // Expose the web app ONLY through a compositor-measured slot.
+        // Clipping applies to Camera's own QML content, not the separate
+        // Sway browser actor; retain its explicitly verified geometry.
         fillOpacity: camera.zoomWebVisualHeld ? 0.0 : 0.97
+        clipContent: camera.zoomWebVisualHeld
         borderColor: Colors.cyan
         borderWidth: 1
         glowVisible: camera.menuOpen
@@ -946,6 +949,30 @@ PanelWindow {
             y: camera.zoomActorTop + camera.zoomActorHeight
             width: parent.width
             height: Math.max(0, parent.height - y)
+            color: Colors.black
+            visible: camera.zoomWebVisualHeld
+        }
+
+        // The native browser intentionally has a 2px inset on EACH side.
+        // With frame.fillOpacity=0, those strips otherwise expose whichever
+        // unrelated desktop windows happen to be behind Camera. Seal only
+        // the frame-local perimeter; never draw outside the Camera surface.
+        // The external browser window and the mask remain untouched.
+        Rectangle {
+            id: zoomWebLeftEdgeSeal
+            x: 0
+            y: camera.zoomActorTop
+            width: Math.max(0, camera.zoomActorLeft)
+            height: Math.max(0, camera.zoomActorHeight)
+            color: Colors.black
+            visible: camera.zoomWebVisualHeld
+        }
+        Rectangle {
+            id: zoomWebRightEdgeSeal
+            x: camera.zoomActorLeft + camera.zoomActorWidth
+            y: camera.zoomActorTop
+            width: Math.max(0, frame.width - x)
+            height: Math.max(0, camera.zoomActorHeight)
             color: Colors.black
             visible: camera.zoomWebVisualHeld
         }

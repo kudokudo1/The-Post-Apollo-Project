@@ -95,3 +95,34 @@ test("focused detail UI shows all twelve fields without paging, main scroll or e
  assert.match(fixture,/ECLIPSE_FULL_CALENDAR_MISSING/);
  assert.match(fixture,/STAR_NAVIGATION_DETAILS_MISSING/);
 });
+
+
+test("C26 NASA eclipse highlights are pinned above one bounded calendar and retain C6 inspector",()=>{
+ const board=read("widgets/weather/StationCosmosEclipseBoard.qml");
+ assert.match(modes,/kind === "eclipses" \? eclipseBoardComponent/);
+ assert.match(modes,/id: eclipseBoardComponent\s*StationCosmosEclipseBoard\s*\{/);
+ assert.match(modes,/eclipseSource: cosmosModePane\.eclipseSource/);
+ assert.match(board,/objectName: "cosmos-c26-eclipse-sticky-header"/);
+ assert.match(board,/objectName: "cosmos-c26-eclipse-highlight-row"/);
+ assert.match(board,/objectName: "cosmos-c26-eclipse-highlight"/);
+ assert.match(board,/eclipseBoard\.eclipseSource\.nextSolar/);
+ assert.match(board,/eclipseBoard\.eclipseSource\.nextLunar/);
+ assert.match(board,/objectName: "cosmos-c26-eclipse-catalog-frame"/);
+ assert.match(board,/anchors\.top: fixedEclipseHeader\.bottom/);
+ assert.match(board,/objectName: "cosmos-c26-eclipse-catalog-scroll"/);
+ assert.match(board,/contentHeight: eclipseRows\.implicitHeight/);
+ assert.match(board,/boundsBehavior: Flickable\.StopAtBounds/);
+ assert.match(board,/objectName: "cosmos-c26-eclipse-event-card"/);
+ assert.match(board,/model: eclipseBoard\.recordCount/);
+ assert.match(board,/NeonScrollBar\s*\{[\s\S]*?flickable: eclipseScroll/);
+ assert.match(board,/StationCosmosDetailPane\s*\{[\s\S]*?kind: "eclipses"/);
+ assert.match(board,/readonly property int renderedFactCount: eclipseDetails\.renderedFactCount/);
+ assert.match(board,/property alias selectedIndex: eclipseDetails\.selectedIndex/);
+ assert.match(board,/function inspectFeatured\(row\)/);
+ assert.match(board,/onClicked: eclipseBoard\.inspectRecord\(index\)/);
+ assert.match(board,/onClicked: eclipseBoard\.inspecting = false/);
+ assert.match(board,/LOCAL VISIBILITY \+ CONTACTS NOT CALCULATED/);
+ assert.equal((board.match(/Flickable\s*\{/g)||[]).length,1);
+ for(const forbidden of ["Process {","FileView {","XMLHttpRequest","ScrollView {"])
+   assert.ok(!board.includes(forbidden),forbidden);
+});

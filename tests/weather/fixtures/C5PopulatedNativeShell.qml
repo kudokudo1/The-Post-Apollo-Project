@@ -281,6 +281,43 @@ ShellRoot {
                 if (details.renderedFactCount !== 12
                         || details.facts[8].value !== "NOT CALCULATED")
                     return root.fail("ECLIPSE_LOCAL_VISIBILITY_CAVEAT_MISSING");
+                const featured = findNamed(details,"cosmos-c26-eclipse-sticky-header");
+                const highlights = findNamed(details,"cosmos-c26-eclipse-highlight-row");
+                const frame = findNamed(details,"cosmos-c26-eclipse-catalog-frame");
+                const scroll = findNamed(details,"cosmos-c26-eclipse-catalog-scroll");
+                if (!featured || !highlights || !frame || !scroll
+                    || countNamed(details,"cosmos-c26-eclipse-highlight") !== 2
+                    || countNamed(details,"cosmos-c26-eclipse-event-card") !== 2
+                    || highlights.height < 70 || scroll.height < 30
+                    || frame.y <= featured.height)
+                    return root.fail("C26_ECLIPSE_PINNED_HIGHLIGHTS_MISSING");
+                // C6 inspector still exposes all source facts when explicitly opened.
+                details.inspectRecord(1);
+                if (!details.inspecting || details.selectedIndex !== 1
+                    || countNamed(details,"cosmos-c6-observation-cell") !== 12)
+                    return root.fail("C26_C6_TWELVE_FACT_INSPECTOR_BROKEN");
+                details.inspecting = false;
+                const more = [];
+                for(let n=0;n<8;n++)
+                    more.push({event:"ECLIPSE TEST "+n,
+                        date:"2028-04-03",body:n%2===0?"SOLAR":"LUNAR",
+                        phase:"PARTIAL",daysUntil:510+n});
+                focused.eclipseSource.events =
+                    focused.eclipseSource.events.concat(more);
+                root.phase = 85;
+            } else if (root.phase === 85) {
+                const details = focused.instrumentItem;
+                const featured = findNamed(details,"cosmos-c26-eclipse-sticky-header");
+                const scroll = findNamed(details,"cosmos-c26-eclipse-catalog-scroll");
+                if (!featured || !scroll || details.recordCount !== 10
+                    || countNamed(details,"cosmos-c26-eclipse-event-card") !== 10
+                    || scroll.contentHeight <= scroll.height)
+                    return root.fail("C26_ECLIPSE_CATALOG_NOT_SCROLLABLE");
+                const y = featured.mapToItem(details,0,0).y;
+                scroll.contentY = Math.min(90,scroll.contentHeight-scroll.height);
+                if (scroll.contentY < 20
+                    || featured.mapToItem(details,0,0).y !== y)
+                    return root.fail("C26_ECLIPSE_FIXED_HIGHLIGHTS_SCROLL_WITH_LIST");
                 root.phase = 9;
                 root.route = "cosmos/planets-stars/celestial-fix";
             } else if (root.phase === 9) {

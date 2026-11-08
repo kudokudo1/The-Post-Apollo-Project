@@ -126,3 +126,40 @@ test("C26 NASA eclipse highlights are pinned above one bounded calendar and reta
  for(const forbidden of ["Process {","FileView {","XMLHttpRequest","ScrollView {"])
    assert.ok(!board.includes(forbidden),forbidden);
 });
+
+
+test("C27 SKY NOW uses real USNO positions with pinned compass and bounded star catalog",()=>{
+ const sky=read("widgets/weather/StationCosmosStarsBoard.qml");
+ assert.match(modes,/kind === "stars" \? starsBoardComponent/);
+ assert.match(modes,/id: starsBoardComponent\s*StationCosmosStarsBoard\s*\{/);
+ assert.match(modes,/celestialSource: cosmosModePane\.celnav/);
+ assert.match(sky,/objectName: "cosmos-c27-sky-now-sticky-header"/);
+ assert.match(sky,/objectName: "cosmos-c27-sky-position-plot"/);
+ assert.match(sky,/objectName: "cosmos-c27-plotted-usno-star"/);
+ assert.match(sky,/starBoard\.stars\[index\]/);
+ assert.match(sky,/Math\.sin\(azRadians\)\*radiusAtAltitude/);
+ assert.match(sky,/Math\.cos\(azRadians\)\*radiusAtAltitude/);
+ assert.match(sky,/90-Math\.max\(0,Math\.min\(90,alt\)\)/);
+ assert.match(sky,/onClicked: starBoard\.inspectStar\(plottedStar\.index\)/);
+ assert.match(sky,/objectName: "cosmos-c27-featured-star-reading"/);
+ assert.match(sky,/featuredAnchor\.anchorStar/);
+ assert.match(sky,/featuredAnchor\.anchorAltitude/);
+ assert.match(sky,/featuredAnchor\.anchorAzimuth/);
+ assert.match(sky,/objectName: "cosmos-c27-star-catalog-frame"/);
+ assert.match(sky,/anchors\.top: fixedSkyHeader\.bottom/);
+ assert.match(sky,/objectName: "cosmos-c27-star-catalog-scroll"/);
+ assert.match(sky,/contentHeight: starRows\.implicitHeight/);
+ assert.match(sky,/boundsBehavior: Flickable\.StopAtBounds/);
+ assert.match(sky,/objectName: "cosmos-c27-star-catalog-record"/);
+ assert.match(sky,/NeonScrollBar\s*\{[\s\S]*?flickable: starCatalogScroll/);
+ assert.match(sky,/StationCosmosDetailPane\s*\{[\s\S]*?kind: "stars"/);
+ assert.match(sky,/property alias starsAsNav: starDetails\.starsAsNav/);
+ assert.match(sky,/property alias selectedIndex: starDetails\.selectedIndex/);
+ assert.match(sky,/readonly property int renderedFactCount: starDetails\.renderedFactCount/);
+ assert.match(sky,/onClicked: starBoard\.inspectStar\(index\)/);
+ assert.match(sky,/onClicked: starBoard\.inspecting = false/);
+ assert.match(sky,/NOT FULL SKY OR OPTICAL VISIBILITY/);
+ assert.equal((sky.match(/Flickable\s*\{/g)||[]).length,1);
+ for(const forbidden of ["Process {","FileView {","XMLHttpRequest","ScrollView {"])
+   assert.ok(!sky.includes(forbidden),forbidden);
+});

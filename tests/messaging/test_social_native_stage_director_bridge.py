@@ -2,7 +2,6 @@
 """Social W's compositor-native handoff and exact-identity fallback contract."""
 import importlib.util
 from pathlib import Path
-import os
 import subprocess
 import sys
 import time
@@ -147,7 +146,7 @@ class NativePairTests(unittest.TestCase):
                 try:
                     self.assertIsNotNone(child.stdin)
                     if watching:
-                        child.stdin.write(b'{"op":"watch","enabled":true}\\n'.replace(b"\\n", b"\n"))
+                        child.stdin.write(b'{"op":"watch","enabled":true}\n')
                         child.stdin.flush()
                     time.sleep(0.08)
                     self.assertIsNone(child.poll(), "helper exited before EOF")

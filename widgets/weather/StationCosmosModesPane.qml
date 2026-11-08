@@ -757,12 +757,31 @@ Rectangle {
                 border.width: 1
                 border.color: Colors.cyan
                 clip: true
+                // C29 // The image is a fixed peer of the bounded catalogue:
+                // neither the NASA archival photograph nor the peak meter
+                // scrolls with the shower cards.
+                StationCosmosMeteorVisual {
+                    id: meteorVisual
+                    objectName: "cosmos-c29-meteor-image-panel"
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    width: parent.width >= 320
+                        ? Math.min(220,parent.width*0.44) : 0
+                    visible: width > 0
+                    sourceReady: !!cosmosModePane.meteorSource
+                        && cosmosModePane.meteorSource.ready
+                    upcomingShowers: meteorBoard.upcomingShowers
+                    selectedShowerName: meteorBoard.selectedShowerName
+                }
                 GohuText {
                     id: meteorCatalogTitle
                     anchors.top: parent.top
                     anchors.topMargin: 4
-                    anchors.left: parent.left
+                    anchors.left: meteorVisual.right
                     anchors.leftMargin: 6
+                    anchors.right: parent.right
+                    anchors.rightMargin: 7
                     height: 13
                     text: "SHOWER CATALOG // ACTIVE + UPCOMING"
                     color: Colors.magenta
@@ -774,7 +793,7 @@ Rectangle {
                     objectName: "cosmos-c25-meteor-catalog-scroll"
                     anchors.top: meteorCatalogTitle.bottom
                     anchors.topMargin: 3
-                    anchors.left: parent.left
+                    anchors.left: meteorVisual.right
                     anchors.leftMargin: 5
                     anchors.right: parent.right
                     anchors.rightMargin: 12

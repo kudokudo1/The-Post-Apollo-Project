@@ -45,6 +45,7 @@ Item {
         task === "BRANCH_LOCATIONS" ? "BRANCH LOCATIONS"
         : task === "UNIT_LOCATIONS" ? "UNIT LOCATIONS"
         : task === "REPORTING" ? "FUNCTIONAL REPORTING"
+        : task === "LINK_MODIFIERS" ? "SOCIAL LINK MODIFIERS"
         : title
 
     readonly property string normalizedSearch: searchField.text.trim().toLowerCase()
@@ -60,6 +61,8 @@ Item {
             unitLocationEditor.pendingRemovalId = "";
         if (reportingEditor)
             reportingEditor.confirmRemovalId = "";
+        if (modifierEditor)
+            modifierEditor.confirmUnlinkKey = "";
     }
     onSectionChanged: {
         if (searchField)
@@ -168,8 +171,10 @@ Item {
                 }
                 QuietText {
                     width: parent.width
-                    text: pane.task === "BRANCH_LOCATIONS"
-                          ? "LINK SAVED BRANCHES TO LOCAL LOCATIONS. REMOVE OR REBUILD LINKS IN DETAILS."
+                    text: pane.task === "LINK_MODIFIERS"
+                          ? "LINK OR UNLINK LOCAL SOCIAL IDS AND SAVED ACCOUNT NAMES TO A COMPANY OR BRANCH."
+                          : pane.task === "BRANCH_LOCATIONS"
+                            ? "LINK SAVED BRANCHES TO LOCAL LOCATIONS. REMOVE OR REBUILD LINKS IN DETAILS."
                           : pane.task === "UNIT_LOCATIONS"
                             ? "LINK DIVISIONS, DEPARTMENTS AND TEAMS TO LOCAL LOCATIONS."
                             : pane.task === "REPORTING"
@@ -371,12 +376,32 @@ Item {
                     useSharedContext: true
                     selectedOrgId: pane.selectedOrganizationId
                 }
+                // The original Social form supports LOCATED AT, REPORTS TO
+                // and SOCIAL LABEL on existing local records. Social ID/account
+                // names are local labels; they never authorize provider login.
+                IdentityCenterLocalRelationshipModifiers {
+                    id: modifierEditor
+                    width: parent.width
+                    visible: pane.section === "ORGANIZATIONS"
+                             && pane.task === "LINK_MODIFIERS"
+                    height: visible ? implicitHeight : 0
+                    useSharedContext: true
+                    useSharedRefreshControl: true
+                    selectedOrgId: pane.selectedOrganizationId
+                    directoryStore: SocialOrganizationDirectoryStore
+                    structureStore: SocialLocalOrganizationStructureStore
+                    functionLocationStore: SocialLocalUnitLocationLinksStore
+                    branchLocationStore: SocialLocalBranchLocationLinksStore
+                    reportingStore: SocialLocalFunctionalReportingStore
+                    socialLinksStore: SocialOrganizationLinksStore
+                    identitiesSnapshot: SocialIdentityStore.snapshot
+                    accountDetailsStore: SocialAccountDetailsStore
+                }
                 IdentityCenterLocalArchiveTray {
                     id: archiveTray
                     width: parent.width
                     // Relationship filters have their own guarded UNLINK.
                     visible: pane.task === "EDITOR"
-                    directoryStore:
                     directoryStore: SocialOrganizationDirectoryStore
                     portfolioStore: SocialLocalPortfoliosStore
                     structureStore: SocialLocalOrganizationStructureStore

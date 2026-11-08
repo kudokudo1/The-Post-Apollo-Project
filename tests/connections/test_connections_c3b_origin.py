@@ -186,6 +186,54 @@ class C3bOriginPolicyTests(unittest.TestCase):
         for path in (*base.glob("*.qml"), *base.glob("*.js"), base / "qmldir"):
             self.assertNotIn("C3bOriginCheck", path.read_text(), path)
 
+    def test_10a_c4b_physical_profile_is_exact_and_test_only(self):
+        snapshot = valid()
+        snapshot["proc_args"][0] = m.C4B_PHYSICAL_INTERPRETER
+        snapshot["protected_dirs"] = {
+            path: {"owner": 0, "mode": 0o755, "directory": True, "symlink": False}
+            for path in m.C4B_PHYSICAL_DIRS
+        }
+        self.assertIn("/var/opt", m.C4B_PHYSICAL_DIRS)
+        self.assertNotIn("/opt", m.C4B_PHYSICAL_DIRS)
+        self.denied(snapshot, "C3B_COMMAND_MISMATCH")  # default never changes
+        result = m.evaluate(snapshot, c4b_physical=True)
+        self.assertEqual(result["status"], "C3B_OS_ORIGIN_COHERENT_TEST_ONLY")
+        self.assertTrue(all(value is False for key, value in result.items()
+                            if key != "status"))
+        for path in m.C4B_PHYSICAL_DIRS:
+            for field, bad in (("owner", 1000), ("mode", 0o775),
+                               ("directory", False), ("symlink", True)):
+                changed = {
+                    **snapshot,
+                    "protected_dirs": {k: dict(v) for k, v in snapshot["protected_dirs"].items()},
+                }
+                changed["protected_dirs"][path][field] = bad
+                self.assertEqual(
+                    m.evaluate(changed, c4b_physical=True)["status"],
+                    "C3C_UNPROTECTED_DIRECTORY",
+                )
+        changed = dict(snapshot)
+        changed["proc_args"] = [m.INTERPRETER, m.HOST, "--read-only"]
+        self.assertEqual(m.evaluate(changed, c4b_physical=True)["status"],
+                         "C3B_COMMAND_MISMATCH")
+        changed = dict(snapshot)
+        changed["protected_dirs"] = valid()["protected_dirs"]
+        self.assertEqual(m.evaluate(changed, c4b_physical=True)["status"],
+                         "C3C_DIRECTORIES_MISMATCH")
+        self.assertEqual(m.evaluate(snapshot, c4b_physical=1)["status"],
+                         "C3B_INVALID_EVIDENCE")
+
+    def test_10b_physical_entry_without_real_guest_is_denied(self):
+        result = subprocess.run(
+            [sys.executable, "-I", "-B", str(SOURCE), "--verify-disposable-physical"],
+            env={"GITHUB_ACTIONS": "true", "POST_APOLLO_C3B_TEST_GUEST": "1",
+                 "POST_APOLLO_C4B_TEST_GUEST": "1"},
+            capture_output=True, text=True, timeout=4,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("C3B_REFUSED_NOT_DISPOSABLE_GUEST", result.stdout)
+        self.assertEqual(result.stderr, "")
+
     def test_10_unapproved_test_entry_refuses_before_host_observation(self):
         result = subprocess.run(
             [sys.executable, "-I", "-B", str(SOURCE), "--verify-disposable"],

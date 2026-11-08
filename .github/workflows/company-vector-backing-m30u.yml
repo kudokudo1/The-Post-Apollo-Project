@@ -1,0 +1,74 @@
+name: Company M30u native pixel backing alignment contract (candidate only)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'widgets/CompanyVectorPhysicalBackingPolicy.js'
+      - 'tests/company/test_company_vector_physical_backing_m30u.test.js'
+      - '.github/workflows/company-vector-backing-m30u.yml'
+      - 'docs/company-m30u-native-pixel-backing-20261108.md'
+      - 'widgets/CompanyNetworkW.qml'
+      - 'widgets/CompanyVectorBridgeLink.qml'
+      - 'services/company/CompanyVectorSidecarController.qml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-only-backing-geometry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout original Company without retained GitHub credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test exact M30t evidence, parity math and fail-closed buffer unknowns
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/company/test_company_vector_physical_backing_m30u.test.js
+      - name: Ensure existing Company candidate and native child are unaffected
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/company/test_company_vector_viewport_m18.test.js
+          node --test tests/company/test_company_vector_bridge_m26.test.js
+          node --test tests/company/test_company_map_geometry_m30q.test.js
+          node --test tests/company/test_company_vector_attached_pidfd_m28c.test.js
+      - name: Verify helper is not an active launcher or a production permission
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(head -n 1 widgets/CompanyVectorPhysicalBackingPolicy.js)" = '.pragma library'
+          grep -Fq 'productionAuthority: false' widgets/CompanyVectorPhysicalBackingPolicy.js
+          grep -Fq 'ARITHMETIC_ONLY_UNVERIFIED_FOR_REAL_RENDERER' widgets/CompanyVectorPhysicalBackingPolicy.js
+          grep -Fq 'property bool vectorBridgeOptIn: false' widgets/CompanyNetworkW.qml
+          grep -Fq 'property bool bridgeEnabled: false' widgets/CompanyVectorBridgeLink.qml
+          grep -Fq 'signal nativeChildStarted(int pid)' services/company/CompanyVectorSidecarController.qml
+          if grep -Fq 'CompanyVectorPhysicalBackingPolicy.js' widgets/CompanyNetworkW.qml; then
+            echo 'M30U_BUFFER_CONTRACT_WIRED_WITHOUT_RUNTIME_AUTHORIZATION' >&2
+            exit 1
+          fi
+          echo 'COMPANY_M30U_CANDIDATE_ONLY native_actor=NOT_ACTIVATED original_bridges=UNCHANGED PASS'
+      - name: Record source-only acceptance scope
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Company M30u // Native physical backing proposal'
+            echo 'The observed M30t CI rendering passed with 1494x788'
+            echo 'physical Qt source clipped to a 1493x788 Company Canvas.'
+            echo 'This does NOT attest other buffer formats or row strides.'
+            echo 'Unknown formats/dimensions refuse. Only exact 1493x788'
+            echo 'has observed native pixel-fidelity evidence. Others are'
+            echo 'unverified arithmetic proposals with zero actor authority.'
+            echo 'No native child launch, local machine, Social/Stage Director'
+            echo 'source edit, Company UI activation or online tile access.'
+          } >> "$GITHUB_STEP_SUMMARY"

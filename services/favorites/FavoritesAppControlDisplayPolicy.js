@@ -87,7 +87,7 @@ function stableOwnerWindowName(models, label) {
             const candidate=String(row.label || row.name || "");
             if (candidate===label) {
                 const safe=visibleName(candidate);
-                if (safe && !/(?:password|secret|token|credential|private)/i.test(safe))
+                if (safe && !/(?:password|secret|token|credential|private|confidential)/i.test(safe))
                     return safe;
             }
         }

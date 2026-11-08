@@ -18,7 +18,7 @@ const inputs={
 };
 const rows=policy.build(inputs);
 assert.equal(rows.length,9);
-assert.deepEqual([...new Set(rows.map(x=>x.id))].sort(),rows.map(x=>x.id).sort());
+assert.equal(new Set(rows.map(x=>x.id)).size,9);
 const telegram=policy.find(rows,"telegram");
 assert.equal(telegram.title,"TELEGRAM // NATIVE");
 assert.equal(telegram.status,"CHECK SESSION IN SOCIAL");

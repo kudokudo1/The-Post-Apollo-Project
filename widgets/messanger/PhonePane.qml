@@ -150,7 +150,7 @@ Rectangle {
             return "Opening the oFono installer in PHONE...";
         if (callSetupStatus === "STAGED_TERMINAL_REQUESTED"
                 || callSetupStatus === "STAGED_TERMINAL_EXISTING")
-            return "Fedora's interactive installer runs in the PHONE terminal below. Review its transaction and confirm or decline; Social has not assumed installation succeeded.";
+            return "Fedora's interactive installer runs in the PHONE terminal below. Use FOCUS TERMINAL if typing fails; after the command finishes, the terminal closes automatically. An active transaction is never killed by closing PHONE. Social has not assumed installation succeeded.";
         if (callSetupStatus === "GUI_OPEN_REQUESTED")
             return "A native PackageKit installer was requested. Review and approve it there, then choose CHECK AGAIN. No installation was confirmed by Social.";
         if (callSetupStatus === "RECHECKING")
@@ -520,6 +520,21 @@ Rectangle {
             ];
             stageCloseProcess.running = true;
         }
+    }
+
+    function focusStagedInstaller() {
+        if (!visible || selectedSection !== "DEVICE" || !stageWanted
+                || stagePurpose !== "OFONO" || stageState !== "ALIGNED"
+                || stageFocusProcess.running)
+            return;
+        // User click only. Restores keyboard input to exactly the installed
+        // foot actor, without sending Enter or stopping a package transaction.
+        stageFocusProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneStageDirector.py"),
+            "--focus-installer"
+        ];
+        stageFocusProcess.running = true;
     }
 
     function syncStagedSetup() {
@@ -2066,6 +2081,10 @@ Rectangle {
         id: stageCloseProcess
     }
 
+    Process {
+        id: stageFocusProcess
+    }
+
     Timer {
         interval: 700
         repeat: true
@@ -2869,6 +2888,7 @@ Rectangle {
                 anchors.leftMargin: 18
                 anchors.verticalCenter: parent.verticalCenter
                 text: "PHONE SETUP"
+                visible: !(phonePane.stageWanted && phonePane.stagePurpose === "OFONO")
                 color: Colors.cyan
                 font.family: "GohuFont 11 Nerd Font Mono"
                 font.pixelSize: 18
@@ -2882,7 +2902,7 @@ Rectangle {
                 anchors.right: parent.right
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(160, Math.max(100, parent.width * 0.36))
+                width: Math.min(150, Math.max(90, (parent.width - 24) / 2))
                 height: 32
                 visible: phonePane.stageWanted
                 label: phonePane.stagePurpose === "OFONO"
@@ -2892,6 +2912,21 @@ Rectangle {
                              ? Colors.magenta : Colors.red
                 destructive: phonePane.stagePurpose !== "OFONO"
                 onTriggered: phonePane.closeStagedSetup()
+            }
+
+            ActionButton {
+                id: stagedFocusAction
+                anchors.left: parent.left
+                anchors.leftMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(150, Math.max(90, (parent.width - 24) / 2))
+                height: 32
+                visible: phonePane.stageWanted && phonePane.stagePurpose === "OFONO"
+                         && phonePane.stageState === "ALIGNED"
+                label: "FOCUS TERMINAL"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                onTriggered: phonePane.focusStagedInstaller()
             }
         }
 

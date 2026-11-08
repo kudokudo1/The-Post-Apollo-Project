@@ -2,9 +2,10 @@
 """Camera M1: local-only Sway screenshots, image inventory and reversible cleanup.
 
 No daemon, network, JSON database or automatic scans. The owning QML widget
-executes one action on user input. Destructive cleanup is limited to matching
-screenshot-like files immediately inside Desktop, only after preview and a
-second explicit confirmation. "Trash" uses GIO; no unlink/rm fallback.
+executes one action on user input. Desktop screenshot cleanup and Gallery
+batch/individual selections require a short-lived plan plus an explicit
+second confirmation. Only validated media files may enter the Gallery batch.
+"Trash" uses GIO, never an irreversible unlink/rm fallback.
 """
 import argparse
 from collections import deque

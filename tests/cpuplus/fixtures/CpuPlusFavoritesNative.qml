@@ -58,6 +58,28 @@ ShellRoot {
             {appKey:"github",source:"GitHub"}
         ]
     }
+    // Mock the existing Weather Station RADIO memory after owner decode.
+    // These are public UUIDs + station titles, not stream URLs or actions.
+    QtObject {
+        id: radioSaved
+        property string state: "ready"
+        property var favorites: [
+            {ref:{source:"radio-browser",kind:"station",
+                   id:"123e4567-e89b-42d3-a456-000000000001"},
+             title:"Public News One"},
+            {ref:{source:"radio-browser",kind:"station",
+                   id:"123e4567-e89b-42d3-a456-000000000002"},
+             title:"Jazz Station"}
+        ]
+        property var recents: [
+            {ref:{source:"radio-browser",kind:"station",
+                   id:"123e4567-e89b-42d3-a456-000000000002"},
+             title:"Jazz Station"},
+            {ref:{source:"radio-browser",kind:"station",
+                   id:"123e4567-e89b-42d3-a456-000000000003"},
+             title:"World Radio"}
+        ]
+    }
     readonly property var options:
         Management.list(["UTC"],[{id:12,place:{label:"Example City"}}],
             ["fav1:local:finance:instrument:TEST.01"],[],
@@ -74,6 +96,10 @@ ShellRoot {
                 ready:notificationFavorites.ready,
                 status:notificationFavorites.status,
                 sources:notificationFavorites.sources
+            }),({
+                state:radioSaved.state,
+                favorites:radioSaved.favorites,
+                recents:radioSaved.recents
             }))
     readonly property var selection: Management.recordFor(options,selectedKey)
 
@@ -234,16 +260,35 @@ ShellRoot {
                     && item.menu==="SOURCES"
                     && item.item==="GitHub";
             });
+            const radioFavoritesGroup=dossier.dossier.groups.find(function(group) {
+                return group.key==="RADIO|FAVORITES";
+            });
+            const radioRecentsGroup=dossier.dossier.groups.find(function(group) {
+                return group.key==="RADIO|RECENTS";
+            });
+            const jazz=root.options.rows.find(function(row) {
+                return row.owner==="radio" && row.item==="Jazz Station";
+            });
+            const world=root.options.rows.find(function(row) {
+                return row.owner==="radio" && row.item==="World Radio";
+            });
             const fileGroup=dossier.dossier.groups.find(function(group) {
                 return group.key==="APP CTRL|FILES";
             });
             const processGroup=dossier.dossier.groups.find(function(group) {
                 return group.key==="CPU++|KILL";
             });
-            if(!root.options || root.options.total!==16
+            if(!root.options || root.options.total!==19
                || dossier.dossier.total!==root.options.rows.length
                || !weatherPanel || !weatherCard
                || weatherGroups.length!==2
+               || !radioFavoritesGroup || radioFavoritesGroup.count!==2
+               || !radioRecentsGroup || radioRecentsGroup.count!==1
+               || !jazz || !jazz.isFavorite || !jazz.isRecent
+               || jazz.favoriteType!=="FAVORITE + RECENT STATION"
+               || !world || world.isFavorite || !world.isRecent
+               || !jazz.readOnly || !world.readOnly
+               || jazz.available!=="unresolved"
                || notificationGroups.length!==1
                || notificationGroups[0].title!=="NOTIFICATIONS // SOURCES"
                || notificationGroups[0].count!==2

@@ -198,7 +198,17 @@ def serve(review_fd: int, client_fd: int, reviewer_pid: int,
                     if sender is None:
                         reply = S1.report("REVIEWER_KERNEL_CREDENTIALS_MISSING")
                     elif sender[0] != reviewer_pid:
-                        reply = S1.report("REVIEWER_KERNEL_PID_MISMATCH")
+                        # Only a harmless category is reported; the test
+                        # never returns the PID itself or any packet data.
+                        reason = (
+                            "REVIEWER_KERNEL_PID_IS_HOST"
+                            if sender[0] == os.getpid() else
+                            "REVIEWER_KERNEL_PID_IS_PARENT"
+                            if sender[0] == os.getppid() else
+                            "REVIEWER_KERNEL_PID_IS_ZERO"
+                            if sender[0] == 0 else
+                            "REVIEWER_KERNEL_PID_IS_OTHER")
+                        reply = S1.report(reason)
                     elif sender[1] != reviewer_uid:
                         reply = S1.report("REVIEWER_KERNEL_UID_MISMATCH")
                     elif sender[2] != reviewer_gid:

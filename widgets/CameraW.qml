@@ -74,12 +74,13 @@ PanelWindow {
     // Keep a 1px border while using the full remaining physical frame height.
     readonly property int zoomBayBottom: 1
     // Keep #1505's raised compact controls and common 3px deck spacing.
-    // Native screenshots show the physical Zoom page starts ~8px too low in
-    // ALL sizes. Raise only the browser actor/viewport, retaining its bottom.
+    // The first 8px rise improved all three sizes; a subsequent native screenshot
+    // calls for another 5px. Rise is now 13px total from the #1505 deck.
+    // Raise only the browser actor/viewport, retaining its bottom.
     // A short visual underlap is covered by the opaque Camera mode-row matte;
     // the input hole still begins at the real deck bottom, never in buttons.
     readonly property int zoomDeckGap: 3
-    readonly property int zoomBrowserRise: 8
+    readonly property int zoomBrowserRise: 13
     readonly property int zoomControlDeckBottom: Math.max(0, Math.round(
         cameraBodyColumn.y + cameraModes.y + cameraModes.height))
     readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))
@@ -958,8 +959,8 @@ PanelWindow {
             // frame's inner edges rather than the narrower content Column,
             // and keep the actual browser, mask and host on this one rect.
             // Keep controls in their #1505 positions. Lift the physical
-            // browser 8px (all three sizes) to close the native-measured
-            // gap while keeping the viewport's bottom edge unchanged.
+            // browser 13px total (8px previous + 5px additional) in all three
+            // sizes while keeping the viewport's bottom edge unchanged.
             // The opaque deck covers its small overlap and the input mask
             // stays clamped below the buttons. Follower uses this same rect.
             x: camera.zoomWebEdgeInset
@@ -1445,9 +1446,9 @@ PanelWindow {
 
         }
 
-        // The physical browser now rises 8px behind the lower edge of the
-        // mode row. Cover the FULL 42px row independently of viewport.y,
-        // including the 5px visual underlap, without affecting input.
+        // The physical browser rises 13px relative to the original deck slot.
+        // Cover the FULL 42px row independently of viewport.y, including
+        // the 10px visual underlap, without affecting input.
         // Matte is still behind all Camera buttons and has no handlers.
         Rectangle {
             id: zoomModeDeckMatte

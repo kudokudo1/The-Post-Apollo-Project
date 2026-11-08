@@ -189,9 +189,11 @@ def inspect_operator_supersession(*, witness_db: Path, client_db: Path,
             payload=work / "operator.json",
             signature=work / "operator.sig", directory=work)
         signed = _strict_json((work / "operator.json").read_bytes())
+        release_snapshot = work / "release"
+        release_snapshot.mkdir(mode=0o700)
         try:
             files, target = split._candidate(
-                work / "release", (release_root_public, policy, policy_signature,
+                release_snapshot, (release_root_public, policy, policy_signature,
                                   delegated_public, manifest,
                                   manifest_signature, artifact),
                 root_pin=root_pin, external_epoch=floor[0],

@@ -52,9 +52,13 @@ function createState() {
         huntPaused:true,
         huntRoundComplete:false,
         huntLastEvent:"READY // NEW ROUND",
+        huntSpawnCount:3,
         huntMouseX:0.5,
         huntMouseY:0.5,
         huntMouseActive:false,
+        huntMouseMovingTicks:0,
+        huntMouseVX:0,
+        huntMouseVY:0,
         HuntMotion:motion,
         feedback:"",
         called:[],
@@ -106,6 +110,11 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /cursorShape: Qt\.CrossCursor/);
     assert.match(cleanup, /label: "UNDO SHOT"/);
     assert.match(cleanup, /label: "NEW ROUND"/);
+    assert.match(cleanup, /label: "SPAWN -"/);
+    assert.match(cleanup, /label: "SPAWN +"/);
+    assert.match(cleanup, /TARGETS \/\//);
+    assert.match(cleanup, /z: target.profile === "ox" \? 40 : 2/);
+    assert.match(cleanup, /readonly property real crowdScale/);
     assert.match(qml, /readonly property bool batchMode: activeView === "cleanup"/);
     assert.match(qml, /camera\.loadGallery\(false, "cleanup"\)/);
 });
@@ -404,20 +413,26 @@ test("Deer runs fast, leaps diagonally and settles back to its baseline", () => 
     assert.ok(sawRun && sawLeap && sawAir && landed);
 });
 
-test("Fox gently dodges nearby pointer but has a strict speed cap", () => {
+test("Fox juke-orbits moving pointer but taunts a stationary one at bounded speeds", () => {
     const f = motion.createTarget({path:"/tmp/fox.png"}, "fox",()=>0.6);
-    f.xNorm=0.60; f.yNorm=0.60; f.vx=0.006; f.vy=0.002;
-    const noCursor=motion.advanceTarget(f,{active:false,x:0.45,y:0.55});
-    const nearby=motion.advanceTarget(f,{active:true,x:0.45,y:0.55});
-    assert.ok(nearby.xNorm > noCursor.xNorm,"fox should drift away from cursor");
-    let t=nearby;
+    f.xNorm=0.63; f.yNorm=0.50; f.vx=0; f.vy=0;
+    const untracked=motion.advanceTarget(f,{active:false,x:0.50,y:0.50});
+    const taunting=motion.advanceTarget(f,{active:true,moving:false,x:0.50,y:0.50});
+    const chased=motion.advanceTarget(f,{active:true,moving:true,x:0.50,y:0.50});
+    assert.ok(taunting.xNorm < untracked.xNorm,"settled cursor attracts fox");
+    assert.ok(chased.xNorm > untracked.xNorm,"moving cursor triggers evasive radial juke");
+    assert.ok(Math.abs(chased.vy)>Math.abs(untracked.vy),
+              "moving cursor induces sideways orbit motion");
+    assert.equal(chased.state,"juke");
+    assert.equal(taunting.state,"taunt");
+    let t=chased;
     for(let i=0;i<600;i++) {
         t=motion.advanceTarget(t,{
-            active:true,x:Math.max(0,t.xNorm-0.06),
+            active:true,moving:true,x:Math.max(0,t.xNorm-0.06),
             y:Math.max(0,t.yNorm-0.06)
         });
-        assert.ok(Math.abs(t.vx)<=0.022001);
-        assert.ok(Math.abs(t.vy)<=0.018001);
+        assert.ok(Math.abs(t.vx)<=0.041001);
+        assert.ok(Math.abs(t.vy)<=0.034001);
         assert.ok(t.xNorm>=0 && t.xNorm<=1);
         assert.ok(t.yNorm>=0 && t.yNorm<=1);
     }
@@ -461,4 +476,118 @@ test("Only Hunt mode accepts pointer tracking; normalized mouse coordinates are 
     assert.equal(s.huntMouseX,1);
     assert.equal(s.huntMouseY,0);
     assert.equal(s.huntSetPointer(40,50,0,100),false);
+});
+
+
+test("Spawn controls cap at 1–10 and do not modify active round or touch Trash", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    assert.equal(s.huntSpawnCount,3);
+    assert.equal(s.huntSetSpawnCount(999),true);
+    assert.equal(s.huntSpawnCount,10);
+    assert.equal(s.huntSetSpawnCount(-10),true);
+    assert.equal(s.huntSpawnCount,1);
+    assert.equal(s.huntSetSpawnCount("not-a-number"),false);
+    assert.equal(s.huntSpawnCount,1);
+    assert.equal(s.huntSetSpawnCount(4),true);
+    assert.equal(s.huntStartRound(),true);
+    // Only 3 eligible files exist despite requesting four.
+    assert.equal(s.huntTargets.length,3);
+    assert.equal(s.huntSetSpawnCount(9),true);
+    assert.equal(s.huntTargets.length,3);
+    assert.equal(s.called.length,0);
+    s.activeView="gallery";
+    assert.equal(s.huntSetSpawnCount(5),false);
+});
+
+test("Ten Hunt targets draw from eligible inventory with shuffled profile cycles", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=Array.from({length:15},(_,i)=>({
+        path:"/tmp/inventory_"+i+".png",
+        name:"inventory_"+i+".png",mediaType:"image"
+    }));
+    s.huntSetSpawnCount(10);
+    assert.equal(s.huntStartRound(),true);
+    assert.equal(s.huntTargets.length,10);
+    assert.equal(new Set(s.huntTargets.map(t=>t.path)).size,10);
+    assert.equal(new Set(s.huntTargets.slice(0,5).map(t=>t.profile)).size,5);
+    assert.equal(new Set(s.huntTargets.slice(5,10).map(t=>t.profile)).size,5);
+    assert.equal(s.huntTargets.some(t=>t.profile==="ox"),true);
+    assert.equal(s.called.length,0);
+    s.huntFire(s.huntTargets[0].path);
+    assert.equal(s.batchPaths.length,1);
+    assert.equal(s.called.length,0);
+});
+
+test("Ox is substantially bigger; Frog is smaller and hop parameters vary", () => {
+    const f=motion.createTarget({path:"/tmp/frog.png"},"frog",()=>0.6);
+    const ox=motion.createTarget({path:"/tmp/ox.png"},"ox",()=>0.6);
+    assert.ok(ox.sizeScale>=1.6);
+    assert.ok(f.sizeScale<=0.70);
+    assert.ok(ox.sizeScale > f.sizeScale*2);
+    let frog=f;
+    const hops=[];
+    let previous="idle";
+    for(let i=0;i<300;i++) {
+        frog=motion.advanceTarget(frog,{active:false});
+        if(frog.state==="hop" && previous==="idle")
+            hops.push({speed:Math.abs(frog.vx),height:Math.abs(frog.vy),
+                       gravity:frog.hopGravity});
+        previous=frog.state;
+    }
+    assert.ok(hops.length>=3,"need several frog jumps");
+    assert.ok(new Set(hops.map(x=>x.speed.toFixed(5))).size>=2,
+              "hop distance varies");
+    assert.ok(new Set(hops.map(x=>x.height.toFixed(5))).size>=2,
+              "hop lift varies");
+});
+
+test("Bird occasionally perches and then takes flight again", () => {
+    let t=motion.createTarget({path:"/tmp/bird.png"},"bird",()=>0.6);
+    assert.ok(Math.abs(t.vx)>=0.015);
+    let perched=false,resumed=false;
+    for(let i=0;i<160;i++) {
+        const before=t;
+        t=motion.advanceTarget(t,{active:false});
+        if(t.state==="perch") {
+            perched=true;
+            assert.equal(t.vx,0);
+            assert.equal(t.vy,0);
+            assert.equal(t.xNorm,before.xNorm);
+            assert.equal(t.yNorm,before.yNorm);
+        } else if(perched && t.state==="fly")
+            resumed=true;
+    }
+    assert.ok(perched && resumed);
+});
+
+test("Deer takes rare short rest and resumes its prior run", () => {
+    let t=motion.createTarget({path:"/tmp/deer.png"},"deer",()=>0.6);
+    assert.ok(t.fatigueAt>=215);
+    t.fatigueAt=3; // synthetic forced rare event
+    let rested=false,resumed=false;
+    for(let i=0;i<40;i++) {
+        t=motion.advanceTarget(t,{active:false});
+        if(t.state==="rest") rested=true;
+        if(rested && t.state==="run") resumed=true;
+    }
+    assert.ok(rested && resumed);
+    assert.ok(t.fatigueAt>40);
+});
+
+test("Mouse motion decays to settled after five ticks and resets at new scan", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    assert.equal(s.huntSetPointer(50,50,100,100),true);
+    assert.equal(s.huntMouseMovingTicks,0); // first sighting isn't a chase
+    s.huntSetPointer(70,45,100,100);
+    assert.equal(s.huntMouseMovingTicks,5);
+    assert.ok(s.huntMouseVX>0);
+    s.huntStartRound();
+    for(let i=0;i<5;i++)
+        s.huntAdvance();
+    assert.equal(s.huntMouseMovingTicks,0);
+    assert.equal(s.huntMouseActive,true);
+    assert.equal(s.called.length,0);
 });

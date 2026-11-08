@@ -9,10 +9,17 @@ ShellRoot {
     id: root
     property string selectedKey: ""
     property bool ready: false
+    property bool selectedByClick: false
     property bool done: false
     readonly property var options:
         Management.list(["UTC"],[{id:12,place:{label:"Example City"}}],
-            ["fav1:local:finance:instrument:TEST.01"],[])
+            ["fav1:local:finance:instrument:TEST.01"],[],
+            ({
+                favoriteKeys:["task|hidden-process","run|private-command"],
+                favoriteDetailActionKeys:[],
+                favoriteMonitorBoxKeys:[],
+                favoriteTaskMetricKeys:[]
+            }))
     readonly property var selection: Management.recordFor(options,selectedKey)
 
     QtObject {
@@ -67,6 +74,7 @@ ShellRoot {
             CpuPlusFavoritesHubPane {
                 id: selector
                 area: "selector"
+                filterMode: "CPU++"
                 width: 263
                 height: parent.height
                 catalogSnapshot: ({ok:true,groups:[],rows:[],total:0})
@@ -78,6 +86,7 @@ ShellRoot {
                 collectionsOwner: collections
                 onSelectionRequested: function(key) {
                     root.selectedKey=key;
+                    root.selectedByClick=true;
                     console.log("U4_SELECT // "+root.selection.category);
                 }
             }
@@ -100,17 +109,20 @@ ShellRoot {
         running: !root.ready && !root.done
         repeat: true
         onTriggered: {
-            if(!root.options || root.options.total!==3
-               || selector.choices.length!==3
-               || !root.selection || root.selection.category!=="CLOCK") {
+            if(!root.options || root.options.total!==5
+               || selector.choices.length!==1
+               || selector.choices[0].category!=="CPU++"
+               || !selector.choices[0].readOnly
+               || !root.selection || root.selection.category!=="CPU++") {
                 root.fail("INITIAL");
                 return;
             }
+            const row=selector.favoriteRowRepeater.itemAt(0);
+            if(!row) return;
             root.ready=true;
-            // Second selector row uses an existing ActionButton; calculate
-            // coordinates in the fixture window, not global monitor space.
-            const pt=selector.mapToItem(win.contentItem,
-                selector.width-34,155);
+            // Click the actual VIEW button, not guessed screen coordinates.
+            const pt=row.mapToItem(win.contentItem,
+                row.width-33,row.height/2);
             console.log("U4_READY // x="+Math.round(pt.x)
                 +" y="+Math.round(pt.y));
         }
@@ -120,12 +132,15 @@ ShellRoot {
         running: root.ready && !root.done
         repeat: true
         onTriggered: {
-            if(root.selection && root.selection.category==="PLACES") {
+            if(root.selectedByClick && root.selection
+                    && root.selection.category==="CPU++"
+                    && root.selection.owner==="appcontrol"
+                    && root.selection.readOnly) {
                 if(time.removals || places.removals || defaults.mutations) {
                     root.fail("UNEXPECTED_PROVIDER_ACTION");return;
                 }
                 root.done=true;
-                console.log("U4_PASS // SELECTED_PLACE_NO_ACTION");
+                console.log("U4_PASS // SELECTED_PROCESS_READ_ONLY");
                 Qt.quit();
             }
         }

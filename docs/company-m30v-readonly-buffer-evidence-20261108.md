@@ -66,8 +66,16 @@ M30v adds the first **narrow, genuinely observed** metadata:
   The test checks the helper never claims actual native buffer
   format/stride/scene permission.
 - GitHub Actions compiles/runs the Qt6Gui C++ harness and existing
-  M5/M26/M30q/M30u regressions. It does **not** run the full
-  MapLibre Qt application yet.
+  M5/M26/M30q/M30u regressions.
+- The existing `company-network-vector-probe-m5.yml` already compiles
+  the **actual MapLibre Qt v3 standalone application**. M30v adds one
+  explicit offline `--readback-evidence` process invocation on its
+  disposable Xvfb display. The job parses the actual native Qt log,
+  checks one successful `QQuickWindow::grabWindow` metadata record,
+  asserts all native wl_buffer values remain null, verifies that no
+  PNG file is written, and rejects a combined `--styled-online`
+  diagnostic with exit 16. All existing M5 offline/online image,
+  motion, and disposable synthetic-owner tests remain unchanged.
 
 ## HOW TO USE
 
@@ -96,6 +104,10 @@ At the implementation checkpoint, exact-head CI is pending. To pass:
 4. The explicit CLI must not be available to the automatic Company
    QProcess sidecar or any online/private/hub input.
 5. Existing Company M5/M26/M30q/M30u contracts must still pass.
+6. The **full native MapLibre Qt executable** must report exactly
+   one actual Qt CPU readback metadata record when given the offline
+   flag and no private/online flags; combined online mode must refuse.
+7. No new capture file or runtime activation is allowed.
 
 ## WATCH OUT FOR
 

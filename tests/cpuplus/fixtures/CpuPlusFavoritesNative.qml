@@ -144,9 +144,10 @@ ShellRoot {
             const row=selector.favoriteRowRepeater.itemAt(0);
             if(!row) return;
             root.ready=true;
-            // Click the actual VIEW button, not guessed screen coordinates.
+            // Click the LEFT TEXT AREA, far from the former VIEW button.
+            // This verifies the complete row now owns selection.
             const pt=row.mapToItem(win.contentItem,
-                row.width-33,row.height/2);
+                16,row.height/2);
             console.log("U4_READY // x="+Math.round(pt.x)
                 +" y="+Math.round(pt.y));
         }

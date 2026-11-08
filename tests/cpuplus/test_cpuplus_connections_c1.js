@@ -45,7 +45,7 @@ const socials = {
 };
 let rows = policy.build(socials);
 assert.equal(rows.length, 9);
-assert.equal(new Set(rows.map(x=>x.id)).size, 8);
+assert.equal(new Set(rows.map(x=>x.id)).size, 9);
 assert.equal(policy.find(rows,"social").status,"LAYOUT READY");
 assert.equal(policy.find(rows,"telegram").title,"TELEGRAM // NATIVE");
 assert.equal(policy.find(rows,"telegram").status,"CHECK SESSION IN SOCIAL");

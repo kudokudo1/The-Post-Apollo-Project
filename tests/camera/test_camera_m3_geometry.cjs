@@ -56,6 +56,18 @@ test("Camera compact retains its size; Zoom expanded reserves deck height beyond
     assert.equal(compactBrowserTop, 95);
     assert.equal(699 - compactBrowserTop - 1, 603);
     assert.match(camera, /readonly property int zoomDeckGap: 3/);
+    assert.match(camera, /readonly property int zoomBrowserRise: 8/);
+    assert.match(camera, /y: camera\.zoomControlDeckBottom \+ camera\.zoomDeckGap\s*- camera\.zoomBrowserRise/);
+    assert.match(camera, /height: Math\.max\(0, camera\.zoomControlDeckBottom - y \+ 1\)/);
+    // Button geometry is unchanged. Only the guest moves 8px upward;
+    // host, follower and mask use the same raised viewport.
+    const raisedTop = compactBrowserTop - 8;
+    const inputTop = Math.max(raisedTop, compactDeckEnd);
+    assert.equal(raisedTop, 87);
+    assert.equal(699 - raisedTop - 1, 611);
+    assert.equal(inputTop, compactDeckEnd);
+    assert.equal(611 - (inputTop - raisedTop), 606);
+    assert.equal(expandedZoomFrame - (reserve - 8), 908);
     assert.doesNotMatch(camera, /zoomTopNudge/);
     assert.equal(policy.step("compact", 1), "expanded");
     assert.equal(policy.step("expanded", 1), "fullscreen");

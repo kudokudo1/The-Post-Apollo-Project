@@ -73,12 +73,13 @@ PanelWindow {
     readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))
     // Keep a 1px border while using the full remaining physical frame height.
     readonly property int zoomBayBottom: 1
-    // The live Zoom browser starts AFTER the whole mode deck, in every size.
-    // Compact previously placed 17px of the real browser behind the controls.
-    // Compress compact's own header/spacing instead of overlapping the guest.
-    // A small, opaque separation between buttons and browser is a deck
-    // design spacing, not an independent Sway/browser positioning correction.
+    // Keep #1505's raised compact controls and common 3px deck spacing.
+    // Native screenshots show the physical Zoom page starts ~8px too low in
+    // ALL sizes. Raise only the browser actor/viewport, retaining its bottom.
+    // A short visual underlap is covered by the opaque Camera mode-row matte;
+    // the input hole still begins at the real deck bottom, never in buttons.
     readonly property int zoomDeckGap: 3
+    readonly property int zoomBrowserRise: 8
     readonly property int zoomControlDeckBottom: Math.max(0, Math.round(
         cameraBodyColumn.y + cameraModes.y + cameraModes.height))
     readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))
@@ -956,11 +957,14 @@ PanelWindow {
             // Zoom is a separate physical Sway guest. Fit its client to the
             // frame's inner edges rather than the narrower content Column,
             // and keep the actual browser, mask and host on this one rect.
-            // All chassis sizes use the same deck-end boundary and a small
-            // opaque seam. Compact moves its CONTROLS up, not Zoom under them.
-            // Host, Sway follower and click-through region use this one rect.
+            // Keep controls in their #1505 positions. Lift the physical
+            // browser 8px (all three sizes) to close the native-measured
+            // gap while keeping the viewport's bottom edge unchanged.
+            // The opaque deck covers its small overlap and the input mask
+            // stays clamped below the buttons. Follower uses this same rect.
             x: camera.zoomWebEdgeInset
             y: camera.zoomControlDeckBottom + camera.zoomDeckGap
+               - camera.zoomBrowserRise
             width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)
             height: Math.max(0, frame.height - y - camera.zoomBayBottom)
             visible: camera.menuOpen && camera.activeView === "zoom"
@@ -1441,18 +1445,18 @@ PanelWindow {
 
         }
 
-        // The Zoom browser is a separate Sway client behind the panel.
-        // Cover ALL of the 42px mode row, plus the 3px deck gap, so unused
-        // button space cannot reveal browser chrome or neighboring windows.
-        // The matte is behind Camera buttons and has no input handlers.
+        // The physical browser now rises 8px behind the lower edge of the
+        // mode row. Cover the FULL 42px row independently of viewport.y,
+        // including the 5px visual underlap, without affecting input.
+        // Matte is still behind all Camera buttons and has no handlers.
         Rectangle {
             id: zoomModeDeckMatte
             x: 0
             y: cameraBodyColumn.y + cameraModes.y
             width: frame.width
-            // The complete row and gap are opaque; the 1px seam seal is
-            // deliberate, never an 17px browser underlap.
-            height: Math.max(0, zoomViewport.y - y + 1)
+            // The measured button boundary, not the raised browser top,
+            // decides matte height; 1px seals compositor rounding.
+            height: Math.max(0, camera.zoomControlDeckBottom - y + 1)
             color: Colors.black
             visible: camera.menuOpen && camera.activeView === "zoom"
                      && camera.zoomWebVisualHeld

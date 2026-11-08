@@ -171,8 +171,8 @@ ShellRoot {
                 lastResultCode="INVALID_NAME";
                 return false;
             }
-            const existing=collections[0];
-            collections=[{
+            const existing=collections.collections[0];
+            collections.collections=[{
                 id:existing.id,name:name,members:existing.members.slice()
             }];
             renameCalls++;

@@ -1,0 +1,87 @@
+name: Company M30v real Qt readback evidence (offline, no wl_buffer claim)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'experiments/company-vector-qt/CompanyVectorReadbackEvidence.h'
+      - 'experiments/company-vector-qt/main.cpp'
+      - 'tests/company/native/test_company_vector_readback_m30v.cpp'
+      - 'tests/company/test_company_vector_readback_m30v.py'
+      - '.github/workflows/company-vector-readback-m30v.yml'
+      - 'docs/company-m30v-readonly-buffer-evidence-20261108.md'
+      - 'services/company/CompanyVectorSidecarController.qml'
+      - 'services/company/CompanyVectorSidecarLaunch.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qt-cpu-readback-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install only Qt6Gui development headers for isolated CPU image test
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qt6-base-dev pkg-config g++
+          pkg-config --modversion Qt6Gui
+      - name: Compile and execute real Qt QImage width/format/stride witnesses
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ -std=c++17 -Wall -Wextra -Werror \
+            tests/company/native/test_company_vector_readback_m30v.cpp \
+            $(pkg-config --cflags --libs Qt6Gui) \
+            -o "$RUNNER_TEMP/company-m30v-qimage-readback-contract"
+          QT_QPA_PLATFORM=offscreen "$RUNNER_TEMP/company-m30v-qimage-readback-contract"
+      - name: Verify original native map CLI, M30u buffer policy and authority refusal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests/company \
+            -p 'test_company_vector_readback_m30v.py' -v
+          python3 -m unittest discover -s tests/company \
+            -p 'test_company_vector_probe_m5.py' -v
+          node --test tests/company/test_company_vector_physical_backing_m30u.test.js
+          node --test tests/company/test_company_map_geometry_m30q.test.js
+          node --test tests/company/test_company_vector_bridge_m26.test.js
+      - name: Refuse production embedding and preserve attached native child
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'productionAuthority", false' \
+            experiments/company-vector-qt/CompanyVectorReadbackEvidence.h
+          grep -Fq 'waylandBufferAttested", false' \
+            experiments/company-vector-qt/CompanyVectorReadbackEvidence.h
+          grep -Fq 'actualStride = image.bytesPerLine()' \
+            experiments/company-vector-qt/CompanyVectorReadbackEvidence.h
+          ! grep -Fq -- '--readback-evidence' \
+            services/company/CompanyVectorSidecarLaunch.py
+          ! grep -Fq -- '--readback-evidence' \
+            services/company/CompanyVectorSidecarController.qml
+          grep -Fq 'property bool vectorBridgeOptIn: false' widgets/CompanyNetworkW.qml
+          grep -Fq 'property bool bridgeEnabled: false' widgets/CompanyVectorBridgeLink.qml
+          echo 'COMPANY_M30V_READBACK_EVIDENCE real_qimage_stride=OBSERVED ' \
+            'actual_wl_buffer=UNKNOWN production_authority=OFF PASS'
+      - name: Publish narrow evidence scope
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## M30v Company native Qt readback evidence'
+            echo 'Qt6Gui C++ test measures actual QImage bytesPerLine for'
+            echo 'both the 1493 and 1494 pixel image widths.'
+            echo 'Actual Qt CPU readback pitch is NOT actual wl_buffer pitch.'
+            echo 'The host must still attest native actor, buffer format,'
+            echo 'stride, modifier, scale and target surface independently.'
+            echo 'The opt-in diagnostic never starts from the normal'
+            echo 'Quickshell sidecar, writes a screenshot, reads Company'
+            echo 'records or grants rendering/input permissions.'
+          } >> "$GITHUB_STEP_SUMMARY"

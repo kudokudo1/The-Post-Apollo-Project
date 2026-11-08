@@ -34,6 +34,7 @@ jobs:
           bash -n tests/connections/c3d_provenance/build_signed_ci_status.sh
           bash -n tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
           python3 -B tests/connections/test_connections_c4b_silverblue_contract.py
+          python3 -B tests/connections/test_connections_c4b_opt_profile_candidate.py
           python3 -B tests/connections/test_connections_c4a_silverblue_contract.py
           python3 -B tests/connections/test_connections_c3b_origin.py
           python3 -B tests/connections/test_connections_c3d_provenance_contract.py
@@ -133,5 +134,6 @@ jobs:
         run: |
           set -euo pipefail
           python3 -B tests/connections/test_connections_c4b_silverblue_contract.py
+          python3 -B tests/connections/test_connections_c4b_opt_profile_candidate.py
           python3 -B tests/connections/test_connections_c2n_policy_contract.py
           echo "C4B_PASS // PRODUCTION_CREDENTIALS_GRANTS_AND_HOST_AUTH_DISABLED"

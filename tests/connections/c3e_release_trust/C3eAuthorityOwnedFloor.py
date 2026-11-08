@@ -18,6 +18,7 @@ import base64
 import importlib.util
 import json
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -176,24 +177,47 @@ def _attest(args, request: dict) -> dict:
             proof.CHALLENGE_PATTERN.fullmatch(challenge) is None):
         deny("INVALID_VERIFIER_CHALLENGE")
 
-    epoch, sequence, policy_digest, artifact_digest = _state(args)
-    # An explicitly bootstrapped but never independently verified release
-    # is NOT proof of any admitted artifact. Refuse signing before admission.
-    if not policy_digest or not artifact_digest:
-        deny("NO_VERIFIED_RELEASE_HISTORY")
-    statement = {
-        "schema": proof.SCHEMA,
-        "audience": proof.AUDIENCE,
-        "release_id": admission.RELEASE_ID,
-        "node_id": args.node_id,
-        "challenge": challenge,
-        "release_root_pin": args.release_root_pin,
-        "minimum_policy_epoch": epoch,
-        "minimum_release_sequence": sequence,
-    }
-    message = json.dumps(
-        statement, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    signature = _sign(args, message)
+    # Hold the authority's SQLite write reservation across BOTH the
+    # committed-state read and signature generation. Otherwise an advance
+    # could commit between _state() and _sign(), producing an already-stale
+    # statement at signing time. This is only local CI serialization.
+    try:
+        db = durable._connect(args.state_db)
+    except durable.Refused:
+        deny("AUTHORITY_LEDGER_UNAVAILABLE")
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            root_pin, epoch, sequence, policy_digest, artifact_digest = (
+                durable._read(db))
+            if root_pin != args.release_root_pin:
+                deny("AUTHORITY_ROOT_PIN_MISMATCH")
+            # An explicitly bootstrapped but never independently verified
+            # release is NOT proof of any admitted artifact.
+            if not policy_digest or not artifact_digest:
+                deny("NO_VERIFIED_RELEASE_HISTORY")
+            statement = {
+                "schema": proof.SCHEMA,
+                "audience": proof.AUDIENCE,
+                "release_id": admission.RELEASE_ID,
+                "node_id": args.node_id,
+                "challenge": challenge,
+                "release_root_pin": args.release_root_pin,
+                "minimum_policy_epoch": epoch,
+                "minimum_release_sequence": sequence,
+            }
+            message = json.dumps(
+                statement, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            signature = _sign(args, message)
+            db.execute("COMMIT")
+        except BaseException:
+            if db.in_transaction:
+                db.execute("ROLLBACK")
+            raise
+    except (sqlite3.Error, durable.Refused):
+        deny("AUTHORITY_LEDGER_UNAVAILABLE")
+    finally:
+        db.close()
     return {
         "proof_b64": base64.b64encode(message).decode("ascii"),
         "signature_b64": base64.b64encode(signature).decode("ascii"),

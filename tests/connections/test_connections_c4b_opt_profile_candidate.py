@@ -73,7 +73,7 @@ class C4bSilverblueCandidateTests(unittest.TestCase):
             "profile": [None, "", "C3B_PRODUCTION", "C4B_OFFLINE_SILVERBLUE_45_CANDIDATE_ONLY"],
             "fedora_release": ["Fedora release 43", "Fedora release 45", "Ubuntu 24.04", None],
             "ostree_booted": [False, 1, None],
-            "ostree_ref": [None, "", "fedora/44/x86_64/workstation", "/fake"],
+            "ostree_ref": [None, "", "fedora/44/x86_64/workstation", "/fake", "notsilverblue", "fedora/45/x86_64/silverblue", "fedora/44/aarch64/silverblue"],
             "network_interfaces": [["eth0"], ["wlan0"], None, "[]", {"lo": "only"}],
         }
         for field, values in changes.items():

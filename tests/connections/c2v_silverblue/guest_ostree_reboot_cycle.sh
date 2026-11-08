@@ -292,15 +292,38 @@ set -x
 # Preserve the exact first failing command and exit status; a successful
 # systemd-run start does not prove its later transient unit stayed healthy.
 trap 'rc=$?; msg="C2V_MONITOR_ERR // rc=$rc line=$LINENO command=$BASH_COMMAND"; echo "$msg"; printf "%s\n" "$msg" >> /var/tmp/c2v-monitor-exit.log' ERR
-trap 'rc=$?; msg="C2V_MONITOR_EXIT // rc=$rc"; echo "$msg"; printf "%s\n" "$msg" >> /var/tmp/c2v-monitor-exit.log' EXIT
+trap 'rc=$?; msg="C2V_MONITOR_EXIT // rc=$rc"; echo "$msg"; printf "%s\n" "$msg" >> /var/tmp/c2v-monitor-exit.log; if [[ "$rc" -ne 0 ]] && declare -F c4b_emergency_relay >/dev/null; then c4b_emergency_relay "MONITOR_ABNORMAL_EXIT_$rc"; fi' EXIT
 echo "C2V_MONITOR_READY // $(date --iso-8601=seconds)"
 echo ready > /run/c2v-monitor-ready
 pkg=postapollo-connections-c2t-fixture
 log=/var/tmp/c2v-rpm-ostree-install.log
 resultfile=/run/c2v-rpm-layer-worker-exit
 staged_json=/run/c2v-ostree-pending.json
+# Opt-in C4b-only evidence relay. The monitor's normal stdout is a private
+# guest-local file; when it intentionally powers off a failed test, the
+# periodic probe may not get another tick to relay the reason.
+# Relay is best-effort, bounded, and NEVER authorizes a reboot or success.
+c4b_emergency_relay() {
+  [[ -f /var/lib/c4b-runtime-ci-only ]] || return 0
+  local reason="$1"
+  {
+    printf 'C4B_DIAG_MONITOR_FATAL // %s\n' "$reason"
+    printf 'C4B_DIAG_WORKER_EXIT // %s\n' \
+      "$(cat /run/c2v-rpm-layer-worker-exit 2>/dev/null || echo unobserved)"
+    echo 'C4B_DIAG_MONITOR_OUTPUT_BEGIN'
+    tail -n 45 /var/tmp/c2v-monitor-output.log 2>/dev/null || true
+    echo 'C4B_DIAG_RPM_OSTREE_WORKER_LOG_BEGIN'
+    tail -n 45 /var/tmp/c2v-rpm-ostree-install.log 2>/dev/null || true
+  } > /var/tmp/c4b-monitor-fatal-summary.log 2>&1 || true
+  # Fatal diagnostics may itself be rejected by ttyS0. Never let this
+  # diagnostic channel extend the host's authority or block poweroff.
+  timeout --signal=TERM --kill-after=2s 9s \
+    cat /var/tmp/c4b-monitor-fatal-summary.log >/dev/ttyS0 2>&1 || true
+  return 0
+}
 fail() {
   echo "C2V_FAIL // INDEPENDENT_MONITOR_$*"
+  c4b_emergency_relay "INDEPENDENT_MONITOR_$*"
   tail -n 45 "$log" 2>/dev/null || true
   timeout --signal=TERM --kill-after=5s 15s rpm-ostree status || true
   systemctl poweroff --no-block || true

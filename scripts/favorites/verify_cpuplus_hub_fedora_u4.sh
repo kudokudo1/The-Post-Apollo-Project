@@ -111,6 +111,45 @@ read -r gx gy <<<"$group_coords"
 [ -n "$gx" ] && [ -n "$gy" ] ||
   { cat "$log"; echo "U6B_FAIL // bad group coordinates"; exit 1; }
 xdotool mousemove --window "$window" "$gx" "$gy" click 1
+# U6c: open inline rename in the ORIGINAL collection editor. Type into its
+# real TextField and press Enter, then inspect the same shared index by name.
+for ((i=0;i<100;i++)); do
+  if grep -F 'U4_FAIL' "$log" >/dev/null; then
+    cat "$log"; echo "U6C_FAIL // fixture before rename"; exit 1
+  fi
+  if grep -F 'U6C_RENAME_READY // x=' "$log" >/dev/null; then
+    break
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    cat "$log"; echo "U6C_FAIL // exited before rename"; exit 1
+  fi
+  sleep 0.1
+done
+grep -F 'U6C_RENAME_READY // x=' "$log" >/dev/null ||
+  { cat "$log"; echo "U6C_FAIL // no rename control"; exit 1; }
+rename_coords="$(grep -F 'U6C_RENAME_READY // x=' "$log" | tail -n 1 |
+  sed -E 's/.*x=([0-9]+) y=([0-9]+).*/\1 \2/')"
+read -r rx ry <<<"$rename_coords"
+[ -n "$rx" ] && [ -n "$ry" ] ||
+  { cat "$log"; echo "U6C_FAIL // invalid rename coordinates"; exit 1; }
+xdotool mousemove --window "$window" "$rx" "$ry" click 1
+for ((i=0;i<100;i++)); do
+  if grep -F 'U4_FAIL' "$log" >/dev/null; then
+    cat "$log"; echo "U6C_FAIL // fixture during rename"; exit 1
+  fi
+  if grep -F 'U6C_EDIT_READY' "$log" >/dev/null; then
+    break
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    cat "$log"; echo "U6C_FAIL // exited before edit focus"; exit 1
+  fi
+  sleep 0.1
+done
+grep -F 'U6C_EDIT_READY' "$log" >/dev/null ||
+  { cat "$log"; echo "U6C_FAIL // name field never focused"; exit 1; }
+xdotool key --clearmodifiers ctrl+a
+xdotool type --clearmodifiers --delay 12 "Daily Workspace"
+xdotool key Return
 set +e
 wait "$pid"
 rc="$?"
@@ -130,6 +169,8 @@ grep -F 'U6_PASS // SAFE_MEMBER_ONLY_NO_PROVIDER_WRITES' "$log" >/dev/null ||
   { echo "U6_FAIL // cross-widget collection gate was not verified"; exit 1; }
 grep -F 'U6B_PASS // COLLECTION_TO_SELECTOR_AND_DETAILS_NO_WRITES' "$log" >/dev/null ||
   { echo "U6B_FAIL // live left collection click did not route to center"; exit 1; }
+grep -F 'U6C_PASS // INLINE_RENAME_UPDATES_INDEX_NO_OWNER_WRITES' "$log" >/dev/null ||
+  { echo "U6C_FAIL // inline collection rename was not verified"; exit 1; }
 if find "$work/data" -type f | grep -q .; then
   echo "U4_FAIL // manager created a writer file"; exit 1
 fi

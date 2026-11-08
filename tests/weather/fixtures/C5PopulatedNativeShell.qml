@@ -11,6 +11,8 @@ ShellRoot {
     property int ticks: 0
     property bool done: false
     property string route: "cosmos/planets-stars/planet-clock"
+    property real meteorHeaderY: -1
+    property real catalogScrollY: -1
 
     QtObject {
         id: fakeWeather
@@ -169,7 +171,7 @@ ShellRoot {
                 }];
                 focused.meteorSource.upcomingShowers = [{
                     name:"SAMPLE FUTURE",peakUtc:"2026-11-12 23:00Z",
-                    code:"TEST-B"
+                    code:"TEST-B",daysToPeak:7.0,ra:46.8,dec:31.2
                 }];
                 focused.meteorSource.ready = true;
                 root.phase = 5;
@@ -181,6 +183,65 @@ ShellRoot {
                 if (countNamed(focused.instrumentItem,
                         "cosmos-c5-meteor-card") !== 2)
                     return root.fail("IAU_CARDS_NOT_RENDERED");
+                const instrument = focused.instrumentItem;
+                const header = findNamed(instrument,
+                    "cosmos-c25-meteor-sticky-header");
+                const peaks = findNamed(instrument,
+                    "cosmos-c25-meteor-next-peaks-row");
+                const frame = findNamed(instrument,
+                    "cosmos-c25-meteor-catalog-frame");
+                const scroll = findNamed(instrument,
+                    "cosmos-c25-meteor-catalog-scroll");
+                if (!header || !peaks || !frame || !scroll
+                    || countNamed(instrument,"cosmos-c25-meteor-peak-card") !== 3
+                    || peaks.height < 65
+                    || scroll.height < 35
+                    || frame.y < header.height
+                    || scroll.contentHeight !== 99)
+                    return root.fail("C25_STICKY_METEOR_HEADER_OR_CATALOG_BOUNDS");
+                // Populate a long bounded catalog after the old two-card
+                // acceptance check. A real scroll must leave the header still.
+                const extra = [];
+                for (let i=1;i<=7;i++)
+                    extra.push({name:"FUTURE "+i,
+                        peakUtc:"2026-11-20T11:30:00Z",
+                        code:"T-"+i,daysToPeak:12+i,ra:45+i,dec:18+i});
+                focused.meteorSource.upcomingShowers = [{
+                    name:"SAMPLE FUTURE",peakUtc:"2026-11-12T23:00:00Z",
+                    code:"TEST-B",daysToPeak:7,ra:46.8,dec:31.2
+                }].concat(extra);
+                root.phase = 55;
+            } else if (root.phase === 55) {
+                const instrument = focused.instrumentItem;
+                const header = findNamed(instrument,
+                    "cosmos-c25-meteor-sticky-header");
+                const frame = findNamed(instrument,
+                    "cosmos-c25-meteor-catalog-frame");
+                const scroll = findNamed(instrument,
+                    "cosmos-c25-meteor-catalog-scroll");
+                if (!header || !frame || !scroll
+                    || countNamed(instrument,"cosmos-c5-meteor-card") !== 9
+                    || scroll.contentHeight <= scroll.height
+                    || scroll.height < 35)
+                    return root.fail("C25_LONG_CATALOG_NOT_SCROLLABLE");
+                root.meteorHeaderY = header.mapToItem(instrument,0,0).y;
+                scroll.contentY = Math.min(90,scroll.contentHeight-scroll.height);
+                root.catalogScrollY = scroll.contentY;
+                root.phase = 56;
+            } else if (root.phase === 56) {
+                const instrument = focused.instrumentItem;
+                const header = findNamed(instrument,
+                    "cosmos-c25-meteor-sticky-header");
+                const scroll = findNamed(instrument,
+                    "cosmos-c25-meteor-catalog-scroll");
+                if (!header || !scroll
+                    || scroll.contentY < 30
+                    || header.mapToItem(instrument,0,0).y !== root.meteorHeaderY)
+                    return root.fail("C25_PINNED_HEADER_MOVED_WITH_SCROLL");
+                instrument.jumpToShower("FUTURE 7");
+                if (instrument.selectedShowerName !== "FUTURE 7"
+                    || scroll.contentY <= root.catalogScrollY)
+                    return root.fail("C25_PEAK_CARD_CANNOT_REVEAL_CATALOG_RECORD");
                 root.phase = 6;
                 root.route = "cosmos/sun/position";
             } else if (root.phase === 6) {

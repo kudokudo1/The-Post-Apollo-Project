@@ -34,13 +34,13 @@ PROTECTED_DIRS = (
     "/usr/share", "/usr/share/dbus-1", "/usr/share/dbus-1/system.d",
     "/opt", "/opt/postapollo-c2o-venv", "/opt/postapollo-c2o-venv/bin",
 ) 
-# C4b-specific physical-path profile. Not a general /opt symlink exception.
-# The default Fedora Cloud profile above retains its original exact contract.
-C4B_PHYSICAL_INTERPRETER = "/var/opt/postapollo-c2o-venv/bin/python3"
-C4B_PHYSICAL_DIRS = tuple(
-    path for path in PROTECTED_DIRS if not (path == "/opt" or path.startswith("/opt/"))
-) + (
-    "/var", "/var/opt", "/var/opt/postapollo-c2o-venv",
+# C4b's *signed* fake host has the original /opt shebang. Only the
+# canonical Silverblue link inode below may differ from Fedora Cloud.
+# The default mode's no-symlink directory list and exact argv are unchanged.
+C4B_OPT_LINK = "var/opt"
+C4B_OPT_REALPATH = "/var/opt"
+C4B_OPT_REAL_DIRS = (
+    "/", "/var", "/var/opt", "/var/opt/postapollo-c2o-venv",
     "/var/opt/postapollo-c2o-venv/bin",
 )
 KEYS = {
@@ -63,10 +63,13 @@ def refusal(reason: str) -> dict:
     return {"status": reason, **DENIED_FLAGS}
 
 
-def evaluate(evidence: object, *, c4b_physical: bool = False) -> dict:
-    """Pure, fail-closed projection. Results are test evidence, not authority."""
-    if type(c4b_physical) is not bool:
+def evaluate(evidence: object, *, c4b_opt: bool = False,
+             opt_proof: object = None) -> dict:
+    """Pure fail-closed projection. This NEVER authorizes production access."""
+    if type(c4b_opt) is not bool or (not c4b_opt and opt_proof is not None):
         return refusal("C3B_INVALID_EVIDENCE")
+    if c4b_opt and not _valid_opt_proof(opt_proof):
+        return refusal("C3C_UNTRUSTED_C4B_OPT_LINK")
     if type(evidence) is not dict or set(evidence) != KEYS:
         return refusal("C3B_INVALID_EVIDENCE")
     e = evidence
@@ -94,8 +97,7 @@ def evaluate(evidence: object, *, c4b_physical: bool = False) -> dict:
         return refusal("C3B_CGROUP_MISMATCH")
     args = e["proc_args"]
     if (type(args) is not list or len(args) != 3 or
-            type(args[0]) is not str or
-            args[0] != (C4B_PHYSICAL_INTERPRETER if c4b_physical else INTERPRETER) or
+            type(args[0]) is not str or args[0] != INTERPRETER or
             args[1:] != [HOST, "--read-only"]):
         return refusal("C3B_COMMAND_MISMATCH")
     if (e["selinux_mode"] != "Enforcing" or e["kernel_enforcing"] != "1" or
@@ -115,11 +117,17 @@ def evaluate(evidence: object, *, c4b_physical: bool = False) -> dict:
                 f["regular"] is not True or f["symlink"] is not False):
             return refusal("C3B_UNPROTECTED_FILE")
     dirs = e["protected_dirs"]
-    required_dirs = C4B_PHYSICAL_DIRS if c4b_physical else PROTECTED_DIRS
-    if type(dirs) is not dict or set(dirs) != set(required_dirs):
+    if type(dirs) is not dict or set(dirs) != set(PROTECTED_DIRS):
         return refusal("C3C_DIRECTORIES_MISMATCH")
-    for path in required_dirs:
+    for path in PROTECTED_DIRS:
         d = dirs[path]
+        if c4b_opt and path == "/opt":
+            link = opt_proof["before"]["link"]
+            if (type(d) is not dict or
+                    d != {key: link[key] for key in
+                          ("owner", "mode", "directory", "symlink")}):
+                return refusal("C3C_UNTRUSTED_C4B_OPT_LINK")
+            continue
         if (type(d) is not dict or
                 set(d) != {"owner", "mode", "directory", "symlink"} or
                 type(d["owner"]) is not int or d["owner"] != 0 or
@@ -176,21 +184,80 @@ def _proc_cgroup(pid: int) -> str:
     return unified[0]
 
     
-def _physical_dir_identity(path: str) -> tuple[int, int, int, int, int]:
-    """Reject unsafe or replaced physical ancestors in an isolated C4b VM."""
-    info = os.lstat(path)
-    if (info.st_uid != 0 or stat.S_IMODE(info.st_mode) & 0o022
-            or not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode)):
-        raise ValueError("C3B_UNPROTECTED_C4B_PHYSICAL_ANCESTOR")
-    return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid)
+def _opt_snapshot() -> dict:
+    """Read genuine guest filesystem state, never D-Bus/client-supplied facts."""
+    link = os.lstat("/opt")
+    dirs = {}
+    for path in C4B_OPT_REAL_DIRS:
+        info = os.lstat(path)
+        dirs[path] = {
+            "owner": info.st_uid, "group": info.st_gid,
+            "mode": stat.S_IMODE(info.st_mode),
+            "directory": stat.S_ISDIR(info.st_mode),
+            "symlink": stat.S_ISLNK(info.st_mode),
+            "device": info.st_dev, "inode": info.st_ino,
+        }
+    return {
+        "link": {
+            "owner": link.st_uid, "group": link.st_gid,
+            "mode": stat.S_IMODE(link.st_mode),
+            "directory": stat.S_ISDIR(link.st_mode),
+            "symlink": stat.S_ISLNK(link.st_mode),
+            "target": os.readlink("/opt"),
+            "resolved": os.path.realpath("/opt"),
+            "device": link.st_dev, "inode": link.st_ino,
+        },
+        "dirs": dirs,
+    }
 
 
-def _physical_snapshot() -> dict[str, tuple[int, int, int, int, int]]:
-    return {path: _physical_dir_identity(path) for path in C4B_PHYSICAL_DIRS}
+def _valid_opt_snapshot(snapshot: object) -> bool:
+    if type(snapshot) is not dict or set(snapshot) != {"link", "dirs"}:
+        return False
+    link, dirs = snapshot["link"], snapshot["dirs"]
+    if type(link) is not dict or set(link) != {
+            "owner", "group", "mode", "directory", "symlink",
+            "target", "resolved", "device", "inode"}:
+        return False
+    if not (
+            type(link["owner"]) is int and link["owner"] == 0 and
+            type(link["group"]) is int and link["group"] == 0 and
+            type(link["mode"]) is int and link["mode"] == 0o777 and
+            link["directory"] is False and link["symlink"] is True and
+            link["target"] == C4B_OPT_LINK and
+            link["resolved"] == C4B_OPT_REALPATH and
+            type(link["device"]) is int and link["device"] > 0 and
+            type(link["inode"]) is int and link["inode"] > 0):
+        return False
+    if type(dirs) is not dict or set(dirs) != set(C4B_OPT_REAL_DIRS):
+        return False
+    for path in C4B_OPT_REAL_DIRS:
+        d = dirs[path]
+        if type(d) is not dict or set(d) != {
+                "owner", "group", "mode", "directory", "symlink",
+                "device", "inode"}:
+            return False
+        if not (
+                type(d["owner"]) is int and d["owner"] == 0 and
+                type(d["group"]) is int and d["group"] == 0 and
+                type(d["mode"]) is int and 0 <= d["mode"] <= 0o7777 and
+                not (d["mode"] & 0o022) and
+                d["directory"] is True and d["symlink"] is False and
+                type(d["device"]) is int and d["device"] > 0 and
+                type(d["inode"]) is int and d["inode"] > 0):
+            return False
+    return True
 
 
-def _verified_c4b_physical_guest() -> bool:
-    """Independent guest facts, never supplied by the D-Bus service or client."""
+def _valid_opt_proof(proof: object) -> bool:
+    return (type(proof) is dict and set(proof) == {"before", "after"} and
+            _valid_opt_snapshot(proof["before"]) and
+            _valid_opt_snapshot(proof["after"]) and
+            proof["before"] == proof["after"])
+
+
+def _verified_c4b_opt_guest() -> bool:
+    """CI selector must agree with independently observed offline VM facts."""
     if (os.geteuid() != 0 or
             os.environ.get("GITHUB_ACTIONS") != "true" or
             os.environ.get("POST_APOLLO_C3B_TEST_GUEST") != "1" or
@@ -210,20 +277,23 @@ def _verified_c4b_physical_guest() -> bool:
             ["ostree", "admin", "status"], check=True, capture_output=True,
             text=True, timeout=5,
         ).stdout
-        if "fedora/44/x86_64/silverblue" not in ref.lower():
+        if re.search(r"(?<![a-z0-9_/])fedora/44/x86_64/silverblue(?![a-z0-9_/-])",
+                     ref.lower()) is None:
             return False
     except (OSError, ValueError, subprocess.SubprocessError):
         return False
     return True
 
 
-async def _probe(*, c4b_physical: bool = False) -> dict:
+async def _probe(*, c4b_opt: bool = False) -> tuple[dict, object]:
     # D-Bus is queried only via a private disposable Fedora VM's system bus.
     # The bus daemon reports ownership and Unix peer identity, not the service.
     from dbus_next import BusType, Message, MessageType
     from dbus_next.aio import MessageBus
 
-    physical_before = _physical_snapshot() if c4b_physical else None
+    before = _opt_snapshot() if c4b_opt else None
+    if c4b_opt and not _valid_opt_snapshot(before):
+        raise ValueError("C3C_UNTRUSTED_C4B_OPT_LINK")
     bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
     try:
         async def query(member: str, name: str):
@@ -273,32 +343,31 @@ async def _probe(*, c4b_physical: bool = False) -> dict:
             "kernel_enforcing": Path("/sys/fs/selinux/enforce").read_text().strip(),
             "protected_files": {path: _file_evidence(path) for path in FILES},
             "protected_dirs": {
-                path: _directory_evidence(path) for path in
-                (C4B_PHYSICAL_DIRS if c4b_physical else PROTECTED_DIRS)
+                path: _directory_evidence(path) for path in PROTECTED_DIRS
             },
         }
         e["owner_last"] = await query("GetNameOwner", NAME)
-        if c4b_physical and physical_before != _physical_snapshot():
-            raise ValueError("C3B_PHYSICAL_DIRECTORY_IDENTITY_CHANGED")
-        return e
+        after = _opt_snapshot() if c4b_opt else None
+        proof = {"before": before, "after": after} if c4b_opt else None
+        if c4b_opt and not _valid_opt_proof(proof):
+            raise ValueError("C3C_UNTRUSTED_C4B_OPT_LINK")
+        return e, proof
     finally:
         bus.disconnect()
 
 
 def main() -> int:
     args = sys.argv[1:]
-    c4b_physical = args == ["--verify-disposable-physical"]
-    if (args not in (["--verify-disposable"], ["--verify-disposable-physical"]) or
+    c4b_opt = args == ["--verify-disposable-silverblue-opt"]
+    if (args not in (["--verify-disposable"], ["--verify-disposable-silverblue-opt"]) or
             os.environ.get("GITHUB_ACTIONS") != "true" or
             os.environ.get("POST_APOLLO_C3B_TEST_GUEST") != "1" or
-            (c4b_physical and not _verified_c4b_physical_guest())):
+            (c4b_opt and not _verified_c4b_opt_guest())):
         print("C3B_REFUSED_NOT_DISPOSABLE_GUEST")
         return 2
     try:
-        result = evaluate(
-            asyncio.run(_probe(c4b_physical=c4b_physical)),
-            c4b_physical=c4b_physical,
-        )
+        evidence, opt_proof = asyncio.run(_probe(c4b_opt=c4b_opt))
+        result = evaluate(evidence, c4b_opt=c4b_opt, opt_proof=opt_proof)
     except Exception as exc:
         print("C3B_FAIL // ORIGIN_EVIDENCE_UNAVAILABLE: " + type(exc).__name__)
         return 2

@@ -109,9 +109,9 @@ function inspect(roomValue) {
     } else if (assignmentStatus && assignmentStatus !== "ACTIVE") {
         code = "ASSIGNMENT_INACTIVE"; label = "ASSIGNMENT NOT ACTIVE";
         next = "Review Assignment status; do not auto-activate or override.";
-    } else if (status === "REVIEW" || status === "WAITING") {
+    } else if (status === "REVIEW") {
         code = "SESSION_HOLD"; label = "SESSION NEEDS REVIEW";
-        next = "Session records a hold; inspect the reason before any new turn.";
+        next = "Explicit review state recorded; inspect before another turn.";
     } else if (status === "PAUSED") {
         code = "SESSION_PAUSED"; label = "SESSION PAUSED";
         next = "Deliberate pause; review before an authorized resume.";
@@ -119,6 +119,24 @@ function inspect(roomValue) {
             || Number(room.sessionActivePid || 0) > 0) {
         code = "SESSION_BUSY"; label = "SESSION RECORDED BUSY";
         next = "Do not issue another worker turn over in-flight work.";
+    } else if (valueOf(room.sessionLastError)
+            || (room.sessionLastExitCode !== null
+                && room.sessionLastExitCode !== undefined
+                && valueOf(room.sessionLastExitCode) !== ""
+                && valueOf(room.sessionLastExitCode) !== "0")) {
+        code = "RECORDED_FAILURE"; label = "SESSION ERROR RECORDED";
+        next = "Inspect PX failure history before requesting another turn.";
+    } else if (status === "WAITING") {
+        // PX sets WAITING after every successful provider response.
+        // A zero exit code, no PID and no saved error establish completion
+        // in this record, NOT a live heartbeat or autonomous permission.
+        if (valueOf(room.sessionLastExitCode) === "0") {
+            code = "WAITING_READY"; label = "WAITING // OPERATOR MAY CONTINUE";
+            next = "Previous PX turn succeeded; operator can request the next turn. PX checks authority again.";
+        } else {
+            code = "SESSION_HOLD"; label = "WAITING // OUTCOME UNVERIFIED";
+            next = "No successful prior turn recorded; inspect PX before continuing.";
+        }
     } else if (status !== "IDLE") {
         code = "UNKNOWN_STATE"; label = "SESSION STATE UNKNOWN";
         next = "PX must resolve the recorded Session state before dispatch.";
@@ -130,7 +148,7 @@ function inspect(roomValue) {
             : "Identity fields align; PX must still check provider, Bed and authority.";
     }
 
-    const canRequestTurn = code === "STRUCTURED";
+    const canRequestTurn = code === "STRUCTURED" || code === "WAITING_READY";
     return {
         code: code,
         label: label,

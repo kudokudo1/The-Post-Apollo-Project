@@ -80,6 +80,18 @@ ShellRoot {
              title:"World Radio"}
         ]
     }
+    // Synthetic Reception owner projection. No original activity key, report
+    // body, room context, transcript or Reception action passes to CPU++.
+    QtObject {
+        id: hospitalPins
+        property string state: "hydrated"
+        property var pins: [
+            {ref:"pinned|reports|report|2026-11-08T18:12:05.000Z|1",
+             source:"reports",kind:"report",recordedAt:"2026-11-08T18:12:05.000Z"},
+            {ref:"pinned|rounds|room|2026-11-08T18:13:08.000Z|1",
+             source:"rounds",kind:"room",recordedAt:"2026-11-08T18:13:08.000Z"}
+        ]
+    }
     readonly property var options:
         Management.list(["UTC"],[{id:12,place:{label:"Example City"}}],
             ["fav1:local:finance:instrument:TEST.01"],[],
@@ -100,6 +112,9 @@ ShellRoot {
                 state:radioSaved.state,
                 favorites:radioSaved.favorites,
                 recents:radioSaved.recents
+            }),({
+                state:hospitalPins.state,
+                pins:hospitalPins.pins
             }))
     readonly property var selection: Management.recordFor(options,selectedKey)
 
@@ -272,14 +287,29 @@ ShellRoot {
             const world=root.options.rows.find(function(row) {
                 return row.owner==="radio" && row.item==="World Radio";
             });
+            const hospitalReportGroup=dossier.dossier.groups.find(function(group) {
+                return group.key==="HOSPITAL|REPORTS";
+            });
+            const hospitalRoundsGroup=dossier.dossier.groups.find(function(group) {
+                return group.key==="HOSPITAL|ROUNDS";
+            });
+            const hospitalReport=root.options.rows.find(function(row) {
+                return row.owner==="hospital" && row.menu==="REPORTS";
+            });
             const fileGroup=dossier.dossier.groups.find(function(group) {
                 return group.key==="APP CTRL|FILES";
             });
             const processGroup=dossier.dossier.groups.find(function(group) {
                 return group.key==="CPU++|KILL";
             });
-            if(!root.options || root.options.total!==19
+            if(!root.options || root.options.total!==21
                || dossier.dossier.total!==root.options.rows.length
+               || !hospitalReportGroup || hospitalReportGroup.count!==1
+               || !hospitalRoundsGroup || hospitalRoundsGroup.count!==1
+               || !hospitalReport || !hospitalReport.readOnly
+               || !hospitalReport.isPinned
+               || hospitalReport.available!=="unresolved"
+               || hospitalReport.item!=="REPORT // 2026-11-08 18:12:05 UTC"
                || !weatherPanel || !weatherCard
                || weatherGroups.length!==2
                || !radioFavoritesGroup || radioFavoritesGroup.count!==2

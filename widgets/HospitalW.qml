@@ -2453,6 +2453,52 @@ PanelWindow {
         aiInterpretationEnabled: interpretationService.enabled
     }
 
+    // U5d // Only Reception owns the pin/archive FileView. This snapshot is
+    // derived from hydrated local records without exporting activity keys,
+    // names, titles, reports, bodies, private context or navigation routes.
+    // Its ref is an ephemeral metadata identity, NOT a Hospital action token.
+    readonly property var receptionPinnedReadOnlySnapshot: {
+        const hydrated=receptionistService.activityHydrated;
+        const pinned=receptionistService.pinnedKeys;
+        const archive=receptionistService.activityEvents;
+        if (!hydrated) return ({state:"loading",pins:[]});
+        if (!Array.isArray(pinned) || !Array.isArray(archive)
+                || pinned.length>receptionistService.maxPinnedEvents)
+            return ({state:"invalid",pins:[]});
+        const byKey=Object.create(null);
+        for (const activity of archive) {
+            if (activity && typeof activity.key==="string" && activity.key)
+                byKey[activity.key]=activity;
+        }
+        const used=Object.create(null),out=[];
+        const sources=["rounds","staff","reports","phone","intercom"];
+        const kinds=["room","staff","report","phone","intercom"];
+        for (const privateKey of pinned) {
+            if (typeof privateKey!=="string" || !privateKey
+                    || !Object.prototype.hasOwnProperty.call(byKey,privateKey))
+                return ({state:"invalid",pins:[]});
+            const event=byKey[privateKey];
+            const rawSource=String(event.source || "").toLowerCase();
+            const rawKind=String(event.kind || "").toLowerCase();
+            const source=sources.indexOf(rawSource)>=0?rawSource:"activity";
+            const kind=kinds.indexOf(rawKind)>=0?rawKind:"activity";
+            const value=event.recordedAt;
+            const at=typeof value==="string"
+                && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
+                && !Number.isNaN(Date.parse(value)) ? value : "";
+            const base=source+"|"+kind+"|"+(at || "undated");
+            const serial=(used[base] || 0)+1;
+            used[base]=serial;
+            out.push({
+                ref:"pinned|"+base+"|"+serial,
+                source:source,kind:kind,recordedAt:at
+            });
+        }
+        // 'hydrated' deliberately does not assert that the existing FileView
+        // read succeeded: its current onLoadFailed also hydrates empty arrays.
+        return ({state:"hydrated",pins:out});
+    }
+
     HospitalContextService {
         id: hospitalContextService
     }

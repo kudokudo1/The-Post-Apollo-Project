@@ -23,7 +23,9 @@ const Notifications={Adapters};
 load("services/favorites/FavoritesNotificationsProjection.js",Notifications);
 const Radio={Adapters};
 load("services/favorites/FavoritesRadioProjection.js",Radio);
-const Hub={Resource,Default,Collections,Adapters,WeatherHome,NotificationsProjection:Notifications,RadioProjection:Radio};
+const Hospital={Adapters};
+load("services/favorites/FavoritesHospitalProjection.js",Hospital);
+const Hub={Resource,Default,Collections,Adapters,WeatherHome,NotificationsProjection:Notifications,RadioProjection:Radio,HospitalProjection:Hospital};
 load("services/favorites/FavoritesManagementPolicy.js",Hub);
 const plain=v=>JSON.parse(JSON.stringify(v));
 const k=(provider,kind,id)=>Resource.identityKey(provider,kind,id);
@@ -240,8 +242,8 @@ test("CPU++ imports all AppControl owner lists, with seven source filters and re
     "FavoritesStore.favoriteTaskMetricKeys"
   ]) assert.ok(cpu.includes(field),field);
   assert.match(cpu,/FavoritesManagement\.list\(/);
-  assert.match(panel,/model: \["ALL","CPU\+\+","APP CTRL","WEATHER","NOTIFS","RADIO","CLOCK","PLACES","NEW"\]/);
-  assert.match(panel,/height: 90/);
+  assert.match(panel,/model: \["ALL","CPU\+\+","APP CTRL","WEATHER","NOTIFS","RADIO","HOSPITAL","CLOCK","PLACES","NEW"\]/);
+  assert.match(panel,/height: 121/);
   assert.match(panel,/modelData\.readOnly\?"READ ONLY"/);
   assert.match(panel,/pane\.selectedResource && !pane\.selectedResource\.readOnly/);
   assert.match(panel,/APP CONTROL-OWNED \/\/ READ ONLY/);
@@ -1110,4 +1112,135 @@ test("U5a and U5c Weather favorites pass only loaded owner snapshots through she
   assert.equal((shell.match(/\bWeatherStationW\s*\{/g)||[]).length,1);
   assert.doesNotMatch(shell+cpu,/\bStationRadio\s*\{|\bWeatherHomeFavoritesStore\s*\{|\bFileView\s*\{/);
   assert.doesNotMatch(media+station+workspace,/writeAdapter\(|loadMedia\(|transport\(|execDetached/);
+});
+
+
+test("U5d Hospital pinned activities have readable source/type/time but no archive text",()=>{
+  const record=(source,kind,date,ordinal,privateFields={})=>({
+    ref:"pinned|"+source+"|"+kind+"|"+date+"|"+ordinal,
+    source,kind,recordedAt:date,...privateFields
+  });
+  const sample={
+    state:"hydrated",
+    pins:[
+      record("reports","report","2026-11-08T18:12:05.000Z",1,
+             {title:"PRIVATE PERSON // ROOM B",detail:"PRIVATE_REPORT_BODY",
+              context:{room:"PRIVATE_ROOM"},route:"reports",
+              key:"PRIVATE_ACTIVITY_KEY"}),
+      record("rounds","room","2026-11-08T18:13:08.000Z",1,
+             {title:"PRIVATE_TEAM_DO_NOT_SHOW",body:"PRIVATE_TRANSCRIPT"}),
+      record("intercom","intercom","2026-11-08T18:14:09.000Z",1,
+             {message:"PRIVATE_CONVERSATION"})
+    ]
+  };
+  const untouched=plain(sample);
+  const result=Hub.list([],[],[],[],undefined,undefined,undefined,
+                        undefined,undefined,undefined,sample);
+  assert.equal(result.total,3);
+  assert.equal(result.rows.length,3);
+  assert.deepEqual(plain(result.rows.map(r=>r.label)),[
+    "HOSPITAL // REPORTS // REPORT // 2026-11-08 18:12:05 UTC",
+    "HOSPITAL // ROUNDS // ROOM // 2026-11-08 18:13:08 UTC",
+    "HOSPITAL // INTERCOM // INTERCOM // 2026-11-08 18:14:09 UTC"
+  ]);
+  for(const row of result.rows) {
+    assert.equal(row.owner,"hospital");
+    assert.equal(row.provider,"hospital");
+    assert.equal(row.category,"HOSPITAL");
+    assert.equal(row.kind,"activity");
+    assert.equal(row.favoriteType,"PINNED ACTIVITY");
+    assert.equal(row.readOnly,true);
+    assert.equal(row.isPinned,true);
+    assert.equal(row.isFavorite,true);
+    assert.equal(row.available,"unresolved");
+    assert.deepEqual(plain(row.capabilities),[]);
+    assert.equal("resourceId" in row,false);
+    assert.equal("title" in row,false);
+    assert.equal("context" in row,false);
+    assert.equal("body" in row,false);
+    assert.equal("route" in row,false);
+  }
+  assert.equal(Hub.filterRows(result,"HOSPITAL").length,3);
+  const Dossier={};
+  load("services/favorites/FavoritesDossierIndexPolicy.js",Dossier);
+  const grouped=Dossier.build(result);
+  assert.deepEqual(plain(grouped.groups.map(g=>g.key)),
+                   ["HOSPITAL|ROUNDS","HOSPITAL|REPORTS","HOSPITAL|INTERCOM"]);
+  assert.equal(grouped.total,3);
+  for(const word of ["PRIVATE PERSON","PRIVATE_REPORT_BODY","PRIVATE_ROOM",
+                     "PRIVATE_ACTIVITY_KEY","PRIVATE_TEAM_DO_NOT_SHOW",
+                     "PRIVATE_TRANSCRIPT","PRIVATE_CONVERSATION"]) {
+    assert.equal(JSON.stringify(grouped).includes(word),false,word);
+    assert.equal(JSON.stringify(result).includes(word),false,word);
+  }
+  assert.deepEqual(plain(sample),untouched);
+});
+
+test("U5d Hospital projection declines unhydrated, malformed and raw sensitive identities",()=>{
+  assert.equal(Hospital.build(null).state,"disconnected");
+  for(const state of ["loading","failed","error","unsupported"]) {
+    const got=Hospital.build({state,pins:[]});
+    assert.equal(got.rows.length,0);
+    assert.equal(got.state,state);
+  }
+  const goodAt="2026-11-08T18:22:30.000Z";
+  const good={ref:"pinned|reports|report|"+goodAt+"|1",
+    source:"reports",kind:"report",recordedAt:goodAt};
+  for(const bad of [
+    {state:"hydrated",pins:null},
+    {state:"hydrated",pins:Array(6).fill(good)},
+    {state:"hydrated",pins:[good,good]},
+    {state:"hydrated",pins:[{...good,ref:"reports::PRIVATE_CLIENT_NAME"}]},
+    {state:"hydrated",pins:[{...good,source:"PRIVATE_CLIENT_NAME"}]},
+    {state:"hydrated",pins:[{...good,kind:"report//PRIVATE_REPORT"}]},
+    {state:"hydrated",pins:[{...good,recordedAt:"../../private"}]},
+    {state:"hydrated",pins:[{...good,ref:"pinned|reports|report|"+goodAt+"|7"}]}
+  ]) {
+    const out=Hospital.build(bad);
+    assert.equal(out.state,"invalid");
+    assert.equal(out.rows.length,0);
+    assert.ok(out.invalidCount>0);
+  }
+  const unknown=Hospital.build({state:"hydrated",pins:[{
+    ref:"pinned|activity|activity|undated|1",
+    source:"activity",kind:"activity",recordedAt:""
+  }]});
+  assert.equal(unknown.rows.length,1);
+  assert.equal(unknown.rows[0].item,"ACTIVITY // DATE UNAVAILABLE");
+  assert.equal(unknown.rows[0].resolved,true);
+  assert.ok(!JSON.stringify(unknown).includes("PRIVATE"));
+});
+
+test("U5d Hospital owner emits sanitized refs and shell routes only metadata to CPU++",()=>{
+  const w=read("widgets/HospitalW.qml");
+  const sh=read("shell.qml");
+  const cpu=read("widgets/CpuPlusW.qml");
+  const manager=read("services/favorites/FavoritesManagementPolicy.js");
+  const adapter=read("services/favorites/FavoritesReadOnlyAdapters.js");
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const index=read("services/favorites/FavoritesDossierIndexPolicy.js");
+  const projection=read("services/favorites/FavoritesHospitalProjection.js");
+  const owner=read("services/hospital/HospitalReceptionistService.qml");
+
+  assert.match(w,/readonly property var receptionPinnedReadOnlySnapshot:/);
+  assert.match(w,/receptionistService\.pinnedKeys/);
+  assert.match(w,/receptionistService\.activityEvents/);
+  assert.match(w,/Object\.prototype\.hasOwnProperty\.call\(byKey,privateKey\)/);
+  assert.match(w,/ref:"pinned\|"\+base\+"\|"\+serial/);
+  assert.match(w,/source:source,kind:kind,recordedAt:at/);
+  assert.doesNotMatch(w.slice(w.indexOf("readonly property var receptionPinnedReadOnlySnapshot:"),
+                               w.indexOf("HospitalContextService {")),/event\.title|event\.detail|event\.context|event\.route/);
+  assert.match(sh,/hospitalPinnedFavoritesSource:\s*hospitalWindow\.receptionPinnedReadOnlySnapshot/);
+  assert.match(cpu,/property var hospitalPinnedFavoritesSource: null/);
+  assert.match(cpu,/cpuPlusWindow\.hospitalPinnedFavoritesSnapshot/);
+  assert.match(manager,/HospitalProjection\.build\(hospitalSnapshot\)/);
+  assert.match(adapter,/function hospital\(pinnedKeys\)/);
+  assert.match(pane,/"HOSPITAL"/);
+  assert.match(pane,/SOURCE \/\/ HOSPITAL RECEPTION/);
+  assert.match(index,/"HOSPITAL\|ROUNDS"/);
+  assert.match(owner,/path: Quickshell\.dataPath\("hospital-reception\.json"\)/);
+  assert.match(owner,/function setPinned\(event, pinnedValue\)/);
+  assert.doesNotMatch(projection+cpu,
+       /FileView\s*\{|JsonAdapter\s*\{|Process\s*\{|setPinned\(|togglePinned\(|exportArchive\(/);
+  assert.doesNotMatch(projection,/\.title|\.detail|\.context|\.route|\.message|\.body/);
 });

@@ -11,11 +11,13 @@ var ORDER=[
     "WEATHER|HOME","WEATHER|CARD",
     "NOTIFS|SOURCES",
     "RADIO|FAVORITES","RADIO|RECENTS",
+    "HOSPITAL|ROUNDS","HOSPITAL|STAFF","HOSPITAL|REPORTS",
+    "HOSPITAL|PHONE","HOSPITAL|INTERCOM","HOSPITAL|ACTIVITY",
     "CLOCK|CLOCK","PLACES|PLACES","NEW|NEW"
 ];
 function itemLabel(row,menu) {
     if (row.owner==="weather-home" || row.owner==="notifications"
-            || row.owner==="radio")
+            || row.owner==="radio" || row.owner==="hospital")
         return String(row.item || "NAME UNAVAILABLE");
     if (row.owner!=="appcontrol")
         return String(row.label || "NAME UNAVAILABLE");
@@ -34,10 +36,11 @@ function build(candidates) {
         if (!row || typeof row.key!=="string" || !row.key
                 || seen[row.key]) continue;
         const category=String(row.category || "");
-        if (["APP CTRL","CPU++","WEATHER","NOTIFS","RADIO","CLOCK","PLACES","NEW"].indexOf(category)<0)
+        if (["APP CTRL","CPU++","WEATHER","NOTIFS","RADIO","HOSPITAL","CLOCK","PLACES","NEW"].indexOf(category)<0)
             continue;
         const menu=row.owner==="appcontrol" || row.owner==="weather-home"
             || row.owner==="notifications" || row.owner==="radio"
+            || row.owner==="hospital"
             ? String(row.menu || "OTHER") : category;
         const key=category+"|"+menu;
         if (!byKey[key]) {

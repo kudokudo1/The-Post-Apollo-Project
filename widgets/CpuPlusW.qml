@@ -1616,6 +1616,10 @@ PanelWindow {
             catalogSnapshot: cpuFavoritesCatalog.snapshot
             candidates: cpuPlusWindow.favoriteCandidates
             selectedResource: cpuPlusWindow.selectedFavoriteResource
+            timeOwner: TimeSettings
+            placesOwner: PlaceRegistry
+            defaultOwner: FavoritesDefaultStore
+            collectionsOwner: FavoritesCollectionsStore
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom
@@ -2060,6 +2064,10 @@ PanelWindow {
             catalogSnapshot: cpuFavoritesCatalog.snapshot
             candidates: cpuPlusWindow.favoriteCandidates
             selectedResource: cpuPlusWindow.selectedFavoriteResource
+            timeOwner: TimeSettings
+            placesOwner: PlaceRegistry
+            defaultOwner: FavoritesDefaultStore
+            collectionsOwner: FavoritesCollectionsStore
             onSelectionRequested: function(key) {
                 cpuPlusWindow.selectedFavoriteKey = key;
             }
@@ -2595,6 +2603,10 @@ PanelWindow {
             catalogSnapshot: cpuFavoritesCatalog.snapshot
             candidates: cpuPlusWindow.favoriteCandidates
             selectedResource: cpuPlusWindow.selectedFavoriteResource
+            timeOwner: TimeSettings
+            placesOwner: PlaceRegistry
+            defaultOwner: FavoritesDefaultStore
+            collectionsOwner: FavoritesCollectionsStore
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: actuatorHeader.bottom

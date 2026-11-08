@@ -72,9 +72,14 @@ PanelWindow {
     property bool huntPaused: true
     property bool huntRoundComplete: false
     property string huntLastEvent: "READY // NEW ROUND"
+    // Player choice affects NEW rounds, never existing targets.
+    property int huntSpawnCount: 3
     property real huntMouseX: 0.5
     property real huntMouseY: 0.5
     property bool huntMouseActive: false
+    property int huntMouseMovingTicks: 0
+    property real huntMouseVX: 0
+    property real huntMouseVY: 0
     property string captureMode: "region"
     // Read Social's active identity and provider alias metadata, not login state.
     readonly property var zoomSocialIdentity: SocialIdentityStore.snapshot
@@ -437,6 +442,9 @@ PanelWindow {
             huntScore = 0;
             huntLastEvent = "READY // NEW ROUND";
             huntMouseActive = false;
+            huntMouseMovingTicks = 0;
+            huntMouseVX = 0;
+            huntMouseVY = 0;
             galleryFiles = [];
         } else if (!galleryHasMore) {
             return false;
@@ -592,14 +600,33 @@ PanelWindow {
         return true;
     }
 
-    // Fox cursor tracking is only visual gameplay state. Target positions
-    // are normalized to arena space and never used as filesystem authority.
+    // Spawn count is strictly bounded, with no filesystem authority. It
+    // applies only when starting the next round.
+    function huntSetSpawnCount(value) {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || !Number.isFinite(Number(value)))
+            return false;
+        huntSpawnCount = Math.max(1, Math.min(10, Math.round(Number(value))));
+        return true;
+    }
+
+    // Cursor motion decays after half a second of inactivity. The fox uses
+    // moving vs. stationary state, not absolute pointer coordinates alone.
     function huntSetPointer(x, y, width, height) {
         if (activeView !== "cleanup" || cleanupTechnique !== "hunt"
                 || width <= 0 || height <= 0)
             return false;
-        huntMouseX = Math.max(0, Math.min(1, x / width));
-        huntMouseY = Math.max(0, Math.min(1, y / height));
+        const nx = Math.max(0, Math.min(1, x / width));
+        const ny = Math.max(0, Math.min(1, y / height));
+        const dx = nx - huntMouseX;
+        const dy = ny - huntMouseY;
+        if (huntMouseActive && Math.sqrt(dx * dx + dy * dy) > 0.007) {
+            huntMouseMovingTicks = 5;
+            huntMouseVX = Math.max(-0.12, Math.min(0.12, dx));
+            huntMouseVY = Math.max(-0.12, Math.min(0.12, dy));
+        }
+        huntMouseX = nx;
+        huntMouseY = ny;
         huntMouseActive = true;
         return true;
     }
@@ -638,19 +665,24 @@ PanelWindow {
             eligible[i] = eligible[j];
             eligible[j] = tmp;
         }
-        const picked = eligible.slice(0, Math.min(3, eligible.length));
-        // Draw different animal behavior profiles for each round. Each
-        // profile has its own size, 2D speed, bounce and/or hop pattern.
-        const profiles = HuntMotion.PROFILES.slice();
-        for (let i = profiles.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            const tmp = profiles[i];
-            profiles[i] = profiles[j];
-            profiles[j] = tmp;
-        }
+        const picked = eligible.slice(0, Math.min(huntSpawnCount, eligible.length));
+        // Deal shuffled sets of all five profiles before repeating.
+        // 1-5 spawns are distinct; 6-10 can repeat in a new shuffle.
+        let profiles = [];
         const targets = [];
-        for (let i = 0; i < picked.length; i++)
-            targets.push(HuntMotion.createTarget(picked[i], profiles[i], Math.random));
+        for (let i = 0; i < picked.length; i++) {
+            if (i % HuntMotion.PROFILES.length === 0) {
+                profiles = HuntMotion.PROFILES.slice();
+                for (let j = profiles.length - 1; j > 0; j--) {
+                    const k = Math.floor(Math.random() * (j + 1));
+                    const tmp = profiles[j];
+                    profiles[j] = profiles[k];
+                    profiles[k] = tmp;
+                }
+            }
+            targets.push(HuntMotion.createTarget(
+                picked[i], profiles[i % HuntMotion.PROFILES.length], Math.random));
+        }
         huntTargets = targets;
         huntHistory = [];
         huntRound += 1;
@@ -661,7 +693,7 @@ PanelWindow {
         huntPaused = false;
         huntLastEvent = "ROUND " + huntRound + " // FIRE TO QUEUE";
         feedback = "HUNT // ROUND " + huntRound
-                   + " // THREE RANDOM LOADED MEDIA TARGETS MAX";
+                   + " // " + targets.length + " LOADED MEDIA TARGETS";
         return true;
     }
 
@@ -674,8 +706,12 @@ PanelWindow {
         // and image sources alive instead of re-creating every 100ms.
         const pointer = {
             active: huntMouseActive,
-            x: huntMouseX, y: huntMouseY
+            moving: huntMouseMovingTicks > 0,
+            x: huntMouseX, y: huntMouseY,
+            vx: huntMouseVX, vy: huntMouseVY
         };
+        if (huntMouseMovingTicks > 0)
+            huntMouseMovingTicks -= 1;
         const nextTargets = [];
         for (let i = 0; i < huntTargets.length; i++)
             nextTargets.push(HuntMotion.advanceTarget(huntTargets[i], pointer));
@@ -2713,6 +2749,7 @@ PanelWindow {
                                         camera.huntPaused = true;
                                     camera.cleanupTechnique = modelData.id;
                                     camera.huntMouseActive = false;
+                                    camera.huntMouseMovingTicks = 0;
                                     camera.batchPreview = null;
                                     camera.batchReviewKey = "";
                                     if (modelData.id === "swipe")
@@ -3298,10 +3335,48 @@ PanelWindow {
                                     }
                                 }
 
+                                Row {
+                                    id: huntSpawnRow
+                                    width: parent.width
+                                    height: 27
+                                    spacing: 6
+                                    ActionButton {
+                                        width: Math.max(72, parent.width * 0.28)
+                                        height: 26
+                                        label: "SPAWN -"
+                                        labelPixelSize: 10
+                                        accentColor: Colors.cyan
+                                        available: !camera.busy && camera.huntSpawnCount > 1
+                                        onLeftClicked: camera.huntSetSpawnCount(
+                                                           camera.huntSpawnCount - 1)
+                                    }
+                                    GohuText {
+                                        width: parent.width - 2 * Math.max(72, parent.width * 0.28)
+                                               - 12
+                                        height: 26
+                                        verticalAlignment: Text.AlignVCenter
+                                        horizontalAlignment: Text.AlignHCenter
+                                        font.pixelSize: 10
+                                        color: Colors.yellow
+                                        text: "TARGETS // " + camera.huntSpawnCount
+                                              + " / 10"
+                                    }
+                                    ActionButton {
+                                        width: Math.max(72, parent.width * 0.28)
+                                        height: 26
+                                        label: "SPAWN +"
+                                        labelPixelSize: 10
+                                        accentColor: Colors.magenta
+                                        available: !camera.busy && camera.huntSpawnCount < 10
+                                        onLeftClicked: camera.huntSetSpawnCount(
+                                                           camera.huntSpawnCount + 1)
+                                    }
+                                }
+
                                 Rectangle {
                                     id: huntArena
                                     width: parent.width
-                                    height: Math.max(95, cleanupWorkArea.height - 100)
+                                    height: Math.max(80, cleanupWorkArea.height - 132)
                                     color: Colors.black
                                     border.width: 1
                                     border.color: Colors.cyan
@@ -3329,7 +3404,10 @@ PanelWindow {
                                                                   huntArena.width,
                                                                   huntArena.height);
                                         }
-                                        onExited: camera.huntMouseActive = false
+                                        onExited: {
+                                            camera.huntMouseActive = false;
+                                            camera.huntMouseMovingTicks = 0;
+                                        }
                                         onClicked: {
                                             huntArena.forceActiveFocus();
                                             camera.huntFire("");
@@ -3343,14 +3421,21 @@ PanelWindow {
                                         delegate: Item {
                                             id: huntTargetItem
                                             property var target: camera.huntTargets[index]
+                                            // Dense rounds preserve usable hitboxes.
+                                            // Ox is larger and always above the other
+                                            // thumbnail actors if targets overlap.
+                                            readonly property real crowdScale: Math.max(
+                                                0.63, Math.min(1, Math.sqrt(
+                                                    3 / Math.max(3, camera.huntTargets.length))))
                                             width: Math.min(Math.max(40, huntArena.width - 16),
                                                 Math.min(170, Math.max(90,
                                                     huntArena.width / 4.6))
-                                                * target.sizeScale)
+                                                * target.sizeScale * crowdScale)
                                             height: Math.min(Math.max(30, huntArena.height - 12),
                                                 Math.min(88, Math.max(51,
                                                     huntArena.height / 4.3))
-                                                * target.sizeScale)
+                                                * target.sizeScale * crowdScale)
+                                            z: target.profile === "ox" ? 40 : 2
                                             x: 8 + Math.max(0, huntArena.width - width - 16)
                                                * target.xNorm
                                             y: 6 + Math.max(0, huntArena.height - height - 12)

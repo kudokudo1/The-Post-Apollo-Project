@@ -1,6 +1,6 @@
 .pragma library
 
-// Camera Cleanup Hunt M3b. This module performs visual movement ONLY.
+// Camera Cleanup Hunt M3c. This module performs visual movement ONLY.
 // It never reads a filesystem path, executes a command, or marks Trash.
 var PROFILES = ["bird", "frog", "deer", "ox", "fox"];
 
@@ -53,16 +53,23 @@ function createTarget(record, profile, random) {
         phase: randomUnit(random) * Math.PI * 2,
         state: "move",
         age: 0,
-        stateTicks: 0
+        stateTicks: 0,
+        // Additional profile-specific timers are gameplay state only.
+        fatigueAt: 0,
+        hopGravity: 0.0035,
+        perchVX: 0,
+        perchVY: 0
     };
     if (profile === "bird") {
-        target.sizeScale = 0.92;
-        target.vx = randomDirection(random) * pickSpeed(0.010, 0.006, random);
-        target.vy = randomDirection(random) * pickSpeed(0.007, 0.004, random);
+        target.sizeScale = 0.89;
+        // Quicker than M3b, but occasionally holds still on a "perch".
+        target.vx = randomDirection(random) * pickSpeed(0.015, 0.009, random);
+        target.vy = randomDirection(random) * pickSpeed(0.010, 0.007, random);
         target.yNorm = 0.12 + 0.64 * randomUnit(random);
         target.state = "fly";
+        target.stateTicks = 43 + Math.floor(34 * randomUnit(random));
     } else if (profile === "frog") {
-        target.sizeScale = 0.91;
+        target.sizeScale = 0.68;
         target.vx = 0;
         target.vy = 0;
         target.state = "idle";
@@ -73,15 +80,18 @@ function createTarget(record, profile, random) {
         target.vy = 0;
         target.state = "run";
         target.stateTicks = 9 + Math.floor(18 * randomUnit(random));
+        // Most 25-second rounds end before fatigue. A rare long run
+        // gets a brief rest; it never stays asleep permanently.
+        target.fatigueAt = 215 + Math.floor(430 * randomUnit(random));
     } else if (profile === "ox") {
-        target.sizeScale = 1.30;
+        target.sizeScale = 1.72;
         target.vx = randomDirection(random) * pickSpeed(0.0025, 0.0020, random);
         target.vy = randomDirection(random) * pickSpeed(0.0018, 0.0015, random);
         target.state = "trudge";
     } else if (profile === "fox") {
-        target.sizeScale = 0.77;
-        target.vx = randomDirection(random) * pickSpeed(0.010, 0.006, random);
-        target.vy = randomDirection(random) * pickSpeed(0.007, 0.004, random);
+        target.sizeScale = 0.75;
+        target.vx = randomDirection(random) * pickSpeed(0.019, 0.011, random);
+        target.vy = randomDirection(random) * pickSpeed(0.013, 0.009, random);
         target.state = "dart";
     }
     return target;
@@ -94,21 +104,49 @@ function advanceTarget(current, pointer) {
     t.age += 1;
 
     if (t.profile === "bird") {
-        // Unsteady diagonal flight, with mild altitude wobble.
-        t.vy = clamp(t.vy + Math.sin(t.age * 0.19 + t.phase) * 0.00055,
-                     -0.014, 0.014);
+        if (t.state === "perch") {
+            // Pause flight for 0.7-1.2 seconds, then resume original
+            // velocity. No random per-tick teleports or lost bounce state.
+            t.stateTicks -= 1;
+            if (t.stateTicks <= 0) {
+                t.state = "fly";
+                t.vx = t.perchVX;
+                t.vy = t.perchVY;
+                t.stateTicks = 42 + (t.age % 41);
+            } else {
+                return t;
+            }
+        } else {
+            t.stateTicks -= 1;
+            if (t.stateTicks <= 0) {
+                t.state = "perch";
+                t.perchVX = t.vx;
+                t.perchVY = t.vy;
+                t.vx = 0;
+                t.vy = 0;
+                t.stateTicks = 7 + (t.age % 6);
+                return t;
+            }
+        }
+        // Faster 2D flight with soft up/down wobble.
+        t.vy = clamp(t.vy + Math.sin(t.age * 0.23 + t.phase) * 0.00070,
+                     -0.022, 0.022);
     } else if (t.profile === "frog") {
         if (t.state === "idle") {
             t.stateTicks -= 1;
             if (t.stateTicks <= 0) {
+                // Distinct hop speed, height and gravity on EVERY jump.
+                // Deterministic variation keeps Undo snapshots recoverable.
+                var cycle = Math.abs(Math.sin(t.phase * 4.3 + t.age * 1.71));
+                var lift = Math.abs(Math.cos(t.phase * 2.9 + t.age * 0.97));
                 t.state = "hop";
-                t.vx = Math.sin(t.phase + t.age * 1.3) >= 0 ? 0.011 : -0.011;
-                t.vy = -0.040;
+                t.vx = (Math.sin(t.phase + t.age * 1.3) >= 0 ? 1 : -1)
+                       * (0.008 + 0.016 * cycle);
+                t.vy = -(0.026 + 0.032 * lift);
+                t.hopGravity = 0.0030 + 0.0024 * cycle;
             }
         } else {
-            // Ballistic hop: starts upward, falls back to a personal
-            // landing level, then rests before the next jump.
-            t.vy += 0.0035;
+            t.vy += t.hopGravity;
             t.yNorm += t.vy;
             if (t.yNorm <= 0) {
                 t.yNorm = 0;
@@ -119,10 +157,25 @@ function advanceTarget(current, pointer) {
                 t.vx = 0;
                 t.vy = 0;
                 t.state = "idle";
-                t.stateTicks = 8 + (t.age % 11);
+                t.stateTicks = 5 + (t.age % 12);
             }
         }
     } else if (t.profile === "deer") {
+        if (t.state === "rest") {
+            t.stateTicks -= 1;
+            if (t.stateTicks <= 0) {
+                t.state = "run";
+                t.stateTicks = 15 + (t.age % 19);
+                t.fatigueAt = t.age + 240 + (t.age % 130);
+            }
+            return t;
+        }
+        if (t.age >= t.fatigueAt && t.state === "run") {
+            t.state = "rest";
+            t.stateTicks = 8 + (t.age % 12);
+            t.yNorm = t.baseY;
+            return t;
+        }
         if (t.state === "run") {
             t.stateTicks -= 1;
             t.yNorm = clamp(t.baseY + 0.018 * Math.sin(t.age * 0.85), 0, 1);
@@ -145,25 +198,43 @@ function advanceTarget(current, pointer) {
             }
         }
     } else if (t.profile === "fox") {
-        if (t.age % 35 === 0) {
-            // Occasional feint; no teleport, just a new direction.
-            t.vx = -t.vx * 0.88;
-            t.vy += Math.sin(t.phase + t.age) * 0.004;
+        // The fox is curious when the pointer is still, but slips around
+        // a moving pointer. Its orbit direction changes occasionally,
+        // making jukes and counter-circles without teleporting.
+        if (t.age % 31 === 0) {
+            t.vx = -t.vx * 0.90;
+            t.vy += Math.sin(t.phase + t.age) * 0.005;
         }
         if (pointer && pointer.active) {
             var dx = t.xNorm - pointer.x;
             var dy = t.yNorm - pointer.y;
-            var d = Math.sqrt(dx * dx + dy * dy);
-            if (d < 0.28 && d > 0.01) {
-                // Small, bounded evasive acceleration away from cursor.
-                // Fox reacts, but cannot become impossible to click.
-                var boost = 0.0019 * (1 - d / 0.28);
-                t.vx += boost * dx / d;
-                t.vy += boost * dy / d;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 0.012) {
+                var ux = dx / dist;
+                var uy = dy / dist;
+                if (pointer.moving && dist < 0.58) {
+                    // Close chase = dodge outward while sliding around the
+                    // pointer's sides. The occasional sign flip is a juke.
+                    var orbitSign = Math.sin(t.phase + Math.floor(t.age / 22))
+                                    >= 0 ? 1 : -1;
+                    var pressure = 1 - dist / 0.58;
+                    var tangential = 0.0028 + 0.0029 * pressure;
+                    var dodge = 0.0022 * pressure;
+                    t.vx += (-uy * orbitSign) * tangential + ux * dodge;
+                    t.vy += (ux * orbitSign) * tangential + uy * dodge;
+                    t.state = "juke";
+                } else if (!pointer.moving && dist < 0.72) {
+                    // Tease stationary cursor: gently approach at range,
+                    // then circle close to it rather than covering it.
+                    var curiosity = dist > 0.15 ? 0.00145 : -0.00070;
+                    t.vx += -ux * curiosity - uy * 0.00075;
+                    t.vy += -uy * curiosity + ux * 0.00075;
+                    t.state = "taunt";
+                }
             }
         }
-        t.vx = clamp(t.vx, -0.022, 0.022);
-        t.vy = clamp(t.vy, -0.018, 0.018);
+        t.vx = clamp(t.vx, -0.041, 0.041);
+        t.vy = clamp(t.vy, -0.034, 0.034);
     }
 
     var x = reflect(t.xNorm, t.vx);

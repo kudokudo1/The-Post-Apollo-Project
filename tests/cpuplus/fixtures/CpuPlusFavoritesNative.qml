@@ -275,6 +275,17 @@ ShellRoot {
                     selector.filterMode="GROUP";
                     root.selectedKey=group.rows.length?group.rows[0].key:"";
                 }
+                onOwnerNavigationRequested: function(owner,view) {
+                    if(root.testStage!==7 || owner!=="weather" || view!=="home"
+                            || time.removals || places.removals
+                            || defaults.mutations || collections.renameCalls!==1) {
+                        root.fail("U7A_UNSAFE_OWNER_ROUTE");return;
+                    }
+                    // No selected key or owner object is part of the signal.
+                    root.done=true;
+                    console.log("U7A_PASS // OWNER_VIEW_ONLY_NO_PROVIDER_ACTIONS");
+                    Qt.quit();
+                }
             }
         }
     }
@@ -546,9 +557,20 @@ ShellRoot {
                         || time.removals || places.removals || defaults.mutations) {
                     root.fail("U6C_RENAME_OR_OWNER_BOUNDARY");return;
                 }
-                root.done=true;
                 console.log("U6C_PASS // INLINE_RENAME_UPDATES_INDEX_NO_OWNER_WRITES");
-                Qt.quit();
+                const ownerButton=detail.ownerNavigationControl;
+                if(!ownerButton || !ownerButton.available
+                        || ownerButton.label!=="OPEN OWNER"
+                        || !detail.ownerNavigation.ok
+                        || detail.ownerNavigation.owner!=="weather"
+                        || detail.ownerNavigation.view!=="home") {
+                    root.fail("U7A_OWNER_BUTTON_NOT_READY");return;
+                }
+                const pt=ownerButton.mapToItem(win.contentItem,
+                    ownerButton.width/2,ownerButton.height/2);
+                root.testStage=7;
+                console.log("U7A_OWNER_READY // x="+Math.round(pt.x)
+                    +" y="+Math.round(pt.y));
             }
         }
     }

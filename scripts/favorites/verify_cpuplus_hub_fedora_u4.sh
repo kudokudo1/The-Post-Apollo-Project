@@ -150,6 +150,29 @@ grep -F 'U6C_EDIT_READY' "$log" >/dev/null ||
 xdotool key --clearmodifiers ctrl+a
 xdotool type --clearmodifiers --delay 12 "Daily Workspace"
 xdotool key Return
+# U7a: click the now-enabled OPEN OWNER control on the selected Weather
+# favorite. The fixture emits ONLY the fixed owner/view route; no app/stream
+# action is available in the disposable environment.
+for ((i=0;i<100;i++)); do
+  if grep -F 'U4_FAIL' "$log" >/dev/null; then
+    cat "$log"; echo "U7A_FAIL // fixture before owner route"; exit 1
+  fi
+  if grep -F 'U7A_OWNER_READY // x=' "$log" >/dev/null; then
+    break
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    cat "$log"; echo "U7A_FAIL // exited before owner route"; exit 1
+  fi
+  sleep 0.1
+done
+grep -F 'U7A_OWNER_READY // x=' "$log" >/dev/null ||
+  { cat "$log"; echo "U7A_FAIL // no available OPEN OWNER button"; exit 1; }
+nav_coords="$(grep -F 'U7A_OWNER_READY // x=' "$log" | tail -n 1 |
+  sed -E 's/.*x=([0-9]+) y=([0-9]+).*/\1 \2/')"
+read -r ox oy <<<"$nav_coords"
+[ -n "$ox" ] && [ -n "$oy" ] ||
+  { cat "$log"; echo "U7A_FAIL // bad owner navigation coordinates"; exit 1; }
+xdotool mousemove --window "$window" "$ox" "$oy" click 1
 set +e
 wait "$pid"
 rc="$?"
@@ -171,6 +194,8 @@ grep -F 'U6B_PASS // COLLECTION_TO_SELECTOR_AND_DETAILS_NO_WRITES' "$log" >/dev/
   { echo "U6B_FAIL // live left collection click did not route to center"; exit 1; }
 grep -F 'U6C_PASS // INLINE_RENAME_UPDATES_INDEX_NO_OWNER_WRITES' "$log" >/dev/null ||
   { echo "U6C_FAIL // inline collection rename was not verified"; exit 1; }
+grep -F 'U7A_PASS // OWNER_VIEW_ONLY_NO_PROVIDER_ACTIONS' "$log" >/dev/null ||
+  { echo "U7A_FAIL // fixed owner navigation click was not verified"; exit 1; }
 if find "$work/data" -type f | grep -q .; then
   echo "U4_FAIL // manager created a writer file"; exit 1
 fi

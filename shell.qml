@@ -240,6 +240,51 @@ PanelWindow {
         }
     }
 
+    // U7a: explicit Favorites owner navigation only. These destinations
+    // contain fixed menu/view names, NEVER saved resource keys, paths, PIDs,
+    // process commands, station URLs or Hospital record identities.
+    function openApolloFavoriteOwner(owner,view) {
+        if(owner==="appcontrol") {
+            const modes={
+                "FAVORITES":appControlWindow.favoritesModeIndex,
+                "APPS":appControlWindow.appsModeIndex,
+                "FILES":appControlWindow.filesModeIndex,
+                "RUN":appControlWindow.runModeIndex,
+                "WINDOWS":appControlWindow.windowsModeIndex,
+                "KILL":appControlWindow.killModeIndex,
+                "THERMAL":appControlWindow.thermalModeIndex,
+                "SYSTEM":appControlWindow.systemModeIndex
+            };
+            if (!Object.prototype.hasOwnProperty.call(modes,view)) return false;
+            appControlWindow.menuOpen=true;
+            // Owner performs its own mode switch. No selected item actuation.
+            appControlWindow.switchMode(modes[view],false);
+            shellRoot.requestControlKeyboard("appcontrol","favorites-owner");
+            return true;
+        }
+        if(owner==="weather" && (view==="home" || view==="radio")) {
+            if(!weatherStationWindow.openNotificationView(view))
+                return false;
+            shellRoot.requestControlKeyboard("weather","favorites-owner");
+            return true;
+        }
+        if(owner==="notifications" && view==="favorites") {
+            notificationsHubWindow.open();
+            notificationsHubWindow.activeFilter="favorites";
+            shellRoot.requestControlKeyboard("notifications","favorites-owner");
+            return true;
+        }
+        if(owner==="hospital" && view==="reception") {
+            if(!hospitalWindow.menuOpen)
+                hospitalWindow.open();
+            else
+                hospitalWindow.openReception();
+            shellRoot.requestControlKeyboard("hospital","favorites-owner");
+            return true;
+        }
+        return false;
+    }
+
     function swapControlKeyboardOwner() {
         if (!hospitalWindow.menuOpen || !gitWindow.menuOpen)
             return;
@@ -1070,6 +1115,12 @@ PanelWindow {
                 // tokens, account nicknames or a durable permission grant.
                 telegramConnectionObservation: messagingWindow
                     ? messagingWindow.telegramConnectionObservation : null
+                onFavoriteOwnerNavigationRequested: function(owner,view) {
+                    // Only after the destination opens does CPU++ withdraw.
+                    // Invalid plans keep the user's current Favorites view.
+                    if(shellRoot.openApolloFavoriteOwner(owner,view))
+                        cpuPlusWindow.close();
+                }
                 onTelegramAccessRequested: {
                     // Social exclusively owns the native Telegram session,
                     // auth workflow and private/shared identity scope.

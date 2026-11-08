@@ -27,6 +27,8 @@ const Hospital={Adapters};
 load("services/favorites/FavoritesHospitalProjection.js",Hospital);
 const CollectionView={CollectionRules:Collections};
 load("services/favorites/FavoritesCollectionsViewPolicy.js",CollectionView);
+const OwnerNavigation={};
+load("services/favorites/FavoritesOwnerNavigationPolicy.js",OwnerNavigation);
 const Hub={Resource,Default,Collections,Adapters,WeatherHome,NotificationsProjection:Notifications,RadioProjection:Radio,HospitalProjection:Hospital};
 load("services/favorites/FavoritesManagementPolicy.js",Hub);
 const plain=v=>JSON.parse(JSON.stringify(v));
@@ -249,7 +251,7 @@ test("CPU++ imports all AppControl owner lists, with seven source filters and re
   assert.match(panel,/modelData\.readOnly\?"READ ONLY"/);
   assert.match(panel,/pane\.selectedResource && !pane\.selectedResource\.readOnly/);
   assert.match(panel,/APP CONTROL-OWNED \/\/ READ ONLY/);
-  assert.match(panel,/OWNER CONTROL/);
+  assert.match(panel,/OPEN OWNER/);
   assert.doesNotMatch(panel,/pane\.appControlOwner|FavoritesStore\.favoriteKeys\s*=/);
 });
 
@@ -1387,4 +1389,94 @@ test("U6c right collection names navigate to shared GROUP filter without activat
           cpu.indexOf("function openFavoriteCollection")+1100),panel]) {
     assert.doesNotMatch(src,/FileView\s*\{|Process\s*\{|JsonAdapter\s*\{|setFavorite\(|togglePinned\(|loadMedia\(/);
   }
+});
+
+
+test("U7a owner navigation emits fixed views for existing read-only sources only",()=>{
+  const row=(owner,category,menu)=>({
+    owner,category,menu,readOnly:true,
+    key:"fav1:local:"+owner+":item:PRIVATE_KEY",
+    resourceId:"PRIVATE_RESOURCE",
+    item:"PRIVATE_ITEM",label:"PRIVATE_LABEL",
+    sourceName:"PRIVATE_SOURCE",capabilities:[]
+  });
+  const good=[
+    ["appcontrol","APP CTRL","APPS","appcontrol","APPS"],
+    ["appcontrol","APP CTRL","RUN","appcontrol","RUN"],
+    ["appcontrol","APP CTRL","FILES","appcontrol","FILES"],
+    ["appcontrol","APP CTRL","KILL","appcontrol","KILL"],
+    ["appcontrol","APP CTRL","SYSTEM","appcontrol","SYSTEM"],
+    ["appcontrol","APP CTRL","OTHER","appcontrol","FAVORITES"],
+    ["weather-home","WEATHER","HOME","weather","home"],
+    ["weather-home","WEATHER","CARD","weather","home"],
+    ["radio","RADIO","FAVORITES","weather","radio"],
+    ["radio","RADIO","RECENTS","weather","radio"],
+    ["notifications","NOTIFS","SOURCES","notifications","favorites"],
+    ["hospital","HOSPITAL","ROUNDS","hospital","reception"],
+    ["hospital","HOSPITAL","REPORTS","hospital","reception"]
+  ];
+  for(const [owner,category,menu,destination,view] of good) {
+    const source=row(owner,category,menu);
+    const before=plain(source);
+    const target=OwnerNavigation.plan(source);
+    assert.deepEqual(plain(target),{ok:true,owner:destination,view});
+    const output=JSON.stringify(target);
+    for(const privateValue of ["PRIVATE_KEY","PRIVATE_RESOURCE",
+                               "PRIVATE_ITEM","PRIVATE_LABEL","PRIVATE_SOURCE"])
+      assert.equal(output.includes(privateValue),false,privateValue);
+    assert.deepEqual(plain(source),before);
+  }
+});
+
+test("U7a owner navigation refuses unsupported, mutable or forged destinations",()=>{
+  const good={key:"fav1:local:radio:station:PRIVATE",
+    owner:"radio",category:"RADIO",menu:"FAVORITES",readOnly:true};
+  for(const altered of [
+    null,[],{}, {...good,key:""}, {...good,readOnly:false},
+    {...good,owner:"radio",category:"APP CTRL"},
+    {...good,category:"RADIO",menu:"STREAM"},
+    {...good,owner:"weather-home",category:"WEATHER",menu:"TERMINAL"},
+    {...good,owner:"hospital",category:"HOSPITAL",menu:"PRIVATE_REPORT"},
+    {...good,owner:"notifications",category:"NOTIFS",menu:"WEBSITE"},
+    {...good,owner:"appcontrol",category:"APP CTRL",menu:"EXECUTE"},
+    {...good,owner:"shell",category:"RADIO",menu:"FAVORITES"},
+    {...good,owner:"../../private",category:"RADIO",menu:"FAVORITES"}
+  ]) {
+    assert.deepEqual(plain(OwnerNavigation.plan(altered)),
+                     {ok:false,owner:"",view:""});
+  }
+});
+
+test("U7a OPEN OWNER uses shell's existing windows and never forwards selected IDs",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const cpu=read("widgets/CpuPlusW.qml");
+  const shell=read("shell.qml");
+  const policy=read("services/favorites/FavoritesOwnerNavigationPolicy.js");
+  assert.match(pane,/import "\.\.\/\.\.\/services\/favorites\/FavoritesOwnerNavigationPolicy\.js" as OwnerNavigation/);
+  assert.match(pane,/signal ownerNavigationRequested\(string owner, string view\)/);
+  assert.match(pane,/OwnerNavigation\.plan\(pane\.selectedResource\)/);
+  assert.match(pane,/label: pane\.selectedResource && pane\.selectedResource\.readOnly\s*\? "OPEN OWNER"/);
+  assert.match(pane,/if\(item\.readOnly\) return pane\.ownerNavigation\.ok/);
+  assert.match(pane,/pane\.ownerNavigationRequested\(target\.owner,target\.view\)/);
+  assert.match(cpu,/signal favoriteOwnerNavigationRequested\(string owner,string view\)/);
+  assert.match(cpu,/onOwnerNavigationRequested: function\(owner,view\)/);
+  assert.match(cpu,/cpuPlusWindow\.favoriteOwnerNavigationRequested\(owner,view\)/);
+  assert.match(shell,/function openApolloFavoriteOwner\(owner,view\)/);
+  assert.match(shell,/onFavoriteOwnerNavigationRequested: function\(owner,view\)/);
+  assert.match(shell,/if\(shellRoot\.openApolloFavoriteOwner\(owner,view\)\)\s*cpuPlusWindow\.close\(\)/);
+  const route=shell.slice(shell.indexOf("function openApolloFavoriteOwner("),
+                          shell.indexOf("function swapControlKeyboardOwner()"));
+  assert.match(route,/appControlWindow\.switchMode\(modes\[view\],false\)/);
+  assert.match(route,/weatherStationWindow\.openNotificationView\(view\)/);
+  assert.match(route,/notificationsHubWindow\.activeFilter="favorites"/);
+  assert.match(route,/hospitalWindow\.openReception\(\)/);
+  assert.match(route,/requestControlKeyboard\("appcontrol","favorites-owner"\)/);
+  assert.match(route,/requestControlKeyboard\("weather","favorites-owner"\)/);
+  assert.match(route,/requestControlKeyboard\("notifications","favorites-owner"\)/);
+  assert.match(route,/requestControlKeyboard\("hospital","favorites-owner"\)/);
+  for(const code of [policy,route]) {
+    assert.doesNotMatch(code,/FileView\s*\{|Process\s*\{|JsonAdapter\s*\{|execDetached|setFavorite\(|togglePinned\(|loadMedia\(|runCommand\(/);
+    assert.doesNotMatch(code,/\.resourceId|\.command|\.streamUrl|\.url|\.hospitalRecord/);
+  }
+  assert.match(shell,/function openApolloNotificationRoute\(destination\)/);
 });

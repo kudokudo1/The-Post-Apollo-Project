@@ -147,8 +147,14 @@ ShellRoot {
             const cli=named.find(function(item) {
                 return item.menu==="APPS" && item.item==="btop [CLI]";
             });
+            const unavailable=root.options.rows.find(function(item) {
+                return item.menu==="RUN" && item.owner==="appcontrol"
+                       && !item.resolved;
+            });
             if(!root.options || root.options.total!==8
-               || !run || !winItem || !cli
+               || !run || !winItem || !cli || !unavailable
+               || selector.favoriteRowLabel(unavailable)
+                   !=="APP CTRL // RUN // SAVED COMMAND #1"
                || selector.choices.length!==1
                || selector.choices[0].category!=="CPU++"
                || !selector.choices[0].readOnly

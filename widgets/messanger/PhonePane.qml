@@ -44,6 +44,14 @@ Rectangle {
         personalPermissionOpen = false;
         personalNeedsExplicitReload = true;
         personalReadStatus = "IDENTITY_CHANGED";
+        callsWorkspaceGeneration += 1;
+        callsRequireExplicitRefresh = true;
+        callsConfirmDial = false;
+        callsPendingDial = "";
+        liveCalls = ([]);
+        callsWorkspaceState = "IDENTITY_CHANGED";
+        if (phoneCallsStatusProcess.running)
+            phoneCallsStatusProcess.running = false;
         if (personalStatusProcess.running)
             personalStatusProcess.running = false;
         if (visible)
@@ -74,6 +82,15 @@ Rectangle {
     property var callPrerequisiteReport: ({})
     property string callPrerequisiteCheck: "NOT CHECKED"
     property string callSetupStatus: "IDLE"
+    // Only inspect active calls while CALLS is visible. Provider-owned HFP
+    // call control is separate from Messages/Contacts Personal read consent.
+    property var liveCalls: ([])
+    property string callsWorkspaceState: "NOT_CHECKED"
+    property string callsWorkspaceResult: "IDLE"
+    property int callsWorkspaceGeneration: 0
+    property bool callsRequireExplicitRefresh: false
+    property bool callsConfirmDial: false
+    property string callsPendingDial: ""
     // Strict, public tool identifiers only; never paths or process output.
     property var callSetupMissingTools: ([])
 
@@ -535,6 +552,16 @@ Rectangle {
     onSelectedSectionChanged: {
         if (!personalReadUiReady) return;
         if (selectedSection !== "DEVICE") closeStagedSetup();
+        if (selectedSection !== "CALLS") {
+            callsWorkspaceGeneration += 1;
+            callsConfirmDial = false;
+            callsPendingDial = "";
+            liveCalls = ([]);
+            if (phoneCallsStatusProcess.running)
+                phoneCallsStatusProcess.running = false;
+        }
+        if (visible && selectedSection === "CALLS" && !callsRequireExplicitRefresh)
+            refreshCallsWorkspace();
         if (visible && phoneStorageState === "UNKNOWN")
             checkBlueFerryStorage();
         personalReadGeneration += 1;
@@ -628,6 +655,12 @@ Rectangle {
         if (!visible) {
             personalReadGeneration += 1;
             phoneStorageGeneration += 1;
+            callsWorkspaceGeneration += 1;
+            callsConfirmDial = false;
+            callsPendingDial = "";
+            liveCalls = ([]);
+            if (phoneCallsStatusProcess.running)
+                phoneCallsStatusProcess.running = false;
             if (personalReadProcess.running)
                 personalReadProcess.running = false;
             if (personalStatusProcess.running)
@@ -641,6 +674,12 @@ Rectangle {
             personalApproved = false;
         }
         if (visible) {
+            callsWorkspaceGeneration += 1;
+            liveCalls = ([]);
+            callsWorkspaceState = "NOT_CHECKED";
+            callsWorkspaceResult = "IDLE";
+            callsConfirmDial = false;
+            callsPendingDial = "";
             phoneStorageGeneration += 1;
             phoneStorageState = "UNKNOWN";
             phoneStoragePolicy = "unknown";
@@ -688,6 +727,232 @@ Rectangle {
                 }
             });
         }
+    }
+
+    function callsWorkspaceMessage() {
+        switch (callsWorkspaceState) {
+        case "CHECKING": return "CHECKING IPHONE HANDS-FREE CALLS...";
+        case "READY": return liveCalls.length > 0
+                       ? "LIVE CALLS // " + liveCalls.length + " reported by BlueFerry."
+                       : "CALLS READY // No current calls. A real test call must still verify mic and speaker.";
+        case "DISABLED": return "CALLS DISABLED // Open DEVICE and enable CALLS ON PC after oFono setup.";
+        case "UNAVAILABLE": return "OFONO OR HFP UNAVAILABLE // Check oFono permissions and WirePlumber HFP backend.";
+        case "SEARCHING": return "HFP SEARCHING // BlueFerry has not found the iPhone hands-free modem.";
+        case "CONNECTING": return "HFP CONNECTING // Waiting for the phone modem to come online.";
+        case "BLUEZ_CONFLICT": return "HFP CONFLICT // BlueZ and oFono are competing for the hands-free profile.";
+        case "DEVICE_UNAVAILABLE": return "PHONE NOT READY // No matching connected Personal iPhone.";
+        case "UNSUPPORTED": return "CALLS1 NOT SUPPORTED // Check installed BlueFerry version.";
+        case "BACKEND_UNAVAILABLE": return "BLUEFERRY CALLS SERVICE UNAVAILABLE // No live call control.";
+        case "IDENTITY_CHANGED": return "SOCIAL IDENTITY CHANGED // Select REFRESH CALLS to view Personal calls.";
+        default: return "CALLS NOT CHECKED // Select REFRESH CALLS.";
+        }
+    }
+
+    function callsActionMessage() {
+        switch (callsWorkspaceResult) {
+        case "SUBMITTING": return "REQUESTING PHONE ACTION...";
+        case "ACTION_SUBMITTED": return "REQUEST ACCEPTED BY BLUEFERRY // Actual call state will update separately.";
+        case "ACTION_REFUSED": return "ACTION NOT VALID FOR THE CURRENT CALL. Refresh and try again.";
+        case "ACTION_FAILED": return "CALL ACTION FAILED // BlueFerry did not confirm the request.";
+        case "ACTION_NOT_CONFIRMED": return "CALL ACTION SENT, BUT HFP STATE CHANGED. Verify on your iPhone.";
+        case "DEVICE_UNAVAILABLE": return "PHONE DISCONNECTED OR CHANGED DURING THE REQUEST.";
+        case "INVALID_NUMBER": return "ENTER A PLAIN PHONE NUMBER WITH COUNTRY CODE IF NEEDED.";
+        case "CONFIRM_DIAL": return "CONFIRM THIS NUMBER. Emergencies must be called directly on the iPhone.";
+        default: return "";
+        }
+    }
+
+    function activeCallId() {
+        for (var i = 0; i < liveCalls.length; ++i) {
+            if (liveCalls[i].state === "active")
+                return String(liveCalls[i].id);
+        }
+        return "";
+    }
+
+    function canSwapCalls() {
+        var active = false, held = false;
+        for (var i = 0; i < liveCalls.length; ++i) {
+            active = active || liveCalls[i].state === "active";
+            held = held || liveCalls[i].state === "held";
+        }
+        return active && held;
+    }
+
+    function canHoldAnswer() {
+        var active = false, waiting = false;
+        for (var i = 0; i < liveCalls.length; ++i) {
+            active = active || liveCalls[i].state === "active";
+            waiting = waiting || liveCalls[i].state === "waiting";
+        }
+        return active && waiting;
+    }
+
+    function refreshCallsWorkspace() {
+        if (!visible || selectedSection !== "CALLS" || stageWanted
+                || phoneCallsStatusProcess.running || phoneCallsActionProcess.running)
+            return;
+        callsRequireExplicitRefresh = false;
+        // Keep ready actions visible while a normal live refresh is pending.
+        if (callsWorkspaceState !== "READY")
+            callsWorkspaceState = "CHECKING";
+        phoneCallsStatusProcess.generation = callsWorkspaceGeneration;
+        phoneCallsStatusProcess.command = [
+            "python3", Quickshell.shellPath("services/phone/PhoneCallWorkspace.py"),
+            "--status"
+        ];
+        phoneCallsStatusProcess.running = true;
+    }
+
+    function preparePhoneDial() {
+        if (!visible || selectedSection !== "CALLS"
+                || callsWorkspaceState !== "READY"
+                || phoneCallsActionProcess.running)
+            return;
+        var entered = phoneDialInput.text.trim();
+        if (!/^\+?[0-9]{3,18}$/.test(entered)) {
+            callsWorkspaceResult = "INVALID_NUMBER";
+            return;
+        }
+        callsPendingDial = entered;
+        callsConfirmDial = true;
+        callsWorkspaceResult = "CONFIRM_DIAL";
+    }
+
+    function requestCallAction(action, argument) {
+        if (!visible || selectedSection !== "CALLS"
+                || callsWorkspaceState !== "READY"
+                || phoneCallsActionProcess.running
+                || phoneCallsStatusProcess.running)
+            return;
+        var named = ["dial", "answer", "decline", "hangup", "tones"];
+        var plain = ["swap", "hold-answer"];
+        if (named.indexOf(action) < 0 && plain.indexOf(action) < 0)
+            return;
+        if (action === "dial" && (!callsConfirmDial || argument !== callsPendingDial))
+            return;
+        if (action === "dial") {
+            callsConfirmDial = false;
+            callsPendingDial = "";
+            phoneDialInput.text = "";
+        }
+        callsWorkspaceResult = "SUBMITTING";
+        phoneCallsActionProcess.generation = callsWorkspaceGeneration;
+        phoneCallsActionProcess.requestAction = action;
+        phoneCallsActionProcess.command = [
+            "python3", Quickshell.shellPath("services/phone/PhoneCallWorkspace.py"),
+            "--action", action
+        ];
+        if (named.indexOf(action) >= 0)
+            phoneCallsActionProcess.command =
+                phoneCallsActionProcess.command.concat([argument]);
+        phoneCallsActionProcess.running = true;
+    }
+
+    Process {
+        id: phoneCallsStatusProcess
+        property int generation: 0
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phonePane.selectedSection !== "CALLS"
+                        || phoneCallsStatusProcess.generation
+                           !== phonePane.callsWorkspaceGeneration
+                        || phonePane.callsRequireExplicitRefresh)
+                    return;
+                try {
+                    var response = JSON.parse(String(text || ""));
+                    if (response.schema !== "post-apollo.phone.calls-workspace.v0"
+                            || response.execution !== "PERSONAL_SESSION_BLUEFERRY_CALLS1"
+                            || response.scope !== "PERSONAL_LOCAL_USER_ONLY"
+                            || response.organizationGrant !== false
+                            || response.faceTimeEnabled !== false
+                            || response.smsReplyEnabled !== false
+                            || response.autoCallingEnabled !== false
+                            || typeof response.state !== "string"
+                            || ["READY", "DISABLED", "UNAVAILABLE", "SEARCHING",
+                                "CONNECTING", "BLUEZ_CONFLICT", "DEVICE_UNAVAILABLE",
+                                "UNSUPPORTED", "BACKEND_UNAVAILABLE"].indexOf(response.state) < 0)
+                        throw new Error("invalid CALLS status");
+                    var calls = response.state === "READY" ? response.calls : [];
+                    if (!Array.isArray(calls) || calls.length > 8)
+                        throw new Error("invalid call list");
+                    for (var i = 0; i < calls.length; ++i) {
+                        var c = calls[i];
+                        if (!c || typeof c.id !== "string" || c.id.length > 128
+                                || typeof c.peer !== "string" || c.peer.length > 96
+                                || ["incoming", "waiting", "dialing", "alerting",
+                                    "active", "held", "disconnecting"].indexOf(c.state) < 0
+                                || typeof c.multiparty !== "boolean"
+                                || typeof c.emergency !== "boolean")
+                            throw new Error("invalid call");
+                    }
+                    phonePane.liveCalls = calls;
+                    phonePane.callsWorkspaceState = response.state;
+                } catch (error) {
+                    phonePane.liveCalls = ([]);
+                    phonePane.callsWorkspaceState = "BACKEND_UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (phonePane.visible && phonePane.selectedSection === "CALLS"
+                    && code !== 0 && generation === phonePane.callsWorkspaceGeneration) {
+                phonePane.liveCalls = ([]);
+                phonePane.callsWorkspaceState = "BACKEND_UNAVAILABLE";
+            }
+        }
+    }
+
+    Process {
+        id: phoneCallsActionProcess
+        property int generation: 0
+        property string requestAction: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phonePane.selectedSection !== "CALLS"
+                        || generation !== phonePane.callsWorkspaceGeneration)
+                    return;
+                try {
+                    var result = JSON.parse(String(text || ""));
+                    if (result.schema !== "post-apollo.phone.calls-workspace.v0"
+                            || result.execution !== "PERSONAL_SESSION_BLUEFERRY_CALLS1"
+                            || result.scope !== "PERSONAL_LOCAL_USER_ONLY"
+                            || result.organizationGrant !== false
+                            || result.faceTimeEnabled !== false
+                            || result.smsReplyEnabled !== false
+                            || result.autoCallingEnabled !== false
+                            || ["ACTION_SUBMITTED", "ACTION_REFUSED", "ACTION_FAILED",
+                                "ACTION_NOT_CONFIRMED", "DEVICE_UNAVAILABLE",
+                                "DISABLED", "UNAVAILABLE", "SEARCHING",
+                                "CONNECTING", "BLUEZ_CONFLICT",
+                                "BACKEND_UNAVAILABLE"].indexOf(result.state) < 0)
+                        throw new Error("invalid call action");
+                    phonePane.callsWorkspaceResult = result.state;
+                } catch (error) {
+                    phonePane.callsWorkspaceResult = "ACTION_FAILED";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (phonePane.visible && phonePane.selectedSection === "CALLS"
+                    && generation === phonePane.callsWorkspaceGeneration) {
+                if (code !== 0)
+                    phonePane.callsWorkspaceResult = "ACTION_FAILED";
+                Qt.callLater(function() {
+                    if (phonePane.visible && phonePane.selectedSection === "CALLS")
+                        phonePane.refreshCallsWorkspace();
+                });
+            }
+        }
+    }
+
+    Timer {
+        interval: 2500
+        repeat: true
+        running: phonePane.visible && phonePane.selectedSection === "CALLS"
+                 && !phonePane.callsRequireExplicitRefresh
+                 && !phoneCallsActionProcess.running
+        onTriggered: phonePane.refreshCallsWorkspace()
     }
 
     // The service adapter only displays already-released projections.
@@ -2081,7 +2346,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         width: Math.min(200, Math.max(135, phonePane.width * 0.30))
-        visible: phonePane.selectedSection !== "CONTACTS"
+        visible: phonePane.selectedSection === "MESSAGES"
         conversations: phonePane.selectedSection === "MESSAGES"
                        ? phoneReadAdapter.conversations : []
         keyboardFocused: false
@@ -2135,7 +2400,8 @@ Rectangle {
         id: emptyPhoneContacts
         visible: phonePane.selectedSection === "CONTACTS"
                  ? phoneReadAdapter.contactCards.length === 0
-                 : phoneReadAdapter.conversations.length === 0
+                 : phonePane.selectedSection === "MESSAGES"
+                   && phoneReadAdapter.conversations.length === 0
         anchors.top: phoneContactList.top
         anchors.topMargin: 108
         anchors.left: phoneContactList.left
@@ -2163,7 +2429,8 @@ Rectangle {
         anchors.left: phoneContactList.right
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        visible: phonePane.selectedSection !== "DEVICE"
+        visible: phonePane.selectedSection === "MESSAGES"
+                 || phonePane.selectedSection === "CONTACTS"
         conversation: phonePane.selectedSection === "MESSAGES"
                       ? phoneContactList.selectedConversation : null
         messages: phonePane.selectedSection === "MESSAGES"
@@ -2207,6 +2474,370 @@ Rectangle {
         font.pixelSize: 11
         wrapMode: Text.WordWrap
         horizontalAlignment: Text.AlignHCenter
+    }
+
+    // CALLS is a real workspace inside the existing PHONE menu, not a
+    // separate screen, and never changes the MESSAGES "Contacts" sidebar.
+    Rectangle {
+        id: phoneCallsWorkspace
+        anchors.top: sectionToolbar.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        visible: phonePane.selectedSection === "CALLS"
+        color: Colors.black
+        border.width: 1
+        border.color: Colors.cyan
+        z: 7
+
+        Flickable {
+            anchors.fill: parent
+            anchors.margins: 12
+            clip: true
+            contentWidth: width
+            contentHeight: callsColumn.implicitHeight + 20
+            flickableDirection: Flickable.VerticalFlick
+            boundsBehavior: Flickable.StopAtBounds
+
+            Column {
+                id: callsColumn
+                width: parent.width
+                spacing: 12
+
+                Text {
+                    width: parent.width
+                    text: "CALLS // IPHONE HANDS-FREE"
+                    color: Colors.cyan
+                    font.bold: true
+                    font.pixelSize: 17
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: phonePane.callsWorkspaceMessage()
+                    textFormat: Text.PlainText
+                    color: phonePane.callsWorkspaceState === "READY"
+                           ? Colors.green : Colors.orange
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                }
+                Row {
+                    spacing: 8
+                    ActionButton {
+                        width: Math.min(160, (callsColumn.width - 8) / 2)
+                        height: 34
+                        label: phoneCallsStatusProcess.running
+                               ? "CHECKING..." : "REFRESH CALLS"
+                        labelPixelSize: 9
+                        accentColor: Colors.cyan
+                        interactive: !phoneCallsActionProcess.running
+                                     && !phoneCallsStatusProcess.running
+                        onTriggered: phonePane.refreshCallsWorkspace()
+                    }
+                    ActionButton {
+                        width: Math.min(170, (callsColumn.width - 8) / 2)
+                        height: 34
+                        label: "DEVICE / HFP SETUP"
+                        labelPixelSize: 9
+                        accentColor: Colors.magenta
+                        onTriggered: phonePane.startSetup()
+                    }
+                }
+                Text {
+                    width: parent.width
+                    visible: phonePane.callsWorkspaceState !== "READY"
+                    text: "Ordinary cellular calls need BlueFerry Calls1, oFono's active system service, system D-Bus permission and WirePlumber's oFono HFP backend. This does not change your music audio route."
+                    textFormat: Text.PlainText
+                    color: Colors.white
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    visible: phonePane.callsWorkspaceState === "READY"
+                    text: "ACTIVE PHONE CALLS // " + phonePane.liveCalls.length
+                    textFormat: Text.PlainText
+                    color: Colors.magenta
+                    font.pixelSize: 12
+                    font.bold: true
+                }
+
+                Repeater {
+                    model: phonePane.callsWorkspaceState === "READY"
+                           ? phonePane.liveCalls : []
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: callsColumn.width
+                        height: 108
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.cyan
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 7
+                            Text {
+                                width: parent.width
+                                text: modelData.peer
+                                textFormat: Text.PlainText
+                                color: Colors.white
+                                font.pixelSize: 12
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                width: parent.width
+                                text: String(modelData.state).toUpperCase()
+                                      + " // " + modelData.direction
+                                      + (modelData.multiparty ? " // CONFERENCE" : "")
+                                textFormat: Text.PlainText
+                                color: Colors.orange
+                                font.pixelSize: 11
+                            }
+                            Row {
+                                spacing: 8
+                                ActionButton {
+                                    width: 100
+                                    height: 31
+                                    visible: modelData.state === "incoming"
+                                             || modelData.state === "waiting"
+                                    label: "ANSWER"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.magenta
+                                    interactive: !phoneCallsActionProcess.running
+                                    onTriggered: phonePane.requestCallAction("answer", modelData.id)
+                                }
+                                ActionButton {
+                                    width: 105
+                                    height: 31
+                                    visible: modelData.state === "incoming"
+                                             || modelData.state === "waiting"
+                                    label: "DECLINE"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.red
+                                    destructive: true
+                                    interactive: !phoneCallsActionProcess.running
+                                    onTriggered: phonePane.requestCallAction("decline", modelData.id)
+                                }
+                                ActionButton {
+                                    width: 105
+                                    height: 31
+                                    visible: modelData.state === "active"
+                                             || modelData.state === "held"
+                                             || modelData.state === "dialing"
+                                             || modelData.state === "alerting"
+                                    label: "HANG UP"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.red
+                                    destructive: true
+                                    interactive: !phoneCallsActionProcess.running
+                                    onTriggered: phonePane.requestCallAction("hangup", modelData.id)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Text {
+                    width: parent.width
+                    visible: phonePane.callsWorkspaceState === "READY"
+                             && phonePane.liveCalls.length === 0
+                    text: "No active or incoming cellular calls."
+                    color: Colors.white
+                    font.pixelSize: 11
+                }
+
+                Text {
+                    width: parent.width
+                    text: "PLACE A CALL // Personal iPhone"
+                    color: Colors.cyan
+                    font.bold: true
+                    font.pixelSize: 12
+                }
+                Rectangle {
+                    width: Math.min(340, callsColumn.width)
+                    height: 36
+                    border.width: 1
+                    border.color: Colors.magenta
+                    color: Colors.dark
+                    TextInput {
+                        id: phoneDialInput
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        color: Colors.magenta
+                        selectionColor: Colors.yellow
+                        selectedTextColor: Colors.black
+                        font.pixelSize: 13
+                        maximumLength: 19
+                        clip: true
+                        cursorDelegate: Rectangle {
+                            width: 2
+                            height: phoneDialInput.font.pixelSize + 2
+                            color: Colors.orange
+                        }
+                        onTextChanged: {
+                            phonePane.callsConfirmDial = false;
+                            phonePane.callsPendingDial = "";
+                        }
+                    }
+                    Text {
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        visible: phoneDialInput.text.length === 0
+                        text: "Number (digits, optional leading +)"
+                        color: Colors.white
+                        opacity: 0.55
+                        font.pixelSize: 11
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+                ActionButton {
+                    width: Math.min(200, callsColumn.width)
+                    height: 35
+                    label: "REVIEW OUTGOING CALL"
+                    labelPixelSize: 9
+                    accentColor: Colors.magenta
+                    interactive: phonePane.callsWorkspaceState === "READY"
+                                 && !phoneCallsActionProcess.running
+                    onTriggered: phonePane.preparePhoneDial()
+                }
+                Rectangle {
+                    width: Math.min(380, callsColumn.width)
+                    height: 116
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.orange
+                    visible: phonePane.callsConfirmDial
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 8
+                        Text {
+                            width: parent.width
+                            text: "CALL VIA IPHONE: " + phonePane.callsPendingDial
+                            textFormat: Text.PlainText
+                            color: Colors.orange
+                            font.pixelSize: 12
+                            wrapMode: Text.WrapAnywhere
+                        }
+                        Row {
+                            spacing: 8
+                            ActionButton {
+                                width: 125
+                                height: 34
+                                label: "CONFIRM CALL"
+                                labelPixelSize: 10
+                                accentColor: Colors.magenta
+                                onTriggered: phonePane.requestCallAction(
+                                    "dial", phonePane.callsPendingDial)
+                            }
+                            ActionButton {
+                                width: 110
+                                height: 34
+                                label: "CANCEL"
+                                labelPixelSize: 10
+                                accentColor: Colors.red
+                                onTriggered: {
+                                    phonePane.callsConfirmDial = false;
+                                    phonePane.callsPendingDial = "";
+                                }
+                            }
+                        }
+                    }
+                }
+                Text {
+                    width: parent.width
+                    visible: phonePane.canSwapCalls()
+                    text: "CALL WAITING // Manage the existing cellular calls."
+                    color: Colors.orange
+                    font.pixelSize: 11
+                }
+                ActionButton {
+                    width: Math.min(208, callsColumn.width)
+                    height: 34
+                    visible: phonePane.canSwapCalls()
+                    label: "SWAP ACTIVE / HELD"
+                    labelPixelSize: 9
+                    accentColor: Colors.cyan
+                    interactive: !phoneCallsActionProcess.running
+                    onTriggered: phonePane.requestCallAction("swap", "")
+                }
+                ActionButton {
+                    width: Math.min(208, callsColumn.width)
+                    height: 34
+                    visible: phonePane.canHoldAnswer()
+                    label: "HOLD AND ANSWER"
+                    labelPixelSize: 9
+                    accentColor: Colors.magenta
+                    interactive: !phoneCallsActionProcess.running
+                    onTriggered: phonePane.requestCallAction("hold-answer", "")
+                }
+
+                Text {
+                    width: parent.width
+                    visible: phonePane.activeCallId().length > 0
+                    text: "IN-CALL KEYPAD // DTMF"
+                    color: Colors.cyan
+                    font.pixelSize: 11
+                }
+                Rectangle {
+                    width: Math.min(240, callsColumn.width)
+                    height: visible ? 34 : 0
+                    visible: phonePane.activeCallId().length > 0
+                    color: Colors.dark
+                    border.color: Colors.cyan
+                    TextInput {
+                        id: callTonesInput
+                        anchors.fill: parent
+                        anchors.margins: 6
+                        color: Colors.magenta
+                        font.pixelSize: 12
+                        maximumLength: 32
+                        cursorDelegate: Rectangle {
+                            width: 2
+                            height: callTonesInput.font.pixelSize + 2
+                            color: Colors.orange
+                        }
+                    }
+                }
+                ActionButton {
+                    width: 160
+                    height: 34
+                    visible: phonePane.activeCallId().length > 0
+                    label: "SEND TONES"
+                    labelPixelSize: 9
+                    accentColor: Colors.cyan
+                    interactive: !phoneCallsActionProcess.running
+                                 && /^[0-9*#]{1,32}$/.test(callTonesInput.text)
+                    onTriggered: {
+                        var callId = phonePane.activeCallId();
+                        if (callId.length > 0)
+                            phonePane.requestCallAction(
+                                "tones", callId + "\t" + callTonesInput.text);
+                        callTonesInput.text = "";
+                    }
+                }
+
+                Text {
+                    width: parent.width
+                    visible: phonePane.callsActionMessage().length > 0
+                    text: phonePane.callsActionMessage()
+                    textFormat: Text.PlainText
+                    color: Colors.orange
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+
+                Text {
+                    width: parent.width
+                    text: "FaceTime, decline-with-text, starting conferences and call transfer are NOT supported by this cellular HFP control. Use your iPhone for emergency calls. No call audio routing or system service changes happen in this pane."
+                    textFormat: Text.PlainText
+                    color: Colors.orange
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+            }
+        }
     }
 
     // DEVICE is a contextual overlay in the existing chat-feed column,

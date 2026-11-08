@@ -74,7 +74,11 @@ class PhoneStageLayoutTests(unittest.TestCase):
                       self.phone)
         self.assertIn('color: phonePane.stageHoleActive ? "transparent" : Colors.black',
                       self.phone)
-        self.assertIn('visible: phonePane.selectedSection !== "DEVICE"', self.phone)
+        self.assertIn('visible: phonePane.selectedSection === "MESSAGES"\n'
+                      '                 || phonePane.selectedSection === "CONTACTS"',
+                      self.phone)
+        self.assertIn('id: phoneCallsWorkspace', self.phone)
+        self.assertIn('visible: phonePane.selectedSection === "CALLS"', self.phone)
         self.assertIn('    ContactList {', self.phone)
         self.assertIn('    ChatFeed {', self.phone)
         self.assertIn('sendEnabled: false', self.phone)

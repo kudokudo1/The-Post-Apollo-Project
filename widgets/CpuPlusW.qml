@@ -1660,6 +1660,12 @@ PanelWindow {
             placesOwner: PlaceRegistry
             defaultOwner: FavoritesDefaultStore
             collectionsOwner: FavoritesCollectionsStore
+            onIndexSelectionRequested: function(key, category) {
+                // The left dossier navigates only existing candidates.
+                // The middle selector keeps the actual filter/selection UI.
+                favoritesSelectorPane.filterMode = category;
+                cpuPlusWindow.selectedFavoriteKey = key;
+            }
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom

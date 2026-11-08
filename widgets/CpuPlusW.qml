@@ -15,6 +15,8 @@ import "thermal"
 PanelWindow {
     id: cpuPlusWindow
 
+    // Fixed provider navigation only. Shell owns Social instance and routing.
+    signal telegramAccessRequested()
     property var appControlWindow
     required property var systemTelemetry
     required property var fanControl
@@ -2611,6 +2613,12 @@ PanelWindow {
             visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
             selectedId: cpuPlusWindow.selectedConnectionId
+            onTelegramOpenRequested: {
+                if (cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 6
+                        && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+                        && cpuPlusWindow.selectedConnectionId === "telegram")
+                    cpuPlusWindow.telegramAccessRequested();
+            }
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: actuatorHeader.bottom

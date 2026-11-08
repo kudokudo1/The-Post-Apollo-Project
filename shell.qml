@@ -1056,6 +1056,13 @@ PanelWindow {
                 fanControl: sharedFanControl
                 relationshipFocusModeActive: relationshipFocus.active
                 relationshipFocused: relationshipFocus.owner === "cpu"
+                onTelegramAccessRequested: {
+                    // Social exclusively owns the native Telegram session,
+                    // auth workflow and private/shared identity scope.
+                    if (messagingWindow
+                            && messagingWindow.openTelegramFromConnections())
+                        cpuPlusWindow.close();
+                }
             }
         }
 

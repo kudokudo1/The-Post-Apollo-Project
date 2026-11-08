@@ -73,7 +73,7 @@ cat "$log"
 if grep -F "U4_FAIL" "$log" >/dev/null; then
   echo "U4_FAIL // failure marker even if success present"; exit 1
 fi
-grep -F 'U4_PASS // SELECTED_PLACE_NO_ACTION' "$log" >/dev/null ||
+grep -F 'U4_PASS // SELECTED_PROCESS_READ_ONLY' "$log" >/dev/null ||
   { echo "U4_FAIL // click did not select row"; exit 1; }
 if find "$work/data" -type f | grep -q .; then
   echo "U4_FAIL // manager created a writer file"; exit 1

@@ -188,7 +188,7 @@ class ZoomWebHostTests(unittest.TestCase):
         for frame_width, frame_height, top, expect_width, expect_height in (
                 (784, 699, 92, 780, 606),
                 (1000, 1010, 109, 996, 900),
-                (2536, 1423, 109, 2532, 1313)):
+                (2536, 1345, 109, 2532, 1235)):
             self.assertEqual(frame_width - 2 * 2, expect_width)
             self.assertEqual(frame_height - top - 1, expect_height)
         # Preserve all four controls and the same header navigation.
@@ -238,7 +238,7 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('readonly property int availableFrameHeight: Math.max(', QML)
         self.assertIn('viewportHeight - frameTopInset - bottomScreenGap', QML)
         self.assertIn('financeSize.height + zoomDeckReserve', QML)
-        self.assertIn('camera.activeView === "zoom"', QML)
+        self.assertIn('camera.activeView === "zoom" && chassisLevel === "expanded"', QML)
         self.assertIn('Math.min(availableFrameHeight,', QML)
         self.assertIn('chassisLevel === "compact" ? 17 : 0', QML)
         self.assertIn('height: 42', QML)
@@ -260,6 +260,14 @@ class ZoomWebHostTests(unittest.TestCase):
         for screen_height, base_height in ((768,751),(1080,900),(1440,900)):
             available=screen_height-9-8
             self.assertLessEqual(min(available,base_height+chrome), available)
+        # Fullscreen must retain the tested Finance height rather than
+        # adding 110px into the workarea. DP-3 has an 82px top workarea.
+        fullscreen_frame = 1345
+        physical_bottom = 82 + 9 + fullscreen_frame - bottom
+        self.assertEqual(physical_bottom, 1435)
+        rejected_frame = min(1440 - 9 - 8, 1345 + chrome)
+        self.assertEqual(rejected_frame, 1423)
+        self.assertGreater(82 + 9 + rejected_frame - bottom, 1440)
         # Existing compact geometry and calibrated placement stay unchanged.
         self.assertEqual(699 - (header-17) - bottom,606)
 

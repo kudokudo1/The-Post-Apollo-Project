@@ -275,10 +275,16 @@ PanelWindow {
         + zoomBayBottom))
     readonly property int availableFrameHeight: Math.max(
         1, viewportHeight - frameTopInset - bottomScreenGap)
+    // Expanded has room to add the mode deck above Finance's 900px content.
+    // Fullscreen does NOT: on DP-3 the Sway workarea begins 82px below
+    // output Y=0, while viewportHeight still reports the full 1440px.
+    // Extending the 1345px Finance fullscreen frame to 1423px made
+    // ZoomWebHost reject its physical rectangle as OUTSIDE_WORKAREA.
+    // Preserve Finance's fullscreen budget; keep expanded's deck reserve.
     readonly property int frameHeight:
         chassisLevel === "compact"
         ? Math.max(1, Math.min(699, availableFrameHeight))
-        : camera.activeView === "zoom"
+        : camera.activeView === "zoom" && chassisLevel === "expanded"
           ? Math.min(availableFrameHeight,
                      financeSize.height + zoomDeckReserve)
           : financeSize.height

@@ -1,8 +1,5 @@
 import QtQuick
 import "../../components"
-import qs.services.time
-import qs.services.location
-import qs.services.favorites
 
 // CPU++ Favorites++ manager. Three instances share one selection/snapshot.
 // No new FileView, owner process, or action authority is created here.
@@ -12,6 +9,10 @@ Item {
     property var catalogSnapshot: null
     property var candidates: null
     property var selectedResource: null
+    property var timeOwner: null
+    property var placesOwner: null
+    property var defaultOwner: null
+    property var collectionsOwner: null
     property string filterMode: "ALL"
     signal selectionRequested(string key)
     readonly property bool editingText:
@@ -26,7 +27,7 @@ Item {
             return filterMode==="ALL" || row.category===filterMode;
         }) : []
     readonly property var groupRecords:
-        FavoritesCollectionsStore.collections
+        collectionsOwner ? collectionsOwner.collections : []
 
     Column {
         id: overview
@@ -53,16 +54,16 @@ Item {
         }
         Rectangle {width: parent.width;height: 1;color: Colors.cyan}
         GohuText {
-            text: "COLLECTIONS // "+FavoritesCollectionsStore.collections.length
-                  +"  |  SAVE "+FavoritesCollectionsStore.storageState.toUpperCase()
+            text: "COLLECTIONS // "+pane.collectionsOwner.collections.length
+                  +"  |  SAVE "+pane.collectionsOwner.storageState.toUpperCase()
             color: Colors.cyan
             font.pixelSize: 11
             width: parent.width
             elide: Text.ElideRight
         }
         GohuText {
-            text: "NEW PROVIDERS // "+FavoritesDefaultStore.favoriteKeys.length
-                +" FAV  |  "+FavoritesDefaultStore.pinnedKeys.length+" PIN"
+            text: "NEW PROVIDERS // "+pane.defaultOwner.favoriteKeys.length
+                +" FAV  |  "+pane.defaultOwner.pinnedKeys.length+" PIN"
             color: Colors.white
             font.pixelSize: 11
             width: parent.width
@@ -232,12 +233,12 @@ Item {
                     const item=pane.selectedResource;
                     if (!item) return false;
                     if(item.category==="CLOCK")
-                        return TimeSettings.worldFavoriteCanEdit
-                            && TimeSettings.zoneCatalogLoaded;
+                        return pane.timeOwner.worldFavoriteCanEdit
+                            && pane.timeOwner.zoneCatalogLoaded;
                     if(item.category==="PLACES")
-                        return PlaceRegistry.canSaveHome;
+                        return pane.placesOwner.canSaveHome;
                     if(item.category==="NEW")
-                        return FavoritesDefaultStore.canEdit && item.isFavorite;
+                        return pane.defaultOwner.canEdit && item.isFavorite;
                     return false;
                 }
                 onLeftClicked: {
@@ -245,12 +246,12 @@ Item {
                     if (!pane.removeArmed) {pane.removeArmed=true;return;}
                     const item=pane.selectedResource;
                     if (item.category==="CLOCK")
-                        TimeSettings.toggleWorldFavorite(
-                            item.resourceId,TimeSettings.zoneCatalog);
+                        pane.timeOwner.toggleWorldFavorite(
+                            item.resourceId,pane.timeOwner.zoneCatalog);
                     else if (item.category==="PLACES")
-                        PlaceRegistry.removeSavedPlace(Number(item.resourceId));
+                        pane.placesOwner.removeSavedPlace(Number(item.resourceId));
                     else if (item.category==="NEW")
-                        FavoritesDefaultStore.setFavorite(item.key,false);
+                        pane.defaultOwner.setFavorite(item.key,false);
                     pane.removeArmed=false;
                 }
             }
@@ -260,7 +261,7 @@ Item {
                 height: 30
                 label: pane.selectedResource
                     && pane.selectedResource.category==="CLOCK"
-                    && !TimeSettings.zoneCatalogLoaded
+                    && !pane.timeOwner.zoneCatalogLoaded
                     ? "CHECK ZONES"
                     : pane.selectedResource
                         && pane.selectedResource.category==="NEW"
@@ -270,16 +271,16 @@ Item {
                 accentColor: Colors.cyan
                 available: pane.selectedResource !== null &&
                     (pane.selectedResource.category==="CLOCK"
-                       ? !TimeSettings.zoneCatalogLoaded
-                          && !TimeSettings.zoneCatalogLoading
+                       ? !pane.timeOwner.zoneCatalogLoaded
+                          && !pane.timeOwner.zoneCatalogLoading
                        : pane.selectedResource.category==="NEW"
-                         && FavoritesDefaultStore.canEdit)
+                         && pane.defaultOwner.canEdit)
                 onLeftClicked: {
                     if(!available || !pane.selectedResource) return;
                     if(pane.selectedResource.category==="CLOCK")
-                        TimeSettings.loadZoneCatalog();
+                        pane.timeOwner.loadZoneCatalog();
                     else if(pane.selectedResource.category==="NEW")
-                        FavoritesDefaultStore.togglePinned(pane.selectedResource.key);
+                        pane.defaultOwner.togglePinned(pane.selectedResource.key);
                 }
             }
         }
@@ -294,7 +295,7 @@ Item {
             id: collectionManager
             width: parent.width
             height: Math.max(0,details.height-143)
-            collectionStore: FavoritesCollectionsStore
+            collectionStore: pane.collectionsOwner
             resource: pane.selectedResource
                 ? ({
                     provider:pane.selectedResource.provider,

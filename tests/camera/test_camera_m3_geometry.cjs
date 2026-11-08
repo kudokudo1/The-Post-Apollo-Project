@@ -68,13 +68,23 @@ test("Camera uses Finance's baseline fullscreen width/height outside Zoom; Zoom 
     assert.equal(full.width, 2536);
     assert.equal(full.height, 1345);
     const reserve = 110;
+    // Fullscreen retains Finance's baseline instead of growing into the
+    // physical output area reserved by Sway's top panel.
+    assert.match(camera, /camera.activeView === "zoom" && chassisLevel === "expanded"/);
     for (const [width, height] of [[2560,1440],[1920,1080],[1360,768]]) {
-        const base=policy.frame("fullscreen",width,height,12,9,8);
-        const available=height-9-8;
-        const zoomFrame=Math.min(available,base.height+reserve);
-        assert.ok(zoomFrame>=base.height);
-        assert.ok(zoomFrame<=available);
+        const base = policy.frame("fullscreen", width, height, 12, 9, 8);
+        const available = height - 9 - 8;
+        const zoomFrame = base.height;
+        assert.equal(zoomFrame, base.height);
+        assert.ok(zoomFrame <= available);
     }
+    const workareaTop = 82; // DP-3's operator-verified Sway workarea origin
+    const safeBrowserBottom = workareaTop + 9 + full.height - 1;
+    assert.equal(safeBrowserBottom, 1435);
+    const rejectedFrame = Math.min(1440 - 9 - 8, full.height + reserve);
+    assert.equal(rejectedFrame, 1423);
+    assert.equal(workareaTop + 9 + rejectedFrame - 1, 1513);
+    assert.ok(safeBrowserBottom <= 1440);
     assert.match(camera, /: financeSize\.height/);
     assert.match(camera, /FinanceChassisPolicy\.leftMargin\(/);
     assert.match(camera, /top: 0/);

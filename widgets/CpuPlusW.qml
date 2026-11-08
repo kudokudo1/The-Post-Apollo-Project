@@ -61,7 +61,19 @@ PanelWindow {
             TimeSettings.worldFavoriteZones,
             PlaceRegistry.savedPlaces,
             FavoritesDefaultStore.favoriteKeys,
-            FavoritesDefaultStore.pinnedKeys)
+            FavoritesDefaultStore.pinnedKeys,
+            // Read ORIGINAL AppControl list<string> aliases without moving
+            // favorites, HUNTER privileges or source owner mutations.
+            ({
+                favoriteKeys:cpuFavoritesCatalog.copyValues(
+                    FavoritesStore.favoriteKeys),
+                favoriteDetailActionKeys:cpuFavoritesCatalog.copyValues(
+                    FavoritesStore.favoriteDetailActionKeys),
+                favoriteMonitorBoxKeys:cpuFavoritesCatalog.copyValues(
+                    FavoritesStore.favoriteMonitorBoxKeys),
+                favoriteTaskMetricKeys:cpuFavoritesCatalog.copyValues(
+                    FavoritesStore.favoriteTaskMetricKeys)
+            }))
     readonly property var selectedFavoriteResource:
         FavoritesManagement.recordFor(favoriteCandidates,selectedFavoriteKey)
     FavoritesUnifiedCatalog {

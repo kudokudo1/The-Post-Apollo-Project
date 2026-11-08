@@ -1,0 +1,67 @@
+name: Connections C5c TASKS signed executable admission (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/experiments/C5cSignedCallerHost.py'
+      - 'services/connections/experiments/C5bTasksDurableConsentHost.py'
+      - 'tests/connections/fixtures/C5cTasksSignedDummy.c'
+      - 'tests/connections/test_connections_c5c_signed_executable.py'
+      - 'docs/connections-c5c-signed-caller-admission.md'
+      - '.github/workflows/connections-c5c-signed-caller.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/connections/experiments/C5cSignedCallerHost.py'
+      - 'services/connections/experiments/C5bTasksDurableConsentHost.py'
+      - 'tests/connections/fixtures/C5cTasksSignedDummy.c'
+      - 'tests/connections/test_connections_c5c_signed_executable.py'
+      - '.github/workflows/connections-c5c-signed-caller.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  signed-caller-identity:
+    name: Signed running ELF admission and C5b denied credential scopes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: C5c synthetic signed Linux ELF and kernel process identity
+        run: |
+          python3 -B -m unittest discover -s tests/connections \
+            -p 'test_connections_c5c_signed_executable.py' -v
+      - name: C5b persistent one-use and real sender credentials
+        run: |
+          python3 -B -m unittest discover -s tests/connections \
+            -p 'test_connections_c5b_durable_consent.py' -v
+      - name: C5a independent reviewer transport and request scope
+        run: |
+          python3 -B -m unittest discover -s tests/connections \
+            -p 'test_connections_c5a_tasks_scope_broker.py' -v
+      - name: C3e existing signed release verifier
+        run: |
+          python3 -B -m unittest discover -s tests/connections \
+            -p 'test_connections_c3e_release_trust.py' -v
+      - name: TASKS single editor snapshots and default deny
+        run: |
+          node --test tests/tasks/test_task_editor_snapshot_host_m15e.cjs
+          node --test tests/tasks/test_task_draft_target_selection_m15d.cjs
+          node --test tests/tasks/test_task_encrypted_draft_access_m15c.cjs
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Fail closed against production imports and credentials
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/experiments/C5bTasksDurableConsentHost.py \
+            services/connections/experiments/C5cSignedCallerHost.py \
+            tests/connections/test_connections_c5c_signed_executable.py
+          ! grep -R -F 'C5cSignedCallerHost' \
+            services/connections/ConnectionsBroker.qml \
+            services/hub/ApolloHubTodoStore.qml widgets shell.qml
+          grep -q 'readonly property bool credentialActionsEnabled: false' \
+            services/connections/ConnectionsBroker.qml
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          printf '%s\n' 'C5C_SIGNED_RUNNING_ELF_NO_REAL_OPERATOR_OR_KEY_PASS'

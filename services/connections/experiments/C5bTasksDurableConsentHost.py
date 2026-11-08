@@ -259,7 +259,7 @@ class DurableBroker:
         return C5a.reply("OPERATOR_OPERATION_REFUSED")
 
 
-def serve(operator_fd: int, client_fd: int) -> int:
+def serve(operator_fd: int, client_fd: int, ledger_factory=None) -> int:
     root = Path(os.environ["POST_APOLLO_C5B_FIXTURE_ROOT"])
     with (socket.socket(fileno=operator_fd) as operator,
           socket.socket(fileno=client_fd) as client,
@@ -273,7 +273,7 @@ def serve(operator_fd: int, client_fd: int) -> int:
         # Kernel origin of original reviewer endpoint, not a label in a frame.
         reviewer_origin = struct.unpack("3i", operator.getsockopt(
             socket.SOL_SOCKET, socket.SO_PEERCRED, CRED_SIZE))
-        ledger = DurableBroker(root)
+        ledger = (ledger_factory or DurableBroker)(root)
         try:
             events.register(operator, selectors.EVENT_READ, "reviewer")
             events.register(client, selectors.EVENT_READ, "client")

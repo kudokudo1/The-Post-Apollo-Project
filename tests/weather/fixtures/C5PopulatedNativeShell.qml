@@ -112,26 +112,43 @@ ShellRoot {
             } else if (root.phase === 1) {
                 if (focused.planetRows[0].events.length !== 3)
                     return root.fail("USNO_RECORDS_NOT_MAPPED_TO_EVENT_CLOCK");
-                if (countNamed(focused.instrumentItem,
-                        "cosmos-c5-planet-event-marker") !== 3) {
+                const clock = focused.instrumentItem;
+                const dial = findNamed(clock,"cosmos-c28-clock-dial-canvas");
+                const frame = findNamed(clock,"cosmos-c28-clock-dial-frame");
+                const inspector = findNamed(clock,"cosmos-c28-event-inspector");
+                const filter = findNamed(clock,"cosmos-c28-event-type-filters");
+                const firstMarker = findNamed(clock,"cosmos-c5-planet-event-marker");
+                if (!dial || !frame || !inspector || !filter
+                    || clock.renderedRowCount !== 5
+                    || clock.events.length !== 3
+                    || dial.width < 130 || dial.height < 130
+                    || inspector.width < 150 || inspector.height < 130
+                    || countNamed(clock,"cosmos-c5-planet-event-marker") !== 3
+                    || !firstMarker || firstMarker.pos === null) {
                     let names = [];
-                    dumpTree(focused.instrumentItem,0,names);
-                    const firstLane = focused.instrumentItem.children[1];
-                    const laneRow = firstLane ? firstLane.children[0] : null;
-                    const bar = laneRow ? laneRow.children[1] : null;
-                    const eventRepeater = bar ? bar.children[0] : null;
-                    console.log("C5_RENDER_METRICS // model="
-                      +(focused.planetRows[0].events.length)
-                      +" displayed="+(focused.displayedPlanetRows[0].events.length)
-                      +" delegateIndex="+(firstLane ? firstLane.index : "NONE")
-                      +" delegateType="+(firstLane ? typeof firstLane.planetRow : "NONE")
-                      +" delegateRaw="+(firstLane ? String(firstLane.planetRow) : "NONE")
-                      +" delegate="+(firstLane && firstLane.planetRow && firstLane.planetRow.events
-                        ? firstLane.planetRow.events.length : "NONE")
-                      +" repeater="+(eventRepeater ? eventRepeater.count : "NONE"));
-                    console.log("C5_RENDER_TREE // "+names.join("|"));
-                    return root.fail("USNO_EVENT_MARKERS_NOT_RENDERED");
+                    dumpTree(clock,0,names);
+                    console.log("C28_RENDER_TREE // "+names.join("|"));
+                    return root.fail("C28_USNO_CIRCULAR_CLOCK_NOT_RENDERED");
                 }
+                // Real circular markers expose their original event kind and
+                // local civil time, and not a fabricated orbit/sky position.
+                if (clock.events[0].source !== "USNO MRST"
+                    || firstMarker.eventData.minute !== clock.events[0].minute
+                    || clock.events.some(e => e.date !== focused.civilDate))
+                    return root.fail("C28_USNO_EVENT_PROVENANCE_LOST");
+                clock.pickKind("rise");
+                if (clock.events.length !== 1
+                    || clock.events[0].kind !== "rise")
+                    return root.fail("C28_RING_RISE_FILTER_BROKEN");
+                clock.pickKind("ALL");
+                clock.pickPlanet("MERCURY");
+                if (clock.events.length !== 3)
+                    return root.fail("C28_PLANET_FILTER_BROKEN");
+                clock.step(1);
+                if (!clock.lockedEvent || !clock.lockedEvent.id
+                    || clock.events.every(e=>e.id !== clock.lockedEvent.id))
+                    return root.fail("C28_EVENT_INSPECTOR_STEPPER_BROKEN");
+                clock.pickPlanet("ALL");
                 root.phase = 2;
                 root.route = "cosmos/events/iss";
             } else if (root.phase === 2) {

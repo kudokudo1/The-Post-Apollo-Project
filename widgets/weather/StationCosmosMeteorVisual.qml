@@ -18,6 +18,7 @@ Rectangle {
 
     property bool showArchive: false
     property bool playing: true
+    readonly property bool archiveCycling: archiveTimer.running
     property int archiveIndex: 0
     readonly property var archiveFrames: [
         {

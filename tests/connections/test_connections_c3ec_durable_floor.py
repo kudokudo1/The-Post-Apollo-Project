@@ -121,7 +121,8 @@ class C3eCDurableFloorTests(unittest.TestCase):
             artifact=self.artifact,
         )
         opts.update(overrides)
-        return floor.admit_and_record(self.db, **opts)
+        db_path = opts.pop("db_path", self.db)
+        return floor.admit_and_record(db_path, **opts)
 
     def expect_refusal(self, code, **overrides):
         with self.assertRaises(floor.Refused) as e:

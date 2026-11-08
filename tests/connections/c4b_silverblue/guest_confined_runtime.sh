@@ -73,25 +73,19 @@ if [[ "$phase" == booted ]]; then
   stage BASELINE_CHECKS
   check_accounts_absent
   check_released
-  stage CHECK_POLICY_TOOLS
+  # This policy must already be present in the signed, offline layered
+  # deployment. Runtime relabel of immutable /usr is not possible on Silverblue.
+  stage COMPOSED_POLICY_VERIFICATION_BEGIN
   command -v semodule >/dev/null || fail "SEMODULE_UNAVAILABLE"
-  command -v restorecon >/dev/null || fail "RESTORECON_UNAVAILABLE"
-  if semodule -l | grep -Fq postapollo_connections; then
-    fail "CUSTOM_POLICY_ALREADY_PRESENT"
-  fi
-  stage POLICY_LOAD_BEGIN
-  timeout --signal=TERM --kill-after=15s 240s semodule -i "$assets/postapollo_connections.pp" ||
-    fail "SELINUX_POLICY_INSTALL_REFUSED"
-  stage POLICY_LOAD_RETURNED
+  [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}\n' \
+    postapollo-connections-c4b-policy-ci 2>/dev/null || true)" == \
+    "postapollo-connections-c4b-policy-ci 0.1 noarch" ]] ||
+    fail "SIGNED_POLICY_RPM_NOT_COMPOSED"
   timeout 15s semodule -l | grep -Fq postapollo_connections ||
-    fail "CUSTOM_POLICY_NOT_LOADED"
+    fail "COMPOSED_SELINUX_POLICY_NOT_LOADED"
   [[ "$(getenforce)" == Enforcing ]] || fail "ENFORCING_WEAKENED"
   echo "C4B_PASS // SELINUX_POLICY_LOADED_WITH_ENFORCING_KERNEL"
-  # A genuine Silverblue signed /usr artifact must acquire the custom entry
-  # label without remount, usroverlay, unsigned file copying or permissive.
-  stage SIGNED_IMMUTABLE_ENTRYPOINT_RELABEL_BEGIN
-  timeout --signal=TERM --kill-after=5s 45s restorecon -F "$host" ||
-    fail "IMMUTABLE_USR_ENTRYPOINT_LABEL_REFUSED"
+  stage COMPOSED_IMMUTABLE_EXECUTABLE_LABEL_CHECK
   [[ "$(ls -Z "$host")" == *postapollo_connections_exec_t* ]] ||
     fail "SIGNED_OSTREE_EXECUTABLE_NOT_LABELED"
   echo "C4B_PASS // SIGNED_SILVERBLUE_EXECUTABLE_CONFINED_ENTRYPOINT"
@@ -156,9 +150,50 @@ if [[ "$phase" == booted ]]; then
     fail "CONFINED_SERVICE_DID_NOT_REFUSE_DUMMY_FILE"
   echo "C4B_PASS // REAL_SELINUX_SERVICE_DOMAIN_AND_NEGATIVE_FILE_DENIAL"
   stage C3B_OS_ORIGIN_VERIFICATION_BEGIN
-  GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1 \
-    timeout --signal=TERM --kill-after=5s 60s "$python" -I -B "$assets/C3bOriginCheck.py" --verify-disposable ||
+  if ! GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1 \
+      timeout --signal=TERM --kill-after=5s 60s \
+        "$python" -I -B "$assets/C3bOriginCheck.py" --verify-disposable; then
+    # Read-only diagnostic on rejection. Import the exact staged C3b probe
+    # rather than inventing a second list of protected directories. Report
+    # only ancestor attributes that violate its existing strict predicate.
+    # Never permit a symlink or writable directory as a workaround.
+    stage C3B_REJECTED_ORIGIN_ANCESTOR_DIAG_BEGIN
+    timeout --signal=TERM --kill-after=3s 12s "$python" -I -B - \
+      "$assets/C3bOriginCheck.py" <<'C4B_C3B_DIR_DIAG' || true
+import importlib.util
+import os
+import stat
+import sys
+
+probe_path = sys.argv[1]
+spec = importlib.util.spec_from_file_location("c4b_exact_c3b_probe", probe_path)
+if spec is None or spec.loader is None:
+    print("C4B_DIAG_C3B_PROBE_UNAVAILABLE", flush=True)
+    raise SystemExit(1)
+probe = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(probe)
+violations = 0
+for path in probe.PROTECTED_DIRS:
+    try:
+        info = os.lstat(path)
+        owner = info.st_uid
+        mode = stat.S_IMODE(info.st_mode)
+        directory = stat.S_ISDIR(info.st_mode)
+        symlink = stat.S_ISLNK(info.st_mode)
+        if owner != 0 or mode & 0o022 or not directory or symlink:
+            violations += 1
+            print("C4B_DIAG_C3B_UNPROTECTED_DIRECTORY // "
+                  f"path={path!r} uid={owner} mode={mode:04o} "
+                  f"directory={directory} symlink={symlink}",
+                  flush=True)
+    except OSError as exc:
+        violations += 1
+        print("C4B_DIAG_C3B_ANCESTOR_STAT_REFUSED // "
+              f"path={path!r} error={type(exc).__name__}", flush=True)
+print(f"C4B_DIAG_C3B_ANCESTOR_VIOLATION_COUNT // {violations}", flush=True)
+C4B_C3B_DIR_DIAG
     fail "DBUS_SYSTEMD_PID_UID_SELINUX_ORIGIN_REJECTED"
+  fi
   client_check c4b-reader status OBSERVED_UNVERIFIED
   client_check c4b-reader approve METHOD_REFUSED
   client_check c4b-reader claim OWN_REFUSED
@@ -181,17 +216,16 @@ if [[ "$phase" == booted ]]; then
     userdel postapollo-connections || fail "TEST_USER_REMOVAL_FAILED"
   groupdel c4b-clients && groupdel postapollo-status-readers &&
     groupdel postapollo-connections || fail "TEST_GROUP_REMOVAL_FAILED"
-  stage TEST_POLICY_CLEANUP_BEGIN
-  timeout --signal=TERM --kill-after=15s 240s semodule -r postapollo_connections ||
-    fail "TEST_POLICY_REMOVAL_FAILED"
-  if semodule -l | grep -Fq postapollo_connections; then
-    fail "CUSTOM_POLICY_REMAINS"
-  fi
+  # The custom policy is part of the booted deployment and MUST NOT be
+  # removed at runtime. Only the real OSTree rollback may remove it.
+  stage COMPOSED_POLICY_RETAINED_FOR_ROLLBACK
+  timeout 15s semodule -l | grep -Fq postapollo_connections ||
+    fail "COMPOSED_POLICY_VANISHED_PREMATURELY"
   check_accounts_absent
   check_released
   stage BOOTED_RUNTIME_ACCEPTED
   echo complete > "$donefile"
-  echo "C4B_PASS // RUNTIME_USERS_VENV_AND_SELINUX_POLICY_CLEANED"
+  echo "C4B_PASS // RUNTIME_USERS_VENV_CLEANED_POLICY_RETAINED_FOR_ROLLBACK"
 else
   stage ROLLBACK_RECHECK_BEGIN
   [[ "$(cat /var/lib/c2v-transaction-stage)" == rollback_pending ]] ||
@@ -208,6 +242,9 @@ else
     fail "SIGNED_PACKAGE_OR_TEST_FILES_SURVIVED_ROLLBACK"
   if semodule -l | grep -Fq postapollo_connections; then
     fail "TEST_SELINUX_POLICY_REMAINS_AFTER_ROLLBACK"
+  fi
+  if rpm -q postapollo-connections-c4b-policy-ci >/dev/null 2>&1; then
+    fail "SIGNED_COMPOSED_POLICY_RPM_REMAINS_AFTER_ROLLBACK"
   fi
   rm -f -- "$donefile" "$mode"
   rm -rf -- "$assets"

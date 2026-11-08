@@ -40,6 +40,7 @@ c4a_mode=/var/lib/c4a-signed-service-test
 c4a_gate=/var/lib/c4a-guest-signed-status-gate.sh
 c4b_mode=/var/lib/c4b-runtime-ci-only
 c4b_gate=/var/lib/c4b-guest-confined-runtime.sh
+c4b_policy_gate=/var/lib/c4b-guest-signed-policy-gate.sh
 c4b_assets=/var/lib/c4b-runtime-assets
 
 # Independently observe C4b without controlling package/reboot authorization.
@@ -142,8 +143,10 @@ case "$stage" in
     # The legacy C2v/C2x and signed-but-inactive C4a paths never enter here.
     if [[ -f "$data/c4b-opt-in.marker" ]]; then
       [[ -f "$c4a_mode" ]] || failure "C4B_REQUIRES_C4A_SIGNED_MODE"
-      [[ -s "$data/c4b-guest-confined-runtime.sh" ]] ||
-        failure "C4B_RUNTIME_GATE_NOT_STAGED"
+      [[ -s "$data/c4b-guest-confined-runtime.sh" &&
+         -s "$data/c4b-guest-signed-policy-gate.sh" &&
+         -s "$data/c4b-policy.rpm" ]] ||
+        failure "C4B_RUNTIME_OR_SIGNED_POLICY_GATE_NOT_STAGED"
       (cd "$data" && sha256sum --check --status c4b-runtime-manifest.sha256) ||
         failure "C4B_OFFLINE_ASSETS_FAILED_CHECKSUM"
       mkdir -m 0700 -p "$c4b_assets"
@@ -154,6 +157,10 @@ case "$stage" in
       done
       install -m 0700 "$data/c4b-guest-confined-runtime.sh" "$c4b_gate" ||
         failure "C4B_RUNTIME_SCRIPT_STAGING_FAILED"
+      install -m 0700 "$data/c4b-guest-signed-policy-gate.sh" "$c4b_policy_gate" ||
+        failure "C4B_SIGNED_POLICY_GATE_STAGING_FAILED"
+      /usr/bin/bash "$c4b_policy_gate" prelayer ||
+        failure "C4B_SIGNED_POLICY_PRELAYER_VERIFICATION_FAILED"
       printf '%s\n' C4B_DISPOSABLE_VM_ONLY > "$c4b_mode"
       # This witness runs only when poweroff is requested inside disposable
       # C4b. It never initiates shutdown or authorizes a stage transition.
@@ -441,6 +448,10 @@ if os.path.isfile("/var/lib/c4a-signed-service-test"):
         "postapollo-connections-c2t-fixture-0.1-1.fc44.noarch",
         "postapollo-connections-c3d-ci-status-0.1-1.fc44.noarch",
     )
+    # C4b opts into one more independently signed local policy package.
+    # A staged C2t+C3d deployment without it is NOT C4b authority.
+    if os.path.isfile("/var/lib/c4b-runtime-ci-only"):
+        expected += ("postapollo-connections-c4b-policy-ci-0.1-1.fc44.noarch",)
     if not isinstance(local_refs,list) or not all(
         any(isinstance(ref,str) and (
             ref==nevra or
@@ -548,6 +559,13 @@ if [[ -f /var/lib/c4a-signed-service-test ]]; then
     exit 2
   fi
 fi
+if [[ -f /var/lib/c4b-runtime-ci-only ]]; then
+  if [[ ! -s /mnt/c2v-offline/c4b-policy.rpm ]]; then
+    printf '2\n' > /run/c2v-rpm-layer-worker-exit
+    exit 2
+  fi
+  set -- "$@" /mnt/c2v-offline/c4b-policy.rpm
+fi
 if timeout --signal=TERM --kill-after=20s 480s rpm-ostree install --cache-only "$@" >> "$log" 2>&1; then
   printf "0\n" > /run/c2v-rpm-layer-worker-exit
 else
@@ -577,7 +595,10 @@ C2V_WORKER
         failure "C4A_SIGNED_SERVICE_NOT_VALID_AFTER_REBOOT"
     fi
     if [[ -f "$c4b_mode" ]]; then
-      [[ -s "$c4b_gate" ]] || failure "C4B_RUNTIME_GATE_LOST_AFTER_REBOOT"
+      [[ -s "$c4b_gate" && -s "$c4b_policy_gate" ]] ||
+        failure "C4B_RUNTIME_OR_SIGNED_POLICY_GATE_LOST_AFTER_REBOOT"
+      /usr/bin/bash "$c4b_policy_gate" booted ||
+        failure "C4B_SIGNED_COMPOSED_POLICY_NOT_VALID_AFTER_REBOOT"
       c4b_execute booted ||
         failure "C4B_CONFINED_RUNTIME_NOT_VERIFIED"
     fi
@@ -607,7 +628,10 @@ C2V_WORKER
         failure "C4A_SIGNED_SERVICE_ROLLBACK_NOT_VERIFIED"
     fi
     if [[ -f "$c4b_mode" ]]; then
-      [[ -s "$c4b_gate" ]] || failure "C4B_RUNTIME_GATE_LOST_AFTER_ROLLBACK"
+      [[ -s "$c4b_gate" && -s "$c4b_policy_gate" ]] ||
+        failure "C4B_RUNTIME_OR_POLICY_GATE_LOST_AFTER_ROLLBACK"
+      /usr/bin/bash "$c4b_policy_gate" rolledback ||
+        failure "C4B_SIGNED_POLICY_ROLLBACK_VERIFICATION_FAILED"
       c4b_execute rolledback ||
         failure "C4B_RUNTIME_CLEANUP_OR_ROLLBACK_NOT_VERIFIED"
     fi

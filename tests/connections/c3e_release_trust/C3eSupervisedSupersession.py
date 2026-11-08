@@ -140,7 +140,9 @@ def inspect(*, witness_db: Path, client_db: Path):
         db.close()
     client = split._client(client_db)
     if pending is None:
-        phase = "clear" if old is None and client[1:3] == witness[3:] else "untracked"
+        phase = ("clear" if old is None and client[1:3] == witness[3:]
+                 else "legacy_pending" if old is not None
+                 else "untracked")
     elif client[1:] == pending[6:10]:
         phase = "client_committed"
     elif client[1:] == pending[2:6]:

@@ -216,7 +216,9 @@ def run(
     )
     if not reading and not allowed_shapes:
         return _reply("REFUSED")
-    if type(argument) is not str or len(argument) > 128:
+    # A bounded opaque call ID plus at most 32 DTMF digits can exceed 128
+    # chars when separated by a tab, without being an unsafe input.
+    if type(argument) is not str or len(argument) > 192:
         return _reply("REFUSED")
 
     try:

@@ -24,7 +24,7 @@ class CallWorkspaceUiTests(unittest.TestCase):
             'text: modelData.peer',
             'text: "CALLS // IPHONE HANDS-FREE"',
             'phonePane.callsWorkspaceMessage()',
-            'label: "REFRESH CALLS"',
+            '? "CHECKING..." : "REFRESH CALLS"',
             'label: "DEVICE / HFP SETUP"',
             'onTriggered: phonePane.startSetup()',
         ):

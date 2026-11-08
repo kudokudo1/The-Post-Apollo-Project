@@ -163,12 +163,12 @@ test("AppControl favorites now appear in the CPU++ middle selector",()=>{
   assert.equal(cpu.length,6);
   assert.equal(other.length,4);
   assert.deepEqual(plain(cpu.map(x=>x.label)),[
-    "PROCESS FAVORITE #1","THERMAL FAVORITE #1","SYSTEM FAVORITE #1",
-    "THERMAL METRIC WATCH #1","SYSTEM METRIC WATCH #1","PROCESS METRIC WATCH #1"
+    "KILL // SAVED PROCESS #1","THERMAL // SAVED SENSOR #1","SYSTEM // SAVED METRIC #1",
+    "THERMAL // METRIC WATCH #1","SYSTEM // METRIC WATCH #1","KILL // METRIC WATCH #1"
   ]);
   assert.deepEqual(plain(other.map(x=>x.label)),[
     "APP CONTROL FAVORITE #1","RUN // SAVED COMMAND #1",
-    "SYSTEM // SAVED METRIC #1","PREFERRED ACTION #1"
+    "SYSTEM // SAVED METRIC #1","APPS // PREFERRED ACTION #1"
   ]);
   assert.ok(cpu.every(x=>x.owner==="appcontrol" && x.readOnly));
   assert.ok(other.every(x=>x.owner==="appcontrol" && x.readOnly));
@@ -205,7 +205,7 @@ test("malformed AppControl snapshots are bounded and don't become actions",()=>{
   };
   const out=Hub.list([],[],[],[],bad);
   assert.equal(out.total,1);
-  assert.equal(out.rows[0].label,"PROCESS FAVORITE #1");
+  assert.equal(out.rows[0].label,"KILL // SAVED PROCESS #1");
   assert.ok(out.rejected>=4);
   const missing=Hub.list([],[],[],[],{favoriteKeys:["task|ok"]});
   assert.equal(missing.total,0);
@@ -253,15 +253,15 @@ test("owner-provided labels are display-only and safely validated",()=>{
   labels[third]="token://private";
   const withLabels=Hub.list([],[],[],[],donor,labels);
   assert.equal(withLabels.rows[0].label,"Firefox Worker");
-  assert.equal(withLabels.rows[1].label,"PROCESS FAVORITE #2");
-  assert.equal(withLabels.rows[2].label,"APP CONTROL FAVORITE #1");
+  assert.equal(withLabels.rows[1].label,"KILL // SAVED PROCESS #2");
+  assert.equal(withLabels.rows[2].label,"RUN // SAVED COMMAND #1");
   for(const row of withLabels.rows) {
     assert.equal(row.readOnly,true);
     assert.equal(row.owner,"appcontrol");
     assert.deepEqual(plain(row.capabilities),[]);
     assert.equal("resourceId" in row,false);
   }
-  assert.equal(Hub.list([],[],[],[],donor).rows[0].label,"PROCESS FAVORITE #1");
+  assert.equal(Hub.list([],[],[],[],donor).rows[0].label,"KILL // SAVED PROCESS #1");
   assert.ok(withLabels.rows.every(row=>!row.label.includes("private-command")));
 });
 

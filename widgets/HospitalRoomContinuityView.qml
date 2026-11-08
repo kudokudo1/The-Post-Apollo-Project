@@ -12,6 +12,23 @@ Item {
     property var roomData: ({})
     property var allSessions: []
     property bool sessionsLoaded: false
+    property var availableDoctors: []
+    property var availableProviders: []
+    property var allRooms: []
+    property bool doctorsLoaded: false
+    property bool providersLoaded: false
+    property bool roomsLoaded: false
+    property string sourceError: ""
+    property bool recoveryOpen: false
+
+    signal registryRefreshRequested()
+
+    onRoomIdChanged: recoveryOpen = false
+    onActiveChanged: {
+        if (!active)
+            recoveryOpen = false;
+    }
+
     readonly property var overview: ContinuityPolicy.project({
         roomId: root.roomId,
         snapshot: continuity.snapshot,
@@ -38,7 +55,7 @@ Item {
     Flickable {
         id: contentScroll
         anchors.fill: parent
-        visible: root.active
+        visible: root.active && !root.recoveryOpen
         clip: true
         contentWidth: width
         contentHeight: contentColumn.implicitHeight + 12
@@ -54,7 +71,7 @@ Item {
                 height: 29
                 spacing: 8
                 GohuText {
-                    width: parent.width - 91
+                    width: parent.width - 204
                     height: parent.height
                     text: "PERMANENT ROOM // CONTINUITY"
                     font.pixelSize: 12
@@ -63,13 +80,24 @@ Item {
                     verticalAlignment: Text.AlignVCenter
                 }
                 HospitalActionButton {
+                    width: 107
+                    height: 27
+                    label: "RECOVER ROOM"
+                    compactIcon: "ROOM"
+                    accent: Colors.magenta
+                    onTriggered: root.recoveryOpen = true
+                }
+                HospitalActionButton {
                     width: 83
                     height: 27
                     label: continuity.loading ? "READING" : "REFRESH"
                     compactIcon: "↻"
                     accent: Colors.cyan
                     enabledAction: !continuity.loading
-                    onTriggered: root.refresh()
+                    onTriggered: {
+                        root.refresh();
+                        root.registryRefreshRequested();
+                    }
                 }
             }
             GohuText {
@@ -373,9 +401,33 @@ Item {
         }
     }
 
+    HospitalRoomSuccessorView {
+        id: successorView
+        anchors.fill: parent
+        active: root.active && root.recoveryOpen
+        roomId: root.active ? root.roomId : ""
+        overview: root.overview
+        snapshot: continuity.snapshot
+        roomData: root.roomData
+        doctors: root.availableDoctors
+        providers: root.availableProviders
+        rooms: root.allRooms
+        sessions: root.allSessions
+        doctorsLoaded: root.doctorsLoaded
+        providersLoaded: root.providersLoaded
+        roomsLoaded: root.roomsLoaded
+        sessionsLoaded: root.sessionsLoaded
+        sourceError: root.sourceError || continuity.lastError
+        onReturnRequested: root.recoveryOpen = false
+        onRefreshRequested: {
+            root.refresh();
+            root.registryRefreshRequested();
+        }
+    }
+
     NeonScrollBar {
         flickable: contentScroll
         handleStyle: "star"
-        visible: root.active && scrollable
+        visible: root.active && !root.recoveryOpen && scrollable
     }
 }

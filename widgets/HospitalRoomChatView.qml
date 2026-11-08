@@ -17,6 +17,7 @@ Item {
     property string assignmentId: ""
 
     readonly property string activeSessionId: adapter.activeSessionId
+    readonly property bool doctorTurnActive: adapter.sending
 
     readonly property var displayMessages: {
         const source =
@@ -42,6 +43,7 @@ Item {
 
     signal closeRequested()
     signal richActionRequested(string action, string value, var message)
+    signal targetMismatchDetected(string roomId, string code, string detail, string draft)
 
     readonly property var conversation: {
         const rows =
@@ -152,6 +154,14 @@ Item {
         doctorId: root.doctorId
         providerId: root.providerId
         workingDirectory: root.bedPath
+
+        onTargetMismatchDetected: function(roomId, code, detail) {
+            // Preserve original Room identity and unsent prompt before the
+            // adapter clears its per-turn transient data.
+            root.targetMismatchDetected(
+                roomId, code, detail, String(adapter.pendingTurnBody || "")
+            );
+        }
     }
 
     Timer {

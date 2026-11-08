@@ -2,6 +2,14 @@
 // The PX provider-launch preflight remains the execution authority.
 // Do not use this UI-side metadata filter as a permission or safety grant.
 
+// Read the refusal issued by PX itself. A generic provider failure should
+// not summon the recovery UI. The caller also checks process exit != 0.
+function targetRefusalCode(stderrText) {
+    const text = String(stderrText || "");
+    const match = text.match(/HOSPITAL TARGET REFUSED\s*\/\/\s*([A-Z0-9_]+)/);
+    return match ? String(match[1]) : "";
+}
+
 function githubRepository(value) {
     const text = String(value || "").trim();
     if (!text || text === "NO ORIGIN")

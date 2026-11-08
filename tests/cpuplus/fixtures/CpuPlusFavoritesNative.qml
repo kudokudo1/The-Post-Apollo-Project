@@ -48,6 +48,16 @@ ShellRoot {
         property var panelRoutes: ["home/auto","home/health"]
         property var cardKeys: ["sky|next-hours"]
     }
+    // Saved notification source metadata; no notification message data.
+    QtObject {
+        id: notificationFavorites
+        property bool ready: true
+        property string status: "ready"
+        property var sources: [
+            {appKey:"org.mozilla.firefox",source:"Firefox"},
+            {appKey:"github",source:"GitHub"}
+        ]
+    }
     readonly property var options:
         Management.list(["UTC"],[{id:12,place:{label:"Example City"}}],
             ["fav1:local:finance:instrument:TEST.01"],[],
@@ -60,6 +70,10 @@ ShellRoot {
                 storageState:weatherBookmarks.storageState,
                 panelRoutes:weatherBookmarks.panelRoutes,
                 cardKeys:weatherBookmarks.cardKeys
+            }),({
+                ready:notificationFavorites.ready,
+                status:notificationFavorites.status,
+                sources:notificationFavorites.sources
             }))
     readonly property var selection: Management.recordFor(options,selectedKey)
 
@@ -212,16 +226,29 @@ ShellRoot {
             const weatherGroups=dossier.dossier.groups.filter(function(group) {
                 return group.category==="WEATHER";
             });
+            const notificationGroups=dossier.dossier.groups.filter(function(group) {
+                return group.category==="NOTIFS";
+            });
+            const notificationRow=root.options.rows.find(function(item) {
+                return item.owner==="notifications"
+                    && item.menu==="SOURCES"
+                    && item.item==="GitHub";
+            });
             const fileGroup=dossier.dossier.groups.find(function(group) {
                 return group.key==="APP CTRL|FILES";
             });
             const processGroup=dossier.dossier.groups.find(function(group) {
                 return group.key==="CPU++|KILL";
             });
-            if(!root.options || root.options.total!==14
+            if(!root.options || root.options.total!==16
                || dossier.dossier.total!==root.options.rows.length
                || !weatherPanel || !weatherCard
                || weatherGroups.length!==2
+               || notificationGroups.length!==1
+               || notificationGroups[0].title!=="NOTIFICATIONS // SOURCES"
+               || notificationGroups[0].count!==2
+               || !notificationRow || !notificationRow.readOnly
+               || notificationRow.available!=="unresolved"
                || !weatherPanel.readOnly || !weatherCard.readOnly
                || weatherPanel.available!=="unresolved"
                || !fileGroup || fileGroup.count!==3

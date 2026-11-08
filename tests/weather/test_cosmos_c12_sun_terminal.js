@@ -263,3 +263,77 @@ test("C34 SUN OBSERVATION SUVI FULL uses shared subject-stage viewer and keeps l
     }
   }
 });
+
+
+test("C36 SDO 512p solar movies are a fixed NASA source allowlist, never a NOAA video claim",()=>{
+  const catalog=policy("widgets/weather/StationCosmosSolarMoviePolicy.js");
+  assert.equal(catalog.CHANNELS.length,3);
+  assert.deepEqual(Array.from(catalog.CHANNELS,r=>r.id),["171","193","304"]);
+  for(const id of ["171","193","304"]){
+    const u=catalog.url(id);
+    assert.match(u,/^https:\/\/sdo\.gsfc\.nasa\.gov\/assets\/img\/latest\/mpeg\/latest_512_0(?:171|193|304)\.mp4$/);
+    assert.equal(catalog.byId(id).id,id);
+  }
+  for(const bad of ["","foo","195","file:///tmp/video.mp4",
+                    "https://evil.example/movie.mp4",null,171])
+    assert.equal(catalog.url(bad),"",String(bad));
+  assert.equal(catalog.positionFraction(250,1000),0.25);
+  assert.equal(catalog.positionFraction(3500,1000),1);
+  assert.equal(catalog.positionFraction(10,0),0);
+  assert.equal(catalog.seekPosition(0.5,1000),500);
+  assert.equal(catalog.seekPosition(-1,1000),0);
+  assert.equal(catalog.seekPosition(2,1000),1000);
+  assert.equal(catalog.seekPosition(NaN,1000),null);
+});
+
+test("C36 native media decoder is lazy and an optional QtMultimedia import cannot break Weather startup",()=>{
+  const pane=read("widgets/weather/StationCosmosSolarMoviePane.qml");
+  const decoder=read("widgets/weather/StationCosmosSolarMovieDecoder.qml");
+  assert.match(old,/property bool solarMovieEnabled: false/);
+  assert.match(old,/signal solarMovieRequested\(\)/);
+  assert.match(old,/objectName: "cosmos-c36-suvi-movie-action"/);
+  assert.match(old,/onClicked: solarFocus\.solarMovieRequested\(\)/);
+  assert.match(terminal,/property bool movieOpen: false/);
+  assert.match(terminal,/property bool movieFull: false/);
+  assert.match(terminal,/solarMovieEnabled: true/);
+  assert.match(terminal,/onSolarMovieRequested: \{/);
+  assert.match(terminal,/StationCosmosSolarMoviePane\s*\{/);
+  assert.match(terminal,/objectName: "cosmos-c36-observation-solar-movie"/);
+  assert.match(terminal,/visible: observation\.movieOpen/);
+  assert.match(terminal,/expanded: observation\.movieFull/);
+  assert.match(terminal,/width: observation\.movieFull \? observation\.width/);
+  assert.match(terminal,/height: observation\.movieFull \? observation\.height/);
+  assert.match(terminal,/onExpandRequested: observation\.movieFull = !observation\.movieFull/);
+  assert.match(terminal,/onCloseRequested: \{[\s\S]*?observation\.movieOpen = false/);
+  assert.doesNotMatch(terminal,/import QtMultimedia/);
+  assert.doesNotMatch(pane,/import QtMultimedia/);
+  assert.match(pane,/property bool playbackRequested: false/);
+  assert.match(pane,/active: movie\.visible && movie\.playbackRequested/);
+  assert.match(pane,/source: "StationCosmosSolarMovieDecoder\.qml"/);
+  assert.match(pane,/onLoaded: \{[\s\S]*?item\.mediaUrl = movie\.mediaUrl/);
+  assert.match(pane,/QTMULTIMEDIA UNAVAILABLE/);
+  assert.match(pane,/PRESS PLAY \/\/ NASA SDO TIME-LAPSE/);
+  assert.match(pane,/onVisibleChanged: \{\s*if \(!visible\) playbackRequested = false/);
+  assert.match(pane,/objectName: "cosmos-c36-sdo-channel-controls"/);
+  assert.match(pane,/objectName: "cosmos-c36-bounded-video-bay"/);
+  assert.match(pane,/objectName: "cosmos-c36-solar-play-pause"/);
+  assert.match(pane,/objectName: "cosmos-c36-solar-movie-expand"/);
+  assert.match(pane,/objectName: "cosmos-c36-sdo-seek-track"/);
+  assert.match(pane,/NOT LIVE SUVI/);
+  assert.match(decoder,/import QtMultimedia/);
+  assert.match(decoder,/objectName: "cosmos-c36-qt-video-decoder"/);
+  assert.match(decoder,/objectName: "cosmos-c36-native-video-output"/);
+  assert.match(decoder,/objectName: "cosmos-c36-native-media-player"/);
+  assert.match(decoder,/videoOutput: videoOutput/);
+  assert.match(decoder,/audioOutput: AudioOutput \{ muted: true \}/);
+  assert.match(decoder,/fillMode: VideoOutput\.PreserveAspectFit/);
+  assert.match(decoder,/loops: MediaPlayer\.Infinite/);
+  assert.match(decoder,/Component\.onDestruction: player\.stop\(\)/);
+  assert.match(decoder,/function seekFraction\(fraction\)/);
+  assert.match(decoder,/onErrorOccurred: function\(error, description\)/);
+  for(const component of [pane,decoder]){
+    for(const bad of ["PanelWindow {","Window {","Process {","FileView {",
+                      "WebEngineView {","Qt.openUrlExternally","XMLHttpRequest","Flickable {"])
+      assert.ok(!component.includes(bad),bad);
+  }
+});

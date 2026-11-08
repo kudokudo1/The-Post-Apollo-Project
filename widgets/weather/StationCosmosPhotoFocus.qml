@@ -16,6 +16,10 @@ Rectangle {
     property string sourceUrl: ""
     property string photoTitle: "ARCHIVAL IMAGE"
     property string credit: ""
+    // C34 // Archived photos and periodically refreshed NOAA source images
+    // share controls but must not share an inaccurate "ARCHIVAL" label
+    // or stale cache behavior.
+    property bool archival: true
     property bool canNext: false
     property bool canPlay: false
     property bool playing: false
@@ -167,7 +171,7 @@ Rectangle {
             objectName: "cosmos-c33-photo-image"
             source: photoFocus.visible ? photoFocus.sourceUrl : ""
             asynchronous: true
-            cache: true
+            cache: photoFocus.archival
             smooth: true
             fillMode: Image.PreserveAspectFit
             width: Math.max(1,photoViewport.width*photoFocus.zoom)
@@ -181,7 +185,8 @@ Rectangle {
             anchors.centerIn: parent
             width: Math.max(1,parent.width-20)
             text: expandedPhoto.status===Image.Error
-                ? "ARCHIVAL IMAGE OFFLINE" : "LOADING ARCHIVAL IMAGE"
+                ? (photoFocus.archival ? "ARCHIVAL IMAGE OFFLINE" : "NOAA IMAGE UNAVAILABLE")
+                : (photoFocus.archival ? "LOADING ARCHIVAL IMAGE" : "LOADING NOAA IMAGE")
             font.pixelSize: 10
             color: Colors.orange
             horizontalAlignment: Text.AlignHCenter
@@ -234,7 +239,8 @@ Rectangle {
             anchors.fill: parent
             anchors.margins: 4
             text: photoFocus.photoTitle + " // " + photoFocus.credit
-                  + " // ARCHIVAL, NOT LIVE"
+                  + (photoFocus.archival ? " // ARCHIVAL, NOT LIVE"
+                      : " // NOAA SOURCE SNAPSHOT, NOT CONTINUOUS VIDEO")
             color: Colors.yellow
             font.pixelSize: 9
             horizontalAlignment: Text.AlignHCenter

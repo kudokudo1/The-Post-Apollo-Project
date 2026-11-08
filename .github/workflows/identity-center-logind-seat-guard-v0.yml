@@ -1,0 +1,54 @@
+name: Identity Center Real logind Seat Guard V0
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/logind_seat_guard_v0.py'
+      - 'services/identity/requirements-logind-seat-guard-v0.txt'
+      - 'tests/identity/test_logind_seat_guard_v0.py'
+      - 'MODEL/contracts/identity-center-logind-seat-guard-v0.md'
+      - 'MODEL/contracts/social-postwallet-management-connectivity-roadmap-v0.md'
+      - 'MODEL/README.md'
+      - '.github/workflows/identity-center-logind-seat-guard-v0.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/logind_seat_guard_v0.py'
+      - 'services/identity/requirements-logind-seat-guard-v0.txt'
+      - 'tests/identity/test_logind_seat_guard_v0.py'
+      - 'MODEL/contracts/identity-center-logind-seat-guard-v0.md'
+      - 'MODEL/contracts/social-postwallet-management-connectivity-roadmap-v0.md'
+      - 'MODEL/README.md'
+      - '.github/workflows/identity-center-logind-seat-guard-v0.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  logind-seat-guard:
+    name: System-bus monitor, fail-closed session and host IPC integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned D-Bus client and existing signed-token test libraries
+        run: |
+          python3 -m pip install -r services/identity/requirements-logind-seat-guard-v0.txt
+          python3 -m pip install -r services/identity/requirements-jwks-verifier-v0.txt
+      - name: Compile host logind monitor and integration tests
+        run: |
+          python3 -m py_compile services/identity/logind_seat_guard_v0.py
+          python3 -m py_compile tests/identity/test_logind_seat_guard_v0.py
+      - name: Test system-bus method shape, monitored session and host revocation
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_logind_seat_guard_v0.py' -v
+      - name: Preserve existing session and authenticated-code boundaries
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_seat_invalidation_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_host_lifecycle_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_host_oidc_code_exchange_v0.py' -v
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_identity_host_context_v0.py' -v

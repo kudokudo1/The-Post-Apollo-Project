@@ -90,3 +90,51 @@ test("U7b policy remains a pure navigation contract without filesystem or player
     assert.match(code,/ownerAllows\(/);
     assert.match(code,/Resource\.identityKey\(/);
 });
+
+test("U7b shell, CPU++ and Weather owner form an allowlisted exact-item chain",()=>{
+    const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+    const cpu=read("widgets/CpuPlusW.qml");
+    const shell=read("shell.qml");
+    const weather=read("widgets/weather/WeatherStationW.qml");
+    assert.match(pane,/import ".+FavoritesExactNavigationPolicy.js" as ExactNavigation/);
+    assert.match(pane,/exactNavigationRequested\(target\.owner,target\.route\)/);
+    assert.match(pane,/label: pane\.selectedResource && pane\.selectedResource\.readOnly[\s\S]*?"OPEN ITEM"/);
+    assert.match(pane,/if\(pane\.selectedResource\.readOnly\)/);
+    assert.match(pane,/id: openItem/);
+    assert.match(pane,/property alias exactNavigationControl: openItem/);
+    assert.match(cpu,/signal favoriteExactNavigationRequested\(string owner,string route\)/);
+    assert.match(cpu,/onExactNavigationRequested: function\(owner,route\)/);
+    assert.match(cpu,/cpuPlusWindow\.favoriteExactNavigationRequested\(owner,route\)/);
+    assert.match(shell,/onFavoriteExactNavigationRequested: function\(owner,route\)/);
+    assert.match(shell,/if\(shellRoot\.openApolloFavoriteItem\(owner,route\)\)\s*cpuPlusWindow\.close\(\)/);
+    const routing=shell.split("function openApolloFavoriteItem(owner,route) {")[1]
+        .split("function openApolloFavoriteOwner(owner,view) {")[0];
+    assert.ok(routing);
+    assert.match(routing,/owner!=="weather"/);
+    assert.match(routing,/Object\.prototype\.hasOwnProperty\.call\(homeRoutes,route\)/);
+    assert.match(routing,/weatherStationWindow\.openSavedHomePanel\(route\)/);
+    assert.match(routing,/requestControlKeyboard\("weather","favorites-exact-item"\)/);
+    assert.doesNotMatch(routing,/runCommand|execDetached|openUrl|launch|kill|playStation|favoriteKey/);
+    const allow=[...routing.matchAll(/"(home\/[a-z-]+)":true/g)].map(x=>x[1]).sort();
+    assert.deepEqual(allow,known.slice().sort());
+    assert.match(weather,/function openSavedHomePanel\(route\)/);
+    const ownerPath=weather.split("function openSavedHomePanel(route) {")[1]
+        .split("function openNotificationView(view) {")[0];
+    assert.ok(ownerPath);
+    assert.equal((ownerPath.match(/ExactNavigation\.ownerAllows\(/g)||[]).length,2);
+    assert.match(ownerPath,/subjectNavigator\.chooseRoute\(route\)/);
+    assert.match(ownerPath,/!menuOpen \|\| !subjectNavigationOpen \|\| contextTerminalRequested/);
+    assert.doesNotMatch(ownerPath,/toggleCardFavorite|replacePanelFavorites|FileView|playStation|launchSubjectTerminal/);
+});
+
+test("U7b native fixture explicitly clicks OPEN ITEM after OPEN OWNER",()=>{
+    const fixture=read("tests/cpuplus/fixtures/CpuPlusFavoritesNative.qml");
+    const runner=read("scripts/favorites/verify_cpuplus_hub_fedora_u4.sh");
+    assert.match(fixture,/onExactNavigationRequested: function\(owner,route\)/);
+    assert.match(fixture,/route!=="home\/auto"/);
+    assert.match(fixture,/detail\.exactNavigationControl/);
+    assert.match(fixture,/U7B_PASS \/\/ EXACT_HOME_PANEL_ONLY_NO_PROVIDER_ACTIONS/);
+    assert.match(runner,/U7B_ITEM_READY/);
+    assert.match(runner,/U7B_PASS \/\/ EXACT_HOME_PANEL_ONLY_NO_PROVIDER_ACTIONS/);
+    assert.match(runner,/xdotool mousemove --window "\$window" "\$ex" "\$ey" click 1/);
+});

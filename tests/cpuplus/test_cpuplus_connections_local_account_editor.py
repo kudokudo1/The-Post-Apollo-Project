@@ -58,6 +58,26 @@ class CpuPlusConnectionsLocalAccountEditor(unittest.TestCase):
         self.assertNotIn("SocialAccountDetailsStore.renameAccountName(", DETAILS)
         self.assertNotIn("SocialAccountDetailsStore.removeAccountName(", DETAILS)
 
+    def test_cancel_exits_account_editing_with_red_control(self):
+        # The old handler cleared only the textbox and selected account,
+        # leaving the selected service's editor visible. Cancel must close it.
+        cancel = EDITOR.split('label: "CANCEL ACCOUNT EDIT"', 1)[1].split(
+            'label: accountEditor.confirmRemoveId', 1)[0]
+        for snippet in ('accentColor: Colors.red', 'destructive: true',
+                        'onClicked: accountEditor.resetEditor()'):
+            self.assertIn(snippet, cancel)
+        self.assertNotIn('accountEditor.selectedAccountId = "";', cancel)
+        self.assertIn('visible: accountEditor.selectedServiceId !== ""', EDITOR)
+        reset = EDITOR.split('function resetEditor() {', 1)[1].split(
+            '\n    }', 1)[0]
+        for field in ('selectedServiceId = "";', 'selectedAccountId = "";',
+                      'confirmRemoveId = "";', 'servicePickerOpen = false;',
+                      'labelField.text = "";', 'serviceFilter.text = "";',
+                      'feedback = "";'):
+            self.assertIn(field, reset)
+        self.assertNotIn('SocialAccountDetailsStore.', reset)
+        self.assertNotIn('SocialIdentityStore.selectIdentity(', reset)
+
     def test_typing_prevents_cpuplus_main_mode_shortcuts(self):
         self.assertIn('readonly property bool editingText: details.selectedId === "social"', DETAILS)
         self.assertIn('connectedAccountNamesEditor.editingText', DETAILS)

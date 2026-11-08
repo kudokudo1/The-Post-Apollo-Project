@@ -74,11 +74,11 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('Math.round(zoomViewport.y)', QML)
         self.assertIn('Math.round(zoomViewport.width)', QML)
         self.assertIn('Math.round(zoomViewport.height)', QML)
-        # Compact now makes room for its full-size control deck. The frame
-        # grows by 24px; the browser starts 16px lower (no 12px overlap
-        # and a 4px taller mode row), leaving MORE browser height than before.
-        compact_height, page_start, bottom = 699, 133 - 17, 1
-        self.assertEqual(compact_height - page_start - bottom, 582)
+        # The live compact Sway client was 780x606 at X=68,Y=183.
+        # Its local top is 183-(82 workarea)-(9 frame inset)=92.
+        # That agrees with the real 109px deck bottom minus 17px nudge.
+        compact_height, page_start, bottom = 699, 109 - 17, 1
+        self.assertEqual(compact_height - page_start - bottom, 606)
         self.assertGreater(compact_height - page_start - bottom,
                            compact_height - 169)
 
@@ -118,14 +118,14 @@ class ZoomWebHostTests(unittest.TestCase):
             'width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)', QML)
         self.assertIn('readonly property int zoomActorTop: zoomBayTop', QML)
         self.assertIn('readonly property int zoomActorHeight: zoomBayHeight', QML)
-        # Compared with the current deployed 4px correction, the measured
-        # adjustment changes only Y and height: 129 -> 116, 569 -> 582.
-        # Width remains 780 and the bottom remains at frame-local 698.
-        old_top, old_height, old_width = 129, 569, 780
+        # Native baseline preceding the 13px correction: frame-local top
+        # 105 and 593px height. Current compact is 92px top and 606px high.
+        # Expanded/fullscreen have no browser overlap after this repair.
+        old_top, old_height, old_width = 105, 593, 780
         new_top = old_top - 13
         new_height = old_height + 13
         new_width = old_width
-        self.assertEqual((new_top,new_height,new_width), (116,582,780))
+        self.assertEqual((new_top,new_height,new_width), (92,606,780))
         self.assertEqual(new_top + new_height,old_top + old_height)
         self.assertGreaterEqual(42,34)
         self.assertIn('anchors.margins: camera.activeView === "zoom" ? 12 : 18', QML)
@@ -186,9 +186,9 @@ class ZoomWebHostTests(unittest.TestCase):
         # Representative panels all obey the same fitted rectangle rule;
         # this does not assert native Sway placement or browser page zoom.
         for frame_width, frame_height, top, expect_width, expect_height in (
-                (784, 699, 116, 780, 582),
-                (1000, 1010, 110, 996, 899),
-                (2536, 1423, 110, 2532, 1312)):
+                (784, 699, 92, 780, 606),
+                (1000, 1010, 109, 996, 900),
+                (2536, 1423, 109, 2532, 1313)):
             self.assertEqual(frame_width - 2 * 2, expect_width)
             self.assertEqual(frame_height - top - 1, expect_height)
         # Preserve all four controls and the same header navigation.

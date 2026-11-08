@@ -60,7 +60,7 @@ function approvedOwnerDescription(descriptions,key) {
         return null;
     const value=descriptions[key];
     if (!value || typeof value!=="object") return null;
-    if (["APPS","KILL","THERMAL","SYSTEM"].indexOf(value.menu)<0
+    if (["APPS","KILL","THERMAL","SYSTEM","RUN","WINDOWS"].indexOf(value.menu)<0
             || ["FAVORITE","PROCESS FAVORITE","PREFERRED ACTION",
                 "METRIC WATCH"].indexOf(value.type)<0
             || typeof value.item!=="string") return null;
@@ -81,9 +81,36 @@ function appControlMenu(record) {
         return "SYSTEM";
     if (id.indexOf("run:")===0 || id.indexOf("run|")===0)
         return "RUN";
-    if (record.kind==="preferred-action" && id.indexOf("app|")===0)
+    if (id.indexOf("hidden:")===0 || (record.kind==="preferred-action" && id.indexOf("app|")===0)
+            || (record.kind==="item"
+                && /^[A-Za-z][A-Za-z0-9 ._+()-]{0,95}$/.test(id)))
         return "APPS";
+    const match=/^mode:([0-8]):/.exec(id);
+    if (match) {
+        const modes=["FAVORITES","APPS","FILES","RUN","WINDOWS",
+                     "REMOTE","THERMAL","KILL","SYSTEM"];
+        return modes[Number(match[1])];
+    }
     return "OTHER";
+}
+function safeUnresolvedLabel(menu,classification,ordinal) {
+    const type={
+        "RUN":"SAVED COMMAND",
+        "WINDOWS":"SAVED WINDOW",
+        "FILES":"SAVED FILE",
+        "REMOTE":"SAVED REMOTE ITEM",
+        "APPS":"SAVED APPLICATION",
+        "KILL":"SAVED PROCESS",
+        "THERMAL":"SAVED SENSOR",
+        "SYSTEM":"SAVED METRIC",
+        "FAVORITES":"SAVED ITEM"
+    };
+    if (menu==="OTHER") return classification+" #"+ordinal;
+    if (classification==="PREFERRED ACTION")
+        return menu+" // PREFERRED ACTION #"+ordinal;
+    if (classification.indexOf("METRIC WATCH")!==-1)
+        return menu+" // METRIC WATCH #"+ordinal;
+    return menu+" // "+(type[menu] || "SAVED ITEM")+" #"+ordinal;
 }
 
 function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions) {
@@ -144,9 +171,11 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
                 const classification=appControlClassification(entry);
                 const type=classification.label;
                 const descriptor=approvedOwnerDescription(appControlDescriptions,entry.key);
-                ordinalByType[type]=(ordinalByType[type] || 0)+1;
+                const menu=appControlMenu(entry);
+                const group=menu==="OTHER" ? type : menu+"|"+type;
+                ordinalByType[group]=(ordinalByType[group] || 0)+1;
                 const fallback=approvedOwnerLabel(appControlDisplayLabels,entry.key)
-                    || (type+" #"+ordinalByType[type]);
+                    || safeUnresolvedLabel(menu,type,ordinalByType[group]);
                 accept({
                     key:entry.key,
                     provider:"appcontrol",kind:entry.kind,
@@ -154,7 +183,7 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
                     // never printed or forwarded to a generic action/collection.
                     label:descriptor ? descriptor.menu+" // "+descriptor.item : fallback,
                     sourceName:"APP CONTROL",
-                    menu:descriptor ? descriptor.menu : appControlMenu(entry),
+                    menu:descriptor ? descriptor.menu : menu,
                     item:descriptor ? descriptor.item : "NAME UNAVAILABLE",
                     favoriteType:descriptor ? descriptor.type : type,
                     resolved:!!descriptor,

@@ -163,12 +163,12 @@ test("AppControl favorites now appear in the CPU++ middle selector",()=>{
   assert.equal(cpu.length,6);
   assert.equal(other.length,4);
   assert.deepEqual(plain(cpu.map(x=>x.label)),[
-    "PROCESS FAVORITE #1","THERMAL FAVORITE #1","SYSTEM FAVORITE #1",
-    "THERMAL METRIC WATCH #1","SYSTEM METRIC WATCH #1","PROCESS METRIC WATCH #1"
+    "KILL // SAVED PROCESS #1","THERMAL // SAVED SENSOR #1","SYSTEM // SAVED METRIC #1",
+    "THERMAL // METRIC WATCH #1","SYSTEM // METRIC WATCH #1","KILL // METRIC WATCH #1"
   ]);
   assert.deepEqual(plain(other.map(x=>x.label)),[
-    "APP CONTROL FAVORITE #1","APP CONTROL FAVORITE #2",
-    "APP CONTROL FAVORITE #3","PREFERRED ACTION #1"
+    "APP CONTROL FAVORITE #1","RUN // SAVED COMMAND #1",
+    "SYSTEM // SAVED METRIC #1","APPS // PREFERRED ACTION #1"
   ]);
   assert.ok(cpu.every(x=>x.owner==="appcontrol" && x.readOnly));
   assert.ok(other.every(x=>x.owner==="appcontrol" && x.readOnly));
@@ -205,7 +205,7 @@ test("malformed AppControl snapshots are bounded and don't become actions",()=>{
   };
   const out=Hub.list([],[],[],[],bad);
   assert.equal(out.total,1);
-  assert.equal(out.rows[0].label,"PROCESS FAVORITE #1");
+  assert.equal(out.rows[0].label,"KILL // SAVED PROCESS #1");
   assert.ok(out.rejected>=4);
   const missing=Hub.list([],[],[],[],{favoriteKeys:["task|ok"]});
   assert.equal(missing.total,0);
@@ -253,15 +253,15 @@ test("owner-provided labels are display-only and safely validated",()=>{
   labels[third]="token://private";
   const withLabels=Hub.list([],[],[],[],donor,labels);
   assert.equal(withLabels.rows[0].label,"Firefox Worker");
-  assert.equal(withLabels.rows[1].label,"PROCESS FAVORITE #2");
-  assert.equal(withLabels.rows[2].label,"APP CONTROL FAVORITE #1");
+  assert.equal(withLabels.rows[1].label,"KILL // SAVED PROCESS #2");
+  assert.equal(withLabels.rows[2].label,"RUN // SAVED COMMAND #1");
   for(const row of withLabels.rows) {
     assert.equal(row.readOnly,true);
     assert.equal(row.owner,"appcontrol");
     assert.deepEqual(plain(row.capabilities),[]);
     assert.equal("resourceId" in row,false);
   }
-  assert.equal(Hub.list([],[],[],[],donor).rows[0].label,"PROCESS FAVORITE #1");
+  assert.equal(Hub.list([],[],[],[],donor).rows[0].label,"KILL // SAVED PROCESS #1");
   assert.ok(withLabels.rows.every(row=>!row.label.includes("private-command")));
 });
 
@@ -337,8 +337,12 @@ test("AppControl owner labels update with source availability without executing"
     "thermal|sensor-secret"],favoriteDetailActionKeys:[],
     favoriteMonitorBoxKeys:[],favoriteTaskMetricKeys:[]};
   const empty=Hub.list([],[],[],[],saved,{},Display.build(saved,{}));
-  assert.equal(empty.rows[0].resolved,false);
-  assert.equal(empty.rows[0].menu,"OTHER");
+  // Without a live DesktopEntry, the saved APPS ID can still provide its
+  // safe program token. A real installed name supersedes that fallback.
+  assert.equal(empty.rows[0].resolved,true);
+  assert.equal(empty.rows[0].menu,"APPS");
+  assert.equal(empty.rows[0].item,"test [SAVED APP ID]");
+  assert.equal(empty.rows[0].available,"unresolved");
   const ready=Hub.list([],[],[],[],saved,{},Display.build(saved,{
     apps:[{id:"org.test.desktop",name:"Test Application"}],
     taskRows:[],thermalRows:[],systemRows:[]
@@ -390,10 +394,154 @@ test("CPU++ Favorites entries select from their entire row with // breadcrumb se
     "onClicked: pane.selectionRequested(modelData.key)",
     "Accessible.role: Accessible.Button",
     "Keys.onPressed:",
-    '"APP CTRL // "+modelData.menu',
-    '+" // "+(modelData.resolved'
+    "function favoriteRowLabel(item)",
+    'return "APP CTRL // "+menu+" // "+text',
+    "text: pane.favoriteRowLabel(modelData)"
   ]) assert.ok(pane.includes(required),required);
   assert.doesNotMatch(pane,/label:\s*"VIEW"/);
   assert.ok(fixture.includes("16,row.height/2"));
   assert.ok(!fixture.includes("row.width-33"));
+});
+
+
+test("RUN, hidden CLI, windows and preferred RUN favorites expose distinguishable safe menu/items",()=>{
+  const Display={Resource};
+  load("services/favorites/FavoritesAppControlDisplayPolicy.js",Display);
+  const saved={
+    favoriteKeys:[
+      "run:kitty:zellij%20--session%20private-value",
+      "run:firefox",
+      "run:toolbox:mpv%20--fullscreen",
+      "hidden:btop",
+      "mode:4:Work Window",
+      "mode:1:App Settings",
+      "mode:2:%2Fhome%2Fprivate%2Fnotes.txt",
+      "run:private%20command",
+      "run:%2Fhome%2Fprivate%2Fscript%20--token%20never-show",
+      "mode:4:Confidential Document"
+    ],
+    favoriteDetailActionKeys:["run|run%3Akitty%3Azellij%2520--session%2520private-value|kitty"],
+    favoriteMonitorBoxKeys:[],favoriteTaskMetricKeys:[]
+  };
+  const source=Display.build(saved,{
+    apps:[],taskRows:[],thermalRows:[],fanRows:[],systemRows:[],
+    swayWindows:[{name:"Work Window"},{name:"Confidential Document"}],
+    appTabs:[]
+  });
+  const hub=Hub.list([],[],[],[],saved,{},source);
+  const row=(kind,raw)=>hub.rows.find(x=>
+    x.key===Resource.identityKey("appcontrol",kind,raw));
+  const expected=[
+    ["item","run:kitty:zellij%20--session%20private-value",
+        "RUN","zellij [KITTY] [OPTIONS HIDDEN]","FAVORITE"],
+    ["item","run:firefox","RUN","firefox","FAVORITE"],
+    ["item","run:toolbox:mpv%20--fullscreen",
+        "RUN","mpv [TOOLBOX] [OPTIONS HIDDEN]","FAVORITE"],
+    ["item","hidden:btop","APPS","btop [CLI]","FAVORITE"],
+    ["item","mode:4:Work Window","WINDOWS","Work Window","FAVORITE"],
+    ["item","mode:1:App Settings","APPS","App Settings","FAVORITE"],
+    ["preferred-action","run|run%3Akitty%3Azellij%2520--session%2520private-value|kitty",
+        "RUN","zellij [KITTY] [OPTIONS HIDDEN] - Run in Kitty","PREFERRED ACTION"]
+  ];
+  for(const [kind,raw,menu,item,type] of expected) {
+    const entry=row(kind,raw);
+    assert.ok(entry,raw);
+    assert.equal(entry.resolved,true,raw);
+    assert.equal(entry.menu,menu);
+    assert.equal(entry.item,item);
+    assert.equal(entry.label,menu+" // "+item);
+    assert.equal(entry.favoriteType,type);
+    assert.equal(entry.readOnly,true);
+    assert.deepEqual(plain(entry.capabilities),[]);
+    assert.equal("resourceId" in entry,false);
+  }
+  const denied=[
+    ["mode:2:%2Fhome%2Fprivate%2Fnotes.txt","FILES"],
+    ["run:private%20command","RUN"],
+    ["run:%2Fhome%2Fprivate%2Fscript%20--token%20never-show","RUN"],
+    ["mode:4:Confidential Document","WINDOWS"]
+  ];
+  for(const [raw,menu] of denied) {
+    const entry=row("item",raw);
+    assert.equal(entry.resolved,false,raw);
+    assert.equal(entry.menu,menu);
+    assert.equal(entry.item,"NAME UNAVAILABLE");
+    assert.ok(entry.label.startsWith(menu+" // SAVED "));
+  }
+  const visible=hub.rows.map(x=>x.label).join(" | ");
+  for(const secret of ["private-value","never-show","notes.txt",
+                       "Confidential Document","%2Fhome"])
+    assert.ok(!visible.includes(secret),secret);
+});
+
+test("AppControl saved-mode fallbacks provide actual source family without guessing names",()=>{
+  const donor={favoriteKeys:[
+    "mode:4:private document","mode:5:remote secret",
+    "mode:2:private file","mode:7:private process",
+    "hidden:secret-token",
+    "run:token%3Dabc%20--hidden"
+  ],favoriteDetailActionKeys:[],favoriteMonitorBoxKeys:[],
+  favoriteTaskMetricKeys:[]};
+  const descriptions=Object.create(null);
+  const result=Hub.list([],[],[],[],donor,{},descriptions);
+  assert.deepEqual(plain(result.rows.map(x=>x.menu)),
+      ["WINDOWS","REMOTE","FILES","KILL","APPS","RUN"]);
+  for(const entry of result.rows) {
+    assert.equal(entry.resolved,false);
+    assert.equal(entry.item,"NAME UNAVAILABLE");
+    assert.equal(entry.readOnly,true);
+    assert.equal(entry.capabilities.length,0);
+    assert.ok(!entry.label.includes("private"));
+    assert.ok(!entry.label.includes("secret"));
+  }
+});
+
+test("AppControl display source reads original window and tab models without new authority",()=>{
+  const qml=read("widgets/appcontrol/AppControlFavoriteDisplaySource.qml");
+  const policy=read("services/favorites/FavoritesAppControlDisplayPolicy.js");
+  for(const prop of [
+    "appControlOwner.swayWindows","appControlOwner.appTabs",
+    "appControlOwner.thermalRows","appControlOwner.systemRows"
+  ]) assert.ok(qml.includes(prop),prop);
+  for(const term of ["safeRunDisplay","modeIdentity","stableOwnerWindowName",
+    "preferredRunAction"]) assert.ok(policy.includes(term),term);
+  assert.doesNotMatch(qml+policy,/FileView\s*\{|execDetached|Process\s*\{|Qt\.openUrlExternally/);
+  const panel=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  assert.match(panel,/onClicked: pane\.selectionRequested\(modelData\.key\)/);
+  assert.match(panel,/pane\.favoriteRowLabel\(modelData\)/);
+});
+
+
+test("saved freedesktop identifiers remain recognizable without installed app models",()=>{
+  const Display={Resource};
+  load("services/favorites/FavoritesAppControlDisplayPolicy.js",Display);
+  const saved={favoriteKeys:[
+      "org.example.Galaxy.desktop",
+      "com.example.secret-vault.desktop",
+      "com.example.SecureApp.desktop",
+      "Brave Web Browser", "kitty"
+    ],
+    favoriteDetailActionKeys:[],favoriteMonitorBoxKeys:[],
+    favoriteTaskMetricKeys:[]
+  };
+  const desc=Display.build(saved,{apps:[]});
+  const list=Hub.list([],[],[],[],saved,{},desc);
+  assert.equal(list.rows.length,5);
+  assert.equal(list.rows[0].menu,"APPS");
+  assert.equal(list.rows[0].item,"Galaxy [SAVED APP ID]");
+  assert.equal(list.rows[0].label,"APPS // Galaxy [SAVED APP ID]");
+  assert.equal(list.rows[0].available,"unresolved");
+  assert.equal(list.rows[1].resolved,false);
+  assert.equal(list.rows[1].item,"NAME UNAVAILABLE");
+  assert.equal(list.rows[1].menu,"APPS");
+  assert.equal(list.rows[1].label,"APPS // SAVED APPLICATION #2");
+  assert.equal(list.rows[2].item,"SecureApp [SAVED APP ID]");
+  assert.equal(list.rows[3].item,"Brave Web Browser [SAVED APP ID]");
+  assert.equal(list.rows[4].item,"kitty [SAVED APP ID]");
+  for(const row of list.rows) {
+    assert.equal(row.readOnly,true);
+    assert.deepEqual(plain(row.capabilities),[]);
+    assert.equal("resourceId" in row,false);
+    assert.ok(!row.label.includes("org.example."));
+  }
 });

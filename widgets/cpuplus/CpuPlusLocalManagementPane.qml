@@ -41,20 +41,20 @@ Item {
         : section === "STRUCTURE" ? "STRUCTURE / UNITS"
         : "ORGANIZATIONS / BRANCHES"
 
-    property string searchQuery: ""
-    readonly property string normalizedSearch: searchQuery.trim().toLowerCase()
+    readonly property string normalizedSearch: searchField.text.trim().toLowerCase()
     readonly property bool editingText: pane.area === "selector" && searchField.editingText
     onSectionChanged: {
-        pane.searchQuery = "";
-        if (pane.area === "details")
+        if (searchField)
+            searchField.text = "";
+        if (pane.area === "details" && archiveTray)
             archiveTray.cancelDelete();
     }
     onSelectedOrganizationIdChanged: {
-        if (pane.area === "details")
+        if (pane.area === "details" && archiveTray)
             archiveTray.cancelDelete();
     }
     onSelectedPortfolioIdChanged: {
-        if (pane.area === "details")
+        if (pane.area === "details" && archiveTray)
             archiveTray.cancelDelete();
     }
 
@@ -199,8 +199,6 @@ Item {
                     width: parent.width
                     placeholder: "SEARCH LOCAL RECORDS"
                     maxLength: 80
-                    text: pane.searchQuery
-                    onTextChanged: pane.searchQuery = text
                 }
                 Repeater {
                     model: pane.section === "PORTFOLIOS"

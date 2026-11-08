@@ -177,6 +177,7 @@ Rectangle {
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
                                 text: modelData.label
+                                textFormat: Text.PlainText
                                 color: Colors.white
                                 font.pixelSize: 10
                                 elide: Text.ElideRight

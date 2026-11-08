@@ -80,6 +80,15 @@ Rectangle {
     readonly property string liveMediaKind:
         MediaPanelPolicy.kindForRoute(currentPath)
 
+    // U5c: only the current loaded RADIO/MEDIA surface has an eligible
+    // memory snapshot. On other routes or closed Weather return disconnected.
+    readonly property var radioFavoritesSnapshot: {
+        if (!browser.visible || browser.liveMediaKind==="") return null;
+        const pane=browser.indexOpen ? mediaLivePane : workspaceLoader.item;
+        if (!pane || !pane.visible) return null;
+        return pane.radioFavoritesSnapshot || null;
+    }
+
     // One active NEWS viewport only. Workspace and INDEX intentionally have
     // different MEDIA panes; select by actual presentation ownership.
     readonly property string activeWatchSourceId: {

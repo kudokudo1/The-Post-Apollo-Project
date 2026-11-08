@@ -31,10 +31,31 @@ Rectangle {
     property int recallAttempts: 0
     property string lastRememberedLoadedId: ""
 
+    // U5c: status is established by this existing FileView, never by CPU++.
+    // An unopened/error memory file is not an authoritative empty list.
+    property string radioMemoryState: "loading"
     readonly property var favoriteItems:
         RadioMemory.decodeList(radioMemoryAdapter.favoriteEntries, 10)
     readonly property var recentItems:
         RadioMemory.decodeList(radioMemoryAdapter.recentEntries, 8)
+
+    // Read-only boundary: copy public station identity/title only. No FileView
+    // QObject, stream URL, playback controller or mutation callback escapes.
+    readonly property var favoritesBridgeSnapshot: {
+        const state=stationRadio.radioMemoryState;
+        if (state!=="ready") return ({state:state,favorites:[],recents:[]});
+        function copy(items) {
+            return items.map(function(item) {
+                return ({
+                    ref:{source:item.ref.source,kind:item.ref.kind,id:item.ref.id},
+                    title:item.title
+                });
+            });
+        }
+        return ({state:"ready",
+                 favorites:copy(stationRadio.favoriteItems),
+                 recents:copy(stationRadio.recentItems)});
+    }
 
     readonly property var presets: [
         {name: "NEWS", query: "tag:news"},
@@ -83,7 +104,20 @@ Rectangle {
         id: radioMemoryFile
         path: Quickshell.dataDir + "/weather-radio-memory.json"
         watchChanges: true
-        onFileChanged: reload()
+        onFileChanged: {
+            stationRadio.radioMemoryState="loading";
+            reload();
+        }
+        onLoaded: stationRadio.radioMemoryState="ready"
+        onLoadFailed: function(error) {
+            // Including FileNotFound: never present old in-memory favorites as
+            // an authoritative cleared list. A successful future save heals it.
+            stationRadio.radioMemoryState="unavailable";
+        }
+        onSaved: stationRadio.radioMemoryState="ready"
+        onSaveFailed: function(error) {
+            stationRadio.radioMemoryState="error";
+        }
         onAdapterUpdated: writeAdapter()
 
         JsonAdapter {

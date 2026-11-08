@@ -1055,3 +1055,59 @@ test("U5c Radio remains the sole Weather radio memory writer and playback owner"
   assert.doesNotMatch(policy,/streamHost|\.genre|\.artist|\.codec|\.bitrate|\.url/);
   assert.doesNotMatch(cpu,/StationRadio\s*\{/);
 });
+
+
+test("U5a and U5c Weather favorites pass only loaded owner snapshots through shell",()=>{
+  const shell=read("shell.qml");
+  const weather=read("widgets/weather/WeatherStationW.qml");
+  const station=read("widgets/weather/StationSubjectNavigator.qml");
+  const workspace=read("widgets/weather/StationWorkspaceSurface.qml");
+  const media=read("widgets/weather/StationMediaSubjectPane.qml");
+  const radio=read("widgets/weather/StationRadio.qml");
+  const cpu=read("widgets/CpuPlusW.qml");
+  const home=read("services/weather/WeatherHomeFavoritesStore.qml");
+
+  // The actual shell wiring is not just a synthetic projection or a second
+  // store. Both references point into the existing WeatherStationW instance.
+  assert.match(shell,/weatherHomeFavoritesSource:\s*weatherStationWindow\.homeFavoritesReadOnlySnapshot/);
+  assert.match(shell,/radioFavoritesSource:\s*weatherStationWindow\.radioFavoritesReadOnlySnapshot/);
+  assert.match(weather,/readonly property var homeFavoritesReadOnlySnapshot:/);
+  assert.match(weather,/storageState:homeFavoritesStore\.storageState/);
+  assert.match(weather,/homeFavoritesStore\.panelRoutes\.slice\(\)/);
+  assert.match(weather,/homeFavoritesStore\.cardKeys\.slice\(\)/);
+  assert.match(weather,/readonly property var radioFavoritesReadOnlySnapshot:\s*subjectNavigator\.radioFavoritesSnapshot/);
+  assert.match(home,/readonly property var panelRoutes: document\.panelRoutes/);
+  assert.match(home,/readonly property var cardKeys: document\.cardKeys/);
+  assert.match(cpu,/cpuPlusWindow\.weatherHomeFavoritesSnapshot/);
+  assert.match(cpu,/cpuPlusWindow\.radioFavoritesSnapshot/);
+
+  // The route chain includes both workspace and INDEX.MEDIA paths.
+  assert.match(station,/readonly property var radioFavoritesSnapshot:/);
+  assert.match(station,/browser\.indexOpen \? mediaLivePane : workspaceLoader\.item/);
+  assert.match(station,/if \(!browser\.visible \|\| browser\.liveMediaKind===""\) return null;/);
+  assert.match(workspace,/mediaWorkspacePane\.radioFavoritesSnapshot/);
+  assert.match(media,/readonly property var radioFavoritesSnapshot:/);
+  assert.match(media,/mediaLoader\.active && mediaLoader\.item/);
+  assert.match(media,/mediaLoader\.item\.favoritesBridgeSnapshot/);
+  assert.match(media,/readonly property var favoritesBridgeSnapshot:\s*overviewRadio\.favoritesBridgeSnapshot/);
+  assert.match(media,/id: overviewRadio/);
+
+  // A FileView load/success/failure sets source truth, not CPU++.
+  assert.match(radio,/property string radioMemoryState: "loading"/);
+  assert.match(radio,/onLoaded: stationRadio\.radioMemoryState="ready"/);
+  assert.match(radio,/onLoadFailed: function\(error\)/);
+  assert.match(radio,/stationRadio\.radioMemoryState="unavailable"/);
+  assert.match(radio,/onSaved: stationRadio\.radioMemoryState="ready"/);
+  assert.match(radio,/onSaveFailed: function\(error\)/);
+  assert.match(radio,/radioMemoryState="loading";\s*reload\(\);/);
+  assert.match(radio,/if \(state!=="ready"\) return \(\{state:state,favorites:\[\],recents:\[\]\}\);/);
+  assert.match(radio,/favorites:copy\(stationRadio\.favoriteItems\)/);
+  assert.match(radio,/recents:copy\(stationRadio\.recentItems\)/);
+
+  // Keep original owner files and playback exactly where they were.
+  assert.equal((radio.match(/\bFileView\s*\{/g)||[]).length,1);
+  assert.equal((home.match(/\bFileView\s*\{/g)||[]).length,1);
+  assert.equal((shell.match(/\bWeatherStationW\s*\{/g)||[]).length,1);
+  assert.doesNotMatch(shell+cpu,/\bStationRadio\s*\{|\bWeatherHomeFavoritesStore\s*\{|\bFileView\s*\{/);
+  assert.doesNotMatch(media+station+workspace,/writeAdapter\(|loadMedia\(|transport\(|execDetached/);
+});

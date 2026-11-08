@@ -47,6 +47,10 @@ Rectangle {
         : activeFamily === "weather" ? weatherSourcePane.runtimeRows : []
     // MEDIA only: rebase the actual visible NEWS hub into workspace-local
     // coordinates. No duplicate route hub, no static hard-coded viewport.
+    // Copy only from the currently loaded MEDIA pane; no independent radio
+    // service, memory reader or hidden player is constructed for Favorites++.
+    readonly property var radioFavoritesSnapshot:
+        mediaWorkspacePane.visible ? mediaWorkspacePane.radioFavoritesSnapshot : null
     readonly property string activeWatchSourceId:
         activePlayerViewportRect.width > 0 && mediaWorkspacePane.visible
         ? mediaWorkspacePane.activeWatchSourceId : ""

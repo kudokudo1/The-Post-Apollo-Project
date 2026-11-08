@@ -1054,6 +1054,12 @@ PanelWindow {
                 appControlWindow: appControlWindow
                 systemTelemetry: sharedSystemTelemetry
                 fanControl: sharedFanControl
+                // U5a/U5c: connect only copied, read-only Weather owner
+                // snapshots. No Weather/Radio writer or player QObject passes.
+                weatherHomeFavoritesSource:
+                    weatherStationWindow.homeFavoritesReadOnlySnapshot
+                radioFavoritesSource:
+                    weatherStationWindow.radioFavoritesReadOnlySnapshot
                 relationshipFocusModeActive: relationshipFocus.active
                 relationshipFocused: relationshipFocus.owner === "cpu"
                 // Read-only Social adapter state: never credentials, login

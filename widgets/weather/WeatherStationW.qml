@@ -47,6 +47,21 @@ PanelWindow {
         id: homeFavoritesStore
     }
 
+    // U5a: copy the original Weather HOME owner's stable saved identities.
+    // Neither its QObject/writer nor raw measurements leave this component.
+    readonly property var homeFavoritesReadOnlySnapshot: ({
+        storageState:homeFavoritesStore.storageState,
+        panelRoutes:Array.isArray(homeFavoritesStore.panelRoutes)
+                    ? homeFavoritesStore.panelRoutes.slice() : [],
+        cardKeys:Array.isArray(homeFavoritesStore.cardKeys)
+                 ? homeFavoritesStore.cardKeys.slice() : []
+    })
+
+    // U5c: only the loaded MEDIA/RADIO owner can publish this snapshot.
+    // Null when the route is inactive/unloaded; never build a second reader.
+    readonly property var radioFavoritesReadOnlySnapshot:
+        subjectNavigator.radioFavoritesSnapshot
+
     WeatherServices.WeatherHistoryService {
         id: weatherHistoryService
         active: weatherStation.menuOpen && weatherStation.subjectNavigationOpen

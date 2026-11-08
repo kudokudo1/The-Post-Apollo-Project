@@ -190,6 +190,30 @@ for path in probe.PROTECTED_DIRS:
         violations += 1
         print("C4B_DIAG_C3B_ANCESTOR_STAT_REFUSED // "
               f"path={path!r} error={type(exc).__name__}", flush=True)
+# Supplemental OS-layout evidence only: C3b still refuses the /opt link.
+# Do not normalize, alter or substitute any origin evidence.
+try:
+    link_target = os.readlink("/opt")
+    resolved = os.path.realpath("/opt")
+    print("C4B_DIAG_C3B_OPT_LINK // "
+          f"target={link_target!r} resolved={resolved!r}", flush=True)
+    for path in dict.fromkeys(("/var", "/var/opt", resolved)):
+        try:
+            target_info = os.lstat(path)
+            print("C4B_DIAG_C3B_OPT_CHAIN // "
+                  f"path={path!r} uid={target_info.st_uid} "
+                  f"mode={stat.S_IMODE(target_info.st_mode):04o} "
+                  f"directory={stat.S_ISDIR(target_info.st_mode)} "
+                  f"symlink={stat.S_ISLNK(target_info.st_mode)}",
+                  flush=True)
+        except OSError as exc:
+            print("C4B_DIAG_C3B_OPT_CHAIN_STAT_REFUSED // "
+                  f"path={path!r} error={type(exc).__name__}",
+                  flush=True)
+except OSError as exc:
+    print("C4B_DIAG_C3B_OPT_LINK_READ_REFUSED // "
+          f"error={type(exc).__name__}", flush=True)
+
 print(f"C4B_DIAG_C3B_ANCESTOR_VIOLATION_COUNT // {violations}", flush=True)
 C4B_C3B_DIR_DIAG
     fail "DBUS_SYSTEMD_PID_UID_SELINUX_ORIGIN_REJECTED"

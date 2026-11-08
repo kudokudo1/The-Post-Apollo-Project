@@ -56,6 +56,21 @@ PanelWindow {
     property string batchReceipt: ""
     property int swipeIndex: 0
     property var swipeHistory: []
+    // Hunt is a presentation over the same review queue. Only the existing
+    // confirmBatchTrash() can authorize a physical move to recoverable Trash.
+    property var huntTargets: []
+    property var huntHistory: []
+    property int huntRound: 0
+    property int huntTick: 0
+    property int huntSecondsLeft: 25
+    property int huntShots: 0
+    property int huntHits: 0
+    property int huntMisses: 0
+    property int huntCombo: 0
+    property int huntScore: 0
+    property bool huntPaused: true
+    property bool huntRoundComplete: false
+    property string huntLastEvent: "READY // NEW ROUND"
     property string captureMode: "region"
     // Read Social's active identity and provider alias metadata, not login state.
     readonly property var zoomSocialIdentity: SocialIdentityStore.snapshot
@@ -402,6 +417,21 @@ PanelWindow {
             batchReviewKey = "";
             swipeIndex = 0;
             swipeHistory = [];
+            // A new inventory invalidates active Hunt targets and history.
+            // Never fire a selection for an earlier folder or filter.
+            huntTargets = [];
+            huntHistory = [];
+            huntPaused = true;
+            huntRoundComplete = false;
+            huntRound = 0;
+            huntTick = 0;
+            huntSecondsLeft = 25;
+            huntShots = 0;
+            huntHits = 0;
+            huntMisses = 0;
+            huntCombo = 0;
+            huntScore = 0;
+            huntLastEvent = "READY // NEW ROUND";
             galleryFiles = [];
         } else if (!galleryHasMore) {
             return false;
@@ -468,6 +498,7 @@ PanelWindow {
         batchPreview = null;
         batchReviewKey = "";
         swipeHistory = [];
+        huntHistory = [];
         return true;
     }
 
@@ -493,6 +524,7 @@ PanelWindow {
         batchPreview = null;
         batchReviewKey = "";
         swipeHistory = [];
+        huntHistory = [];
         return true;
     }
 
@@ -502,6 +534,7 @@ PanelWindow {
         batchPreview = null;
         batchReviewKey = "";
         swipeHistory = [];
+        huntHistory = [];
         return true;
     }
 
@@ -531,6 +564,7 @@ PanelWindow {
         batchPaths = next;
         batchPreview = null;
         batchReviewKey = "";
+        huntHistory = [];
         feedback = "SWIPE // " + action.toUpperCase()
                    + " // " + swipeIndex + "/" + galleryFiles.length
                    + " // QUEUED " + batchPaths.length;
@@ -549,6 +583,176 @@ PanelWindow {
         batchPreview = null;
         batchReviewKey = "";
         feedback = "SWIPE // UNDID " + last.decision.toUpperCase();
+        huntHistory = [];
+        return true;
+    }
+
+    // Duck Hunt-style Cleanup game. Targets come only from the already-loaded
+    // safe gallery inventory. Hits mark paths; no game code calls GIO/Trash.
+    function huntStartRound() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || (!huntRoundComplete && huntTargets.length > 0))
+            return false;
+        if (batchPaths.length >= 500) {
+            feedback = "HUNT // QUEUE FULL // REVIEW OR CLEAR";
+            return false;
+        }
+        const eligible = [];
+        const seen = {};
+        for (let i = 0; i < galleryFiles.length; i++) {
+            const item = galleryFiles[i];
+            if (!item || typeof item.path !== "string" || !item.path
+                    || seen[item.path] || batchContains(item.path))
+                continue;
+            seen[item.path] = true;
+            eligible.push(item);
+        }
+        if (eligible.length === 0) {
+            huntPaused = true;
+            huntLastEvent = "NO UNQUEUED LOADED FILES // LOAD MORE OR CHANGE FILTER";
+            feedback = huntLastEvent;
+            return false;
+        }
+        // Presentation randomness only. Never randomly choose files outside
+        // the active, filtered and explicitly scanned gallery inventory.
+        for (let i = eligible.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = eligible[i];
+            eligible[i] = eligible[j];
+            eligible[j] = tmp;
+        }
+        const picked = eligible.slice(0, Math.min(3, eligible.length));
+        const targets = [];
+        for (let i = 0; i < picked.length; i++) {
+            targets.push({
+                path: picked[i].path, name: String(picked[i].name || ""),
+                mediaType: String(picked[i].mediaType || ""),
+                lane: i, phase: Math.random() * Math.PI * 2,
+                speed: 0.032 + Math.random() * 0.027
+            });
+        }
+        huntTargets = targets;
+        huntHistory = [];
+        huntRound += 1;
+        huntTick = 0;
+        huntSecondsLeft = 25;
+        huntCombo = 0;
+        huntRoundComplete = false;
+        huntPaused = false;
+        huntLastEvent = "ROUND " + huntRound + " // FIRE TO QUEUE";
+        feedback = "HUNT // ROUND " + huntRound
+                   + " // THREE RANDOM LOADED MEDIA TARGETS MAX";
+        return true;
+    }
+
+    function huntAdvance() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || huntPaused || huntTargets.length === 0)
+            return false;
+        huntTick++;
+        huntSecondsLeft = Math.max(0, 25 - Math.floor(huntTick / 10));
+        if (huntTick >= 250) {
+            // Timeouts never queue anything. Unshot files stay eligible for
+            // a later round and are never silently marked for deletion.
+            huntTargets = [];
+            huntHistory = [];
+            huntPaused = true;
+            huntRoundComplete = true;
+            huntCombo = 0;
+            huntLastEvent = "TIME UP // UNHIT FILES STAY UNTOUCHED";
+            feedback = huntLastEvent;
+        }
+        return true;
+    }
+
+    function huntTogglePause() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || huntRoundComplete || huntTargets.length === 0)
+            return false;
+        huntPaused = !huntPaused;
+        huntLastEvent = huntPaused ? "PAUSED // NO SHOTS" : "RESUMED // HUNT";
+        return true;
+    }
+
+    function huntFire(path) {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || huntPaused || huntRoundComplete || huntTargets.length === 0)
+            return false;
+        const targetPath = String(path || "");
+        let hitIndex = -1;
+        for (let i = 0; i < huntTargets.length; i++)
+            if (huntTargets[i].path === targetPath && targetPath)
+                hitIndex = i;
+        if (targetPath && hitIndex < 0)
+            return false; // forged/stale hit cannot add an arbitrary path
+        if (hitIndex >= 0 && !batchContains(targetPath)
+                && batchPaths.length >= 500) {
+            feedback = "HUNT // QUEUE FULL // REVIEW OR CLEAR";
+            huntPaused = true;
+            return false;
+        }
+        const history = huntHistory.slice();
+        history.push({
+            targets: huntTargets.slice(), paths: batchPaths.slice(),
+            shots: huntShots, hits: huntHits, misses: huntMisses,
+            score: huntScore, combo: huntCombo,
+            paused: huntPaused, complete: huntRoundComplete
+        });
+        if (history.length > 30)
+            history.shift();
+        huntHistory = history;
+        huntShots += 1;
+        if (hitIndex < 0) {
+            huntMisses += 1;
+            huntCombo = 0;
+            huntLastEvent = "MISS // TARGETS STILL ACTIVE";
+        } else {
+            const nextTargets = huntTargets.slice();
+            nextTargets.splice(hitIndex, 1);
+            huntTargets = nextTargets;
+            if (!batchContains(targetPath)) {
+                const next = batchPaths.slice();
+                next.push(targetPath);
+                batchPaths = next;
+            }
+            huntHits += 1;
+            huntCombo += 1;
+            huntScore += 100 + Math.min(huntCombo - 1, 5) * 25;
+            batchPreview = null;
+            batchReviewKey = "";
+            swipeHistory = [];
+            huntLastEvent = "HIT // QUEUED " + huntTargets.length
+                            + " TARGETS REMAIN";
+            if (huntTargets.length === 0) {
+                huntRoundComplete = true;
+                huntPaused = true;
+                huntLastEvent = "ROUND CLEARED // REVIEW QUEUE OR NEXT ROUND";
+            }
+        }
+        feedback = "HUNT // " + huntLastEvent + " // SCORE " + huntScore;
+        return true;
+    }
+
+    function huntUndo() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || huntHistory.length === 0)
+            return false;
+        const history = huntHistory.slice();
+        const last = history.pop();
+        huntHistory = history;
+        huntTargets = last.targets.slice();
+        batchPaths = last.paths.slice();
+        huntShots = last.shots;
+        huntHits = last.hits;
+        huntMisses = last.misses;
+        huntScore = last.score;
+        huntCombo = last.combo;
+        huntPaused = last.paused;
+        huntRoundComplete = last.complete;
+        batchPreview = null;
+        batchReviewKey = "";
+        huntLastEvent = "UNDO // TARGET AND QUEUE RESTORED";
+        feedback = "HUNT // " + huntLastEvent;
         return true;
     }
 
@@ -888,6 +1092,9 @@ PanelWindow {
             batchPreview = null;
             swipeIndex = 0;
             swipeHistory = [];
+            huntHistory = [];
+            huntTargets = [];
+            huntPaused = true;
             Qt.callLater(function() { camera.loadGallery(false, "cleanup"); });
         } else if (action === "previewSelected") {
             if (payload.path === selectedPath) {
@@ -2457,8 +2664,8 @@ PanelWindow {
                             model: [
                                 {id: "batch", label: "BATCH"},
                                 {id: "swipe", label: "SWIPE"},
-                                {id: "desktop", label: "DESKTOP"},
-                                {id: "hunt", label: "HUNT // NEXT"}
+                                {id: "hunt", label: "HUNT"},
+                                {id: "desktop", label: "DESKTOP"}
                             ]
                             ActionButton {
                                 width: (cleanupModeRow.width - 3 * cleanupModeRow.spacing) / 4
@@ -2467,9 +2674,12 @@ PanelWindow {
                                 labelPixelSize: 10
                                 selected: camera.cleanupTechnique === modelData.id
                                 accentColor: modelData.id === "hunt"
-                                             ? Colors.white : Colors.magenta
-                                available: !camera.busy && modelData.id !== "hunt"
+                                             ? Colors.cyan : Colors.magenta
+                                available: !camera.busy
                                 onLeftClicked: {
+                                    if (camera.cleanupTechnique === "hunt"
+                                            && modelData.id !== "hunt")
+                                        camera.huntPaused = true;
                                     camera.cleanupTechnique = modelData.id;
                                     camera.batchPreview = null;
                                     camera.batchReviewKey = "";
@@ -2984,6 +3194,248 @@ PanelWindow {
                                     available: !camera.busy && camera.galleryHasMore
                                                && camera.swipeIndex >= camera.galleryFiles.length
                                     onLeftClicked: camera.loadGallery(true, "cleanup")
+                                }
+                            }
+                        }
+
+
+                        // Three moving media targets per round. Hits only mark
+                        // Gallery-validated file paths in the common review queue.
+                        Item {
+                            id: cleanupHuntView
+                            anchors.fill: parent
+                            visible: camera.cleanupTechnique === "hunt"
+                            focus: visible && camera.activeView === "cleanup"
+
+                            Keys.onPressed: function(event) {
+                                if (event.key === Qt.Key_N) {
+                                    camera.huntStartRound();
+                                    event.accepted = true;
+                                } else if (event.key === Qt.Key_P) {
+                                    camera.huntTogglePause();
+                                    event.accepted = true;
+                                } else if (event.key === Qt.Key_Z) {
+                                    camera.huntUndo();
+                                    event.accepted = true;
+                                }
+                            }
+                            Timer {
+                                id: huntClock
+                                interval: 100
+                                repeat: true
+                                running: camera.menuOpen
+                                         && camera.activeView === "cleanup"
+                                         && camera.cleanupTechnique === "hunt"
+                                         && !camera.busy && !camera.huntPaused
+                                         && camera.huntTargets.length > 0
+                                         && camera.huntSecondsLeft > 0
+                                onTriggered: camera.huntAdvance()
+                            }
+                            Column {
+                                width: parent.width
+                                height: parent.height
+                                spacing: 6
+
+                                Row {
+                                    width: parent.width
+                                    height: 22
+                                    spacing: 6
+                                    GohuText {
+                                        width: (parent.width - 12) / 3
+                                        height: 22
+                                        font.pixelSize: 10
+                                        color: Colors.magenta
+                                        text: "SCORE // " + camera.huntScore
+                                    }
+                                    GohuText {
+                                        width: (parent.width - 12) / 3
+                                        height: 22
+                                        font.pixelSize: 10
+                                        color: Colors.cyan
+                                        text: "HITS " + camera.huntHits
+                                              + " // MISSES " + camera.huntMisses
+                                    }
+                                    GohuText {
+                                        width: (parent.width - 12) / 3
+                                        height: 22
+                                        font.pixelSize: 10
+                                        color: camera.huntSecondsLeft < 6
+                                               ? Colors.red : Colors.yellow
+                                        text: "ROUND " + camera.huntRound
+                                              + " // " + camera.huntSecondsLeft + " SEC"
+                                    }
+                                }
+
+                                Rectangle {
+                                    id: huntArena
+                                    width: parent.width
+                                    height: Math.max(95, cleanupWorkArea.height - 100)
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.cyan
+                                    radius: 4
+                                    clip: true
+
+                                    Repeater {
+                                        model: 3
+                                        Rectangle {
+                                            x: 4
+                                            y: (index + 1) * huntArena.height / 3
+                                            width: huntArena.width - 8
+                                            height: 1
+                                            color: Colors.cyan
+                                            opacity: 0.18
+                                        }
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        enabled: !camera.huntPaused && !camera.busy
+                                        cursorShape: Qt.CrossCursor
+                                        onClicked: {
+                                            huntArena.forceActiveFocus();
+                                            camera.huntFire("");
+                                        }
+                                    }
+                                    Repeater {
+                                        id: huntTargetRepeater
+                                        model: camera.huntTargets
+                                        delegate: Item {
+                                            id: huntTargetItem
+                                            property var target: modelData
+                                            width: Math.min(170, Math.max(90,
+                                                huntArena.width / 4.6))
+                                            height: Math.min(88, Math.max(51,
+                                                huntArena.height / 4.3))
+                                            x: 8 + Math.max(0, huntArena.width - width - 16)
+                                               * (0.50 + 0.44 * Math.sin(
+                                                   camera.huntTick * target.speed
+                                                   + target.phase))
+                                            y: 6 + Math.max(0, huntArena.height - height - 12)
+                                               * ((target.lane + 0.5) / 3)
+
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                radius: 5
+                                                border.width: 2
+                                                border.color: Colors.magenta
+                                                color: Colors.black
+                                                clip: true
+                                                Image {
+                                                    x: 4
+                                                    y: 3
+                                                    width: parent.width - 8
+                                                    height: parent.height - 21
+                                                    source: huntTargetItem.target.mediaType.indexOf("video") >= 0
+                                                            ? ""
+                                                            : camera.fileUrl(huntTargetItem.target.path)
+                                                    sourceSize.width: 200
+                                                    sourceSize.height: 110
+                                                    fillMode: Image.PreserveAspectFit
+                                                    asynchronous: true
+                                                    cache: false
+                                                }
+                                                GohuText {
+                                                    anchors.centerIn: parent
+                                                    visible: huntTargetItem.target.mediaType.indexOf("video") >= 0
+                                                    font.pixelSize: 12
+                                                    color: Colors.cyan
+                                                    text: "VIDEO"
+                                                }
+                                                GohuText {
+                                                    anchors.bottom: parent.bottom
+                                                    anchors.horizontalCenter: parent.horizontalCenter
+                                                    width: parent.width - 6
+                                                    height: 17
+                                                    horizontalAlignment: Text.AlignHCenter
+                                                    elide: Text.ElideMiddle
+                                                    font.pixelSize: 9
+                                                    color: Colors.white
+                                                    text: huntTargetItem.target.name
+                                                }
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    enabled: !camera.huntPaused && !camera.busy
+                                                    cursorShape: Qt.CrossCursor
+                                                    onPressed: huntArena.forceActiveFocus()
+                                                    onClicked: camera.huntFire(
+                                                                   huntTargetItem.target.path)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    GohuText {
+                                        anchors.centerIn: parent
+                                        visible: camera.huntTargets.length === 0
+                                                 || camera.huntPaused
+                                        font.pixelSize: 13
+                                        color: Colors.yellow
+                                        text: camera.huntTargets.length === 0
+                                              ? "HUNT // PRESS NEW ROUND"
+                                              : camera.huntRoundComplete
+                                                ? "ROUND CLEARED"
+                                                : "PAUSED"
+                                    }
+                                }
+
+                                Row {
+                                    width: parent.width
+                                    height: 30
+                                    spacing: 6
+                                    ActionButton {
+                                        width: (parent.width - 18) / 4
+                                        height: 29
+                                        label: "NEW ROUND"
+                                        labelPixelSize: 10
+                                        accentColor: Colors.magenta
+                                        available: !camera.busy
+                                            && (camera.huntTargets.length === 0
+                                                || camera.huntRoundComplete)
+                                        onLeftClicked: {
+                                            camera.huntStartRound();
+                                            cleanupHuntView.forceActiveFocus();
+                                        }
+                                    }
+                                    ActionButton {
+                                        width: (parent.width - 18) / 4
+                                        height: 29
+                                        label: camera.huntPaused ? "RESUME" : "PAUSE"
+                                        labelPixelSize: 10
+                                        accentColor: Colors.cyan
+                                        available: !camera.busy
+                                            && !camera.huntRoundComplete
+                                            && camera.huntTargets.length > 0
+                                        onLeftClicked: camera.huntTogglePause()
+                                    }
+                                    ActionButton {
+                                        width: (parent.width - 18) / 4
+                                        height: 29
+                                        label: "UNDO SHOT"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.yellow
+                                        available: !camera.busy
+                                            && camera.huntHistory.length > 0
+                                        onLeftClicked: camera.huntUndo()
+                                    }
+                                    ActionButton {
+                                        width: (parent.width - 18) / 4
+                                        height: 29
+                                        label: "LOAD MORE"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.white
+                                        available: !camera.busy && camera.galleryHasMore
+                                            && camera.huntTargets.length === 0
+                                        onLeftClicked: camera.loadGallery(true, "cleanup")
+                                    }
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    height: 19
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                    elide: Text.ElideRight
+                                    text: camera.huntLastEvent
+                                          + " // " + camera.batchPaths.length
+                                          + " MARKED FOR REVIEW"
                                 }
                             }
                         }

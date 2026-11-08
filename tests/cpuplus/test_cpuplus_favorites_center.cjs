@@ -19,7 +19,9 @@ const WeatherRules={};
 load("services/weather/WeatherHomeFavoritesPolicy.js",WeatherRules);
 const WeatherHome={WeatherRules,Adapters};
 load("services/favorites/FavoritesWeatherHomeProjection.js",WeatherHome);
-const Hub={Resource,Default,Collections,Adapters,WeatherHome};
+const Notifications={Adapters};
+load("services/favorites/FavoritesNotificationsProjection.js",Notifications);
+const Hub={Resource,Default,Collections,Adapters,WeatherHome,NotificationsProjection:Notifications};
 load("services/favorites/FavoritesManagementPolicy.js",Hub);
 const plain=v=>JSON.parse(JSON.stringify(v));
 const k=(provider,kind,id)=>Resource.identityKey(provider,kind,id);
@@ -236,7 +238,7 @@ test("CPU++ imports all AppControl owner lists, with seven source filters and re
     "FavoritesStore.favoriteTaskMetricKeys"
   ]) assert.ok(cpu.includes(field),field);
   assert.match(cpu,/FavoritesManagement\.list\(/);
-  assert.match(panel,/model: \["ALL","CPU\+\+","APP CTRL","WEATHER","CLOCK","PLACES","NEW"\]/);
+  assert.match(panel,/model: \["ALL","CPU\+\+","APP CTRL","WEATHER","NOTIFS","CLOCK","PLACES","NEW"\]/);
   assert.match(panel,/height: 90/);
   assert.match(panel,/modelData\.readOnly\?"READ ONLY"/);
   assert.match(panel,/pane\.selectedResource && !pane\.selectedResource\.readOnly/);
@@ -818,4 +820,121 @@ test("U5a Weather source is optional and cannot instantiate a duplicate writer",
   const shell=read("shell.qml");
   assert.doesNotMatch(shell,/WeatherHomeFavoritesStore\s*\{/);
   assert.doesNotMatch(cpu,/WeatherHomeFavoritesStore\s*\{/);
+});
+
+
+test("U5b notification source favorites appear as read-only named candidates",()=>{
+  const snap={
+    ready:true,status:"ready",revision:7,
+    sources:[
+      {appKey:"org.mozilla.firefox",source:"Firefox",sourceId:"PRIVATE_ID_SHOULD_NOT_APPEAR"},
+      {appKey:"github",source:"GitHub",message:"PRIVATE_MESSAGE_BODY"},
+      {appKey:"proton-mail",source:"Proton Mail",url:"https://private.example"}
+    ]
+  };
+  const original=plain(snap);
+  const projected=Notifications.build(snap);
+  assert.equal(projected.state,"ready");
+  assert.equal(projected.invalidCount,0);
+  assert.equal(projected.rows.length,3);
+  const all=Hub.list([],[],[],[],undefined,undefined,undefined,undefined,snap);
+  assert.equal(all.total,3);
+  const names=all.rows.map(x=>x.item);
+  assert.deepEqual(plain(names),["Firefox","GitHub","Proton Mail"]);
+  for(const row of all.rows) {
+    assert.equal(row.category,"NOTIFS");
+    assert.equal(row.menu,"SOURCES");
+    assert.equal(row.owner,"notifications");
+    assert.equal(row.provider,"notifications");
+    assert.equal(row.favoriteType,"SOURCE FAVORITE");
+    assert.equal(row.readOnly,true);
+    assert.equal(row.available,"unresolved");
+    assert.equal(row.isFavorite,true);
+    assert.equal(row.isPinned,false);
+    assert.deepEqual(plain(row.capabilities),[]);
+    assert.equal("sourceId" in row,false);
+    assert.equal("resourceId" in row,false);
+    assert.equal("body" in row,false);
+    assert.equal("url" in row,false);
+    assert.equal(row.label,"NOTIFICATIONS // SOURCES // "+row.item);
+  }
+  assert.equal(Hub.filterRows(all,"NOTIFS").length,3);
+  assert.equal(Hub.filterRows(all,"WEATHER").length,0);
+  const Dossier={};
+  load("services/favorites/FavoritesDossierIndexPolicy.js",Dossier);
+  const grouped=Dossier.build(all);
+  assert.equal(grouped.total,3);
+  assert.equal(grouped.groups.length,1);
+  assert.equal(grouped.groups[0].key,"NOTIFS|SOURCES");
+  assert.equal(grouped.groups[0].title,"NOTIFICATIONS // SOURCES");
+  assert.deepEqual(plain(grouped.groups[0].items.map(x=>x.name)),plain(names));
+  const rendered=all.rows.map(row=>row.label).join(" ");
+  for(const hidden of ["PRIVATE_ID_SHOULD_NOT_APPEAR","PRIVATE_MESSAGE_BODY","private.example"])
+    assert.ok(!rendered.includes(hidden),hidden);
+  assert.deepEqual(plain(snap),original);
+});
+
+test("U5b notifications refuse bad storage state and private-looking names",()=>{
+  const noData=Notifications.build(null);
+  assert.equal(noData.state,"disconnected");
+  assert.equal(noData.rows.length,0);
+  for(const status of ["loading","saving","parse-error","load-error","save-error","new"]) {
+    const out=Notifications.build({
+      ready:true,status:status,sources:[{appKey:"github",source:"GitHub"}]});
+    assert.equal(out.rows.length,0,status);
+    assert.equal(out.state,status);
+  }
+  assert.equal(Notifications.build({
+    ready:false,status:"ready",sources:[{appKey:"github",source:"GitHub"}]
+  }).rows.length,0);
+  const snap={ready:true,status:"saved",sources:[
+    {appKey:"github",source:"GitHub"},
+    {appKey:"github",source:"duplicate"},
+    {appKey:"com.example.notify",source:"person@example.com"},
+    {appKey:"website:encoded::host.example",source:""},
+    {appKey:"",source:"INVALID"},
+    {appKey:"https://private.example",source:"unsafe"},
+    {appKey:"org.fake.password",source:"App password token"},
+    {appKey:"weather",source:"Weather"}
+  ]};
+  const out=Notifications.build(snap);
+  assert.ok(out.invalidCount>=3);
+  assert.deepEqual(plain(out.rows.map(row=>row.item)),
+    ["GitHub","com.example.notify",
+     "WEBSITE SOURCE NAME UNAVAILABLE","SOURCE NAME UNAVAILABLE","Weather"]);
+  const visible=out.rows.map(row=>row.label).join(" ");
+  assert.ok(!visible.includes("person@example.com"));
+  assert.ok(!visible.includes("host.example"));
+  assert.ok(!visible.includes("App password token"));
+  assert.ok(!visible.includes("org.fake.password"));
+  assert.ok(!visible.includes("https://private.example"));
+  assert.equal(out.rows.every(row=>row.readOnly&&row.capabilities.length===0),true);
+  assert.equal(Notifications.build({
+    ready:true,status:"ready",sources:Array(129).fill({appKey:"same",source:"Same"})
+  }).state,"invalid");
+});
+
+test("U5b consumes the existing Notifications singleton without duplicating its writer",()=>{
+  const cpu=read("widgets/CpuPlusW.qml");
+  const projection=read("services/favorites/FavoritesNotificationsProjection.js");
+  const manager=read("services/favorites/FavoritesManagementPolicy.js");
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const index=read("services/favorites/FavoritesDossierIndexPolicy.js");
+  const owner=read("services/notifications/NotificationsService.qml");
+  assert.match(owner,/pragma Singleton/);
+  assert.match(owner,/property ListModel favoriteSources: ListModel \{\}/);
+  assert.match(owner,/property int favoritesRevision: 0/);
+  assert.match(cpu,/import qs.services.notifications/);
+  assert.match(cpu,/NotificationsService\.favoritesRevision/);
+  assert.match(cpu,/NotificationsService\.favoriteSources/);
+  assert.match(cpu,/NotificationsService\.favoritesStatus/);
+  assert.match(cpu,/cpuPlusWindow\.notificationFavoritesSnapshot/);
+  assert.match(manager,/NotificationsProjection\.build\(notificationsSnapshot\)/);
+  assert.match(pane,/"NOTIFS"/);
+  assert.match(pane,/SOURCE \/\/ NOTIFICATIONS/);
+  assert.match(index,/"NOTIFS\|SOURCES"/);
+  assert.doesNotMatch(projection+manager+cpu,
+    /FileView\s*\{|JsonAdapter\s*\{|Process\s*\{|setFavorite\(|toggleFavorite\(/);
+  assert.doesNotMatch(cpu,/NotificationsService\s*\{/);
+  assert.doesNotMatch(projection,/source\.sourceId|source\.body|source\.message|NotificationsService\.(?:setFavorite|toggleFavorite|notifications|sourcePolicies)/);
 });

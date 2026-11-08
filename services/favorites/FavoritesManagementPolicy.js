@@ -4,6 +4,7 @@
 .import "FavoritesCollectionsPolicy.js" as Collections
 .import "FavoritesReadOnlyAdapters.js" as Adapters
 .import "FavoritesWeatherHomeProjection.js" as WeatherHome
+.import "FavoritesNotificationsProjection.js" as NotificationsProjection
 
 // CPU++ candidate projection. The original AppControl store remains the ONLY
 // owner of its four favorite/watch lists. This view never executes, writes or
@@ -123,7 +124,7 @@ function safeUnresolvedLabel(menu,classification,ordinal) {
     return menu+" // "+(type[menu] || "SAVED ITEM")+" #"+ordinal;
 }
 
-function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions, weatherHomeSnapshot) {
+function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions, weatherHomeSnapshot, notificationsSnapshot) {
     const out=[], seen=Object.create(null);
     let rejected=0,total=0;
     function accept(record) {
@@ -212,6 +213,12 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
     rejected+=weather.invalidCount;
     for(const item of weather.rows) accept(item);
 
+    // Notifications singleton already owns favorites. Only saved source
+    // metadata enters this read-only projection, never message/history data.
+    const notifications=NotificationsProjection.build(notificationsSnapshot);
+    rejected+=notifications.invalidCount;
+    for(const item of notifications.rows) accept(item);
+
     const zones=Array.isArray(clockZones)?clockZones:[];
     for (const zone of zones.slice(0,9)) {
         if(typeof zone!=="string") {rejected++;continue;}
@@ -251,7 +258,7 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
 
 function filterRows(records,category) {
     const rows=records && Array.isArray(records.rows)?records.rows:[];
-    if(["CLOCK","PLACES","NEW","CPU++","APP CTRL","WEATHER"].indexOf(category)<0)
+    if(["CLOCK","PLACES","NEW","CPU++","APP CTRL","WEATHER","NOTIFS"].indexOf(category)<0)
         return rows;
     return rows.filter(item=>item.category===category);
 }

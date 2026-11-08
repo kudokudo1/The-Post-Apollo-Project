@@ -1,0 +1,64 @@
+name: Connections C5b TASKS durable sender consent (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/experiments/C5bTasksDurableConsentHost.py'
+      - 'tests/connections/test_connections_c5b_durable_consent.py'
+      - 'docs/connections-c5b-durable-consent.md'
+      - '.github/workflows/connections-c5b-durable-consent.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/connections/experiments/C5bTasksDurableConsentHost.py'
+      - 'tests/connections/test_connections_c5b_durable_consent.py'
+      - '.github/workflows/connections-c5b-durable-consent.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  durable-consent:
+    name: Kernel sender identity, one-use durable ledger and restart denial
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: C5b real process sender and persisted crash/restart tests
+        run: |
+          python3 -B -m unittest discover -s tests/connections \
+            -p 'test_connections_c5b_durable_consent.py' -v
+      - name: C5a exact three-scope descriptor process regression
+        run: |
+          python3 -B -m unittest discover -s tests/connections \
+            -p 'test_connections_c5a_tasks_scope_broker.py' -v
+      - name: Existing C2c descriptor and C2l identity caution
+        run: |
+          python3 -B tests/connections/test_connections_c2c_descriptor_authority.py
+          python3 -B -m unittest discover -s tests/connections \
+            -p 'test_connections_c2l_host_trust_boundary.py' -v
+      - name: TASKS M15e snapshot, M15d selection and M15c default deny
+        run: |
+          node --test tests/tasks/test_task_editor_snapshot_host_m15e.cjs
+          node --test tests/tasks/test_task_draft_target_selection_m15d.cjs
+          node --test tests/tasks/test_task_encrypted_draft_access_m15c.cjs
+      - name: Existing encrypted storage, permissions and single writer
+        run: |
+          node --test tests/tasks/test_task_encrypted_draft_transaction_m13m.cjs
+          node --test tests/tasks/test_task_connections_permission_m13p.cjs
+          node --test tests/tasks/test_task_recovery_consent_source_m13t.cjs
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: No installed host, credentials, content or production activation
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/experiments/C5bTasksDurableConsentHost.py \
+            tests/connections/test_connections_c5b_durable_consent.py
+          ! grep -R -F 'C5bTasksDurableConsentHost' \
+            services/connections/ConnectionsBroker.qml \
+            services/hub/ApolloHubTodoStore.qml widgets shell.qml
+          grep -q 'readonly property bool credentialActionsEnabled: false' \
+            services/connections/ConnectionsBroker.qml
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          printf '%s\n' 'C5B_LINUX_PACKET_CREDENTIALS_DURABLE_REVOKE_NO_REAL_AUTHORITY_PASS'

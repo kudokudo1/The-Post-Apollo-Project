@@ -190,3 +190,39 @@ test("C28 focused clock is an integrated source-backed circular instrument",()=>
    "StationSky {","UsnoPlanetRiseSetService {"
  ])assert.ok(!face.includes(forbidden),forbidden);
 });
+
+
+test("C29 Meteors combines a credited embedded NASA photograph with a source-only 30D meter",()=>{
+  const v=read("widgets/weather/StationCosmosMeteorVisual.qml");
+  assert.match(focus,/StationCosmosMeteorVisual\s*\{[\s\S]*?id: meteorVisual/);
+  assert.match(focus,/objectName: "cosmos-c29-meteor-image-panel"/);
+  assert.match(focus,/upcomingShowers: meteorBoard\.upcomingShowers/);
+  assert.match(focus,/selectedShowerName: meteorBoard\.selectedShowerName/);
+  assert.match(focus,/sourceReady: !!cosmosModePane\.meteorSource/);
+  assert.match(focus,/width: parent\.width >= 320/);
+  assert.match(focus,/anchors\.left: meteorVisual\.right/);
+  assert.match(focus,/contentHeight: meteorCards\.implicitHeight/);
+  assert.match(v,/objectName: "cosmos-c29-meteor-visual"/);
+  assert.match(v,/objectName: "cosmos-c29-meteor-photo-viewport"/);
+  assert.match(v,/objectName: "cosmos-c29-nasa-archival-photo"/);
+  assert.match(v,/source: "https:\/\/assets\.science\.nasa\.gov\//);
+  assert.match(v,/NASA \/ BILL INGALLS/);
+  assert.match(v,/PERSEID PHOTO/);
+  assert.match(v,/NASA PHOTO OFFLINE/);
+  assert.match(v,/objectName: "cosmos-c29-peak-countdown"/);
+  assert.match(v,/objectName: "cosmos-c29-source-countdown-fill"/);
+  assert.match(v,/readonly property real daysToPeak:/);
+  assert.match(v,/Number\(row\.daysToPeak\)/);
+  assert.match(v,/remaining30DayFraction: hasCountdown/);
+  assert.match(v,/Math\.min\(1,daysToPeak\/30\)/);
+  assert.match(v,/Behavior on width\s*\{\s*NumberAnimation/);
+  assert.match(v,/function setZoom\(next\)/);
+  assert.match(v,/function resetView\(\)/);
+  assert.match(v,/onPositionChanged: function\(mouse\)/);
+  assert.match(v,/onWheel: function\(wheel\)/);
+  assert.match(v,/onDoubleClicked: visual\.resetView\(\)/);
+  assert.equal((v.match(/Image\s*\{/g)||[]).length,1);
+  assert.equal((v.match(/Flickable\s*\{/g)||[]).length,0);
+  for(const bad of ["Process {","FileView {","Timer {","XMLHttpRequest","new WebSocket","UsnoPlanetRiseSetService {"])
+    assert.ok(!v.includes(bad),bad);
+});

@@ -216,6 +216,30 @@ ShellRoot {
                     || frame.y < header.height
                     || scroll.contentHeight !== 99)
                     return root.fail("C25_STICKY_METEOR_HEADER_OR_CATALOG_BOUNDS");
+                // C29 joins the fixed archival image + countdown to the
+                // existing C25 scroll without depending on remote image load.
+                const visual = findNamed(instrument,
+                    "cosmos-c29-meteor-image-panel");
+                const photograph = findNamed(instrument,
+                    "cosmos-c29-nasa-archival-photo");
+                const meter = findNamed(instrument,
+                    "cosmos-c29-source-countdown-fill");
+                if (!visual || !photograph || !meter
+                    || !visual.sourceReady
+                    || visual.width < 150
+                    || visual.height < 55
+                    || scroll.width < 140
+                    || Math.abs(visual.daysToPeak - 7) > 0.001
+                    || Math.abs(visual.remaining30DayFraction-7/30)>0.001)
+                    return root.fail("C29_METEOR_PHOTO_AND_DATA_METER_MISSING");
+                visual.setZoom(3.8);
+                if (visual.zoom !== 3)
+                    return root.fail("C29_PHOTO_ZOOM_BOUNDS_BROKEN");
+                visual.panX = 31;
+                visual.panY = 12;
+                visual.resetView();
+                if (visual.zoom !== 1 || visual.panX !== 0 || visual.panY !== 0)
+                    return root.fail("C29_PHOTO_RESET_BROKEN");
                 // Populate a long bounded catalog after the old two-card
                 // acceptance check. A real scroll must leave the header still.
                 const extra = [];

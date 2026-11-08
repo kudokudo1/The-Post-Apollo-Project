@@ -9,6 +9,8 @@ import "../../services/connections/ConnectionsRequestDisplayPolicy.js" as Reques
 // credential editor, adapter handoff, permission grant or session mutation.
 Item {
     id: details
+    // Route fixed provider intent to shell-owned Social. No credential data.
+    signal telegramOpenRequested()
     property string selectedId: "social"
     property bool guideOpen: false
     property bool permissionReviewOpen: false
@@ -469,6 +471,36 @@ Item {
                 labelPixelSize: 10
                 accentColor: Colors.cyan
                 onClicked: ConnectionsRegistry.refreshSocial()
+            }
+            // Telegram uses its already-running native Social provider
+            // workflow. CPU++ merely requests opening that pane. This does
+            // not pair, disconnect, inspect a session or start a new adapter.
+            Column {
+                visible: details.selectedId === "telegram"
+                width: parent.width
+                spacing: 7
+                GohuText {
+                    width: parent.width
+                    text: "TELEGRAM // NATIVE SIGN-IN"
+                    color: Colors.magenta
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: "OPEN SOCIAL TO CHECK THE ACTUAL SESSION AND, IF NEEDED, CHOOSE QR OR PHONE SIGN-IN. NO AUTOMATIC PAIRING."
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: Math.min(parent.width, 186)
+                    height: 32
+                    label: "OPEN TELEGRAM"
+                    labelPixelSize: 10
+                    accentColor: Colors.cyan
+                    onClicked: details.telegramOpenRequested()
+                }
             }
             // CPU++ Connected Accounts // REAL local label management.
             // Reuse the original Social writer; this never signs into a

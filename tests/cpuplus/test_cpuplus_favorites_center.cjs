@@ -251,7 +251,7 @@ test("CPU++ imports all AppControl owner lists, with seven source filters and re
   assert.match(panel,/modelData\.readOnly\?"READ ONLY"/);
   assert.match(panel,/pane\.selectedResource && !pane\.selectedResource\.readOnly/);
   assert.match(panel,/APP CONTROL-OWNED \/\/ READ ONLY/);
-  assert.match(panel,/OWNER CONTROL/);
+  assert.match(panel,/OPEN OWNER/);
   assert.doesNotMatch(panel,/pane\.appControlOwner|FavoritesStore\.favoriteKeys\s*=/);
 });
 

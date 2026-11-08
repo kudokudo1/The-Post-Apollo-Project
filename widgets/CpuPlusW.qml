@@ -49,6 +49,39 @@ PanelWindow {
     property string selectedConnectionId: "social"
     // UI-only inspection selection; never changes the active Social layout.
     property string selectedLocalIdForManagement: ""
+    // UI section and local editing focus, never provider login or tenant switch.
+    property string idManagementSection: "IDS"
+    property string selectedLocalOrganizationForManagement: ""
+    property string selectedLocalPortfolioForManagement: ""
+    readonly property var availableLocalManagementOrganizations:
+        SocialOrganizationDirectoryStore.state === "ready"
+        ? SocialOrganizationDirectoryStore.saved.organizations.filter(function(entry) {
+            return !entry.archived;
+        }) : []
+    readonly property var availableLocalManagementPortfolios:
+        SocialLocalPortfoliosStore.state === "ready"
+        ? SocialLocalPortfoliosStore.saved.portfolios.filter(function(entry) {
+            return !entry.archived;
+        }) : []
+    readonly property string effectiveLocalManagementOrganizationId: {
+        const saved = availableLocalManagementOrganizations;
+        const chosen = saved.find(function(entry) {
+            return entry.id === selectedLocalOrganizationForManagement;
+        });
+        return chosen ? chosen.id : (saved.length ? saved[0].id : "");
+    }
+    readonly property string effectiveLocalManagementPortfolioId: {
+        const saved = availableLocalManagementPortfolios;
+        const chosen = saved.find(function(entry) {
+            return entry.id === selectedLocalPortfolioForManagement;
+        });
+        return chosen ? chosen.id : (saved.length ? saved[0].id : "");
+    }
+    function selectLocalManagementSection(section) {
+        if (["IDS", "ORGANIZATIONS", "STRUCTURE", "PORTFOLIOS"].indexOf(section) === -1)
+            return;
+        idManagementSection = section;
+    }
     readonly property var localIdManagementSnapshot: SocialIdentityStore.snapshot
     readonly property string effectiveLocalIdForManagement: {
         const snap = localIdManagementSnapshot;
@@ -212,7 +245,8 @@ PanelWindow {
         && !(selectedModeIndex === 4 && settingsSubMode === "TIME"
              && settingsTimeBasicsPane.zoneSearchFocused)
         && !(selectedModeIndex === 5
-             && (idManagementSelectorPane.editingText
+             && (idManagementSection !== "IDS"
+                 || idManagementSelectorPane.editingText
                  || idManagementDetailsPane.editingText))
 
     function cycleMainMode(direction) {
@@ -1096,7 +1130,10 @@ PanelWindow {
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                      ? "CONNECTIONS // OVERVIEW" : "SETTINGS // OVERVIEW")
                 : cpuPlusWindow.selectedModeIndex === 5
-                ? "ID MANAGEMENT // OVERVIEW" : "SHARED INSTRUMENT"
+                ? (cpuPlusWindow.idManagementSection === "IDS"
+                   ? "ID MANAGEMENT // OVERVIEW"
+                   : "SOCIAL MANAGEMENT // OVERVIEW")
+                : "SHARED INSTRUMENT"
 
             font.pixelSize: 13
             color: Colors.magenta
@@ -1556,18 +1593,51 @@ PanelWindow {
             anchors.bottomMargin: 9
         }
 
+        CpuPlusLocalManagementNav {
+            id: idManagementLocalNavigation
+            visible: cpuPlusWindow.selectedModeIndex === 5
+            section: cpuPlusWindow.idManagementSection
+            onSectionRequested: function(section) {
+                cpuPlusWindow.selectLocalManagementSection(section);
+            }
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedStateHeader.bottom
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
+            anchors.topMargin: 9
+            height: implicitHeight
+        }
         CpuPlusIdManagementPane {
             id: idManagementOverviewPane
             area: "overview"
             selectedId: cpuPlusWindow.effectiveLocalIdForManagement
             visible: cpuPlusWindow.selectedModeIndex === 5
+                     && cpuPlusWindow.idManagementSection === "IDS"
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: sharedStateHeader.bottom
+            anchors.top: idManagementLocalNavigation.bottom
             anchors.bottom: parent.bottom
             anchors.leftMargin: 12
             anchors.rightMargin: 12
-            anchors.topMargin: 9
+            anchors.topMargin: 7
+            anchors.bottomMargin: 9
+        }
+        CpuPlusLocalManagementPane {
+            id: localManagementOverviewPane
+            area: "overview"
+            section: cpuPlusWindow.idManagementSection
+            selectedOrganizationId: cpuPlusWindow.effectiveLocalManagementOrganizationId
+            selectedPortfolioId: cpuPlusWindow.effectiveLocalManagementPortfolioId
+            visible: cpuPlusWindow.selectedModeIndex === 5
+                     && cpuPlusWindow.idManagementSection !== "IDS"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: idManagementLocalNavigation.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
+            anchors.topMargin: 7
             anchors.bottomMargin: 9
         }
     }
@@ -1618,7 +1688,10 @@ PanelWindow {
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                      ? "CONNECTIONS // SOURCES" : "SETTINGS // CATEGORIES")
                 : cpuPlusWindow.selectedModeIndex === 5
-                ? "ID MANAGEMENT // IDS" : "TARGET"
+                ? (cpuPlusWindow.idManagementSection === "IDS"
+                   ? "ID MANAGEMENT // IDS"
+                   : "LOCAL // " + cpuPlusWindow.idManagementSection)
+                : "TARGET"
 
             font.pixelSize: 12
             color: Colors.magenta
@@ -1964,8 +2037,32 @@ PanelWindow {
             area: "selector"
             selectedId: cpuPlusWindow.effectiveLocalIdForManagement
             visible: cpuPlusWindow.selectedModeIndex === 5
+                     && cpuPlusWindow.idManagementSection === "IDS"
             onIdRequested: function(localId) {
                 cpuPlusWindow.selectedLocalIdForManagement = localId;
+            }
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: targetHeaderLine.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 9
+            anchors.bottomMargin: 9
+        }
+        CpuPlusLocalManagementPane {
+            id: localManagementSelectorPane
+            area: "selector"
+            section: cpuPlusWindow.idManagementSection
+            selectedOrganizationId: cpuPlusWindow.effectiveLocalManagementOrganizationId
+            selectedPortfolioId: cpuPlusWindow.effectiveLocalManagementPortfolioId
+            visible: cpuPlusWindow.selectedModeIndex === 5
+                     && cpuPlusWindow.idManagementSection !== "IDS"
+            onOrganizationRequested: function(orgId) {
+                cpuPlusWindow.selectedLocalOrganizationForManagement = orgId;
+            }
+            onPortfolioRequested: function(portfolioId) {
+                cpuPlusWindow.selectedLocalPortfolioForManagement = portfolioId;
             }
             anchors.left: parent.left
             anchors.right: parent.right
@@ -2375,7 +2472,9 @@ PanelWindow {
                      : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                        ? "CONNECTIONS // ACCESS" : "LOCATION // SETTINGS")
                   : cpuPlusWindow.selectedModeIndex === 5
-                  ? "ID MANAGEMENT // DETAILS" : "CPU++ ACTUATORS"
+                  ? (cpuPlusWindow.idManagementSection === "IDS"
+                     ? "ID MANAGEMENT // DETAILS" : "LOCAL // EDIT")
+                  : "CPU++ ACTUATORS"
 
             font.pixelSize: 12
             color: Colors.magenta
@@ -2452,6 +2551,24 @@ PanelWindow {
             area: "details"
             selectedId: cpuPlusWindow.effectiveLocalIdForManagement
             visible: cpuPlusWindow.selectedModeIndex === 5
+                     && cpuPlusWindow.idManagementSection === "IDS"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 20
+            anchors.bottomMargin: 10
+        }
+        CpuPlusLocalManagementPane {
+            id: localManagementDetailsPane
+            area: "details"
+            section: cpuPlusWindow.idManagementSection
+            selectedOrganizationId: cpuPlusWindow.effectiveLocalManagementOrganizationId
+            selectedPortfolioId: cpuPlusWindow.effectiveLocalManagementPortfolioId
+            visible: cpuPlusWindow.selectedModeIndex === 5
+                     && cpuPlusWindow.idManagementSection !== "IDS"
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: actuatorHeader.bottom

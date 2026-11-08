@@ -103,7 +103,8 @@ ShellRoot {
                     || root.store.collections[0].members[0]!==root.placeKey
                     || root.store.collections[0].members[1]!==root.zoneKey
                     || !root.store.hasMember("c1",root.zoneKey)
-                    || !panel.createControl.available) {
+                    || !panel.canUseResource
+                    || panel.createControl.available) {
                     root.fail("READBACK_WRONG");
                     return;
                 }

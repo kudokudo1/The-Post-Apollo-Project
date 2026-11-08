@@ -65,7 +65,7 @@ test("legacy owners retain write authority; only approved safe collection IDs ar
     key("hospital","activity","pinned|reports|report|2026-11-08T18:12:05.000Z|1"),
     key("hospital","activity","room-24"),
     key("radio","station","not-a-uuid"),
-    key("radio","station","123e4567-e89b-12d3-a456-000000000001"),
+    key("radio","station","123e4567-e89b-72d3-a456-000000000001"),
     key("notifications","source","website:my-private-site"),
     key("notifications","source","https://example.com/account"),
     key("notifications","source","private-mail"),
@@ -305,7 +305,7 @@ test("U6a rejected owner identities cannot enter even a previously valid documen
     key("appcontrol","monitor-watch","watchbox|system|CPU"),
     key("notifications","source","website:session:example.org"),
     key("notifications","source","org.example.secret-app"),
-    key("radio","station","123e4567-e89b-12d3-a456-000000000002"),
+    key("radio","station","123e4567-e89b-72d3-a456-000000000002"),
     key("hospital","activity","pinned|reports|report|2026-11-08T18:12:05.000Z|1"),
     key("weather-home","panel","home/../../credentials")
   ];

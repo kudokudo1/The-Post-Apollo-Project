@@ -1,0 +1,70 @@
+name: Connections C5d TASKS signed reviewer peer (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/experiments/C5dSignedReviewerHost.py'
+      - 'services/connections/experiments/C5cSignedCallerHost.py'
+      - 'services/connections/experiments/C5bTasksDurableConsentHost.py'
+      - 'tests/connections/fixtures/C5dSignedReviewerDummy.c'
+      - 'tests/connections/test_connections_c5d_signed_reviewer.py'
+      - 'docs/connections-c5d-signed-reviewer.md'
+      - '.github/workflows/connections-c5d-signed-reviewer.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/connections/experiments/C5dSignedReviewerHost.py'
+      - 'services/connections/experiments/C5cSignedCallerHost.py'
+      - 'services/connections/experiments/C5bTasksDurableConsentHost.py'
+      - 'tests/connections/fixtures/C5dSignedReviewerDummy.c'
+      - 'tests/connections/test_connections_c5d_signed_reviewer.py'
+      - '.github/workflows/connections-c5d-signed-reviewer.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  signed-reviewer:
+    name: Distinct signed reviewer ELF, spoof-denial and C5b durable grant ledger
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: C5d two real Linux signed processes and adversarial reviewer evidence
+        run: |
+          python3 -B -m unittest discover -s tests/connections \
+            -p 'test_connections_c5d_signed_reviewer.py' -v
+      - name: C5c signed requester regression
+        run: |
+          python3 -B -m unittest discover -s tests/connections \
+            -p 'test_connections_c5c_signed_executable.py' -v
+      - name: C5b original reviewer identity and durable consent regression
+        run: |
+          python3 -B -m unittest discover -s tests/connections \
+            -p 'test_connections_c5b_durable_consent.py' -v
+      - name: C5a distinct reviewer/client FDs regression
+        run: |
+          python3 -B -m unittest discover -s tests/connections \
+            -p 'test_connections_c5a_tasks_scope_broker.py' -v
+      - name: TASKS M15e/M15d/M15c, writer and Connections deny-only inventory
+        run: |
+          node --test tests/tasks/test_task_editor_snapshot_host_m15e.cjs
+          node --test tests/tasks/test_task_draft_target_selection_m15d.cjs
+          node --test tests/tasks/test_task_encrypted_draft_access_m15c.cjs
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Explicit no-user-consent and no-production-key grant boundary
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/experiments/C5dSignedReviewerHost.py \
+            services/connections/experiments/C5cSignedCallerHost.py \
+            services/connections/experiments/C5bTasksDurableConsentHost.py \
+            tests/connections/test_connections_c5d_signed_reviewer.py
+          ! grep -R -F 'C5dSignedReviewerHost' \
+            services/connections/ConnectionsBroker.qml \
+            services/hub/ApolloHubTodoStore.qml widgets shell.qml
+          grep -q 'readonly property bool credentialActionsEnabled: false' \
+            services/connections/ConnectionsBroker.qml
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          echo 'C5D_SIGNED_REVIEWER_PROGRAM_ONLY_NOT_HUMAN_CONSENT_PASS'

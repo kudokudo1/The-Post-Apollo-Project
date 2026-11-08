@@ -62,7 +62,8 @@ def expected_artifact_digest(root_pub: Path, pin: str,
                              policy: Path, policy_sig: Path,
                              delegate_pub: Path, manifest: Path,
                              manifest_sig: Path, epoch_floor: int,
-                             sequence_floor: int) -> str:
+                             sequence_floor: int,
+                             role: str = ROLE) -> tuple[str, int]:
     """Verify two exact signatures and purpose-bound delegation, no key grants."""
     if (type(epoch_floor) is not int or epoch_floor < 1
             or type(sequence_floor) is not int or sequence_floor < 1
@@ -84,7 +85,7 @@ def expected_artifact_digest(root_pub: Path, pin: str,
         p = E._unique_json(policy)
         E._fields(p, {"schema", "role", "epoch", "min_sequence",
                       "delegated_fingerprint"}, "POLICY_SCHEMA_REFUSED")
-        if (p["schema"] != POLICY_SCHEMA or p["role"] != ROLE
+        if (p["schema"] != POLICY_SCHEMA or p["role"] != role
                 or E._integer(p["epoch"], 1, "POLICY_EPOCH_REFUSED")
                 < epoch_floor):
             raise E.Refused("POLICY_SCOPE_OR_EPOCH_REFUSED")
@@ -98,7 +99,7 @@ def expected_artifact_digest(root_pub: Path, pin: str,
         m = E._unique_json(manifest)
         E._fields(m, {"schema", "role", "epoch", "sequence", "sha256", "size"},
                   "MANIFEST_SCHEMA_REFUSED")
-        if (m["schema"] != MANIFEST_SCHEMA or m["role"] != ROLE
+        if (m["schema"] != MANIFEST_SCHEMA or m["role"] != role
                 or m["epoch"] != p["epoch"]
                 or E._integer(m["sequence"], 1, "RELEASE_SEQUENCE_REFUSED")
                 < floor

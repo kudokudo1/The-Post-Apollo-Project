@@ -71,13 +71,14 @@ PanelWindow {
     readonly property int zoomWebEdgeInset: 2
     readonly property int zoomBayInset: Math.max(0, Math.round(zoomViewport.x))
     readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))
-    // Zoom's measured physical browser target fits 10px shorter than the
-    // original Camera frame, but a browser-only trim exposed a black strip
-    // from the existing bottom backing Rectangle. Shorten the Zoom MODE
-    // chassis itself instead; the guest still fills to the 1px frame inset.
-    // Non-Zoom chassis and the already-raised top controls do not change.
+    // Zoom's browser and Camera bottom border are fitted together so the
+    // external guest remains physically within its panel without exposing
+    // the black bottom backing strip. After the 10px frame-fit correction,
+    // operator visual review requested a further SMALL 2px reduction in
+    // all three modes. Keep the normal 1px inset and unchanged top/deck.
+    // Capture, Gallery and Cleanup retain their baseline frame heights.
     readonly property int zoomBayBottom: 1
-    readonly property int zoomFrameBottomFit: 10
+    readonly property int zoomFrameBottomFit: 12
     // Keep #1505's raised compact controls and common 3px deck spacing.
     // The first 8px rise improved all three sizes; a subsequent native screenshot
     // calls for another 5px. Rise is now 13px total from the #1505 deck.
@@ -287,9 +288,9 @@ PanelWindow {
     // ZoomWebHost reject its physical rectangle as OUTSIDE_WORKAREA.
     // Preserve Finance's fullscreen budget; keep expanded's deck reserve.
     // Finance/chassis baseline is unchanged for Capture, Gallery, Cleanup.
-    // In Zoom only, shorten the OUTER frame by the same 10px once applied
-    // to the browser alone. This preserves the smaller native guest while
-    // eliminating the exposed black band between it and Camera's border.
+    // In Zoom only, shorten the OUTER frame by 12px total (10px prior and
+    // 2px further). The browser follows its bottom automatically, retaining
+    // the 1px border with no new black band or other-mode size change.
     readonly property int frameHeightBase:
         chassisLevel === "compact"
         ? Math.max(1, Math.min(699, availableFrameHeight))

@@ -81,7 +81,9 @@ function appControlMenu(record) {
         return "SYSTEM";
     if (id.indexOf("run:")===0 || id.indexOf("run|")===0)
         return "RUN";
-    if (id.indexOf("hidden:")===0 || (record.kind==="preferred-action" && id.indexOf("app|")===0))
+    if (id.indexOf("hidden:")===0 || (record.kind==="preferred-action" && id.indexOf("app|")===0)
+            || (record.kind==="item"
+                && /^(?:[A-Za-z][A-Za-z0-9_-]{0,40}\.){1,6}[A-Za-z][A-Za-z0-9_-]{0,40}(?:\.desktop)?$/.test(id)))
         return "APPS";
     const match=/^mode:([0-8]):/.exec(id);
     if (match) {

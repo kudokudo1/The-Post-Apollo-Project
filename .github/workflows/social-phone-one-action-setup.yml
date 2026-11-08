@@ -12,6 +12,8 @@ on:
       - 'services/phone/BlueFerrySocialProjection.py'
       - 'services/phone/PhoneContentDiagnostic.py'
       - 'services/phone/BlueFerryHostReadPort.py'
+      - 'tests/phone/test_blueferry_legacy_contacts.py'
+      - 'MODEL/contracts/social-phone-blueferry-legacy-contact-list-p24-v0.md'
       - 'services/phone/HostReadReleaseGateModel.py'
       - 'services/phone/PhonePersonalReadPilot.py'
       - 'services/phone/PhoneRememberedRead.py'
@@ -92,6 +94,8 @@ on:
       - 'services/phone/BlueFerrySocialProjection.py'
       - 'services/phone/PhoneContentDiagnostic.py'
       - 'services/phone/BlueFerryHostReadPort.py'
+      - 'tests/phone/test_blueferry_legacy_contacts.py'
+      - 'MODEL/contracts/social-phone-blueferry-legacy-contact-list-p24-v0.md'
       - 'services/phone/HostReadReleaseGateModel.py'
       - 'services/phone/PhonePersonalReadPilot.py'
       - 'services/phone/PhoneRememberedRead.py'
@@ -174,7 +178,7 @@ jobs:
       - name: Compile setup and provider code
         run: |
           python3 -m py_compile services/phone/PhoneSetupReadiness.py services/phone/PhoneProviderObservation.py services/phone/PhoneNativeSetupLaunch.py services/phone/PhoneStageDirector.py services/phone/PhoneSavedBridgeState.py services/phone/PhoneDeviceObservation.py services/phone/PhoneNickname.py services/phone/BlueFerrySocialProjection.py services/phone/PhoneContentDiagnostic.py services/phone/BlueFerryHostReadPort.py services/phone/HostReadReleaseGateModel.py services/phone/PhonePersonalReadPilot.py services/phone/PhoneRememberedRead.py services/phone/PhoneBlueFerryStorageUi.py services/phone/PhoneAudioControls.py services/phone/PhoneCallPrerequisites.py services/phone/PhoneCallingSetupHandoff.py services/phone/PhoneOfonoInstallSession.py services/phone/PhoneInstallCommandDiscovery.py
-          python3 -m py_compile tests/phone/test_phone_setup_readiness.py tests/messaging/test_social_phone_connect_flow.py tests/phone/test_phone_native_setup_launch.py tests/messaging/test_social_phone_native_setup_handoff.py tests/messaging/test_social_phone_unified_layout.py tests/phone/test_phone_stage_director.py tests/messaging/test_social_phone_stage_terminal.py tests/phone/test_phone_saved_bridge_state.py tests/phone/test_phone_device_observation.py tests/phone/test_phone_nickname.py tests/phone/test_blueferry_social_projection.py tests/phone/test_phone_content_diagnostic.py tests/phone/test_blueferry_host_read_port.py tests/phone/test_host_read_release_gate_model.py tests/phone/test_phone_personal_read_pilot.py tests/phone/test_phone_remembered_read.py tests/phone/test_phone_blueferry_storage_ui.py tests/messaging/test_social_phone_storage_unlock_ui.py tests/messaging/test_social_phone_personal_read_pilot_ui.py tests/messaging/test_social_phone_release_gate_boundary.py tests/messaging/test_social_phone_blueferry_adapter_p18e.py tests/messaging/test_social_phone_host_read_port_boundary.py tests/messaging/test_social_phone_content_diagnostic_ui.py tests/messaging/test_social_phone_blueferry_projection_contract.py tests/messaging/test_social_phone_nickname_ui.py tests/messaging/test_social_phone_saved_lifecycle.py tests/messaging/test_social_phone_device_observation.py tests/phone/test_phone_audio_controls.py tests/messaging/test_social_phone_audio_controls.py tests/phone/test_phone_call_prerequisites.py tests/phone/test_phone_calling_setup_handoff.py tests/messaging/test_social_phone_calling_setup.py tests/phone/test_phone_ofono_install_session.py tests/phone/test_phone_install_command_discovery.py
+          python3 -m py_compile tests/phone/test_phone_setup_readiness.py tests/messaging/test_social_phone_connect_flow.py tests/phone/test_phone_native_setup_launch.py tests/messaging/test_social_phone_native_setup_handoff.py tests/messaging/test_social_phone_unified_layout.py tests/phone/test_phone_stage_director.py tests/messaging/test_social_phone_stage_terminal.py tests/phone/test_phone_saved_bridge_state.py tests/phone/test_phone_device_observation.py tests/phone/test_phone_nickname.py tests/phone/test_blueferry_social_projection.py tests/phone/test_phone_content_diagnostic.py tests/phone/test_blueferry_host_read_port.py tests/phone/test_blueferry_legacy_contacts.py tests/phone/test_host_read_release_gate_model.py tests/phone/test_phone_personal_read_pilot.py tests/phone/test_phone_remembered_read.py tests/phone/test_phone_blueferry_storage_ui.py tests/messaging/test_social_phone_storage_unlock_ui.py tests/messaging/test_social_phone_personal_read_pilot_ui.py tests/messaging/test_social_phone_release_gate_boundary.py tests/messaging/test_social_phone_blueferry_adapter_p18e.py tests/messaging/test_social_phone_host_read_port_boundary.py tests/messaging/test_social_phone_content_diagnostic_ui.py tests/messaging/test_social_phone_blueferry_projection_contract.py tests/messaging/test_social_phone_nickname_ui.py tests/messaging/test_social_phone_saved_lifecycle.py tests/messaging/test_social_phone_device_observation.py tests/phone/test_phone_audio_controls.py tests/messaging/test_social_phone_audio_controls.py tests/phone/test_phone_call_prerequisites.py tests/phone/test_phone_calling_setup_handoff.py tests/messaging/test_social_phone_calling_setup.py tests/phone/test_phone_ofono_install_session.py tests/phone/test_phone_install_command_discovery.py
       - name: Verify one-action check and existing PHONE surface
         run: |
           python3 -m unittest discover -s tests/phone -p 'test_phone_setup_readiness.py' -v
@@ -186,6 +190,7 @@ jobs:
           python3 -m unittest discover -s tests/phone -p 'test_blueferry_social_projection.py' -v
           python3 -m unittest discover -s tests/phone -p 'test_phone_content_diagnostic.py' -v
           python3 -m unittest discover -s tests/phone -p 'test_blueferry_host_read_port.py' -v
+          python3 -m unittest discover -s tests/phone -p 'test_blueferry_legacy_contacts.py' -v
           python3 -m unittest discover -s tests/phone -p 'test_host_read_release_gate_model.py' -v
           python3 -m unittest discover -s tests/phone -p 'test_phone_personal_read_pilot.py' -v
           python3 -m unittest discover -s tests/phone -p 'test_phone_remembered_read.py' -v

@@ -271,6 +271,8 @@ PanelWindow {
     readonly property bool standardKeysAvailable:
         menuOpen && (!relationshipFocusModeActive || relationshipFocused)
         && !(selectedModeIndex === 6 && settingsLocationPane.editingText)
+        && !(selectedModeIndex === 6 && settingsSubMode === "CONNECTIONS"
+             && settingsConnectionsDetails.editingText)
         && !(selectedModeIndex === 4 && favoritesDetailsPane.editingText)
         && !(selectedModeIndex === 6 && settingsSubMode === "TIME"
              && settingsTimeBasicsPane.zoneSearchFocused)

@@ -1,0 +1,49 @@
+name: CPU++ Connections Social account-name editing
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/CpuPlusW.qml'
+      - 'widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml'
+      - 'widgets/cpuplus/CpuPlusIdAccountEditor.qml'
+      - 'tests/cpuplus/test_cpuplus_connections_local_account_editor.py'
+      - 'docs/cpuplus-connected-accounts-local-labels-v0.md'
+      - '.github/workflows/cpuplus-connections-local-account-editor.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/CpuPlusW.qml'
+      - 'widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml'
+      - 'tests/cpuplus/test_cpuplus_connections_local_account_editor.py'
+      - '.github/workflows/cpuplus-connections-local-account-editor.yml'
+permissions:
+  contents: read
+
+jobs:
+  local-account-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: CPU++ Connections real local editor and privilege refusal
+        run: python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_connections_local_account_editor.py' -v
+      - name: Existing CPU++ Connections, ID editor and account store
+        run: |
+          node tests/cpuplus/test_cpuplus_connections_c1.js
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_management_editor.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details_ui.py' -v
+      - name: Existing broker denial and CPU++ Settings geometry contracts
+        run: |
+          node tests/cpuplus/test_connections_broker_c2a.js
+          python3 tests/components/test_cpuplus_settings_mode_contracts.py
+      - name: Qt 6 syntax for reused editor, details host and CPU++ panel
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/cpuplus/CpuPlusIdAccountEditor.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/CpuPlusW.qml >/dev/null

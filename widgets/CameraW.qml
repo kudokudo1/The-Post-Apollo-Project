@@ -3818,6 +3818,154 @@ PanelWindow {
                                           + " MARKED // RIGHT-HOLD SCOPE"
                                 }
                             }
+
+                            Rectangle {
+                                id: huntSettingsOverlay
+                                anchors.fill: parent
+                                z: 200
+                                visible: camera.huntSettingsOpen
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.magenta
+                                radius: 5
+
+                                Flickable {
+                                    id: huntSettingsScroll
+                                    anchors.fill: parent
+                                    anchors.margins: 8
+                                    clip: true
+                                    boundsBehavior: Flickable.StopAtBounds
+                                    contentHeight: huntSettingsColumn.implicitHeight
+                                    Column {
+                                        id: huntSettingsColumn
+                                        width: huntSettingsScroll.width
+                                        spacing: 7
+                                        GohuText {
+                                            width: parent.width
+                                            height: 23
+                                            color: Colors.magenta
+                                            font.pixelSize: 13
+                                            text: "HUNT // ROUND PROGRESSION"
+                                        }
+                                        GohuText {
+                                            width: parent.width
+                                            height: 23
+                                            color: Colors.cyan
+                                            font.pixelSize: 9
+                                            wrapMode: Text.WordWrap
+                                            text: "START " + camera.huntSpawnCount
+                                                  + " // MAX 10 TARGETS // SPEED MAX 2.50X"
+                                        }
+                                        ActionButton {
+                                            width: parent.width
+                                            height: 30
+                                            label: camera.huntAutoRounds
+                                                   ? "AUTO NEXT ROUND // ON"
+                                                   : "AUTO NEXT ROUND // OFF"
+                                            labelPixelSize: 10
+                                            selected: camera.huntAutoRounds
+                                            accentColor: Colors.yellow
+                                            onLeftClicked: camera.huntSetAutoRounds(
+                                                               !camera.huntAutoRounds)
+                                        }
+                                        Repeater {
+                                            model: [
+                                                {id: "targetGain", label: "ADD TARGETS / TIER", step: 1, low: 0, high: 5},
+                                                {id: "targetEvery", label: "ADD EVERY N ROUNDS", step: 1, low: 1, high: 50},
+                                                {id: "speedGain", label: "SPEED GAIN / TIER", step: 5, low: 0, high: 50},
+                                                {id: "speedEvery", label: "SPEED EVERY N ROUNDS", step: 1, low: 1, high: 50}
+                                            ]
+                                            delegate: Row {
+                                                id: huntProgressionRow
+                                                width: huntSettingsColumn.width
+                                                height: 34
+                                                spacing: 5
+                                                readonly property int currentValue:
+                                                    modelData.id === "targetGain" ? camera.huntTargetsPerTier
+                                                    : modelData.id === "targetEvery" ? camera.huntTargetsEvery
+                                                    : modelData.id === "speedGain" ? camera.huntSpeedGainPercent
+                                                    : camera.huntSpeedEvery
+                                                GohuText {
+                                                    width: (huntProgressionRow.width - 15) * 0.43
+                                                    height: 33
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    color: Colors.white
+                                                    font.pixelSize: 9
+                                                    text: modelData.label
+                                                }
+                                                ActionButton {
+                                                    width: (huntProgressionRow.width - 15) * 0.17
+                                                    height: 32
+                                                    label: "−"
+                                                    accentColor: Colors.cyan
+                                                    available: !camera.busy
+                                                               && huntProgressionRow.currentValue > modelData.low
+                                                    onLeftClicked: camera.huntSetProgression(
+                                                        modelData.id,
+                                                        huntProgressionRow.currentValue - modelData.step)
+                                                }
+                                                GohuText {
+                                                    width: (huntProgressionRow.width - 15) * 0.23
+                                                    height: 33
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    horizontalAlignment: Text.AlignHCenter
+                                                    color: Colors.yellow
+                                                    font.pixelSize: 11
+                                                    text: modelData.id === "speedGain"
+                                                          ? "+" + huntProgressionRow.currentValue + "%"
+                                                          : "" + huntProgressionRow.currentValue
+                                                }
+                                                ActionButton {
+                                                    width: (huntProgressionRow.width - 15) * 0.17
+                                                    height: 32
+                                                    label: "+"
+                                                    accentColor: Colors.magenta
+                                                    available: !camera.busy
+                                                               && huntProgressionRow.currentValue < modelData.high
+                                                    onLeftClicked: camera.huntSetProgression(
+                                                        modelData.id,
+                                                        huntProgressionRow.currentValue + modelData.step)
+                                                }
+                                            }
+                                        }
+                                        GohuText {
+                                            width: parent.width
+                                            height: 39
+                                            font.pixelSize: 10
+                                            wrapMode: Text.WordWrap
+                                            color: Colors.cyan
+                                            text: "ROUND " + (camera.huntRound + 1)
+                                                + " FORECAST // "
+                                                + HuntMotion.spawnForRound(
+                                                    camera.huntSpawnCount,
+                                                    camera.huntTargetsPerTier,
+                                                    camera.huntTargetsEvery,
+                                                    camera.huntRound + 1)
+                                                + " TARGETS // "
+                                                + HuntMotion.speedForRound(
+                                                    camera.huntSpeedGainPercent,
+                                                    camera.huntSpeedEvery,
+                                                    camera.huntRound + 1).toFixed(2) + "X SPEED"
+                                        }
+                                        ActionButton {
+                                            width: parent.width
+                                            height: 34
+                                            label: "CLOSE SETTINGS"
+                                            labelPixelSize: 11
+                                            accentColor: Colors.magenta
+                                            onLeftClicked: camera.huntToggleSettings()
+                                        }
+                                        GohuText {
+                                            width: parent.width
+                                            height: 28
+                                            wrapMode: Text.WordWrap
+                                            font.pixelSize: 9
+                                            color: Colors.yellow
+                                            text: "CHANGES APPLY TO NEXT ROUND. OPENING SETTINGS PAUSES THE CURRENT ROUND."
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         Flickable {

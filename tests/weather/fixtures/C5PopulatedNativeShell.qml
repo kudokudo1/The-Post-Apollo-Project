@@ -288,7 +288,7 @@ ShellRoot {
                 meteorFocus.closeRequested();
                 if (meteorFocus.visible
                     || !visual.showArchive
-                    || meteorScroll.contentY !== 0)
+                    || scroll.contentY !== 0)
                     return root.fail("C33_METEOR_BACK_DID_NOT_RESTORE_CATALOG");
                 visual.showArchive = false;
                 visual.playing = true;

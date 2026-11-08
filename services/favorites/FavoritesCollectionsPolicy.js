@@ -49,7 +49,8 @@ function checkMemberKey(key) {
     if (match[1] === "time") {
         if (match[2] !== "timezone" || id.length > 100
                 || !(id === "UTC"
-                     || /^[A-Za-z][A-Za-z0-9._+-]*(?:\/[A-Za-z0-9._+-]+)+$/.test(id)))
+                     || /^[A-Za-z][A-Za-z0-9._+-]*(?:\/[A-Za-z0-9._+-]+)+$/.test(id))
+                || id.split("/").some(part=>part==="." || part===".."))
             return {ok:false,reason:"UNSUPPORTED_OWNER"};
     } else if (match[1] === "places") {
         if (match[2] !== "saved-place" || !/^[1-9][0-9]{0,14}$/.test(id)

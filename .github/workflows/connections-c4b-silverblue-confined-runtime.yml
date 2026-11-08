@@ -1,0 +1,138 @@
+name: Connections C4b signed confined fake status host on Silverblue (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c4b_silverblue/**"
+      - "tests/connections/test_connections_c4b_silverblue_contract.py"
+      - "tests/connections/c2v_silverblue/**"
+      - ".github/workflows/connections-c4b-silverblue-confined-runtime.yml"
+      - "docs/connections-c4b-silverblue-confined-runtime.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  silverblue-confined-signed-fake-host:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 78
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check shell, experimental runtime and deny-only contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/connections/c4b_silverblue/guest_confined_runtime.sh
+          bash -n tests/connections/c2v_silverblue/boot_official_silverblue.sh
+          bash -n tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh
+          bash -n tests/connections/c3d_provenance/build_signed_ci_status.sh
+          bash -n tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
+          python3 -B tests/connections/test_connections_c4b_silverblue_contract.py
+          python3 -B tests/connections/test_connections_c4a_silverblue_contract.py
+          python3 -B tests/connections/test_connections_c3b_origin.py
+          python3 -B tests/connections/test_connections_c3d_provenance_contract.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          echo "C4B_PASS // STATIC_CONTRACTS_AND_DENY_ONLY_PRODUCTION_POLICY"
+
+      - name: Check disposable runner KVM and disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -c /dev/kvm ] || { echo "C4B_BLOCKED // NO_KVM"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          [ -r /dev/kvm ] && [ -w /dev/kvm ] || exit 2
+          avail="$(df -B1 --output=avail / | tail -n 1)"
+          [ "$avail" -ge 12000000000 ] ||
+            { echo "C4B_BLOCKED // RUNNER_DISK_TOO_SMALL"; exit 2; }
+
+      - name: Build inert C2t signed fixture in ephemeral Fedora container
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c2t-rpms"
+          docker run --rm \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c2t-rpms,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
+          (cd "$RUNNER_TEMP/c2t-rpms" && sha256sum --check --status c2t-artifact-manifest.sha256)
+
+      - name: Build signed C3d fake service RPM in separate ephemeral Fedora container
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c4b-status-rpm"
+          docker run --rm \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c4b-status-rpm,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/c3d_provenance/build_signed_ci_status.sh
+          (cd "$RUNNER_TEMP/c4b-status-rpm" && sha256sum --check --status c3d-artifact-manifest.sha256)
+          test "$(find "$RUNNER_TEMP/c4b-status-rpm" -maxdepth 1 -type f | wc -l)" = 4
+
+      - name: Build C2r custom confined SELinux policy only in Fedora test builder
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c4b-assets"
+          docker run --rm \
+            --mount "type=bind,src=$PWD/tests/connections/c2r_selinux_domain,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c4b-assets,dst=/out" \
+            fedora:44 /bin/bash -euc '
+              dnf -y --setopt=install_weak_deps=False install selinux-policy-devel make
+              mkdir -p /tmp/c4b-src
+              cp /src/postapollo_connections.te /src/postapollo_connections.fc /tmp/c4b-src/
+              cd /tmp/c4b-src
+              make -f /usr/share/selinux/devel/Makefile postapollo_connections.pp
+              cp postapollo_connections.pp /out/postapollo_connections.pp
+              test -s /out/postapollo_connections.pp
+            '
+          echo "C4B_PASS // CUSTOM_POLICY_BUILT_WITHOUT_PERMISSIVE_OR_PRODUCTION_INSTALLATION"
+
+      - name: Install ephemeral QEMU and pinned wheel download prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 150s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 update ||
+            { echo "C4B_BLOCKED // RUNNER_APT_UPDATE"; exit 2; }
+          timeout 360s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 install -y --no-install-recommends \
+            qemu-system-x86 qemu-utils xorriso genisoimage python3-pip ||
+            { echo "C4B_BLOCKED // RUNNER_APT_INSTALL"; exit 2; }
+
+      - name: Stage pinned offline Python client wheel and exact C3b probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip download --disable-pip-version-check --no-deps \
+            --only-binary=:all: --dest "$RUNNER_TEMP/c4b-assets" "dbus-next==0.2.3"
+          wheel="$RUNNER_TEMP/c4b-assets/dbus_next-0.2.3-py3-none-any.whl"
+          echo "58948f9aff9db08316734c0be2a120f6dc502124d9642f55e90ac82ffb16a18b  $wheel" |
+            sha256sum --check --status ||
+              { echo "C4B_BLOCKED // PINNED_DBUS_WHEEL_HASH_MISMATCH"; exit 2; }
+          mv "$wheel" "$RUNNER_TEMP/c4b-assets/dbus_next.whl"
+          cp tests/connections/c3b_origin/C3bOriginCheck.py \
+            "$RUNNER_TEMP/c4b-assets/C3bOriginCheck.py"
+          cp tests/connections/c2o_fedora/BusPolicyClient.py \
+            "$RUNNER_TEMP/c4b-assets/BusPolicyClient.py"
+          (cd "$RUNNER_TEMP/c4b-assets" && \
+            sha256sum postapollo_connections.pp dbus_next.whl \
+              C3bOriginCheck.py BusPolicyClient.py > c4b-runtime-manifest.sha256)
+          echo "C4B_PASS // OFFLINE_PINNED_WHEEL_POLICY_AND_ORIGIN_PROBE_READY"
+
+      - name: Run official offline Silverblue real reboots, confined host and rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          C4A_SERVICE_RPM_DIR="$RUNNER_TEMP/c4b-status-rpm" \
+            C4B_RUNTIME_ASSETS_DIR="$RUNNER_TEMP/c4b-assets" \
+            timeout 3550s bash tests/connections/c2v_silverblue/boot_official_silverblue.sh
+
+      - name: Confirm no production Connections authority was enabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c4b_silverblue_contract.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          echo "C4B_PASS // PRODUCTION_CREDENTIALS_GRANTS_AND_HOST_AUTH_DISABLED"

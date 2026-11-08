@@ -506,3 +506,35 @@ test("AppControl display source reads original window and tab models without new
   assert.match(panel,/onClicked: pane\.selectionRequested\(modelData\.key\)/);
   assert.match(panel,/pane\.favoriteRowLabel\(modelData\)/);
 });
+
+
+test("saved freedesktop identifiers remain recognizable without installed app models",()=>{
+  const Display={Resource};
+  load("services/favorites/FavoritesAppControlDisplayPolicy.js",Display);
+  const saved={favoriteKeys:[
+      "org.example.Galaxy.desktop",
+      "com.example.secret-vault.desktop",
+      "com.example.SecureApp.desktop"
+    ],
+    favoriteDetailActionKeys:[],favoriteMonitorBoxKeys:[],
+    favoriteTaskMetricKeys:[]
+  };
+  const desc=Display.build(saved,{apps:[]});
+  const list=Hub.list([],[],[],[],saved,{},desc);
+  assert.equal(list.rows.length,3);
+  assert.equal(list.rows[0].menu,"APPS");
+  assert.equal(list.rows[0].item,"Galaxy [SAVED APP ID]");
+  assert.equal(list.rows[0].label,"APPS // Galaxy [SAVED APP ID]");
+  assert.equal(list.rows[0].available,"unresolved");
+  assert.equal(list.rows[1].resolved,false);
+  assert.equal(list.rows[1].item,"NAME UNAVAILABLE");
+  assert.equal(list.rows[1].menu,"APPS");
+  assert.equal(list.rows[1].label,"APPS // SAVED APPLICATION #2");
+  assert.equal(list.rows[2].item,"SecureApp [SAVED APP ID]");
+  for(const row of list.rows) {
+    assert.equal(row.readOnly,true);
+    assert.deepEqual(plain(row.capabilities),[]);
+    assert.equal("resourceId" in row,false);
+    assert.ok(!row.label.includes("org.example."));
+  }
+});

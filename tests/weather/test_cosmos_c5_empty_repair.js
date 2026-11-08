@@ -205,9 +205,11 @@ test("C29 Meteors combines a credited embedded NASA photograph with a source-onl
   assert.match(v,/objectName: "cosmos-c29-meteor-visual"/);
   assert.match(v,/objectName: "cosmos-c29-meteor-photo-viewport"/);
   assert.match(v,/objectName: "cosmos-c29-nasa-archival-photo"/);
-  assert.match(v,/source: "https:\/\/assets\.science\.nasa\.gov\//);
+  assert.match(v,/url: "https:\/\/assets\.science\.nasa\.gov\//);
+  assert.match(v,/source: visual\.showArchive \? visual\.archiveFrame\.url : ""/);
   assert.match(v,/NASA \/ BILL INGALLS/);
-  assert.match(v,/PERSEID PHOTO/);
+  assert.match(v,/PERSEIDS 2016/);
+  assert.match(v,/SPRUCE KNOB 2016/);
   assert.match(v,/NASA PHOTO OFFLINE/);
   assert.match(v,/objectName: "cosmos-c29-peak-countdown"/);
   assert.match(v,/objectName: "cosmos-c29-source-countdown-fill"/);
@@ -223,6 +225,49 @@ test("C29 Meteors combines a credited embedded NASA photograph with a source-onl
   assert.match(v,/onDoubleClicked: visual\.resetView\(\)/);
   assert.equal((v.match(/Image\s*\{/g)||[]).length,1);
   assert.equal((v.match(/Flickable\s*\{/g)||[]).length,0);
-  for(const bad of ["Process {","FileView {","Timer {","XMLHttpRequest","new WebSocket","UsnoPlanetRiseSetService {"])
+  for(const bad of ["Process {","FileView {","XMLHttpRequest","new WebSocket","UsnoPlanetRiseSetService {"])
     assert.ok(!v.includes(bad),bad);
+});
+
+
+test("C30 Meteors defaults to a moving radiant visualization, with a cycling credited photo archive",()=>{
+  const v=read("widgets/weather/StationCosmosMeteorVisual.qml");
+  const motion=read("widgets/weather/StationCosmosMeteorMotion.qml");
+  assert.match(v,/property bool showArchive: false/);
+  assert.match(v,/property bool playing: true/);
+  assert.match(v,/StationCosmosMeteorMotion\s*\{[\s\S]*?peak: visual\.activePeak/);
+  assert.match(v,/visible: !visual\.showArchive/);
+  assert.match(v,/playing: visual\.playing/);
+  assert.match(v,/readonly property var archiveFrames:/);
+  assert.match(v,/property int archiveIndex: 0/);
+  assert.match(v,/archiveIndex = \(archiveIndex \+ 1\) % archiveFrames\.length/);
+  assert.match(v,/objectName: "cosmos-c30-nasa-gallery-timer"/);
+  assert.match(v,/running: visual\.visible && visual\.showArchive && visual\.playing/);
+  assert.match(v,/onTriggered: visual\.nextArchive\(\)/);
+  assert.match(v,/objectName: "cosmos-c30-toggle-view"/);
+  assert.match(v,/objectName: "cosmos-c30-play-pause"/);
+  assert.match(v,/objectName: "cosmos-c30-gallery-next"/);
+  assert.match(v,/visual\.playing = !visual\.playing/);
+  assert.match(v,/onClicked: visual\.nextArchive\(\)/);
+  assert.match(v,/EQUATORIAL SCHEMATIC \/\/ ARTISTIC TRAILS/);
+  assert.match(motion,/objectName: "cosmos-c30-meteor-moving-sky"/);
+  assert.match(motion,/objectName: "cosmos-c30-meteor-motion-driver"/);
+  assert.match(motion,/running: motion\.visible && motion\.playing/);
+  assert.match(motion,/skyCanvas\.requestPaint\(\)/);
+  assert.match(motion,/readonly property bool radiantValid:/);
+  assert.match(motion,/Number\(peak\.ra\)/);
+  assert.match(motion,/Number\(peak\.dec\)/);
+  assert.match(motion,/readonly property real radiantX:/);
+  assert.match(motion,/readonly property real radiantY:/);
+  assert.match(motion,/SIMULATED TRAILS/);
+  assert.match(motion,/does not claim to show a local live sky/i);
+  assert.match(motion,/Their \*rate is purely decorative\*/);
+  assert.equal((motion.match(/Canvas\s*\{/g)||[]).length,1);
+  assert.equal((motion.match(/Timer\s*\{/g)||[]).length,1);
+  assert.equal((v.match(/Image\s*\{/g)||[]).length,1);
+  assert.equal((v.match(/Timer\s*\{/g)||[]).length,1);
+  for(const forbidden of ["Process {","FileView {","XMLHttpRequest","Flickable {"]) {
+    assert.ok(!v.includes(forbidden),forbidden);
+    assert.ok(!motion.includes(forbidden),forbidden);
+  }
 });

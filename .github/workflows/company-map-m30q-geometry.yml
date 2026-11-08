@@ -1,0 +1,75 @@
+name: Company M30q native viewport candidate QML geometry repair
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'widgets/CompanyCoveragePane.qml'
+      - 'widgets/CompanyNetworkW.qml'
+      - 'widgets/CompanyVectorViewportPolicy.js'
+      - 'tests/company/test_company_map_geometry_m30q.test.js'
+      - 'tests/company/test_company_vector_viewport_m18.test.js'
+      - 'tests/company/test_company_vector_bridge_m26.test.js'
+      - '.github/workflows/company-vector-stage-geometry-m18.yml'
+      - '.github/workflows/company-map-m30q-geometry.yml'
+      - 'docs/company-m30q-native-candidate-geometry-20261108.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  geometry-and-native-intent-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout Company source without retained credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test M30q actual QML coordinate equations and fail-closed guards
+        run: node --test tests/company/test_company_map_geometry_m30q.test.js
+      - name: Preserve existing Company M18 and M26 geometry and bridge contracts
+        run: |
+          node --test tests/company/test_company_vector_viewport_m18.test.js
+          node --test tests/company/test_company_vector_bridge_m26.test.js
+          node --test tests/company/test_company_layer_namespace_m19b.test.js
+      - name: Preserve Company chassis/coverage and native child selection
+        run: |
+          node --test tests/company/test_company_network_m1.test.js
+          node --test tests/company/test_company_network_m2.test.js
+          node --test tests/company/test_company_vector_attached_pidfd_m28c.test.js
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_sidecar_m13.py' -v
+      - name: Verify source still contains only candidate geometry
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'companyFrame.mapToItem(null, 0, 0)' widgets/CompanyNetworkW.qml
+          grep -Fq 'column.x + mapRow.x + mapSurface.x + mapCanvas.x' widgets/CompanyCoveragePane.qml
+          grep -Fq 'mapCanvas.parent !== mapSurface' widgets/CompanyCoveragePane.qml
+          if grep -Fq 'companyFrame.mapToItem(root, 0, 0)' widgets/CompanyNetworkW.qml ||
+             grep -Fq 'mapCanvas.mapToItem(root, 0, 0)' widgets/CompanyCoveragePane.qml; then
+            echo 'M30Q_OLD_QML_COORDINATES_PRESENT' >&2
+            exit 1
+          fi
+          grep -Fq 'property bool vectorBridgeOptIn: false' widgets/CompanyNetworkW.qml
+          grep -Fq 'property bool bridgeEnabled: false' widgets/CompanyVectorBridgeLink.qml
+          grep -Fq 'CompanyVectorSidecarController {' widgets/CompanyCoveragePane.qml
+          echo 'M30Q_COMPANY_CANDIDATE_GEOMETRY_WITHOUT_ACTIVATION PASS'
+      - name: Clarify verification scope
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## M30q original Company QML geometry repair'
+            echo 'Fixes source coordinate candidate calculation only.'
+            echo 'A green test proves static QML and Node geometry contracts.'
+            echo 'Actual native Quickshell/Wayland running viewport and'
+            echo 'live desktop deployment remain separate verification.'
+            echo 'Stage Director compositor, Social, production actor'
+            echo 'render/input/clip permission and operator decisions unchanged.'
+          } >> "$GITHUB_STEP_SUMMARY"

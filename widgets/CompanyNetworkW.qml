@@ -80,7 +80,11 @@ PanelWindow {
     readonly property rect activeVectorFrameInHostRect: {
         if (!root.menuOpen || !companyFrame.visible)
             return Qt.rect(0, 0, 0, 0);
-        const origin = companyFrame.mapToItem(root, 0, 0);
+        // PanelWindow is not a QQuickItem. Qt6 cannot use it as
+        // mapToItem(Item) target; null explicitly requests scene-local
+        // coordinates, which are PanelWindow-local for this frame.
+        // This is candidate geometry, never native actor authority.
+        const origin = companyFrame.mapToItem(null, 0, 0);
         const candidate = Qt.rect(origin.x, origin.y,
                                   companyFrame.width, companyFrame.height);
         return VectorViewportPolicy.within(candidate, root.width, root.height)

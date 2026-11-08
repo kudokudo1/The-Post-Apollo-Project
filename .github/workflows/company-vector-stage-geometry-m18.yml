@@ -37,7 +37,9 @@ jobs:
         run: |
           set -euo pipefail
           grep -Fq 'activeVectorViewportRect' widgets/CompanyNetworkW.qml
-          grep -Fq 'mapCanvas.mapToItem(root, 0, 0)' widgets/CompanyCoveragePane.qml
+          grep -Fq 'column.x + mapRow.x + mapSurface.x + mapCanvas.x' widgets/CompanyCoveragePane.qml
+          grep -Fq 'mapCanvas.parent !== mapSurface' widgets/CompanyCoveragePane.qml
+          ! grep -Fq 'mapCanvas.mapToItem(root, 0, 0)' widgets/CompanyCoveragePane.qml
           ! grep -Eq 'WatchBridge|wl_display_connect|startDetached|swaymsg' widgets/CompanyVectorViewportPolicy.js
           grep -Fq 'vectorController.stop()' widgets/CompanyCoveragePane.qml
           grep -Fq 'CompanyStreetMap {' widgets/CompanyCoveragePane.qml

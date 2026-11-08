@@ -71,7 +71,27 @@ Item {
                     Qt.rect(0, 0, mapCanvas.width, mapCanvas.height),
                     mapSurface.width, mapSurface.height))
             return Qt.rect(0, 0, 0, 0);
-        const origin = mapCanvas.mapToItem(root, 0, 0);
+        // M30q // Keep the candidate in Coverage-local coordinates.
+        // M30i's native Quickshell run found that mapToItem(root) could
+        // include the wrong scene y offset for this nested Canvas.
+        // Walk this specific untransformed Item chain only. If the
+        // hierarchy ever changes, suppress the candidate rather than
+        // reporting a plausible but wrong viewport to Stage Director.
+        if (mapCanvas.parent !== mapSurface
+                || mapSurface.parent !== mapRow
+                || mapRow.parent !== column
+                || column.parent !== root
+                || mapCanvas.scale !== 1
+                || mapSurface.scale !== 1
+                || mapRow.scale !== 1 || column.scale !== 1
+                || mapCanvas.rotation !== 0
+                || mapSurface.rotation !== 0
+                || mapRow.rotation !== 0
+                || column.rotation !== 0)
+            return Qt.rect(0, 0, 0, 0);
+        const origin = Qt.point(
+            column.x + mapRow.x + mapSurface.x + mapCanvas.x,
+            column.y + mapRow.y + mapSurface.y + mapCanvas.y);
         const candidate = Qt.rect(
             origin.x, origin.y, mapCanvas.width, mapCanvas.height);
         return VectorViewportPolicy.within(candidate, root.width, root.height)

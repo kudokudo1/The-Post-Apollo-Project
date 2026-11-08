@@ -72,7 +72,16 @@ test("actual Coverage canvas is the only rectangle source",()=>{
                         "mapSurface.visible","mapCanvas.visible"]){
         assert.ok(coverage.includes(guard),guard);
     }
-    assert.match(coverage,/mapCanvas\.mapToItem\(root,\s*0,\s*0\)/);
+    assert.match(coverage,/column\.x \+ mapRow\.x \+ mapSurface\.x \+ mapCanvas\.x/);
+    assert.match(coverage,/column\.y \+ mapRow\.y \+ mapSurface\.y \+ mapCanvas\.y/);
+    for (const guard of ["mapCanvas.parent !== mapSurface",
+                         "mapSurface.parent !== mapRow",
+                         "mapRow.parent !== column",
+                         "column.parent !== root",
+                         "mapCanvas.scale !== 1",
+                         "column.rotation !== 0"])
+        assert.ok(coverage.includes(guard),guard);
+    assert.doesNotMatch(coverage,/mapCanvas\.mapToItem\(root,\s*0,\s*0\)/);
     assert.match(coverage,/mapCanvas\.width,\s*mapCanvas\.height/);
     assert.match(coverage,/VectorViewportPolicy\.within\(candidate,\s*root\.width,\s*root\.height\)/);
     assert.match(coverage,/id: mapSurface/);

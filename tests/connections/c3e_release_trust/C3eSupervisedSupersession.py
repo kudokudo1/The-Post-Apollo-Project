@@ -91,7 +91,7 @@ def _row(db):
     v = values[0]
     if (len(v) != 12 or any(type(x) is not str or
             durable.admission.SHA256.fullmatch(x) is None
-            for x in (v[0], v[1], v[6], v[7])) or
+            for x in (v[0], v[1], v[8], v[9])) or
             any(type(x) is not int or x < 1
                 for x in (v[2], v[3], v[6], v[7], v[10], v[11])) or
             any(type(x) is not str or (x and
@@ -276,6 +276,7 @@ def execute(*, witness_db: Path, client_db: Path,
                 operator_pin=operator_pin,
                 operator_signed_approval=staged["operator_signed_approval"],
                 operator_signature=staged["operator_signature"],
+                allow_supersession_target=recovery,
                 authority_anchor_public=staged["authority_anchor_public"],
                 authority_anchor_pin=authority_anchor_pin,
                 node_id=node_id, release_root_pin=release_root_pin,

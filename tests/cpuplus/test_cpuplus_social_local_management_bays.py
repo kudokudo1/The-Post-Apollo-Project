@@ -69,6 +69,45 @@ class CpuPlusSocialManagementBays(unittest.TestCase):
         self.assertIn('cpuPlusWindow.idManagementSection === "IDS"', CPU)
         self.assertIn('cpuPlusWindow.idManagementSection !== "IDS"', CPU)
 
+    def test_category_filters_are_in_middle_bay_not_left_overview(self):
+        left = CPU.split("id: sharedInstrumentPane", 1)[1].split(
+            "id: targetPane", 1)[0]
+        middle = CPU.split("id: targetPane", 1)[1].split(
+            "id: actuatorPane", 1)[0]
+        right = CPU.split("id: actuatorPane", 1)[1]
+        self.assertNotIn("CpuPlusLocalManagementNav {", left)
+        self.assertNotIn("idManagementLocalNavigation.bottom", left)
+        self.assertIn("CpuPlusLocalManagementNav {", middle)
+        self.assertEqual(middle.count("CpuPlusLocalManagementNav {"), 1)
+        self.assertIn("id: idManagementLocalNavigation", middle)
+        self.assertIn("anchors.top: targetHeaderLine.bottom", middle)
+        self.assertEqual(
+            middle.count("anchors.top: idManagementLocalNavigation.bottom"), 2
+        )
+        self.assertIn("id: idManagementSelectorPane", middle)
+        self.assertIn("id: localManagementSelectorPane", middle)
+        self.assertLess(
+            middle.index("id: idManagementLocalNavigation"),
+            middle.index("id: idManagementSelectorPane"),
+        )
+        self.assertLess(
+            middle.index("id: idManagementLocalNavigation"),
+            middle.index("id: localManagementSelectorPane"),
+        )
+        self.assertIn("id: idManagementOverviewPane", left)
+        self.assertIn("id: localManagementOverviewPane", left)
+        self.assertEqual(
+            left.count("anchors.top: sharedStateHeader.bottom"), 3
+        )
+        self.assertIn("id: idManagementDetailsPane", right)
+        self.assertIn("id: localManagementDetailsPane", right)
+        self.assertIn('text: "FILTER // LOCAL RECORDS"', NAV)
+        self.assertIn("columns: 2", NAV)
+        self.assertIn("width: Math.floor((navigation.width - 5) / 2)", NAV)
+        self.assertIn("height: 31", NAV)
+        self.assertNotIn("FileView {", NAV)
+        self.assertNotIn("Process {", NAV)
+
     def test_selectors_drive_real_selected_local_record_editor_focus(self):
         for expected in (
             "availableLocalManagementOrganizations",

@@ -262,7 +262,7 @@ test("owner-provided labels are display-only and safely validated",()=>{
     assert.equal("resourceId" in row,false);
   }
   assert.equal(Hub.list([],[],[],[],donor).rows[0].label,"PROCESS FAVORITE #1");
-  assert.equal(JSON.stringify(withLabels).includes("private-command"),false);
+  assert.ok(withLabels.rows.every(row=>!row.label.includes("private-command")));
 });
 
 test("display label ingress remains volatile and owned by AppControl",()=>{
@@ -272,4 +272,109 @@ test("display label ingress remains volatile and owned by AppControl",()=>{
   assert.match(cpu,/FavoritesStore\.favoriteDisplayLabels/);
   const persisted=store.split("JsonAdapter {")[1];
   assert.doesNotMatch(persisted,/favoriteDisplayLabels/);
+});
+
+
+test("AppControl original models resolve actual menu, exact item and type",()=>{
+  const Display={Resource};
+  load("services/favorites/FavoritesAppControlDisplayPolicy.js",Display);
+  const saved={
+    favoriteKeys:[
+      "org.mozilla.firefox.desktop","thermal|sensor-a",
+      "system|memory","task|firefox","run:private%20command"
+    ],
+    favoriteDetailActionKeys:["app|org.mozilla.firefox.desktop|launch"],
+    favoriteMonitorBoxKeys:["watchbox|thermal|sensor-a|temp"],
+    favoriteTaskMetricKeys:["taskmetric|firefox|cpu"]
+  };
+  const model={
+    apps:[{id:"org.mozilla.firefox.desktop",name:"Firefox",actions:[]}],
+    thermalRows:[{id:"sensor-a",name:"CPU Temperature"}],
+    fanRows:[],
+    systemRows:[{id:"memory",name:"Memory Usage"}],
+    taskRows:[{comm:"firefox",name:"Firefox",pid:4321,args:"private arg"}]
+  };
+  const descriptions=Display.build(saved,model);
+  const all=Hub.list([],[],[],[],saved,{},descriptions);
+  assert.equal(all.total,8);
+  const get=(kind,raw)=>all.rows.find(row=>
+      row.key===Resource.identityKey("appcontrol",kind,raw));
+  for (const [kind,raw,menu,item,type] of [
+    ["item","org.mozilla.firefox.desktop","APPS","Firefox","FAVORITE"],
+    ["item","thermal|sensor-a","THERMAL","CPU Temperature","FAVORITE"],
+    ["item","system|memory","SYSTEM","Memory Usage","FAVORITE"],
+    ["item","task|firefox","KILL","firefox","PROCESS FAVORITE"],
+    ["preferred-action","app|org.mozilla.firefox.desktop|launch",
+      "APPS","Firefox / Launch","PREFERRED ACTION"],
+    ["monitor-watch","watchbox|thermal|sensor-a|temp",
+      "THERMAL","CPU Temperature / TEMP","METRIC WATCH"],
+    ["task-watch","taskmetric|firefox|cpu",
+      "KILL","firefox / CPU","METRIC WATCH"]
+  ]) {
+    const row=get(kind,raw);
+    assert.ok(row,kind+" "+raw);
+    assert.equal(row.menu,menu);
+    assert.equal(row.item,item);
+    assert.equal(row.favoriteType,type);
+    assert.equal(row.resolved,true);
+    assert.equal(row.label,menu+" // "+item);
+    assert.equal(row.readOnly,true);
+    assert.deepEqual(plain(row.capabilities),[]);
+  }
+  const command=get("item","run:private%20command");
+  assert.equal(command.resolved,false);
+  assert.equal(command.menu,"RUN");
+  assert.equal(command.item,"NAME UNAVAILABLE");
+  assert.ok(!all.rows.some(row=>row.label.includes("private command")));
+  assert.ok(!all.rows.some(row=>row.label.includes("4321")));
+  assert.ok(!all.rows.some(row=>row.label.includes("private arg")));
+});
+
+test("AppControl owner labels update with source availability without executing",()=>{
+  const Display={Resource};
+  load("services/favorites/FavoritesAppControlDisplayPolicy.js",Display);
+  const saved={favoriteKeys:["org.test.desktop","task|absent-app",
+    "thermal|sensor-secret"],favoriteDetailActionKeys:[],
+    favoriteMonitorBoxKeys:[],favoriteTaskMetricKeys:[]};
+  const empty=Hub.list([],[],[],[],saved,{},Display.build(saved,{}));
+  assert.equal(empty.rows[0].resolved,false);
+  assert.equal(empty.rows[0].menu,"OTHER");
+  const ready=Hub.list([],[],[],[],saved,{},Display.build(saved,{
+    apps:[{id:"org.test.desktop",name:"Test Application"}],
+    taskRows:[],thermalRows:[],systemRows:[]
+  }));
+  assert.equal(ready.rows[0].item,"Test Application");
+  assert.equal(ready.rows[0].menu,"APPS");
+  assert.equal(ready.rows[1].item,"absent-app"); // AppControl's offline comm rule
+  assert.equal(ready.rows[2].resolved,false);
+  // A label-looking command or private path must never be accepted.
+  const bad=Display.build({
+    favoriteKeys:["task|private-name"],favoriteDetailActionKeys:[],
+    favoriteMonitorBoxKeys:[],favoriteTaskMetricKeys:[]
+  },{taskRows:[{comm:"private-name",name:"/home/private/secret"}]});
+  assert.equal(Hub.list([],[],[],[],{
+    favoriteKeys:["task|private-name"],favoriteDetailActionKeys:[],
+    favoriteMonitorBoxKeys:[],favoriteTaskMetricKeys:[]
+  },{},bad).rows[0].item,"private-name");
+});
+
+test("CPU++ source renders real AppControl metadata without crossing authority",()=>{
+  const qml=read("widgets/appcontrol/AppControlFavoriteDisplaySource.qml");
+  const cpu=read("widgets/CpuPlusW.qml");
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const policy=read("services/favorites/FavoritesAppControlDisplayPolicy.js");
+  assert.match(qml,/DesktopEntries\.applications\.values/);
+  for(const token of ["appControlOwner.thermalRows","appControlOwner.fanRows",
+    "appControlOwner.systemRows","appControlOwner.taskRows"])
+    assert.ok(qml.includes(token),token);
+  assert.match(cpu,/AppControlFavoriteDisplaySource \{/);
+  assert.match(cpu,/cpuAppFavoriteDescriptions\.records/);
+  for(const token of ["SOURCE // APP CONTROL","MENU // ","ITEM // ",
+    "TYPE // ","STATUS // READ ONLY"])
+    assert.ok(pane.includes(token),token);
+  assert.match(pane,/modelData\.favoriteType/);
+  assert.match(pane,/modelData\.menu/);
+  assert.match(pane,/modelData\.item/);
+  assert.doesNotMatch(qml+policy,/FileView\s*\{|execDetached|Process\s*\{/);
+  assert.doesNotMatch(pane,/AppControlW\.execute|appControlWindow\.kill/);
 });

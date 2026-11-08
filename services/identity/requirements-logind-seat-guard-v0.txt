@@ -1,0 +1,3 @@
+# Explicit host-owned system D-Bus seat monitor dependency (not installed by app).
+# Pure-Python D-Bus client; pinned to the reviewed v0 adapter API.
+dbus-next==0.2.3

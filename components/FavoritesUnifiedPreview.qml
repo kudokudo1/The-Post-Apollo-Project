@@ -6,6 +6,10 @@ Rectangle {
     id: preview
 
     property var snapshot: null
+    // Optional U3a collections are injected, never loaded or written here.
+    property var collectionStore: null
+    property var collectionResource: null
+    property bool showingCollections: false
     readonly property var rows:
         snapshot && snapshot.ok && Array.isArray(snapshot.rows)
         ? snapshot.rows : []
@@ -33,13 +37,27 @@ Rectangle {
             spacing: 6
 
             GohuText {
-                width: Math.max(0,parent.width - dismiss.width - 6)
+                width: Math.max(0,parent.width - dismiss.width
+                    - (preview.collectionStore !== null ? collectionSwitch.width + 6 : 0) - 6)
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
                 text: "FAVORITES++ // READ ONLY"
                 font.pixelSize: 12
                 color: Colors.magenta
                 elide: Text.ElideRight
+            }
+
+            ActionButton {
+                id: collectionSwitch
+                width: 63
+                height: 27
+                visible: preview.collectionStore !== null
+                label: preview.showingCollections ? "SAVED" : "GROUPS"
+                labelPixelSize: 10
+                accentColor: Colors.magenta
+                selected: preview.showingCollections
+                onLeftClicked:
+                    preview.showingCollections = !preview.showingCollections
             }
 
             ActionButton {
@@ -114,8 +132,13 @@ Rectangle {
             color: Colors.orange
         }
 
+        Item {
+            width: parent.width
+            height: Math.max(0,preview.height - 116)
+
         Flickable {
             id: scroll
+            visible: !preview.showingCollections
             width: parent.width
             height: Math.max(0,preview.height - 116)
             clip: true
@@ -154,6 +177,7 @@ Rectangle {
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
                                 text: modelData.label
+                                textFormat: Text.PlainText
                                 color: Colors.white
                                 font.pixelSize: 10
                                 elide: Text.ElideRight
@@ -164,9 +188,20 @@ Rectangle {
             }
         }
 
+
+            FavoritesCollectionPanel {
+                anchors.fill: parent
+                visible: preview.showingCollections
+                collectionStore: preview.collectionStore
+                resource: preview.collectionResource
+            }
+        }
+
         GohuText {
             width: parent.width
-            text: "SAVED IDENTITY ≠ LIVE RESOURCE // NO ACTIONS"
+            text: preview.showingCollections
+                ? "COLLECTIONS ORGANIZE ONLY // NO PROVIDER ACTIONS"
+                : "SAVED IDENTITY ≠ LIVE RESOURCE // NO ACTIONS"
             color: Colors.orange
             font.pixelSize: 9
             elide: Text.ElideRight

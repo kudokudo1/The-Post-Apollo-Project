@@ -19,15 +19,9 @@ install -d -m 700 "$work/home" "$work/run" "$work/data" \
   "$work/cache" "$work/config-home" "$work/config/services/favorites" \
   "$work/config/tests/favorites"
 cp -a "$repo/components" "$work/config/components"
-cp "$repo/services/favorites/FavoritesResourcePolicy.js" \
-  "$repo/services/favorites/FavoritesDefaultPolicy.js" \
-  "$repo/services/favorites/FavoritesDefaultStore.qml" \
-  "$repo/services/favorites/qmldir" "$work/config/services/favorites/"
-# Other registered singletons must be resolvable by the module loader.
-cp "$repo/services/favorites/FavoritesStore.qml" \
-  "$repo/services/favorites/FavoritesService.qml" \
-  "$repo/services/favorites/FavoritesReadOnlyAdapters.js" \
-  "$work/config/services/favorites/"
+# Quickshell resolves EVERY qmldir-declared singleton even if this fixture
+# uses only FavoritesDefaultStore. Copy the whole module to the sandbox.
+cp "$repo/services/favorites/"* "$work/config/services/favorites/"
 cp "$repo/tests/favorites/fixtures/FavoritesU1NativeProbe.qml" \
   "$work/config/shell.qml"
 

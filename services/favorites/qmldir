@@ -3,4 +3,5 @@ module qs.services.favorites
 singleton FavoritesStore 1.0 FavoritesStore.qml
 singleton FavoritesService 1.0 FavoritesService.qml
 singleton FavoritesDefaultStore 1.0 FavoritesDefaultStore.qml
+singleton FavoritesCollectionsStore 1.0 FavoritesCollectionsStore.qml
 FavoritesUnifiedCatalog 1.0 FavoritesUnifiedCatalog.qml

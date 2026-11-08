@@ -20,6 +20,7 @@ test("absent, inactive and wrong private identity never assert authorization",()
     for(const data of [null,{},[],active("READY",{nativeSelected:false}),
                        active("READY",{adapterActive:false}),
                        active("READY",{privateMode:true,scopeMatches:false}),
+                       active("READY",{privateMode:false,scopeMatches:false}),
                        active("READY",{loginInProgress:true}),
                        active("READY",{privateMode:true,scopeMatches:null})]){
         const x=view(data);
@@ -29,6 +30,8 @@ test("absent, inactive and wrong private identity never assert authorization",()
     }
     assert.equal(view(active("READY",{privateMode:true,scopeMatches:false})).status,
                  "PRIVATE IDENTITY CHANGED // NOT CHECKED");
+    assert.equal(view(active("READY",{privateMode:false,scopeMatches:false})).status,
+                 "SHARED SESSION SCOPE CHANGED // NOT CHECKED");
 });
 test("only native READY at a matching scope exposes last-checked result",()=>{
     const s=view(active("READY"));
@@ -75,7 +78,7 @@ test("read-only real adapter connection and recheck chain, no second login owner
         "nativeSelected: messagingWindow.activeAppIndex === 2",
         "adapterActive: messageRouter.telegramBackend.active",
         "backendMode: messageRouter.telegramBackend.backendMode",
-        "scopeMatches: !messagingWindow.telegramIsolationEnabled",
+        "scopeMatches: messagingWindow.telegramIsolationEnabled",
         "messageRouter.telegramBackend.identityId",
         "loginInProgress: messageRouter.telegramBackend.loginInProgress"
     ])assert.ok(social.includes(bit),bit);

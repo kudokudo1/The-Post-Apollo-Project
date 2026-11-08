@@ -37,7 +37,7 @@ class C4bContracts(unittest.TestCase):
         self.assertIn("c4b_emergency_relay", guest)
         self.assertIn("c4b-monitor-fatal-summary.log", guest)
         self.assertIn("timeout --signal=TERM --kill-after=2s 9s", guest)
-        self.assertIn("if [[ "$rc" -ne 0 ]] && declare -F c4b_emergency_relay", guest)
+        self.assertIn('if [[ "$rc" -ne 0 ]] && declare -F c4b_emergency_relay', guest)
         self.assertIn('timeout --signal=TERM --kill-after=15s 560s', guest)
         self.assertIn('C4B_CONFINED_RUNTIME_NOT_VERIFIED', guest)
         self.assertIn('C4B_RUNTIME_CLEANUP_OR_ROLLBACK_NOT_VERIFIED', guest)

@@ -56,6 +56,21 @@ PanelWindow {
     property string batchReceipt: ""
     property int swipeIndex: 0
     property var swipeHistory: []
+    // Hunt is a presentation over the same review queue. Only the existing
+    // confirmBatchTrash() can authorize a physical move to recoverable Trash.
+    property var huntTargets: []
+    property var huntHistory: []
+    property int huntRound: 0
+    property int huntTick: 0
+    property int huntSecondsLeft: 25
+    property int huntShots: 0
+    property int huntHits: 0
+    property int huntMisses: 0
+    property int huntCombo: 0
+    property int huntScore: 0
+    property bool huntPaused: true
+    property bool huntRoundComplete: false
+    property string huntLastEvent: "READY // NEW ROUND"
     property string captureMode: "region"
     // Read Social's active identity and provider alias metadata, not login state.
     readonly property var zoomSocialIdentity: SocialIdentityStore.snapshot
@@ -402,6 +417,21 @@ PanelWindow {
             batchReviewKey = "";
             swipeIndex = 0;
             swipeHistory = [];
+            // A new inventory invalidates active Hunt targets and history.
+            // Never fire a selection for an earlier folder or filter.
+            huntTargets = [];
+            huntHistory = [];
+            huntPaused = true;
+            huntRoundComplete = false;
+            huntRound = 0;
+            huntTick = 0;
+            huntSecondsLeft = 25;
+            huntShots = 0;
+            huntHits = 0;
+            huntMisses = 0;
+            huntCombo = 0;
+            huntScore = 0;
+            huntLastEvent = "READY // NEW ROUND";
             galleryFiles = [];
         } else if (!galleryHasMore) {
             return false;
@@ -468,6 +498,7 @@ PanelWindow {
         batchPreview = null;
         batchReviewKey = "";
         swipeHistory = [];
+        huntHistory = [];
         return true;
     }
 
@@ -493,6 +524,7 @@ PanelWindow {
         batchPreview = null;
         batchReviewKey = "";
         swipeHistory = [];
+        huntHistory = [];
         return true;
     }
 
@@ -502,6 +534,7 @@ PanelWindow {
         batchPreview = null;
         batchReviewKey = "";
         swipeHistory = [];
+        huntHistory = [];
         return true;
     }
 
@@ -531,6 +564,7 @@ PanelWindow {
         batchPaths = next;
         batchPreview = null;
         batchReviewKey = "";
+        huntHistory = [];
         feedback = "SWIPE // " + action.toUpperCase()
                    + " // " + swipeIndex + "/" + galleryFiles.length
                    + " // QUEUED " + batchPaths.length;
@@ -549,6 +583,176 @@ PanelWindow {
         batchPreview = null;
         batchReviewKey = "";
         feedback = "SWIPE // UNDID " + last.decision.toUpperCase();
+        huntHistory = [];
+        return true;
+    }
+
+    // Duck Hunt-style Cleanup game. Targets come only from the already-loaded
+    // safe gallery inventory. Hits mark paths; no game code calls GIO/Trash.
+    function huntStartRound() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || (!huntRoundComplete && huntTargets.length > 0))
+            return false;
+        if (batchPaths.length >= 500) {
+            feedback = "HUNT // QUEUE FULL // REVIEW OR CLEAR";
+            return false;
+        }
+        const eligible = [];
+        const seen = {};
+        for (let i = 0; i < galleryFiles.length; i++) {
+            const item = galleryFiles[i];
+            if (!item || typeof item.path !== "string" || !item.path
+                    || seen[item.path] || batchContains(item.path))
+                continue;
+            seen[item.path] = true;
+            eligible.push(item);
+        }
+        if (eligible.length === 0) {
+            huntPaused = true;
+            huntLastEvent = "NO UNQUEUED LOADED FILES // LOAD MORE OR CHANGE FILTER";
+            feedback = huntLastEvent;
+            return false;
+        }
+        // Presentation randomness only. Never randomly choose files outside
+        // the active, filtered and explicitly scanned gallery inventory.
+        for (let i = eligible.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = eligible[i];
+            eligible[i] = eligible[j];
+            eligible[j] = tmp;
+        }
+        const picked = eligible.slice(0, Math.min(3, eligible.length));
+        const targets = [];
+        for (let i = 0; i < picked.length; i++) {
+            targets.push({
+                path: picked[i].path, name: String(picked[i].name || ""),
+                mediaType: String(picked[i].mediaType || ""),
+                lane: i, phase: Math.random() * Math.PI * 2,
+                speed: 0.032 + Math.random() * 0.027
+            });
+        }
+        huntTargets = targets;
+        huntHistory = [];
+        huntRound += 1;
+        huntTick = 0;
+        huntSecondsLeft = 25;
+        huntCombo = 0;
+        huntRoundComplete = false;
+        huntPaused = false;
+        huntLastEvent = "ROUND " + huntRound + " // FIRE TO QUEUE";
+        feedback = "HUNT // ROUND " + huntRound
+                   + " // THREE RANDOM LOADED MEDIA TARGETS MAX";
+        return true;
+    }
+
+    function huntAdvance() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || huntPaused || huntTargets.length === 0)
+            return false;
+        huntTick++;
+        huntSecondsLeft = Math.max(0, 25 - Math.floor(huntTick / 10));
+        if (huntTick >= 250) {
+            // Timeouts never queue anything. Unshot files stay eligible for
+            // a later round and are never silently marked for deletion.
+            huntTargets = [];
+            huntHistory = [];
+            huntPaused = true;
+            huntRoundComplete = true;
+            huntCombo = 0;
+            huntLastEvent = "TIME UP // UNHIT FILES STAY UNTOUCHED";
+            feedback = huntLastEvent;
+        }
+        return true;
+    }
+
+    function huntTogglePause() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || huntRoundComplete || huntTargets.length === 0)
+            return false;
+        huntPaused = !huntPaused;
+        huntLastEvent = huntPaused ? "PAUSED // NO SHOTS" : "RESUMED // HUNT";
+        return true;
+    }
+
+    function huntFire(path) {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || huntPaused || huntRoundComplete || huntTargets.length === 0)
+            return false;
+        const targetPath = String(path || "");
+        let hitIndex = -1;
+        for (let i = 0; i < huntTargets.length; i++)
+            if (huntTargets[i].path === targetPath && targetPath)
+                hitIndex = i;
+        if (targetPath && hitIndex < 0)
+            return false; // forged/stale hit cannot add an arbitrary path
+        if (hitIndex >= 0 && !batchContains(targetPath)
+                && batchPaths.length >= 500) {
+            feedback = "HUNT // QUEUE FULL // REVIEW OR CLEAR";
+            huntPaused = true;
+            return false;
+        }
+        const history = huntHistory.slice();
+        history.push({
+            targets: huntTargets.slice(), paths: batchPaths.slice(),
+            shots: huntShots, hits: huntHits, misses: huntMisses,
+            score: huntScore, combo: huntCombo,
+            paused: huntPaused, complete: huntRoundComplete
+        });
+        if (history.length > 30)
+            history.shift();
+        huntHistory = history;
+        huntShots += 1;
+        if (hitIndex < 0) {
+            huntMisses += 1;
+            huntCombo = 0;
+            huntLastEvent = "MISS // TARGETS STILL ACTIVE";
+        } else {
+            const nextTargets = huntTargets.slice();
+            nextTargets.splice(hitIndex, 1);
+            huntTargets = nextTargets;
+            if (!batchContains(targetPath)) {
+                const next = batchPaths.slice();
+                next.push(targetPath);
+                batchPaths = next;
+            }
+            huntHits += 1;
+            huntCombo += 1;
+            huntScore += 100 + Math.min(huntCombo - 1, 5) * 25;
+            batchPreview = null;
+            batchReviewKey = "";
+            swipeHistory = [];
+            huntLastEvent = "HIT // QUEUED " + huntTargets.length
+                            + " TARGETS REMAIN";
+            if (huntTargets.length === 0) {
+                huntRoundComplete = true;
+                huntPaused = true;
+                huntLastEvent = "ROUND CLEARED // REVIEW QUEUE OR NEXT ROUND";
+            }
+        }
+        feedback = "HUNT // " + huntLastEvent + " // SCORE " + huntScore;
+        return true;
+    }
+
+    function huntUndo() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || huntHistory.length === 0)
+            return false;
+        const history = huntHistory.slice();
+        const last = history.pop();
+        huntHistory = history;
+        huntTargets = last.targets.slice();
+        batchPaths = last.paths.slice();
+        huntShots = last.shots;
+        huntHits = last.hits;
+        huntMisses = last.misses;
+        huntScore = last.score;
+        huntCombo = last.combo;
+        huntPaused = last.paused;
+        huntRoundComplete = last.complete;
+        batchPreview = null;
+        batchReviewKey = "";
+        huntLastEvent = "UNDO // TARGET AND QUEUE RESTORED";
+        feedback = "HUNT // " + huntLastEvent;
         return true;
     }
 
@@ -888,6 +1092,9 @@ PanelWindow {
             batchPreview = null;
             swipeIndex = 0;
             swipeHistory = [];
+            huntHistory = [];
+            huntTargets = [];
+            huntPaused = true;
             Qt.callLater(function() { camera.loadGallery(false, "cleanup"); });
         } else if (action === "previewSelected") {
             if (payload.path === selectedPath) {

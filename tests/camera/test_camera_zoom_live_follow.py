@@ -80,6 +80,8 @@ class FollowTests(unittest.TestCase):
         self.assertIn('zoomActorTop, zoomControlDeckBottom)', QML)
         self.assertIn('cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
         self.assertIn('y: camera.zoomControlDeckBottom + camera.zoomDeckGap', QML)
+        self.assertIn('               - camera.zoomBrowserRise', QML)
+        self.assertIn('zoomActorTop, zoomControlDeckBottom)', QML)
         self.assertNotIn('zoomTopNudge', QML)
         self.assertIn('zoomFollowProcess.running = true;', QML)
 

@@ -337,8 +337,12 @@ test("AppControl owner labels update with source availability without executing"
     "thermal|sensor-secret"],favoriteDetailActionKeys:[],
     favoriteMonitorBoxKeys:[],favoriteTaskMetricKeys:[]};
   const empty=Hub.list([],[],[],[],saved,{},Display.build(saved,{}));
-  assert.equal(empty.rows[0].resolved,false);
-  assert.equal(empty.rows[0].menu,"OTHER");
+  // Without a live DesktopEntry, the saved APPS ID can still provide its
+  // safe program token. A real installed name supersedes that fallback.
+  assert.equal(empty.rows[0].resolved,true);
+  assert.equal(empty.rows[0].menu,"APPS");
+  assert.equal(empty.rows[0].item,"test [SAVED APP ID]");
+  assert.equal(empty.rows[0].available,"unresolved");
   const ready=Hub.list([],[],[],[],saved,{},Display.build(saved,{
     apps:[{id:"org.test.desktop",name:"Test Application"}],
     taskRows:[],thermalRows:[],systemRows:[]

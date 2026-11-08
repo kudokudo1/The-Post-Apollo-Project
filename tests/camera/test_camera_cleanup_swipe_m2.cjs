@@ -111,7 +111,7 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /label: "UNDO SHOT"/);
     assert.match(cleanup, /label: "NEW ROUND"/);
     assert.match(cleanup, /label: "SPAWN -"/);
-    assert.match(cleanup, /label: "SPAWN +"/);
+    assert.match(cleanup, /label: "SPAWN \+"/);
     assert.match(cleanup, /TARGETS \/\//);
     assert.match(cleanup, /z: target.profile === "ox" \? 40 : 2/);
     assert.match(cleanup, /readonly property real crowdScale/);
@@ -415,7 +415,7 @@ test("Deer runs fast, leaps diagonally and settles back to its baseline", () => 
 
 test("Fox juke-orbits moving pointer but taunts a stationary one at bounded speeds", () => {
     const f = motion.createTarget({path:"/tmp/fox.png"}, "fox",()=>0.6);
-    f.xNorm=0.63; f.yNorm=0.50; f.vx=0; f.vy=0;
+    f.xNorm=0.72; f.yNorm=0.50; f.vx=0; f.vy=0;
     const untracked=motion.advanceTarget(f,{active:false,x:0.50,y:0.50});
     const taunting=motion.advanceTarget(f,{active:true,moving:false,x:0.50,y:0.50});
     const chased=motion.advanceTarget(f,{active:true,moving:true,x:0.50,y:0.50});

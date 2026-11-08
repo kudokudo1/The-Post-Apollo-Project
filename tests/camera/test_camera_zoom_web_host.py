@@ -194,9 +194,11 @@ class ZoomWebHostTests(unittest.TestCase):
         for frame_w, frame_h, actor_top in (
                 (784, 699, 82), (1000, 1013, 99), (2536, 1345, 99)):
             actor_left, actor_width = 2, frame_w - 4
-            actor_bottom = frame_h - 1
+            # The physical guest's bottom ends 11px inside the frame:
+            # 1px original inset plus 10px source-specific trim.
+            actor_bottom = frame_h - 1 - 10
             self.assertEqual(actor_left + actor_width + 2, frame_w)
-            self.assertEqual(actor_top + (actor_bottom - actor_top) + 1,
+            self.assertEqual(actor_top + (actor_bottom - actor_top) + 11,
                              frame_h)
             self.assertGreaterEqual(actor_top, 0)
             self.assertLessEqual(actor_bottom, frame_h)

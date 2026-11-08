@@ -27,6 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           bash -n tests/connections/c4b_silverblue/guest_confined_runtime.sh
+          bash -n tests/connections/c4b_silverblue/build_signed_composed_policy.sh
           bash -n tests/connections/c2v_silverblue/boot_official_silverblue.sh
           bash -n tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh
           bash -n tests/connections/c3d_provenance/build_signed_ci_status.sh
@@ -78,18 +79,13 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/c4b-assets"
           docker run --rm \
-            --mount "type=bind,src=$PWD/tests/connections/c2r_selinux_domain,dst=/src,readonly" \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
             --mount "type=bind,src=$RUNNER_TEMP/c4b-assets,dst=/out" \
-            fedora:44 /bin/bash -euc '
-              dnf -y --setopt=install_weak_deps=False install selinux-policy-devel make
-              mkdir -p /tmp/c4b-src
-              cp /src/postapollo_connections.te /src/postapollo_connections.fc /tmp/c4b-src/
-              cd /tmp/c4b-src
-              make -f /usr/share/selinux/devel/Makefile postapollo_connections.pp
-              cp postapollo_connections.pp /out/postapollo_connections.pp
-              test -s /out/postapollo_connections.pp
-            '
-          echo "C4B_PASS // CUSTOM_POLICY_BUILT_WITHOUT_PERMISSIVE_OR_PRODUCTION_INSTALLATION"
+            fedora:44 /bin/bash /src/tests/connections/c4b_silverblue/build_signed_composed_policy.sh
+          (cd "$RUNNER_TEMP/c4b-assets" && \
+            sha256sum --check --status c4b-policy-artifact-manifest.sha256)
+          test "$(find "$RUNNER_TEMP/c4b-assets" -maxdepth 1 -type f | wc -l)" = 5
+          echo "C4B_PASS // CUSTOM_POLICY_RPM_BUILT_SIGNED_FOR_OSTREE_COMPOSITION"
 
       - name: Install ephemeral QEMU and pinned wheel download prerequisites
         shell: bash
@@ -117,7 +113,9 @@ jobs:
           cp tests/connections/c2o_fedora/BusPolicyClient.py \
             "$RUNNER_TEMP/c4b-assets/BusPolicyClient.py"
           (cd "$RUNNER_TEMP/c4b-assets" && \
-            sha256sum postapollo_connections.pp dbus_next.whl \
+            sha256sum postapollo_connections.pp c4b-policy.rpm \
+              c4b-policy-public.asc c4b-policy-fingerprint.txt \
+              c4b-policy-artifact-manifest.sha256 dbus_next.whl \
               C3bOriginCheck.py BusPolicyClient.py > c4b-runtime-manifest.sha256)
           echo "C4B_PASS // OFFLINE_PINNED_WHEEL_POLICY_AND_ORIGIN_PROBE_READY"
 

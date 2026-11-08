@@ -150,9 +150,14 @@ if [[ "$phase" == booted ]]; then
     fail "CONFINED_SERVICE_DID_NOT_REFUSE_DUMMY_FILE"
   echo "C4B_PASS // REAL_SELINUX_SERVICE_DOMAIN_AND_NEGATIVE_FILE_DENIAL"
   stage C3B_OS_ORIGIN_VERIFICATION_BEGIN
-  if ! GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1 \
+  # Exact owner-controlled C3b Silverblue-44 opt-in mode. The signed C3d
+  # executable and its /opt interpreter shebang stay byte-for-byte unchanged.
+  # C3b independently verifies the canonical /opt -> var/opt link, all
+  # protected physical directories, SELinux, D-Bus and OS process identity.
+  # Any rejection remains fatal. No synthetic candidate or copied policy.
+  if ! GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1 POST_APOLLO_C4B_TEST_GUEST=1 \
       timeout --signal=TERM --kill-after=5s 60s \
-        "$python" -I -B "$assets/C3bOriginCheck.py" --verify-disposable; then
+        "$python" -I -B "$assets/C3bOriginCheck.py" --verify-disposable-silverblue-opt; then
     # Read-only diagnostic on rejection. Import the exact staged C3b probe
     # rather than inventing a second list of protected directories. Report
     # only ancestor attributes that violate its existing strict predicate.
@@ -238,8 +243,19 @@ C4B_C3B_DIR_DIAG
   rm -rf -- /opt/postapollo-c2o-venv
   userdel c4b-reader && userdel c4b-outsider &&
     userdel postapollo-connections || fail "TEST_USER_REMOVAL_FAILED"
-  groupdel c4b-clients && groupdel postapollo-status-readers &&
-    groupdel postapollo-connections || fail "TEST_GROUP_REMOVAL_FAILED"
+  # Fedora shadow-utils may automatically remove the user's matching
+  # private primary group during userdel. This is already the desired
+  # result, not a failed cleanup. Other test groups must still be removed
+  # explicitly, and every user/group must be absent after these commands.
+  groupdel c4b-clients || fail "CLIENT_GROUP_REMOVAL_FAILED"
+  groupdel postapollo-status-readers || fail "READER_GROUP_REMOVAL_FAILED"
+  if getent group postapollo-connections >/dev/null; then
+    groupdel postapollo-connections || fail "SERVICE_GROUP_REMOVAL_FAILED"
+  else
+    echo "C4B_DIAG // SERVICE_PRIMARY_GROUP_ALREADY_ABSENT_AFTER_USERDEL"
+  fi
+  check_accounts_absent
+  echo "C4B_PASS // TEST_USERS_AND_GROUPS_FULLY_ABSENT"
   # The custom policy is part of the booted deployment and MUST NOT be
   # removed at runtime. Only the real OSTree rollback may remove it.
   stage COMPOSED_POLICY_RETAINED_FOR_ROLLBACK

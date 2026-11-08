@@ -316,6 +316,7 @@ Rectangle {
                 : cosmosModePane.kind === "solar-section" ? solarDetails
                 : cosmosModePane.kind === "meteors" ? meteorList
                 : cosmosModePane.kind === "eclipses" ? eclipseBoardComponent
+                : cosmosModePane.kind === "stars" ? starsBoardComponent
                 : subjectCards
         }
         // An unavailable solar forecast must not leave a blank graph without
@@ -353,6 +354,7 @@ Rectangle {
                 : cosmosModePane.kind === "annual-solar" ? "JPL // CALCULATE YEAR ON DEMAND"
                 : cosmosModePane.kind === "meteors" ? "IAU MDC // SCROLL MIDDLE ONLY"
                 : cosmosModePane.kind === "eclipses" ? "NASA GSFC // GLOBAL DATES ONLY"
+                : cosmosModePane.kind === "stars" ? "USNO // NAVIGATION SAMPLE NOT FULL SKY"
                 : cosmosModePane.kind === "solar-section" ? "NOAA // ONE INSTRUMENT"
                 : "SOURCE-BACKED // FOCUSED VIEW"
             color: Colors.cyan
@@ -612,6 +614,13 @@ Rectangle {
         id: eclipseBoardComponent
         StationCosmosEclipseBoard {
             eclipseSource: cosmosModePane.eclipseSource
+            sourceStatus: cosmosModePane.sourceStatus
+        }
+    }
+    Component {
+        id: starsBoardComponent
+        StationCosmosStarsBoard {
+            celestialSource: cosmosModePane.celnav
             sourceStatus: cosmosModePane.sourceStatus
         }
     }

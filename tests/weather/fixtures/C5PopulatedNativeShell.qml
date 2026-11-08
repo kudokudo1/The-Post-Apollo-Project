@@ -228,7 +228,7 @@ ShellRoot {
                     || !visual.sourceReady
                     || visual.width < 150
                     || visual.height < 55
-                    || meteorScroll.width < 140
+                    || scroll.width < 140
                     || Math.abs(visual.daysToPeak - 7) > 0.001
                     || Math.abs(visual.remaining30DayFraction-7/30)>0.001)
                     return root.fail("C29_METEOR_PHOTO_AND_DATA_METER_MISSING");

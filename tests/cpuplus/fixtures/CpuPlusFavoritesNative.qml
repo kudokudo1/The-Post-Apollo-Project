@@ -25,7 +25,10 @@ ShellRoot {
         id: appFavorites
         property var favoriteKeys: [
             "task|hidden-process","run|private-command",
-            "run:kitty:zellij","mode:4:Favorite Window","hidden:btop"
+            "run:kitty:zellij","mode:4:Favorite Window","hidden:btop",
+            "mode:2:◇  budget-2026.xlsx",
+            "mode:2:⌯🗁๋࣭⭑  Properties/",
+            "mode:2:↗  Active Contract.pdf"
         ]
         property var favoriteDetailActionKeys: []
         property var favoriteMonitorBoxKeys: []
@@ -151,8 +154,28 @@ ShellRoot {
                 return item.menu==="RUN" && item.owner==="appcontrol"
                        && !item.resolved;
             });
-            if(!root.options || root.options.total!==8
+            const file=named.find(function(item) {
+                return item.menu==="FILES"
+                       && item.item==="budget-2026.xlsx"
+                       && item.favoriteType==="FILE FAVORITE";
+            });
+            const folder=named.find(function(item) {
+                return item.menu==="FILES"
+                       && item.item==="Properties"
+                       && item.favoriteType==="DIRECTORY FAVORITE";
+            });
+            const link=named.find(function(item) {
+                return item.menu==="FILES"
+                       && item.item==="Active Contract.pdf"
+                       && item.favoriteType==="SYMLINK FAVORITE";
+            });
+            if(!root.options || root.options.total!==11
                || !run || !winItem || !cli || !unavailable
+               || !file || !folder || !link
+               || selector.favoriteRowLabel(file)
+                   !=="APP CTRL // FILES // budget-2026.xlsx"
+               || file.available!=="unresolved"
+               || !folder.readOnly || !link.readOnly
                || selector.favoriteRowLabel(unavailable)
                    !=="APP CTRL // RUN // SAVED COMMAND #1"
                || selector.choices.length!==1

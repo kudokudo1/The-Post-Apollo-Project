@@ -1,9 +1,9 @@
 import QtQuick
 import "../../components"
 
-// C29 // Embedded NASA archival photograph plus an IAU-source countdown.
-// The 2016 Perseid exposure is an example photograph, NOT a live feed,
-// an image of the currently selected shower, or a local viewing forecast.
+// C30 // Moving, source-positioned schematic is the default view.
+// A user-controlled NASA photo archive (not live footage) is secondary.
+// The existing IAU numeric countdown remains scientifically separate.
 Rectangle {
     id: visual
     objectName: "cosmos-c29-meteor-visual"
@@ -15,6 +15,37 @@ Rectangle {
     property var upcomingShowers: []
     property string selectedShowerName: ""
     property bool sourceReady: false
+
+    property bool showArchive: false
+    property bool playing: true
+    property int archiveIndex: 0
+    readonly property var archiveFrames: [
+        {
+            url: "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/n/NHQ201608120002.jpg",
+            name: "PERSEIDS 2016",
+            credit: "NASA / BILL INGALLS"
+        },
+        {
+            url: "https://assets.science.nasa.gov/dynamicimage/assets/science/psd/solar/2023/09/2/28936614905_7161ae74be_k.jpg?crop=faces%2Cfocalpoint&fit=clip&h=1628&w=2048",
+            name: "SPRUCE KNOB 2016",
+            credit: "NASA / BILL INGALLS"
+        }
+    ]
+    readonly property var archiveFrame: archiveFrames[archiveIndex]
+    function nextArchive() {
+        archiveIndex = (archiveIndex + 1) % archiveFrames.length;
+        resetView();
+    }
+    onShowArchiveChanged: resetView()
+
+    Timer {
+        id: archiveTimer
+        objectName: "cosmos-c30-nasa-gallery-timer"
+        interval: 12000
+        repeat: true
+        running: visual.visible && visual.showArchive && visual.playing
+        onTriggered: visual.nextArchive()
+    }
 
     property real zoom: 1
     property real panX: 0
@@ -69,13 +100,21 @@ Rectangle {
         anchors.bottom: dataFooter.top
         clip: true
 
+        StationCosmosMeteorMotion {
+            id: skyMotion
+            objectName: "cosmos-c30-simulated-motion-view"
+            anchors.fill: parent
+            peak: visual.activePeak
+            playing: visual.playing
+            visible: !visual.showArchive
+        }
+
         Image {
             id: nasaPhoto
             objectName: "cosmos-c29-nasa-archival-photo"
-            // NASA/Bill Ingalls, Perseid over Spruce Knob WV, 2016-08-12.
-            // Official original: https://science.nasa.gov/resource/perseid-meteor-over-west-virginia/
-            // This image is loaded ONLY when COSMOS -> METEORS is visible.
-            source: "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/p/e/perseidwestva1200w.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg"
+            // Two credit-labeled authentic NASA Perseid photographs.
+            // They are fetched only when the user selects ARCHIVE.
+            source: visual.showArchive ? visual.archiveFrame.url : ""
             asynchronous: true
             cache: true
             fillMode: Image.PreserveAspectCrop
@@ -83,14 +122,14 @@ Rectangle {
             height: Math.max(1,photoArea.height*visual.zoom)
             x: (photoArea.width-width)/2+visual.panX
             y: (photoArea.height-height)/2+visual.panY
-            visible: status === Image.Ready
+            visible: visual.showArchive && status === Image.Ready
             smooth: true
         }
 
         QuietText {
             anchors.centerIn: parent
             width: Math.max(1,parent.width-10)
-            visible: nasaPhoto.status !== Image.Ready
+            visible: visual.showArchive && nasaPhoto.status !== Image.Ready
             text: nasaPhoto.status === Image.Error
                 ? "NASA PHOTO OFFLINE" : "NASA PHOTO LOADING"
             color: Colors.cyan
@@ -102,7 +141,7 @@ Rectangle {
         MouseArea {
             id: photoGesture
             anchors.fill: parent
-            enabled: nasaPhoto.status === Image.Ready
+            enabled: visual.showArchive && nasaPhoto.status === Image.Ready
             cursorShape: visual.zoom > 1 ? Qt.OpenHandCursor : Qt.PointingHandCursor
             property real startX: 0
             property real startY: 0
@@ -143,11 +182,43 @@ Rectangle {
                 anchors.margins: 2
                 spacing: 2
                 QuietText {
-                    width: Math.max(1,parent.width-90)
-                    text: "NASA // ARCHIVE 2016"
+                    width: Math.max(1,parent.width
+                        - (visual.showArchive ? 157 : 64))
+                    text: visual.showArchive ? "NASA ARCHIVE" : "SIMULATED SKY"
                     color: Colors.yellow
                     font.pixelSize: 8
                     elide: Text.ElideRight
+                }
+                ActionButton {
+                    objectName: "cosmos-c30-toggle-view"
+                    width: 36
+                    height: 16
+                    label: visual.showArchive ? "SKY" : "PHOTO"
+                    labelPixelSize: 8
+                    contentPadding: 0
+                    accentColor: Colors.magenta
+                    onClicked: visual.showArchive = !visual.showArchive
+                }
+                ActionButton {
+                    objectName: "cosmos-c30-play-pause"
+                    width: 23
+                    height: 16
+                    label: visual.playing ? "II" : "PLAY"
+                    labelPixelSize: 7
+                    contentPadding: 0
+                    accentColor: Colors.cyan
+                    onClicked: visual.playing = !visual.playing
+                }
+                ActionButton {
+                    objectName: "cosmos-c30-gallery-next"
+                    width: visible ? 24 : 0
+                    visible: visual.showArchive
+                    height: 16
+                    label: "NEXT"
+                    labelPixelSize: 7
+                    contentPadding: 0
+                    accentColor: Colors.orange
+                    onClicked: visual.nextArchive()
                 }
                 Repeater {
                     model: [
@@ -157,7 +228,8 @@ Rectangle {
                     ]
                     delegate: ActionButton {
                         required property var modelData
-                        width: modelData.delta===0 ? 32 : 22
+                        visible: visual.showArchive
+                        width: visible ? (modelData.delta===0 ? 26 : 19) : 0
                         height: 16
                         label: modelData.label
                         labelPixelSize: 8
@@ -182,7 +254,9 @@ Rectangle {
                 anchors.margins: 3
                 color: Colors.cyan
                 font.pixelSize: 8
-                text: "PERSEID PHOTO // NASA / BILL INGALLS"
+                text: visual.showArchive
+                    ? visual.archiveFrame.name + " // " + visual.archiveFrame.credit
+                    : "EQUATORIAL SCHEMATIC // ARTISTIC TRAILS"
                 elide: Text.ElideRight
             }
         }

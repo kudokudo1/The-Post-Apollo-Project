@@ -11,6 +11,8 @@ WORKFLOW = (ROOT / ".github/workflows/connections-c4b-silverblue-confined-runtim
 C4A = (ROOT / "tests/connections/c4a_silverblue/guest_signed_status_gate.sh")
 C3B = (ROOT / "tests/connections/c3b_origin/C3bOriginCheck.py")
 C2R = (ROOT / "tests/connections/c2r_selinux_domain/postapollo_connections.te")
+SIGNED_C2R_HOST_SOURCE = (ROOT / "tests/connections/c2r_selinux_domain/C2rStatusHost.py")
+SIGNED_C3D_UNIT_SOURCE = (ROOT / "services/connections/experiments/c2n_package/postapollo-connections-status.service.template")
 POLICY_GATE = (ROOT / "tests/connections/c4b_silverblue/guest_signed_policy_gate.sh")
 POLICY_BUILDER = (ROOT / "tests/connections/c4b_silverblue/build_signed_composed_policy.sh")
 POLICY_SPEC = (ROOT / "tests/connections/c4b_silverblue/signed-compose-policy.spec")
@@ -144,6 +146,16 @@ class C4bContracts(unittest.TestCase):
         self.assertIn("C3B_PASS // OS_DBUS_PID_UID_SYSTEMD_SELINUX_ORIGIN_COHERENCE_TEST_ONLY",
                       BOOT.read_text())
         self.assertIn("C3B_OS_ORIGIN_COHERENT_TEST_ONLY", C3B.read_text())
+        # These source guards take effect only after the independently
+        # reviewed C3b #1553 reaches main. Never copy that owner source here.
+        c3b = C3B.read_text()
+        self.assertIn("--verify-disposable-silverblue-opt", c3b)
+        self.assertIn('C4B_OPT_LINK = "var/opt"', c3b)
+        self.assertIn('C4B_OPT_REALPATH = "/var/opt"', c3b)
+        self.assertIn("def _verified_c4b_opt_guest()", c3b)
+        self.assertIn("def _valid_opt_proof(", c3b)
+        self.assertIn("os.readlink(\"/opt\")", c3b)
+        self.assertIn("os.lstat(\"/opt\")", c3b)
         self.assertIn("init_daemon_domain", C2R.read_text())
         self.assertIn("stage COMPOSED_POLICY_VERIFICATION_BEGIN", script)
         self.assertIn("stage COMPOSED_IMMUTABLE_EXECUTABLE_LABEL_CHECK", script)
@@ -154,6 +166,15 @@ class C4bContracts(unittest.TestCase):
         self.assertIn("C4B_EXIT // phase=", script)
         self.assertIn('exec >>/var/tmp/c4b-runtime.log 2>&1', script)
         self.assertIn("GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1", script)
+        # C4b requests the C3b-owner's explicit, independently gated
+        # Silverblue-only path. Default --verify-disposable stays untouched.
+        self.assertIn("POST_APOLLO_C4B_TEST_GUEST=1", script)
+        self.assertIn("--verify-disposable-silverblue-opt", script)
+        self.assertIn("C3B_OS_ORIGIN_VERIFICATION_BEGIN", script)
+        self.assertIn("DBUS_SYSTEMD_PID_UID_SELINUX_ORIGIN_REJECTED", script)
+        self.assertNotIn("--verify-disposable-physical", script)
+        self.assertIn('python=/opt/postapollo-c2o-venv/bin/python3', script)
+        self.assertIn('python3 -m venv --without-pip /opt/postapollo-c2o-venv', script)
         self.assertIn("C3B_REJECTED_ORIGIN_ANCESTOR_DIAG_BEGIN", script)
         self.assertIn("C4B_DIAG_C3B_UNPROTECTED_DIRECTORY //", script)
         self.assertIn("C4B_DIAG_C3B_ANCESTOR_VIOLATION_COUNT //", script)
@@ -207,6 +228,18 @@ class C4bContracts(unittest.TestCase):
         self.assertIn("C4B_POLICY_UNEXPECTED_PAYLOAD", builder)
         self.assertIn("rpmsign --addsign", builder)
         self.assertIn("build_signed_composed_policy.sh", workflow)
+        # The C3b owner's opt profile must use the ORIGINAL C3d-signed host,
+        # not C4b's now-closed physical-shebang derivative experiment #1551.
+        self.assertTrue(SIGNED_C2R_HOST_SOURCE.read_bytes().startswith(
+            b"#!/opt/postapollo-c2o-venv/bin/python3\n"
+        ))
+        self.assertIn(
+            "ExecStart=/usr/libexec/post-apollo/connections-status-host --read-only",
+            SIGNED_C3D_UNIT_SOURCE.read_text(),
+        )
+        self.assertNotIn("prepare_physical_status_host.py", workflow)
+        self.assertNotIn("c4b-physical-status-host.py", workflow)
+        self.assertIn("build_signed_ci_status.sh", workflow)
         self.assertIn("c4b-policy.rpm", workflow)
         self.assertIn("sha256sum --check --status c4b-policy-artifact-manifest.sha256", workflow)
         for forbidden in ("setenforce ", "rpm-ostree usroverlay",

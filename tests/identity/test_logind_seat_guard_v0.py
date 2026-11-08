@@ -16,6 +16,7 @@ import tempfile
 import threading
 import unittest
 from urllib.parse import parse_qs, urlencode, urlsplit
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "services" / "identity"))
@@ -183,6 +184,30 @@ class LogindSeatGuardTests(unittest.IsolatedAsyncioTestCase):
         ])
         self.assertTrue(self.guard.is_active())
 
+    async def test_default_factory_uses_real_system_bus_api_not_session_bus(self):
+        from dbus_next import BusType
+        source = self.bus
+        def factory(*, bus_type):
+            self.assertEqual(bus_type, BusType.SYSTEM)
+            class Connector:
+                async def connect(self):
+                    return source
+            return Connector()
+
+        monitor = LogindSeatGuard(
+            on_revoke=self._callback,
+            pid_provider=lambda: 1200, uid_provider=lambda: 1000,
+            monotonic=lambda: self.now, poll_seconds=0.2,
+            stale_after_seconds=0.7,
+        )
+        try:
+            with patch("dbus_next.aio.MessageBus", side_effect=factory):
+                await monitor.start()
+            self.assertTrue(monitor.is_active())
+            self.assertEqual(source.seen_pid, 1200)
+        finally:
+            await monitor.close()
+
     async def test_lock_signal_revokes_and_never_recovers(self):
         await self.guard.start()
         self.bus.session.lock()
@@ -226,6 +251,7 @@ class LogindSeatGuardTests(unittest.IsolatedAsyncioTestCase):
                 await self._event()
                 self.assertEqual(self.revokes[-1], wanted)
                 self.assertFalse(self.guard.is_active())
+        await self.guard.close()
 
     async def test_invalidation_of_critical_property_revokes(self):
         await self.guard.start()

@@ -526,8 +526,13 @@ ShellRoot {
                 focused.celnav.ready = true;
                 root.phase = 10;
             } else if (root.phase === 10) {
-                const details = focused.instrumentItem;
-                if (!details || details.recordCount !== 2
+                // C38 // PLANETS is now a composite. The original C6
+                // twelve-fact inspector remains the mounted SKY NOW child.
+                const shell = focused.instrumentItem;
+                const details = findNamed(shell,"cosmos-c6-record-detail");
+                const submodes = findNamed(shell,"cosmos-c38-planets-inner-modes");
+                if (!shell || !submodes || !details
+                        || details.recordCount !== 2
                         || details.facts[0].value !== "37.5°"
                         || countNamed(details,"cosmos-c6-observation-cell") !== 12)
                     return root.fail("PLANET_TWELVE_FACTS_MISSING");

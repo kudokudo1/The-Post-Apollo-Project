@@ -10,6 +10,10 @@ Rectangle {
     color: Colors.black
     clip: true
     property string subjectRoute: ""
+    // C38 // PLANETS has SKY NOW and an opt-in dated-event instrument.
+    // The hidden StationSky source switches its USNO route; there is never
+    // a second concurrent USNO collector or a global source override.
+    property string planetSubmode: "sky"
     property var weatherService: null
     property var spaceService: null
     property var liveHistoryStore: null
@@ -58,7 +62,8 @@ Rectangle {
                 && weatherService.longitude !== "";
         if (kind === "light")
             return !!twilight && twilight.available;
-        if (kind === "planet-clock")
+        if (kind === "planet-clock"
+            || (kind === "planets" && planetSubmode === "day"))
             return !!planetSource && planetSource.configured;
         if (kind === "planets" || kind === "stars")
             return !!celnav && celnav.configured;
@@ -71,7 +76,8 @@ Rectangle {
         return true;
     }
     readonly property var selectedProvider:
-        kind === "planet-clock" ? planetSource
+        kind === "planet-clock" || (kind === "planets" && planetSubmode === "day")
+            ? planetSource
         : kind === "planets" || kind === "stars" ? celnav
         : kind === "meteors" ? meteorSource
         : kind === "eclipses" ? eclipseSource
@@ -170,7 +176,10 @@ Rectangle {
         sourceComponent: Component {
             StationSky {
                 sourceOnly: true
-                subjectRoute: Modes.dataRoute(cosmosModePane.subjectRoute || "")
+                subjectRoute: cosmosModePane.kind === "planets"
+                    && cosmosModePane.planetSubmode === "day"
+                    ? "cosmos/planets-stars/planet-clock"
+                    : Modes.dataRoute(cosmosModePane.subjectRoute || "")
                 // Service pointers bound by the parent AFTER item creation.
             }
         }
@@ -313,6 +322,7 @@ Rectangle {
                 : cosmosModePane.kind === "solar-path" ? sunPath
                 : cosmosModePane.kind === "light" ? sunLight
                 : cosmosModePane.kind === "planet-clock" ? planetClock
+                : cosmosModePane.kind === "planets" ? planetsComposite
                 : cosmosModePane.kind === "solar-section" ? solarDetails
                 : cosmosModePane.kind === "meteors" ? meteorList
                 : cosmosModePane.kind === "eclipses" ? eclipseBoardComponent
@@ -518,6 +528,85 @@ Rectangle {
             }
         }
     }
+    Component {
+        id: planetsComposite
+        Item {
+            id: planetsLanding
+            objectName: "cosmos-c38-planets-composite"
+            anchors.fill: parent
+            clip: true
+            Row {
+                id: planetsViews
+                objectName: "cosmos-c38-planets-inner-modes"
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: 23
+                spacing: 4
+                ActionButton {
+                    width: Math.max(1,(planetsViews.width-8)/3)
+                    height: 22
+                    label: "SKY NOW"
+                    labelPixelSize: 9
+                    contentPadding: 0
+                    selected: cosmosModePane.planetSubmode === "sky"
+                    accentColor: Colors.cyan
+                    onClicked: cosmosModePane.planetSubmode = "sky"
+                }
+                ActionButton {
+                    width: Math.max(1,(planetsViews.width-8)/3)
+                    height: 22
+                    label: "DAY EVENTS"
+                    labelPixelSize: 9
+                    contentPadding: 0
+                    selected: cosmosModePane.planetSubmode === "day"
+                    accentColor: Colors.magenta
+                    onClicked: cosmosModePane.planetSubmode = "day"
+                }
+                ActionButton {
+                    width: Math.max(1,(planetsViews.width-8)/3)
+                    height: 22
+                    label: "DAY RING // CLOCK"
+                    labelPixelSize: 9
+                    contentPadding: 0
+                    accentColor: Colors.yellow
+                    onClicked: cosmosModePane.routeRequested(
+                        "cosmos/planets-stars/planet-clock")
+                }
+            }
+            Loader {
+                id: planetsViewLoader
+                objectName: "cosmos-c38-planets-active-view"
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: planetsViews.bottom
+                anchors.topMargin: 4
+                anchors.bottom: parent.bottom
+                active: planetsLanding.visible
+                sourceComponent: cosmosModePane.planetSubmode === "day"
+                    ? planetsTimelineComponent : planetsSkyComponent
+            }
+        }
+    }
+    Component {
+        id: planetsSkyComponent
+        StationCosmosDetailPane {
+            kind: "planets"
+            celestialSource: cosmosModePane.celnav
+            sourceStatus: cosmosModePane.sourceStatus
+        }
+    }
+    Component {
+        id: planetsTimelineComponent
+        StationCosmosPlanetsDayPane {
+            datedRows: cosmosModePane.planetRows
+            civilDate: cosmosModePane.civilDate
+            sourceReady: !!cosmosModePane.planetSource
+                && cosmosModePane.planetSource.ready
+            sourceStatus: cosmosModePane.sourceStatus
+        }
+    }
+
     Component {
         id: planetClock
         // C28 // The circular 24h dial is the focused CLOCK screen, not

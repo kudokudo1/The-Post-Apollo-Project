@@ -56,6 +56,18 @@ Item {
         }
         Rectangle {width: parent.width;height: 1;color: Colors.cyan}
         GohuText {
+            width: parent.width
+            text: "CPU++ // "
+                +(pane.candidates ? pane.candidates.rows.filter(
+                    function(item) {return item.category==="CPU++";}).length : 0)
+                +"  |  APP CTRL // "
+                +(pane.candidates ? pane.candidates.rows.filter(
+                    function(item) {return item.category==="APP CTRL";}).length : 0)
+            color: Colors.orange
+            font.pixelSize: 10
+            elide: Text.ElideRight
+        }
+        GohuText {
             text: "COLLECTIONS // "+(pane.collectionsOwner ? pane.collectionsOwner.collections.length : 0)
                   +"  |  SAVE "+(pane.collectionsOwner ? pane.collectionsOwner.storageState.toUpperCase() : "UNAVAILABLE")
             color: Colors.cyan

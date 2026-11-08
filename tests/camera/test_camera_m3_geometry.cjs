@@ -117,6 +117,31 @@ test("Camera uses Finance's baseline fullscreen width/height outside Zoom; Zoom 
     assert.match(shell, /id: cameraWindow[\s\S]*?dockCenterX: shellRoot\.margins\.left \+ leftModules\.x/);
 });
 
+test("Camera's transparent Zoom frame seals its inner 2px perimeter but leaves desktop outside frame untouched", () => {
+    const frame = camera.split("WindowPanelFrame {", 2)[1];
+    assert.ok(frame, "Camera's frame exists");
+    assert.match(frame, /fillOpacity: camera\.zoomWebVisualHeld \? 0\.0 : 0\.97/);
+    assert.match(frame, /clipContent: camera\.zoomWebVisualHeld/);
+    for (const id of ["zoomWebLeftEdgeSeal", "zoomWebRightEdgeSeal"]) {
+        assert.ok(frame.includes("id: " + id), "missing perimeter: " + id);
+    }
+    const left = frame.split("id: zoomWebLeftEdgeSeal", 2)[1].split("id: zoomWebRightEdgeSeal", 2)[0];
+    const right = frame.split("id: zoomWebRightEdgeSeal", 2)[1].split("id: zoomViewport", 2)[0];
+    assert.ok(left.includes("width: Math.max(0, camera.zoomActorLeft)"));
+    assert.ok(right.includes("width: Math.max(0, frame.width - x)"));
+    assert.ok(right.includes("x: camera.zoomActorLeft + camera.zoomActorWidth"));
+    assert.ok(left.includes("visible: camera.zoomWebVisualHeld"));
+    assert.ok(right.includes("visible: camera.zoomWebVisualHeld"));
+    for (const [width, height, top] of [[784,699,82],[1000,1013,99],[2536,1345,99]]) {
+        const inset = 2, browserWidth = width - 2 * inset;
+        const browserBottom = height - 1;
+        assert.equal(inset + browserWidth + inset, width);
+        assert.equal(top + (browserBottom - top) + 1, height);
+    }
+    assert.match(camera, /readonly property int zoomBrowserRise: 13/);
+    assert.match(camera, /intersection: Intersection\.Subtract/);
+});
+
 test("Header has Finance-style independent down/up size controls and close", () => {
     assert.match(camera, /id: cameraCollapseButton/);
     assert.match(camera, /label: "↓"/);

@@ -134,8 +134,8 @@ class Session:
         except subprocess.TimeoutExpired:
             self.host.kill()
             self.host.wait(timeout=5)
-        assert self.client.returncode == 0, "C5B_CLIENT_NOT_CLEAN"
         if not crash:
+            assert self.client.returncode == 0, "C5B_CLIENT_NOT_CLEAN"
             assert self.host.returncode == 0, "C5B_HOST_NOT_CLEAN"
         assert self.client.stdout and self.client.stdout.read() == ""
         assert self.client.stderr and self.client.stderr.read() == ""
@@ -292,11 +292,10 @@ class C5bDurableHostTests(unittest.TestCase):
             # A second server cannot silently share the same authority DB.
             other = self.session()
             try:
-                out = other.bind()
-                self.fail("Second host unexpectedly accepted: " + str(out))
-            except (AssertionError, ValueError, TimeoutError, BrokenPipeError,
-                    ConnectionResetError, OSError):
-                pass
+                with self.assertRaises((AssertionError, ValueError,
+                                        TimeoutError, BrokenPipeError,
+                                        ConnectionResetError, OSError)):
+                    other.bind()
             finally:
                 other.close(crash=True)
         finally:

@@ -20,6 +20,16 @@ Rectangle {
         collectionStore ? collectionStore.collections : []
     signal createAccepted(string collectionId)
 
+    function createFromInput() {
+        if (collectionStore === null || !collectionStore.canEdit)
+            return;
+        const id=collectionStore.createCollection(nameInput.text);
+        if (id !== "") {
+            nameInput.text="";
+            createAccepted(id);
+        }
+    }
+
     color: Colors.black
     clip: true
 
@@ -51,7 +61,7 @@ Rectangle {
                         ? Colors.magenta : Colors.cyan
                     border.width: 1
                 }
-                onAccepted: createButton.triggered(null)
+                onAccepted: panel.createFromInput()
             }
 
             ActionButton {
@@ -64,14 +74,7 @@ Rectangle {
                 available: panel.collectionStore !== null
                     && panel.collectionStore.canEdit
                     && nameInput.text.trim().length > 0
-                onLeftClicked: {
-                    if (!available) return;
-                    const id=panel.collectionStore.createCollection(nameInput.text);
-                    if (id !== "") {
-                        nameInput.text="";
-                        panel.createAccepted(id);
-                    }
-                }
+                onLeftClicked: panel.createFromInput()
             }
         }
 

@@ -19,7 +19,7 @@ donefile=/var/lib/c4b-runtime-cleaned
 unit=postapollo-connections-status.service
 bus=org.postapollo.ConnectionsStatus1
 host=/usr/libexec/post-apollo/connections-status-host
-python=/opt/postapollo-c2o-venv/bin/python3
+python=/var/opt/postapollo-c2o-venv/bin/python3
 fail() {
   echo "C4B_FAIL // $*" >&2
   timeout 5s systemctl status "$unit" --no-pager -l 2>&1 | tail -n 20 || true
@@ -56,7 +56,7 @@ check_accounts_absent() {
 }
 client_check() {
   local result
-  result="$(runuser -u "$1" -- "$python" -I -B /opt/c4b/BusPolicyClient.py "$2")" ||
+  result="$(runuser -u "$1" -- "$python" -I -B /var/opt/c4b/BusPolicyClient.py "$2")" ||
     fail "CLIENT_INVOCATION_FAILED"
   [[ "$result" == "$3" ]] || fail "CLIENT_RESPONSE_MISMATCH"
 }
@@ -89,6 +89,15 @@ if [[ "$phase" == booted ]]; then
   [[ "$(ls -Z "$host")" == *postapollo_connections_exec_t* ]] ||
     fail "SIGNED_OSTREE_EXECUTABLE_NOT_LABELED"
   echo "C4B_PASS // SIGNED_SILVERBLUE_EXECUTABLE_CONFINED_ENTRYPOINT"
+  # The signed C4b-only package is assembled from the original C3d sources
+  # with exactly one different shebang byte-span BEFORE signing. Never
+  # override a signed systemd unit or modify immutable /usr at runtime.
+  stage SIGNED_PHYSICAL_INTERPRETER_SHEBANG_CHECK
+  [[ "$(head -n 1 "$host")" == '#!/var/opt/postapollo-c2o-venv/bin/python3' ]] ||
+    fail "SIGNED_PHYSICAL_INTERPRETER_SHEBANG_NOT_PRESENT"
+  [[ -d /var && ! -L /var && -d /var/opt && ! -L /var/opt ]] ||
+    fail "PHYSICAL_INTERPRETER_DIRECTORY_CHAIN_NOT_PRESENT"
+  echo "C4B_PASS // SIGNED_PHYSICAL_INTERPRETER_SHEBANG_PROVEN"
 
   stage SERVICE_IDENTITY_SETUP_BEGIN
   groupadd --system postapollo-connections || fail "SERVICE_GROUP_FAILED"
@@ -102,15 +111,15 @@ if [[ "$phase" == booted ]]; then
   useradd --system --no-create-home --shell /usr/sbin/nologin \
     --gid c4b-clients c4b-outsider || fail "OUTSIDER_USER_FAILED"
   stage PINNED_OFFLINE_PYTHON_SETUP_BEGIN
-  timeout --signal=TERM --kill-after=5s 90s python3 -m venv --without-pip /opt/postapollo-c2o-venv ||
+  timeout --signal=TERM --kill-after=5s 90s python3 -m venv --without-pip /var/opt/postapollo-c2o-venv ||
     fail "OFFLINE_VENV_UNAVAILABLE"
   site="$("$python" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')" ||
     fail "VENV_SITE_NOT_FOUND"
-  mkdir -p "$site" /opt/c4b
+  mkdir -p "$site" /var/opt/c4b
   "$python" -m zipfile -e "$assets/dbus_next.whl" "$site" ||
     fail "PINNED_WHEEL_UNPACK_REFUSED"
   "$python" -I -c 'import dbus_next' || fail "OFFLINE_DBUS_MODULE_IMPORT_FAILED"
-  install -m 0644 "$assets/BusPolicyClient.py" /opt/c4b/BusPolicyClient.py
+  install -m 0644 "$assets/BusPolicyClient.py" /var/opt/c4b/BusPolicyClient.py
   printf '%s\n' C4B_WORLD_READABLE_FAKE_NON_SECRET \
     > /var/lib/postapollo-c2r-ci-denied
   chmod 0644 /var/lib/postapollo-c2r-ci-denied
@@ -231,11 +240,11 @@ C4B_C3B_DIR_DIAG
     fail "SERVICE_STOP_FAILED"
   check_released
   echo "C4B_PASS // SERVICE_STOP_RELEASES_DBUS_NAME"
-  rm -f -- /var/lib/postapollo-c2r-ci-denied /opt/c4b/BusPolicyClient.py
-  rmdir /opt/c4b || fail "CLIENT_DIRECTORY_CLEANUP_FAILED"
-  [[ -d /opt/postapollo-c2o-venv ]] ||
+  rm -f -- /var/lib/postapollo-c2r-ci-denied /var/opt/c4b/BusPolicyClient.py
+  rmdir /var/opt/c4b || fail "CLIENT_DIRECTORY_CLEANUP_FAILED"
+  [[ -d /var/opt/postapollo-c2o-venv ]] ||
     fail "OFFLINE_VENV_MISSING_AT_CLEANUP"
-  rm -rf -- /opt/postapollo-c2o-venv
+  rm -rf -- /var/opt/postapollo-c2o-venv
   userdel c4b-reader && userdel c4b-outsider &&
     userdel postapollo-connections || fail "TEST_USER_REMOVAL_FAILED"
   groupdel c4b-clients && groupdel postapollo-status-readers &&
@@ -261,7 +270,7 @@ else
   [[ ! -e "$host" &&
      ! -e /usr/lib/systemd/system/postapollo-connections-status.service &&
      ! -e /usr/share/dbus-1/system.d/org.postapollo.ConnectionsStatus1.conf &&
-     ! -e /opt/postapollo-c2o-venv && ! -e /opt/c4b &&
+     ! -e /var/opt/postapollo-c2o-venv && ! -e /var/opt/c4b &&
      ! -e /var/lib/postapollo-c2r-ci-denied ]] ||
     fail "SIGNED_PACKAGE_OR_TEST_FILES_SURVIVED_ROLLBACK"
   if semodule -l | grep -Fq postapollo_connections; then

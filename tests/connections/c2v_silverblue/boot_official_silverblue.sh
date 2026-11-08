@@ -276,6 +276,7 @@ fi
 # removal are independently mandatory; no marker is inferred from exit=0.
 if [[ "$c4b_requested" == 1 ]]; then
   for evidence in \
+    'C4B_PASS // SIGNED_POLICY_VERIFIED_WITH_SEPARATE_TEST_ONLY_KEYRING' \
     'C4B_PASS // SIGNED_POLICY_RPM_COMPOSED_ENTRYPOINT_LABEL_BEFORE_REBOOT' \
     'C4B_PASS // SELINUX_POLICY_LOADED_WITH_ENFORCING_KERNEL' \
     'C4B_PASS // SIGNED_SILVERBLUE_EXECUTABLE_CONFINED_ENTRYPOINT' \

@@ -90,7 +90,7 @@ def evaluate_candidate(evidence: object) -> dict:
         or re.fullmatch(r"Fedora release 44(?: .*)?", e["fedora_release"]) is None
         or e["ostree_booted"] is not True
         or type(e["ostree_ref"]) is not str
-        or "silverblue" not in e["ostree_ref"].lower()
+        or e["ostree_ref"] != "fedora/44/x86_64/silverblue"
         or type(e["network_interfaces"]) is not list
         or e["network_interfaces"] != []
     ):

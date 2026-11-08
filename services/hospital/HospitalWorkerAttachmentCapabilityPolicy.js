@@ -4,7 +4,7 @@
 function evaluate(exitCode, stdoutText, stderrText) {
     const out = String(stdoutText || "");
     const err = String(stderrText || "");
-    const code = Number(exitCode);
+    const code = exitCode;
     const usage = out.toLowerCase();
     const required = [
         "px agent session-attach",
@@ -15,7 +15,8 @@ function evaluate(exitCode, stdoutText, stderrText) {
         "--mode",
         "--confirm"
     ];
-    let matching = Number.isFinite(code) && code === 0;
+    let matching = typeof code === "number"
+        && Number.isFinite(code) && code === 0;
     for (let i = 0; i < required.length; ++i)
         matching = matching && usage.indexOf(required[i]) !== -1;
 

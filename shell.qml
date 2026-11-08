@@ -1056,12 +1056,22 @@ PanelWindow {
                 fanControl: sharedFanControl
                 relationshipFocusModeActive: relationshipFocus.active
                 relationshipFocused: relationshipFocus.owner === "cpu"
+                // Read-only Social adapter state: never credentials, login
+                // tokens, account nicknames or a durable permission grant.
+                telegramConnectionObservation: messagingWindow
+                    ? messagingWindow.telegramConnectionObservation : null
                 onTelegramAccessRequested: {
                     // Social exclusively owns the native Telegram session,
                     // auth workflow and private/shared identity scope.
                     if (messagingWindow
                             && messagingWindow.openTelegramFromConnections())
                         cpuPlusWindow.close();
+                }
+                onTelegramRecheckRequested: {
+                    // The Social owner revalidates adapter and identity state.
+                    // No duplicate health client is ever started by CPU++.
+                    if (messagingWindow)
+                        messagingWindow.recheckTelegramFromConnections();
                 }
             }
         }

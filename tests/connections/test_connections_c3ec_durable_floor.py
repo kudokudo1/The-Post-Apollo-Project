@@ -14,6 +14,7 @@ import shutil
 import sqlite3
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -143,6 +144,19 @@ class C3eCDurableFloorTests(unittest.TestCase):
         self.assertEqual(observed[4], hashlib.sha256(self.artifact.read_bytes()).hexdigest())
         self.assertEqual(self.admit(), floor.SUCCESS)
         self.assertEqual(floor.inspect(self.db), observed)
+        # A fresh Python interpreter must recover the same committed state.
+        read_code = (
+            "import importlib.util,sys; from pathlib import Path; "
+            "sp=importlib.util.spec_from_file_location('c3ec_child',sys.argv[1]); "
+            "m=importlib.util.module_from_spec(sp); sp.loader.exec_module(m); "
+            "print(m.inspect(Path(sys.argv[2]))[1:3])"
+        )
+        child = subprocess.run(
+            [sys.executable, "-I", "-B", "-c", read_code,
+             str(SOURCE), str(self.db)],
+            capture_output=True, text=True, timeout=8, check=False)
+        self.assertEqual(child.returncode, 0, child.stderr)
+        self.assertEqual(child.stdout.strip(), "(3, 8)")
 
     def test_03_signed_release_advances_policy_and_sequence_after_restart(self):
         self.admit()
@@ -231,10 +245,19 @@ class C3eCDurableFloorTests(unittest.TestCase):
     def test_13_uncommitted_sqlite_write_rolls_back_after_process_loss(self):
         self.admit()
         before = floor.inspect(self.db)
-        connection = sqlite3.connect(self.db, isolation_level=None)
-        connection.execute("BEGIN IMMEDIATE")
-        connection.execute("UPDATE checkpoint SET epoch_floor=99 WHERE id=1")
-        connection.close()   # A vanished process has no successful COMMIT.
+        # An actual child process dies while a write transaction is open.
+        # SQLite must roll the journal back on the next independent opener.
+        crash_code = (
+            "import os,sqlite3,sys; "
+            "db=sqlite3.connect(sys.argv[1],isolation_level=None); "
+            "db.execute('BEGIN IMMEDIATE'); "
+            "db.execute('UPDATE checkpoint SET epoch_floor=99 WHERE id=1'); "
+            "os._exit(47)"
+        )
+        child = subprocess.run(
+            [sys.executable, "-I", "-B", "-c", crash_code, str(self.db)],
+            capture_output=True, text=True, timeout=8, check=False)
+        self.assertEqual(child.returncode, 47, child.stderr)
         self.assertEqual(floor.inspect(self.db), before)
 
     def test_14_ledger_file_cannot_be_world_readable_or_symlinked(self):

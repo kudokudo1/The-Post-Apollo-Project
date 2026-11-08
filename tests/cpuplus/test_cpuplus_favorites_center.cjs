@@ -21,7 +21,9 @@ const WeatherHome={WeatherRules,Adapters};
 load("services/favorites/FavoritesWeatherHomeProjection.js",WeatherHome);
 const Notifications={Adapters};
 load("services/favorites/FavoritesNotificationsProjection.js",Notifications);
-const Hub={Resource,Default,Collections,Adapters,WeatherHome,NotificationsProjection:Notifications};
+const Radio={Adapters};
+load("services/favorites/FavoritesRadioProjection.js",Radio);
+const Hub={Resource,Default,Collections,Adapters,WeatherHome,NotificationsProjection:Notifications,RadioProjection:Radio};
 load("services/favorites/FavoritesManagementPolicy.js",Hub);
 const plain=v=>JSON.parse(JSON.stringify(v));
 const k=(provider,kind,id)=>Resource.identityKey(provider,kind,id);
@@ -238,7 +240,7 @@ test("CPU++ imports all AppControl owner lists, with seven source filters and re
     "FavoritesStore.favoriteTaskMetricKeys"
   ]) assert.ok(cpu.includes(field),field);
   assert.match(cpu,/FavoritesManagement\.list\(/);
-  assert.match(panel,/model: \["ALL","CPU\+\+","APP CTRL","WEATHER","NOTIFS","CLOCK","PLACES","NEW"\]/);
+  assert.match(panel,/model: \["ALL","CPU\+\+","APP CTRL","WEATHER","NOTIFS","RADIO","CLOCK","PLACES","NEW"\]/);
   assert.match(panel,/height: 90/);
   assert.match(panel,/modelData\.readOnly\?"READ ONLY"/);
   assert.match(panel,/pane\.selectedResource && !pane\.selectedResource\.readOnly/);
@@ -937,4 +939,119 @@ test("U5b consumes the existing Notifications singleton without duplicating its 
     /FileView\s*\{|JsonAdapter\s*\{|Process\s*\{|setFavorite\(|toggleFavorite\(/);
   assert.doesNotMatch(cpu,/NotificationsService\s*\{/);
   assert.doesNotMatch(projection,/source\.sourceId|source\.body|source\.message|NotificationsService\.(?:setFavorite|toggleFavorite|notifications|sourcePolicies)/);
+});
+
+
+test("U5c projects original Weather RADIO favorites and recents with stable UUID deduplication",()=>{
+  const station=(suffix,title)=>({
+    ref:{source:"radio-browser",kind:"station",
+         id:"123e4567-e89b-42d3-a456-"+String(suffix).padStart(12,"0")},
+    title,artist:"MUST_NOT_COPY",genre:"private,hidden",
+    streamHost:"private-stream.invalid",url:"https://private.invalid/audio"
+  });
+  const favorites=[station(1,"Public News One"),station(2,"Jazz Station")];
+  const recents=[station(2,"Jazz Station"),station(3,"World Radio")];
+  const snap={state:"ready",favorites,recents};
+  const saved=plain(snap);
+  const result=Hub.list([],[],[],[],undefined,undefined,undefined,
+                        undefined,undefined,snap);
+  assert.equal(result.total,3);
+  assert.equal(result.rows.length,3);
+  const expected=[
+    ["FAVORITES","Public News One","FAVORITE STATION",true,false],
+    ["FAVORITES","Jazz Station","FAVORITE + RECENT STATION",true,true],
+    ["RECENTS","World Radio","RECENT STATION",false,true]
+  ];
+  for(let i=0;i<expected.length;i++) {
+    const row=result.rows[i], [menu,item,type,favorite,recent]=expected[i];
+    assert.equal(row.category,"RADIO");
+    assert.equal(row.provider,"radio");
+    assert.equal(row.owner,"radio");
+    assert.equal(row.kind,"station");
+    assert.equal(row.menu,menu);
+    assert.equal(row.item,item);
+    assert.equal(row.label,"RADIO // "+menu+" // "+item);
+    assert.equal(row.favoriteType,type);
+    assert.equal(row.isFavorite,favorite);
+    assert.equal(row.isRecent,recent);
+    assert.equal(row.isPinned,false);
+    assert.equal(row.readOnly,true);
+    assert.equal(row.available,"unresolved");
+    assert.deepEqual(plain(row.capabilities),[]);
+    assert.equal("resourceId" in row,false);
+    assert.equal("ref" in row,false);
+    assert.equal("url" in row,false);
+    assert.equal("streamHost" in row,false);
+  }
+  const Dossier={};
+  load("services/favorites/FavoritesDossierIndexPolicy.js",Dossier);
+  const idx=Dossier.build(result);
+  assert.equal(idx.total,3);
+  assert.deepEqual(plain(idx.groups.map(group=>group.key)),
+                   ["RADIO|FAVORITES","RADIO|RECENTS"]);
+  assert.deepEqual(plain(idx.groups.map(group=>group.count)),[2,1]);
+  assert.deepEqual(plain(idx.groups[0].items.map(item=>item.name)),
+                   ["Public News One","Jazz Station"]);
+  assert.equal(Hub.filterRows(result,"RADIO").length,3);
+  assert.equal(Hub.filterRows(result,"NOTIFS").length,0);
+  assert.deepEqual(plain(snap),saved);
+  const visible=JSON.stringify(result);
+  for(const sensitive of ["MUST_NOT_COPY","private-stream.invalid",
+                           "private,hidden","private.invalid"])
+    assert.ok(!visible.includes(sensitive),sensitive);
+});
+
+test("U5c preserves Radio owner readiness and rejects corrupt station snapshots",()=>{
+  const s=(suffix,title)=>({
+    ref:{source:"radio-browser",kind:"station",
+         id:"123e4567-e89b-42d3-a456-"+String(suffix).padStart(12,"0")},
+    title
+  });
+  assert.equal(Radio.build(null).state,"disconnected");
+  for(const state of ["loading","saving","error","load-error","unavailable"]) {
+    const result=Radio.build({state,favorites:[s(1,"Station")],recents:[]});
+    assert.equal(result.rows.length,0,state);
+    assert.equal(result.state,state);
+  }
+  for(const bad of [
+    {state:"ready",favorites:null,recents:[]},
+    {state:"ready",favorites:[s(1,"One"),s(1,"Duplicate")],recents:[]},
+    {state:"ready",favorites:[s(1,"One")],recents:[s(2,"https://secret.invalid/path")]},
+    {state:"ready",favorites:[s(1,"Private token from playback")],recents:[]},
+    {state:"ready",favorites:[{ref:{source:"direct-stream",kind:"stream",id:s(1,"").ref.id},title:"Wrong source"}],recents:[]},
+    {state:"ready",favorites:[{ref:{source:"radio-browser",kind:"station",id:"not-a-uuid"},title:"Unknown"}],recents:[]},
+    {state:"ready",favorites:Array(11).fill(s(1,"One")),recents:[]},
+    {state:"ready",favorites:[],recents:Array(9).fill(s(1,"One"))}
+  ]) {
+    const out=Radio.build(bad);
+    assert.equal(out.state,"invalid");
+    assert.equal(out.rows.length,0);
+    assert.ok(out.invalidCount>0);
+  }
+  assert.deepEqual(plain(Radio.build({state:"empty",favorites:[],recents:[]}).rows),[]);
+});
+
+test("U5c Radio remains the sole Weather radio memory writer and playback owner",()=>{
+  const cpu=read("widgets/CpuPlusW.qml");
+  const policy=read("services/favorites/FavoritesRadioProjection.js");
+  const manager=read("services/favorites/FavoritesManagementPolicy.js");
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const dossier=read("services/favorites/FavoritesDossierIndexPolicy.js");
+  const radio=read("widgets/weather/StationRadio.qml");
+  const memory=read("widgets/weather/StationRadioMemoryPolicy.js");
+  assert.match(radio,/FileView\s*\{/);
+  assert.match(radio,/weather-radio-memory\.json/);
+  assert.match(radio,/RadioMemory\.decodeList\(radioMemoryAdapter\.favoriteEntries, 10\)/);
+  assert.match(radio,/RadioMemory\.decodeList\(radioMemoryAdapter\.recentEntries, 8\)/);
+  assert.match(memory,/function decodeList\(/);
+  assert.match(cpu,/property var radioFavoritesSource: null/);
+  assert.match(cpu,/cpuPlusWindow\.radioFavoritesSnapshot/);
+  assert.match(manager,/RadioProjection\.build\(radioSnapshot\)/);
+  assert.match(pane,/"RADIO"/);
+  assert.match(pane,/SOURCE \/\/ WEATHER STATION RADIO/);
+  assert.match(dossier,/"RADIO\|FAVORITES","RADIO\|RECENTS"/);
+  assert.doesNotMatch(policy+cpu+manager,
+      /FileView\s*\{|JsonAdapter\s*\{|Process\s*\{|loadMedia\(|playMedia\(|toggleFavorite\(|setFavorite\(/);
+  assert.doesNotMatch(policy,/streamHost|\.genre|\.artist|\.codec|\.bitrate|\.url/);
+  assert.doesNotMatch(cpu,/StationRadio\s*\{/);
 });

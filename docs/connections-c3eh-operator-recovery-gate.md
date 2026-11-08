@@ -18,9 +18,9 @@ C3e-H adds a **READ-ONLY authorization preflight** and defines the proposed supe
 4. Snapshot bounded, nofollow operator approval bytes, detached signature and public key into a temporary location. Verify actual `gpgv` signature against a separately pinned **operator** signer. It must be distinct from the simulated release signing root and authority witness signer.
 5. Copy and verify the **newer exact signed release** using existing C3e-A policy/manifest/delegated OpenPGP checks against the signed current authority floor. A forged package or mismatched root policy never obtains a positive preflight.
 6. The signed operator record has an exact schema, purpose/audience, node/release/authority/operator pins, pending journal digest, new signed policy/artifact SHA-256, new epoch/sequence, external authority floors, issuance and expiry. Require issued time at or before verifier clock and a maximum 10-minute validity window. Any missing, duplicate, extra or altered field rejects.
-7. Reinspect ledgers before returning success to detect state changes during signature verification. Result is only `C3EH_TEST_SUPERSESSION_GATE_AUTHORIZED_READ_ONLY`; the code contains no witness/client UPDATE, DELETE, installation, network endpoint or production broker import.
+7. Inspect the two ledger files with SQLite `mode=ro` and `query_only=ON`, not with the previous read/write connection helper. Reinspect them before returning success to detect state changes during signature verification. Result is only `C3EH_TEST_SUPERSESSION_GATE_AUTHORIZED_READ_ONLY`; the code contains no witness/client UPDATE, DELETE, installation, network endpoint or production broker import.
 
-The new workflow exercises 15 real GPG adversarial cases, all earlier C3e-G/F/E/D/C/A tests, and the existing C2n permission-denial contract. Prior C3e code, C4 Silverblue, systemd, CPU++ widgets and package installation are untouched.
+The new workflow exercises 16 real GPG adversarial cases, all earlier C3e-G/F/E/D/C/A tests, and the existing C2n permission-denial contract. Prior C3e code, C4 Silverblue, systemd, CPU++ widgets and package installation are untouched.
 
 ## HOW TO USE
 
@@ -32,7 +32,7 @@ This is a prerequisite contract for a later, independently reviewed recovery exe
 
 On exact PR head:
 
-- [ ] 15/15 C3e-H real operator-signer and pending-context tests.
+- [ ] 16/16 C3e-H real operator-signer, pending-context, and read-only-storage tests.
 - [ ] Approval must reference exact pending journal SHA-256 and exact root-authorized replacement release bytes.
 - [ ] Wrong key/pin, replayed signed approval for another intent, wrong scope/node/root, stale/expired approval, duplicate signed fields and forged signature refuse.
 - [ ] Unavailable/replayed authority challenge and unsigned candidate refuse.
@@ -53,7 +53,7 @@ The unsigned request can supply paths, but the bounded nofollow snapshot and det
 
 - [x] Inspect current Syntagma AGENTS/Hospital policies, PR #1525 state, code/ownership, concurrent PRs.
 - [x] Create dedicated C3e-H GitHub-only branch.
-- [x] Add read-only operator-signed supersession gate and 15 adversarial cases.
+- [x] Add read-only operator-signed supersession gate and 16 adversarial cases.
 - [x] Add workflow and recovery document.
 - [ ] Exact-head CI and failure-driven repairs.
 - [ ] Independent security review and scoped merge authorization.

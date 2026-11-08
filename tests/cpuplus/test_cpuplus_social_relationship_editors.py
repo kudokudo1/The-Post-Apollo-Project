@@ -59,7 +59,7 @@ class CpuPlusSocialRelationshipEditors(unittest.TestCase):
             'property string idManagementTask: "EDITOR"',
             "function selectLocalManagementTask(task)",
             'idManagementSection === "ORGANIZATIONS"',
-            '["EDITOR", "BRANCH_LOCATIONS"]',
+            '["EDITOR", "BRANCH_LOCATIONS", "LINK_MODIFIERS"]',
             'idManagementSection === "STRUCTURE"',
             '["EDITOR", "UNIT_LOCATIONS", "REPORTING"]',
             'if (allowed.indexOf(task) === -1)',

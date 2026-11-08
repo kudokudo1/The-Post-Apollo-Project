@@ -35,7 +35,7 @@ const oldHelp = `usage: px agent session-create [-h] --room-id ROOM_ID
    --doctor-id DOCTOR_ID --provider-id PROVIDER_ID
    --working-directory WORKING_DIRECTORY`;
 assert.equal(policy.evaluate(0, oldHelp, "").supported, false);
-assert.equal(policy.evaluate(0, help.replace("--confirm", "--skip-confirm"), "").supported, false);
+assert.equal(policy.evaluate(0, help.replaceAll("--confirm", "--skip-confirm"), "").supported, false);
 assert.equal(policy.evaluate(0, help.replace("--assignment-id", "--task-id"), "").supported, false);
 assert.equal(policy.evaluate(0, help.replace("session-attach", "session-create"), "").supported, false);
 assert.equal(policy.evaluate(1, help, "").supported, false);

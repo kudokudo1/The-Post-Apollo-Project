@@ -8,6 +8,8 @@ Column {
     property var portfolioStore: null
     property var directoryStore: null
     property var removalController: null
+    // Optional CPU++ focus; empty preserves Social's existing all-row view.
+    property string focusedPortfolioId: ""
     property string searchQuery: ""
     readonly property string normalizedSearch: searchQuery.trim().toLowerCase()
     function matchesPortfolio(portfolio) {
@@ -197,6 +199,8 @@ Column {
             width: editor.width
             spacing: 6
             visible: (!modelData.archived || editor.showArchived)
+                     && (editor.focusedPortfolioId === ""
+                         || modelData.id === editor.focusedPortfolioId)
                      && editor.matchesPortfolio(modelData)
             height: visible ? implicitHeight : 0
             Rectangle {

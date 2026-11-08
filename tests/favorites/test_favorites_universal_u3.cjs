@@ -382,7 +382,11 @@ test("U6c collection panel renames through original owner only and has explicit 
   assert.match(panel,/nameInput\.activeFocus\s*\|\|\s*activeRenameId!==""/);
   assert.match(panel,/signal collectionRequested\(string collectionId\)/);
   assert.match(panel,/onClicked: panel\.collectionRequested\(modelData\.id\)/);
-  assert.match(panel,/panel\.collectionStore\.renameCollection\(\s*modelData\.id,renameInput\.text\)/);
+  assert.match(panel,/panel\.collectionStore\.renameCollection\(\s*id,draft\)/);
+  const close=panel.indexOf('panel.activeRenameId="";\n                            const accepted=');
+  const ownerChange=panel.indexOf('panel.collectionStore.renameCollection(\n                                id,draft)');
+  assert.ok(close>=0 && ownerChange>close,
+    "close the Repeater rename delegate before the original writer changes its model");
   assert.match(panel,/onAccepted: groupRow\.saveRename\(\)/);
   assert.match(panel,/Keys\.onEscapePressed: groupRow\.cancelRename\(\)/);
   assert.match(panel,/label: groupRow\.renaming \? "SAVE" : "RENAME"/);

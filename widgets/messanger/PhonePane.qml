@@ -101,7 +101,8 @@ Rectangle {
             "INSTALLER_HELPER": "PHONE installer script",
             "PKCON": "PackageKit (pkcon)",
             "PKEXEC": "Polkit (pkexec)",
-            "DNF5": "DNF5"
+            "DNF5": "DNF5",
+            "RPM_OSTREE": "Silverblue host rpm-ostree"
         });
         var found = [];
         for (var i = 0; i < callSetupMissingTools.length; ++i) {
@@ -155,9 +156,9 @@ Rectangle {
         if (callSetupStatus === "RECHECKING")
             return "Checking oFono, the system service and BlueFerry call status...";
         if (callSetupStatus === "INSTALL_NOT_CONFIRMED")
-            return "oFono is still reported missing. Complete the installation in the software manager, or retry setup. No audio changes were made by Social.";
+            return "oFono is still reported missing. On Silverblue, an rpm-ostree install is not active until a separately approved reboot. Check rpm-ostree status before retrying setup. No audio changes were made by Social.";
         if (callSetupStatus === "FOLLOWUP_REQUIRED")
-            return "Package check completed. The next step is shown below. CHECK AGAIN updates the existing service and call statuses without changing audio.";
+            return "Package check completed. The next step is shown below. CHECK AGAIN updates the existing service and call statuses without changing audio. On Silverblue, complete the separate reboot before expecting oFono to appear.";
         if (callSetupStatus === "STAGE_BAY_TOO_SMALL")
             return "PHONE is too small for an interactive installer. Enlarge the Social panel and try SET UP CALLING again. No external window was opened.";
         if (callSetupStatus === "TERMINAL_UNAVAILABLE")
@@ -166,11 +167,13 @@ Rectangle {
         if (callSetupStatus === "PACKAGE_MANAGER_UNAVAILABLE")
             return "No supported Fedora package installer is available to PHONE."
                 + callingMissingToolText()
-                + " Either PackageKit or BOTH Polkit and DNF5 are required. No installation was attempted.";
+                + (callSetupMissingTools.indexOf("RPM_OSTREE") >= 0
+                   ? " Silverblue requires trusted host rpm-ostree. No installation was attempted."
+                   : " Either PackageKit or BOTH Polkit and DNF5 are required. No installation was attempted.");
         if (callSetupStatus === "GUI_UNAVAILABLE")
             return "The embedded package installer is unavailable. No external window was opened or package installed.";
         if (callSetupStatus === "GUI_LAUNCH_FAILED")
-            return "PHONE could not start the embedded PackageKit terminal. No external window was opened or installation confirmed.";
+            return "PHONE could not start the embedded installer terminal. No external window was opened or installation confirmed.";
         if (callSetupStatus === "UNSUPPORTED_HOST")
             return "Automatic package selection is currently supported on Fedora only. No changes were made.";
         if (callSetupStatus === "DIAGNOSIS_UNAVAILABLE"
@@ -1890,11 +1893,11 @@ Rectangle {
                             || r.execution !== "USER_INITIATED_INSTALLER_HANDOFF"
                             || r.package !== "ofono"
                             || !Array.isArray(r.missingTools)
-                            || r.missingTools.length > 6
+                            || r.missingTools.length > 7
                             || r.missingTools.some(function(v, i) {
                                 return typeof v !== "string"
                                     || ["FOOT", "PYTHON3", "INSTALLER_HELPER",
-                                        "PKCON", "PKEXEC", "DNF5"].indexOf(v) < 0
+                                        "PKCON", "PKEXEC", "DNF5", "RPM_OSTREE"].indexOf(v) < 0
                                     || r.missingTools.indexOf(v) !== i;
                             })
                             || (r.status !== "TERMINAL_UNAVAILABLE"
@@ -3350,7 +3353,7 @@ Rectangle {
                         width: parent.width
                         visible: installCallingSupport.visible
                                  && phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
-                        text: "Only oFono. Review and confirm the Fedora package transaction inside PHONE. Social never approves it automatically."
+                        text: "Only oFono. Review and confirm the Fedora package transaction inside PHONE. Social never approves it automatically. Silverblue stages a new deployment; reboot is a separate action, never automatic."
                         color: Colors.white
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap

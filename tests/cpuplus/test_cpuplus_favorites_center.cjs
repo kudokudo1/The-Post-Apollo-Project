@@ -606,7 +606,7 @@ test("file name recovery rejects navigation, paths and encoded path escapes",()=
   ],favoriteDetailActionKeys:[],favoriteMonitorBoxKeys:[],
   favoriteTaskMetricKeys:[]};
   const out=Hub.list([],[],[],[],saved,{},Display.build(saved,{}));
-  assert.equal(out.rows.length,7); // control/newline key rejected by U0 adapter
+  assert.equal(out.rows.length,6); // control/newline and trailing-whitespace keys rejected by U0
   for(const row of out.rows) {
     assert.equal(row.menu,"FILES");
     assert.equal(row.resolved,false);

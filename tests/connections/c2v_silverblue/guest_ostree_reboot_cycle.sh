@@ -147,6 +147,9 @@ case "$stage" in
 #!/usr/bin/bash
 set +e
 [[ -f /var/lib/c4b-runtime-ci-only && -c /dev/ttyS1 ]] || exit 0
+# Emit the witness start first, in case systemd disappears during shutdown.
+timeout --signal=TERM --kill-after=1s 3s \
+  /usr/bin/bash -c 'printf "C4B_DIAG_POWEROFF_WITNESS_START\n" >/dev/ttyS1' || true
 {
   echo "C4B_DIAG_POWEROFF_WITNESS // $(date --iso-8601=seconds)"
   for unit in c2v-ostree-cycle.service c2v-rpm-layer-monitor.service \
@@ -181,7 +184,7 @@ ConditionPathExists=/var/lib/c4b-runtime-ci-only
 
 [Service]
 Type=oneshot
-TimeoutStartSec=25
+TimeoutStartSec=45
 ExecStart=-/usr/bin/bash /var/lib/c4b-shutdown-witness.sh
 
 [Install]

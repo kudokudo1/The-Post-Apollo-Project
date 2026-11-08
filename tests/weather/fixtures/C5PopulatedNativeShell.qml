@@ -470,6 +470,41 @@ ShellRoot {
                     || countNamed(details,"cosmos-c27-star-catalog-record") !== 1
                     || frame.y <= header.height)
                     return root.fail("C27_SKY_NOW_FIXED_INSTRUMENT_MISSING");
+                const skyVisual = findNamed(details,"cosmos-c32-sky-image-panel");
+                const movingStars = findNamed(details,"cosmos-c32-moving-star-field");
+                const archivePhoto = findNamed(details,"cosmos-c32-hubble-archive-photo");
+                const photoToggle = findNamed(details,"cosmos-c32-sky-photo-toggle");
+                const pauseToggle = findNamed(details,"cosmos-c32-sky-play-pause");
+                const nextToggle = findNamed(details,"cosmos-c32-hubble-next");
+                if (!skyVisual || !movingStars || !archivePhoto
+                    || !photoToggle || !pauseToggle || !nextToggle
+                    || !skyVisual.motionRunning || !movingStars.visible
+                    || !plot.visible || !starPoint.visible
+                    || skyVisual.archiveFrames.length !== 2)
+                    return root.fail("C32_LIVING_USNO_SKY_MISSING");
+                details.visualPlaying = false;
+                if (skyVisual.motionRunning || skyVisual.galleryRunning)
+                    return root.fail("C32_PAUSE_SKY_FAILED");
+                details.showArchive = true;
+                if (!skyVisual.showArchive || skyVisual.motionRunning
+                    || plot.visible || starPoint.visible
+                    || skyVisual.archiveFrame.name !== "MESSIER 3")
+                    return root.fail("C32_SKY_ARCHIVE_SWITCH_FAILED");
+                skyVisual.nextArchive();
+                if (skyVisual.archiveIndex !== 1
+                    || skyVisual.archiveFrame.name !== "MESSIER 28")
+                    return root.fail("C32_SKY_ARCHIVE_NEXT_FAILED");
+                skyVisual.zoomTo(4);
+                if (skyVisual.zoom !== 3)
+                    return root.fail("C32_SKY_PHOTO_ZOOM_BOUND_BROKEN");
+                skyVisual.resetPhoto();
+                if (skyVisual.zoom !== 1 || skyVisual.panX !== 0
+                    || skyVisual.panY !== 0)
+                    return root.fail("C32_SKY_PHOTO_RESET_BROKEN");
+                details.showArchive = false;
+                details.visualPlaying = true;
+                if (!plot.visible || !starPoint.visible)
+                    return root.fail("C32_USNO_DOTS_NOT_RESTORED");
                 details.inspectStar(0);
                 if (!details.inspecting || details.recordCount !== 1
                     || details.facts[0].value !== "42.1°")

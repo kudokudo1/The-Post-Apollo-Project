@@ -212,3 +212,52 @@ test("C31 living ECLIPSES shows solar and lunar moving geometry, optional credit
  }
  assert.ok(!scene.includes("Flickable {"));
 });
+
+
+test("C32 SKY NOW animates decorative stars while preserving actual USNO plots and rotating Hubble references",()=>{
+ const sky=read("widgets/weather/StationCosmosStarsBoard.qml");
+ const visual=read("widgets/weather/StationCosmosStarsVisual.qml");
+ assert.match(sky,/property bool visualPlaying: true/);
+ assert.match(sky,/property bool showArchive: false/);
+ assert.match(sky,/objectName: "cosmos-c32-sky-visual-controls"/);
+ assert.match(sky,/objectName: "cosmos-c32-sky-photo-toggle"/);
+ assert.match(sky,/objectName: "cosmos-c32-sky-play-pause"/);
+ assert.match(sky,/objectName: "cosmos-c32-hubble-next"/);
+ assert.match(sky,/StationCosmosStarsVisual\s*\{/);
+ assert.match(sky,/objectName: "cosmos-c32-sky-image-panel"/);
+ assert.match(sky,/playing: starBoard\.visualPlaying && !starBoard\.inspecting/);
+ assert.match(sky,/showArchive: starBoard\.showArchive/);
+ assert.match(sky,/visible: !starBoard\.showArchive/);
+ assert.match(sky,/Math\.sin\(azRadians\)\*radiusAtAltitude/);
+ assert.match(sky,/Math\.cos\(azRadians\)\*radiusAtAltitude/);
+ assert.match(sky,/onClicked: starBoard\.inspectStar\(plottedStar\.index\)/);
+ assert.match(sky,/onClicked: starBoard\.showArchive = !starBoard\.showArchive/);
+ assert.match(sky,/onClicked: starBoard\.visualPlaying = !starBoard\.visualPlaying/);
+ assert.match(sky,/onClicked: skyMotion\.nextArchive\(\)/);
+ assert.match(sky,/objectName: "cosmos-c27-star-catalog-scroll"/);
+ assert.equal((sky.match(/Flickable\s*\{/g)||[]).length,1);
+ assert.match(visual,/objectName: "cosmos-c32-moving-star-field"/);
+ assert.match(visual,/objectName: "cosmos-c32-star-scan-driver"/);
+ assert.match(visual,/running: visual\.visible && visual\.playing && !visual\.showArchive/);
+ assert.match(visual,/objectName: "cosmos-c32-star-gallery-driver"/);
+ assert.match(visual,/running: visual\.visible && visual\.playing && visual\.showArchive/);
+ assert.match(visual,/onTriggered: visual\.nextArchive\(\)/);
+ assert.match(visual,/onTriggered: \{[\s\S]*?starfield\.requestPaint\(\)/);
+ assert.match(visual,/objectName: "cosmos-c32-hubble-archive-photo"/);
+ assert.match(visual,/source: visual\.showArchive \? visual\.archiveFrame\.url : ""/);
+ assert.match(visual,/Hubble_M3_2019_potw1914a/);
+ assert.match(visual,/potw1910a\.jpg/);
+ assert.match(visual,/HUBBLE ARCHIVE OFFLINE/);
+ assert.match(visual,/ARTISTIC SCAN \/\/ USNO DOTS = SNAPSHOT/);
+ assert.match(visual,/function nextArchive\(\)/);
+ assert.match(visual,/function resetPhoto\(\)/);
+ assert.match(visual,/function zoomTo\(next\)/);
+ assert.match(visual,/onWheel: function\(wheel\)/);
+ assert.match(visual,/onDoubleClicked: visual\.resetPhoto\(\)/);
+ assert.equal((visual.match(/Timer\s*\{/g)||[]).length,2);
+ assert.equal((visual.match(/Canvas\s*\{/g)||[]).length,1);
+ assert.equal((visual.match(/Image\s*\{/g)||[]).length,1);
+ for(const forbidden of ["Process {","FileView {","XMLHttpRequest","Flickable {","MediaPlayer {"]) {
+    assert.ok(!visual.includes(forbidden),forbidden);
+ }
+});

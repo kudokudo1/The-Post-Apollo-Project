@@ -11,6 +11,8 @@ Item {
     property var celestialSource: null
     property string sourceStatus: "SOURCE WAITING"
     property bool inspecting: false
+    property bool visualPlaying: true
+    property bool showArchive: false
 
     readonly property var snapshot:
         celestialSource && celestialSource.ready ? celestialSource.snapshot : null
@@ -60,18 +62,19 @@ Item {
         spacing: 4
 
         Row {
-            height: 16
+            objectName: "cosmos-c32-sky-visual-controls"
+            height: 18
             width: parent.width
-            spacing: 5
+            spacing: 4
             GohuText {
-                width: Math.max(1,(parent.width-5)*0.47)
+                width: Math.max(1,parent.width-228)
                 text: "SKY NOW // USNO NAV STARS"
                 font.pixelSize: 10
                 color: Colors.magenta
                 elide: Text.ElideRight
             }
             QuietText {
-                width: Math.max(1,(parent.width-5)*0.53)
+                width: 89
                 text: starBoard.snapshot
                     ? String(starBoard.snapshot.date || "--") + " "
                       + String(starBoard.snapshot.time || "--") + " UTC"
@@ -80,6 +83,37 @@ Item {
                 color: Colors.cyan
                 horizontalAlignment: Text.AlignRight
                 elide: Text.ElideRight
+            }
+            ActionButton {
+                objectName: "cosmos-c32-sky-photo-toggle"
+                width: 43
+                height: 18
+                contentPadding: 0
+                labelPixelSize: 8
+                accentColor: Colors.orange
+                label: starBoard.showArchive ? "SKY" : "PHOTO"
+                onClicked: starBoard.showArchive = !starBoard.showArchive
+            }
+            ActionButton {
+                objectName: "cosmos-c32-sky-play-pause"
+                width: 42
+                height: 18
+                contentPadding: 0
+                labelPixelSize: 8
+                accentColor: Colors.cyan
+                label: starBoard.visualPlaying ? "PAUSE" : "PLAY"
+                onClicked: starBoard.visualPlaying = !starBoard.visualPlaying
+            }
+            ActionButton {
+                objectName: "cosmos-c32-hubble-next"
+                visible: starBoard.showArchive
+                width: visible ? 31 : 0
+                height: 18
+                contentPadding: 0
+                labelPixelSize: 8
+                accentColor: Colors.magenta
+                label: "NEXT"
+                onClicked: skyMotion.nextArchive()
             }
         }
 
@@ -100,13 +134,22 @@ Item {
                 border.color: Colors.magenta
                 clip: true
 
+                StationCosmosStarsVisual {
+                    id: skyMotion
+                    objectName: "cosmos-c32-sky-image-panel"
+                    anchors.fill: parent
+                    playing: starBoard.visualPlaying && !starBoard.inspecting
+                    showArchive: starBoard.showArchive
+                }
                 QuietText {
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.margins: 5
+                    z: 2
                     width: parent.width-10
                     height: 11
-                    text: "HORIZON // AZIMUTH · ALTITUDE"
+                    text: starBoard.showArchive ? "HUBBLE // ARCHIVAL IMAGES"
+                        : "HORIZON // AZIMUTH · ALTITUDE"
                     font.pixelSize: 8
                     color: Colors.cyan
                     elide: Text.ElideRight
@@ -114,6 +157,7 @@ Item {
                 Canvas {
                     id: skyCompass
                     objectName: "cosmos-c27-sky-position-plot"
+                    visible: !starBoard.showArchive
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 4
@@ -159,7 +203,8 @@ Item {
                             Math.max(1,skyCompass.width/2-10)
                             * (90-Math.max(0,Math.min(90,alt)))/90
                         readonly property real azRadians: az*Math.PI/180
-                        visible: isFinite(alt) && isFinite(az)
+                        visible: !starBoard.showArchive
+                            && isFinite(alt) && isFinite(az)
                         x: skyCompass.x + skyCompass.width/2
                             + Math.sin(azRadians)*radiusAtAltitude - width/2
                         y: skyCompass.y + skyCompass.height/2

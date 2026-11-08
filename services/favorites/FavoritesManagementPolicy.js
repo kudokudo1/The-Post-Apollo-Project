@@ -91,14 +91,18 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot) {
         if(valid) {
             const items=Adapters.appControl(bounded);
             rejected+=items.invalidCount;
+            const ordinalByType=Object.create(null);
             for(const entry of items.items) {
                 const classification=appControlClassification(entry);
+                const type=classification.label;
+                ordinalByType[type]=(ordinalByType[type] || 0)+1;
                 accept({
                     key:entry.key,
                     provider:"appcontrol",kind:entry.kind,
                     // The raw donor identity is intentionally NOT exported
                     // to the CPU++ management record or collection controls.
-                    label:classification.label,
+                    // Number duplicate display types without exposing commands.
+                    label:type+" #"+ordinalByType[type],
                     category:classification.category,
                     owner:"appcontrol",readOnly:true,
                     isFavorite:true,isPinned:false,

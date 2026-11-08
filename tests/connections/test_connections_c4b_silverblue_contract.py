@@ -154,6 +154,13 @@ class C4bContracts(unittest.TestCase):
         self.assertIn("C4B_EXIT // phase=", script)
         self.assertIn('exec >>/var/tmp/c4b-runtime.log 2>&1', script)
         self.assertIn("GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1", script)
+        self.assertIn("C3B_REJECTED_ORIGIN_ANCESTOR_DIAG_BEGIN", script)
+        self.assertIn("C4B_DIAG_C3B_UNPROTECTED_DIRECTORY //", script)
+        self.assertIn("C4B_DIAG_C3B_ANCESTOR_VIOLATION_COUNT //", script)
+        self.assertIn("os.lstat(path)", script)
+        self.assertIn("mode & 0o022 or not directory or symlink", script)
+        self.assertIn("for path in probe.PROTECTED_DIRS", script)
+        self.assertIn('fail "DBUS_SYSTEMD_PID_UID_SELINUX_ORIGIN_REJECTED"', script)
 
     def test_045_signed_policy_is_composed_before_immutable_boot(self):
         host, guest = BOOT.read_text(), OSTREE.read_text()

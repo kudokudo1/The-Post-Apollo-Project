@@ -13,6 +13,8 @@ Item {
     // Expose rendered rows for native selector/a11y testing, not actuation.
     property alias favoriteRowRepeater: savedItemRows
     property alias dossierGroupItems: dossierGroupRepeater
+    // Native fixture inspection of the existing group editor (no new action).
+    property alias collectionPanel: collectionManager
     property var timeOwner: null
     property var placesOwner: null
     property var defaultOwner: null

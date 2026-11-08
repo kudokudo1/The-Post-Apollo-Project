@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""C2v rollback failure evidence contracts. Static only; no host/VM mutation.
+
+These checks preserve the exact signed C4b second-real-reboot acceptance gate.
+They do not prove the actual rpm-ostree rollback command succeeds.
+"""
+from pathlib import Path
+import unittest
+
+ROOT = Path(__file__).resolve().parents[2]
+GUEST = ROOT / "tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh"
+HOST = ROOT / "tests/connections/c2v_silverblue/boot_official_silverblue.sh"
+
+
+class C2vRollbackEvidenceContract(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.guest = GUEST.read_text()
+        cls.host = HOST.read_text()
+
+    def test_01_rollback_command_remains_authoritative_and_fail_closed(self):
+        src = self.guest
+        self.assertEqual(
+            src.count('if rpm-ostree rollback --reboot > "$rollback_output" 2>&1; then'),
+            1,
+        )
+        self.assertIn('echo rollback_pending > "$stagefile"', src)
+        self.assertIn('failure "RPM_OSTREE_ROLLBACK_FAILED"', src)
+        self.assertIn('rollback_rc="$?"', src)
+        self.assertIn('c2v_rollback_failure_diagnostic "$rollback_rc"', src)
+        self.assertIn('C2V_ROLLBACK_COMMAND_RETURNED_ZERO // second_boot_still_required', src)
+        self.assertNotIn('rpm-ostree rollback --reboot || true', src)
+        self.assertNotIn('rpm-ostree rollback --reboot || :', src)
+        self.assertNotIn('rpm-ostree usroverlay', src)
+        begin = src.index('echo rollback_pending > "$stagefile"')
+        command = src.index('if rpm-ostree rollback --reboot > "$rollback_output" 2>&1; then', begin)
+        evidence = src.index('c2v_rollback_failure_diagnostic "$rollback_rc"', command)
+        fail = src.index('failure "RPM_OSTREE_ROLLBACK_FAILED"', evidence)
+        rollback_branch = src.index('  rollback_pending)', fail)
+        self.assertLess(begin, command)
+        self.assertLess(command, evidence)
+        self.assertLess(evidence, fail)
+        self.assertLess(fail, rollback_branch)
+
+    def test_02_only_failure_collects_bounded_read_only_evidence(self):
+        src = self.guest
+        for needle in (
+            'c2v_rollback_failure_diagnostic() {',
+            "C2V_DIAG_ROLLBACK_COMMAND_RC //",
+            "C2V_DIAG_ROLLBACK_STDOUT_STDERR_BEGIN",
+            "C2V_DIAG_ROLLBACK_STDOUT_STDERR_END",
+            "C2V_DIAG_ROLLBACK_RPM_OSTREE_JSON_BEGIN",
+            "C2V_DIAG_ROLLBACK_OSTREE_ADMIN_BEGIN",
+            "C2V_DIAG_ROLLBACK_SYSTEMD_UNITS_BEGIN",
+            "C2V_DIAG_ROLLBACK_RPM_OSTREE_JOURNAL_BEGIN",
+            "C2V_DIAG_ROLLBACK_FAILURE_REPORT_BEGIN",
+            "C2V_DIAG_ROLLBACK_FAILURE_REPORT_END",
+            'tail -c 6000 "$rollback_output"',
+            '8s rpm-ostree status --json',
+            '8s ostree admin status',
+            '6s systemctl show',
+            '6s journalctl -b',
+            'head -c 15000 "$evidence" >/dev/ttyS0',
+            'head -c 15000 "$evidence" >/dev/ttyS1',
+            'if [[ -f "$c4b_mode" && -c /dev/ttyS1 ]]; then',
+            "/run/c2v-rpm-ostree-rollback-command.log",
+            "/run/c2v-rpm-ostree-rollback-failure.log",
+        ):
+            with self.subTest(needle=needle):
+                self.assertIn(needle, src)
+        self.assertNotIn('echo "C2V_PASS // RPM_OSTREE_ROLLBACK_FAILED"', src)
+
+    def test_03_genuine_second_boot_and_rollback_gates_remain_unchanged(self):
+        src = self.guest
+        for expected in (
+            'C2V_PASS // LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT',
+            'C2V_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER',
+            'C2V_PASS // NO_CONNECTIONS_SERVICE_OR_CREDENTIALS_ACTIVATED',
+            'failure "ROLLED_BACK_RPM_STILL_IN_BOOTED_DATABASE"',
+            'failure "ROLLED_BACK_USR_STILL_HAS_LAYER"',
+            'failure "SELINUX_WEAKENED"',
+            'failure "C4A_SIGNED_SERVICE_ROLLBACK_NOT_VERIFIED"',
+            'failure "C4B_SIGNED_POLICY_ROLLBACK_VERIFICATION_FAILED"',
+            'failure "C4B_RUNTIME_CLEANUP_OR_ROLLBACK_NOT_VERIFIED"',
+            'c4b_execute rolledback',
+            'echo complete > "$stagefile"',
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, src)
+        self.assertIn('C2V_PASS // ACTUAL_SILVERBLUE_BOOTED_LAYER_AND_ROLLBACK_SEQUENCE', self.host)
+        self.assertIn('C4B_PASS // REAL_SILVERBLUE_SIGNED_FAKE_SERVICE_OS_ORIGIN_AND_ROLLBACK', self.host)
+
+    def test_04_no_diagnostics_can_create_a_success_signal(self):
+        source = self.guest
+        begin = source.index("c2v_rollback_failure_diagnostic() {")
+        end = source.index("\ntrap 'rc=$?;", begin)
+        diagnostic = source[begin:end]
+        for forbidden in (
+            "systemctl reboot",
+            "systemctl poweroff",
+            "rpm-ostree rollback --reboot",
+            "rpm-ostree install",
+            "C2V_PASS //",
+            "C4B_PASS //",
+            "echo complete >",
+            "echo rollback_pending >",
+            "C3B_PASS //",
+            "setenforce",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, diagnostic)
+        # The only path allowed for a failed rollback is an existing fatal
+        # service exit, not a successful poweroff or synthetic stage change.
+        self.assertIn('failure "RPM_OSTREE_ROLLBACK_FAILED"', source)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

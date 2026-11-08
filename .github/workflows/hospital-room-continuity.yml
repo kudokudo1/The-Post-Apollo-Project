@@ -1,0 +1,48 @@
+name: Hospital Permanent Room Continuity
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "widgets/HospitalRoomContinuityView.qml"
+      - "services/hospital/HospitalRoomContinuityService.qml"
+      - "services/hospital/HospitalRoomContinuityPolicy.js"
+      - "tests/hospital/test_room_continuity_policy.js"
+      - "tests/hospital/test_room_continuity_ui_contracts.py"
+      - ".github/workflows/hospital-room-continuity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "widgets/HospitalRoomContinuityView.qml"
+      - "services/hospital/HospitalRoomContinuityService.qml"
+      - "services/hospital/HospitalRoomContinuityPolicy.js"
+      - "tests/hospital/test_room_continuity_policy.js"
+      - "tests/hospital/test_room_continuity_ui_contracts.py"
+      - ".github/workflows/hospital-room-continuity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-room-briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Room continuity projection and meaningful progress
+        run: |
+          node --check services/hospital/HospitalRoomContinuityPolicy.js
+          node tests/hospital/test_room_continuity_policy.js
+      - name: Exact Room read-only UI, previous worker routes
+        run: |
+          python3 tests/hospital/test_room_continuity_ui_contracts.py
+          python3 tests/hospital/test_worker_connection_ui_contracts.py
+          python3 tests/hospital/test_registered_worker_routes.py
+          python3 tests/hospital/test_worker_attention_ui_contracts.py
+          python3 tests/hospital/test_worker_atomic_attach_ui_contracts.py
+          python3 tests/hospital/test_worker_attach_capability_ui_contracts.py
+          python3 tests/hospital/test_main_mode_keyboard_contracts.py

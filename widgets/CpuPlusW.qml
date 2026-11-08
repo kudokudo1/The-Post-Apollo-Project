@@ -21,6 +21,8 @@ PanelWindow {
     signal telegramRecheckRequested()
     // U7a shell-owned widget navigation, never a provider action.
     signal favoriteOwnerNavigationRequested(string owner,string view)
+    // U7b: this never carries saved resource keys, only one fixed HOME route.
+    signal favoriteExactNavigationRequested(string owner,string route)
     property var telegramConnectionObservation: null
     property var appControlWindow
     required property var systemTelemetry
@@ -2793,6 +2795,9 @@ PanelWindow {
             }
             onOwnerNavigationRequested: function(owner,view) {
                 cpuPlusWindow.favoriteOwnerNavigationRequested(owner,view);
+            }
+            onExactNavigationRequested: function(owner,route) {
+                cpuPlusWindow.favoriteExactNavigationRequested(owner,route);
             }
             anchors.left: parent.left
             anchors.right: parent.right

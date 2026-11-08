@@ -240,6 +240,24 @@ PanelWindow {
         }
     }
 
+    // U7b: separate exact-item path. Shell checks the fixed route allowlist,
+    // then Weather checks its current saved membership. This cannot become
+    // an arbitrary URL, command, file path, station player or process action.
+    function openApolloFavoriteItem(owner,route) {
+        const homeRoutes={
+            "home/auto":true, "home/quick":true,
+            "home/snapshot":true, "home/history":true,
+            "home/runtime":true, "home/health":true
+        };
+        if (owner!=="weather" ||
+                !Object.prototype.hasOwnProperty.call(homeRoutes,route))
+            return false;
+        if (!weatherStationWindow.openSavedHomePanel(route))
+            return false;
+        shellRoot.requestControlKeyboard("weather","favorites-exact-item");
+        return true;
+    }
+
     // U7a: explicit Favorites owner navigation only. These destinations
     // contain fixed menu/view names, NEVER saved resource keys, paths, PIDs,
     // process commands, station URLs or Hospital record identities.
@@ -1119,6 +1137,11 @@ PanelWindow {
                     // Only after the destination opens does CPU++ withdraw.
                     // Invalid plans keep the user's current Favorites view.
                     if(shellRoot.openApolloFavoriteOwner(owner,view))
+                        cpuPlusWindow.close();
+                }
+                onFavoriteExactNavigationRequested: function(owner,route) {
+                    // A failed/stale owner request leaves CPU++ open.
+                    if(shellRoot.openApolloFavoriteItem(owner,route))
                         cpuPlusWindow.close();
                 }
                 onTelegramAccessRequested: {

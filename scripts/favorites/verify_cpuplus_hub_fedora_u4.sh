@@ -173,6 +173,28 @@ read -r ox oy <<<"$nav_coords"
 [ -n "$ox" ] && [ -n "$oy" ] ||
   { cat "$log"; echo "U7A_FAIL // bad owner navigation coordinates"; exit 1; }
 xdotool mousemove --window "$window" "$ox" "$oy" click 1
+# U7b: the fixture retains the selected Weather HOME panel. Now click the
+# separate OPEN ITEM button through its real ActionButton mouse target.
+for ((i=0;i<100;i++)); do
+  if grep -F 'U4_FAIL' "$log" >/dev/null; then
+    cat "$log"; echo "U7B_FAIL // fixture before exact item click"; exit 1
+  fi
+  if grep -F 'U7B_ITEM_READY // x=' "$log" >/dev/null; then
+    break
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    cat "$log"; echo "U7B_FAIL // process exited before exact item click"; exit 1
+  fi
+  sleep 0.1
+done
+grep -F 'U7B_ITEM_READY // x=' "$log" >/dev/null ||
+  { cat "$log"; echo "U7B_FAIL // no available OPEN ITEM button"; exit 1; }
+item_coords="$(grep -F 'U7B_ITEM_READY // x=' "$log" | tail -n 1 |
+  sed -E 's/.*x=([0-9]+) y=([0-9]+).*/\1 \2/')"
+read -r ex ey <<<"$item_coords"
+[ -n "$ex" ] && [ -n "$ey" ] ||
+  { cat "$log"; echo "U7B_FAIL // bad item navigation coordinates"; exit 1; }
+xdotool mousemove --window "$window" "$ex" "$ey" click 1
 set +e
 wait "$pid"
 rc="$?"
@@ -196,6 +218,8 @@ grep -F 'U6C_PASS // INLINE_RENAME_UPDATES_INDEX_NO_OWNER_WRITES' "$log" >/dev/n
   { echo "U6C_FAIL // inline collection rename was not verified"; exit 1; }
 grep -F 'U7A_PASS // OWNER_VIEW_ONLY_NO_PROVIDER_ACTIONS' "$log" >/dev/null ||
   { echo "U7A_FAIL // fixed owner navigation click was not verified"; exit 1; }
+grep -F 'U7B_PASS // EXACT_HOME_PANEL_ONLY_NO_PROVIDER_ACTIONS' "$log" >/dev/null ||
+  { echo "U7B_FAIL // exact-item click or route was not verified"; exit 1; }
 if find "$work/data" -type f | grep -q .; then
   echo "U4_FAIL // manager created a writer file"; exit 1
 fi

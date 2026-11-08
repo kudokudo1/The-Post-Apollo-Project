@@ -15,6 +15,7 @@ import "StationProviderDiagnosticsPolicy.js" as ProviderDiagnostics
 import "StationMagickSubjectPanelPolicy.js" as MagickPanelPolicy
 import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
+import "../../services/favorites/FavoritesExactNavigationPolicy.js" as ExactNavigation
 
 PanelWindow {
     id: weatherStation
@@ -701,6 +702,24 @@ PanelWindow {
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
         onActivated: weatherStation.activateNavigationCursor()
+    }
+
+    // U7b: Weather is the sole authority for its saved HOME panel routes.
+    // Refuse stale, removed, corrupt or not-yet-loaded favorites. Navigation
+    // never opens a terminal, plays Radio, or writes to the Weather store.
+    function openSavedHomePanel(route) {
+        if (!ExactNavigation.ownerAllows(
+                route,weatherStation.homeFavoritesReadOnlySnapshot))
+            return false;
+        if (!menuOpen) open();
+        if (!menuOpen || !subjectNavigationOpen || contextTerminalRequested)
+            return false;
+        // Recheck against the CURRENT owner snapshot immediately before
+        // changing the page; CPU++ selection is not a permission grant.
+        if (!ExactNavigation.ownerAllows(
+                route,weatherStation.homeFavoritesReadOnlySnapshot))
+            return false;
+        return subjectNavigator.chooseRoute(route);
     }
 
     // Notifications retain historical view tokens but now open native routes.

@@ -282,8 +282,18 @@ ShellRoot {
                         root.fail("U7A_UNSAFE_OWNER_ROUTE");return;
                     }
                     // No selected key or owner object is part of the signal.
-                    root.done=true;
                     console.log("U7A_PASS // OWNER_VIEW_ONLY_NO_PROVIDER_ACTIONS");
+                    root.testStage=8;
+                }
+                onExactNavigationRequested: function(owner,route) {
+                    if(root.testStage!==9 || owner!=="weather"
+                            || route!=="home/auto"
+                            || time.removals || places.removals
+                            || defaults.mutations || collections.renameCalls!==1) {
+                        root.fail("U7B_UNSAFE_EXACT_ROUTE");return;
+                    }
+                    root.done=true;
+                    console.log("U7B_PASS // EXACT_HOME_PANEL_ONLY_NO_PROVIDER_ACTIONS");
                     Qt.quit();
                 }
             }
@@ -570,6 +580,20 @@ ShellRoot {
                     ownerButton.width/2,ownerButton.height/2);
                 root.testStage=7;
                 console.log("U7A_OWNER_READY // x="+Math.round(pt.x)
+                    +" y="+Math.round(pt.y));
+            } else if(root.testStage===8) {
+                const itemButton=detail.exactNavigationControl;
+                if(!itemButton || !itemButton.available
+                        || itemButton.label!=="OPEN ITEM"
+                        || !detail.exactNavigation.ok
+                        || detail.exactNavigation.owner!=="weather"
+                        || detail.exactNavigation.route!=="home/auto") {
+                    root.fail("U7B_ITEM_BUTTON_NOT_READY");return;
+                }
+                const pt=itemButton.mapToItem(win.contentItem,
+                    itemButton.width/2,itemButton.height/2);
+                root.testStage=9;
+                console.log("U7B_ITEM_READY // x="+Math.round(pt.x)
                     +" y="+Math.round(pt.y));
             }
         }

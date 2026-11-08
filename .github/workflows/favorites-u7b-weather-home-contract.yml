@@ -7,6 +7,12 @@ on:
       - "services/favorites/FavoritesResourcePolicy.js"
       - "services/weather/WeatherHomeFavoritesPolicy.js"
       - "tests/cpuplus/test_favorites_exact_navigation_u7b.cjs"
+      - "widgets/cpuplus/CpuPlusFavoritesHubPane.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "shell.qml"
+      - "tests/cpuplus/fixtures/CpuPlusFavoritesNative.qml"
+      - "scripts/favorites/verify_cpuplus_hub_fedora_u4.sh"
       - ".github/workflows/favorites-u7b-weather-home-contract.yml"
   push:
     paths:
@@ -14,6 +20,12 @@ on:
       - "services/favorites/FavoritesResourcePolicy.js"
       - "services/weather/WeatherHomeFavoritesPolicy.js"
       - "tests/cpuplus/test_favorites_exact_navigation_u7b.cjs"
+      - "widgets/cpuplus/CpuPlusFavoritesHubPane.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "shell.qml"
+      - "tests/cpuplus/fixtures/CpuPlusFavoritesNative.qml"
+      - "scripts/favorites/verify_cpuplus_hub_fedora_u4.sh"
       - ".github/workflows/favorites-u7b-weather-home-contract.yml"
 
 permissions:

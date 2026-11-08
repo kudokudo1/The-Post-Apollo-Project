@@ -194,6 +194,9 @@ ShellRoot {
             const obsFull=fixture.locate(observation,"cosmos-c34-sun-suvi-photo-focus");
             const obsFullImage=fixture.locate(observation,"cosmos-c33-photo-image");
             const obsFullBack=fixture.locate(observation,"cosmos-c33-photo-back");
+            const movie=fixture.locate(observation,"cosmos-c36-observation-solar-movie");
+            const movieAction=fixture.locate(observation,"cosmos-c36-suvi-movie-action");
+            const decoder=fixture.locate(observation,"cosmos-c36-lazy-decoder-loader");
             const metrics=fixture.locate(activity,"cosmos-c12-activity-metrics");
             const trend=fixture.locate(activity,"cosmos-c12-xray-trend");
             const xray=fixture.locate(activity,"cosmos-c12-xray-facts");
@@ -212,7 +215,8 @@ ShellRoot {
                 ||!obsMeters||!obsTimeline||!obsTwilightGroups
                 ||!obsSingleRow||!obsRowTime||!obsSuviViewport
                 ||!liveSuviViewport||!obsZoomButtons||!obsExpandButton
-                ||!obsFull||!obsFullImage||!obsFullBack)return;
+                ||!obsFull||!obsFullImage||!obsFullBack
+                ||!movie||!movieAction||!decoder)return;
             if(fixture.phase===0){
                 if(position.positionRows.length!==8||position.positionStrip.length!==5)
                     return fixture.stop("POSITION_DATA_MISSING");
@@ -290,6 +294,42 @@ ShellRoot {
                     || obsSuviViewport.currentZoom !== 1
                     || observation.width !== 450 || observation.height !== 254)
                     return fixture.stop("C34_SUVI_BACK_DID_NOT_RESTORE_OBSERVATION");
+                // C36 // The MOVIE control exists only in OBSERVATION,
+                // and QtMultimedia is NOT imported/loaded until PLAY.
+                const liveMovie=fixture.locate(live,"cosmos-c36-suvi-movie-action");
+                if (!obsImage.solarMovieEnabled || liveMovie
+                    || !movieAction.visible || movie.visible
+                    || movie.playbackRequested || decoder.active)
+                    return fixture.stop("C36_SOLAR_MOVIE_NOT_LAZY_OR_SCOPED");
+                obsImage.solarMovieRequested();
+                if (!obsBoard.movieOpen || !movie.visible || movie.expanded
+                    || movie.width !== obsImage.width
+                    || movie.height !== obsImage.height
+                    || movie.playbackRequested || decoder.active
+                    || movie.mediaUrl.indexOf("latest_512_0171.mp4")<0)
+                    return fixture.stop("C36_SOLAR_MOVIE_HERO_GEOMETRY_BROKEN");
+                movie.chooseChannel("193");
+                if (movie.channelId !== "193"
+                    || movie.mediaUrl.indexOf("latest_512_0193.mp4")<0
+                    || decoder.active)
+                    return fixture.stop("C36_SOLAR_CHANNEL_SELECTION_BROKEN");
+                movie.chooseChannel("https://invalid.example/movie.mp4");
+                if (movie.channelId !== "193")
+                    return fixture.stop("C36_UNTRUSTED_VIDEO_URL_ACCEPTED");
+                movie.expandRequested();
+                if (!obsBoard.movieFull || !movie.expanded
+                    || movie.width !== obsBoard.width
+                    || movie.height !== obsBoard.height || decoder.active)
+                    return fixture.stop("C36_MOVIE_FULL_STAGE_GEOMETRY_BROKEN");
+                movie.expandRequested();
+                if (obsBoard.movieFull || movie.width !== obsImage.width
+                    || movie.height !== obsImage.height)
+                    return fixture.stop("C36_MOVIE_RESTORE_HERO_BROKEN");
+                movie.closeRequested();
+                if (obsBoard.movieOpen || movie.visible
+                    || movie.playbackRequested || decoder.active
+                    || observation.width !== 450 || observation.height !== 254)
+                    return fixture.stop("C36_SOLAR_MOVIE_BACK_NOT_RELEASED");
                 liveSuviViewport.zoomAt(2,25,25);
                 if(liveSuviViewport.currentZoom!==1)
                     return fixture.stop("LEGACY_SUVI_ZOOM_UNEXPECTED");

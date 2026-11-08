@@ -163,12 +163,12 @@ test("AppControl favorites now appear in the CPU++ middle selector",()=>{
   assert.equal(cpu.length,6);
   assert.equal(other.length,4);
   assert.deepEqual(plain(cpu.map(x=>x.label)),[
-    "PROCESS FAVORITE","THERMAL FAVORITE","SYSTEM FAVORITE",
-    "THERMAL METRIC WATCH","SYSTEM METRIC WATCH","PROCESS METRIC WATCH"
+    "PROCESS FAVORITE #1","THERMAL FAVORITE #1","SYSTEM FAVORITE #1",
+    "THERMAL METRIC WATCH #1","SYSTEM METRIC WATCH #1","PROCESS METRIC WATCH #1"
   ]);
   assert.deepEqual(plain(other.map(x=>x.label)),[
-    "APP CONTROL FAVORITE","APP CONTROL FAVORITE",
-    "APP CONTROL FAVORITE","PREFERRED ACTION"
+    "APP CONTROL FAVORITE #1","APP CONTROL FAVORITE #2",
+    "APP CONTROL FAVORITE #3","PREFERRED ACTION #1"
   ]);
   assert.ok(cpu.every(x=>x.owner==="appcontrol" && x.readOnly));
   assert.ok(other.every(x=>x.owner==="appcontrol" && x.readOnly));
@@ -205,7 +205,7 @@ test("malformed AppControl snapshots are bounded and don't become actions",()=>{
   };
   const out=Hub.list([],[],[],[],bad);
   assert.equal(out.total,1);
-  assert.equal(out.rows[0].label,"PROCESS FAVORITE");
+  assert.equal(out.rows[0].label,"PROCESS FAVORITE #1");
   assert.ok(out.rejected>=4);
   const missing=Hub.list([],[],[],[],{favoriteKeys:["task|ok"]});
   assert.equal(missing.total,0);

@@ -515,6 +515,14 @@ Item {
             roomData: root.roomData
             allSessions: root.allSessions
             sessionsLoaded: root.sessionsSnapshotLoaded
+            allRooms: root.allRooms
+            roomsLoaded: root.roomsSnapshotLoaded
+            availableDoctors: root.availableDoctors
+            availableProviders: root.availableProviders
+            doctorsLoaded: root.doctorDirectoryLoaded
+            providersLoaded: root.providerDirectoryLoaded
+            sourceError: root.attachmentSourceError
+            onRegistryRefreshRequested: root.refreshRequested()
         }
 
         Flickable {

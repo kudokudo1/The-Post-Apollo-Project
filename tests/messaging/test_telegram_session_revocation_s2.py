@@ -89,7 +89,7 @@ class TelegramS2Transport(unittest.TestCase):
 
     def reviewer(self, obj, sock=None):
         sock = sock or self.operator
-        C5A.exchange(sock, obj)
+        S2.credential_frame(sock, obj)
         return C5A.receive(sock)
 
     def client_request(self, obj):

@@ -17,13 +17,16 @@ cleanup() {
 trap cleanup EXIT
 install -d -m 700 "$work/home" "$work/run" "$work/data" \
   "$work/cache" "$work/config-home" "$work/config/widgets/cpuplus" \
-  "$work/config/services/favorites" "$work/config/widgets/appcontrol"
+  "$work/config/services/favorites" "$work/config/widgets/appcontrol" \
+  "$work/config/services/weather"
 cp -a "$repo/components" "$work/config/components"
 cp "$repo/widgets/cpuplus/CpuPlusFavoritesHubPane.qml" \
   "$work/config/widgets/cpuplus/"
 cp "$repo/widgets/appcontrol/AppControlFavoriteDisplaySource.qml" \
   "$work/config/widgets/appcontrol/"
 cp "$repo/services/favorites/"* "$work/config/services/favorites/"
+cp "$repo/services/weather/WeatherHomeFavoritesPolicy.js" \
+  "$work/config/services/weather/"
 cp "$repo/tests/cpuplus/fixtures/CpuPlusFavoritesNative.qml" \
   "$work/config/shell.qml"
 

@@ -41,6 +41,13 @@ ShellRoot {
         appControlOwner: fakeAppControl
         favoritesStore: appFavorites
     }
+    // Synthetic read-only copy of the single Weather owner snapshot.
+    QtObject {
+        id: weatherBookmarks
+        property string storageState: "ready"
+        property var panelRoutes: ["home/auto","home/health"]
+        property var cardKeys: ["sky|next-hours"]
+    }
     readonly property var options:
         Management.list(["UTC"],[{id:12,place:{label:"Example City"}}],
             ["fav1:local:finance:instrument:TEST.01"],[],
@@ -49,7 +56,11 @@ ShellRoot {
                 favoriteDetailActionKeys:appFavorites.favoriteDetailActionKeys,
                 favoriteMonitorBoxKeys:appFavorites.favoriteMonitorBoxKeys,
                 favoriteTaskMetricKeys:appFavorites.favoriteTaskMetricKeys
-            }),({}),ownerNames.records)
+            }),({}),ownerNames.records,({
+                storageState:weatherBookmarks.storageState,
+                panelRoutes:weatherBookmarks.panelRoutes,
+                cardKeys:weatherBookmarks.cardKeys
+            }))
     readonly property var selection: Management.recordFor(options,selectedKey)
 
     QtObject {
@@ -189,14 +200,30 @@ ShellRoot {
                        && item.item==="Active Contract.pdf"
                        && item.favoriteType==="SYMLINK FAVORITE";
             });
+            const weatherPanel=root.options.rows.find(function(item) {
+                return item.owner==="weather-home"
+                    && item.menu==="HOME" && item.item==="AUTO";
+            });
+            const weatherCard=root.options.rows.find(function(item) {
+                return item.owner==="weather-home"
+                    && item.menu==="CARD"
+                    && item.item==="SKY // NEXT HOURS";
+            });
+            const weatherGroups=dossier.dossier.groups.filter(function(group) {
+                return group.category==="WEATHER";
+            });
             const fileGroup=dossier.dossier.groups.find(function(group) {
                 return group.key==="APP CTRL|FILES";
             });
             const processGroup=dossier.dossier.groups.find(function(group) {
                 return group.key==="CPU++|KILL";
             });
-            if(!root.options || root.options.total!==11
+            if(!root.options || root.options.total!==14
                || dossier.dossier.total!==root.options.rows.length
+               || !weatherPanel || !weatherCard
+               || weatherGroups.length!==2
+               || !weatherPanel.readOnly || !weatherCard.readOnly
+               || weatherPanel.available!=="unresolved"
                || !fileGroup || fileGroup.count!==3
                || !processGroup || processGroup.count!==1
                || fileGroup.items[0].name!=="budget-2026.xlsx"

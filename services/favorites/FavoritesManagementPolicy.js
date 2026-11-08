@@ -3,6 +3,7 @@
 .import "FavoritesDefaultPolicy.js" as Default
 .import "FavoritesCollectionsPolicy.js" as Collections
 .import "FavoritesReadOnlyAdapters.js" as Adapters
+.import "FavoritesWeatherHomeProjection.js" as WeatherHome
 
 // CPU++ candidate projection. The original AppControl store remains the ONLY
 // owner of its four favorite/watch lists. This view never executes, writes or
@@ -122,7 +123,7 @@ function safeUnresolvedLabel(menu,classification,ordinal) {
     return menu+" // "+(type[menu] || "SAVED ITEM")+" #"+ordinal;
 }
 
-function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions) {
+function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions, weatherHomeSnapshot) {
     const out=[], seen=Object.create(null);
     let rejected=0,total=0;
     function accept(record) {
@@ -205,6 +206,12 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
         }
     }
 
+    // No duplicate Weather store. A read-only source snapshot is injected by
+    // its owner after its single writer has loaded successfully.
+    const weather=WeatherHome.build(weatherHomeSnapshot);
+    rejected+=weather.invalidCount;
+    for(const item of weather.rows) accept(item);
+
     const zones=Array.isArray(clockZones)?clockZones:[];
     for (const zone of zones.slice(0,9)) {
         if(typeof zone!=="string") {rejected++;continue;}
@@ -244,7 +251,7 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
 
 function filterRows(records,category) {
     const rows=records && Array.isArray(records.rows)?records.rows:[];
-    if(["CLOCK","PLACES","NEW","CPU++","APP CTRL"].indexOf(category)<0)
+    if(["CLOCK","PLACES","NEW","CPU++","APP CTRL","WEATHER"].indexOf(category)<0)
         return rows;
     return rows.filter(item=>item.category===category);
 }

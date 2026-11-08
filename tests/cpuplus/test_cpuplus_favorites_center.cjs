@@ -15,7 +15,11 @@ const Collections={Resource,Default};
 load("services/favorites/FavoritesCollectionsPolicy.js",Collections);
 const Adapters={Policy:Resource};
 load("services/favorites/FavoritesReadOnlyAdapters.js",Adapters);
-const Hub={Resource,Default,Collections,Adapters};
+const WeatherRules={};
+load("services/weather/WeatherHomeFavoritesPolicy.js",WeatherRules);
+const WeatherHome={WeatherRules,Adapters};
+load("services/favorites/FavoritesWeatherHomeProjection.js",WeatherHome);
+const Hub={Resource,Default,Collections,Adapters,WeatherHome};
 load("services/favorites/FavoritesManagementPolicy.js",Hub);
 const plain=v=>JSON.parse(JSON.stringify(v));
 const k=(provider,kind,id)=>Resource.identityKey(provider,kind,id);
@@ -222,7 +226,7 @@ test("malformed AppControl snapshots are bounded and don't become actions",()=>{
   );
 });
 
-test("CPU++ imports all AppControl owner lists, with two-row filters and read-only details",()=>{
+test("CPU++ imports all AppControl owner lists, with seven source filters and read-only details",()=>{
   const cpu=read("widgets/CpuPlusW.qml");
   const panel=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
   for(const field of [
@@ -232,8 +236,8 @@ test("CPU++ imports all AppControl owner lists, with two-row filters and read-on
     "FavoritesStore.favoriteTaskMetricKeys"
   ]) assert.ok(cpu.includes(field),field);
   assert.match(cpu,/FavoritesManagement\.list\(/);
-  assert.match(panel,/model: \["ALL","CPU\+\+","APP CTRL","CLOCK","PLACES","NEW"\]/);
-  assert.match(panel,/height: 59/);
+  assert.match(panel,/model: \["ALL","CPU\+\+","APP CTRL","WEATHER","CLOCK","PLACES","NEW"\]/);
+  assert.match(panel,/height: 90/);
   assert.match(panel,/modelData\.readOnly\?"READ ONLY"/);
   assert.match(panel,/pane\.selectedResource && !pane\.selectedResource\.readOnly/);
   assert.match(panel,/APP CONTROL-OWNED \/\/ READ ONLY/);
@@ -715,4 +719,103 @@ test("dossier uses only supplied labels and never decodes raw identities",()=>{
   assert.equal(result.groups[2].items[0].name,"kitty");
   assert.ok(!JSON.stringify(result).includes("private-command"));
   assert.ok(!JSON.stringify(result).includes("resourceId"));
+});
+
+
+test("U5a Weather HOME panels and cards join the same read-only CPU++ candidate list",()=>{
+  const wx={storageState:"ready",panelRoutes:["home/auto","home/history"],
+            cardKeys:["sky|next-hours","space|geomagnetic"]};
+  const original=plain(wx);
+  const result=Hub.list([],[],[],[],undefined,undefined,undefined,wx);
+  assert.equal(result.total,4);
+  assert.equal(result.rows.length,4);
+  const expected=[
+    ["panel","HOME","AUTO","HOME PANEL FAVORITE"],
+    ["panel","HOME","HISTORY","HOME PANEL FAVORITE"],
+    ["card","CARD","SKY // NEXT HOURS","HOME CARD FAVORITE"],
+    ["card","CARD","SPACE // GEOMAGNETIC","HOME CARD FAVORITE"]
+  ];
+  for(let i=0;i<expected.length;i++) {
+    const row=result.rows[i], [kind,menu,item,type]=expected[i];
+    assert.equal(row.kind,kind);
+    assert.equal(row.menu,menu);
+    assert.equal(row.item,item);
+    assert.equal(row.label,"WEATHER // "+menu+" // "+item);
+    assert.equal(row.favoriteType,type);
+    assert.equal(row.category,"WEATHER");
+    assert.equal(row.provider,"weather-home");
+    assert.equal(row.owner,"weather-home");
+    assert.equal(row.readOnly,true);
+    assert.equal(row.available,"unresolved");
+    assert.deepEqual(plain(row.capabilities),[]);
+    assert.equal("resourceId" in row,false);
+    assert.equal("action" in row,false);
+  }
+  assert.deepEqual(plain(wx),original);
+  assert.equal(Hub.filterRows(result,"WEATHER").length,4);
+  assert.equal(Hub.filterRows(result,"APP CTRL").length,0);
+  assert.equal(Hub.filterRows(result,"ALL").length,4);
+  const Dossier={};
+  load("services/favorites/FavoritesDossierIndexPolicy.js",Dossier);
+  const index=Dossier.build(result);
+  assert.equal(index.total,4);
+  assert.deepEqual(plain(index.groups.map(g=>g.title)),
+                   ["WEATHER // HOME","WEATHER // CARD"]);
+  assert.deepEqual(plain(index.groups[1].items.map(x=>x.name)),
+                   ["SKY // NEXT HOURS","SPACE // GEOMAGNETIC"]);
+});
+
+test("U5a weather source fails closed for unavailable or invalid owner snapshots",()=>{
+  assert.equal(WeatherHome.build(null).state,"disconnected");
+  for(const state of ["loading","saving","error","unsupported","load-error"]) {
+    const result=Hub.list([],[],[],[],undefined,undefined,undefined,
+      {storageState:state,panelRoutes:["home/auto"],
+       cardKeys:["sky|next-hours"]});
+    assert.equal(result.total,0,state);
+    assert.equal(result.rows.length,0,state);
+  }
+  for(const input of [
+    {storageState:"ready",panelRoutes:["home/not-a-panel"],cardKeys:[]},
+    {storageState:"ready",panelRoutes:["home/auto","home/auto"],cardKeys:[]},
+    {storageState:"ready",panelRoutes:["home/auto"],
+      cardKeys:["sky|next-hours","sky|next-hours"]},
+    {storageState:"ready",panelRoutes:["home/auto"],
+      cardKeys:["weather|private/script"]},
+    {storageState:"ready",panelRoutes:["home/auto"],
+      cardKeys:["sky|foo\nsecret"]},
+    {storageState:"ready",panelRoutes:[],
+      cardKeys:Array(33).fill("sky|next-hours")},
+    {storageState:"ready",panelRoutes:null,cardKeys:[]}
+  ]) {
+    const invalid=WeatherHome.build(input);
+    assert.equal(invalid.rows.length,0);
+    assert.equal(invalid.state,"invalid");
+    assert.ok(invalid.invalidCount>0);
+  }
+  const safe=WeatherHome.build({
+    storageState:"empty",panelRoutes:[],cardKeys:[]});
+  assert.equal(safe.state,"empty");
+  assert.equal(safe.rows.length,0);
+});
+
+test("U5a Weather source is optional and cannot instantiate a duplicate writer",()=>{
+  const cpu=read("widgets/CpuPlusW.qml");
+  const manager=read("services/favorites/FavoritesManagementPolicy.js");
+  const projection=read("services/favorites/FavoritesWeatherHomeProjection.js");
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const dossier=read("services/favorites/FavoritesDossierIndexPolicy.js");
+  assert.match(cpu,/property var weatherHomeFavoritesSource: null/);
+  assert.match(cpu,/cpuPlusWindow\.weatherHomeFavoritesSnapshot/);
+  assert.match(manager,/WeatherHome\.build\(weatherHomeSnapshot\)/);
+  assert.match(pane,/"WEATHER"/);
+  assert.match(pane,/SOURCE \/\/ WEATHER STATION/);
+  assert.match(dossier,/"WEATHER\|HOME","WEATHER\|CARD"/);
+  assert.doesNotMatch(cpu+manager+projection,
+    /FileView\s*\{|JsonAdapter\s*\{|Process\s*\{|execDetached|setText\(/);
+  // The existing W2b owner is still instantiated only inside WeatherStationW.
+  const station=read("widgets/weather/WeatherStationW.qml");
+  assert.match(station,/WeatherServices\.WeatherHomeFavoritesStore \{/);
+  const shell=read("shell.qml");
+  assert.doesNotMatch(shell,/WeatherHomeFavoritesStore\s*\{/);
+  assert.doesNotMatch(cpu,/WeatherHomeFavoritesStore\s*\{/);
 });

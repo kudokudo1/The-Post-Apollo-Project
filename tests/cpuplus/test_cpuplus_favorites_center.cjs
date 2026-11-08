@@ -226,7 +226,7 @@ test("malformed AppControl snapshots are bounded and don't become actions",()=>{
   );
 });
 
-test("CPU++ imports all AppControl owner lists, with two-row filters and read-only details",()=>{
+test("CPU++ imports all AppControl owner lists, with seven source filters and read-only details",()=>{
   const cpu=read("widgets/CpuPlusW.qml");
   const panel=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
   for(const field of [
@@ -236,8 +236,8 @@ test("CPU++ imports all AppControl owner lists, with two-row filters and read-on
     "FavoritesStore.favoriteTaskMetricKeys"
   ]) assert.ok(cpu.includes(field),field);
   assert.match(cpu,/FavoritesManagement\.list\(/);
-  assert.match(panel,/model: \["ALL","CPU\+\+","APP CTRL","CLOCK","PLACES","NEW"\]/);
-  assert.match(panel,/height: 59/);
+  assert.match(panel,/model: \["ALL","CPU\+\+","APP CTRL","WEATHER","CLOCK","PLACES","NEW"\]/);
+  assert.match(panel,/height: 90/);
   assert.match(panel,/modelData\.readOnly\?"READ ONLY"/);
   assert.match(panel,/pane\.selectedResource && !pane\.selectedResource\.readOnly/);
   assert.match(panel,/APP CONTROL-OWNED \/\/ READ ONLY/);

@@ -185,7 +185,12 @@ class LogindSeatGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.guard.is_active())
 
     async def test_default_factory_uses_real_system_bus_api_not_session_bus(self):
-        from dbus_next import BusType
+        # The dedicated logind CI installs the optional host-only transport;
+        # the global offline Identity tests intentionally have no D-Bus dep.
+        try:
+            from dbus_next import BusType
+        except ImportError:
+            self.skipTest("Optional dbus-next is installed by logind host CI")
         source = self.bus
         def factory(*, bus_type):
             self.assertEqual(bus_type, BusType.SYSTEM)

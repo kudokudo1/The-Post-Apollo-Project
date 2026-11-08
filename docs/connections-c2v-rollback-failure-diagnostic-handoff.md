@@ -55,3 +55,26 @@ C2v/C2z owner boundaries remain in force. No attempt to reverse merge #1555, no 
 [ ] Real Silverblue rollback PASS and operator technical acceptance.  
 
 DECISIONS // This branch is a **draft diagnostic**, not a C2v ownership transfer, a release fix, or an acceptance claim. Production HOLD.
+
+
+## Follow-up checkpoint // 2026-11-08 // C4b live-process observer
+
+The new full signed [C4b run #42519417577](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42519417577) finished **FAILURE** at the original rollback stage. It reconfirmed C3b origin, signed confined fake runtime, negative authorization, complete service shutdown, vanished accounts/groups and venv cleanup. It did **not** observe a successful rollback invocation or a second real reboot.
+
+This run did **not** execute the nonzero-exit diagnostic path: no C2V_DIAG_ROLLBACK_COMMAND_RC appeared. The host reported C2V_BLOCKED // SILVERBLUE_LAYER_REBOOT_ROLLBACK_RESULT= (empty), and UART1 reported C4B_DIAG_CONTROLLER_FATAL // SCRIPT_EXIT_1-line-1. The source host loop of 700 cycles with 2-second sleeps exhausted its ~1400-second VM observation horizon. The host recorded the same **211310 guest serial bytes from 20:37:03 to 20:57:47 UTC**, so absence of controller progress lasted more than twenty minutes. The final serial tail contains C2V_ROLLBACK_COMMAND_BEGIN, but not command return or the second boot. The exact mechanism (blocked rpm-ostreed, dead/terminated controller, SELinux interaction, stuck CLI, serial loss) remains unproven. There is no evidence that merely increasing the host deadline would fix the CLI.
+
+**Additional diagnostic only:** Immediately after writing the existing rollback_pending stage, C4b starts an independent transient systemd observer in its own cgroup. While the genuine rollback CLI executes, this observer writes timestamped ticks and bounded process states, systemd unit properties, OSTree state, rpm-ostree JSON status, relevant service journal and the current command stdout/stderr tail **directly to C4b UART1**. Every read-only probe has a short timeout. A recorder startup failure prints an explicit diagnostic marker and does **not** grant success or intercept rollback. The observer writes no deployment changes or reboot decisions. It exits on a /run finished marker or the natural OS reboot, and it exists only for the disposable offline C4b guest.
+
+The earlier real standard fixture [C2v run #42519417601](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42519417601) and [C2x run #42519417508](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42519417508) both passed real two-boot rollback; they do not substitute for three signed package + custom SELinux policy removal.
+
+### Follow-up verification boundary
+
+- [x] Full signed C4b failed specifically after successful first-boot security/cleanup, before verified real rollback.
+- [x] Read-only independent live rollback observation staged on this **draft** branch for C2v owner review.
+- [x] No C3b/C3c, C3d, signed host/policy, real machine, provider credentials or production behavior edits.
+- [ ] New exact-head grammar and test/static contracts.
+- [ ] New full signed Silverblue VM with independent UART1 observer proves exact process/transaction state or successfully completes actual second reboot.
+- [ ] C2v owner reviews real evidence and authorizes *only* justified rollback fix.
+- [ ] Full signed all-assets absent and operator acceptance.
+
+**Decision:** This remains a bounded C2v-owned diagnostic proposal; no merge, production activation, bypass of OSTree rollback, or declaration of C4b success. The host 1400-second observation deadline is preserved until the new independent evidence can distinguish exhausted budget from a stuck process.

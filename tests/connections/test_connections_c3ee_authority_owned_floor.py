@@ -13,10 +13,13 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = ROOT / "tests/connections/c3e_release_trust"
@@ -31,6 +34,7 @@ def import_source(name, path):
     return result
 
 
+authority = import_source("c3ee_test_authority", "C3eAuthorityOwnedFloor.py")
 durable = import_source("c3ee_test_durable", "C3eDurableFloor.py")
 proof = import_source("c3ee_test_proof", "C3eExternalFloorProof.py")
 
@@ -321,7 +325,52 @@ class C3eEAuthorityOwnedFloorTests(unittest.TestCase):
         self.assertEqual(stale["minimum_release_sequence"], 8)
         self.assertEqual(durable.inspect(self.authority_db)[2], 8)
 
-    def test_13_real_production_broker_remains_disabled(self):
+    def test_13_attestation_serializes_floor_read_with_signature(self):
+        self.advance()
+        args = SimpleNamespace(
+            state_db=self.authority_db,
+            node_id=self.node,
+            release_root_pin=self.fprs["release-root"],
+            anchor_secret_home=self.homes["external-anchor"],
+            anchor_pin=self.fprs["external-anchor"],
+        )
+
+        def prove_no_concurrent_advance(_args, _payload):
+            # A second database writer must be blocked while the authority
+            # signs its floor statement. Mock the signature only to inspect
+            # the interleaving; other tests use actual detached GPG signatures.
+            connection = sqlite3.connect(
+                self.authority_db, timeout=0.05, isolation_level=None)
+            try:
+                with self.assertRaises(sqlite3.OperationalError):
+                    connection.execute("BEGIN IMMEDIATE")
+            finally:
+                connection.close()
+            return b"synthetic-signature-for-lock-test"
+
+        with patch.object(authority, "_sign", side_effect=prove_no_concurrent_advance):
+            result = authority._attest(args, self.attest_request())
+        statement = json.loads(base64.b64decode(result["proof_b64"]))
+        self.assertEqual(statement["minimum_release_sequence"], 8)
+        self.assertEqual(durable.inspect(self.authority_db)[2], 8)
+
+    def test_14_failed_signing_releases_authority_transaction(self):
+        self.advance()
+        args = SimpleNamespace(
+            state_db=self.authority_db, node_id=self.node,
+            release_root_pin=self.fprs["release-root"],
+            anchor_secret_home=self.homes["external-anchor"],
+            anchor_pin=self.fprs["external-anchor"],
+        )
+        with patch.object(authority, "_sign", side_effect=RuntimeError("test error")):
+            with self.assertRaisesRegex(RuntimeError, "test error"):
+                authority._attest(args, self.attest_request())
+        # Failed signing must neither deadlock nor advance the ledger.
+        self.assertEqual(durable.inspect(self.authority_db)[1:3], (3, 8))
+        self.issue(4, 9, b"fake-signed-release-9")
+        self.assertEqual(self.advance()["sequence"], 9)
+
+    def test_15_real_production_broker_remains_disabled(self):
         base = ROOT / "services/connections"
         self.assertIn("readonly property bool hostAuthenticated: false",
                       (base / "ConnectionsRequestStatus.qml").read_text())

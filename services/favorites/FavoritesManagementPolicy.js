@@ -6,6 +6,7 @@
 .import "FavoritesWeatherHomeProjection.js" as WeatherHome
 .import "FavoritesNotificationsProjection.js" as NotificationsProjection
 .import "FavoritesRadioProjection.js" as RadioProjection
+.import "FavoritesHospitalProjection.js" as HospitalProjection
 
 // CPU++ candidate projection. The original AppControl store remains the ONLY
 // owner of its four favorite/watch lists. This view never executes, writes or
@@ -125,7 +126,7 @@ function safeUnresolvedLabel(menu,classification,ordinal) {
     return menu+" // "+(type[menu] || "SAVED ITEM")+" #"+ordinal;
 }
 
-function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions, weatherHomeSnapshot, notificationsSnapshot, radioSnapshot) {
+function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions, weatherHomeSnapshot, notificationsSnapshot, radioSnapshot, hospitalSnapshot) {
     const out=[], seen=Object.create(null);
     let rejected=0,total=0;
     function accept(record) {
@@ -226,6 +227,12 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
     rejected+=radio.invalidCount;
     for(const item of radio.rows) accept(item);
 
+    // Hospital Reception owns the only durable activity pins/archive.
+    // Its public snapshot contains sanitized metadata, no private key/title.
+    const hospital=HospitalProjection.build(hospitalSnapshot);
+    rejected+=hospital.invalidCount;
+    for(const item of hospital.rows) accept(item);
+
     const zones=Array.isArray(clockZones)?clockZones:[];
     for (const zone of zones.slice(0,9)) {
         if(typeof zone!=="string") {rejected++;continue;}
@@ -265,7 +272,7 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
 
 function filterRows(records,category) {
     const rows=records && Array.isArray(records.rows)?records.rows:[];
-    if(["CLOCK","PLACES","NEW","CPU++","APP CTRL","WEATHER","NOTIFS","RADIO"].indexOf(category)<0)
+    if(["CLOCK","PLACES","NEW","CPU++","APP CTRL","WEATHER","NOTIFS","RADIO","HOSPITAL"].indexOf(category)<0)
         return rows;
     return rows.filter(item=>item.category===category);
 }

@@ -244,11 +244,7 @@ ShellRoot {
                     "cosmos-c30-simulated-motion-view");
                 const movingCanvas = findNamed(instrument,
                     "cosmos-c30-meteor-moving-sky");
-                const motionTimer = findNamed(instrument,
-                    "cosmos-c30-meteor-motion-driver");
-                const archiveTimer = findNamed(instrument,
-                    "cosmos-c30-nasa-gallery-timer");
-                if (!simulatedSky || !movingCanvas || !motionTimer || !archiveTimer
+                if (!simulatedSky || !movingCanvas
                     || !simulatedSky.visible || !visual.playing
                     || visual.showArchive
                     || visual.archiveFrames.length !== 2
@@ -257,7 +253,7 @@ ShellRoot {
                     || Math.abs(simulatedSky.radiantY-(90-31.2)/180) > 0.001)
                     return root.fail("C30_MOVING_SOURCE_RADIANT_NOT_RENDERED");
                 visual.playing = false;
-                if (motionTimer.running || archiveTimer.running)
+                if (simulatedSky.motionRunning || visual.archiveCycling)
                     return root.fail("C30_PAUSE_DID_NOT_STOP_ANIMATION");
                 visual.showArchive = true;
                 if (!visual.showArchive || simulatedSky.visible

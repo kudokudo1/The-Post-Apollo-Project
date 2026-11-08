@@ -119,6 +119,59 @@ jobs:
             timeout 25s ./company-vector-probe --capture
           test -s company-vector-probe.png
           cp company-vector-probe.png "$GITHUB_WORKSPACE/company-vector-offline.png"
+          rm company-vector-probe.png
+
+          # M30v: invoke the REAL assembled MapLibre Qt binary in a
+          # disposable Xvfb display. Observe only QImage CPU readback
+          # metadata, never a selected wl_buffer or a user location.
+          # The normal Quickshell native sidecar does not use this flag.
+          xvfb-run -a -s '-screen 0 1280x900x24' \
+            timeout 20s ./company-vector-probe --readback-evidence \
+              2>&1 | tee company-m30v-readback.log
+          python3 - company-m30v-readback.log <<'PY'
+          import json,math,pathlib,sys
+          logs=pathlib.Path(sys.argv[1]).read_text()
+          marker="COMPANY_M30V_QT_READBACK_EVIDENCE "
+          reports=[json.loads(line.split(marker,1)[1])
+                   for line in logs.splitlines() if marker in line]
+          assert len(reports)==1, "one actual native MapLibre readback record"
+          report=reports[0]
+          assert report["status"]=="OBSERVED_QT_READBACK"
+          assert report["scope"]=="QT_CPU_READBACK_ONLY"
+          assert report["source"]=="QQuickWindow::grabWindow"
+          assert report["readbackWidth"]>0 and report["readbackHeight"]>0
+          assert report["readbackBytesPerLine"]>=report["readbackMinimumStrideBytes"]
+          assert report["readbackDepthBits"]>0
+          assert math.isfinite(report["readbackDevicePixelRatio"])
+          assert report["productionAuthority"] is False
+          assert report["waylandBufferAttested"] is False
+          assert report["selectedNativeActorVerified"] is False
+          assert report["readyForNativeBufferImport"] is False
+          assert report["requiresIndependentHostBufferEvidence"] is True
+          for field in ("nativeBufferFormat", "nativeBufferStrideBytes",
+                        "nativeBufferModifier","nativeBufferAllocationKind",
+                        "nativeSurfaceScale"):
+              assert report[field] is None,field
+          print("COMPANY_M30V_REAL_MAPLIBRE_QT_READBACK actual_qimage_pitch=",
+                report["readbackBytesPerLine"],
+                "wayland_native_buffer=UNKNOWN production_scene_input=OFF PASS")
+          PY
+          test ! -e company-vector-probe.png
+
+          # M30v's diagnostic is offline-only and must never accept an
+          # online or owner-local combined option.
+          set +e
+          xvfb-run -a -s '-screen 0 1280x900x24' \
+            timeout 15s ./company-vector-probe \
+              --readback-evidence --styled-online \
+              > company-m30v-refused.log 2>&1
+          m30v_rc=$?
+          set -e
+          test "$m30v_rc" -eq 16
+          grep -Fq 'M30V_READBACK_ARGUMENTS_REFUSED' company-m30v-refused.log
+          test ! -e company-vector-probe.png
+          echo 'COMPANY_M30V_REAL_MAPLIBRE_ONLINE_COMBINATION_REFUSED PASS'
+          cp company-m30v-readback.log "$GITHUB_WORKSPACE/company-m30v-readback.log"
 
           # Explicit, bounded public-area network test; no private user
           # location, hub, provider or worker data is passed to MapLibre.
@@ -207,4 +260,5 @@ jobs:
           path: |
             company-vector-*.png
             company-m10-bench.log
+            company-m30v-readback.log
           if-no-files-found: ignore

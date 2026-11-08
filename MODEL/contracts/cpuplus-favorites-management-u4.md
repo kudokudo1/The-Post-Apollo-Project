@@ -16,9 +16,9 @@ The older first-slot FAVORITES face was a placeholder. Its face/artwork/entry se
 
 ## Data and action flow
 
-Left bay: Existing FavoritesUnifiedCatalog reads the original AppControl, World Clock and saved Places owners. AppControl identity and command text remains redacted; source-readiness is not claimed to be live resource availability. Summary cards display collection and new-default-store counts.
+Left bay: Existing FavoritesUnifiedCatalog reads the original AppControl, World Clock and saved Places owners. AppControl identity and command text remains redacted; source-readiness is not claimed to be live resource availability. Summary cards display the CPU++ vs APP CTRL category counts, collections and new-default-store counts.
 
-Middle bay: a safe selectable projection from FavoritesManagementPolicy.js of stored WORLD timezone IDs, saved-place IDs and U1 default favorite/pin keys, with ALL/CLOCK/PLACES/NEW filters. Existing AppControl/Weather/Hospital/RADIO source items remain read-only in the left overview until provider-owned privacy-safe action contracts exist. Candidate source records are bounded; new-provider raw IDs are not printed.
+Middle bay: a safe selectable projection from FavoritesManagementPolicy.js of **all four existing AppControl saved lists** (favorites, preferred actions, THERMAL/SYSTEM metric watches and process metric watches), alongside WORLD timezone IDs, saved-place IDs and U1 default favorite/pin keys. Filters now occupy two compact rows: ALL / CPU++ / APP CTRL / CLOCK / PLACES / NEW. Process, THERMAL and SYSTEM donor entries are classified as CPU++, while the remaining AppControl entries are APP CTRL. Both remain AppControl-owned and **read-only** here. Candidate records are bounded and redacted; AppControl's raw commands/paths are neither rendered nor forwarded as action or collection authority. Weather, Hospital and RADIO still await source-owned adapters.
 
 Right bay: selected-resource details and original-owner operations. A two-click confirmation removes eligible Clock/Place/U1 favorites through TimeSettings.toggleWorldFavorite, PlaceRegistry.removeSavedPlace or FavoritesDefaultStore.setFavorite. World Clock removal is gated by installed tzdata validation; when not loaded, the operator can explicitly request the existing owner to load it. U1 pin state is toggled through FavoritesDefaultStore. Collections use the existing FavoritesCollectionPanel and FavoritesCollectionsStore for create, add/remove, reorder and guarded group deletion.
 
@@ -26,13 +26,13 @@ No new favorites JSON files, FileView instances, network sources, provider autom
 
 ## UI path
 
-CPU++ → FAVORITES. The top order ends SYSTEM → FAVORITES → ID MANAGEMENT → SETTINGS. Use middle filters to choose a saved entry and right panel to manage that entry or organize it in collections. The left side displays source overview and counts. Other supported providers can be added later through source-owned adapters.
+CPU++ → FAVORITES. The top order ends SYSTEM → FAVORITES → ID MANAGEMENT → SETTINGS. Use middle filters to choose a saved entry and right panel to manage that entry or organize it in collections. The left side displays source overview and counts. AppControl rows may be selected and inspected, but their REMOVE and collection actions remain disabled until their original owner exposes reviewed safe management contracts. Other providers can be added through source-owned adapters.
 
 ## Verification
 
 - tests/cpuplus/test_cpuplus_favorites_center.cjs checks bounded safe projection, provider privacy, mode ordering, bay integration and owner action contracts.
 - Updated legacy CPU++ tests preserve TIME/LOCATION, existing ID MANAGEMENT, focus and three-bay/monitor semantics.
-- scripts/favorites/verify_cpuplus_hub_fedora_u4.sh tests an actual native synthetic selector click with injected owner stubs and no writing to existing user data.
+- scripts/favorites/verify_cpuplus_hub_fedora_u4.sh tests an actual native synthetic selector click on a CPU++-classified AppControl process favorite and verifies no owner actions or file writes. The extended policy tests check all four AppControl lists, bounded admission, redacted numbered labels and separation of source ownership.
 - The full live desktop, exact geometry on operator monitors and visual acceptance are not yet verified by this PR.
 
 ## Existing constraints and watch points
@@ -49,4 +49,8 @@ Revert the additive CPU++ Favorites mode and associated tests. No existing favor
 
 ## Next
 
-Operator visual approval, dependency PR integration, then wider owner-safe providers and search/managing more favorite types without elevating permissions.
+Operator visual approval of the two-row filter strip and categorized rows, then source-owned action adapters for AppControl and wider providers. Do not elevate permissions.
+
+## U4b follow-up decision // AppControl category projection
+
+This follow-up changes presentation, not storage or permissions. Explicit donor prefixes `task|`, `thermal|`, `system|`, `watchbox|thermal|`, `watchbox|system|`, and `taskmetric|` determine the CPU++ label. All other AppControl favorite and preferred-action keys remain categorized APP CTRL. Labels use type and ordinal only, never command names or raw filesystem/process identifiers. The original AppControl store remains the only writer; HUNTER behavior is unchanged.

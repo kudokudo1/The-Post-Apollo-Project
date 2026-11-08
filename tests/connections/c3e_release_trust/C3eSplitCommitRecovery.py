@@ -273,8 +273,8 @@ def _finish(*, witness_db, client_db, node_id, root_pin, anchor_pin,
         pending = _intent(db)
         if pending != expected_pending:
             deny("PENDING_INTENT_CHANGED")
-        if saved[3] > pending[4] or saved[4] > pending[5]:
-            deny("WITNESS_ADVANCED_DURING_PENDING_INTENT")
+        if saved[3:] != pending[:2]:
+            deny("WITNESS_CHANGED_DURING_PENDING_INTENT")
         if _client(client_db)[1:] != pending[4:8]:
             deny("CLIENT_CHECKPOINT_NOT_AT_VERIFIED_TARGET")
         db.execute(
@@ -350,8 +350,8 @@ def submit(*, witness_db: Path, client_db: Path,
                     deny("RECOVERY_SIGNED_RELEASE_NOT_PENDING_TARGET")
                 if authority_floor != pending[8:10]:
                     deny("RECOVERY_AUTHORITY_FLOOR_CHANGED")
-                if saved[3] > target[0] or saved[4] > target[1]:
-                    deny("WITNESS_STATE_OUTRAN_PENDING_INTENT")
+                if saved[3:] != pending[:2]:
+                    deny("WITNESS_CHANGED_DURING_PENDING_INTENT")
                 if client[0] != release_root_pin:
                     deny("CLIENT_ROOT_PIN_MISMATCH")
                 if client[1:] not in (pending[:4], target):

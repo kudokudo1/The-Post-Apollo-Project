@@ -1,0 +1,26 @@
+name: Hospital / Bed Recovery Contract
+
+on:
+  pull_request:
+    paths:
+      - widgets/HospitalBedRecoveryDialog.qml
+      - services/hospital/HospitalBedRecoveryPolicy.js
+      - tests/hospital/test_bed_recovery_policy.js
+      - .github/workflows/hospital-bed-recovery.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bed-recovery-policy:
+    name: Candidate search and recovery contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify JavaScript syntax
+        run: |
+          node --check services/hospital/HospitalBedRecoveryPolicy.js
+          node --check tests/hospital/test_bed_recovery_policy.js
+      - name: Test candidate search, move eligibility and dialog contract
+        run: node tests/hospital/test_bed_recovery_policy.js

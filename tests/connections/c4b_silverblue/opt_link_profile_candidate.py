@@ -29,7 +29,13 @@ LINK_KEYS = {
     "owner", "group", "mode", "directory", "symlink",
     "target", "resolved", "device", "inode",
 }
-DIRECTORY_KEYS = {"owner", "mode", "directory", "symlink"}
+# Require stable inode identity, not merely matching owner/mode/type. Each
+# physical venv directory must also be the SAME inode as its /opt alias.
+DIRECTORY_KEYS = {"owner", "mode", "directory", "symlink", "device", "inode"}
+PHYSICAL_ALIAS_PAIRS = (
+    ("/var/opt/postapollo-c2o-venv", "/opt/postapollo-c2o-venv"),
+    ("/var/opt/postapollo-c2o-venv/bin", "/opt/postapollo-c2o-venv/bin"),
+)
 DENIED_FLAGS = {
     "hostAuthenticated": False, "credentialPresent": False,
     "grantActive": False, "canApprove": False, "canUseApi": False,
@@ -55,6 +61,8 @@ def _safe_dir(value: object) -> bool:
         and (value["mode"] & 0o022) == 0
         and value["directory"] is True
         and value["symlink"] is False
+        and _integer(value["device"]) and value["device"] > 0
+        and _integer(value["inode"]) and value["inode"] > 0
     )
 
 
@@ -111,5 +119,13 @@ def evaluate_candidate(evidence: object) -> dict:
             return refusal("C4B_CANDIDATE_UNPROTECTED_DIRECTORY")
         if before[path] != after[path]:
             return refusal("C4B_CANDIDATE_DIRECTORY_CHAIN_CHANGED")
+    # A physical target and its symlink-resolved logical directory must be
+    # the very SAME dev/inode, not merely two root-owned 0755 lookalikes.
+    for physical, alias in PHYSICAL_ALIAS_PAIRS:
+        for snapshot in (before, after):
+            if (snapshot[physical]["device"], snapshot[physical]["inode"]) != (
+                snapshot[alias]["device"], snapshot[alias]["inode"]
+            ):
+                return refusal("C4B_CANDIDATE_ALIAS_IDENTITY_MISMATCH")
     # Never return a C3b-compatible PASS marker or permission to use an API.
     return refusal("C4B_SILVERBLUE_OPT_LAYOUT_CANDIDATE_ONLY")

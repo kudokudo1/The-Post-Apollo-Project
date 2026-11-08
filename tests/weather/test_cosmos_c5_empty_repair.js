@@ -62,14 +62,20 @@ test("C5 civil date uses only existing verified timezone, not system timezone",(
   assert.match(focus,/solarDate: cosmosModePane\.civilDate/);
 });
 
-test("No-source UI retains five planet lanes and shows detailed provider errors",()=>{
+test("No-source clock retains five planet categories and shows provider errors",()=>{
   const blank=clock.clockRows([],"");
   assert.equal(blank.length,5);
   assert.equal(blank.every(r=>!r.available && r.events.length===0),true);
   assert.match(focus,/readonly property var displayedPlanetRows:/);
-  assert.match(focus,/id: clockRepeater\s*[\s\S]*?model: 5/);
-  assert.match(focus,/required property int index/);
-  assert.match(focus,/planetRow\.events\.length : 0/);
+  assert.match(focus,/id: planetClock\s*[\s\S]*?StationCosmosPlanetClockFace\s*\{/);
+  assert.match(focus,/datedRows: cosmosModePane\.planetRows/);
+  assert.match(focus,/sourceReady: !!cosmosModePane\.planetSource/);
+  const dial=read("widgets/weather/StationCosmosPlanetClockFace.qml");
+  assert.match(dial,/readonly property int renderedRowCount: Day\.PLANETS\.length/);
+  assert.match(dial,/Day\.datedEvents\(/);
+  assert.match(dial,/objectName: "cosmos-c28-clock-dial-canvas"/);
+  assert.match(dial,/objectName: "cosmos-c5-planet-event-marker"/);
+  assert.doesNotMatch(dial,/clockLane|LINEAR LANE|Flickable\s*\{/);
   for(const planet of ["MERCURY","VENUS","MARS","JUPITER","SATURN"])
     assert.ok(focus.includes('name:"'+planet+'"'),planet);
   for(const signal of [
@@ -109,7 +115,7 @@ test("C5 populated source-to-render contracts use actual provider fields",()=>{
   assert.match(focus,/seenShower\[item\.name\]/);
   for (const anchor of [
     'objectName: "cosmos-c5-sun-path"',
-    'objectName: "cosmos-c5-planet-event-marker"',
+    'StationCosmosPlanetClockFace {',
     'id: subjectCards',
     'objectName: "cosmos-c5-meteor-card"'
   ]) assert.ok(focus.includes(anchor),anchor);
@@ -147,4 +153,40 @@ test("C25 Meteors pins IAU next peaks outside the only inner catalog scroll",()=
   const reference=read("widgets/weather/StationSky.qml");
   assert.match(reference,/id: meteorUpcomingRow/);
   assert.match(reference,/meteorService\.upcomingShowers\.slice\(0, 5\)/);
+});
+
+
+test("C28 focused clock is an integrated source-backed circular instrument",()=>{
+ const face=read("widgets/weather/StationCosmosPlanetClockFace.qml");
+ const wheel=read("widgets/weather/StationCosmosPlanetDayWheel.qml");
+ assert.match(face,/StationCosmosPlanetDayWheelPolicy\.js" as Day/);
+ assert.match(face,/PlanetPolicy\.orderedEvents\(datedRows,selectedPlanet,selectedKind\)/);
+ assert.match(face,/Day\.datedEvents\(/);
+ assert.match(face,/Day\.geometry\(/);
+ assert.match(face,/Day\.ringRadius\(/);
+ assert.match(face,/Day\.timeAngle\(/);
+ assert.match(face,/Day\.timeLabel\(/);
+ assert.match(face,/Day\.point\(/);
+ assert.match(face,/Day\.pick\(/);
+ assert.match(face,/Day\.pickRing\(/);
+ assert.match(face,/eventData\.kind==="rise"\?"R"/);
+ assert.match(face,/eventData\.kind==="transit"\?"T":"S"/);
+ assert.match(face,/objectName: "cosmos-c28-event-inspector"/);
+ assert.match(face,/objectName: "cosmos-c28-planet-filters"/);
+ assert.match(face,/objectName: "cosmos-c28-event-type-filters"/);
+ assert.match(face,/onClicked: face\.lockedEvent=clockEvent\.eventData/);
+ assert.match(face,/face\.step\(-1\)/);
+ assert.match(face,/face\.step\(1\)/);
+ assert.match(face,/onClicked: face\.pickPlanet\(modelData\)/);
+ assert.match(face,/onClicked: face\.pickKind\(modelData\.id\)/);
+ assert.match(face,/NO ORBITS OR RETROGRADE INFERENCE/);
+ assert.match(face,/anchors\.bottom: clockFooter\.top/);
+ assert.match(focus,/kind === "planet-clock" \? planetClock/);
+ assert.match(focus,/localCivilMinute: cosmosModePane\.skyFeed/);
+ assert.match(wheel,/Day\.ringRadius\(/);
+ assert.match(wheel,/Day\.point\(/);
+ for(const forbidden of [
+   "Process {","Timer {","FileView {","XMLHttpRequest","Flickable {",
+   "StationSky {","UsnoPlanetRiseSetService {"
+ ])assert.ok(!face.includes(forbidden),forbidden);
 });

@@ -276,8 +276,12 @@ class C3eHOperatorRecoveryGateTests(unittest.TestCase):
             # This will fail if a read/write SQLite connection (or journal
             # mutation) is introduced into the C3e-H gate.
             self.assertEqual(self.check(), gate.SUCCESS)
-            self.assertEqual(gate._open_read_only(witness_path, "WITNESS").
-                             execute("PRAGMA query_only").fetchone()[0], 1)
+            conn = gate._open_read_only(witness_path, "WITNESS")
+            try:
+                self.assertEqual(
+                    conn.execute("PRAGMA query_only").fetchone()[0], 1)
+            finally:
+                conn.close()
         finally:
             witness_path.chmod(0o600)
             client_path.chmod(0o600)

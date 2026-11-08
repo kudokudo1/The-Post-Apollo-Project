@@ -297,7 +297,8 @@ ShellRoot {
                 // C36 // The MOVIE control exists only in OBSERVATION,
                 // and QtMultimedia is NOT imported/loaded until PLAY.
                 const liveMovie=fixture.locate(live,"cosmos-c36-suvi-movie-action");
-                if (!obsImage.solarMovieEnabled || liveMovie
+                if (!obsImage.solarMovieEnabled
+                    || (liveMovie && liveMovie.visible)
                     || !movieAction.visible || movie.visible
                     || movie.playbackRequested || decoder.active)
                     return fixture.stop("C36_SOLAR_MOVIE_NOT_LAZY_OR_SCOPED");

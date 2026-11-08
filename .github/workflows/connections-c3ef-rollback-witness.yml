@@ -1,0 +1,66 @@
+name: Connections C3e-F independent witness ledger (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eRollbackWitness.py"
+      - "tests/connections/test_connections_c3ef_rollback_witness.py"
+      - ".github/workflows/connections-c3ef-rollback-witness.yml"
+      - "docs/connections-c3ef-rollback-witness.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-third-ledger-witness:
+    # Synthetic keys and all three ledgers exist only on the CI runner.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate GPG, SQLite, source and disabled production broker
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v gpg
+          command -v gpgv
+          python3 -m py_compile \
+            tests/connections/c3e_release_trust/C3eRollbackWitness.py \
+            tests/connections/test_connections_c3ef_rollback_witness.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          base = Path("services/connections")
+          assert "readonly property bool credentialActionsEnabled: false" in (base/"ConnectionsBroker.qml").read_text()
+          assert "readonly property bool hostAuthenticated: false" in (base/"ConnectionsRequestStatus.qml").read_text()
+          for p in (*base.glob("*.qml"), *base.glob("*.js"), base/"qmldir"):
+              assert "C3eRollbackWitness" not in p.read_text(), p
+          print("C3EF_PASS // REAL_AUTHENTICATION_AND_CREDENTIAL_GRANTS_REMAIN_DISABLED")
+          PY
+      - name: Exercise real signed proof and three-ledger rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ef_rollback_witness.py
+          echo "C3EF_PASS // SIGNED_AUTHORITY_ROLLBACK_REJECTED_BY_SEPARATE_WITNESS"
+          echo "C3EF_LIMITATION // RESTORING_ALL_THREE_SQLITE_FILES_DEFEATS_THIS_FIXTURE"
+      - name: Preserve existing release signature and authority suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ee_authority_owned_floor.py
+          python3 -B tests/connections/test_connections_c3ed_signed_floor.py
+          python3 -B tests/connections/test_connections_c3ec_durable_floor.py
+          python3 -B tests/connections/test_connections_c3e_release_trust.py
+          echo "C3EF_PASS // PRIOR_SIGNED_RELEASE_TRUST_REGRESSIONS"
+      - name: Require explicit unresolved shared-host rollback risk
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'not a hardware' docs/connections-c3ef-rollback-witness.md
+          grep -Fq 'restoring all three' docs/connections-c3ef-rollback-witness.md
+          echo "C3EF_LIMITATION // NO_SEPARATELY_SECURED_OR_OPERATOR_ENROLLED_TRUST_ROOT"

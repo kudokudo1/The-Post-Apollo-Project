@@ -12,6 +12,17 @@ on:
       - 'widgets/messanger/IdentityCenterLocalStructureEditor.qml'
       - 'widgets/messanger/IdentityCenterLocalArchiveTray.qml'
       - 'tests/cpuplus/test_cpuplus_social_local_management_bays.py'
+      - 'tests/cpuplus/test_cpuplus_social_relationship_editors.py'
+      - 'widgets/messanger/IdentityCenterLocalBranchLocationsEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalUnitLocationsEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalFunctionalReportingEditor.qml'
+      - 'services/social/SocialLocalBranchLocationLinksStore.qml'
+      - 'services/social/SocialLocalUnitLocationLinksStore.qml'
+      - 'services/social/SocialLocalFunctionalReportingStore.qml'
+      - 'tests/messaging/test_social_local_branch_locations_v1.py'
+      - 'tests/messaging/test_social_local_unit_locations_v1.py'
+      - 'tests/messaging/test_social_local_functional_reporting_v1.py'
+      - 'MODEL/contracts/cpuplus-social-relationship-management-v0.md'
       - 'MODEL/contracts/cpuplus-social-local-management-three-bays-v0.md'
       - 'widgets/cpuplus/CpuPlusIdVerifiedContextPane.qml'
       - 'tests/cpuplus/test_cpuplus_identity_host_context_v0.py'
@@ -48,6 +59,17 @@ on:
       - 'widgets/messanger/IdentityCenterLocalStructureEditor.qml'
       - 'widgets/messanger/IdentityCenterLocalArchiveTray.qml'
       - 'tests/cpuplus/test_cpuplus_social_local_management_bays.py'
+      - 'tests/cpuplus/test_cpuplus_social_relationship_editors.py'
+      - 'widgets/messanger/IdentityCenterLocalBranchLocationsEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalUnitLocationsEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalFunctionalReportingEditor.qml'
+      - 'services/social/SocialLocalBranchLocationLinksStore.qml'
+      - 'services/social/SocialLocalUnitLocationLinksStore.qml'
+      - 'services/social/SocialLocalFunctionalReportingStore.qml'
+      - 'tests/messaging/test_social_local_branch_locations_v1.py'
+      - 'tests/messaging/test_social_local_unit_locations_v1.py'
+      - 'tests/messaging/test_social_local_functional_reporting_v1.py'
+      - 'MODEL/contracts/cpuplus-social-relationship-management-v0.md'
       - 'MODEL/contracts/cpuplus-social-local-management-three-bays-v0.md'
       - 'widgets/cpuplus/CpuPlusIdVerifiedContextPane.qml'
       - 'tests/cpuplus/test_cpuplus_identity_host_context_v0.py'
@@ -93,6 +115,10 @@ jobs:
           python3 -m unittest discover -s tests/identity -p 'test_desktop_context_projection_v0.py' -v
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_organization_links.py' -v
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_social_local_management_bays.py' -v
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_social_relationship_editors.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_branch_locations_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_unit_locations_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_functional_reporting_v1.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_identity_center_archive_tray_v1.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_archived_permanent_removal_v1.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_local_organizations.py' -v

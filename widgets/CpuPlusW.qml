@@ -53,6 +53,8 @@ PanelWindow {
     property string selectedLocalIdForManagement: ""
     // UI section and local editing focus, never provider login or tenant switch.
     property string idManagementSection: "IDS"
+    // Local editor action filter only, never a real account/tenant switch.
+    property string idManagementTask: "EDITOR"
     property string selectedFavoriteKey: ""
     readonly property var favoriteCandidates:
         FavoritesManagement.list(
@@ -97,7 +99,19 @@ PanelWindow {
     function selectLocalManagementSection(section) {
         if (["IDS", "ORGANIZATIONS", "STRUCTURE", "PORTFOLIOS"].indexOf(section) === -1)
             return;
+        if (idManagementSection !== section)
+            idManagementTask = "EDITOR";
         idManagementSection = section;
+    }
+    function selectLocalManagementTask(task) {
+        const allowed = idManagementSection === "ORGANIZATIONS"
+            ? ["EDITOR", "BRANCH_LOCATIONS"]
+            : idManagementSection === "STRUCTURE"
+              ? ["EDITOR", "UNIT_LOCATIONS", "REPORTING"]
+              : ["EDITOR"];
+        if (allowed.indexOf(task) === -1)
+            return;
+        idManagementTask = task;
     }
     readonly property var localIdManagementSnapshot: SocialIdentityStore.snapshot
     readonly property string effectiveLocalIdForManagement: {
@@ -1633,6 +1647,7 @@ PanelWindow {
             id: localManagementOverviewPane
             area: "overview"
             section: cpuPlusWindow.idManagementSection
+            task: cpuPlusWindow.idManagementTask
             selectedOrganizationId: cpuPlusWindow.effectiveLocalManagementOrganizationId
             selectedPortfolioId: cpuPlusWindow.effectiveLocalManagementPortfolioId
             visible: cpuPlusWindow.selectedModeIndex === 5
@@ -2046,8 +2061,12 @@ PanelWindow {
             id: idManagementLocalNavigation
             visible: cpuPlusWindow.selectedModeIndex === 5
             section: cpuPlusWindow.idManagementSection
+            task: cpuPlusWindow.idManagementTask
             onSectionRequested: function(section) {
                 cpuPlusWindow.selectLocalManagementSection(section);
+            }
+            onTaskRequested: function(task) {
+                cpuPlusWindow.selectLocalManagementTask(task);
             }
             anchors.left: parent.left
             anchors.right: parent.right
@@ -2102,6 +2121,7 @@ PanelWindow {
             id: localManagementSelectorPane
             area: "selector"
             section: cpuPlusWindow.idManagementSection
+            task: cpuPlusWindow.idManagementTask
             selectedOrganizationId: cpuPlusWindow.effectiveLocalManagementOrganizationId
             selectedPortfolioId: cpuPlusWindow.effectiveLocalManagementPortfolioId
             visible: cpuPlusWindow.selectedModeIndex === 5
@@ -2635,6 +2655,7 @@ PanelWindow {
             id: localManagementDetailsPane
             area: "details"
             section: cpuPlusWindow.idManagementSection
+            task: cpuPlusWindow.idManagementTask
             selectedOrganizationId: cpuPlusWindow.effectiveLocalManagementOrganizationId
             selectedPortfolioId: cpuPlusWindow.effectiveLocalManagementPortfolioId
             visible: cpuPlusWindow.selectedModeIndex === 5

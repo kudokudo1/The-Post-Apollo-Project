@@ -70,6 +70,7 @@ jobs:
           cat "$work/native.log"
           test "$rc" -eq 0
           grep -F "C36_NATIVE_PASS // QTMULTIMEDIA_REAL_MP4_DECODING_VIDEO_TRACK_SEEK_PAUSE" "$work/native.log"
+          grep -F "C37_NATIVE_PASS // PAUSED_SCRUB_PLAYING_SEEK_ZOOM_PAN_FIT" "$work/native.log"
           if grep -E 'C36_NATIVE_FAIL|Failed to load configuration|module "QtMultimedia" is not installed|ReferenceError|TypeError' "$work/native.log"; then
             exit 1
           fi

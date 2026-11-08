@@ -20,7 +20,10 @@ Rectangle {
         && decoderLoader.item !== null
     readonly property bool decoderFailed: playbackRequested
         && decoderLoader.status === Loader.Error
-    readonly property bool playbackRunning: decoderReady && decoderLoader.item.playing
+    readonly property bool playbackRunning: decoderReady
+        && decoderLoader.item.playing && !decoderLoader.item.stalled
+    readonly property bool playbackIntent: decoderReady && decoderLoader.item.playIntent
+    readonly property real videoZoom: decoderReady ? decoderLoader.item.zoom : 1
     readonly property real playFraction: decoderReady ? decoderLoader.item.progress : 0
     readonly property string playError: decoderFailed
         ? "QTMULTIMEDIA UNAVAILABLE // INSTALLATION NOT VERIFIED"
@@ -52,6 +55,15 @@ Rectangle {
     }
     function seek(fraction) {
         return decoderReady && decoderLoader.item.seekFraction(fraction);
+    }
+    function stepTime(deltaMs) {
+        return decoderReady && decoderLoader.item.seekRelative(deltaMs);
+    }
+    function zoomBy(delta) {
+        if (decoderReady) decoderLoader.item.setZoom(videoZoom+delta);
+    }
+    function fitVideo() {
+        if (decoderReady) decoderLoader.item.resetView();
     }
     onVisibleChanged: {
         if (!visible) playbackRequested = false;
@@ -121,13 +133,60 @@ Rectangle {
             }
         }
 
+        Row {
+            id: zoomControls
+            objectName: "cosmos-c37-solar-movie-zoom-controls"
+            width: parent.width
+            height: 19
+            spacing: 3
+            ActionButton {
+                objectName: "cosmos-c37-video-zoom-out"
+                width: 40
+                height: parent.height
+                label: "ZOOM -"
+                labelPixelSize: 8
+                contentPadding: 0
+                accentColor: Colors.cyan
+                onClicked: movie.zoomBy(-0.25)
+            }
+            ActionButton {
+                objectName: "cosmos-c37-video-zoom-in"
+                width: 40
+                height: parent.height
+                label: "ZOOM +"
+                labelPixelSize: 8
+                contentPadding: 0
+                accentColor: Colors.cyan
+                onClicked: movie.zoomBy(0.25)
+            }
+            ActionButton {
+                objectName: "cosmos-c37-video-fit"
+                width: 35
+                height: parent.height
+                label: "FIT"
+                labelPixelSize: 8
+                contentPadding: 0
+                accentColor: Colors.yellow
+                onClicked: movie.fitVideo()
+            }
+            QuietText {
+                width: Math.max(1,zoomControls.width-124)
+                height: parent.height
+                text: "VIDEO " + Math.round(movie.videoZoom*100) + "% // WHEEL + DRAG"
+                color: Colors.cyan
+                font.pixelSize: 8
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+            }
+        }
+
         Rectangle {
             id: playbackBay
             objectName: "cosmos-c36-bounded-video-bay"
             width: parent.width
             height: Math.max(1,chrome.height-header.height
-                -channels.height-playControls.height-scrubBay.height
-                -sourceNote.height-5*chrome.spacing)
+                -channels.height-zoomControls.height-playControls.height
+                -scrubBay.height-sourceNote.height-6*chrome.spacing)
             color: Colors.dark
             border.width: 1
             border.color: Colors.cyan
@@ -137,6 +196,9 @@ Rectangle {
                 id: decoderLoader
                 objectName: "cosmos-c36-lazy-decoder-loader"
                 anchors.fill: parent
+                // Inset the native video texture from the playback frame;
+                // the existing cyan/magenta instrument dividers remain visible.
+                anchors.margins: 4
                 active: movie.visible && movie.playbackRequested
                 // This path isolates the QtMultimedia import from all
                 // ordinary Weather components and offline native CI.
@@ -172,8 +234,18 @@ Rectangle {
             height: 19
             spacing: 4
             ActionButton {
+                objectName: "cosmos-c37-back-one-second"
+                width: Math.max(28,(playControls.width-12)*0.17)
+                height: parent.height
+                label: "-1s"
+                labelPixelSize: 8
+                contentPadding: 0
+                accentColor: Colors.cyan
+                onClicked: movie.stepTime(-1000)
+            }
+            ActionButton {
                 objectName: "cosmos-c36-solar-play-pause"
-                width: Math.max(1,(playControls.width-4)*0.42)
+                width: Math.max(40,(playControls.width-12)*0.27)
                 height: parent.height
                 label: movie.playbackRunning ? "PAUSE" : "PLAY"
                 labelPixelSize: 9
@@ -181,12 +253,24 @@ Rectangle {
                 accentColor: Colors.orange
                 onClicked: movie.togglePlayback()
             }
+            ActionButton {
+                objectName: "cosmos-c37-forward-one-second"
+                width: Math.max(28,(playControls.width-12)*0.17)
+                height: parent.height
+                label: "+1s"
+                labelPixelSize: 8
+                contentPadding: 0
+                accentColor: Colors.cyan
+                onClicked: movie.stepTime(1000)
+            }
             QuietText {
-                width: Math.max(1,(playControls.width-4)*0.58)
+                width: Math.max(1,playControls.width-12
+                    -Math.max(28,(playControls.width-12)*0.17)*2
+                    -Math.max(40,(playControls.width-12)*0.27))
                 height: parent.height
                 text: movie.decoderReady
-                    ? "MP4 // "+(movie.decoderLoaderStatusLabel)
-                    : "NATIVE DECODER // ON DEMAND"
+                    ? "MP4 // "+movie.decoderLoaderStatusLabel
+                    : "NATIVE // ON DEMAND"
                 color: Colors.cyan
                 font.pixelSize: 8
                 verticalAlignment: Text.AlignVCenter
@@ -218,6 +302,13 @@ Rectangle {
                 onClicked: function(mouse) {
                     movie.seek(mouse.x/Math.max(1,width));
                 }
+                // Small wheel steps permit paused frame inspection without
+                // turning the time-lapse into a separate image gallery.
+                onWheel: function(wheel) {
+                    if (wheel.angleDelta.y===0) return;
+                    movie.stepTime(wheel.angleDelta.y>0 ? 200 : -200);
+                    wheel.accepted=true;
+                }
             }
         }
 
@@ -233,6 +324,10 @@ Rectangle {
     }
 
     // Human-readable status without relying on MediaPlayer enum coercion.
-    readonly property string decoderLoaderStatusLabel: movie.playbackRunning
-        ? "PLAYING" : movie.decoderReady ? "PAUSED/READY" : "OFFLINE"
+    readonly property string decoderLoaderStatusLabel: !movie.decoderReady
+        ? "OFFLINE"
+        : movie.decoderLoader.item.stalled ? "BUFFERING"
+        : movie.playbackRunning ? "PLAYING"
+        : movie.playbackIntent ? "RESUMING"
+        : "PAUSED/READY"
 }

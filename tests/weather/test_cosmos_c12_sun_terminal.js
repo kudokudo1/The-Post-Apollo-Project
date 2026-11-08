@@ -337,3 +337,46 @@ test("C36 native media decoder is lazy and an optional QtMultimedia import canno
       assert.ok(!component.includes(bad),bad);
   }
 });
+
+test("C37 SDO movies stay inside a clipped stage with zoom, pan and FIT",()=>{
+  const pane=read("widgets/weather/StationCosmosSolarMoviePane.qml");
+  const decoder=read("widgets/weather/StationCosmosSolarMovieDecoder.qml");
+  for(const label of ["cosmos-c37-solar-movie-zoom-controls",
+    "cosmos-c37-video-zoom-out","cosmos-c37-video-zoom-in",
+    "cosmos-c37-video-fit","cosmos-c37-clipped-video-viewport",
+    "cosmos-c37-video-zoom-pan-gesture"])
+    assert.ok((pane+decoder).includes(label),label);
+  assert.match(pane,/anchors\.margins: 4\s+active: movie\.visible/);
+  assert.match(decoder,/videoViewport[\s\S]*?clip: true/);
+  assert.match(decoder,/width: Math\.max\(1,videoViewport\.width\*decoder\.zoom\)/);
+  assert.match(decoder,/height: Math\.max\(1,videoViewport\.height\*decoder\.zoom\)/);
+  assert.match(decoder,/ImageViewportPolicy\.zoomAt/);
+  assert.match(decoder,/ImageViewportPolicy\.clampPan/);
+  assert.match(decoder,/function resetView\(\)/);
+  assert.match(decoder,/function panBy\(dx,dy\)/);
+  assert.match(decoder,/onWheel: function\(wheel\)/);
+  assert.match(decoder,/fillMode: VideoOutput\.PreserveAspectFit/);
+  assert.match(pane,/height: Math\.max\(1,chrome\.height-header\.height[\s\S]*?zoomControls\.height/);
+  for(const forbidden of ["Window {","PanelWindow {","WebEngineView {","Flickable {"])
+    assert.ok(!(pane+decoder).includes(forbidden),forbidden);
+});
+
+test("C37 seek resumes active playback while preserving explicit paused frame inspection",()=>{
+  const pane=read("widgets/weather/StationCosmosSolarMoviePane.qml");
+  const decoder=read("widgets/weather/StationCosmosSolarMovieDecoder.qml");
+  const fixture=read("tests/weather/fixtures/C36SolarMovieDecoderNativeShell.qml");
+  assert.match(decoder,/property bool playIntent: false/);
+  assert.match(decoder,/function start\(\)[\s\S]*?playIntent=true;/);
+  assert.match(decoder,/function pause\(\)[\s\S]*?playIntent=false;/);
+  assert.match(decoder,/function seekFraction\(fraction\)[\s\S]*?const resume=playIntent;[\s\S]*?if \(resume\)[\s\S]*?player\.play\(\);[\s\S]*?seekResume\.restart\(\);[\s\S]*?else[\s\S]*?player\.pause\(\);/);
+  assert.match(decoder,/onTriggered:[\s\S]*?decoder\.playIntent[\s\S]*?player\.play\(\)/);
+  assert.match(decoder,/function seekRelative\(deltaMs\)/);
+  assert.match(pane,/objectName: "cosmos-c37-back-one-second"/);
+  assert.match(pane,/objectName: "cosmos-c37-forward-one-second"/);
+  assert.match(pane,/movie\.stepTime\(wheel\.angleDelta\.y>0 \? 200 : -200\)/);
+  assert.match(pane,/label: movie\.playbackRunning \? "PAUSE" : "PLAY"/);
+  assert.match(pane,/movie\.decoderLoader\.item\.stalled \? "BUFFERING"/);
+  assert.match(fixture,/PAUSED_SEEK_AUTOPLAYED_UNEXPECTEDLY/);
+  assert.match(fixture,/PLAYING_SEEK_LOST_AUTO_RESUME_INTENT/);
+  assert.match(fixture,/C37_NATIVE_PASS/);
+});

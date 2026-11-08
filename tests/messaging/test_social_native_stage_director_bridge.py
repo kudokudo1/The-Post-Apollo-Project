@@ -123,6 +123,7 @@ class NativePairTests(unittest.TestCase):
         self.assertFalse(self.bridge.update_native_pair(snap))
         self.assertIsNone(self.bridge.native_pair_key)
         snap["nativeStageDirector"]=False
+        snap["discord"]["rect"]["x"] += 12
         self.bridge.fast_follow(snap)
         self.assertEqual(snap["fastLeader"],"discord")
         self.assertIn("social",self.bridge.pending_sync)

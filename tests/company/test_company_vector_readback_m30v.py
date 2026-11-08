@@ -83,6 +83,19 @@ class CompanyReadbackM30vTests(unittest.TestCase):
         self.assertNotIn('CompanyVectorReadbackEvidence',COMPANY)
         self.assertIn('productionAuthority: false',POLICY)
 
+    def test_full_native_maplibre_ci_executes_offline_readback_and_refuses_online(self):
+        workflow=(ROOT/".github/workflows/company-network-vector-probe-m5.yml").read_text()
+        self.assertIn("timeout 20s ./company-vector-probe --readback-evidence",
+                      workflow)
+        self.assertIn('COMPANY_M30V_QT_READBACK_EVIDENCE ',workflow)
+        self.assertIn('report["readbackBytesPerLine"]',workflow)
+        self.assertIn('report["nativeBufferStrideBytes"] is None',workflow)
+        self.assertIn('--readback-evidence --styled-online',workflow)
+        self.assertIn('test "$m30v_rc" -eq 16',workflow)
+        self.assertIn('test ! -e company-vector-probe.png',workflow)
+        self.assertIn('company-vector-probe --styled-online',workflow)
+        self.assertIn('company-m30v-readback.log',workflow)
+
     def test_evidence_helper_is_pure_no_launch_network_or_personal_data(self):
         for forbidden in ('QProcess','QFile','QTcpSocket','QNetworkAccessManager',
                           'CompanyHubStore','SocialIdentity','QQuickWindow::show',

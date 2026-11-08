@@ -150,9 +150,50 @@ if [[ "$phase" == booted ]]; then
     fail "CONFINED_SERVICE_DID_NOT_REFUSE_DUMMY_FILE"
   echo "C4B_PASS // REAL_SELINUX_SERVICE_DOMAIN_AND_NEGATIVE_FILE_DENIAL"
   stage C3B_OS_ORIGIN_VERIFICATION_BEGIN
-  GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1 \
-    timeout --signal=TERM --kill-after=5s 60s "$python" -I -B "$assets/C3bOriginCheck.py" --verify-disposable ||
+  if ! GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1 \
+      timeout --signal=TERM --kill-after=5s 60s \
+        "$python" -I -B "$assets/C3bOriginCheck.py" --verify-disposable; then
+    # Read-only diagnostic on rejection. Import the exact staged C3b probe
+    # rather than inventing a second list of protected directories. Report
+    # only ancestor attributes that violate its existing strict predicate.
+    # Never permit a symlink or writable directory as a workaround.
+    stage C3B_REJECTED_ORIGIN_ANCESTOR_DIAG_BEGIN
+    timeout --signal=TERM --kill-after=3s 12s "$python" -I -B - \
+      "$assets/C3bOriginCheck.py" <<'C4B_C3B_DIR_DIAG' || true
+import importlib.util
+import os
+import stat
+import sys
+
+probe_path = sys.argv[1]
+spec = importlib.util.spec_from_file_location("c4b_exact_c3b_probe", probe_path)
+if spec is None or spec.loader is None:
+    print("C4B_DIAG_C3B_PROBE_UNAVAILABLE", flush=True)
+    raise SystemExit(1)
+probe = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(probe)
+violations = 0
+for path in probe.PROTECTED_DIRS:
+    try:
+        info = os.lstat(path)
+        owner = info.st_uid
+        mode = stat.S_IMODE(info.st_mode)
+        directory = stat.S_ISDIR(info.st_mode)
+        symlink = stat.S_ISLNK(info.st_mode)
+        if owner != 0 or mode & 0o022 or not directory or symlink:
+            violations += 1
+            print("C4B_DIAG_C3B_UNPROTECTED_DIRECTORY // "
+                  f"path={path!r} uid={owner} mode={mode:04o} "
+                  f"directory={directory} symlink={symlink}",
+                  flush=True)
+    except OSError as exc:
+        violations += 1
+        print("C4B_DIAG_C3B_ANCESTOR_STAT_REFUSED // "
+              f"path={path!r} error={type(exc).__name__}", flush=True)
+print(f"C4B_DIAG_C3B_ANCESTOR_VIOLATION_COUNT // {violations}", flush=True)
+C4B_C3B_DIR_DIAG
     fail "DBUS_SYSTEMD_PID_UID_SELINUX_ORIGIN_REJECTED"
+  fi
   client_check c4b-reader status OBSERVED_UNVERIFIED
   client_check c4b-reader approve METHOD_REFUSED
   client_check c4b-reader claim OWN_REFUSED

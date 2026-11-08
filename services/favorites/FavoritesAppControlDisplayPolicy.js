@@ -38,6 +38,78 @@ function encode(input) {
     try { return encodeURIComponent(String(input)); }
     catch (error) { return ""; }
 }
+// AppControl RUN favorites contain the original shell command. Only a short,
+// conservative executable *name* is permitted outside its owning widget.
+// Arguments, quoting, environment assignments, paths and shell fragments
+// never become cross-widget labels.
+function safeRunDisplay(raw) {
+    if (typeof raw!=="string" || raw.length>2048) return null;
+    let prefix="NORMAL", encoded="";
+    if (raw.indexOf("run:toolbox:")===0) {
+        prefix="TOOLBOX";
+        encoded=raw.slice(12);
+    } else if (raw.indexOf("run:kitty:")===0) {
+        prefix="KITTY";
+        encoded=raw.slice(10);
+    } else if (raw.indexOf("run:")===0) {
+        encoded=raw.slice(4);
+    } else return null;
+    let command="";
+    try {command=decodeURIComponent(encoded).trim();}
+    catch(error) {return null;}
+    if (!command || /[\u0000-\u001f\u007f]/.test(command))
+        return null;
+    // Do not resolve a path or arbitrary quoted/variable command.
+    const match=/^([A-Za-z][A-Za-z0-9_.+-]{0,47})(?=\s|$)/.exec(command);
+    if (!match || /(?:password|secret|token|credential|private|auth|keyring)/i.test(match[1]))
+        return null;
+    const executable=match[1];
+    const suffix=command.length===executable.length ? "" : " [OPTIONS HIDDEN]";
+    const item=executable+(prefix==="NORMAL" ? "" : " ["+prefix+"]")+suffix;
+    return visibleName(item) ? item : null;
+}
+function modeMenu(number) {
+    // Source: AppControlW.modes, not the CPU++ category labels.
+    return ["FAVORITES","APPS","FILES","RUN","WINDOWS",
+            "REMOTE","THERMAL","KILL","SYSTEM"][number] || "";
+}
+function modeIdentity(raw) {
+    if (typeof raw!=="string" || raw.indexOf("mode:")!==0)
+        return null;
+    const match=/^mode:([0-8]):(.+)$/.exec(raw);
+    return match ? {menu:modeMenu(Number(match[1])),label:match[2]} : null;
+}
+function stableOwnerWindowName(models, label) {
+    // Only repeat an actual matching AppControl window/tab row.
+    for(const field of ["swayWindows","appTabs"]) {
+        for(const row of array(models && models[field],MAX_SOURCE_ROWS)) {
+            if (!row || typeof row!=="object") continue;
+            const candidate=String(row.label || row.name || "");
+            if (candidate===label) {
+                const safe=visibleName(candidate);
+                if (safe && !/(?:password|secret|token|credential|private)/i.test(safe))
+                    return safe;
+            }
+        }
+    }
+    return "";
+}
+function preferredRunAction(raw) {
+    const match=/^run\|([^|]+)\|([^|]+)$/.exec(raw);
+    if (!match) return null;
+    let favoriteKey="";
+    try {favoriteKey=decodeURIComponent(match[1]);}
+    catch(error) {return null;}
+    const exe=safeRunDisplay(favoriteKey);
+    const actions={
+        run:"Run",kitty:"Run in Kitty",float:"Float",
+        fullscreen:"Fullscreen",toolbox:"Toolbox",kill:"Kill"
+    };
+    if (!exe || !Object.prototype.hasOwnProperty.call(actions,match[2]))
+        return null;
+    return exe+" - "+actions[match[2]];
+}
+
 function build(saved, models) {
     const out=Object.create(null);
     const permitted=Object.create(null);
@@ -174,6 +246,38 @@ function build(saved, models) {
         if (item && Object.prototype.hasOwnProperty.call(metrics,metric))
             put("task-watch",raw,"KILL",
                 item+" - "+metrics[metric],"METRIC WATCH");
+    }
+    // Resolve command-name-only and opaque-mode favorites without granting
+    // the common catalog access to raw commands, window titles or process IDs.
+    for (const raw of Object.keys(permitted["item"])) {
+        if (raw.indexOf("run:")===0) {
+            const safe=safeRunDisplay(raw);
+            if (safe) put("item",raw,"RUN",safe,"FAVORITE");
+        } else if (raw.indexOf("hidden:")===0) {
+            // APPS > hidden command entries come from AppControl's PATH list.
+            const command=raw.slice(7);
+            if (/^[A-Za-z][A-Za-z0-9_.+-]{0,47}$/.test(command)
+                    && !/(?:password|secret|token|credential|private|auth|keyring)/i.test(command))
+                put("item",raw,"APPS",command+" [CLI]","FAVORITE");
+        } else {
+            const mode=modeIdentity(raw);
+            if (mode && mode.menu==="WINDOWS") {
+                const safe=stableOwnerWindowName(models,mode.label);
+                if (safe) put("item",raw,"WINDOWS",safe,"FAVORITE");
+            } else if (mode && (mode.menu==="APPS"
+                       || mode.menu==="THERMAL" || mode.menu==="SYSTEM")) {
+                // The owner persists these temporary placeholders by their
+                // displayed label. Unlike FILES/REMOTE/WINDOWS, they cannot
+                // contain raw file paths or browser/document titles here.
+                const safe=visibleName(mode.label);
+                if (safe && !/(?:password|secret|token|credential|private)/i.test(safe))
+                    put("item",raw,mode.menu,safe,"FAVORITE");
+            }
+        }
+    }
+    for (const raw of Object.keys(permitted["preferred-action"])) {
+        const safe=preferredRunAction(raw);
+        if (safe) put("preferred-action",raw,"RUN",safe,"PREFERRED ACTION");
     }
     return out;
 }

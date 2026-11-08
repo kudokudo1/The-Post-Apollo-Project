@@ -15,6 +15,7 @@ Item {
     property string lastError: ""
     readonly property bool playing: player.playbackState === MediaPlayer.PlayingState
     readonly property bool seekable: player.seekable
+    readonly property bool hasVideo: player.hasVideo
     readonly property int positionMs: player.position
     readonly property int durationMs: player.duration
     readonly property real progress: SolarMovies.positionFraction(positionMs,durationMs)

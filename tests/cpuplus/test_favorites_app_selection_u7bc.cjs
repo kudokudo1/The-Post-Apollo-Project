@@ -107,6 +107,8 @@ test("AppControl rechecks membership, matches installed desktop ID, selects row,
   assert.ok(seg);
   assert.match(seg,/AppFavoriteSelection\.ownerAllows\(/);
   assert.match(seg,/DesktopEntries\.applications\.values/);
+  assert.match(seg,/\[\.\.\.DesktopEntries\.applications\.values\]/);
+  assert.match(seg,/\[\.\.\.filteredApps\.values\]/);
   assert.match(seg,/appSourceMode=appSourceNative/);
   assert.match(seg,/switchMode\(appsModeIndex,false\)/);
   assert.match(seg,/searchInput\.text=""/);

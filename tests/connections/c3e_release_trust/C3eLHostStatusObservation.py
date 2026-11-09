@@ -169,9 +169,20 @@ def observe(*, socket_path: str, expected_host_pid: int,
                 struct.unpack("3i", conn.getsockopt(
                     socket.SOL_SOCKET, socket.SO_PEERCRED, CRED_SIZE)) != cred):
             deny("HOST_CHANGED_AFTER_RESPONSE")
-        after = socket_origin(target, os.getgid())
-        if (after.st_dev, after.st_ino) != (inode.st_dev, inode.st_ino):
-            deny("HOST_SOCKET_REPLACED")
+        # The C3e-K host is intentionally one-shot: it closes and unlinks
+        # its listener immediately after returning the read-only response.
+        # Missing *after* a verified connected-peer exchange is expected;
+        # a still-existing listener MUST retain the original root-owned inode.
+        try:
+            os.lstat(target)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            deny("HOST_SOCKET_POSTREAD_UNAVAILABLE")
+        else:
+            after = socket_origin(target, os.getgid())
+            if (after.st_dev, after.st_ino) != (inode.st_dev, inode.st_ino):
+                deny("HOST_SOCKET_REPLACED")
         verified = validate_status(
             response, expected_enrollment_sha256=expected_enrollment_sha256,
             minimum_policy_epoch=minimum_policy_epoch,

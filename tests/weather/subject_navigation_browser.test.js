@@ -28,7 +28,7 @@ test("M0 remains a six-subject hierarchy with actual nested routes", () => {
 
 test("source browser distinguishes original legacy pages from new routes", () => {
   assert.deepEqual(plain(env.sourcePagesForPath("weather", env.PANELS).map(x => x.id)),
-    ["home","ground","sky","map"]);
+    ["home","ground","sky"]);
   assert.deepEqual(plain(env.sourcePagesForPath("cosmos", env.PANELS).map(x => x.id)),
     ["home","sky","space"]);
   assert.deepEqual(plain(env.sourcePagesForPath("earth", env.PANELS).map(x => x.id)),
@@ -44,6 +44,8 @@ test("specific mixed panels expose correct classic page without cross-subject cl
   assert.deepEqual(plain(env.sourcePagesForPath("weather/forecasts/hourly", env.PANELS).map(x => x.id)),
     ["home","sky"]);
   assert.deepEqual(plain(env.sourcePagesForPath("weather/water/rivers", env.PANELS).map(x => x.id)),
+    []);
+  assert.deepEqual(plain(env.sourcePagesForPath("earth/water/rivers", env.PANELS).map(x => x.id)),
     ["ground"]);
   assert.deepEqual(plain(env.sourcePagesForPath("cosmos/moon/ephemeris", env.PANELS).map(x => x.id)),
     ["sky"]);
@@ -52,6 +54,8 @@ test("specific mixed panels expose correct classic page without cross-subject cl
   assert.deepEqual(plain(env.sourcePagesForPath("media/news/locations", env.PANELS).map(x => x.id)),
     ["map"]);
   assert.deepEqual(plain(env.sourcePagesForPath("weather/maps/radar", env.PANELS).map(x => x.id)),
+    []);
+  assert.deepEqual(plain(env.sourcePagesForPath("earth/maps/events", env.PANELS).map(x => x.id)),
     ["map"]);
 });
 

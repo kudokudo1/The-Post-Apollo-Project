@@ -3016,12 +3016,12 @@ Rectangle {
         Row {
             visible: ground.sectionVisible("air-pm")
             width: parent.width
-            spacing: 14
+            spacing: ground.compactEarthAir ? 8 : 14
 
             Rectangle {
                 id: airQualityInstrument
                 width: 248
-                height: 166
+                height: ground.compactEarthAir ? 106 : 166
                 color: Colors.dark
                 border.width: 1
                 border.color: Colors.cyan
@@ -3029,7 +3029,7 @@ Rectangle {
                 SecondaryText {
                     anchors.top: parent.top
                     anchors.left: parent.left
-                    anchors.margins: 12
+                    anchors.margins: ground.compactEarthAir ? 7 : 12
                     text: "U.S. AIR QUALITY INDEX"
                     font.pixelSize: 11
                 }
@@ -3052,16 +3052,16 @@ Rectangle {
                     id: aqiReadingText
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top: parent.top
-                    anchors.topMargin: 29
+                    anchors.topMargin: ground.compactEarthAir ? 19 : 29
                     text: ground.aqiReady ? String(weatherService.aqi) : "--"
-                    font.pixelSize: 68
+                    font.pixelSize: ground.compactEarthAir ? 50 : 68
                     color: ground.aqiColor
                 }
 
                 GohuText {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: aqiTrack.top
-                    anchors.bottomMargin: 9
+                    anchors.bottomMargin: ground.compactEarthAir ? 3 : 9
                     text: ground.aqiReady ? weatherService.aqiLabel : "OFFLINE"
                     font.pixelSize: 12
                     color: ground.aqiColor
@@ -3072,8 +3072,8 @@ Rectangle {
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
-                    anchors.margins: 12
-                    height: 9
+                    anchors.margins: ground.compactEarthAir ? 7 : 12
+                    height: ground.compactEarthAir ? 6 : 9
                     color: Colors.black
                     border.width: 1
                     border.color: ground.meterBorderColor
@@ -3090,7 +3090,7 @@ Rectangle {
 
             Column {
                 width: 158
-                spacing: 10
+                spacing: ground.compactEarthAir ? 5 : 10
 
                 SecondaryText {
                     text: "PM2.5 // FINE"
@@ -3127,7 +3127,7 @@ Rectangle {
 
             Column {
                 width: 158
-                spacing: 10
+                spacing: ground.compactEarthAir ? 5 : 10
 
                 SecondaryText {
                     text: "PM10 // COARSE"
@@ -3201,11 +3201,11 @@ Rectangle {
 
         Row {
             visible: ground.sectionVisible("air-gases")
-            spacing: 14
+            spacing: ground.compactEarthAir ? 10 : 14
 
             Column {
                 width: 135
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "OZONE"
@@ -3239,7 +3239,7 @@ Rectangle {
 
             Column {
                 width: 135
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "NO₂"
@@ -3273,7 +3273,7 @@ Rectangle {
 
             Column {
                 width: 150
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "CO"
@@ -3307,7 +3307,7 @@ Rectangle {
 
             Column {
                 width: 135
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "DUST"
@@ -3325,7 +3325,7 @@ Rectangle {
 
             Column {
                 width: 170
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "POLLEN // PEAK"
@@ -3367,7 +3367,7 @@ Rectangle {
                 delegate: Column {
                     required property var modelData
                     width: (groundContent.width - 5 * 8) / 6
-                    spacing: 5
+                    spacing: ground.compactEarthAir ? 2 : 5
 
                     SecondaryText {
                         text: modelData.name
@@ -3403,7 +3403,7 @@ Rectangle {
         Column {
             visible: ground.sectionVisible("air-forecast")
             width: parent.width
-            spacing: 4
+            spacing: ground.compactEarthAir ? 2 : 4
 
             Row {
                 width: parent.width
@@ -3416,7 +3416,7 @@ Rectangle {
                     delegate: Column {
                         required property var modelData
                         width: 116
-                        spacing: 4
+                        spacing: ground.compactEarthAir ? 2 : 4
 
                         SecondaryText {
                             width: parent.width
@@ -3430,14 +3430,14 @@ Rectangle {
                             horizontalAlignment: Text.AlignHCenter
                             text: modelData.aqi >= 0
                                   ? Math.round(modelData.aqi) + " AQI" : "-- AQI"
-                            font.pixelSize: 22
+                            font.pixelSize: ground.compactEarthAir ? 18 : 22
                             color: ground.aqiSeverityColor(modelData.aqi)
                         }
 
                         Rectangle {
                             width: parent.width - 12
                             anchors.horizontalCenter: parent.horizontalCenter
-                            height: 7
+                            height: ground.compactEarthAir ? 5 : 7
                             color: Colors.black
                             border.width: 1
                             border.color: ground.meterBorderColor
@@ -3612,7 +3612,7 @@ Rectangle {
 
             Column {
                 width: 248
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "POSITION // WEATHER FIX"
@@ -3631,7 +3631,7 @@ Rectangle {
 
             Column {
                 width: Math.max(0, parent.width - 270)
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "AIR QUALITY // SAMPLE"

@@ -105,7 +105,15 @@ test("AppControl uses its existing one-writer favorites and live system monitor 
     .split("function rememberCurrentAppSelection() {")[0];
   assert.ok(method);
   assert.match(method,/SystemFavoriteSelection\.ownerAllows\(/);
-  assert.match(method,/favoriteStore\.favoriteKeys/);
+  // U7b-G copies QML's list<string> to a JS Array at the owner boundary.
+  // Assert both that the resolver uses that copy and the helper still reads
+  // the actual FavoritesStore, rather than preserving the obsolete direct gate.
+  assert.match(method,/originalFavoriteKeysForSelection\(\)/);
+  const helper=app.split("function originalFavoriteKeysForSelection() {")[1]
+    .split("function tryResumeFavoriteSelection() {")[0];
+  assert.ok(helper);
+  assert.match(helper,/favoriteStore\.favoriteKeys/);
+  assert.match(helper,/keys\.push\(source\[i\]\)/);
   assert.match(method,/systemRows/);
   assert.match(method,/switchMode\(systemModeIndex,false\)/);
   assert.match(method,/searchInput\.text=""/);

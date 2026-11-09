@@ -1601,3 +1601,63 @@ test("U8a CPU++ red X closes through the established lifecycle while glow probe 
   assert.match(cpu,/primaryGlowEnabled:/);
   assert.match(cpu,/labelGlowEnabled:/);
 });
+
+
+test("U8a collapse-all transitions execute on the actual index functions",()=>{
+  const source=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const first=source.indexOf("    function toggleIndexGroup(key) {");
+  const last=source.indexOf("    function revealSelectedInSelector() {",first);
+  assert.ok(first>=0&&last>first);
+  const scope={pane:{dossier:{groups:[
+    {key:"APP CTRL|RUN"},{key:"CPU++|SYSTEM"},{key:"WEATHER|HOME"}
+  ]},collapsedIndexGroups:{}},dossierScroll:{contentY:84}};
+  Object.defineProperty(scope,"collapsedIndexGroups",{
+    get(){return scope.pane.collapsedIndexGroups;},
+    set(value){scope.pane.collapsedIndexGroups=value;}
+  });
+  const ctx=vm.createContext(scope);
+  vm.runInContext(source.slice(first,last),ctx);
+  assert.equal(scope.allIndexGroupsCollapsed(),false);
+  scope.toggleAllIndexGroups();
+  assert.equal(scope.allIndexGroupsCollapsed(),true);
+  assert.equal(scope.dossierScroll.contentY,0);
+  assert.deepEqual(plain(scope.pane.collapsedIndexGroups),{
+    "APP CTRL|RUN":true,"CPU++|SYSTEM":true,"WEATHER|HOME":true
+  });
+  scope.toggleIndexGroup("CPU++|SYSTEM");
+  assert.equal(scope.allIndexGroupsCollapsed(),false);
+  assert.equal(scope.pane.collapsedIndexGroups["CPU++|SYSTEM"],false);
+  scope.toggleAllIndexGroups();
+  assert.equal(scope.allIndexGroupsCollapsed(),true);
+  scope.toggleAllIndexGroups();
+  assert.deepEqual(plain(scope.pane.collapsedIndexGroups),{});
+  assert.equal(scope.allIndexGroupsCollapsed(),false);
+});
+test("U8a two-click red left collection delete invokes store only on confirmation",()=>{
+  const source=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const start=source.indexOf("id: leftCollectionDelete");
+  const after=source.slice(start);
+  const marker="onLeftClicked: {";
+  const a=after.indexOf(marker),b=after.indexOf("\n                                    }\n                                }\n",a);
+  assert.ok(start>=0 && a>=0 && b>a);
+  const action=after.slice(a+marker.length,b);
+  const calls=[];
+  const scope={
+    collectionGroup:{confirmDelete:false,section:{id:"c7"}},
+    pane:{
+      collectionsOwner:{deleteCollection(id){calls.push("delete:"+id);return true;}},
+      collectionDeleteAccepted(id){calls.push("accepted:"+id);}
+    }
+  };
+  const context=vm.createContext(scope);
+  vm.runInContext("function click() {"+action+"\n}",context);
+  scope.click();
+  assert.equal(scope.collectionGroup.confirmDelete,true);
+  assert.deepEqual(calls,[]);
+  scope.click();
+  assert.deepEqual(calls,["delete:c7","accepted:c7"]);
+  const policy=read("services/favorites/FavoritesCollectionsPolicy.js");
+  assert.match(policy,/action\.type==="delete"/);
+  // Collection deletion is only a grouping writer, not the original owner.
+  assert.doesNotMatch(action,/setFavorite|execDetached|deleteFile|killProcess/);
+});

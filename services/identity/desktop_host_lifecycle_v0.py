@@ -272,8 +272,10 @@ class DesktopHostLifecycle:
         authenticates the asking peer before exposing this status.
         """
         with self._lock:
-            if (self._status != "STARTED" or self._session is None
-                    or not self._seat_ok()):
+            if self._status != "STARTED" or self._session is None:
+                return "HOST_LOST"
+            if not self._seat_ok():
+                self._revoke_locked()
                 return "HOST_LOST"
             if self._signed_in:
                 if not self._session.has_active_session():
@@ -297,9 +299,12 @@ class DesktopHostLifecycle:
         permitted on this one-shot lifecycle.
         """
         with self._lock:
-            if (self._status != "STARTED" or self._session is None
-                    or not self._seat_ok() or self._signed_in
-                    or self._cancelled or not self._attempted
+            if self._status != "STARTED" or self._session is None:
+                return {"status": "UNAVAILABLE"}
+            if not self._seat_ok():
+                self._revoke_locked()
+                return {"status": "UNAVAILABLE"}
+            if (self._signed_in or self._cancelled or not self._attempted
                     or not self._allow_callback):
                 return {"status": "UNAVAILABLE"}
             self._allow_callback = False

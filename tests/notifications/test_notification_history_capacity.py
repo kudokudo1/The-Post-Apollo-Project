@@ -69,8 +69,8 @@ const owner = {
   notifications: retained, maxHistoryEntries: 300, historyVersion: 1,
   historySnapshot: (entry) => entry,
   saves: 0, revisions: 0,
-  scheduleHistorySave() { this.saves++; },
-  markNotificationsChanged() { this.revisions++; }
+  scheduleHistorySave() { owner.saves++; },
+  markNotificationsChanged() { owner.revisions++; }
 };
 vm.runInNewContext(['normalizeHistoryCapacity','setMaxHistoryEntries',
   'pruneHistory','historyDocument','historyToJson']

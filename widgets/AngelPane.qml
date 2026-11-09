@@ -46,6 +46,45 @@ Item {
         {key: "err", label: "ERR"}
     ]
 
+    // Color grammar is shared by the filter buttons and history rows.
+    // An observation can match several patterns; the first structural tag
+    // takes visual precedence unless its number is favorited or ERR-marked.
+    function filterInk(key) {
+        switch (key) {
+        case "favorite": return Colors.magenta;
+        case "mirror": return Colors.yellow;
+        case "add": return Colors.orange;
+        case "subtract": return Colors.blue;
+        case "multiply": return Colors.cyan;
+        case "divide": return Colors.green; // regular green, NOT Omnitrix
+        case "err": return Colors.red;
+        default: return Colors.white; // ALL, REPEAT, SEQUENCE, OTHER
+        }
+    }
+
+    function filterEdge(key) {
+        return key === "sequence" ? Colors.yellow : filterInk(key);
+    }
+
+    function primaryPattern(digits) {
+        const tags = AngelPolicy.patternTags(digits);
+        return tags.length ? tags[0].toLowerCase() : "other";
+    }
+
+    function visiblePattern(digits) {
+        // In a specific pattern filter, show that filter's color even when
+        // the number overlaps several classifications (e.g. ADD and MUL).
+        // ALL, FAV and ERR fall back to the normal primary pattern.
+        const patterns = ["repeat", "mirror", "sequence", "add", "subtract",
+                          "multiply", "divide", "other"];
+        return patterns.indexOf(activeFilter) >= 0
+            ? activeFilter : primaryPattern(digits);
+    }
+
+    function wash(tint, alpha) {
+        return Qt.rgba(tint.r, tint.g, tint.b, alpha);
+    }
+
     function showMeaning() {
         const chosen = pane.selectedObservation !== null
             ? pane.selectedObservation.digits
@@ -122,7 +161,7 @@ Item {
         height: 32
         spacing: 7
 
-        ActionButton {
+        AngelActionButton {
             width: (parent.width - parent.spacing) / 2
             height: parent.height
             label: "JOURNAL"
@@ -136,7 +175,7 @@ Item {
             onLeftClicked: pane.activeView = "journal"
         }
 
-        ActionButton {
+        AngelActionButton {
             width: (parent.width - parent.spacing) / 2
             height: parent.height
             label: "MEANING"
@@ -197,7 +236,7 @@ Item {
                 elide: Text.ElideRight
             }
 
-            ActionButton {
+            AngelActionButton {
                 id: recordClockButton
                 width: 113
                 height: parent.height
@@ -249,7 +288,7 @@ Item {
                 }
             }
 
-            ActionButton {
+            AngelActionButton {
                 id: recordManualButton
                 width: 113
                 height: parent.height
@@ -283,7 +322,12 @@ Item {
             height: 18
             spacing: 4
             GohuText {
-                text: "HISTORY // " + pane.filteredRows.length
+                text: "HISTORY //"
+                font.pixelSize: 12
+                color: Colors.white
+            }
+            GohuText {
+                text: String(pane.filteredRows.length)
                 font.pixelSize: 12
                 color: Colors.magenta
             }
@@ -293,9 +337,14 @@ Item {
                 color: Colors.white
             }
             GohuText {
-                text: AngelObservationsStore.total + " SAVED"
+                text: String(AngelObservationsStore.total)
                 font.pixelSize: 12
                 color: Colors.orange
+            }
+            GohuText {
+                text: "SAVED"
+                font.pixelSize: 12
+                color: Colors.white
             }
         }
 
@@ -338,37 +387,30 @@ Item {
 
             Repeater {
                 model: pane.filters
-                ActionButton {
+                AngelActionButton {
                     width: (angelPatternFilters.width
                             - angelPatternFilters.spacing
                               * (pane.filters.length - 1))
                            / pane.filters.length
                     height: 28
-                    readonly property bool isErrFilter:
-                        modelData.key === "err"
+                    readonly property color ink: pane.filterInk(modelData.key)
+                    readonly property color edge: pane.filterEdge(modelData.key)
                     label: modelData.label
                     labelPixelSize: 9
                     contentPadding: 1
                     trackLabelGlowLocally: true
-                    // ERR has a persistent red identity in idle and selected
-                    // states. This is a review/error bucket, not DELETE.
-                    accentColor: isErrFilter ? Colors.red : Colors.white
-                    hoverFillColor: isErrFilter ? Colors.black : Colors.yellow
-                    hoverForegroundColor: isErrFilter ? Colors.red : Colors.orange
-                    hoverBorderColor: isErrFilter ? Colors.red : Colors.orange
-                    hoverContentGlowColor: isErrFilter ? Colors.red : Colors.orange
-                    hoverSoftGlowColor: isErrFilter ? Colors.red : Colors.orange
-                    pressedFillColor: isErrFilter ? Colors.red : Colors.magenta
-                    pressedForegroundColor: isErrFilter ? Colors.white : Colors.black
-                    pressedBorderColor: isErrFilter ? Colors.red : Colors.magenta
-                    pressedContentGlowColor: isErrFilter ? Colors.red : Colors.black
-                    pressedSoftGlowColor: isErrFilter ? Colors.red : Colors.orange
+                    // Ordinary filters remain outline-only on hover/press.
+                    // The active filter alone receives a subtle color wash.
+                    accentColor: ink
+                    idleBorderColor: edge
+                    idleContentGlowColor: edge
+                    idleSoftGlowColor: edge
                     selected: pane.activeFilter === modelData.key
-                    selectedFillColor: isErrFilter ? Colors.red : Colors.yellow
-                    selectedForegroundColor: isErrFilter ? Colors.white : Colors.magenta
-                    selectedBorderColor: isErrFilter ? Colors.red : Colors.magenta
-                    selectedContentGlowColor: isErrFilter ? Colors.red : Colors.magenta
-                    selectedSoftGlowColor: isErrFilter ? Colors.red : Colors.magenta
+                    selectedFillColor: pane.wash(ink, 0.24)
+                    selectedForegroundColor: ink
+                    selectedBorderColor: edge
+                    selectedContentGlowColor: edge
+                    selectedSoftGlowColor: edge
                     onLeftClicked: pane.activeFilter = modelData.key
                 }
             }
@@ -407,11 +449,22 @@ Item {
                         AngelPolicy.favoriteKey(modelData.digits)
                     readonly property bool isFavoriteNumber:
                         FavoritesDefaultStore.isFavorite(numberKey)
+                    readonly property string pattern:
+                        pane.visiblePattern(modelData.digits)
+                    readonly property color entryInk:
+                        isMarkedErr ? Colors.red
+                        : isFavoriteNumber ? Colors.magenta
+                        : pane.filterInk(pattern)
+                    readonly property color entryEdge:
+                        isMarkedErr ? Colors.red
+                        : isFavoriteNumber ? Colors.magenta
+                        : pane.filterEdge(pattern)
                     width: angelHistoryList.width
                     height: 47
 
-                    ActionButton {
+                    AngelActionButton {
                         id: observationSelect
+                        x: favoriteObservation.width + 4
                         width: Math.max(0, parent.width - 68)
                         height: parent.height
                         label: (observationEntry.isMarkedErr ? "ERR* // " : "")
@@ -423,33 +476,29 @@ Item {
                         labelHorizontalAlignment: Text.AlignLeft
                         contentPadding: 5
                         trackLabelGlowLocally: true
-                        accentColor: observationEntry.isMarkedErr ? Colors.red
-                            : observationEntry.isFavoriteNumber ? Colors.magenta
-                            : Colors.white
-                        hoverFillColor: observationEntry.isMarkedErr ? Colors.black : Colors.yellow
-                        hoverForegroundColor: observationEntry.isMarkedErr ? Colors.red : Colors.orange
-                        hoverBorderColor: observationEntry.isMarkedErr ? Colors.red : Colors.orange
-                        hoverContentGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.orange
-                        hoverSoftGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.orange
-                        pressedFillColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta
-                        pressedForegroundColor: observationEntry.isMarkedErr ? Colors.white : Colors.black
-                        pressedBorderColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta
-                        pressedContentGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.black
-                        pressedSoftGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.orange
+                        // Saved favorites keep their magenta wash; all other
+                        // idle, hovered and pressed history rows remain dark.
+                        accentColor: observationEntry.entryInk
+                        idleBorderColor: observationEntry.entryEdge
+                        idleContentGlowColor: observationEntry.entryEdge
+                        idleSoftGlowColor: observationEntry.entryEdge
+                        idleFillColor: observationEntry.isFavoriteNumber
+                                       ? pane.wash(Colors.magenta, 0.16)
+                                       : Colors.black
                         selected: pane.selectedId === modelData.id
-                        selectedFillColor: observationEntry.isMarkedErr ? Colors.red : Colors.yellow
-                        selectedForegroundColor: observationEntry.isMarkedErr ? Colors.white : Colors.magenta
-                        selectedBorderColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta
-                        selectedContentGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta
-                        selectedSoftGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta
+                        selectedFillColor: pane.wash(observationEntry.entryEdge, 0.24)
+                        selectedForegroundColor: observationEntry.entryInk
+                        selectedBorderColor: observationEntry.entryEdge
+                        selectedContentGlowColor: observationEntry.entryEdge
+                        selectedSoftGlowColor: observationEntry.entryEdge
                         onLeftClicked: {
                             pane.selectedId = modelData.id;
                             pane.pendingDeleteId = "";
                         }
                     }
-                    ActionButton {
+                    AngelActionButton {
                         id: favoriteObservation
-                        x: observationSelect.width + 4
+                        x: 0
                         width: 30
                         height: parent.height
                         label: "★"
@@ -458,16 +507,16 @@ Item {
                         accentColor: observationEntry.isFavoriteNumber
                                      ? Colors.magenta : Colors.white
                         selected: observationEntry.isFavoriteNumber
-                        selectedFillColor: Colors.black
+                        selectedFillColor: pane.wash(Colors.magenta, 0.28)
                         selectedForegroundColor: Colors.magenta
                         selectedBorderColor: Colors.magenta
                         available: FavoritesDefaultStore.canEdit
                         onLeftClicked: FavoritesDefaultStore.toggleFavorite(
                                            observationEntry.numberKey)
                     }
-                    ActionButton {
+                    AngelActionButton {
                         id: noteObservation
-                        x: favoriteObservation.x + favoriteObservation.width + 4
+                        x: observationSelect.x + observationSelect.width + 4
                         width: 30
                         height: parent.height
                         label: "+"
@@ -475,6 +524,8 @@ Item {
                         contentPadding: 2
                         accentColor: modelData.note ? Colors.orange : Colors.cyan
                         selected: pane.editingNoteId === modelData.id
+                        selectedFillColor: pane.wash(Colors.cyan, 0.23)
+                        selectedForegroundColor: modelData.note ? Colors.orange : Colors.cyan
                         available: AngelObservationsStore.writable
                         onLeftClicked: pane.editObservationNote(modelData)
                     }
@@ -545,7 +596,7 @@ Item {
                     }
                 }
             }
-            ActionButton {
+            AngelActionButton {
                 id: saveNoteButton
                 width: 54
                 height: parent.height
@@ -555,7 +606,7 @@ Item {
                 available: AngelObservationsStore.writable
                 onLeftClicked: pane.saveNote()
             }
-            ActionButton {
+            AngelActionButton {
                 id: cancelNoteButton
                 width: 60
                 height: parent.height
@@ -589,7 +640,7 @@ Item {
                               .toISOString()
                       : "SELECT HISTORY ROW FOR DETAIL"
             }
-            ActionButton {
+            AngelActionButton {
                 id: cancelDelete
                 width: pane.pendingDeleteId !== "" ? 57 : 0
                 height: 30
@@ -600,7 +651,7 @@ Item {
                 destructive: true
                 onLeftClicked: pane.pendingDeleteId = ""
             }
-            ActionButton {
+            AngelActionButton {
                 id: errMarkButton
                 width: 82
                 height: 30
@@ -625,7 +676,7 @@ Item {
                     AngelObservationsStore.toggleErrObservation(pane.selectedId);
                 }
             }
-            ActionButton {
+            AngelActionButton {
                 id: deleteButton
                 width: 111
                 height: 30

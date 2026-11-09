@@ -4727,6 +4727,13 @@ PanelWindow {
                             font.pixelSize: 10
                             wrapMode: Text.Wrap
                         }
+                        GohuText {
+                            width: parent.width
+                            text: "GEOMETRY SAVE // BROWSER TABS + EXACT RESTORE STILL IN DEVELOPMENT"
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
 
                         Row {
                             width: parent.width

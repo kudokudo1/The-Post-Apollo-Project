@@ -663,6 +663,7 @@ Rectangle {
                  && browser.liveMediaKind !== ""
         subjectRoute: browser.currentPath
         runtimeNowMs: browser.runtimeNowMs
+        onRouteRequested: function(path) { browser.chooseRoute(path); }
         onNewsMapRequested: function(payload) {
             browser.showNewsMentionsOnEarth(payload);
         }

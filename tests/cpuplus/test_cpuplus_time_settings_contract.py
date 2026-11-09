@@ -11,6 +11,7 @@ PANE = (ROOT / "widgets/TimeSettingsPane.qml").read_text(encoding="utf-8")
 TIME_SETTINGS = (ROOT / "services/time/TimeSettings.qml").read_text(encoding="utf-8")
 CLOCK = (ROOT / "widgets/TimeW.qml").read_text(encoding="utf-8")
 LOCATION = (ROOT / "widgets/cpuplus/CpuPlusSettingsLocationPane.qml").read_text(encoding="utf-8")
+TIME_ACTIVE = (ROOT / "widgets/cpuplus/CpuPlusSettingsTimeActivePane.qml").read_text(encoding="utf-8")
 
 
 class CpuPlusTimeSettingsContracts(unittest.TestCase):
@@ -28,7 +29,10 @@ class CpuPlusTimeSettingsContracts(unittest.TestCase):
     def test_cpu_mode_uses_shared_view_and_persistence(self):
         self.assertIn("import qs.services.time", CPU)
         self.assertIn("TimeSettingsPane {", CPU)
-        self.assertIn("TimeSettings.displayOffsetLabel", CPU)
+        # TIME calibration remains in the dedicated middle TIME pane;
+        # removing the LOCATION placeholder must not discard the TIME view.
+        self.assertIn("CpuPlusSettingsTimeActivePane {", CPU)
+        self.assertIn("TimeSettings.displayOffsetLabel", TIME_ACTIVE)
         self.assertIn("showClockPreview: false", CPU)
         self.assertIn("showTimezoneDetails: true", CPU)
         self.assertIn("showHostDiagnostics: false", CPU)

@@ -19,6 +19,7 @@ import qs.services.location
 import qs.services.time
 import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy
 import "services/favorites/FavoritesAppSelectionPolicy.js" as AppFavoriteSelection
+import "services/favorites/FavoritesSystemSelectionPolicy.js" as SystemFavoriteSelection
 import qs.services.notifications
 
 import QtQuick.Effects
@@ -239,6 +240,17 @@ PanelWindow {
         function onApolloNavigationRequested(destination) {
             shellRoot.openApolloNotificationRoute(destination);
         }
+    }
+
+    // U7b-D: SYSTEM view selection is fixed to a four-token allowlist. The
+    // AppControl owner independently rechecks its saved key and live metric.
+    function openApolloSavedSystemMetric(metric) {
+        if(!SystemFavoriteSelection.validMetric(metric))
+            return false;
+        if(!appControlWindow.selectSavedSystemMetric(metric))
+            return false;
+        shellRoot.requestControlKeyboard("appcontrol","favorites-system-metric");
+        return true;
     }
 
     // U7b-C: AppControl-specific desktop selection, never a generic executor.
@@ -1161,6 +1173,11 @@ PanelWindow {
                     // Only the AppControl owner can select its installed app;
                     // denied/stale favorites keep CPU++ open.
                     if(shellRoot.openApolloSavedApp(desktopId))
+                        cpuPlusWindow.close();
+                }
+                onFavoriteSystemSelectionRequested: function(metric) {
+                    // No sensor/device path or control action crosses shell.
+                    if(shellRoot.openApolloSavedSystemMetric(metric))
                         cpuPlusWindow.close();
                 }
                 onTelegramAccessRequested: {

@@ -16,6 +16,13 @@ Rectangle {
 
     // Optional WEATHER subject route. Empty keeps the exact CLASSIC page.
     property string subjectRoute: ""
+    // E5 compact visual treatment is strictly local to EARTH GROUND.
+    readonly property bool compactEarthAir: subjectRoute === "earth/ground/air-pollen"
+    readonly property bool compactEarthEnvironment: subjectRoute === "earth/ground/environment"
+    readonly property bool compactEarthGround: compactEarthAir || compactEarthEnvironment
+    readonly property real requiredContentHeight:
+        groundContent.y + groundContent.implicitHeight
+        + (compactEarthGround ? 4 : 12)
     signal routeRequested(string path)
     function sectionVisible(section) {
         return SubjectPanelPolicy.visibleFor("ground",subjectRoute,section);
@@ -721,18 +728,37 @@ Rectangle {
     // if the fixed-height window cannot contain everything at once.
     Flickable {
         id: groundScroll
+        objectName: "earth-e5-ground-viewport"
         anchors.fill: parent
         clip: true
+        interactive: !ground.compactEarthGround
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
+        // Preserve the full original Flickable extent contract for CLASSIC.
+        // E5 checks visible fit separately and disables compact interaction.
         contentHeight: Math.max(height, groundContent.y + groundContent.implicitHeight + 12)
 
         Column {
             id: groundContent
+            objectName: "earth-e5-ground-content"
             x: 20
             y: 12
             width: Math.max(0, groundScroll.width - 40)
             spacing: 10
+
+            // Preserve M8/M28 original GROUND geometry as the base state.
+            // The two E5 pages override it only while those routes are shown.
+            states: State {
+                name: "earth-e5-compact"
+                when: ground.compactEarthGround
+                PropertyChanges {
+                    target: groundContent
+                    x: 12
+                    y: 3
+                    width: Math.max(0, groundScroll.width - 24)
+                    spacing: ground.compactEarthEnvironment ? 2 : 3
+                }
+            }
 
             Row {
             visible: ground.sectionVisible("header")
@@ -784,7 +810,7 @@ Rectangle {
         Column {
             visible: ground.sectionVisible("alerts")
             width: parent.width
-            spacing: 8
+            spacing: ground.compactEarthEnvironment ? 3 : 8
 
             Row {
                 width: parent.width
@@ -851,13 +877,17 @@ Rectangle {
             }
 
             Repeater {
+                // Preserve the canonical full source model; E5 merely omits
+                // excess rows from the compact presentation.
                 model: ground.officialAlerts
 
                 delegate: Rectangle {
                     required property var modelData
+                    required property int index
+                    visible: !ground.compactEarthEnvironment || index < 2
 
                     width: groundContent.width
-                    height: 126
+                    height: ground.compactEarthEnvironment ? 54 : 126
                     color: Colors.dark
                     border.width: 1
                     border.color: modelData.listingState === "RECHECK PENDING"
@@ -866,8 +896,8 @@ Rectangle {
 
                     Column {
                         anchors.fill: parent
-                        anchors.margins: 9
-                        spacing: 4
+                        anchors.margins: ground.compactEarthEnvironment ? 5 : 9
+                        spacing: ground.compactEarthEnvironment ? 2 : 4
 
                         Row {
                             width: parent.width
@@ -911,6 +941,7 @@ Rectangle {
 
                         QuietText {
                             width: parent.width
+                            visible: !ground.compactEarthEnvironment
                             text: "AREA // " + (modelData.area || "NOT PROVIDED")
                                   + " // CERTAINTY "
                                   + String(modelData.certainty || "UNKNOWN").toUpperCase()
@@ -927,6 +958,7 @@ Rectangle {
 
                         QuietText {
                             width: parent.width
+                            visible: !ground.compactEarthEnvironment
                             text: "ISSUER // " + (modelData.issuer || "NWS")
                                   + " // OFFICIAL API PRODUCT, NOT FORECAST INFERENCE"
                             elide: Text.ElideRight
@@ -935,6 +967,15 @@ Rectangle {
                     }
                 }
             }
+        }
+
+        QuietText {
+            visible: ground.compactEarthEnvironment && ground.officialAlerts.length > 2
+            width: parent.width
+            text: "SHOWING 2 OF " + ground.officialAlerts.length
+                + " ALERTS // MORE: WEATHER / HAZARDS / ALERTS"
+            font.pixelSize: 10
+            color: Colors.yellow
         }
 
         StationSectionDivider {
@@ -2821,7 +2862,7 @@ Rectangle {
 
             Rectangle {
                 width: 360
-                height: 112
+                height: ground.compactEarthEnvironment ? 82 : 112
                 color: Colors.dark
                 border.width: 1
                 border.color: ground.heatBandColor(
@@ -2830,8 +2871,8 @@ Rectangle {
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 9
-                    spacing: 5
+                    anchors.margins: ground.compactEarthEnvironment ? 5 : 9
+                    spacing: ground.compactEarthEnvironment ? 2 : 5
 
                     SecondaryText {
                         text: "NWS HEAT INDEX // SHADE"
@@ -2888,7 +2929,7 @@ Rectangle {
 
             Rectangle {
                 width: Math.max(0, parent.width - 372)
-                height: 112
+                height: ground.compactEarthEnvironment ? 82 : 112
                 color: Colors.dark
                 border.width: 1
                 border.color: ground.fireWeatherAlertRows.length > 0
@@ -2896,8 +2937,8 @@ Rectangle {
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 9
-                    spacing: 5
+                    anchors.margins: ground.compactEarthEnvironment ? 5 : 9
+                    spacing: ground.compactEarthEnvironment ? 2 : 5
 
                     SecondaryText {
                         text: "FIRE WEATHER // OFFICIAL + LOCAL OBS"
@@ -2954,15 +2995,17 @@ Rectangle {
 
                 delegate: Rectangle {
                     required property var modelData
+                    required property int index
+                    visible: !ground.compactEarthEnvironment || index === 0
                     width: parent.width
-                    height: 58
+                    height: ground.compactEarthEnvironment ? 40 : 58
                     color: Colors.dark
                     border.width: 1
                     border.color: Colors.red
 
                     Column {
                         anchors.fill: parent
-                        anchors.margins: 7
+                        anchors.margins: ground.compactEarthEnvironment ? 4 : 7
                         spacing: 3
 
                         GohuText {
@@ -3006,20 +3049,33 @@ Rectangle {
         Row {
             visible: ground.sectionVisible("air-pm")
             width: parent.width
-            spacing: 14
+            spacing: ground.compactEarthAir ? 8 : 14
 
             Rectangle {
                 id: airQualityInstrument
                 width: 248
                 height: 166
                 color: Colors.dark
+                // Keep the original full-size instrument canonical.
+                states: State {
+                    name: "earth-e5-compact-aqi"
+                    when: ground.compactEarthAir
+                    PropertyChanges {
+                        target: airQualityInstrument
+                        height: 106
+                    }
+                    PropertyChanges {
+                        target: aqiReadingText
+                        font.pixelSize: 50
+                    }
+                }
                 border.width: 1
                 border.color: Colors.cyan
 
                 SecondaryText {
                     anchors.top: parent.top
                     anchors.left: parent.left
-                    anchors.margins: 12
+                    anchors.margins: ground.compactEarthAir ? 7 : 12
                     text: "U.S. AIR QUALITY INDEX"
                     font.pixelSize: 11
                 }
@@ -3042,7 +3098,7 @@ Rectangle {
                     id: aqiReadingText
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top: parent.top
-                    anchors.topMargin: 29
+                    anchors.topMargin: ground.compactEarthAir ? 19 : 29
                     text: ground.aqiReady ? String(weatherService.aqi) : "--"
                     font.pixelSize: 68
                     color: ground.aqiColor
@@ -3051,7 +3107,7 @@ Rectangle {
                 GohuText {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: aqiTrack.top
-                    anchors.bottomMargin: 9
+                    anchors.bottomMargin: ground.compactEarthAir ? 3 : 9
                     text: ground.aqiReady ? weatherService.aqiLabel : "OFFLINE"
                     font.pixelSize: 12
                     color: ground.aqiColor
@@ -3062,8 +3118,8 @@ Rectangle {
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
-                    anchors.margins: 12
-                    height: 9
+                    anchors.margins: ground.compactEarthAir ? 7 : 12
+                    height: ground.compactEarthAir ? 6 : 9
                     color: Colors.black
                     border.width: 1
                     border.color: ground.meterBorderColor
@@ -3080,7 +3136,7 @@ Rectangle {
 
             Column {
                 width: 158
-                spacing: 10
+                spacing: ground.compactEarthAir ? 5 : 10
 
                 SecondaryText {
                     text: "PM2.5 // FINE"
@@ -3117,7 +3173,7 @@ Rectangle {
 
             Column {
                 width: 158
-                spacing: 10
+                spacing: ground.compactEarthAir ? 5 : 10
 
                 SecondaryText {
                     text: "PM10 // COARSE"
@@ -3191,11 +3247,11 @@ Rectangle {
 
         Row {
             visible: ground.sectionVisible("air-gases")
-            spacing: 14
+            spacing: ground.compactEarthAir ? 10 : 14
 
             Column {
                 width: 135
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "OZONE"
@@ -3229,7 +3285,7 @@ Rectangle {
 
             Column {
                 width: 135
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "NO₂"
@@ -3263,7 +3319,7 @@ Rectangle {
 
             Column {
                 width: 150
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "CO"
@@ -3297,7 +3353,7 @@ Rectangle {
 
             Column {
                 width: 135
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "DUST"
@@ -3315,7 +3371,7 @@ Rectangle {
 
             Column {
                 width: 170
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "POLLEN // PEAK"
@@ -3357,7 +3413,7 @@ Rectangle {
                 delegate: Column {
                     required property var modelData
                     width: (groundContent.width - 5 * 8) / 6
-                    spacing: 5
+                    spacing: ground.compactEarthAir ? 2 : 5
 
                     SecondaryText {
                         text: modelData.name
@@ -3393,7 +3449,7 @@ Rectangle {
         Column {
             visible: ground.sectionVisible("air-forecast")
             width: parent.width
-            spacing: 4
+            spacing: ground.compactEarthAir ? 2 : 4
 
             Row {
                 width: parent.width
@@ -3406,7 +3462,7 @@ Rectangle {
                     delegate: Column {
                         required property var modelData
                         width: 116
-                        spacing: 4
+                        spacing: ground.compactEarthAir ? 2 : 4
 
                         SecondaryText {
                             width: parent.width
@@ -3420,14 +3476,14 @@ Rectangle {
                             horizontalAlignment: Text.AlignHCenter
                             text: modelData.aqi >= 0
                                   ? Math.round(modelData.aqi) + " AQI" : "-- AQI"
-                            font.pixelSize: 22
+                            font.pixelSize: ground.compactEarthAir ? 18 : 22
                             color: ground.aqiSeverityColor(modelData.aqi)
                         }
 
                         Rectangle {
                             width: parent.width - 12
                             anchors.horizontalCenter: parent.horizontalCenter
-                            height: 7
+                            height: ground.compactEarthAir ? 5 : 7
                             color: Colors.black
                             border.width: 1
                             border.color: ground.meterBorderColor
@@ -3515,15 +3571,15 @@ Rectangle {
                         required property var modelData
                         width: Math.max(0, (seismicEventRow.width
                                             - 2 * seismicEventRow.spacing) / 3)
-                        height: 112
+                        height: ground.compactEarthEnvironment ? 78 : 112
                         color: Colors.dark
                         border.width: 1
                         border.color: Colors.cyan
 
                         Column {
                             anchors.fill: parent
-                            anchors.margins: 8
-                            spacing: 4
+                            anchors.margins: ground.compactEarthEnvironment ? 5 : 8
+                            spacing: ground.compactEarthEnvironment ? 2 : 4
 
                             Row {
                                 width: parent.width
@@ -3531,7 +3587,7 @@ Rectangle {
 
                                 GohuText {
                                     text: "M " + modelData.magnitude.toFixed(1)
-                                    font.pixelSize: 23
+                                    font.pixelSize: ground.compactEarthEnvironment ? 20 : 23
                                     color: Colors.green
                                 }
 
@@ -3602,7 +3658,7 @@ Rectangle {
 
             Column {
                 width: 248
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "POSITION // WEATHER FIX"
@@ -3621,7 +3677,7 @@ Rectangle {
 
             Column {
                 width: Math.max(0, parent.width - 270)
-                spacing: 5
+                spacing: ground.compactEarthAir ? 2 : 5
 
                 SecondaryText {
                     text: "AIR QUALITY // SAMPLE"
@@ -3640,9 +3696,19 @@ Rectangle {
     }
 
     NeonScrollBar {
+        id: groundScrollBar
         flickable: groundScroll
         handleStyle: "star"
         geometryHost: ground
         visible: scrollable
+    }
+
+    // E5 hides only the compact EARTH bar, restoring the original
+    // component-owned visibility binding on every other route.
+    Binding {
+        target: groundScrollBar
+        property: "visible"
+        value: false
+        when: ground.compactEarthGround
     }
 }

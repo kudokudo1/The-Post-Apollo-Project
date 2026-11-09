@@ -210,7 +210,7 @@ ShellRoot {
                 if(!p.selectedSource || p.selectedSource.id!=="gdacs")
                     return root.fail("SOURCE_SELECTION_LOST");
                 root.done=true;
-                console.log("E2_NATIVE_PASS // PINNED_SINGLE_MAP_SCROLL_FILTERS_E3_CONTROLS_SERVICES");
+                console.log("E2_NATIVE_PASS // PINNED_SINGLE_MAP_SCROLL_FILTERS_SERVICES // E3_FIXED_CONTROLS");
                 Qt.quit();
             }
         }

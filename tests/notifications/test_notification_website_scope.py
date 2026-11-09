@@ -46,6 +46,7 @@ vm.runInNewContext(['token','hostnameFor'].map(n=>extract(identity,n)).join('\n'
 const S = {
   String, Number, Math, encodeURIComponent, Date: Clock,
   BrowserSiteIdentity: {hostnameFor: Site.hostnameFor},
+  NotificationScopePolicy: {scopeOptionsFor: () => []},
   sourcePolicies: new Model(),
   activeNotifications: new Model(),
   defaultSnoozeDurationMs: 86400000,
@@ -54,7 +55,7 @@ const S = {
   schedulePolicySave() {}
 };
 const functions = [
-  'sourceKey', 'websiteKey', 'policyIndex', 'policyFor',
+  'sourceKey', 'websiteKey', 'scopeOptionsFor', 'policyIndex', 'policyFor',
   'isDnd', 'isSnoozed', 'shouldSuppress', 'ensurePolicy',
   'markPoliciesChanged', 'suppressActiveForKey', 'compactPolicy',
   'setDnd', 'toggleDnd', 'snoozeApp', 'clearSnooze', 'policyDocument'

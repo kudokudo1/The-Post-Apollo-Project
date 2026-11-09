@@ -10,6 +10,7 @@ import qs.services.time
 import qs.services.favorites
 import qs.services.notifications
 import "../services/favorites/FavoritesManagementPolicy.js" as FavoritesManagement
+import "../services/favorites/FavoritesInternetStatusPolicy.js" as InternetStatusPolicy
 import qs.services.social
 import "thermal"
 
@@ -31,6 +32,22 @@ PanelWindow {
     // U7b-E: short opaque thermal selector, never hardware/process action.
     signal favoriteThermalSelectionRequested(string token)
     property var telegramConnectionObservation: null
+    // U8d // Read-only status from the EXISTING Network dock probe.
+    property var internetHealthObservation: null
+    property double internetStatusClockMs: Date.now()
+    readonly property var internetStatus:
+        InternetStatusPolicy.plan(internetHealthObservation,internetStatusClockMs)
+    readonly property color internetStatusColor:
+        internetStatus.code==="online" ? Colors.omnitrix
+        : internetStatus.code==="offline" ? Colors.red
+        : internetStatus.code==="limited" ? Colors.orange : Colors.cyan
+    // Age-check only: no extra network requests, subprocesses or probes.
+    Timer {
+        interval: 60000
+        repeat: true
+        running: cpuPlusWindow.menuOpen
+        onTriggered: cpuPlusWindow.internetStatusClockMs=Date.now()
+    }
     property var appControlWindow
     required property var systemTelemetry
     required property var fanControl
@@ -958,20 +975,83 @@ PanelWindow {
 
         */
 
+        // U8d // The badge and X share one top header band. Neither overlaps
+        // the cyan divider, and the close control uses normal red rules.
         ActionButton {
             id: cpuPlusCloseButton
             anchors.top: parent.top
             anchors.right: parent.right
             anchors.topMargin: 5
-            anchors.rightMargin: 8
+            anchors.rightMargin: 12
             z: 8
-            width: 28
-            height: 27
+            width: 27
+            height: 22
             label: "✕"
             labelPixelSize: 15
+            contentPadding: 4
             accentColor: Colors.red
             destructive: true
+            idleFillColor: Colors.black
+            hoverFillColor: Colors.red
+            pressedFillColor: Colors.red
+            hoverForegroundColor: Colors.black
+            pressedForegroundColor: Colors.black
+            hoverBorderColor: Colors.red
+            pressedBorderColor: Colors.red
+            idleContentGlowColor: Colors.red
+            hoverContentGlowColor: Colors.red
+            pressedContentGlowColor: Colors.red
+            contentGlowPressedOpacity: 0.72
+            softGlowEnabled: true
+            idleSoftGlowColor: Colors.red
+            hoverSoftGlowColor: Colors.red
+            pressedSoftGlowColor: Colors.red
+            softGlowIdleOpacity: 0.48
+            softGlowHoverOpacity: 0.70
+            softGlowPressedOpacity: 0.70
             onLeftClicked: cpuPlusWindow.close()
+        }
+
+        Rectangle {
+            id: cpuPlusInternetIndicator
+            anchors.top: cpuPlusCloseButton.top
+            anchors.right: cpuPlusCloseButton.left
+            anchors.rightMargin: 8
+            width: 156
+            height: cpuPlusCloseButton.height
+            color: Colors.black
+            border.width: 1
+            border.color: cpuPlusWindow.internetStatusColor
+            RectangularShadow {
+                anchors.fill: parent
+                z: -1
+                spread: 3
+                opacity: cpuPlusWindow.menuOpen ? 0.46 : 0
+                color: cpuPlusWindow.internetStatusColor
+            }
+            GohuText {
+                id: cpuPlusInternetText
+                anchors.centerIn: parent
+                width: parent.width-8
+                horizontalAlignment: Text.AlignHCenter
+                text: "LIVE // NET // "+cpuPlusWindow.internetStatus.label
+                textFormat: Text.PlainText
+                font.pixelSize: 9
+                elide: Text.ElideRight
+                color: cpuPlusWindow.internetStatusColor
+            }
+            SafeDropShadow {
+                anchors.fill: cpuPlusInternetText
+                safeSource: cpuPlusInternetText
+                requestedVisible: cpuPlusWindow.menuOpen
+                horizontalOffset: 0
+                verticalOffset: 0
+                radius: 6
+                samples: 9
+                opacity: 0.72
+                color: cpuPlusWindow.internetStatusColor
+                transparentBorder: true
+            }
         }
 
         Rectangle {
@@ -983,7 +1063,7 @@ PanelWindow {
 
             anchors.leftMargin: 10
             anchors.rightMargin: 10
-            anchors.topMargin: 5
+            anchors.topMargin: 12
 
             height: 2
 

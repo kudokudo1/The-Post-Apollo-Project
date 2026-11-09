@@ -734,7 +734,9 @@ Rectangle {
         interactive: !ground.compactEarthGround
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
-        contentHeight: Math.max(height, ground.requiredContentHeight)
+        // Preserve the full original Flickable extent contract for CLASSIC.
+        // E5 checks visible fit separately and disables compact interaction.
+        contentHeight: Math.max(height, groundContent.y + groundContent.implicitHeight + 12)
 
         Column {
             id: groundContent
@@ -742,7 +744,8 @@ Rectangle {
             x: ground.compactEarthGround ? 12 : 20
             y: ground.compactEarthGround ? 3 : 12
             width: Math.max(0, groundScroll.width - (ground.compactEarthGround ? 24 : 40))
-            spacing: ground.compactEarthGround ? 3 : 10
+            spacing: ground.compactEarthEnvironment ? 2
+                : ground.compactEarthAir ? 3 : 10
 
             Row {
             visible: ground.sectionVisible("header")
@@ -861,11 +864,14 @@ Rectangle {
             }
 
             Repeater {
-                model: ground.compactEarthEnvironment
-                    ? ground.officialAlerts.slice(0, 2) : ground.officialAlerts
+                // Preserve the canonical full source model; E5 merely omits
+                // excess rows from the compact presentation.
+                model: ground.officialAlerts
 
                 delegate: Rectangle {
                     required property var modelData
+                    required property int index
+                    visible: !ground.compactEarthEnvironment || index < 2
 
                     width: groundContent.width
                     height: ground.compactEarthEnvironment ? 54 : 126

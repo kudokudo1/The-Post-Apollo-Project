@@ -4305,14 +4305,74 @@ PanelWindow {
                                 id: huntSettingsOverlay
                                 anchors.fill: parent
                                 z: 200
-                                visible: camera.huntSettingsOpen
+                                visible: camera.huntPauseMenuOpen
                                 color: Colors.black
                                 border.width: 1
                                 border.color: Colors.magenta
                                 radius: 5
 
+                                Column {
+                                    id: huntPauseContents
+                                    anchors.fill: parent
+                                    anchors.margins: 10
+                                    spacing: 10
+                                    visible: !camera.huntSettingsOpen
+                                    GohuText {
+                                        width: parent.width
+                                        height: 26
+                                        font.pixelSize: 15
+                                        color: Colors.magenta
+                                        text: "HUNT // PAUSED"
+                                    }
+                                    GohuText {
+                                        width: parent.width
+                                        height: 46
+                                        wrapMode: Text.WordWrap
+                                        font.pixelSize: 10
+                                        color: Colors.cyan
+                                        text: "ROUND " + camera.huntRound
+                                              + " // SCORE " + camera.huntScore
+                                              + " // " + camera.batchPaths.length
+                                              + " FILES IN REVIEW QUEUE"
+                                    }
+                                    ActionButton {
+                                        width: parent.width
+                                        height: 36
+                                        label: camera.huntTargets.length === 0
+                                               ? "RETURN TO ARENA" : "RESUME HUNT"
+                                        labelPixelSize: 11
+                                        accentColor: Colors.cyan
+                                        onLeftClicked: camera.huntTogglePause()
+                                    }
+                                    ActionButton {
+                                        width: parent.width
+                                        height: 36
+                                        label: "SETTINGS"
+                                        labelPixelSize: 11
+                                        accentColor: Colors.yellow
+                                        onLeftClicked: camera.huntToggleSettings()
+                                    }
+                                    ActionButton {
+                                        width: parent.width
+                                        height: 36
+                                        label: "RESTART GAME // ROUND 1"
+                                        labelPixelSize: 10
+                                        accentColor: Colors.magenta
+                                        onLeftClicked: camera.huntRestartGame()
+                                    }
+                                    GohuText {
+                                        width: parent.width
+                                        height: 40
+                                        wrapMode: Text.WordWrap
+                                        font.pixelSize: 10
+                                        color: Colors.yellow
+                                        text: "RESTART RESETS ROUNDS AND SCORE. YOUR TRASH REVIEW QUEUE IS PRESERVED."
+                                    }
+                                }
+
                                 Flickable {
                                     id: huntSettingsScroll
+                                    visible: camera.huntSettingsOpen
                                     anchors.fill: parent
                                     anchors.margins: 8
                                     clip: true
@@ -4349,6 +4409,14 @@ PanelWindow {
                                             accentColor: Colors.yellow
                                             onLeftClicked: camera.huntSetAutoRounds(
                                                                !camera.huntAutoRounds)
+                                        }
+                                        ActionButton {
+                                            width: parent.width
+                                            height: 32
+                                            label: "RESET DEFAULTS // SETTINGS"
+                                            labelPixelSize: 10
+                                            accentColor: Colors.orange
+                                            onLeftClicked: camera.huntResetDefaults()
                                         }
                                         Repeater {
                                             model: [
@@ -4432,7 +4500,7 @@ PanelWindow {
                                         ActionButton {
                                             width: parent.width
                                             height: 34
-                                            label: "CLOSE SETTINGS"
+                                            label: "BACK TO PAUSE"
                                             labelPixelSize: 11
                                             accentColor: Colors.magenta
                                             onLeftClicked: camera.huntToggleSettings()
@@ -4443,7 +4511,7 @@ PanelWindow {
                                             wrapMode: Text.WordWrap
                                             font.pixelSize: 9
                                             color: Colors.yellow
-                                            text: "CHANGES APPLY TO NEXT ROUND. OPENING SETTINGS PAUSES THE CURRENT ROUND."
+                                            text: "DEFAULTS: 3 TARGETS, +1 EVERY 5, +10% SPEED EVERY 5. CHANGES APPLY NEXT ROUND."
                                         }
                                     }
                                 }

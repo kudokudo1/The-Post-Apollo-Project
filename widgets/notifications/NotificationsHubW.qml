@@ -884,7 +884,8 @@ PanelWindow {
         const labels = {
             "app": "APP", "website": "SITE", "title": "TITLE",
             "sender": "SENDER", "conversation": "DM",
-            "server": "SERVER", "channel": "CHAN", "event": "EVENT"
+            "server": "SERVER", "channel": "CHAN", "event": "EVENT",
+            "resource": "RSRC", "resourceEvent": "R+E"
         };
         return labels[String(kind || "")] || "APP";
     }
@@ -1130,6 +1131,9 @@ PanelWindow {
                     // no QML callback or native action enters the model.
                     "scopeInfoJson": JSON.stringify((entry.context || {}).notificationScope || {}),
                     "eventType": String((entry.context || {}).eventType || ""),
+                    "resourceId": String((entry.context || {}).resourceId || ""),
+                    "resourceLabel": String((entry.context || {}).resourceLabel || ""),
+                    "legacyMetric": String((entry.context || {}).metric || ""),
                     "category": String(entry.category || "generic"),
                     "severity": String(entry.severity || "normal"),
                     "createdAt": Number(entry.createdAt || 0),
@@ -3062,6 +3066,9 @@ PanelWindow {
                         required property string websiteIcon
                         required property string scopeInfoJson
                         required property string eventType
+                        required property string resourceId
+                        required property string resourceLabel
+                        required property string legacyMetric
                         required property string category
                         required property string severity
                         required property double createdAt
@@ -3089,7 +3096,10 @@ PanelWindow {
                             originalTitle: notificationEntry.originalTitle,
                             context: {
                                 notificationScope: JSON.parse(notificationEntry.scopeInfoJson || "{}"),
-                                eventType: notificationEntry.eventType
+                                eventType: notificationEntry.eventType,
+                                resourceId: notificationEntry.resourceId,
+                                resourceLabel: notificationEntry.resourceLabel,
+                                metric: notificationEntry.legacyMetric
                             }
                         })
                         readonly property var scopeOptions:
@@ -3126,13 +3136,9 @@ PanelWindow {
                             ? NotificationsService.inheritedPolicyOwnerKey(scopeEntry, targetKey) : ""
                         readonly property bool inheritedRule: inheritedPolicyKey !== ""
                         readonly property bool snoozed: NotificationsService.policyRevision >= 0
-                            && (NotificationsService.isSnoozed(targetKey)
-                                || (targetingWebsite && NotificationsService.isSnoozed(appKey))
-                                || (!targetWholeApp && NotificationsService.isSnoozed(appKey)))
+                            && NotificationsService.isSnoozedForNotification(scopeEntry)
                         readonly property bool dnd: NotificationsService.policyRevision >= 0
-                            && (NotificationsService.isDnd(targetKey)
-                                || (targetingWebsite && NotificationsService.isDnd(appKey))
-                                || (!targetWholeApp && NotificationsService.isDnd(appKey)))
+                            && NotificationsService.isDndForNotification(scopeEntry)
                         readonly property string inheritedBlockKey:
                             NotificationsService.policyRevision >= 0
                             ? NotificationsService.inheritedBlockOwnerKey(scopeEntry, targetKey) : ""
@@ -3495,7 +3501,7 @@ PanelWindow {
                             //
                             // The footer cycles exact rule targets: APP,
                             // SITE, declared sender/server/DM/channel/event,
-                            // or explicitly labeled literal TITLE matching.
+                            // RESOURCE, RESOURCE+EVENT, or literal TITLE matching.
                             // FAVS and BLOCK follow the selected scope.
                             // BLOCK rejects future matching intake BEFORE
                             // history; CLEAR ALL still removes existing

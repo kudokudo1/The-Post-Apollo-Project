@@ -365,10 +365,10 @@ class C4bContracts(unittest.TestCase):
         self.assertLess(
             script.index('SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED'),
             script.index('stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN'))
-        begin = "import grp, hashlib, json, os, pwd, re, stat, subprocess, sys\\n"
+        begin = "import grp, hashlib, json, os, pwd, re, stat, subprocess, sys\n"
         self.assertEqual(script.count(begin), 1)
         python_body = begin + script.split(begin, 1)[1].split(
-            "\\nC4B_RUNNING_HOST_PROBE", 1)[0]
+            "\nC4B_RUNNING_HOST_PROBE", 1)[0]
         ast.parse(python_body)
         for needle in (
             '"/run/ostree-booted"', '"MainPID", UNIT',
@@ -377,7 +377,7 @@ class C4bContracts(unittest.TestCase):
             '"/proc/{pid}/cmdline"', '"/proc/{pid}/attr/current"',
             '"/proc/{pid}/status"', '"NoNewPrivs:"',
             '"--checksig", "-v", rpm',
-            '"[%{FILENAMES}\\t%{FILEDIGESTS}\\n]"',
+            '"[%{FILENAMES}\t%{FILEDIGESTS}\n]"',
             '"--read-only"', 'os.O_NOFOLLOW',
             'signedGuestOriginAuthenticated=False',
             'evidenceCryptographicallyAttested=False',

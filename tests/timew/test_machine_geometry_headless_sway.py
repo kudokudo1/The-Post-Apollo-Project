@@ -182,6 +182,9 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             matches = [x for x in rows if x["app_id"] in APP_IDS]
             return matches if len(matches) == 3 else None
         wait_for(three_windows, label="three real test windows")
+        # Foot clients can inherit whichever output was last focused by the
+        # isolated compositor. Place the fixture explicitly before asserting.
+        command('[app_id="' + APP + '"] move container to workspace 1')
         command('[app_id="' + FLOAT + '"] floating enable')
         command('[app_id="' + FLOAT + '"] move container to workspace 2')
         command('[app_id="' + FLOAT + '"] resize set width 440 px height 300 px')
@@ -192,7 +195,19 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             lone = [x for x in rows if x["app_id"] == FLOAT and x["workspace"] == "2"]
             active_outputs = [x for x in get("get_outputs") if x.get("active")]
             return len(paired) == 2 and len(lone) == 1 and len(active_outputs) == 2
-        wait_for(placements_ready, label="split and floating workspace placements")
+        try:
+            wait_for(placements_ready, label="split and floating workspace placements")
+        except AssertionError:
+            # Print only synthetic app/workspace summaries, never raw tree or
+            # arbitrary foot titles. Useful when a Sway version differs.
+            rows = _walk_live(get("get_tree"))
+            summary = [(x["app_id"], x["workspace"], x["floating"])
+                       for x in rows if x["app_id"] in APP_IDS]
+            print("HEADLESS PLACEMENT SUMMARY:", summary, flush=True)
+            print("HEADLESS WORKSPACES:", [
+                (x["name"], x["output"]) for x in get("get_workspaces")
+                if x["name"] in ("1", "2")], flush=True)
+            raise
 
         live_outputs = get("get_outputs")
         live_workspaces = get("get_workspaces")

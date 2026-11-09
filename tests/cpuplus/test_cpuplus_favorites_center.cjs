@@ -1661,3 +1661,50 @@ test("U8a two-click red left collection delete invokes store only on confirmatio
   // Collection deletion is only a grouping writer, not the original owner.
   assert.doesNotMatch(action,/setFavorite|execDetached|deleteFile|killProcess/);
 });
+
+
+test("U8b main Favorites filters are compact, icon-only and accessible by source name",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const index=pane.indexOf("id: categoryFilterFlow");
+  const bottom=pane.indexOf("id: subfilterScroll");
+  assert.ok(index>=0 && bottom>index);
+  const main=pane.slice(index,bottom);
+  assert.match(main,/width: 38/);
+  assert.match(main,/height: 30/);
+  assert.match(main,/label: Dossier\.mainIcon\(modelData\)/);
+  assert.doesNotMatch(main,/label: Dossier\.mainIcon\(modelData\)\s*\+/);
+  assert.match(main,/labelPixelSize: 18/);
+  assert.match(main,/Accessible\.role: Accessible\.Button/);
+  assert.match(main,/Accessible\.name: modelData\+" favorites filter"/);
+  assert.match(main,/onLeftClicked: pane\.filterMode=modelData/);
+  // Two rows at current 260px width; responsive Flow can grow at narrower sizes.
+  const columns=Math.max(1,Math.floor((260+4)/(38+4)));
+  assert.equal(columns,6);
+  assert.equal(Math.ceil(11/columns)*(30+4)-4,64);
+  assert.match(pane,/selector\.height-categoryFilterFlow\.height-121/);
+  // The bottom row retains readable text subfilters.
+  assert.match(main,/\/\/ Secondary source\/menu filters remain pinned/);
+  assert.match(pane,/id: subfilterButtons[\s\S]*?label: modelData/);
+});
+
+test("U8b category icons take verified module colors; Notifications and Time remain white",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const main=pane.slice(pane.indexOf("id: categoryFilterFlow"),
+                        pane.indexOf("id: menuFilterPrev"));
+  assert.match(main,/modelData==="WEATHER" \? Colors\.yellow/);
+  assert.match(main,/modelData==="HOSPITAL" \? Colors\.magenta/);
+  assert.match(main,/modelData==="NOTIFS" \|\| modelData==="CLOCK"/);
+  assert.match(main,/whiteModule \? Colors\.white : Colors\.cyan/);
+  assert.match(main,/accentColor: moduleAccent/);
+  for(const state of [
+    "hoverForegroundColor","pressedForegroundColor",
+    "selectedForegroundColor","selectedFillColor","selectedBorderColor",
+    "selectedContentGlowColor","selectedSoftGlowColor"
+  ]) assert.match(main,new RegExp(state+":\\s*whiteModule \\? Colors\\."));
+  assert.match(main,/selectedFillColor:\s*whiteModule \? Colors\.dark : Colors\.yellow/);
+  assert.match(main,/selectedBorderWidth: 2/);
+  assert.match(read("modules/Weather.qml"),/openFillColor: Colors\.yellow/);
+  assert.match(read("modules/Hospital.qml"),/normalContentGlowColor: Colors\.magenta/);
+  assert.match(read("modules/NotificationsHub.qml"),/normalForegroundColor: Colors\.white/);
+  assert.match(read("modules/Clock.qml"),/Colors\.white/);
+});

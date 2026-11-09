@@ -44,12 +44,16 @@ def _walk_live(tree):
         app = node.get("app_id")
         if app is None and isinstance(node.get("window_properties"), dict):
             app = node["window_properties"].get("class")
-        if kind == "con" and isinstance(app, str) and app and workspace is not None:
+        # Native headless Sway emits the floating leaf itself as
+        # floating_con. Never drop these windows from live matching.
+        if (kind in ("con", "floating_con") and isinstance(app, str)
+                and app and workspace is not None):
             container_id = node.get("id")
             # Invalid/absent live IDs are not silently paired with a saved window.
             windows.append({
                 "app_id": app, "workspace": workspace,
-                "floating": floating or node.get("floating") in ("user_on", "auto_on"),
+                "floating": floating or kind == "floating_con"
+                or node.get("floating") in ("user_on", "auto_on"),
                 "con_id": container_id if _id(container_id) else None,
                 "fullscreen": node.get("fullscreen_mode", 0) not in (0, None)
             })

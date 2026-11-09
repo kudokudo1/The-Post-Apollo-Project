@@ -64,11 +64,11 @@ test("C42 exposes exactly eleven actual NOAA runtime rows with correct freshness
  const now=Date.UTC(2026,10,9,8,30);
  const sample=ctx.displayRow("space-kp",{
     active:true,ready:true,loading:false,errorText:"",
-    receivedAt:new Date(now-8*60000),
-    observedAt:new Date(now-11*60000),usingCache:false
+    receivedAt:new Date(now-12*60000),
+    observedAt:new Date(now-13*60000),usingCache:false
  },now);
- assert.match(ctx.rowAgeLabel(sample),/RX 8m/);
- assert.match(ctx.rowAgeLabel(sample),/OBS 11m/);
+ assert.match(ctx.rowAgeLabel(sample),/RX 12m/);
+ assert.match(ctx.rowAgeLabel(sample),/OBS 13m/);
  assert.equal(ctx.cadenceLabel(sample),"5m");
  assert.equal(ctx.rowStateLabel(sample),"LIVE // AGING");
  assert.equal(ctx.statusToken(sample),"yellow");

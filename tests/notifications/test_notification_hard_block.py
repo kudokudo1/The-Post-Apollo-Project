@@ -77,7 +77,7 @@ vm.runInNewContext([
  'isBlocked','shouldBlockNotification','inheritedBlockOwnerKey',
  'shouldSuppress','shouldSuppressScoped',
  'ensurePolicy','markPoliciesChanged','suppressActiveForKey',
- 'compactPolicy','setBlocked','toggleBlocked','policyDocument','loadPolicies',
+ 'compactPolicy','setBlocked','toggleBlocked','expireSnoozes','policyDocument','loadPolicies',
  'indexOfNotification','replaceModelEntry','updateModelNotification',
  'appendNotification','updateNotification','reconcilePendingPolicyDeliveries'
 ].map(n=>extract(source,n)).join('\n'),S);
@@ -135,6 +135,13 @@ assert.strictEqual(S.shouldBlockNotification(dmFriend),false);
 assert.strictEqual(S.appendNotification(dmMom),false);
 assert.notStrictEqual(S.appendNotification(dmFriend),false);
 assert.strictEqual(S.notifications.count,3);
+
+// Expiring a timed ZZ must not garbage-collect an independent BLOCK.
+const momIndex=S.policyIndex(momKey);
+S.sourcePolicies.setProperty(momIndex,'snoozeUntil',now-1);
+S.expireSnoozes();
+assert.strictEqual(S.isBlocked(momKey),true);
+assert.strictEqual(S.policyFor(momKey).snoozeUntil,0);
 
 // Old raw policies lacking BLOCK must still restore normally.
 const doc=S.policyDocument();

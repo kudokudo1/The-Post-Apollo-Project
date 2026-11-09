@@ -2991,10 +2991,12 @@ Rectangle {
             visible: ground.sectionVisible("heat-fire") && (ground.fireWeatherAlertRows.length > 0)
 
             Repeater {
-                model: ground.fireWeatherAlertRows.slice(0, ground.compactEarthEnvironment ? 1 : 3)
+                model: ground.fireWeatherAlertRows.slice(0, 3)
 
                 delegate: Rectangle {
                     required property var modelData
+                    required property int index
+                    visible: !ground.compactEarthEnvironment || index === 0
                     width: parent.width
                     height: ground.compactEarthEnvironment ? 40 : 58
                     color: Colors.dark

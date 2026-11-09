@@ -97,8 +97,9 @@ check('onRoomIdChanged:' in view
       and 'successorProviderId = ""' in view,
       "Room switch must discard old proposed successor")
 check('onOverviewChanged: prepared = false' in view
-      and 'onSessionsChanged: prepared = false' in view,
-      "A saved preview must be invalidated if work or Session evidence changes")
+      and 'onSessionsChanged: {' in view
+      and 'previousSessionId = ""' in view,
+      "A saved preview and selected predecessor must reset on changed Session evidence")
 check('label: "PREPARE HANDOFF BRIEF // NO WRITES"' in view,
       "Operator can explicitly inspect briefing without executing it")
 check('enabledAction: root.plan.contextAvailable' in view
@@ -109,6 +110,27 @@ check('onReturnRequested: root.recoveryOpen = false' in room,
 check('No PX transfer, Session mutation' in view
       and 'TRANSFER NOT AUTHORIZED' in view,
       "Claims remain accurate")
+check('function successionContract(a)' in policy
+      and 'sameRoom.length > 1 && !selectedPreviousId' in policy
+      and 'select the exact predecessor for PX latest-order verification' in policy
+      and 'Selected predecessor Session is not in this Room registry' in policy
+      and 'mutationAuthorized: false' in policy,
+      "Read-only predecessor contract must require explicit selection and PX latest-order verification")
+check('readonly property var transfer: SuccessorPolicy.successionContract' in view
+      and 'PREDECESSOR SESSION //' in view
+      and 'SUCCESSION HOLD //' in view,
+      "Recovery UI must show pinned previous Session and failed release prerequisites")
+check('NO REPLACEMENT BUTTON YET' in view
+      and 'PX authority and atomic revalidation remain mandatory' in view,
+      "No direct Doctor transfer without authenticated PX authority")
+check('readonly property var predecessorSessions:' in view
+      and 'root.predecessorSessions.length > 1' in view
+      and 'onClicked: root.previousSessionId' in view
+      and 'predecessorPage' in view,
+      "Allow explicit history selection only when several prior Sessions exist")
+check('previousSessionId: root.previousSessionId' in view
+      and 'PX WILL VERIFY LATEST' in view,
+      "Pass selected predecessor only to the read-only backend-check contract")
 for forbidden in ('Process {', 'session-put', 'room-bind', 'session-create',
                   'assignment-activate', 'doctor-put', 'agent turn',
                   'quick("GO")', 'pxArgs('):

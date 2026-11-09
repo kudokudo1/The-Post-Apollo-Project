@@ -24,7 +24,13 @@ Item {
     property string successorProviderId: ""
     property int doctorPage: 0
     property int providerPage: 0
+    property int predecessorPage: 0
+    property string previousSessionId: ""
     readonly property int pageSize: 8
+    readonly property var predecessorSessions: (Array.isArray(root.sessions)
+        ? root.sessions : []).filter(function(s) {
+            return String((s || {}).roomId || "") === root.roomId;
+        })
     property bool prepared: false
     readonly property var plan: SuccessorPolicy.preview({
         roomId: root.roomId,
@@ -37,6 +43,13 @@ Item {
         roomsLoaded: root.roomsLoaded, sessionsLoaded: root.sessionsLoaded,
         sourceError: root.sourceError,
         doctorId: root.successorDoctorId, providerId: root.successorProviderId
+    })
+    // Read-only, pinned predecessor contract for the future authority bridge.
+    // READY only means suitable for a fresh backend check, never authorized.
+    readonly property var transfer: SuccessorPolicy.successionContract({
+        plan: root.plan, snapshot: root.snapshot,
+        sessions: root.sessions, sessionsLoaded: root.sessionsLoaded,
+        previousSessionId: root.previousSessionId
     })
     readonly property string briefing: prepared
         ? SuccessorPolicy.briefing({
@@ -61,13 +74,30 @@ Item {
         successorProviderId = "";
         doctorPage = 0;
         providerPage = 0;
+        predecessorPage = 0;
+        previousSessionId = "";
         prepared = false;
     }
     onSuccessorDoctorIdChanged: prepared = false
     onSuccessorProviderIdChanged: prepared = false
+    onPreviousSessionIdChanged: prepared = false
     onOverviewChanged: prepared = false
-    onSnapshotChanged: prepared = false
-    onSessionsChanged: prepared = false
+    onSnapshotChanged: {
+        prepared = false;
+        previousSessionId = "";
+        predecessorPage = 0;
+    }
+    onSessionsChanged: {
+        prepared = false;
+        previousSessionId = "";
+        predecessorPage = 0;
+    }
+    onActiveChanged: {
+        if (!active) {
+            previousSessionId = "";
+            predecessorPage = 0;
+        }
+    }
 
     Flickable {
         id: recoveryScroll
@@ -332,6 +362,126 @@ Item {
                     color: Colors.blue
                     wrapMode: Text.Wrap
                 }
+            }
+            Rectangle {
+                width: parent.width
+                height: 2
+                color: Colors.magenta
+            }
+            Column {
+                width: parent.width
+                spacing: 6
+                visible: root.predecessorSessions.length > 1
+                GohuText {
+                    width: parent.width
+                    text: "SELECT PREDECESSOR SESSION // PX WILL VERIFY LATEST"
+                    font.pixelSize: 10
+                    color: Colors.orange
+                    wrapMode: Text.Wrap
+                }
+                Repeater {
+                    model: root.predecessorSessions.slice(
+                        root.predecessorPage * root.pageSize,
+                        (root.predecessorPage + 1) * root.pageSize)
+                    Rectangle {
+                        required property var modelData
+                        width: recoveryRows.width
+                        height: 30
+                        color: Colors.black
+                        border.width: 1
+                        border.color: root.previousSessionId
+                            === String(modelData.id || modelData.sessionId || "")
+                            ? Colors.orange : Colors.magenta
+                        GohuText {
+                            anchors.fill: parent
+                            anchors.margins: 6
+                            text: String(modelData.id || modelData.sessionId || "")
+                                + " // " + String(modelData.status || "UNKNOWN")
+                                + " // " + String(modelData.doctorId || "UNKNOWN")
+                            color: Colors.white
+                            font.pixelSize: 9
+                            elide: Text.ElideRight
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.previousSessionId
+                                = String(modelData.id || modelData.sessionId || "")
+                        }
+                    }
+                }
+                Row {
+                    width: parent.width
+                    height: 27
+                    spacing: 8
+                    HospitalActionButton {
+                        width: 69
+                        height: parent.height
+                        label: "PREV"
+                        compactIcon: "<"
+                        accent: Colors.cyan
+                        enabledAction: root.predecessorPage > 0
+                        onTriggered: root.predecessorPage--
+                    }
+                    GohuText {
+                        width: parent.width - 154
+                        height: parent.height
+                        text: "HISTORY // " + root.predecessorSessions.length
+                            + " // PAGE " + (root.predecessorPage + 1)
+                        color: Colors.blue
+                        font.pixelSize: 8
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    HospitalActionButton {
+                        width: 69
+                        height: parent.height
+                        label: "NEXT"
+                        compactIcon: ">"
+                        accent: Colors.cyan
+                        enabledAction: (root.predecessorPage + 1) * root.pageSize
+                            < root.predecessorSessions.length
+                        onTriggered: root.predecessorPage++
+                    }
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: "ATOMIC SUCCESSION // " + root.transfer.status
+                font.pixelSize: 10
+                color: root.transfer.readyForAuthorityCheck ? Colors.cyan : Colors.orange
+                wrapMode: Text.Wrap
+            }
+            GohuText {
+                width: parent.width
+                text: "PREDECESSOR SESSION // "
+                    + (root.transfer.previousSessionId || "NOT VERIFIED")
+                    + " // "
+                    + (root.transfer.previousDoctorId || "NO DOCTOR")
+                    + " // "
+                    + (root.transfer.previousProviderId || "NO PROVIDER")
+                color: Colors.blue
+                font.pixelSize: 9
+                wrapMode: Text.Wrap
+            }
+            Repeater {
+                model: root.transfer.blockers.slice(0, 6)
+                GohuText {
+                    required property string modelData
+                    width: recoveryRows.width
+                    text: "SUCCESSION HOLD // " + modelData
+                    font.pixelSize: 9
+                    color: Colors.orange
+                    wrapMode: Text.Wrap
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: "NO REPLACEMENT BUTTON YET // A recorded terminal Session is not proof of browser death. PX authority and atomic revalidation remain mandatory."
+                color: Colors.blue
+                font.pixelSize: 9
+                wrapMode: Text.Wrap
             }
             GohuText {
                 width: parent.width

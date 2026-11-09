@@ -124,7 +124,16 @@ function scopeOptionsFor(entry, appKey, websiteKey) {
     // Exact TITLE is a deliberately weaker matching option. It never claims
     // to identify a person/server, and the body is never included in its key.
     const title = token(e.originalTitle || e.title);
-    if (title && title.length <= 160)
+    const genericTitle = title.toLowerCase();
+    const appTitle = token(e.source).toLowerCase();
+    // "Discord" or "New message" would match unrelated conversations.
+    // Refuse this misleading "narrow" target rather than muting everyone.
+    const ambiguousTitles = [
+        "message", "new message", "new messages", "notification",
+        "new notification", "notifications", "direct message", "dm"
+    ];
+    if (title && title.length <= 160 && genericTitle !== appTitle
+            && ambiguousTitles.indexOf(genericTitle) === -1)
         add("title", title, "TITLE EXACT // " + title, false);
 
     // For sources without verified child identity, put the exact-title option

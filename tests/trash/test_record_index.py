@@ -151,6 +151,7 @@ class RecordIndexTests(unittest.TestCase):
             ("source", "finance-transactions"),
             ("readOnly", False),
             ("url", "https://bank.example/private"),
+            ("url", "https://quotes.toscrape.com:abc/private"),
         ):
             with self.subTest(field=field):
                 doc = crawl_doc()

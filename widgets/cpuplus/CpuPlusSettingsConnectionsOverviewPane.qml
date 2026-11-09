@@ -1,24 +1,12 @@
 import QtQuick
 import "../../components"
 import qs.services.connections
-import "../../services/connections/ConnectionsUnifiedSignInPolicy.js" as SignInPolicy
 
 // CPU++ left instrument bay. All signals are read from canonical owners;
 // no account/profile switching, secrets, or disk writes originate here.
 Item {
     id: overview
-    signal idManagementRequested()
     property string feedback: ""
-    // Only read the existing owner-managed status surfaces. This view does
-    // not initiate OIDC login, request a grant, or infer login from labels.
-    readonly property var signIn: SignInPolicy.project({
-        identityHostConnected: false, // no approved live host binding yet
-        identityAuthenticated: false, // no verified CPU++ login response yet
-        credentialHostAuthenticated: ConnectionsRequestStatus.hostAuthenticated,
-        credentialActionsEnabled: ConnectionsBroker.credentialActionsEnabled,
-        operatorConsentAuthenticated: ConnectionsRequestStatus.canApprove,
-        localObservationSeen: ConnectionsHostObservation.observing
-    })
     readonly property var social: ConnectionsRegistry.entry("social")
     readonly property var firms: ConnectionsRegistry.entry("nasa-firms")
     readonly property var summary: ConnectionsRegistry.summary
@@ -55,86 +43,6 @@ Item {
                 height: 2
                 color: Colors.cyan
                 opacity: 0.72
-            }
-
-            // A usable single entrypoint today: truthful owner status and
-            // navigation. Auth, provider grants and secrets remain external.
-            GohuText {
-                width: parent.width
-                text: "UNIVERSAL SIGN-IN // CONTROL"
-                color: Colors.magenta
-                font.pixelSize: 11
-                wrapMode: Text.WordWrap
-            }
-            GohuText {
-                width: parent.width
-                text: overview.signIn.identityStatus
-                color: overview.signIn.identityVerified ? Colors.green : Colors.orange
-                font.pixelSize: 10
-                wrapMode: Text.WordWrap
-            }
-            QuietText {
-                width: parent.width
-                text: overview.signIn.identityNote
-                font.pixelSize: 9
-                wrapMode: Text.WordWrap
-            }
-            ActionButton {
-                width: Math.min(parent.width, 188)
-                height: 30
-                label: "OPEN ID MANAGEMENT"
-                labelPixelSize: 10
-                accentColor: Colors.cyan
-                onClicked: overview.idManagementRequested()
-            }
-            GohuText {
-                width: parent.width
-                text: overview.signIn.connectionStatus
-                color: Colors.orange
-                font.pixelSize: 10
-                wrapMode: Text.WordWrap
-            }
-            QuietText {
-                width: parent.width
-                text: overview.signIn.connectionNote
-                font.pixelSize: 9
-                wrapMode: Text.WordWrap
-            }
-            ActionButton {
-                width: Math.min(parent.width, 188)
-                height: 30
-                label: ConnectionsHostObservation.checking
-                       ? "CHECKING LOCAL HOST..." : "INSPECT LOCAL HOST"
-                labelPixelSize: 10
-                accentColor: Colors.cyan
-                available: !ConnectionsHostObservation.checking
-                onClicked: ConnectionsHostObservation.inspect()
-            }
-            GohuText {
-                width: parent.width
-                text: overview.signIn.providerStatus
-                color: Colors.orange
-                font.pixelSize: 10
-                wrapMode: Text.WordWrap
-            }
-            QuietText {
-                width: parent.width
-                text: overview.signIn.providerNote
-                font.pixelSize: 9
-                wrapMode: Text.WordWrap
-            }
-            QuietText {
-                width: parent.width
-                text: overview.signIn.batchStatus
-                color: Colors.orange
-                font.pixelSize: 9
-                wrapMode: Text.WordWrap
-            }
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Colors.cyan
-                opacity: 0.65
             }
 
             GohuText {

@@ -31,8 +31,9 @@ test("M1 RADIO search and transport are fixed above and below the only scrollabl
     const bottom=radio.indexOf('id: fixedTransport');
     assert.ok(0<top && top<middle && middle<results && results<bottom);
     assert.match(radio,/id: fixedSearch[\s\S]*?anchors\.top: parent\.top/);
-    assert.match(radio,/id: radioScroll[\\s\\S]*?anchors\\.top: savedStrips\\.bottom[\\s\\S]*?anchors\\.bottom: fixedTransport\\.top/);
-    assert.match(radio,/StationRadioSavedStrips\\s*\\{/);
+    assert.ok(radio.slice(middle,bottom).includes('anchors.top: savedStrips.bottom'));
+    assert.ok(radio.slice(middle,bottom).includes('anchors.bottom: fixedTransport.top'));
+    assert.ok(radio.includes('StationRadioSavedStrips {'));
     assert.match(radio,/id: fixedTransport[\s\S]*?anchors\.bottom: parent\.bottom/);
     const pinnedTop=radio.slice(top,middle);
     const middleText=radio.slice(results,bottom);

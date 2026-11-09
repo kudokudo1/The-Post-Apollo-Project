@@ -217,6 +217,68 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn("running: trashLauncher.menuOpen", timer)
         self.assertNotIn("trashSearch.activeFocus", timer)
 
+    def test_lifecycle_scaffold_shows_boundaries_without_granting_record_deletion(self):
+        self.assertIn('property string activeMode: "trash"', TRASH)
+        self.assertIn('readonly property var lifecycleModes: ["cleanup", "archive", "trash", "burn"]', TRASH)
+        self.assertIn('function setMode(nextMode)', TRASH)
+        self.assertIn('lifecycleModes.indexOf(requested) < 0', TRASH)
+        self.assertIn('id: trashLifecycleModes', TRASH)
+        for label in ("CLEANUP", "ARCHIVE", "TRASH", "BURN"):
+            self.assertIn('"' + label + '"', TRASH)
+        self.assertIn('onLeftClicked: trashLauncher.setMode(', TRASH)
+        self.assertIn('id: lifecyclePreparation', TRASH)
+        self.assertIn('visible: trashLauncher.activeMode !== "trash"', TRASH)
+        self.assertIn("Camera owns the existing Cleanup queue.", TRASH)
+        self.assertIn("No record stores are connected to Universal Archive yet.", TRASH)
+        self.assertIn("Only SYSTEM TRASH currently supports Burn.", TRASH)
+        self.assertIn('onLeftClicked: trashLauncher.setMode("trash")', TRASH)
+        self.assertIn('visible: trashLauncher.activeMode === "trash"', TRASH)
+        self.assertIn('activeMode === "trash"', TRASH)
+        # New tabs are navigation, not authorization to alter Hospital,
+        # Finance, or arbitrary path records.
+        self.assertNotIn("hospital-room-report-delete", TRASH)
+        self.assertNotIn("remove-worktree", TRASH)
+        self.assertNotIn("finance-write-transaction", TRASH)
+
+    def test_burn_all_requires_spatially_separate_modal_and_pointer_relocation(self):
+        self.assertIn('property bool burnAllPointerRelocated: false', TRASH)
+        self.assertIn('burnAllPointerRelocated = false;', TRASH)
+        arm = section(TRASH, '    function armBurnAll() {', '    IpcHandler {')
+        self.assertIn('confirmMode = "all";', arm)
+        self.assertIn('burnAllPointerRelocated = false;', arm)
+        self.assertIn('&& burnAllPointerRelocated', arm)
+        self.assertIn('&& activeMode === "trash"', arm)
+        self.assertIn('&& confirmRevision === revision', arm)
+        self.assertIn('&& confirmCount === total', arm)
+        self.assertIn('"BURN_ALL_CONFIRMED"', arm)
+
+        # The list footer can ONLY arm, never submit Burn All.
+        self.assertIn('onLeftClicked: trashLauncher.armBurnAll()', TRASH)
+        self.assertNotIn('onLeftClicked: trashLauncher.run("burn-all"', TRASH)
+        self.assertIn('id: burnAllConfirmMenu', TRASH)
+        self.assertIn('visible: trashLauncher.confirmMode === "all"', TRASH)
+        self.assertIn('id: burnAllRemoteTarget', TRASH)
+        self.assertIn('id: confirmAllRemoteButton', TRASH)
+        self.assertIn('id: cancelAllBurnButton', TRASH)
+        self.assertIn('HoverHandler {', TRASH)
+        self.assertIn('onHoveredChanged:', TRASH)
+        self.assertIn('trashLauncher.burnAllPointerRelocated = true;', TRASH)
+        self.assertIn('&& trashLauncher.burnAllPointerRelocated', TRASH)
+        self.assertIn('onLeftClicked: trashLauncher.confirmBurn()', TRASH)
+        self.assertIn('onLeftClicked: trashLauncher.clearConfirmation()', TRASH)
+
+        # Modal is separate from the inline per-item BURN row and traps
+        # clicks that repeat the old lower-right BURN ALL coordinate.
+        self.assertIn('visible: trashLauncher.confirmMode === "item"', TRASH)
+        self.assertIn('height: trashLauncher.confirmMode === "item" ? 40 : 0', TRASH)
+        self.assertIn('anchors.fill: parent', TRASH)
+        self.assertIn('acceptedButtons: Qt.LeftButton | Qt.RightButton', TRASH)
+        self.assertIn('onClicked: function(mouse) { mouse.accepted = true; }', TRASH)
+        self.assertIn('SCOPE // SYSTEM TRASH (INCLUDING OTHER MOUNTS)', TRASH)
+        self.assertIn('ITEMS TO DESTROY // ', TRASH)
+        self.assertIn('This permanently empties the existing Linux Trash.', TRASH)
+        self.assertIn('MOVE YOUR POINTER TO THE SEPARATE CONFIRM BUTTON.', TRASH)
+
     def test_finance_red_close_button_family_and_no_destructive_shortcut(self):
         self.assertIn('id: closeTrashButton', TRASH)
         self.assertIn('label: "×"', TRASH)
@@ -253,7 +315,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn("event.key === Qt.Key_Escape", TRASH)
         self.assertIn("trashLauncher.menuOpen = false", TRASH)
         self.assertIn('label: "×"', TRASH)
-        self.assertIn('text: "TRASH // INDEX // " + trashLauncher.chassisSize.toUpperCase()', TRASH)
+        self.assertIn('text: "TRASH++ // " + trashLauncher.activeMode.toUpperCase()', TRASH)
         self.assertIn('Quickshell.shellPath("scripts/trash/trash_cli.py")', TRASH)
         self.assertIn('stdout: StdioCollector {', TRASH)
         self.assertIn("function consume(raw)", TRASH)

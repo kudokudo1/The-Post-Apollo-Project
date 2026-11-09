@@ -23,6 +23,19 @@ function speedForRound(gainPercent, every, round) {
     return clamp(Math.pow(1 + gain / 100, tier), 1, 2.5);
 }
 
+// The player aims with the cursor; a waist-height muzzle sits OUTSIDE
+// the arena and tracks that aim. The beam enters the visible scene toward
+// the exact clicked location instead of launching from a fixed deck turret.
+function laserEntryPoint(cursorAimX) {
+    var x = clamp(Number(cursorAimX), 0, 1);
+    if (!Number.isFinite(x))
+        x = 0.5;
+    return {
+        x: clamp(x + (x <= 0.5 ? -0.085 : 0.085), 0.02, 0.98),
+        y: 1.14
+    };
+}
+
 function clamp(value, low, high) {
     return Math.max(low, Math.min(high, value));
 }

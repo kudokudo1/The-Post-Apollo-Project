@@ -101,6 +101,9 @@ ShellRoot {
                     || strip.currentRecord.name!=="MARS"
                     || timeline.rows.length!==5 || timeline.events.length!==6)
                     return root.fail("PLANETS_DAY_EVENTS_AND_SKY_STRIP_NOT_RENDERED");
+                // ALL has no selected ring planet; C40 right-arrow starts
+                // at Mercury. Explicitly choose Mars to verify Mars → Jupiter.
+                focused.planetSelection="MARS";
                 strip.stepPlanet(1);
                 if(focused.planetSelection!=="JUPITER"
                     || strip.currentRecord.name!=="JUPITER"

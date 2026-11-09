@@ -251,3 +251,25 @@ version-specific socket permission audit and peer provenance, real native
 response shape compatibility, independently verified host-window binding
 and separately authorized retention or launch. No live-data collection,
 broad remote-control activation or unsupervised command replay.
+
+
+## November 9, 2026 // Operator clarified exact desktop checkpoint scope
+
+**Current direction:** A restorable checkpoint must capture exact per-window
+positions and dimensions, nested Sway tiling geometry, multiple Brave windows
+and their supported session state, and application-specific contents where
+recoverable. A monitor/workspace-only inventory is insufficient. Saving must
+perform capture automatically; a separate preview is an optional inspection
+tool, not a required daily step. Users can selectively include monitors,
+workspaces and windows when they want customization. MARK should not be an
+unrestorable breadcrumb: named checkpoints and notes are part of restorable
+timeline history. Display local time using shared Clock settings.
+
+**First bounded technical stage:** [M2 geometry capture plan](./timew-machine-m2-geometry-capture-plan.md).
+It adds only an isolated geometry projection and fixture validation, not
+persisted v2 checkpoints, live capture, or exact restoration. Reuse M2b's
+checkpoint-local window identity contract. All older v1 rows remain untouched.
+
+**State:** Operator requirement captured; geometry prototype pending CI and
+operator acceptance. No permission to merge, reload Quickshell or change the
+operator's local desktop is implied.

@@ -13,6 +13,7 @@ C3B = (ROOT / "tests/connections/c3b_origin/C3bOriginCheck.py")
 C2R = (ROOT / "tests/connections/c2r_selinux_domain/postapollo_connections.te")
 SIGNED_C2R_HOST_SOURCE = (ROOT / "tests/connections/c2r_selinux_domain/C2rStatusHost.py")
 SIGNED_C3D_UNIT_SOURCE = (ROOT / "services/connections/experiments/c2n_package/postapollo-connections-status.service.template")
+SIGNED_C3D_RPM_SPEC = (ROOT / "tests/connections/c3d_provenance/signed-status.spec")
 POLICY_GATE = (ROOT / "tests/connections/c4b_silverblue/guest_signed_policy_gate.sh")
 POLICY_BUILDER = (ROOT / "tests/connections/c4b_silverblue/build_signed_composed_policy.sh")
 POLICY_SPEC = (ROOT / "tests/connections/c4b_silverblue/signed-compose-policy.spec")
@@ -291,6 +292,38 @@ class C4bContracts(unittest.TestCase):
         self.assertLess(script.index('groupdel c4b-clients', begin), last_check)
         self.assertLess(script.index('groupdel postapollo-status-readers', begin), last_check)
         self.assertLess(last_check, script.index('stage COMPOSED_POLICY_RETAINED_FOR_ROLLBACK'))
+
+    def test_049_boot_composed_signed_dbus_policy_keeps_logind_healthy(self):
+        # C3d's D-Bus policy already exists in immutable /usr on first boot.
+        # Rebooting the system broker during C4b previously preceded a
+        # logind ListInhibitors timeout; never hide that by bypassing inhibitors.
+        script = GUEST.read_text()
+        self.assertNotIn("systemctl restart dbus-broker.service", script)
+        self.assertNotIn("systemctl restart systemd-logind.service", script)
+        self.assertNotIn("systemctl reboot -i", script)
+        self.assertNotIn("--check-inhibitors=no", script)
+        self.assertIn("stage DBUS_BOOT_COMPOSED_POLICY_CHECK_BEGIN", script)
+        self.assertIn("DBUS_POLICY_NOT_OWNED_BY_SIGNED_C3D_RPM", script)
+        self.assertIn("SIGNED_DBUS_POLICY_FILE_UNSAFE", script)
+        self.assertIn("BOOTED_DBUS_BROKER_NOT_ACTIVE", script)
+        self.assertIn("C4B_PASS // BOOT_COMPOSED_DBUS_POLICY_EFFECTIVE_WITHOUT_BROKER_RESTART", script)
+        self.assertIn("check_logind_bus_health() {", script)
+        self.assertIn("org.freedesktop.DBus GetNameOwner s org.freedesktop.login1", script)
+        self.assertIn("org.freedesktop.login1.Manager ListInhibitors", script)
+        self.assertIn("LOGIND_DBUS_OWNER_UNAVAILABLE_", script)
+        self.assertIn("LOGIND_INHIBITOR_QUERY_UNRESPONSIVE_", script)
+        before = script.index("  check_logind_bus_health BEFORE_C4B_DENIALS")
+        denied = script.index("  client_check c4b-reader claim OWN_REFUSED", before)
+        service = script.index("  stage EXPLICIT_SIGNED_FAKE_SERVICE_START_BEGIN", denied)
+        cleanup = script.index("  check_logind_bus_health AFTER_C4B_RUNTIME_CLEANUP")
+        accepted = script.index("  stage BOOTED_RUNTIME_ACCEPTED", cleanup)
+        self.assertLess(before, denied)
+        self.assertLess(denied, service)
+        self.assertLess(cleanup, accepted)
+        self.assertIn(
+            "install -D -m 0644 %{_sourcedir}/org.postapollo.ConnectionsStatus1.conf.template",
+            SIGNED_C3D_RPM_SPEC.read_text(),
+        )
 
     def test_05_fully_disposable_ci_and_production_deny_only(self):
         workflow = WORKFLOW.read_text()

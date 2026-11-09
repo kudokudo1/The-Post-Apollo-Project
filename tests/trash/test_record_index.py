@@ -90,6 +90,10 @@ class RecordIndexTests(unittest.TestCase):
         self.assertIn("2 SNAPSHOTS", rows["EVENT HISTORY"]["details"])
         self.assertEqual(rows["SAVED DOSSIER"]["title"], "storm-1")
         self.assertEqual(rows["WEB SCRAPE"]["title"], "Demo saved quote crawl")
+        self.assertEqual(rows["WEB SCRAPE"]["sourceUrl"],
+                         "https://quotes.toscrape.com/page/1/")
+        self.assertEqual(rows["WEB SCRAPE"]["sourceObservedAt"],
+                         "2026-10-12T10:30:00Z")
         for row in result["items"]:
             self.assertTrue(row["capabilities"]["inspect"])
             for op in ("archive", "trash", "restore", "burn"):

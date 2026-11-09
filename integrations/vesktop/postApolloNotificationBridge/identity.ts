@@ -67,7 +67,7 @@ export function scopedDiscordEvent(event: any, channel: any, selfId: unknown,
 
 function oneLineLabel(value: unknown): string {
     if (typeof value !== "string") return "";
-    return value.trim().replace(/[\\r\\n\\x00-\\x1f\\x7f]/g, " ").slice(0, 80);
+    return value.trim().replace(/[\r\n\x00-\x1f\x7f]/g, " ").slice(0, 80);
 }
 
 // Pure command-argument builder, shared by native code and contract tests.

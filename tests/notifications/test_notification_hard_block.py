@@ -75,6 +75,7 @@ S.root=S;
 vm.runInNewContext([
  'sourceKey','websiteKey','scopeOptionsFor','policyIndex','policyFor',
  'isBlocked','shouldBlockNotification','inheritedBlockOwnerKey',
+ 'shouldSuppress','shouldSuppressScoped',
  'ensurePolicy','markPoliciesChanged','suppressActiveForKey',
  'compactPolicy','setBlocked','toggleBlocked','policyDocument','loadPolicies',
  'indexOfNotification','replaceModelEntry','updateModelNotification',

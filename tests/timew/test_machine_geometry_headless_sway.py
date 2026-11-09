@@ -350,6 +350,39 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             assert chosen_record["geometry"]["windows"][0]["window_key"] == left_window["window_key"]
             assert chosen_record["geometry"]["windows"][0]["rect"] == left_window["rect"]
             assert legacy.load(cid)["checkpoint"]["counts"]["windows"] == 3
+            # Exercise the exact Python -I entrypoint used by TimeW.qml,
+            # not just a Python import with a preconfigured sys.path.
+            # This subprocess inherits only the disposable CI XDG runtime,
+            # with an explicitly pinned private child Sway socket.
+            bridge_env = dict(client_env, SWAYSOCK=ipc,
+                              XDG_DATA_HOME=str(root / "data"))
+            bridge_cli = str(ROOT / "services/time/MachineSaveBridgeV2.py")
+            cli_inspect = subprocess.run(
+                ["python3", "-B", "-I", bridge_cli, "inspect"],
+                env=bridge_env, capture_output=True, timeout=15)
+            assert cli_inspect.returncode == 0, "ISOLATED CLI INSPECT FAILED"
+            review_data = json.loads(cli_inspect.stdout)
+            assert review_data["status"] == "ready"
+            assert review_data["counts"]["outputs"] == 2
+            assert review_data["counts"]["windows"] == 3
+
+            cli_request = json.dumps({
+                "label": "CI ACTUAL CLI SAVE",
+                "review": None,
+                "selection": None,
+            }).encode() + b"\n"
+            cli_save = subprocess.run(
+                ["python3", "-B", "-I", bridge_cli, "save"],
+                input=cli_request, env=bridge_env,
+                capture_output=True, timeout=15)
+            assert cli_save.returncode == 0, "ISOLATED CLI SAVE FAILED"
+            saved_cli = json.loads(cli_save.stdout)
+            assert saved_cli["status"] == "saved"
+            assert saved_cli["checkpoint"]["counts"]["windows"] == 3
+            cli_loaded = load_geometry(saved_cli["checkpoint"]["id"])
+            assert cli_loaded["status"] == "loaded"
+            assert len(cli_loaded["geometry"]["windows"]) == 3
+            print("MACHINE PYTHON -I CLI // INSPECT AND SAVE TO PRIVATE SQLITE PASS")
             print("MACHINE M2 CUSTOM REVIEW-BOUND ONE-WINDOW SAVE // REAL SWAY PASS")
             print("MACHINE M2 CUSTOM SAVE // REAL HEADLESS SWAY SQLITE PASS")
             print("MACHINE M2 AUTOMATIC SAVE // REAL HEADLESS SWAY SQLITE PASS")

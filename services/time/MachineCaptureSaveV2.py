@@ -198,5 +198,10 @@ def capture_and_save(*, label="DESKTOP CHECKPOINT", selection=None,
         return store_adapter(legacy, geometry)
     except SelectionError as exc:
         raise CaptureError(str(exc)) from exc
-    except (PreviewError, GeometryError, StoreError, GeometryStoreError) as exc:
-        raise CaptureError("DESKTOP CAPTURE UNAVAILABLE") from exc
+    except PreviewError as exc:
+        # Stable category only: never echo private Sway socket paths or data.
+        raise CaptureError("DESKTOP CAPTURE UNAVAILABLE // SWAY READ") from exc
+    except GeometryError as exc:
+        raise CaptureError("DESKTOP CAPTURE UNAVAILABLE // GEOMETRY") from exc
+    except (StoreError, GeometryStoreError) as exc:
+        raise CaptureError("DESKTOP CAPTURE UNAVAILABLE // CHECKPOINT STORE") from exc

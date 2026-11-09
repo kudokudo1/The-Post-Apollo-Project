@@ -7,6 +7,7 @@ on:
       - "services/time/MachineSaveBridgeV2.py"
       - "services/time/MachineCaptureSaveV2.py"
       - "tests/timew/test_machine_save_bridge_v2.py"
+      - "tests/timew/test_machine_save_bridge_isolated_cli.py"
       - "tests/timew/test_machine_save_ui_contract.py"
       - "docs/timew-machine-save-ui-v2.md"
       - ".github/workflows/timew-machine-save-ui-v2.yml"
@@ -23,6 +24,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check primary SAVE UI and dormant advanced controls
         run: python3 -B -I tests/timew/test_machine_save_ui_contract.py
+      - name: Verify actual isolated Python CLI can import its sibling modules
+        run: python3 -B -I tests/timew/test_machine_save_bridge_isolated_cli.py
       - name: Verify inspected window-key binding and stale geometry refusal
         run: python3 -B -I tests/timew/test_machine_save_bridge_v2.py
       - name: Preserve previous v1/v2 capture, selection and storage tests

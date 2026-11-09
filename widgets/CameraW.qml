@@ -3217,11 +3217,14 @@ PanelWindow {
                         ActionButton {
                             width: (parent.width - 7) * 0.60
                             height: 31
-                            label: "MOVE " + camera.batchPreview.count + " TO TRASH"
+                            label: camera.batchPreview
+                                   ? "MOVE " + camera.batchPreview.count + " TO TRASH"
+                                   : "MOVE TO TRASH"
                             labelPixelSize: 10
                             accentColor: Colors.red
                             destructive: true
-                            available: !camera.busy
+                            available: !camera.busy && camera.batchPreview !== null
+                                       && !!camera.batchPreview.planId
                             onLeftClicked: camera.confirmBatchTrash()
                         }
                     }

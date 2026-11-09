@@ -4629,17 +4629,348 @@ PanelWindow {
                         }
                     }
 
-                    Column {
-                        id: machinePane
+                    // SAVE is the primary task. CUSTOMIZE and legacy diagnostics
+                    // scroll inside this viewport instead of being cut off.
+                    Item {
+                        id: machineCaptureViewport
                         visible: timew.selectedMode === "machine" && !timew.machineStoredViewOpen
                         width: parent.width
-                        spacing: 9
+                        height: Math.max(0, parent.height - 88)
+
+                        Flickable {
+                            id: machineCaptureScroll
+                            anchors.fill: parent
+                            anchors.rightMargin: 13
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+                            contentWidth: width
+                            contentHeight: machinePane.height
+
+                            Column {
+                                id: machinePane
+                                width: machineCaptureScroll.width
+                                spacing: 9
 
                         GohuText {
                             width: parent.width
-                            text: "MACHINE // SESSION TIMELINE"
-                            color: timew.semanticColor
+                            text: "MACHINE // SAVE DESKTOP"
+                            color: Colors.white
                             font.pixelSize: 14
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: "LOCAL CLOCK // " + timew.clockReadoutText
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                        }
+
+                        TextField {
+                            id: machineSaveNameInput
+                            width: parent.width
+                            height: 35
+                            maximumLength: 48
+                            text: timew.machineCheckpointDraft
+                            placeholderText: "DESKTOP CHECKPOINT // OPTIONAL NAME"
+                            color: Colors.magenta
+                            placeholderTextColor: Colors.cyan
+                            selectionColor: Colors.magenta
+                            selectedTextColor: Colors.black
+                            font.family: "GohuFont 11 Nerd Font Mono"
+                            font.pixelSize: 11
+                            leftPadding: 8
+                            rightPadding: 8
+                            background: Rectangle {
+                                color: Colors.black
+                                border.width: 1
+                                border.color: machineSaveNameInput.activeFocus
+                                              ? Colors.magenta : Colors.cyan
+                            }
+                            onTextEdited: timew.machineCheckpointDraft = text
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 37
+                            spacing: 7
+                            ActionButton {
+                                width: (parent.width - 7) / 2
+                                height: parent.height
+                                label: timew.machineSaveBridgeBusy
+                                       && timew.machineSaveBridgeAction === "save"
+                                       ? "SAVING..." : "SAVE DESKTOP"
+                                labelPixelSize: 11
+                                accentColor: Colors.orange
+                                available: !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
+                                           && !timew.machineCaptureBusy
+                                           && !timew.machineAutoRestoreBusy
+                                onLeftClicked: timew.machineRequestFullSave()
+                            }
+                            ActionButton {
+                                width: (parent.width - 7) / 2
+                                height: parent.height
+                                label: "STORED"
+                                labelPixelSize: 11
+                                accentColor: Colors.white
+                                available: !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
+                                onLeftClicked: timew.machineShowSavedCheckpoints()
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineSaveBridgeStatus
+                            color: timew.machineSaveBridgeStatus.startsWith("SAVED")
+                                   ? Colors.cyan : Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 7
+                            ActionButton {
+                                width: (parent.width - 7) / 2
+                                height: parent.height
+                                label: timew.machineCustomOpen
+                                       ? "CUSTOMIZE // CLOSE" : "CUSTOMIZE"
+                                labelPixelSize: 10
+                                accentColor: timew.machineCustomOpen
+                                             ? Colors.magenta : Colors.white
+                                available: !timew.machineSaveBridgeBusy
+                                onLeftClicked: timew.machineToggleCustomize()
+                            }
+                            ActionButton {
+                                width: (parent.width - 7) / 2
+                                height: parent.height
+                                label: timew.machineAdvancedOpen
+                                       ? "ADVANCED // CLOSE" : "ADVANCED"
+                                labelPixelSize: 10
+                                accentColor: timew.machineAdvancedOpen
+                                             ? Colors.magenta : Colors.white
+                                available: !timew.machineSaveBridgeBusy
+                                onLeftClicked: timew.machineAdvancedOpen =
+                                               !timew.machineAdvancedOpen
+                            }
+                        }
+
+                        Column {
+                            id: machineCustomControls
+                            visible: timew.machineCustomOpen
+                            width: parent.width
+                            spacing: 8
+
+                            GohuText {
+                                width: parent.width
+                                text: "CUSTOM SAVE // THIS DESKTOP CAPTURE"
+                                color: Colors.magenta
+                                font.pixelSize: 11
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: "CHOOSE ITEMS // ORIGINAL WINDOW POSITIONS RETAINED"
+                                color: Colors.cyan
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                            Row {
+                                width: parent.width
+                                height: 30
+                                spacing: 6
+                                ActionButton {
+                                    width: 125
+                                    height: parent.height
+                                    label: "REFRESH CAPTURE"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.cyan
+                                    available: !timew.machineSaveBridgeBusy
+                                    onLeftClicked: timew.machineRequestCustomInspect()
+                                }
+                                GohuText {
+                                    width: parent.width - 131
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: !timew.machineCustomReview ? "NO CURRENT CAPTURE"
+                                          : "MON " + timew.machineCustomReview.outputs.length
+                                            + " // WS " + timew.machineCustomReview.workspaces.length
+                                            + " // WINDOWS " + timew.machineCustomReview.windows.length
+                                    color: Colors.white
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+                            }
+                            Row {
+                                visible: !!timew.machineCustomReview
+                                width: parent.width
+                                height: 28
+                                spacing: 5
+                                Repeater {
+                                    model: [
+                                        {name: "MONITORS", kind: "outputs"},
+                                        {name: "WORKSPACES", kind: "workspaces"},
+                                        {name: "WINDOWS", kind: "windows"}
+                                    ]
+                                    delegate: ActionButton {
+                                        width: (machineCustomControls.width - 10) / 3
+                                        height: 28
+                                        label: modelData.name
+                                        labelPixelSize: 9
+                                        accentColor: timew.machineCustomInspectKind === modelData.kind
+                                                     ? Colors.magenta : Colors.white
+                                        onLeftClicked: timew.machineChooseCustomKind(modelData.kind)
+                                    }
+                                }
+                            }
+                            Row {
+                                visible: !!timew.machineCustomReview
+                                width: parent.width
+                                height: 30
+                                spacing: 6
+                                ActionButton {
+                                    width: 42
+                                    height: parent.height
+                                    label: "<"
+                                    accentColor: Colors.orange
+                                    available: timew.machineCustomItems.length > 1
+                                    onLeftClicked: timew.machineStepCustomInspect(-1)
+                                }
+                                GohuText {
+                                    width: Math.max(0, parent.width - 96)
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: timew.machineCustomItems.length
+                                          ? (timew.machineCustomInspectIndex + 1)
+                                            + " / " + timew.machineCustomItems.length
+                                          : "0 / 0"
+                                    horizontalAlignment: Text.AlignHCenter
+                                    color: Colors.cyan
+                                    font.pixelSize: 12
+                                }
+                                ActionButton {
+                                    width: 42
+                                    height: parent.height
+                                    label: ">"
+                                    accentColor: Colors.orange
+                                    available: timew.machineCustomItems.length > 1
+                                    onLeftClicked: timew.machineStepCustomInspect(1)
+                                }
+                            }
+                            GohuText {
+                                visible: !!timew.machineCustomReview
+                                width: parent.width
+                                text: !timew.machineCustomItem ? "NO ITEMS"
+                                      : timew.machineCustomInspectKind === "outputs"
+                                      ? timew.machineCustomItem.connector + " // "
+                                        + timew.machineCustomItem.rect.width + "x"
+                                        + timew.machineCustomItem.rect.height
+                                      : timew.machineCustomInspectKind === "workspaces"
+                                      ? timew.machineCustomItem.name + " // "
+                                        + timew.machineCustomItem.output
+                                      : timew.machineCustomItem.app_id
+                                        + " // WORKSPACE " + timew.machineCustomItem.workspace
+                                        + " // " + timew.machineCustomItem.output
+                                        + " // " + timew.machineCustomItem.rect.x
+                                        + "," + timew.machineCustomItem.rect.y
+                                        + " // " + timew.machineCustomItem.rect.width
+                                        + "x" + timew.machineCustomItem.rect.height
+                                        + (timew.machineCustomItem.floating
+                                           ? " // FLOATING" : " // TILED")
+                                color: Colors.white
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                            Row {
+                                visible: !!timew.machineCustomReview
+                                width: parent.width
+                                height: 31
+                                spacing: 7
+                                ActionButton {
+                                    width: 145
+                                    height: parent.height
+                                    label: timew.machineCustomIncluded(
+                                           timew.machineCustomInspectKind,
+                                           timew.machineCustomInspectIndex)
+                                           ? "EXCLUDE ITEM" : "INCLUDE ITEM"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.magenta
+                                    available: !!timew.machineCustomItem
+                                    onLeftClicked: timew.machineToggleCustomItem()
+                                }
+                                GohuText {
+                                    width: parent.width - 152
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "INCLUDED // "
+                                          + timew.machineCustomValidation.included[
+                                            timew.machineCustomInspectKind]
+                                          + " / " + timew.machineCustomItems.length
+                                    color: Colors.cyan
+                                    font.pixelSize: 10
+                                }
+                            }
+                            Row {
+                                visible: !!timew.machineCustomReview
+                                width: parent.width
+                                height: 28
+                                spacing: 6
+                                GohuText {
+                                    width: parent.width - 100
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: timew.machineCustomValidation.status === "ready"
+                                          ? "SELECTION READY"
+                                          : timew.machineCustomValidation.issues.length
+                                            ? timew.machineCustomValidation.issues[0].label
+                                            : "INVALID SELECTION"
+                                    color: timew.machineCustomValidation.status === "ready"
+                                           ? Colors.cyan : Colors.orange
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+                                ActionButton {
+                                    width: 94
+                                    height: parent.height
+                                    label: "LOCATE ISSUE"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.orange
+                                    available: timew.machineCustomValidation.issues.length > 0
+                                    onLeftClicked: timew.machineCustomLocateIssue()
+                                }
+                            }
+                            ActionButton {
+                                visible: !!timew.machineCustomReview
+                                width: parent.width
+                                height: 37
+                                label: "SAVE SELECTED DESKTOP"
+                                labelPixelSize: 11
+                                accentColor: Colors.orange
+                                available: !timew.machineSaveBridgeBusy
+                                           && timew.machineCustomValidation.status === "ready"
+                                onLeftClicked: timew.machineRequestCustomSave()
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: "WINDOW TITLES + TABS ARE NOT YET CAPTURED // "
+                                      + "INDIVIDUAL WINDOWS IDENTIFIED BY MONITOR + GEOMETRY"
+                                color: Colors.orange
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                        }
+
+                        // Keep all original manual time markers, previews,
+                        // selection diagnostics and legacy V1 save accessible.
+                        // None is a prerequisite for SAVE DESKTOP.
+                        Column {
+                            id: machineLegacyControls
+                            visible: timew.machineAdvancedOpen
+                            width: parent.width
+                            spacing: 9
+
+                        GohuText {
+                            width: parent.width
+                            text: "ADVANCED // LEGACY CAPTURE AND TIMELINE"
+                            color: Colors.magenta
+                            font.pixelSize: 11
                         }
 
                         GohuText {
@@ -5089,7 +5420,26 @@ PanelWindow {
                             font.pixelSize: 10
                             wrapMode: Text.Wrap
                         }
-                    }
+                        } // machineLegacyControls
+                            } // machinePane
+                        } // machineCaptureScroll
+
+                        NeonScrollBar {
+                            id: machineCaptureRail
+                            flickable: machineCaptureScroll
+                            accountForContentOrigin: true
+                            geometryMode: "viewport"
+                            x: machineCaptureViewport.width - width - 3
+                            y: 0
+                            height: machineCaptureViewport.height
+                            handleStyle: "star"
+                            railColor: Colors.cyan
+                            handleColor: Colors.magenta
+                            handleBorderColor: Colors.magenta
+                            containGlow: true
+                            visible: scrollable
+                        }
+                    } // machineCaptureViewport
 
                     // STORED is taller than the fixed TimeW viewport.
                     // Keep the complete recovery path scrollable and visible.

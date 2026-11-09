@@ -166,6 +166,7 @@ Item {
             trackLabelGlowLocally: true
             accentColor: Colors.white
             selected: pane.activeView === "journal"
+            highlightWhenSelected: true
             selectedForegroundColor: Colors.magenta
             selectedBorderColor: Colors.magenta
             onLeftClicked: pane.activeView = "journal"
@@ -179,6 +180,7 @@ Item {
             trackLabelGlowLocally: true
             accentColor: Colors.white
             selected: pane.activeView === "meaning"
+            highlightWhenSelected: true
             selectedForegroundColor: Colors.magenta
             selectedBorderColor: Colors.magenta
             onLeftClicked: pane.showMeaning()
@@ -394,17 +396,18 @@ Item {
                     labelPixelSize: 9
                     contentPadding: 1
                     trackLabelGlowLocally: true
-                    // Ordinary filters remain outline-only on hover/press.
-                    // The active filter alone receives a subtle color wash.
+                    // Only the active filter gets yellow; nonselected filters
+                    // stay black even when scrolling or pressing.
                     accentColor: ink
                     idleBorderColor: edge
                     idleContentGlowColor: edge
                     idleSoftGlowColor: edge
                     selected: pane.activeFilter === modelData.key
-                    selectedForegroundColor: ink
-                    selectedBorderColor: edge
-                    selectedContentGlowColor: edge
-                    selectedSoftGlowColor: edge
+                    highlightWhenSelected: true
+                    selectedForegroundColor: Colors.magenta
+                    selectedBorderColor: Colors.magenta
+                    selectedContentGlowColor: Colors.magenta
+                    selectedSoftGlowColor: Colors.magenta
                     onLeftClicked: pane.activeFilter = modelData.key
                 }
             }
@@ -470,17 +473,18 @@ Item {
                         labelHorizontalAlignment: Text.AlignLeft
                         contentPadding: 5
                         trackLabelGlowLocally: true
-                        // Every row stays black. Favorites and selection
-                        // are distinguished by magenta/colorful ink and glow.
+                        // Only the opened history row gets yellow with
+                        // magenta text/glow; nonselected entries stay black.
                         accentColor: observationEntry.entryInk
                         idleBorderColor: observationEntry.entryEdge
                         idleContentGlowColor: observationEntry.entryEdge
                         idleSoftGlowColor: observationEntry.entryEdge
                         selected: pane.selectedId === modelData.id
-                        selectedForegroundColor: observationEntry.entryInk
-                        selectedBorderColor: observationEntry.entryEdge
-                        selectedContentGlowColor: observationEntry.entryEdge
-                        selectedSoftGlowColor: observationEntry.entryEdge
+                        highlightWhenSelected: true
+                        selectedForegroundColor: Colors.magenta
+                        selectedBorderColor: Colors.magenta
+                        selectedContentGlowColor: Colors.magenta
+                        selectedSoftGlowColor: Colors.magenta
                         onLeftClicked: {
                             pane.selectedId = modelData.id;
                             pane.pendingDeleteId = "";
@@ -513,7 +517,8 @@ Item {
                         contentPadding: 2
                         accentColor: modelData.note ? Colors.orange : Colors.cyan
                         selected: pane.editingNoteId === modelData.id
-                        selectedForegroundColor: modelData.note ? Colors.orange : Colors.cyan
+                        highlightWhenSelected: true
+                        selectedForegroundColor: Colors.magenta
                         available: AngelObservationsStore.writable
                         onLeftClicked: pane.editObservationNote(modelData)
                     }

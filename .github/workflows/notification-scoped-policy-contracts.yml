@@ -1,0 +1,37 @@
+name: "Notification scoped policy contracts"
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "services/notifications/**"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "tests/notifications/test_notification_scoped_policies.py"
+      - ".github/workflows/notification-scoped-policy-contracts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/notifications/**"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "tests/notifications/test_notification_scoped_policies.py"
+      - ".github/workflows/notification-scoped-policy-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  scoped:
+    name: Synthetic scoped DND ZZ Favorites
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Test scoped identities and popup policy gating
+        run: python3 tests/notifications/test_notification_scoped_policies.py
+      - name: Test existing website and app policy inheritance
+        run: python3 tests/notifications/test_notification_website_scope.py
+      - name: Test notification policy source contracts
+        run: python3 tests/notifications/test_notification_policy_contracts.py
+      - name: Preserve popup input and two-click contracts
+        run: python3 tests/notifications/test_notification_popup_input_contracts.py

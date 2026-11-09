@@ -522,6 +522,12 @@ Singleton {
 
     function releaseExternalNotification(eventId) {
         const id = String(eventId || "");
+        // The native sender may close a delivery while policy storage is
+        // still loading. Never replay that closed event as a new popup.
+        if (pendingPolicyDeliveryIds.length > 0)
+            pendingPolicyDeliveryIds = pendingPolicyDeliveryIds.filter(function(pendingId) {
+                return pendingId !== id;
+            });
         if (!Object.prototype.hasOwnProperty.call(liveExternalNotifications, id))
             return;
         const next = Object.assign({}, liveExternalNotifications);

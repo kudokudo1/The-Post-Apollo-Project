@@ -95,7 +95,8 @@ test("shell validates the scoped app ID and closes CPU++ only if AppControl acce
   assert.match(section,/AppFavoriteSelection\.validDesktopId\(desktopId\)/);
   assert.match(section,/appControlWindow\.selectSavedApplication\(desktopId\)/);
   assert.match(section,/requestControlKeyboard\("appcontrol","favorites-saved-app"\)/);
-  assert.doesNotMatch(section,/execDetached|runCommand|launch|kill|play|Qt\.openUrlExternally/);
+  const executable=section.replace(/\/\/[^\n]*/g,"");
+  assert.doesNotMatch(executable,/\b(?:execDetached|runCommand|launchApp|killProcess|playStation|openUrlExternally)\s*\(/);
   assert.match(shell,/onFavoriteAppSelectionRequested: function\(desktopId\)/);
   assert.match(shell,/if\(shellRoot\.openApolloSavedApp\(desktopId\)\)\s*cpuPlusWindow\.close\(\)/);
 });

@@ -115,6 +115,8 @@ PanelWindow {
     // Surgery opens to registered workers. Git branch topology remains one
     // click away, but technical branches are not stand-ins for AI workers.
     property bool workforceRosterVisible: true
+    // Expand one staffed management panel INSIDE Surgery, never another route.
+    property bool workforceManagerExpanded: false
     // WORKERS naming controls are operator actions, not provider instructions.
     property string rosterEditingRoomId: ""
     property string rosterEditingDoctorId: ""
@@ -263,6 +265,8 @@ PanelWindow {
                 && !root.closeRosterIdentityEditor())
             return;
         workforceRosterVisible = enabled;
+        if (!enabled)
+            root.workforceManagerExpanded = false;
         if (enabled) {
             responsibilityService.refreshDurableGraph();
             if (!doctorService.refreshing)
@@ -2219,6 +2223,7 @@ PanelWindow {
             // The next opening should start from the useful registered roster,
             // not from an old Git branch-only inspection mode.
             root.workforceRosterVisible = true;
+            root.workforceManagerExpanded = false;
             if (speechInputService.busy)
                 speechInputService.cancel();
 
@@ -3332,6 +3337,9 @@ PanelWindow {
                 width: 64
                 height: parent.height
                 label: "ROOM"
+                // One aligned outer glow. The inherited text shadow
+                // doubled the halo and appeared offset in this narrow row.
+                contentGlowEnabled: false
                 compactIcon: "ROOM"
                 accent: Colors.magenta
                 actionDescription: "Open permanent Room briefing, handoff, decisions and recovery context"
@@ -3342,6 +3350,9 @@ PanelWindow {
                 width: 64
                 height: parent.height
                 label: "CHAT"
+                // One aligned outer glow. The inherited text shadow
+                // doubled the halo and appeared offset in this narrow row.
+                contentGlowEnabled: false
                 compactIcon: "CHAT"
                 accent: Colors.cyan
                 actionDescription: "Read the saved Room transcript"
@@ -3351,6 +3362,9 @@ PanelWindow {
                 width: 67
                 height: parent.height
                 label: "QUICK"
+                // One aligned outer glow. The inherited text shadow
+                // doubled the halo and appeared offset in this narrow row.
+                contentGlowEnabled: false
                 compactIcon: "QUICK"
                 accent: Colors.orange
                 actionDescription: "Inspect exact PX Session and Quick commands"
@@ -3360,6 +3374,9 @@ PanelWindow {
                 width: 66
                 height: parent.height
                 label: "LINKS"
+                // One aligned outer glow. The inherited text shadow
+                // doubled the halo and appeared offset in this narrow row.
+                contentGlowEnabled: false
                 compactIcon: "LINK"
                 accent: rosterRow.connectionColor
                 actionDescription: "Inspect Room / Doctor / Provider / Assignment bindings"
@@ -6148,13 +6165,41 @@ PanelWindow {
                 spacing: 8
 
                 SectionLabel {
-                    width: parent.width - 143
+                    width: parent.width - (root.workforceRosterVisible ? 239 : 143)
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.workforceRosterVisible
                         ? "WORKERS // " + root.workforceRosterRows.length
                             + "  ATTN // " + root.workforceAttentionCount
                         : "OPERATING ROOMS // GIT"
                     elide: Text.ElideRight
+                }
+                Rectangle {
+                    width: root.workforceRosterVisible ? 88 : 0
+                    height: 22
+                    visible: root.workforceRosterVisible
+                    color: managerToggleMouse.pressed ? Colors.magenta : Colors.black
+                    border.width: 1
+                    border.color: root.workforceManagerExpanded ? Colors.magenta : Colors.cyan
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: root.workforceManagerExpanded ? "CLOSE MGR" : "MANAGE +"
+                        font.pixelSize: 9
+                        color: managerToggleMouse.pressed ? Colors.black : Colors.cyan
+                    }
+                    MouseArea {
+                        id: managerToggleMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root.workforceManagerExpanded = !root.workforceManagerExpanded;
+                            if (root.workforceManagerExpanded) {
+                                responsibilityService.refreshDurableGraph();
+                                if (!doctorService.refreshing)
+                                    doctorService.refresh();
+                            }
+                        }
+                    }
                 }
                 Rectangle {
                     width: 135
@@ -6258,6 +6303,28 @@ PanelWindow {
                     font.pixelSize: 9
                     color: Colors.cyan
                     elide: Text.ElideRight
+                }
+
+                HospitalWorkforceManagerView {
+                    id: inlineWorkforceManager
+                    width: parent.width
+                    active: root.menuOpen && root.workforceRosterVisible
+                        && root.workforceManagerExpanded
+                    doctorService: doctorService
+                    rooms: responsibilityService.durableRooms
+                    sessions: responsibilityService.durableSessions
+                    roomsLoaded: responsibilityService.roomsLoaded
+                    sessionsLoaded: responsibilityService.sessionsLoaded
+                    registryError: responsibilityService.graphError
+                    registryBusy: responsibilityService.graphLoading
+                        || doctorService.refreshing
+                    suggestedRepository: patientService.repository
+                    onRosterRefreshRequested: {
+                        if (!responsibilityService.graphLoading)
+                            responsibilityService.refreshDurableGraph();
+                        if (!doctorService.refreshing)
+                            doctorService.refresh();
+                    }
                 }
 
                 Repeater {

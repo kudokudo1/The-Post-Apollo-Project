@@ -8635,8 +8635,8 @@ PanelWindow {
                 p.value,[...systemResults.values]);
             if(index<0) return false;
         } else if(p.kind==="thermal") {
-            const current=ThermalFavoriteSelection.resolve(
-                p.value,favoriteStore.favoriteKeys,thermalRows,fanRows);
+            const current=ThermalFavoriteSelection.resolveVisible(
+                p.value,thermalRows,fanRows);
             if(!current.ok) return false;
             const expectedView=current.kind==="fan"
                 ? thermalController.thermalViewFans
@@ -8739,8 +8739,10 @@ PanelWindow {
         return true;
     }
 
-    // U7b-E // Selection-only view of an existing saved temperature/fan
-    // reading. No fan unlock, PWM write, subprocess or sensor controls.
+    // U7b-G // A saved FAVORITE is a navigation link, not an access grant.
+    // This read-only view resolves the token against AppControl's actual
+    // live sensor rows; stale store snapshots do not block a visible sensor.
+    // No fan unlock, PWM write, subprocess or sensor controls.
     function selectSavedThermal(token) {
         if(!ThermalFavoriteSelection.validToken(token)) return false;
         // The token's first letter is an allowlisted VIEW type, not an
@@ -8752,13 +8754,15 @@ PanelWindow {
             ? thermalController.thermalViewFans
             : thermalController.thermalViewThermal);
         searchInput.text="";
-        const original=ThermalFavoriteSelection.resolve(
-            token,favoriteStore.favoriteKeys,thermalRows,fanRows);
+        const original=ThermalFavoriteSelection.resolveVisible(
+            token,thermalRows,fanRows);
         if(!original.ok)
             return deferFavoriteSelection("thermal",token,thermalModeIndex,
-                "SAVED SENSOR NOT FOUND IN CURRENT READINGS // THERMAL IS OPEN");
-        const current=ThermalFavoriteSelection.resolve(
-            token,favoriteStore.favoriteKeys,thermalRows,fanRows);
+                original.reason==="AMBIGUOUS_LIVE_ID"
+                ? "SAVED SENSOR ID AMBIGUOUS // THERMAL IS OPEN"
+                : "SAVED SENSOR NOT FOUND IN CURRENT READINGS // THERMAL IS OPEN");
+        const current=ThermalFavoriteSelection.resolveVisible(
+            token,thermalRows,fanRows);
         if(!current.ok || current.sourceId!==original.sourceId
                 || current.kind!==original.kind)
             return deferFavoriteSelection("thermal",token,thermalModeIndex,
@@ -8779,8 +8783,8 @@ PanelWindow {
                         original.kind==="fan" ? thermalController.thermalViewFans
                                               : thermalController.thermalViewThermal))
                 return;
-            const verified=ThermalFavoriteSelection.resolve(
-                token,favoriteStore.favoriteKeys,thermalRows,fanRows);
+            const verified=ThermalFavoriteSelection.resolveVisible(
+                token,thermalRows,fanRows);
             if(!verified.ok || verified.kind!==original.kind
                     || verified.sourceId!==original.sourceId)
                 return;

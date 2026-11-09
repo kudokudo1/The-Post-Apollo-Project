@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from MachineSwayRead import _read_json, PreviewError
 from MachineGeometryV2 import project_geometry, GeometryError
 from MachineGeometryStoreV2 import (save_pair, GeometryStoreError)
+from MachineCaptureSelectionV2 import select_geometry, SelectionError
 from MachineCheckpointStore import validate as validate_legacy, StoreError
 
 MAX_TREE_DEPTH = 48
@@ -113,12 +114,12 @@ def _legacy_from_geometry(geometry, *, label, captured_at):
     })
 
 
-def capture_and_save(*, label="DESKTOP CHECKPOINT",
+def capture_and_save(*, label="DESKTOP CHECKPOINT", selection=None,
                      read_runner=subprocess.run,
                      store_adapter=save_pair,
                      key_factory=lambda: str(uuid.uuid4()),
                      clock=lambda: dt.datetime.now(dt.timezone.utc)):
-    """A single explicit save; no preview, selection or UI dependency.
+    """A single explicit save; optional scoped selection, no preview or UI dependency.
 
     No disk access is attempted if any read, validation or stability check
     fails. The storage owner handles all-or-nothing rollback on write failure.
@@ -139,6 +140,9 @@ def capture_and_save(*, label="DESKTOP CHECKPOINT",
         again = project_geometry(*second, window_keys=keys)
         if again != geometry:
             raise CaptureError("DESKTOP CHANGED WHILE SAVING; TRY AGAIN")
+        # Optional custom scope prunes the same verified geometry tree.
+        # The ordinary SAVE path leaves selection None and includes all.
+        geometry = select_geometry(geometry, selection)
         current = clock()
         if (not isinstance(current, dt.datetime)
                 or current.tzinfo is None
@@ -148,5 +152,7 @@ def capture_and_save(*, label="DESKTOP CHECKPOINT",
         legacy = _legacy_from_geometry(
             geometry, label=label, captured_at=captured)
         return store_adapter(legacy, geometry)
+    except SelectionError as exc:
+        raise CaptureError(str(exc)) from exc
     except (PreviewError, GeometryError, StoreError, GeometryStoreError) as exc:
         raise CaptureError("DESKTOP CAPTURE UNAVAILABLE") from exc

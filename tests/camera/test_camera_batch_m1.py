@@ -101,6 +101,7 @@ class CameraBatchM1Tests(unittest.TestCase):
         receipt = camera.trash_batch(plan["planId"], "MOVE_TO_TRASH")
         self.assertEqual((receipt["moved"], receipt["skipped"], receipt["failed"]),
                          (2, 0, 0))
+        self.assertEqual(receipt["unmovedPaths"], [])
         self.assertEqual(run.call_count, 2)
         self.assertEqual(run.call_args_list[0].args[0],
                          ["/usr/bin/gio", "trash", str(self.a)])
@@ -116,9 +117,24 @@ class CameraBatchM1Tests(unittest.TestCase):
         receipt = camera.trash_batch(plan["planId"], "MOVE_TO_TRASH")
         self.assertEqual((receipt["moved"], receipt["skipped"], receipt["failed"]),
                          (1, 1, 0))
+        self.assertEqual(receipt["unmovedPaths"], [str(self.b)])
         self.assertEqual(run.call_count, 1)
         self.assertEqual(run.call_args.args[0][-1], str(self.a))
         self.assertTrue(self.b.exists())
+
+    def test_failed_gio_move_preserves_exact_unmoved_path(self):
+        plan = self.preview()
+        with patch.object(camera.shutil, "which", return_value="/usr/bin/gio"), \
+                patch.object(camera.subprocess, "run",
+                             side_effect=[Mock(returncode=0), Mock(returncode=1)]) as run:
+            receipt = camera.trash_batch(plan["planId"], "MOVE_TO_TRASH")
+        self.assertTrue(receipt["ok"])
+        self.assertEqual((receipt["moved"], receipt["skipped"], receipt["failed"]),
+                         (1, 0, 1))
+        self.assertEqual(receipt["unmovedPaths"], [str(self.b)])
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(camera.trash_batch(plan["planId"], "MOVE_TO_TRASH")["error"],
+                         "PLAN_NOT_FOUND")
 
     def test_expired_plan_cannot_move_anything(self):
         plan = self.preview()

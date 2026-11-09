@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""M1o: UI cannot grant an approval or dispatch/undo a move."""
+"""M1o read-only review remains separate from M1r explicit move action."""
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[2]
@@ -29,7 +29,7 @@ for term in (
     'PENDING // NO AUTOMATIC RETRY OR UNDO',
     'machineStepPendingMove(-1)',
     'machineStepPendingMove(1)',
-    'NO SCREENSHOTS OR RESTORATION ACTIVE',
+    'NO SCREENSHOTS OR AUTOMATIC RESTORATION',
 ):
     assert term in qml, term
 for term in (
@@ -59,5 +59,5 @@ for forbidden in (
     "approval_token:",
 ):
     assert forbidden not in qml, forbidden
-assert qml.count("Process {") == 12
+assert qml.count("Process {") == 13
 print("TIMEW MACHINE M1O: READ-ONLY UI / NO-APPLY CONTRACT PASS")

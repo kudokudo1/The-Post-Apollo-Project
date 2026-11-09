@@ -49,6 +49,7 @@ assert.equal(inspect({}).connectionStatus,
 
 // Existing authority/owner paths are read, never overwritten.
 const overview=read("widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml");
+const upper=read("widgets/cpuplus/CpuPlusUniversalSignInHeaderPane.qml");
 const cpu=read("widgets/CpuPlusW.qml");
 const details=read("widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml");
 const broker=read("services/connections/ConnectionsBroker.qml");
@@ -59,12 +60,12 @@ const policySource=read("services/connections/ConnectionsUnifiedSignInPolicy.js"
 for(const s of [
  'signal idManagementRequested()',
  'text: "UNIVERSAL SIGN-IN // CONTROL"',
- 'text: overview.signIn.identityStatus',
- 'text: overview.signIn.connectionStatus',
- 'text: overview.signIn.providerStatus',
- 'text: overview.signIn.batchStatus',
+ 'text: upperSignIn.signIn.identityStatus',
+ 'text: upperSignIn.signIn.connectionStatus',
+ 'text: upperSignIn.signIn.providerStatus',
+ 'text: upperSignIn.signIn.batchStatus',
  'label: "OPEN ID MANAGEMENT"',
- 'onClicked: overview.idManagementRequested()',
+ 'onClicked: upperSignIn.idManagementRequested()',
  'INSPECT LOCAL HOST',
  'onClicked: ConnectionsHostObservation.inspect()',
  'identityHostConnected: false',
@@ -72,8 +73,26 @@ for(const s of [
  'credentialHostAuthenticated: ConnectionsRequestStatus.hostAuthenticated',
  'credentialActionsEnabled: ConnectionsBroker.credentialActionsEnabled',
  'operatorConsentAuthenticated: ConnectionsRequestStatus.canApprove'
-]) assert.ok(overview.includes(s),s);
+]) assert.ok(upper.includes(s),s);
 assert.ok(cpu.includes("onIdManagementRequested:"));
+assert.ok(cpu.includes("CpuPlusUniversalSignInHeaderPane {"));
+assert.ok(cpu.includes("id: universalSignInUpperPane"));
+assert.ok(cpu.includes("anchors.top: sharedHeaderLine.bottom"));
+assert.ok(cpu.includes("anchors.top: universalSignInUpperPane.visible"));
+assert.ok(cpu.includes("? universalSignInUpperPane.bottom"));
+assert.ok(cpu.includes(": selectedMonitorIdentity.bottom"));
+assert.ok(cpu.includes("height: visible ? implicitHeight : 0"));
+assert.ok(cpu.indexOf("CpuPlusUniversalSignInHeaderPane {")
+          < cpu.indexOf("id: sharedStateHeader"));
+assert.ok(!overview.includes('UNIVERSAL SIGN-IN // CONTROL'));
+assert.ok(!overview.includes("overview.signIn"));
+assert.ok(overview.includes('text: "SOCIAL // REUSED IDENTITY"'));
+assert.ok(overview.includes('text: "CONNECTION INVENTORY"'));
+assert.ok(!overview.includes('label: "OPEN ID MANAGEMENT"'));
+assert.ok(!overview.includes("signal idManagementRequested()"));
+assert.ok(upper.includes("signal idManagementRequested()"));
+assert.ok(upper.includes("implicitHeight: controlContent.implicitHeight + 20"));
+assert.ok(upper.includes("ConnectionsHostObservation.inspect()"));
 assert.ok(cpu.includes("cpuPlusWindow.selectMode(5);"));
 assert.ok(cpu.includes('cpuPlusWindow.selectLocalManagementSection("IDS");'));
 assert.ok(cpu.includes('cpuPlusWindow.settingsSubMode === "CONNECTIONS"'));
@@ -86,7 +105,7 @@ assert.match(request,/readonly property bool hostAuthenticated: false/);
 assert.match(request,/readonly property bool canApprove: false/);
 assert.match(host,/readonly property bool hostAuthenticated: false/);
 assert.match(host,/readonly property bool credentialActionsEnabled: false/);
-for(const src of [overview,policySource]){
+for(const src of [overview,upper,policySource]){
   for(const forbidden of [
     "createIdentity(","selectIdentity(","log_out(","startLogin(",
     "begin_login(","ConnectionsBroker.approve(","setCredential(",
@@ -94,5 +113,6 @@ for(const src of [overview,policySource]){
     "Quickshell.env(","Process {","FileView {","session.unlink("
   ]) assert.ok(!src.includes(forbidden),"UI may not mutate auth: "+forbidden);
 }
+assert.doesNotMatch(upper,/label:\s*"(?:SIGN IN|CONNECT ALL|DISCONNECT|APPROVE ACCESS)"/);
 assert.doesNotMatch(overview,/label:\s*"(?:SIGN IN|CONNECT ALL|DISCONNECT|APPROVE ACCESS)"/);
 console.log("CPU++ Universal Sign-In visual integration: fail-closed gates and real UI navigation PASS");

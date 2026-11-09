@@ -74,6 +74,21 @@ PanelWindow {
     property string huntLastEvent: "READY // NEW ROUND"
     // Player choice affects NEW rounds, never existing targets.
     property int huntSpawnCount: 3
+    // Hunt M3d progression: baseline +1 target per 5 completed rounds,
+    // movement speed +10% per 5 rounds, bounded at 10 and 2.5x.
+    property int huntTargetsPerTier: 1
+    property int huntTargetsEvery: 5
+    property int huntSpeedGainPercent: 10
+    property int huntSpeedEvery: 5
+    property real huntRoundSpeed: 1.0
+    property int huntRoundSpawnCount: 3
+    property bool huntAutoRounds: true
+    property bool huntAutoPending: false
+    property bool huntSettingsOpen: false
+    property bool huntScoped: false
+    readonly property real huntScopeScale: huntScoped ? 1.85 : 1
+    readonly property real huntScopeSwayX: huntScoped ? 2.2 * Math.sin(huntTick * 0.19) : 0
+    readonly property real huntScopeSwayY: huntScoped ? 1.8 * Math.cos(huntTick * 0.23) : 0
     property real huntMouseX: 0.5
     property real huntMouseY: 0.5
     property bool huntMouseActive: false
@@ -441,6 +456,11 @@ PanelWindow {
             huntCombo = 0;
             huntScore = 0;
             huntLastEvent = "READY // NEW ROUND";
+            huntAutoPending = false;
+            huntScoped = false;
+            huntSettingsOpen = false;
+            huntRoundSpeed = 1.0;
+            huntRoundSpawnCount = huntSpawnCount;
             huntMouseActive = false;
             huntMouseMovingTicks = 0;
             huntMouseVX = 0;
@@ -610,6 +630,68 @@ PanelWindow {
         return true;
     }
 
+    function huntSetProgression(name, value) {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || !Number.isFinite(Number(value)))
+            return false;
+        const numeric = Math.round(Number(value));
+        if (name === "targetGain")
+            huntTargetsPerTier = Math.max(0, Math.min(5, numeric));
+        else if (name === "targetEvery")
+            huntTargetsEvery = Math.max(1, Math.min(50, numeric));
+        else if (name === "speedGain")
+            huntSpeedGainPercent = Math.max(0, Math.min(50, numeric));
+        else if (name === "speedEvery")
+            huntSpeedEvery = Math.max(1, Math.min(50, numeric));
+        else
+            return false;
+        return true;
+    }
+
+    function huntSetAutoRounds(enabled) {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt")
+            return false;
+        huntAutoRounds = enabled === true;
+        if (!huntAutoRounds)
+            huntAutoPending = false;
+        else if (huntRoundComplete && huntTargets.length === 0)
+            huntAutoPending = true;
+        return true;
+    }
+
+    function huntToggleSettings() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt")
+            return false;
+        huntSettingsOpen = !huntSettingsOpen;
+        if (huntSettingsOpen) {
+            huntPaused = true;
+            huntScoped = false;
+        }
+        return true;
+    }
+
+    function huntSetScoped(enabled) {
+        if (activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || busy || huntPaused || huntRoundComplete
+                || huntTargets.length === 0 || huntSettingsOpen) {
+            huntScoped = false;
+            return false;
+        }
+        huntScoped = enabled === true;
+        return true;
+    }
+
+    function huntAutoStartNext() {
+        if (!huntAutoPending || !huntAutoRounds || busy
+                || huntSettingsOpen || activeView !== "cleanup"
+                || cleanupTechnique !== "hunt" || !huntRoundComplete)
+            return false;
+        // One shot only. A depleted library or full queue must NOT start
+        // an endless timer loop attempting to launch again.
+        huntAutoPending = false;
+        return huntStartRound();
+    }
+
     // Cursor motion decays after half a second of inactivity. The fox uses
     // moving vs. stationary state, not absolute pointer coordinates alone.
     function huntSetPointer(x, y, width, height) {
@@ -637,6 +719,7 @@ PanelWindow {
         if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
                 || (!huntRoundComplete && huntTargets.length > 0))
             return false;
+        huntAutoPending = false;
         if (batchPaths.length >= 500) {
             feedback = "HUNT // QUEUE FULL // REVIEW OR CLEAR";
             return false;
@@ -665,7 +748,10 @@ PanelWindow {
             eligible[i] = eligible[j];
             eligible[j] = tmp;
         }
-        const picked = eligible.slice(0, Math.min(huntSpawnCount, eligible.length));
+        const nextRound = huntRound + 1;
+        const requested = HuntMotion.spawnForRound(
+            huntSpawnCount, huntTargetsPerTier, huntTargetsEvery, nextRound);
+        const picked = eligible.slice(0, Math.min(requested, eligible.length));
         // Deal shuffled sets of all five profiles before repeating.
         // 1-5 spawns are distinct; 6-10 can repeat in a new shuffle.
         let profiles = [];
@@ -685,7 +771,12 @@ PanelWindow {
         }
         huntTargets = targets;
         huntHistory = [];
-        huntRound += 1;
+        huntAutoPending = false;
+        huntScoped = false;
+        huntRoundSpeed = HuntMotion.speedForRound(
+            huntSpeedGainPercent, huntSpeedEvery, nextRound);
+        huntRoundSpawnCount = targets.length;
+        huntRound = nextRound;
         huntTick = 0;
         huntSecondsLeft = 25;
         huntCombo = 0;
@@ -693,7 +784,8 @@ PanelWindow {
         huntPaused = false;
         huntLastEvent = "ROUND " + huntRound + " // FIRE TO QUEUE";
         feedback = "HUNT // ROUND " + huntRound
-                   + " // " + targets.length + " LOADED MEDIA TARGETS";
+                   + " // " + targets.length + " TARGETS // SPEED "
+                   + huntRoundSpeed.toFixed(2) + "X";
         return true;
     }
 
@@ -714,7 +806,8 @@ PanelWindow {
             huntMouseMovingTicks -= 1;
         const nextTargets = [];
         for (let i = 0; i < huntTargets.length; i++)
-            nextTargets.push(HuntMotion.advanceTarget(huntTargets[i], pointer));
+            nextTargets.push(HuntMotion.advanceTarget(
+                huntTargets[i], pointer, huntRoundSpeed));
         huntTargets = nextTargets;
         huntTick++;
         huntSecondsLeft = Math.max(0, 25 - Math.floor(huntTick / 10));
@@ -725,6 +818,8 @@ PanelWindow {
             huntHistory = [];
             huntPaused = true;
             huntRoundComplete = true;
+            huntAutoPending = huntAutoRounds;
+            huntScoped = false;
             huntCombo = 0;
             huntLastEvent = "TIME UP // UNHIT FILES STAY UNTOUCHED";
             feedback = huntLastEvent;
@@ -737,6 +832,7 @@ PanelWindow {
                 || huntRoundComplete || huntTargets.length === 0)
             return false;
         huntPaused = !huntPaused;
+        if (huntPaused) huntScoped = false;
         huntLastEvent = huntPaused ? "PAUSED // NO SHOTS" : "RESUMED // HUNT";
         return true;
     }
@@ -793,7 +889,9 @@ PanelWindow {
             if (huntTargets.length === 0) {
                 huntRoundComplete = true;
                 huntPaused = true;
-                huntLastEvent = "ROUND CLEARED // REVIEW QUEUE OR NEXT ROUND";
+                huntAutoPending = huntAutoRounds;
+                huntScoped = false;
+                huntLastEvent = "ROUND CLEARED // AUTO NEXT OR REVIEW QUEUE";
             }
         }
         feedback = "HUNT // " + huntLastEvent + " // SCORE " + huntScore;
@@ -807,6 +905,8 @@ PanelWindow {
         const history = huntHistory.slice();
         const last = history.pop();
         huntHistory = history;
+        huntAutoPending = false;
+        huntScoped = false;
         huntTargets = last.targets.slice();
         batchPaths = last.paths.slice();
         huntShots = last.shots;
@@ -1162,6 +1262,8 @@ PanelWindow {
             huntHistory = [];
             huntTargets = [];
             huntPaused = true;
+            huntScoped = false;
+            huntAutoPending = false;
             Qt.callLater(function() { camera.loadGallery(false, "cleanup"); });
         } else if (action === "previewSelected") {
             if (payload.path === selectedPath) {
@@ -2745,8 +2847,12 @@ PanelWindow {
                                 available: !camera.busy
                                 onLeftClicked: {
                                     if (camera.cleanupTechnique === "hunt"
-                                            && modelData.id !== "hunt")
+                                            && modelData.id !== "hunt") {
                                         camera.huntPaused = true;
+                                        camera.huntScoped = false;
+                                        camera.huntAutoPending = false;
+                                        camera.huntSettingsOpen = false;
+                                    }
                                     camera.cleanupTechnique = modelData.id;
                                     camera.huntMouseActive = false;
                                     camera.huntMouseMovingTicks = 0;
@@ -3289,6 +3395,18 @@ PanelWindow {
                                 }
                             }
                             Timer {
+                                id: huntAutoNextTimer
+                                interval: 1250
+                                repeat: false
+                                running: camera.menuOpen && camera.huntAutoRounds
+                                         && camera.huntAutoPending
+                                         && !camera.huntSettingsOpen
+                                         && camera.activeView === "cleanup"
+                                         && camera.cleanupTechnique === "hunt"
+                                         && !camera.busy
+                                onTriggered: camera.huntAutoStartNext()
+                            }
+                            Timer {
                                 id: huntClock
                                 interval: 100
                                 repeat: true
@@ -3332,6 +3450,7 @@ PanelWindow {
                                                ? Colors.red : Colors.yellow
                                         text: "ROUND " + camera.huntRound
                                               + " // " + camera.huntSecondsLeft + " SEC"
+                                              + " // " + camera.huntRoundSpeed.toFixed(2) + "X"
                                     }
                                 }
 
@@ -3341,7 +3460,7 @@ PanelWindow {
                                     height: 27
                                     spacing: 6
                                     ActionButton {
-                                        width: Math.max(72, parent.width * 0.28)
+                                        width: (parent.width - 18) * 0.22
                                         height: 26
                                         label: "SPAWN -"
                                         labelPixelSize: 10
@@ -3351,8 +3470,7 @@ PanelWindow {
                                                            camera.huntSpawnCount - 1)
                                     }
                                     GohuText {
-                                        width: parent.width - 2 * Math.max(72, parent.width * 0.28)
-                                               - 12
+                                        width: (parent.width - 18) * 0.34
                                         height: 26
                                         verticalAlignment: Text.AlignVCenter
                                         horizontalAlignment: Text.AlignHCenter
@@ -3362,7 +3480,7 @@ PanelWindow {
                                               + " / 10"
                                     }
                                     ActionButton {
-                                        width: Math.max(72, parent.width * 0.28)
+                                        width: (parent.width - 18) * 0.22
                                         height: 26
                                         label: "SPAWN +"
                                         labelPixelSize: 10
@@ -3370,6 +3488,15 @@ PanelWindow {
                                         available: !camera.busy && camera.huntSpawnCount < 10
                                         onLeftClicked: camera.huntSetSpawnCount(
                                                            camera.huntSpawnCount + 1)
+                                    }
+                                    ActionButton {
+                                        width: (parent.width - 18) * 0.22
+                                        height: 26
+                                        label: "SETTINGS"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.yellow
+                                        selected: camera.huntSettingsOpen
+                                        onLeftClicked: camera.huntToggleSettings()
                                     }
                                 }
 
@@ -3397,6 +3524,7 @@ PanelWindow {
                                     MouseArea {
                                         anchors.fill: parent
                                         enabled: !camera.huntPaused && !camera.busy
+                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
                                         hoverEnabled: true
                                         cursorShape: Qt.CrossCursor
                                         onPositionChanged: function(mouse) {
@@ -3408,9 +3536,23 @@ PanelWindow {
                                             camera.huntMouseActive = false;
                                             camera.huntMouseMovingTicks = 0;
                                         }
-                                        onClicked: {
+                                        onPressed: function(mouse) {
                                             huntArena.forceActiveFocus();
-                                            camera.huntFire("");
+                                            if (mouse.button === Qt.RightButton) {
+                                                camera.huntSetPointer(mouse.x, mouse.y,
+                                                                      huntArena.width,
+                                                                      huntArena.height);
+                                                camera.huntSetScoped(true);
+                                            }
+                                        }
+                                        onReleased: function(mouse) {
+                                            if (mouse.button === Qt.RightButton)
+                                                camera.huntSetScoped(false);
+                                        }
+                                        onCanceled: camera.huntSetScoped(false)
+                                        onClicked: function(mouse) {
+                                            if (mouse.button === Qt.LeftButton)
+                                                camera.huntFire("");
                                         }
                                     }
                                     Repeater {
@@ -3427,19 +3569,35 @@ PanelWindow {
                                             readonly property real crowdScale: Math.max(
                                                 0.63, Math.min(1, Math.sqrt(
                                                     3 / Math.max(3, camera.huntTargets.length))))
-                                            width: Math.min(Math.max(40, huntArena.width - 16),
+                                            readonly property real unscopedWidth: Math.min(
+                                                Math.max(40, huntArena.width - 16),
                                                 Math.min(170, Math.max(90,
                                                     huntArena.width / 4.6))
                                                 * target.sizeScale * crowdScale)
-                                            height: Math.min(Math.max(30, huntArena.height - 12),
+                                            readonly property real unscopedHeight: Math.min(
+                                                Math.max(30, huntArena.height - 12),
                                                 Math.min(88, Math.max(51,
                                                     huntArena.height / 4.3))
                                                 * target.sizeScale * crowdScale)
+                                            readonly property real unscopedX: 8 + Math.max(
+                                                0, huntArena.width - unscopedWidth - 16)
+                                                * target.xNorm
+                                            readonly property real unscopedY: 6 + Math.max(
+                                                0, huntArena.height - unscopedHeight - 12)
+                                                * target.yNorm
+                                            width: unscopedWidth * camera.huntScopeScale
+                                            height: unscopedHeight * camera.huntScopeScale
                                             z: target.profile === "ox" ? 40 : 2
-                                            x: 8 + Math.max(0, huntArena.width - width - 16)
-                                               * target.xNorm
-                                            y: 6 + Math.max(0, huntArena.height - height - 12)
-                                               * target.yNorm
+                                            // The magnified *hitbox* follows the actual
+                                            // magnified thumbnail, not the old world rect.
+                                            x: (unscopedX - huntArena.width * camera.huntMouseX)
+                                               * camera.huntScopeScale
+                                               + huntArena.width * camera.huntMouseX
+                                               + camera.huntScopeSwayX
+                                            y: (unscopedY - huntArena.height * camera.huntMouseY)
+                                               * camera.huntScopeScale
+                                               + huntArena.height * camera.huntMouseY
+                                               + camera.huntScopeSwayY
                                             Behavior on x {
                                                 NumberAnimation {
                                                     duration: 100
@@ -3502,6 +3660,7 @@ PanelWindow {
                                                 MouseArea {
                                                     anchors.fill: parent
                                                     enabled: !camera.huntPaused && !camera.busy
+                                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                                                     hoverEnabled: true
                                                     cursorShape: Qt.CrossCursor
                                                     onPositionChanged: function(mouse) {
@@ -3511,11 +3670,77 @@ PanelWindow {
                                                             position.x, position.y,
                                                             huntArena.width, huntArena.height);
                                                     }
-                                                    onPressed: huntArena.forceActiveFocus()
-                                                    onClicked: camera.huntFire(
-                                                                   huntTargetItem.target.path)
+                                                    onPressed: function(mouse) {
+                                                        huntArena.forceActiveFocus();
+                                                        if (mouse.button === Qt.RightButton) {
+                                                            const pos = mapToItem(
+                                                                huntArena, mouse.x, mouse.y);
+                                                            camera.huntSetPointer(
+                                                                pos.x, pos.y,
+                                                                huntArena.width, huntArena.height);
+                                                            camera.huntSetScoped(true);
+                                                        }
+                                                    }
+                                                    onReleased: function(mouse) {
+                                                        if (mouse.button === Qt.RightButton)
+                                                            camera.huntSetScoped(false);
+                                                    }
+                                                    onCanceled: camera.huntSetScoped(false)
+                                                    onClicked: function(mouse) {
+                                                        if (mouse.button === Qt.LeftButton)
+                                                            camera.huntFire(
+                                                                huntTargetItem.target.path);
+                                                    }
                                                 }
                                             }
+                                        }
+                                    }
+                                    Item {
+                                        id: huntScopeReticle
+                                        anchors.fill: parent
+                                        z: 90
+                                        visible: camera.huntScoped
+                                        // Non-interactive optical overlay. Target
+                                        // MouseAreas underneath keep their exact bounds.
+                                        Rectangle {
+                                            x: parent.width * camera.huntMouseX - width / 2
+                                               + camera.huntScopeSwayX
+                                            y: parent.height * camera.huntMouseY - height / 2
+                                               + camera.huntScopeSwayY
+                                            width: 122
+                                            height: 122
+                                            radius: 61
+                                            color: "transparent"
+                                            border.width: 2
+                                            border.color: Colors.cyan
+                                            Rectangle {
+                                                anchors.centerIn: parent
+                                                width: 1
+                                                height: 110
+                                                color: Colors.cyan
+                                                opacity: 0.65
+                                            }
+                                            Rectangle {
+                                                anchors.centerIn: parent
+                                                width: 110
+                                                height: 1
+                                                color: Colors.cyan
+                                                opacity: 0.65
+                                            }
+                                            Rectangle {
+                                                anchors.centerIn: parent
+                                                width: 7
+                                                height: 7
+                                                radius: 4
+                                                color: Colors.magenta
+                                            }
+                                        }
+                                        GohuText {
+                                            x: 6
+                                            y: 5
+                                            color: Colors.yellow
+                                            font.pixelSize: 10
+                                            text: "SCOPE // 1.85X // HOLD RIGHT"
                                         }
                                     }
                                     GohuText {
@@ -3590,7 +3815,155 @@ PanelWindow {
                                     elide: Text.ElideRight
                                     text: camera.huntLastEvent
                                           + " // " + camera.batchPaths.length
-                                          + " MARKED FOR REVIEW"
+                                          + " MARKED // RIGHT-HOLD SCOPE"
+                                }
+                            }
+
+                            Rectangle {
+                                id: huntSettingsOverlay
+                                anchors.fill: parent
+                                z: 200
+                                visible: camera.huntSettingsOpen
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.magenta
+                                radius: 5
+
+                                Flickable {
+                                    id: huntSettingsScroll
+                                    anchors.fill: parent
+                                    anchors.margins: 8
+                                    clip: true
+                                    boundsBehavior: Flickable.StopAtBounds
+                                    contentHeight: huntSettingsColumn.implicitHeight
+                                    Column {
+                                        id: huntSettingsColumn
+                                        width: huntSettingsScroll.width
+                                        spacing: 7
+                                        GohuText {
+                                            width: parent.width
+                                            height: 23
+                                            color: Colors.magenta
+                                            font.pixelSize: 13
+                                            text: "HUNT // ROUND PROGRESSION"
+                                        }
+                                        GohuText {
+                                            width: parent.width
+                                            height: 23
+                                            color: Colors.cyan
+                                            font.pixelSize: 9
+                                            wrapMode: Text.WordWrap
+                                            text: "START " + camera.huntSpawnCount
+                                                  + " // MAX 10 TARGETS // SPEED MAX 2.50X"
+                                        }
+                                        ActionButton {
+                                            width: parent.width
+                                            height: 30
+                                            label: camera.huntAutoRounds
+                                                   ? "AUTO NEXT ROUND // ON"
+                                                   : "AUTO NEXT ROUND // OFF"
+                                            labelPixelSize: 10
+                                            selected: camera.huntAutoRounds
+                                            accentColor: Colors.yellow
+                                            onLeftClicked: camera.huntSetAutoRounds(
+                                                               !camera.huntAutoRounds)
+                                        }
+                                        Repeater {
+                                            model: [
+                                                {id: "targetGain", label: "ADD TARGETS / TIER", step: 1, low: 0, high: 5},
+                                                {id: "targetEvery", label: "ADD EVERY N ROUNDS", step: 1, low: 1, high: 50},
+                                                {id: "speedGain", label: "SPEED GAIN / TIER", step: 5, low: 0, high: 50},
+                                                {id: "speedEvery", label: "SPEED EVERY N ROUNDS", step: 1, low: 1, high: 50}
+                                            ]
+                                            delegate: Row {
+                                                id: huntProgressionRow
+                                                width: huntSettingsColumn.width
+                                                height: 34
+                                                spacing: 5
+                                                readonly property int currentValue:
+                                                    modelData.id === "targetGain" ? camera.huntTargetsPerTier
+                                                    : modelData.id === "targetEvery" ? camera.huntTargetsEvery
+                                                    : modelData.id === "speedGain" ? camera.huntSpeedGainPercent
+                                                    : camera.huntSpeedEvery
+                                                GohuText {
+                                                    width: (huntProgressionRow.width - 15) * 0.43
+                                                    height: 33
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    color: Colors.white
+                                                    font.pixelSize: 9
+                                                    text: modelData.label
+                                                }
+                                                ActionButton {
+                                                    width: (huntProgressionRow.width - 15) * 0.17
+                                                    height: 32
+                                                    label: "−"
+                                                    accentColor: Colors.cyan
+                                                    available: !camera.busy
+                                                               && huntProgressionRow.currentValue > modelData.low
+                                                    onLeftClicked: camera.huntSetProgression(
+                                                        modelData.id,
+                                                        huntProgressionRow.currentValue - modelData.step)
+                                                }
+                                                GohuText {
+                                                    width: (huntProgressionRow.width - 15) * 0.23
+                                                    height: 33
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    horizontalAlignment: Text.AlignHCenter
+                                                    color: Colors.yellow
+                                                    font.pixelSize: 11
+                                                    text: modelData.id === "speedGain"
+                                                          ? "+" + huntProgressionRow.currentValue + "%"
+                                                          : "" + huntProgressionRow.currentValue
+                                                }
+                                                ActionButton {
+                                                    width: (huntProgressionRow.width - 15) * 0.17
+                                                    height: 32
+                                                    label: "+"
+                                                    accentColor: Colors.magenta
+                                                    available: !camera.busy
+                                                               && huntProgressionRow.currentValue < modelData.high
+                                                    onLeftClicked: camera.huntSetProgression(
+                                                        modelData.id,
+                                                        huntProgressionRow.currentValue + modelData.step)
+                                                }
+                                            }
+                                        }
+                                        GohuText {
+                                            width: parent.width
+                                            height: 39
+                                            font.pixelSize: 10
+                                            wrapMode: Text.WordWrap
+                                            color: Colors.cyan
+                                            text: "ROUND " + (camera.huntRound + 1)
+                                                + " FORECAST // "
+                                                + HuntMotion.spawnForRound(
+                                                    camera.huntSpawnCount,
+                                                    camera.huntTargetsPerTier,
+                                                    camera.huntTargetsEvery,
+                                                    camera.huntRound + 1)
+                                                + " TARGETS // "
+                                                + HuntMotion.speedForRound(
+                                                    camera.huntSpeedGainPercent,
+                                                    camera.huntSpeedEvery,
+                                                    camera.huntRound + 1).toFixed(2) + "X SPEED"
+                                        }
+                                        ActionButton {
+                                            width: parent.width
+                                            height: 34
+                                            label: "CLOSE SETTINGS"
+                                            labelPixelSize: 11
+                                            accentColor: Colors.magenta
+                                            onLeftClicked: camera.huntToggleSettings()
+                                        }
+                                        GohuText {
+                                            width: parent.width
+                                            height: 28
+                                            wrapMode: Text.WordWrap
+                                            font.pixelSize: 9
+                                            color: Colors.yellow
+                                            text: "CHANGES APPLY TO NEXT ROUND. OPENING SETTINGS PAUSES THE CURRENT ROUND."
+                                        }
+                                    }
                                 }
                             }
                         }

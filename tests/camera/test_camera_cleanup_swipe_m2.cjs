@@ -53,6 +53,16 @@ function createState() {
         huntRoundComplete:false,
         huntLastEvent:"READY // NEW ROUND",
         huntSpawnCount:3,
+        huntTargetsPerTier:1,
+        huntTargetsEvery:5,
+        huntSpeedGainPercent:10,
+        huntSpeedEvery:5,
+        huntRoundSpeed:1,
+        huntRoundSpawnCount:3,
+        huntAutoRounds:true,
+        huntAutoPending:false,
+        huntSettingsOpen:false,
+        huntScoped:false,
         huntMouseX:0.5,
         huntMouseY:0.5,
         huntMouseActive:false,
@@ -105,11 +115,26 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /Behavior on x/);
     assert.match(cleanup, /Behavior on y/);
     assert.match(cleanup, /camera\.huntSetPointer\(/);
-    assert.match(cleanup, /onClicked: camera\.huntFire\(/);
+    assert.match(cleanup, /camera\.huntFire\(/);
     assert.match(cleanup, /onTriggered: camera\.huntAdvance\(\)/);
     assert.match(cleanup, /cursorShape: Qt\.CrossCursor/);
     assert.match(cleanup, /label: "UNDO SHOT"/);
     assert.match(cleanup, /label: "NEW ROUND"/);
+    assert.match(cleanup, /id: huntAutoNextTimer/);
+    assert.match(cleanup, /onTriggered: camera\.huntAutoStartNext\(\)/);
+    assert.match(cleanup, /interval: 1250/);
+    assert.match(cleanup, /id: huntScopeReticle/);
+    assert.match(cleanup, /acceptedButtons: Qt\.LeftButton \| Qt\.RightButton/);
+    assert.match(cleanup, /mouse\.button === Qt\.LeftButton/);
+    assert.match(cleanup, /mouse\.button === Qt\.RightButton/);
+    assert.match(cleanup, /camera\.huntScopeScale/);
+    assert.match(cleanup, /unscopedWidth \* camera\.huntScopeScale/);
+    assert.match(cleanup, /id: huntSettingsOverlay/);
+    assert.match(cleanup, /label: "CLOSE SETTINGS"/);
+    assert.match(cleanup, /AUTO NEXT ROUND/);
+    assert.match(cleanup, /ADD EVERY N ROUNDS/);
+    assert.match(cleanup, /SPEED GAIN \/ TIER/);
+    assert.match(cleanup, /SPEED EVERY N ROUNDS/);
     assert.match(cleanup, /label: "SPAWN -"/);
     assert.match(cleanup, /label: "SPAWN \+"/);
     assert.match(cleanup, /TARGETS \/\//);
@@ -589,5 +614,159 @@ test("Mouse motion decays to settled after five ticks and resets at new scan", (
         s.huntAdvance();
     assert.equal(s.huntMouseMovingTicks,0);
     assert.equal(s.huntMouseActive,true);
+    assert.equal(s.called.length,0);
+});
+
+
+test("Progression defaults: target +1 per 5 rounds and speed +10% per five, capped", () => {
+    assert.equal(motion.spawnForRound(3,1,5,1),3);
+    assert.equal(motion.spawnForRound(3,1,5,5),3);
+    assert.equal(motion.spawnForRound(3,1,5,6),4);
+    assert.equal(motion.spawnForRound(3,1,5,10),4);
+    assert.equal(motion.spawnForRound(3,1,5,11),5);
+    assert.equal(motion.spawnForRound(3,1,5,999),10);
+    assert.equal(motion.spawnForRound(10,5,1,1000),10);
+    assert.equal(motion.spawnForRound(3,0,1,100),3);
+    assert.equal(motion.speedForRound(10,5,1),1);
+    assert.equal(motion.speedForRound(10,5,5),1);
+    assert.ok(Math.abs(motion.speedForRound(10,5,6)-1.1)<1e-9);
+    assert.ok(Math.abs(motion.speedForRound(10,5,11)-1.21)<1e-9);
+    assert.equal(motion.speedForRound(50,1,100),2.5);
+    assert.equal(motion.speedForRound(0,1,100),1);
+});
+
+test("Progression settings are bounded and update only the following round", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=Array.from({length:25},(_,i)=>({
+        path:"/tmp/prog_"+i+".png",name:"prog_"+i+".png",mediaType:"image"
+    }));
+    s.huntRound=5; s.huntRoundComplete=true;
+    assert.equal(s.huntStartRound(),true);
+    assert.equal(s.huntRound,6);
+    assert.equal(s.huntRoundSpawnCount,4);
+    assert.equal(s.huntTargets.length,4);
+    assert.ok(Math.abs(s.huntRoundSpeed-1.1)<1e-8);
+    assert.equal(s.huntSetProgression("targetGain",5),true);
+    assert.equal(s.huntSetProgression("targetEvery",1),true);
+    assert.equal(s.huntSetProgression("speedGain",50),true);
+    assert.equal(s.huntSetProgression("speedEvery",1),true);
+    assert.equal(s.huntTargets.length,4);
+    assert.ok(Math.abs(s.huntRoundSpeed-1.1)<1e-8);
+    assert.equal(s.huntSetProgression("speedEvery",0),true);
+    assert.equal(s.huntSpeedEvery,1);
+    assert.equal(s.huntSetProgression("targetEvery",999),true);
+    assert.equal(s.huntTargetsEvery,50);
+    assert.equal(s.huntSetProgression("targetGain",-1),true);
+    assert.equal(s.huntTargetsPerTier,0);
+    assert.equal(s.huntSetProgression("invalid",100),false);
+    assert.equal(s.huntSetProgression("speedGain","whoops"),false);
+    assert.equal(s.called.length,0);
+});
+
+test("Speed tiers move a slow ox farther without compounding stored velocity", () => {
+    const ox=motion.createTarget({path:"/tmp/ox.png"},"ox",()=>0.6);
+    ox.xNorm=0.3; ox.yNorm=0.3; ox.vx=0.003; ox.vy=0.002;
+    const normal=motion.advanceTarget(ox,{active:false},1);
+    const fast=motion.advanceTarget(ox,{active:false},1.5);
+    assert.ok(fast.xNorm>normal.xNorm);
+    assert.ok(fast.yNorm>normal.yNorm);
+    assert.ok(Math.abs(fast.vx-normal.vx)<1e-10);
+    assert.ok(Math.abs(fast.vy-normal.vy)<1e-10);
+    let t=fast;
+    for(let i=0;i<500;i++) {
+        t=motion.advanceTarget(t,{active:false},2.5);
+        assert.ok(t.xNorm>=0&&t.xNorm<=1);
+        assert.ok(t.yNorm>=0&&t.yNorm<=1);
+    }
+    assert.equal(ox.xNorm,0.3); // immutable input
+});
+
+test("Auto-next starts once after all hits and never moves files itself", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=Array.from({length:30},(_,i)=>({
+        path:"/tmp/round_"+i+".png",name:"round_"+i+".png",mediaType:"image"
+    }));
+    assert.equal(s.huntStartRound(),true);
+    while(s.huntTargets.length)
+        s.huntFire(s.huntTargets[0].path);
+    assert.equal(s.huntRoundComplete,true);
+    assert.equal(s.huntAutoPending,true);
+    assert.equal(s.huntAutoStartNext(),true);
+    assert.equal(s.huntRound,2);
+    assert.equal(s.huntAutoPending,false);
+    assert.equal(s.huntRoundComplete,false);
+    assert.equal(s.huntAutoStartNext(),false);
+    assert.equal(s.called.length,0);
+});
+
+test("Auto-next fails closed when no eligible photos remain; no repeat loop", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.huntStartRound();
+    while(s.huntTargets.length)
+        s.huntFire(s.huntTargets[0].path);
+    assert.equal(s.huntAutoPending,true);
+    assert.equal(s.huntAutoStartNext(),false);
+    assert.equal(s.huntAutoPending,false);
+    assert.equal(s.huntTargets.length,0);
+    assert.equal(s.huntRound,1);
+    assert.equal(s.called.length,0);
+    assert.equal(s.huntAutoStartNext(),false);
+});
+
+test("Undo cancels pending auto-next and restores a queued shot", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.huntStartRound();
+    while(s.huntTargets.length)
+        s.huntFire(s.huntTargets[0].path);
+    assert.equal(s.huntAutoPending,true);
+    assert.equal(s.huntUndo(),true);
+    assert.equal(s.huntAutoPending,false);
+    assert.equal(s.huntRoundComplete,false);
+    assert.equal(s.huntPaused,false);
+    assert.equal(s.huntTargets.length,1);
+    assert.equal(s.batchPaths.length,2);
+    assert.equal(s.called.length,0);
+});
+
+test("Auto-round setting and opening settings safely halt active gameplay", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.huntStartRound();
+    assert.equal(s.huntSetScoped(true),true);
+    assert.equal(s.huntScoped,true);
+    assert.equal(s.huntToggleSettings(),true);
+    assert.equal(s.huntSettingsOpen,true);
+    assert.equal(s.huntScoped,false);
+    assert.equal(s.huntPaused,true);
+    assert.equal(s.huntSetScoped(true),false);
+    assert.equal(s.huntToggleSettings(),true);
+    assert.equal(s.huntSettingsOpen,false);
+    assert.equal(s.huntTogglePause(),true);
+    assert.equal(s.huntSetScoped(true),true);
+    assert.equal(s.huntSetScoped(false),true);
+    assert.equal(s.huntScoped,false);
+    assert.equal(s.huntSetAutoRounds(false),true);
+    assert.equal(s.huntAutoRounds,false);
+    assert.equal(s.called.length,0);
+});
+
+test("Auto-next is scheduled on timeout, not triggered by a miss or normal pause", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.huntStartRound();
+    s.huntFire("");
+    assert.equal(s.huntAutoPending,false);
+    s.huntTogglePause();
+    assert.equal(s.huntAutoPending,false);
+    s.huntTogglePause();
+    for(let i=0;i<250;i++) s.huntAdvance();
+    assert.equal(s.huntRoundComplete,true);
+    assert.equal(s.huntAutoPending,true);
+    assert.equal(s.huntAutoStartNext(),true);
+    assert.equal(s.huntRound,2);
     assert.equal(s.called.length,0);
 });

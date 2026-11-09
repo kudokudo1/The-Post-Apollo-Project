@@ -37,6 +37,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const source=fs.readFileSync(process.argv[1],'utf8');
 const scopeSrc=fs.readFileSync(process.argv[2],'utf8');
 const providerSrc=fs.readFileSync(process.argv[3],'utf8');
+const converterSrc=fs.readFileSync(process.argv[4],'utf8');
 function extract(code,name) {
  const start=code.indexOf('function '+name+'(');
  assert(start>=0, name+' function missing');
@@ -80,6 +81,30 @@ const hinted=Scope.scopeFromHints({
 assert.strictEqual(hinted.accountId,'account-1');
 assert.strictEqual(hinted.contactId,'+15551234567');
 assert.strictEqual(hinted.conversationType,'group');
+// Exercise the real native notification converter, not just the policy
+// helper, with explicit freedesktop hints from an opt-in producer.
+const C={BrowserSiteIdentity:{fromNotification:()=>({label:'',host:'',icon:''})},
+ NotificationScopePolicy:Scope, root:{
+  categoryFor:()=> 'im.received', severityFor:()=> 'normal'
+ }};
+vm.runInNewContext(extract(converterSrc,'convert'),C);
+const actualConverted=C.convert({
+ appName:'Vesktop',desktopEntry:'vesktop',
+ summary:'Group ping',body:'No body parsing',
+ hints:{
+  'x-post-apollo-account-id':'account-1',
+  'x-post-apollo-group-id':'group-123',
+  'x-post-apollo-group-name':'Lunch Group',
+  'x-post-apollo-contact-id':'+15551234567',
+  'x-post-apollo-conversation-type':'group'
+ }
+});
+assert(kindsForConverted(actualConverted).includes('group'));
+assert(kindsForConverted(actualConverted).includes('sender'));
+assert.strictEqual(actualConverted.context.notificationScope.accountId,'account-1');
+function kindsForConverted(converted) {
+ return Scope.scopeOptionsFor(converted,converted.sourceId,'').map(x=>x.kind);
+}
 const hintedEntry=entry('Messenger','messenger',hinted);
 assert(kinds(hintedEntry).includes('group'));
 assert(kinds(hintedEntry).includes('sender'));
@@ -274,5 +299,5 @@ assert(S.isFavoriteForNotification(tg));
 assert(!S.isFavoriteForNotification(tp));
 console.log('Messaging account/contact/DM/group/thread provider scope isolation: PASS');
 """
-subprocess.run(["node","-e",NODE,str(SERVICE),str(SCOPE),str(PROVIDERS)],check=True)
+subprocess.run(["node","-e",NODE,str(SERVICE),str(SCOPE),str(PROVIDERS),str(CONVERTER)],check=True)
 print("Notification messaging identity contracts: PASS")

@@ -981,6 +981,7 @@ PanelWindow {
             mediaType: hit ? hitRecord.mediaType : ""
         };
         huntShotSerial++;
+        huntHitFlash = false;
         huntShots += 1;
         if (hitIndex < 0) {
             huntMisses += 1;
@@ -3905,17 +3906,126 @@ PanelWindow {
                                             }
                                         }
                                     }
-                                    // Non-interactive hit wash. Only a validated target
-                                    // click triggers it; a miss or right-click does not.
+                                    // Hit feedback is intentionally restrained. Animal
+                                    // echoes flash red; the WORLD gets only 4.5% of
+                                    // the current laser color, never a full-screen blast.
                                     Rectangle {
                                         id: huntHitWash
                                         anchors.fill: parent
                                         z: 70
-                                        color: Colors.red
-                                        opacity: camera.huntHitFlash ? 0.13 : 0.0
+                                        color: camera.huntShotEffect
+                                               ? camera.huntShotEffect.color : Colors.cyan
+                                        opacity: camera.huntHitFlash ? 0.045 : 0.0
                                         visible: opacity > 0
                                         Behavior on opacity {
-                                            NumberAnimation { duration: 160 }
+                                            NumberAnimation { duration: 100 }
+                                        }
+                                    }
+                                    Item {
+                                        id: huntLaserLayer
+                                        anchors.fill: parent
+                                        z: 74
+                                        visible: camera.huntShotEffect !== null
+                                        property real progress: 0.0
+                                        readonly property var shot: camera.huntShotEffect
+                                            || ({aimX: 0.5, aimY: 0.5, color: Colors.cyan})
+                                        readonly property real muzzleX: width * 0.5
+                                        readonly property real muzzleY: height * 0.97
+                                        readonly property real impactX: width * shot.aimX
+                                        readonly property real impactY: height * shot.aimY
+                                        readonly property real dx: impactX - muzzleX
+                                        readonly property real dy: impactY - muzzleY
+                                        readonly property real length: Math.sqrt(dx * dx + dy * dy)
+                                        readonly property real angle: Math.atan2(dy, dx) * 180 / Math.PI
+                                        NumberAnimation {
+                                            id: huntLaserFlight
+                                            target: huntLaserLayer
+                                            property: "progress"
+                                            from: 0
+                                            to: 1
+                                            duration: 145
+                                            easing.type: Easing.OutCubic
+                                        }
+                                        Rectangle {
+                                            x: huntLaserLayer.muzzleX
+                                            y: huntLaserLayer.muzzleY - height / 2
+                                            width: huntLaserLayer.length * huntLaserLayer.progress
+                                            height: 5
+                                            radius: 2
+                                            rotation: huntLaserLayer.angle
+                                            transformOrigin: Item.Left
+                                            color: huntLaserLayer.shot.color
+                                            opacity: 0.17
+                                        }
+                                        Rectangle {
+                                            x: huntLaserLayer.muzzleX
+                                            y: huntLaserLayer.muzzleY - height / 2
+                                            width: huntLaserLayer.length * huntLaserLayer.progress
+                                            height: 2
+                                            radius: 1
+                                            rotation: huntLaserLayer.angle
+                                            transformOrigin: Item.Left
+                                            color: huntLaserLayer.shot.color
+                                            opacity: 0.82
+                                        }
+                                        Rectangle {
+                                            x: huntLaserLayer.muzzleX
+                                               + huntLaserLayer.dx * huntLaserLayer.progress
+                                               - width / 2
+                                            y: huntLaserLayer.muzzleY
+                                               + huntLaserLayer.dy * huntLaserLayer.progress
+                                               - height / 2
+                                            width: 8
+                                            height: 8
+                                            radius: 4
+                                            color: huntLaserLayer.shot.color
+                                            opacity: 0.85
+                                        }
+                                    }
+                                    // The original target disappears from the playable
+                                    // list immediately, so a short-lived echo at its
+                                    // actual drawn bounds shows the RED impact on it.
+                                    Item {
+                                        id: huntHitAnimalEcho
+                                        z: 77
+                                        visible: camera.huntShotEffect
+                                                 && camera.huntShotEffect.hit
+                                        readonly property var shot: camera.huntShotEffect
+                                            || ({rectX: 0, rectY: 0, rectW: 0, rectH: 0,
+                                                 path: "", mediaType: ""})
+                                        x: shot.rectX * huntArena.width
+                                        y: shot.rectY * huntArena.height
+                                        width: shot.rectW * huntArena.width
+                                        height: shot.rectH * huntArena.height
+                                        clip: true
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            radius: 5
+                                            color: Colors.black
+                                            border.color: Colors.red
+                                            border.width: 2
+                                            Image {
+                                                anchors.fill: parent
+                                                anchors.margins: 3
+                                                source: huntHitAnimalEcho.shot.mediaType.indexOf("video") >= 0
+                                                        ? ""
+                                                        : camera.fileUrl(huntHitAnimalEcho.shot.path)
+                                                fillMode: Image.PreserveAspectFit
+                                                asynchronous: true
+                                                cache: false
+                                            }
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                radius: 4
+                                                color: Colors.red
+                                                opacity: 0.40
+                                            }
+                                            GohuText {
+                                                anchors.centerIn: parent
+                                                text: "HIT"
+                                                font.pixelSize: 12
+                                                color: Colors.white
+                                            }
                                         }
                                     }
                                     Item {

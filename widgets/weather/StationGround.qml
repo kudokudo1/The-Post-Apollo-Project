@@ -3694,9 +3694,19 @@ Rectangle {
     }
 
     NeonScrollBar {
+        id: groundScrollBar
         flickable: groundScroll
         handleStyle: "star"
         geometryHost: ground
-        visible: !ground.compactEarthGround && scrollable
+        visible: scrollable
+    }
+
+    // E5 hides only the compact EARTH bar, restoring the original
+    // component-owned visibility binding on every other route.
+    Binding {
+        target: groundScrollBar
+        property: "visible"
+        value: false
+        when: ground.compactEarthGround
     }
 }

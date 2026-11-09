@@ -100,6 +100,12 @@ const fallback=Scope.scopeOptionsFor(entry('','','','', 'Mom'),'vesktop','');
 assert.strictEqual(fallback[0].kind,'title');
 assert.strictEqual(fallback[0].verified,false);
 assert.strictEqual(fallback[1].kind,'app');
+// Generic headers like "Vesktop" and "New message" do not identify a
+// person or channel. Do not present them as exact per-sender mute choices.
+assert(!Scope.scopeOptionsFor(entry('','','','','Vesktop'),'vesktop','')
+ .some(x=>x.kind==='title'));
+assert(!Scope.scopeOptionsFor(entry('','','','','New message'),'vesktop','')
+ .some(x=>x.kind==='title'));
 assert.notStrictEqual(fallback[0].key,
  Scope.scopeOptionsFor(entry('','','','', 'Mom!'),'vesktop','')[0].key);
 assert.strictEqual(Scope.scopeOptionsFor(entry('','','','','Mom'),'another-app','')[0].key===fallback[0].key,false);

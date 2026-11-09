@@ -13,6 +13,9 @@ ShellRoot {
     property string openedTopic: ""
     property var fakeWeather: ({
         aqiReady:true,aqi:26,aqiLabel:"GOOD",pm25:4.8,pm10:7.4,
+        airQualityForecast:[
+            {aqi:24},{aqi:25},{aqi:28},{aqi:26},{aqi:27},{aqi:29}
+        ],
         pollenAvailable:true,alderPollen:0,birchPollen:2,grassPollen:5,
         mugwortPollen:0,olivePollen:1,ragweedPollen:3,
         tempF:"87",humidity:"62",usingPersistentAqiCache:false
@@ -21,7 +24,7 @@ ShellRoot {
         configured:true,ready:true,usingPersistentCache:false,
         gauge:{lid:"TEST1",name:"Synthetic Nearby Gauge",observedPrimary:2.2,
             forecastPrimary:2.8,primaryUnits:"ft",distanceKm:8.4,
-            observedCategory:{label:"NO FLOODING"}}
+            observedCategory:{label:"NO FLOODING",rank:0}}
     })
     property var fakeNws: ({
         configured:true,ready:true,usingPersistentCache:false,
@@ -104,17 +107,31 @@ ShellRoot {
             const cards=find(summary,"earth-e6-summary-cards");
             const prev=find(summary,"earth-e6-prev");
             const next=find(summary,"earth-e6-next");
-            const open=find(summary,"earth-e6-open-topic");
+            const open=find(summary,"earth-e7-main-environment");
+            const water=find(summary,"earth-e7-main-water");
+            const pollen=find(summary,"earth-e7-main-pollen");
+            const rail=find(summary,"earth-e7-overview-main-rail");
+            const divider=find(summary,"earth-e7-overview-divider");
+            const visibleBar=find(map,"earth-e7-overview-hide-event-scrollbar");
             if(!host||!plot||!filters||!deck||!scroll||!cards
-                    ||!prev||!next||!open)return;
+                    ||!prev||!next||!open||!water||!pollen
+                    ||!rail||!divider||!visibleBar)return;
             if(!host.visible || !plot.visible || plot.parent!==host
                     || Math.abs(host.height-map.height)>8
                     || Math.abs(map.height-stage.height/2)>1
                     || filters.visible || deck.visible || scroll.visible
                     || count(map,"earth-e2-single-map-plot")!==1
                     || count(summary,"earth-e6-metric")!==4
-                    || cards.height<30
-                    || cards.y+cards.height>summary.height-18)
+                    || cards.height<38
+                    || cards.y+cards.height>summary.height-9
+                    || visibleBar.visible
+                    || rail.height!==27
+                    || rail.y>=divider.y
+                    || divider.y>=cards.y
+                    || count(summary,"earth-e7-microchart")!==4
+                    || count(summary,"earth-e7-main-water")!==1
+                    || count(summary,"earth-e7-main-pollen")!==1
+                    || count(summary,"earth-e7-main-environment")!==1)
                 return root.fail("HALF_MAP_OR_COMPACT_SUMMARY_BOUNDS");
             if(root.phase===0) {
                 if(summary.currentTopic.id!=="water"
@@ -125,7 +142,9 @@ ShellRoot {
             }
             if(root.phase===1) {
                 if(summary.currentTopic.id!=="pollen"
-                    || summary.summary.cards[3].detail!=="GRASS")
+                    || summary.summary.cards[3].detail!=="GRASS"
+                    || summary.charts[0].type!=="bars"
+                    || summary.charts[0].values.length!==6)
                     return root.fail("POLLEN_ARROW_MISMATCH");
                 next.clicked(null);
                 root.phase=2; return;
@@ -153,6 +172,7 @@ ShellRoot {
                 if(root.openedTopic!=="environment")
                     return root.fail("DETAIL_LINK_MISMATCH");
                 root.done=true;
+                console.log("E7_NATIVE_PASS // COSMOS_RAIL_MICROCHARTS_NO_OVERVIEW_SCROLLBAR");
                 console.log("E6_NATIVE_PASS // HALF_MAP_THREE_TOPIC_ARROWS_NO_DUPLICATE_MAP");
                 Qt.quit();
             }

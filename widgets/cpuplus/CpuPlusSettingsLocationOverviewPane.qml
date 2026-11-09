@@ -47,60 +47,8 @@ Item {
             width: Math.max(0,overviewScroll.width-14)
             spacing: 12
 
-            GohuText {
-                text: "SHARED CONTEXT // LOCATION"
-                color: Colors.cyan
-                font.pixelSize: 12
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 109
-                color: Colors.black
-                border.width: 1
-                border.color: locationOverview.activeExplore
-                              ? Colors.magenta : Colors.orange
-                Column {
-                    anchors.fill: parent
-                    anchors.margins: 10
-                    spacing: 7
-                    GohuText {
-                        width: parent.width
-                        font.pixelSize: 11
-                        color: Colors.magenta
-                        elide: Text.ElideRight
-                        text: "SHARED CONTEXT // "
-                              +(locationOverview.registry
-                                ? String(locationOverview.registry.contextKind || "UNKNOWN")
-                                : "NOT CONNECTED")
-                    }
-                    GohuText {
-                        width: parent.width
-                        font.pixelSize: 12
-                        color: Colors.white
-                        elide: Text.ElideRight
-                        text: locationOverview.currentPlace
-                              ? locationOverview.currentPlace.label
-                              : "NO HOME CONFIGURED"
-                    }
-                    QuietText {
-                        width: parent.width
-                        font.pixelSize: 9
-                        text: locationOverview.currentPlace
-                              ? Number(locationOverview.currentPlace.latitude).toFixed(4)
-                                +"°, "
-                                +Number(locationOverview.currentPlace.longitude).toFixed(4)+"°"
-                              : "SELECT OR SET A HOME LOCATION"
-                    }
-                    QuietText {
-                        width: parent.width
-                        font.pixelSize: 9
-                        wrapMode: Text.WordWrap
-                        text: "WEATHER, SKY, GROUND AND MAP ROUTING NOT YET WIRED. ALERT TARGETS STAY PINNED."
-                    }
-                }
-            }
-
+            // Header above this bay now shows SHARED CONTEXT + current
+            // place. Keep the existing Explore editor front-and-center.
             // This wide section stays directly beneath SHARED CONTEXT.
             // Destination fields, duration and actions come first; the
             // active-location status follows the actions inside this pane.
@@ -108,6 +56,14 @@ Item {
                 id: explorePanel
                 width: parent.width
                 registry: locationOverview.registry
+            }
+
+            QuietText {
+                width: parent.width
+                font.pixelSize: 9
+                wrapMode: Text.WordWrap
+                text: "WEATHER, SKY, GROUND AND MAP ROUTING NOT YET WIRED. "
+                      +"ALERT TARGETS STAY PINNED."
             }
         }
     }

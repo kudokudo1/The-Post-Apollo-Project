@@ -101,6 +101,11 @@ Item {
         if (!events || events.length === 0) return;
         lockedEvent = PlanetPolicy.stepEvent(events,selectedEvent,direction);
     }
+    onLockedEventChanged: {
+        if (compactInPlanets && controlledSelection && lockedEvent
+            && lockedEvent.planet !== selectedPlanet)
+            planetPicked(lockedEvent.planet);
+    }
     onDatedRowsChanged: { lockedEvent = null; hoveredEvent = null; }
     onCivilDateChanged: {
         lockedEvent = null;

@@ -8,7 +8,7 @@ function token(value) {
 
 function stableId(value) {
     const s = token(value);
-    return s.length > 0 && s.length <= 160 && /^[a-zA-Z0-9_.:@/+~-]+$/.test(s)
+    return s.length > 0 && s.length <= 256 && /^[a-zA-Z0-9_.:@/+~-]+$/.test(s)
         ? s : "";
 }
 

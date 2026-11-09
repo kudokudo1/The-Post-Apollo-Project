@@ -95,7 +95,9 @@ function scopeOptionsFor(entry, appKey, websiteKey) {
     if (s.conversationId)
         add("conversation", s.conversationId, "DM // " + label(s.conversationName, s.conversationId), true);
     if (s.channelId)
-        add("channel", (s.serverId ? s.serverId + "/" : "") + s.channelId,
+        // Length-prefix the server component. A server ID containing '/'
+        // must never collide with a different server/channel pair.
+        add("channel", s.serverId.length + ":" + s.serverId + ":" + s.channelId,
             "CHANNEL // " + label(s.channelName, s.channelId), true);
     if (s.serverId)
         add("server", s.serverId, "SERVER // " + label(s.serverName, s.serverId), true);

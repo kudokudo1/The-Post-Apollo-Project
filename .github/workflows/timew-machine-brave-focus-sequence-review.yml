@@ -1,0 +1,29 @@
+name: TimeW MACHINE Brave focus-sequence untrusted review
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineBraveFocusSequenceReview.py"
+      - "tests/timew/test_machine_brave_focus_sequence_review.py"
+      - "docs/timew-machine-brave-focus-sequence.md"
+      - ".github/workflows/timew-machine-brave-focus-sequence-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focus-sequence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: A/B/A focus review rejects untrusted identity and restore claims
+        run: python3 -B -I tests/timew/test_machine_brave_focus_sequence_review.py
+      - name: Preserve earlier independent Brave/Sway focus witness
+        run: python3 -B -I tests/timew/test_machine_brave_focus_witness.py
+      - name: Preserve optional read-only native transport probe
+        run: |
+          python3 -B -I tests/timew/test_machine_brave_native_probe_contract.py
+          python3 -B -I tests/timew/test_machine_brave_native_probe.py
+          python3 -B -I tests/timew/test_machine_brave_native_manifest.py

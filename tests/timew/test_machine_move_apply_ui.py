@@ -9,6 +9,12 @@ review = (root / "services/time/MachineMoveReviewRead.py").read_text(encoding="u
 confirm = (root / "services/time/MachineMoveConfirmRead.py").read_text(encoding="utf-8")
 
 required_ui = (
+    'id: machineStoredViewport',
+    'id: machineStoredScroll',
+    'contentHeight: machineStoredPane.height',
+    'id: machineStoredRail',
+    'flickable: machineStoredScroll',
+    'geometryMode: "viewport"',
     'label: "RESTORE ONE WINDOW"',
     "onLeftClicked: timew.machineRestoreOneWindow()",
     "function machineRestoreOneWindow()",

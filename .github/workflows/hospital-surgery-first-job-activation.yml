@@ -1,0 +1,38 @@
+name: Hospital Surgery First-Job Activation
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalWorkforceManagerView.qml"
+      - "services/hospital/HospitalWorkforceJobActivationPolicy.js"
+      - "tests/hospital/test_workforce_job_activation_policy.js"
+      - "tests/hospital/test_workforce_job_activation_ui_contracts.py"
+      - ".github/workflows/hospital-surgery-first-job-activation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalWorkforceManagerView.qml"
+      - "services/hospital/HospitalWorkforceJobActivationPolicy.js"
+      - "tests/hospital/test_workforce_job_activation_policy.js"
+      - "tests/hospital/test_workforce_job_activation_ui_contracts.py"
+      - ".github/workflows/hospital-surgery-first-job-activation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  draft-activation-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read-only draft preflight tests
+        run: |
+          node --check services/hospital/HospitalWorkforceJobActivationPolicy.js
+          node tests/hospital/test_workforce_job_activation_policy.js
+      - name: Verify reviewed activation and original workforce UI
+        run: |
+          python3 tests/hospital/test_workforce_job_activation_ui_contracts.py
+          python3 tests/hospital/test_surgery_inline_workforce_ui_contracts.py
+          python3 tests/hospital/test_assignment_manager_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py

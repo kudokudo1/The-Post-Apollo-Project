@@ -2,6 +2,7 @@ import QtQuick
 import qs.components
 import "../services/hospital"
 import "../services/hospital/HospitalWorkforceManagerPolicy.js" as ManagementPolicy
+import "../services/hospital/HospitalWorkforceJobActivationPolicy.js" as JobActivationPolicy
 
 // Collapsible content inside SURGERY → SHOW WORKERS, not a new Hospital route.
 // All writes require a separate operator REVIEW and CONFIRM. No AI turns.
@@ -22,6 +23,10 @@ Column {
     property string roomId: makeId("room")
     property string selectedDoctorId: ""
     property string selectedRoomId: ""
+    property string selectedDraftAssignmentId: ""
+    property bool assignmentListVerified: false
+    property string activationArmKey: ""
+    property int jobPage: 0
     property int workerPage: 0
     property int roomPage: 0
     property string armedKind: ""
@@ -61,6 +66,25 @@ Column {
         title: jobTitleField.value, goal: jobGoalField.value,
         permissions: jobPermissionsField.value
     })
+    readonly property var activationPlan: JobActivationPolicy.review({
+        roomId: root.selectedRoomId,
+        assignmentId: root.selectedDraftAssignmentId,
+        rooms: root.rooms,
+        sessions: root.sessions,
+        assignments: inlineAssignment.assignments,
+        roomsLoaded: root.roomsLoaded,
+        sessionsLoaded: root.sessionsLoaded,
+        assignmentsLoaded: root.assignmentListVerified,
+        assignmentsLoading: inlineAssignment.loading || inlineAssignment.writing,
+        registryError: root.registryError,
+        assignmentError: inlineAssignment.lastError
+    })
+    readonly property string activationSignature: JSON.stringify({
+        plan: root.activationPlan,
+        rooms: root.rooms,
+        sessions: root.sessions,
+        assignments: inlineAssignment.assignments
+    })
     signal rosterRefreshRequested()
 
     width: parent ? parent.width : 350
@@ -76,6 +100,7 @@ Column {
     function disarm() {
         armedKind = "";
         armedKey = "";
+        activationArmKey = "";
     }
     function selectMode(value) {
         if (mode === value) return;
@@ -178,6 +203,46 @@ Column {
                      : inlineAssignment.lastError;
         return ok;
     }
+    function reviewActivation() {
+        activationArmKey = "";
+        if (!root.active || root.registryBusy || !root.activationPlan.ready) {
+            outcome = "ACTIVATION HOLD // " + (root.registryBusy
+                ? "PX registry refreshing"
+                : root.activationPlan.blockers.join(" // "));
+            return false;
+        }
+        activationArmKey = activationSignature;
+        outcome = "REVIEW // ACTIVATE DRAFT #" + root.activationPlan.assignmentId
+            + " // " + root.activationPlan.title
+            + " // ROOM " + root.activationPlan.roomId
+            + " // READ ONLY // NO AI START";
+        return true;
+    }
+    function confirmActivation() {
+        if (!root.active || root.registryBusy
+                || !root.activationPlan.ready
+                || !activationArmKey
+                || activationArmKey !== activationSignature
+                || inlineAssignment.writing || inlineAssignment.loading) {
+            activationArmKey = "";
+            outcome = "ACTIVATION REFUSED // Reload and review the selected Room / job";
+            return false;
+        }
+        const id = root.activationPlan.assignmentId;
+        activationArmKey = "";
+        const ok = inlineAssignment.activateAssignment(id);
+        outcome = ok ? "PX ACTIVATING DRAFT #" + id + " // NO AI LAUNCH"
+            : "ACTIVATION REFUSED // " + inlineAssignment.lastError;
+        return ok;
+    }
+
+    onSelectedRoomIdChanged: {
+        disarm();
+        assignmentListVerified = false;
+        selectedDraftAssignmentId = "";
+        jobPage = 0;
+    }
+    onSelectedDraftAssignmentIdChanged: activationArmKey = ""
     onActiveChanged: {
         disarm();
         if (active)
@@ -189,6 +254,7 @@ Column {
     onRoomsChanged: disarm()
     onSessionsChanged: disarm()
     onRegistryErrorChanged: disarm()
+    onAssignmentListVerifiedChanged: activationArmKey = ""
 
     Connections {
         target: root.doctorService
@@ -226,13 +292,40 @@ Column {
         id: inlineAssignment
         roomId: root.selectedRoomId
         onRoomIdChanged: {
+            root.assignmentListVerified = false;
+            root.activationArmKey = "";
             if (roomId) Qt.callLater(refresh);
+        }
+        onAssignmentsRefreshed: {
+            root.assignmentListVerified = !loading && !lastError
+                && roomId === root.selectedRoomId;
+            root.activationArmKey = "";
+        }
+        onAssignmentActivated: function(result) {
+            const assignment = (result || {}).assignment || {};
+            const room = (result || {}).room || {};
+            if (String(assignment.id || "") !== root.selectedDraftAssignmentId
+                    || String(assignment.roomId || "") !== root.selectedRoomId
+                    || String(room.id || "") !== root.selectedRoomId
+                    || String(assignment.status || "") !== "ACTIVE"
+                    || String(room.assignmentId || "")
+                        !== root.selectedDraftAssignmentId) {
+                root.outcome = "ACTIVATION RESPONSE MISMATCH // REFRESH ROOM";
+            } else {
+                root.outcome = "JOB ACTIVE // #" + assignment.id
+                    + " // ROOM " + root.selectedRoomId
+                    + " // NO AI LAUNCHED";
+            }
+            root.rosterRefreshRequested();
+            root.assignmentListVerified = false;
         }
         onAssignmentSaved: function(assignment) {
             root.outcome = "DRAFT JOB SAVED // #" + String(assignment.id || "")
                 + " // NOT ACTIVATED // NO AI TURN";
             jobTitleField.value = "";
             jobGoalField.value = "";
+            root.selectedDraftAssignmentId = String(assignment.id || "");
+            root.assignmentListVerified = false;
             root.rosterRefreshRequested();
             refresh();
         }
@@ -496,6 +589,91 @@ Column {
             wrapMode: Text.Wrap
         }
         ManagerConfirmRow {kind:"CREATE_JOB"}
+        Rectangle {width:root.width; height:2; color:Colors.magenta}
+        GohuText {
+            width: parent.width
+            text: "SAVED JOBS // CHOOSE READ-ONLY DRAFT TO ACTIVATE"
+            color: Colors.orange
+            font.pixelSize: 9
+            wrapMode: Text.Wrap
+        }
+        GohuText {
+            width: parent.width
+            text: "ACTIVATE marks a job ACTIVE and links it to this Room. It does NOT start an AI. Existing active jobs and occupied Rooms are held for ORDERS."
+            color: Colors.blue
+            font.pixelSize: 9
+            wrapMode: Text.Wrap
+        }
+        Repeater {
+            model: inlineAssignment.assignments.slice(
+                root.jobPage * root.pageSize,
+                (root.jobPage + 1) * root.pageSize)
+            Rectangle {
+                required property var modelData
+                width: root.width
+                height: 34
+                color: Colors.black
+                border.width: 1
+                border.color: root.selectedDraftAssignmentId
+                    === String(modelData.id || "") ? Colors.magenta : Colors.blue
+                GohuText {
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    text: "#" + String(modelData.id || "")
+                        + " // " + String(modelData.status || "UNKNOWN")
+                        + " // " + String(modelData.title || "UNTITLED")
+                    font.pixelSize: 9
+                    color: Colors.white
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.selectedDraftAssignmentId
+                        = String(modelData.id || "")
+                }
+            }
+        }
+        ManagerPageRow {
+            currentPage: root.jobPage
+            count: inlineAssignment.assignments.length
+            onPrevious: root.jobPage--
+            onNext: root.jobPage++
+        }
+        GohuText {
+            width: parent.width
+            text: root.activationPlan.ready
+                ? "READY FOR REVIEW // #" + root.activationPlan.assignmentId
+                    + " // " + root.activationPlan.title
+                    + " // AUTH READ"
+                : "ACTIVATION HOLD // " + root.activationPlan.blockers.join(" // ")
+            color: root.activationPlan.ready ? Colors.cyan : Colors.orange
+            font.pixelSize: 9
+            wrapMode: Text.WrapAnywhere
+        }
+        Row {
+            width: parent.width
+            spacing: 6
+            HospitalActionButton {
+                width: (parent.width - 6) / 2
+                height: 30
+                label: "REVIEW ACTIVE"
+                accent: Colors.cyan
+                contentGlowEnabled: false
+                enabledAction: root.active && !inlineAssignment.loading
+                onTriggered: root.reviewActivation()
+            }
+            HospitalActionButton {
+                width: (parent.width - 6) / 2
+                height: 30
+                label: "CONFIRM ACTIVE"
+                accent: Colors.green
+                contentGlowEnabled: false
+                enabledAction: root.active && root.activationArmKey !== ""
+                onTriggered: root.confirmActivation()
+            }
+        }
         GohuText {
             width: parent.width
             visible: inlineAssignment.lastError.length > 0

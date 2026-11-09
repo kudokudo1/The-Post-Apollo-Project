@@ -152,6 +152,47 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn("glowColor: trashLauncher.burnWarning ? Colors.red : Colors.green", TRASH)
         self.assertIn("glowVisible: trashLauncher.menuOpen", TRASH)
 
+    def test_square_frame_and_live_indicator_by_size_arrows(self):
+        frame = section(TRASH, "    WindowPanelFrame {", "        Keys.onPressed:")
+        self.assertIn("radius: 0", frame)
+        self.assertIn('id: trashLiveIndicator', TRASH)
+        self.assertIn('text: "● " + trashLauncher.liveLabel', TRASH)
+        self.assertIn('readonly property string liveLabel:', TRASH)
+        self.assertIn('readonly property color liveColor:', TRASH)
+        self.assertIn('liveLabel === "LIVE" ? Colors.omnitrix', TRASH)
+        self.assertIn('liveLabel === "STALE" ? Colors.red', TRASH)
+        self.assertLess(TRASH.index('id: collapseTrashButton'),
+                        TRASH.index('id: expandTrashButton'))
+        self.assertLess(TRASH.index('id: expandTrashButton'),
+                        TRASH.index('id: trashLiveIndicator'))
+        self.assertLess(TRASH.index('id: trashLiveIndicator'),
+                        TRASH.index('id: closeTrashButton'))
+        self.assertIn("border.color: trashLauncher.liveColor", TRASH)
+
+    def test_auto_refresh_on_open_and_bounded_safe_live_poll(self):
+        toggle = section(TRASH, "    function toggle() {", "    function run(")
+        self.assertIn("if (menuOpen)", toggle)
+        self.assertIn("refresh(true);", toggle)
+        self.assertIn("function refresh(clearReceipt, passive)", TRASH)
+        self.assertIn('passive === true ? "index-live" : "index"', TRASH)
+        timer = section(TRASH, "    Timer {", "    Process {")
+        self.assertIn("interval: 15000", timer)
+        self.assertIn("repeat: true", timer)
+        self.assertIn("triggeredOnStart: false", timer)
+        self.assertIn("running: trashLauncher.menuOpen", timer)
+        self.assertIn("!trashLauncher.busy", timer)
+        self.assertIn('trashLauncher.confirmMode === ""', timer)
+        self.assertIn("!trashSearch.activeFocus", timer)
+        self.assertIn("trashLauncher.refresh(false, true)", timer)
+        self.assertNotIn('run("burn"', timer)
+        self.assertNotIn('run("burn-all"', timer)
+        self.assertIn('action === "index" || action === "index-live"', TRASH)
+        self.assertIn("const changed = !indexReady || nextRevision !== revision;", TRASH)
+        self.assertIn('if (action === "index" || changed)', TRASH)
+        self.assertIn("items = Array.isArray(payload.items) ? payload.items : [];", TRASH)
+        self.assertIn("indexReady = true;", TRASH)
+        self.assertIn('lastError ? "STALE"', TRASH)
+
     def test_finance_red_close_button_family_and_no_destructive_shortcut(self):
         self.assertIn('id: closeTrashButton', TRASH)
         self.assertIn('label: "×"', TRASH)
@@ -192,7 +233,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('Quickshell.shellPath("scripts/trash/trash_cli.py")', TRASH)
         self.assertIn('stdout: StdioCollector {', TRASH)
         self.assertIn("function consume(raw)", TRASH)
-        self.assertIn("function refresh(clearReceipt)", TRASH)
+        self.assertIn("function refresh(clearReceipt, passive)", TRASH)
         self.assertIn("function restoreItem(item)", TRASH)
         self.assertIn("function armBurn(item)", TRASH)
         self.assertIn("function armBurnAll()", TRASH)

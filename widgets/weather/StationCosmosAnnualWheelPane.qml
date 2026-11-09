@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "StationSubjectHeaderGeometry.js" as HeaderGeometry
 
 // C11 // Two COSMOS destinations for the existing MAGICK JPL annual wheel.
 // No copied Canvas, provider, backend script, or astronomy calculations.
@@ -18,26 +19,45 @@ Rectangle {
     readonly property bool isMoon: subject === "moon"
     readonly property string annualView:
         isMoon ? (moonView === "forecast" ? "forecast" : "moon") : "solar"
-    readonly property int contentInset: isMoon ? 6 : 0
+    readonly property int contentInset: isMoon ? HeaderGeometry.inset : 0
     readonly property var wheelItem: annualWheel
+
+    GohuText {
+        id: annualHeader
+        objectName: "cosmos-c44-moon-year-header"
+        visible: annualFocus.isMoon
+        anchors.top: annualHeader.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: annualFocus.contentInset
+        anchors.rightMargin: annualFocus.contentInset
+        anchors.topMargin: visible ? HeaderGeometry.inset : 0
+        height: visible ? HeaderGeometry.titleHeight : 0
+        text: "LUNAR // " + (annualFocus.moonView === "forecast"
+            ? "FORECAST" : "YEAR")
+        color: Colors.magenta
+        font.pixelSize: 10
+        verticalAlignment: Text.AlignVCenter
+        elide: Text.ElideRight
+    }
 
     Row {
         id: lunarModeRail
         objectName: "cosmos-c11-moon-year-mode-rail"
         visible: annualFocus.isMoon
-        anchors.top: parent.top
+        anchors.top: annualHeader.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: annualFocus.contentInset
         anchors.rightMargin: annualFocus.contentInset
-        anchors.topMargin: visible ? annualFocus.contentInset : 0
-        height: visible ? 27 : 0
-        spacing: 4
+        anchors.topMargin: visible ? HeaderGeometry.titleToTabs : 0
+        height: visible ? HeaderGeometry.tabHeight : 0
+        spacing: HeaderGeometry.tabSpacing
 
         ActionButton {
             objectName: "cosmos-c11-back-to-moon"
-            width: Math.max(1,(lunarModeRail.width-lunarModeRail.spacing)/2)
-            height: 27
+            width: HeaderGeometry.buttonWidth(lunarModeRail.width,2)
+            height: HeaderGeometry.tabHeight
             label: "OVERVIEW"
             labelPixelSize: 10
             contentPadding: 1
@@ -47,8 +67,8 @@ Rectangle {
         }
         ActionButton {
             objectName: "cosmos-c17-moon-wheel-tab"
-            width: Math.max(1,(lunarModeRail.width-lunarModeRail.spacing)/2)
-            height: 27
+            width: HeaderGeometry.buttonWidth(lunarModeRail.width,2)
+            height: HeaderGeometry.tabHeight
             label: "LUNAR YEAR"
             labelPixelSize: 10
             contentPadding: 1
@@ -66,12 +86,12 @@ Rectangle {
         objectName: "cosmos-c23-moon-year-divider"
         visible: annualFocus.isMoon
         anchors.top: lunarModeRail.bottom
-        anchors.topMargin: visible ? 5 : 0
+        anchors.topMargin: visible ? HeaderGeometry.tabsToRule : 0
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: annualFocus.contentInset
         anchors.rightMargin: annualFocus.contentInset
-        height: visible ? 2 : 0
+        height: visible ? HeaderGeometry.ruleHeight : 0
         color: Colors.cyan
     }
 
@@ -92,7 +112,7 @@ Rectangle {
         anchors.leftMargin: annualFocus.contentInset
         anchors.rightMargin: annualFocus.contentInset
         anchors.bottomMargin: annualFocus.contentInset
-        anchors.topMargin: annualFocus.isMoon ? 3 : 0
+        anchors.topMargin: annualFocus.isMoon ? HeaderGeometry.ruleToContent : 0
 
         view: annualFocus.annualView
         lockedView: annualFocus.annualView

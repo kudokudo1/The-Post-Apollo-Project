@@ -26,7 +26,7 @@ Rectangle {
         id: annualHeader
         objectName: "cosmos-c44-moon-year-header"
         visible: annualFocus.isMoon
-        anchors.top: annualHeader.bottom
+        anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: annualFocus.contentInset

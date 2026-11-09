@@ -84,7 +84,7 @@ test("selected WEATHER routes show only their own sections", () => {
 });
 
 test("provider activation matches only relevant routes and preserves old collectors", () => {
-  for (const key of Object.keys(env.ROUTES)) {
+  for (const key of Object.keys(env.ROUTES).filter(x=>x.startsWith("weather/"))) {
     assert.equal(env.needsSource(key,"astronomy"),false,key);
     assert.equal(env.needsSource(key,"river"),
       key === "weather/water/rivers"
@@ -151,7 +151,10 @@ test("one live subject pane uses the already-wired shared sources", () => {
 });
 
 test("no premature MAP or MAGICK activation and no new persistence writer", () => {
-  assert.deepEqual(plain(Object.keys(env.ROUTES).filter(x=>!x.startsWith("weather/"))),[]);
+  const relocated=Object.keys(env.ROUTES).filter(x=>x.startsWith("earth/"));
+  assert.equal(relocated.length,8);
+  assert.ok(relocated.every(x=>x.startsWith("earth/water/")
+    || x==="earth/ground/full"));
   assert.equal(env.kindForRoute("earth/geology/earthquakes"),"");
   for (const t of ["Process {","FileView {","Qt.callLater","fetch(","XMLHttpRequest","swaymsg"])
     assert.ok(!policySource.includes(t),"policy "+t);

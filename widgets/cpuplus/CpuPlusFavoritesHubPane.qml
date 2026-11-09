@@ -560,10 +560,15 @@ Item {
                     required property string modelData
                     readonly property bool whiteModule:
                         modelData==="NOTIFS" || modelData==="CLOCK"
+                    readonly property bool hospitalModule:
+                        modelData==="HOSPITAL"
                     readonly property color moduleAccent:
                         modelData==="WEATHER" ? Colors.yellow
-                        : modelData==="HOSPITAL" ? Colors.magenta
+                        : hospitalModule ? Colors.magenta
                         : whiteModule ? Colors.white : Colors.cyan
+                    readonly property color hoverAccent:
+                        whiteModule ? Colors.white
+                        : hospitalModule ? Colors.magenta : Colors.orange
 
                     width: 38
                     height: 30
@@ -574,15 +579,39 @@ Item {
                     Accessible.name: modelData+" favorites filter"
                     selected: pane.filterMode===modelData
                     accentColor: moduleAccent
-                    // White Notifications/Time icons must stay white even
-                    // while hovered, selected or keyboard-selected.
-                    hoverForegroundColor:
-                        whiteModule ? Colors.white : Colors.orange
+                    // Notifications and Time stay white in EVERY state,
+                    // including their fills/borders/halos. Hospital retains
+                    // its dedicated magenta treatment on hover and press.
+                    hoverFillColor:
+                        whiteModule ? Colors.dark : Colors.yellow
+                    hoverForegroundColor: hoverAccent
+                    hoverBorderColor: hoverAccent
+                    hoverContentGlowColor: hoverAccent
+                    hoverSoftGlowColor: hoverAccent
+                    pressedFillColor:
+                        whiteModule || hospitalModule
+                        ? Colors.dark : Colors.magenta
                     pressedForegroundColor:
-                        whiteModule ? Colors.white : Colors.black
+                        whiteModule || hospitalModule
+                        ? moduleAccent : Colors.black
+                    pressedBorderColor:
+                        whiteModule || hospitalModule
+                        ? moduleAccent : Colors.black
+                    pressedContentGlowColor:
+                        whiteModule || hospitalModule
+                        ? moduleAccent : Colors.magenta
+                    pressedSoftGlowColor:
+                        whiteModule || hospitalModule
+                        ? moduleAccent : Colors.magenta
                     selectedForegroundColor:
                         whiteModule ? Colors.white : Colors.magenta
                     keyboardSelectedForegroundColor: selectedForegroundColor
+                    keyboardSelectedBorderColor:
+                        whiteModule ? Colors.white : Colors.orange
+                    keyboardSelectedContentGlowColor:
+                        whiteModule ? Colors.white : Colors.orange
+                    keyboardSelectedSoftGlowColor:
+                        whiteModule ? Colors.white : Colors.orange
                     selectedFillColor:
                         whiteModule ? Colors.dark : Colors.yellow
                     selectedBorderColor:

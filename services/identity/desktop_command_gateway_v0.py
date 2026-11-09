@@ -240,8 +240,21 @@ class IdentityCommandGateway:
         if self._closing.is_set() or peer.uid != os.geteuid():
             return False
         try:
-            return (self._active_seat() is True
-                    and self._verify_peer(peer) is True
+            seat_ok = self._active_seat() is True
+        except Exception:
+            seat_ok = False
+        if not seat_ok:
+            # Once an active host observes seat loss, its pending code or
+            # verified local credential is revoked permanently. A future
+            # true seat probe must NOT resurrect the previous login.
+            if self._host is not None:
+                try:
+                    self._host.session_event("session-end")
+                except Exception:
+                    return False
+            return False
+        try:
+            return (self._verify_peer(peer) is True
                     and self._approve(peer, action) is True)
         except Exception:
             return False

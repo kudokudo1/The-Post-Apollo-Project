@@ -81,7 +81,7 @@ test("M3 NEWS remains first in OVERVIEW and its fixed contextual filters act on 
 
 test("M3 isolated native check does not activate provider actions and radio controls remain the original owner",()=>{
     assert.match(media,/property bool providerActivationAllowed: true/);
-    assert.equal((media.match(/stationOpen: mediaPane\.visible && mediaPane\.providerActivationAllowed/g)||[]).length,4);
+    assert.equal((media.match(/stationOpen: mediaPane\.visible && mediaPane\.providerActivationAllowed/g)||[]).length,5);
     for(const s of [
         "StationRadioSavedStrips {",
         'id: fixedSearch',

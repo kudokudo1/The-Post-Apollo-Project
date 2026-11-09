@@ -28,6 +28,7 @@ from MachineGeometryV2 import project_geometry, compare_to_v1
 from MachineSwayRead import normalize
 from MachineWindowResolver import _walk_live
 from MachineCaptureSaveV2 import capture_and_save
+from MachineSaveBridgeV2 import inspect as inspect_for_save, save_request
 from MachineGeometryStoreV2 import load_geometry
 import MachineCheckpointStore as legacy
 
@@ -330,6 +331,26 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             assert len({row["window_key"] for row in
                         selected["geometry"]["windows"]}) == 2
             assert legacy.load(cid)["checkpoint"]["counts"]["windows"] == 3
+            # CUSTOMIZE review/selected save uses opaque per-capture keys,
+            # never a guessed app_id or a stale window index.
+            bound_reader = lambda command, **options: run_ipc(command)
+            inspected = inspect_for_save(read_runner=bound_reader)
+            assert inspected["status"] == "ready"
+            assert inspected["counts"]["windows"] == 3
+            left_window = next(x for x in inspected["windows"]
+                               if x["app_id"] == APP and x["workspace"] == "1")
+            selected_result = save_request({
+                "label": "CI ONE WINDOW",
+                "review": inspected["review"],
+                "selection": {"windows": [left_window["window_key"]]},
+            }, read_runner=bound_reader)
+            assert selected_result["status"] == "saved"
+            assert selected_result["checkpoint"]["counts"]["windows"] == 1
+            chosen_record = load_geometry(selected_result["checkpoint"]["id"])
+            assert chosen_record["geometry"]["windows"][0]["window_key"] == left_window["window_key"]
+            assert chosen_record["geometry"]["windows"][0]["rect"] == left_window["rect"]
+            assert legacy.load(cid)["checkpoint"]["counts"]["windows"] == 3
+            print("MACHINE M2 CUSTOM REVIEW-BOUND ONE-WINDOW SAVE // REAL SWAY PASS")
             print("MACHINE M2 CUSTOM SAVE // REAL HEADLESS SWAY SQLITE PASS")
             print("MACHINE M2 AUTOMATIC SAVE // REAL HEADLESS SWAY SQLITE PASS")
         finally:

@@ -142,6 +142,11 @@ Singleton {
     }
 
     function setFavorite(appKey, sourceId, source, enabled) {
+        // Never make a preference change which an in-flight file load might
+        // overwrite, or overwrite a malformed favorites file on accident.
+        if (!favoritesReady || favoritesStatus === "parse-error"
+                || favoritesStatus === "load-error")
+            return false;
         const key = String(appKey || sourceKey(sourceId, source)).trim().toLowerCase();
         if (key === "")
             return;
@@ -353,6 +358,9 @@ Singleton {
     }
 
     function setDnd(appKey, sourceId, source, enabled) {
+        if (!policyReady || policyStatus === "parse-error"
+                || policyStatus === "load-error")
+            return false;
         const index = ensurePolicy(appKey, sourceId, source);
 
         sourcePolicies.setProperty(index, "dnd", enabled === true);
@@ -373,6 +381,9 @@ Singleton {
     }
 
     function snoozeApp(appKey, sourceId, source) {
+        if (!policyReady || policyStatus === "parse-error"
+                || policyStatus === "load-error")
+            return false;
         const index = ensurePolicy(appKey, sourceId, source);
         const until = Date.now() + Math.max(60000, Number(defaultSnoozeDurationMs || 0));
 
@@ -385,6 +396,9 @@ Singleton {
     }
 
     function clearSnooze(appKey) {
+        if (!policyReady || policyStatus === "parse-error"
+                || policyStatus === "load-error")
+            return false;
         const index = policyIndex(appKey);
 
         if (index === -1)
@@ -396,6 +410,9 @@ Singleton {
     }
 
     function setDefaultSnoozeDurationMs(durationMs) {
+        if (!policyReady || policyStatus === "parse-error"
+                || policyStatus === "load-error")
+            return false;
         const minimum = 60 * 1000;
         const maximum = 30 * 24 * 60 * 60 * 1000;
         const next = Math.max(minimum, Math.min(maximum, Number(durationMs || 0)));

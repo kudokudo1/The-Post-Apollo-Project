@@ -17,6 +17,29 @@ Rectangle {
     readonly property string kind:
         MediaPanelPolicy.kindForRoute(subjectRoute)
 
+    // M2 // The contextual rail delegates actions to the currently mounted
+    // NEWS, RADIO or SERVICES owner. No controller or provider is duplicated.
+    readonly property var loadedRadio: kind==="radio" && mediaLoader.item
+        ? mediaLoader.item : null
+    readonly property var loadedNews: kind==="news" && mediaLoader.item
+        ? mediaLoader.item : null
+    readonly property var loadedServices: kind==="services" && mediaLoader.item
+        ? mediaLoader.item : null
+    function selectRadioPreset(index) {
+        if (loadedRadio && loadedRadio.canOperate)
+            loadedRadio.searchPreset(index);
+    }
+    function selectNewsChannel(section) {
+        if (!loadedNews) return;
+        loadedNews.selectSection(section);
+        if (subjectRoute!=="media/news/full")
+            mediaPane.routeRequested("media/news/full");
+    }
+    function selectServiceMode(mode) {
+        if (loadedServices && (mode==="runtime" || mode==="sources"))
+            loadedServices.viewMode=mode;
+    }
+
     // Optional read-only window onto whichever Radio component is actually
     // loaded. A different MEDIA route exposes nothing, not a stale snapshot.
     readonly property var radioFavoritesSnapshot:
@@ -58,8 +81,30 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: parent.top
         subjectRoute: mediaPane.subjectRoute
+        radioPresets: mediaPane.loadedRadio ? mediaPane.loadedRadio.presets : []
+        radioPresetIndex: mediaPane.loadedRadio
+            ? mediaPane.loadedRadio.presetIndex : 0
+        radioCanOperate: mediaPane.loadedRadio
+            ? mediaPane.loadedRadio.canOperate : false
+        radioStatus: mediaPane.loadedRadio
+            ? mediaPane.loadedRadio.headerStatus : ""
+        radioStatusColor: mediaPane.loadedRadio
+            ? mediaPane.loadedRadio.headerStatusColor : Colors.white
+        newsSection: mediaPane.loadedNews
+            ? mediaPane.loadedNews.effectiveSection : "REPORTS"
+        servicesMode: mediaPane.loadedServices
+            ? mediaPane.loadedServices.viewMode : "runtime"
         onRouteRequested: function(path) {
             mediaPane.routeRequested(path);
+        }
+        onRadioPresetRequested: function(index) {
+            mediaPane.selectRadioPreset(index);
+        }
+        onNewsSectionRequested: function(section) {
+            mediaPane.selectNewsChannel(section);
+        }
+        onServicesModeRequested: function(mode) {
+            mediaPane.selectServiceMode(mode);
         }
     }
 
@@ -80,7 +125,7 @@ Rectangle {
 
     Component {
         id: servicesComponent
-        StationMediaServicesPane { }
+        StationMediaServicesPane { embeddedHeader: true }
     }
 
     Component {
@@ -101,6 +146,7 @@ Rectangle {
         StationRadio {
             stationOpen: mediaPane.visible
             subjectRoute: mediaPane.subjectRoute
+            embeddedHeader: true
         }
     }
 

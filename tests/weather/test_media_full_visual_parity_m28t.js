@@ -81,8 +81,8 @@ test("NEWS // ALL exposes all original six channel tabs and the entire GDELT rep
   assert.match(news,/subjectRoute === "" \|\| MediaPanelPolicy\.isFullNews\(subjectRoute\)/);
   assert.match(news,/readonly property string effectiveSection: usesOriginalChannelTabs\s*\? section/);
   assert.match(news,/readonly property bool isReports: usesOriginalChannelTabs\s*\? section === "REPORTS"/);
-  assert.match(news,/height: stationNewsHub\.usesOriginalChannelTabs \? 33 : 0/);
-  assert.match(news,/visible: stationNewsHub\.usesOriginalChannelTabs\s*&& !stationNewsHub\.viewerOpen/);
+  assert.match(news,/height: stationNewsHub\.usesOriginalChannelTabs && !stationNewsHub\.embeddedHeader \? 33 : 0/);
+  assert.match(news,/visible: stationNewsHub\.usesOriginalChannelTabs\s*&& !stationNewsHub\.embeddedHeader\s*&& !stationNewsHub\.viewerOpen/);
   assert.match(news,/model: Catalog\.sections/);
   assert.match(news,/stationNewsHub\.section = modelData;/);
   assert.match(news,/StationDiscovery\s*\{/);

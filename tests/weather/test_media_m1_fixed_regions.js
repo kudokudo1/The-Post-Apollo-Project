@@ -31,14 +31,16 @@ test("M1 RADIO search and transport are fixed above and below the only scrollabl
     const bottom=radio.indexOf('id: fixedTransport');
     assert.ok(0<top && top<middle && middle<results && results<bottom);
     assert.match(radio,/id: fixedSearch[\s\S]*?anchors\.top: parent\.top/);
-    assert.match(radio,/id: radioScroll[\s\S]*?anchors\.top: fixedSearch\.bottom[\s\S]*?anchors\.bottom: fixedTransport\.top/);
+    assert.ok(radio.slice(middle,bottom).includes('anchors.top: savedStrips.bottom'));
+    assert.ok(radio.slice(middle,bottom).includes('anchors.bottom: fixedTransport.top'));
+    assert.ok(radio.includes('StationRadioSavedStrips {'));
     assert.match(radio,/id: fixedTransport[\s\S]*?anchors\.bottom: parent\.bottom/);
     const pinnedTop=radio.slice(top,middle);
     const middleText=radio.slice(results,bottom);
     const pinnedBottom=radio.slice(bottom);
     for(const s of ['id: presetRow','id: queryRow','id: queryInput','label: "NEXT 50"'])
         assert.ok(pinnedTop.includes(s),s);
-    for(const s of ['SAVED // FAVORITES','STATIONS // BROWSE','model: stationRadio.browseItems'])
+    for(const s of ['STATIONS // BROWSE','model: stationRadio.browseItems'])
         assert.ok(middleText.includes(s),s);
     for(const label of ["SELECT","LOAD","ENTER","PLAY","PAUSE","STOP"])
         assert.ok(pinnedBottom.includes('label: "'+label+'"'),label);
@@ -50,7 +52,7 @@ test("M1 RADIO search and transport are fixed above and below the only scrollabl
     assert.ok(pinnedBottom.includes('onClicked: stationRadio.playbackAction("stop")'));
     assert.ok(pinnedBottom.includes("controller.playbackState.toUpperCase()"));
     assert.ok(pinnedBottom.includes("controller.ownsPlayback"));
-    assert.equal((radio.match(/stationRadio\.sectionVisible\("/g)||[]).length,21);
+    assert.equal((radio.match(/stationRadio\.sectionVisible\("/g)||[]).length,19);
     assert.equal((radio.match(/id: radioScroll/g)||[]).length,1);
     assert.ok(radio.includes('readonly property bool compactOverview: subjectRoute === "media/overview"'));
     assert.match(radio,/visible: !stationRadio\.compactOverview/);
@@ -69,8 +71,8 @@ test("M1 all MEDIA screens share the same C44 fixed title/tab/divider geometry",
     assert.match(header,/height: HeaderGeometry\.tabHeight/);
     assert.match(header,/anchors\.topMargin: HeaderGeometry\.tabsToRule/);
     assert.match(header,/height: HeaderGeometry\.ruleHeight/);
-    assert.match(header,/HeaderGeometry\.buttonWidth\(modeRail\.width,5\)/);
-    for(const label of ["OVERVIEW","NEWS","WATCH","RADIO","SERVICES"])
+    assert.match(header,/HeaderGeometry\.buttonWidth\(/);
+    for(const label of ["OVERVIEW","NEWS","WATCH","RADIO","CREATORS","SERVICES"])
         assert.ok(header.includes('label:"'+label+'"'),label);
     assert.match(media,/onRouteRequested: function\(path\)/);
     assert.match(navigator,/onRouteRequested: function\(path\) \{ browser\.chooseRoute\(path\); \}/);

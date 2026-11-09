@@ -115,6 +115,7 @@ assert.deepEqual(decoded.map(x => x.ref.id), [
 ]);
 
 const ui = read("widgets/weather/StationRadio.qml");
+const squares = read("widgets/weather/StationRadioSavedStrips.qml");
 assert.match(
     ui,
     /^import QtQuick\s*\nimport Quickshell\s*\nimport Quickshell\.Io/m,
@@ -143,11 +144,17 @@ assert.match(ui, /onBrowseItemsChanged:/);
 assert.match(ui, /onLoadedMediaChanged:/);
 assert.match(ui, /id !== lastLoadRequestedId/);
 assert.match(ui, /RadioMemory\.touchRecent/);
-assert.match(ui, /title: "SAVED \/\/ FAVORITES \+ RECENTLY LOADED"/);
-assert.match(ui, /label: "RECALL"/);
-assert.match(ui, /label: "X"/);
-assert.match(ui, /UNFAVORITE/);
-assert.match(ui, /NO STORED STREAM URL \/\/ NO AUTOPLAY/);
+assert.ok(ui.includes('StationRadioSavedStrips {'));
+assert.ok(ui.includes('onRecallRequested: function(item)'));
+assert.ok(ui.includes('onRemoveRequested: function(item)'));
+assert.ok(squares.includes('model: strips.favoriteItems'));
+assert.ok(squares.includes('model: strips.recentItems'));
+assert.ok(squares.includes('FAVORITES //'));
+assert.ok(squares.includes('RECENTS //'));
+assert.ok(squares.includes('label: "X"'));
+assert.ok(squares.includes('strips.recallRequested(modelData)'));
+assert.ok(ui.includes('UNFAVORITE'));
+assert.ok(squares.includes('NO STORED STREAM URL // NO AUTOPLAY'));
 
 // Recall must only re-enter the existing directory + select path. It may not
 // directly load/play a persisted ref or manufacture a direct stream URL.

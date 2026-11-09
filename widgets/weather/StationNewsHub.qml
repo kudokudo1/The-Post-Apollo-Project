@@ -18,6 +18,14 @@ Rectangle {
     property string subjectRoute: ""
     // MEDIA M1: native SUBJECTS already has a fixed COSMOS C44 title.
     property bool embeddedHeader: false
+    // Contextual NEWS channel rail in the parent delegates to this owner.
+    function selectSection(nextSection) {
+        if (Catalog.sections.indexOf(nextSection) < 0)
+            return false;
+        stationNewsHub.closeViewer();
+        stationNewsHub.section = nextSection;
+        return true;
+    }
     // M28-T: the native NEWS // ALL route restores the exact CLASSIC
     // six-tab channel controls and the same GDELT report inspector.
     readonly property bool usesOriginalChannelTabs:
@@ -205,9 +213,10 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.margins: 10
-        height: stationNewsHub.usesOriginalChannelTabs ? 33 : 0
+        height: stationNewsHub.usesOriginalChannelTabs && !stationNewsHub.embeddedHeader ? 33 : 0
         spacing: 7
         visible: stationNewsHub.usesOriginalChannelTabs
+                 && !stationNewsHub.embeddedHeader
                  && !stationNewsHub.viewerOpen
 
         Repeater {

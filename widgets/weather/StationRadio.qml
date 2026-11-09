@@ -15,6 +15,13 @@ Rectangle {
     property bool stationOpen: true
     property string subjectRoute: ""
     readonly property bool compactOverview: subjectRoute === "media/overview"
+    property bool embeddedHeader: false
+    readonly property string headerStatus: controller.errorText !== ""
+        ? controller.errorText
+        : controller.busy ? "CONTROLLER WORKING"
+        : controller.playbackState.toUpperCase()
+    readonly property color headerStatusColor: controller.errorText !== ""
+        ? Colors.orange : controller.ownsPlayback ? Colors.green : Colors.white
     function sectionVisible(group) {
         return MediaPanelPolicy.radioGroupVisible(subjectRoute,group);
     }
@@ -368,6 +375,7 @@ Rectangle {
         height: visible ? implicitHeight : 0
             Row {
             visible: stationRadio.sectionVisible("search")
+                && !stationRadio.embeddedHeader
                 id: presetRow
                 objectName: "media-m1-radio-preset-rail"
                 height: 26
@@ -459,13 +467,32 @@ Rectangle {
 
     }
 
+    StationRadioSavedStrips {
+        id: savedStrips
+        objectName: "media-m2-radio-fixed-saved"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: 8
+        anchors.rightMargin: 8
+        anchors.top: fixedSearch.bottom
+        anchors.topMargin: fixedSearch.visible ? 2 : 0
+        visible: !stationRadio.compactOverview
+            && stationRadio.sectionVisible("saved")
+        height: visible ? 88 : 0
+        favoriteItems: stationRadio.favoriteItems
+        recentItems: stationRadio.recentItems
+        canRecall: stationRadio.canOperate
+        onRecallRequested: function(item) { stationRadio.recallSaved(item); }
+        onRemoveRequested: function(item) { stationRadio.removeFavorite(item); }
+    }
+
     Flickable {
         id: radioScroll
         objectName: "media-m1-radio-directory-scroll"
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: fixedSearch.bottom
-        anchors.topMargin: fixedSearch.visible ? 3 : 0
+        anchors.top: savedStrips.bottom
+        anchors.topMargin: savedStrips.visible ? 3 : 0
         anchors.bottom: fixedTransport.top
         anchors.bottomMargin: fixedTransport.visible ? 3 : 0
         clip: true
@@ -480,7 +507,7 @@ Rectangle {
             width: Math.max(0,radioScroll.width-16)
             spacing: 6
             Row {
-            visible: stationRadio.sectionVisible("header")
+            visible: stationRadio.sectionVisible("header") && !stationRadio.embeddedHeader
                 width: parent.width
                 spacing: 18
 
@@ -502,164 +529,16 @@ Rectangle {
             }
 
             StationSectionDivider {
-            visible: stationRadio.sectionVisible("source")
+            visible: stationRadio.sectionVisible("source") && !stationRadio.embeddedHeader
                 width: parent.width
                 title: "SHARED HI-FI // RADIO BROWSER // MPD"
             }
 
             QuietText {
-            visible: stationRadio.sectionVisible("source")
+            visible: stationRadio.sectionVisible("source") && !stationRadio.embeddedHeader
                 width: parent.width
                 font.pixelSize: 11
                 text: "SAME RADIO SERVICE AS HI-FI // DIRECTORY CLASSIFICATION IS NOT VERIFIED NEWS CONTENT"
-            }
-
-            StationSectionDivider {
-            visible: stationRadio.sectionVisible("saved")
-                width: parent.width
-                title: "SAVED // FAVORITES + RECENTLY LOADED"
-            }
-
-            Row {
-            visible: stationRadio.sectionVisible("saved")
-                width: parent.width
-                spacing: 10
-
-                Column {
-                    width: Math.max(0, (parent.width - 10) / 2)
-                    spacing: 5
-
-                    GohuText {
-                        text: "FAVORITES // "
-                              + stationRadio.favoriteItems.length
-                              + " / 10"
-                        color: Colors.magenta
-                        font.pixelSize: 11
-                    }
-
-                    QuietText {
-                        visible: stationRadio.favoriteItems.length === 0
-                        width: parent.width
-                        text: "NO SAVED STATIONS // HIGHLIGHT + FAVORITE"
-                        font.pixelSize: 9
-                    }
-
-                    Repeater {
-                        model: stationRadio.favoriteItems
-
-                        delegate: Rectangle {
-                            required property var modelData
-                            width: parent.width
-                            height: 44
-                            color: Colors.dark
-                            border.width: 1
-                            border.color: Colors.magenta
-
-                            GohuText {
-                                anchors.left: parent.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.leftMargin: 9
-                                width: Math.max(40, parent.width - 154)
-                                text: modelData.title
-                                elide: Text.ElideRight
-                                color: Colors.white
-                                font.pixelSize: 10
-                            }
-
-                            ActionButton {
-                                anchors.right: removeFavoriteButton.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.rightMargin: 6
-                                width: 78
-                                height: 28
-                                label: "RECALL"
-                                labelPixelSize: 9
-                                available: stationRadio.canOperate
-                                onClicked:
-                                    stationRadio.recallSaved(modelData)
-                            }
-
-                            ActionButton {
-                                id: removeFavoriteButton
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.rightMargin: 6
-                                width: 44
-                                height: 28
-                                label: "X"
-                                labelPixelSize: 10
-                                accentColor: Colors.red
-                                destructive: true
-                                onClicked:
-                                    stationRadio.removeFavorite(modelData)
-                            }
-                        }
-                    }
-                }
-
-                Column {
-                    width: Math.max(0, (parent.width - 10) / 2)
-                    spacing: 5
-
-                    GohuText {
-                        text: "RECENTLY LOADED // "
-                              + stationRadio.recentItems.length
-                              + " / 8"
-                        color: Colors.cyan
-                        font.pixelSize: 11
-                    }
-
-                    QuietText {
-                        visible: stationRadio.recentItems.length === 0
-                        width: parent.width
-                        text: "NO WEATHER RADIO LOADS RECORDED"
-                        font.pixelSize: 9
-                    }
-
-                    Repeater {
-                        model: stationRadio.recentItems
-
-                        delegate: Rectangle {
-                            required property var modelData
-                            width: parent.width
-                            height: 44
-                            color: Colors.dark
-                            border.width: 1
-                            border.color: Colors.cyan
-
-                            GohuText {
-                                anchors.left: parent.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.leftMargin: 9
-                                width: Math.max(40, parent.width - 102)
-                                text: modelData.title
-                                elide: Text.ElideRight
-                                color: Colors.white
-                                font.pixelSize: 10
-                            }
-
-                            ActionButton {
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.rightMargin: 6
-                                width: 78
-                                height: 28
-                                label: "RECALL"
-                                labelPixelSize: 9
-                                available: stationRadio.canOperate
-                                onClicked:
-                                    stationRadio.recallSaved(modelData)
-                            }
-                        }
-                    }
-                }
-            }
-
-            QuietText {
-            visible: stationRadio.sectionVisible("saved")
-                width: parent.width
-                text: "RECALL SEARCHES THE LIVE DIRECTORY BY NAME, THEN REQUIRES THE EXACT SAVED UUID // NO STORED STREAM URL // NO AUTOPLAY"
-                font.pixelSize: 9
             }
 
             StationSectionDivider {
@@ -895,7 +774,7 @@ Rectangle {
             }
 
             QuietText {
-            visible: stationRadio.sectionVisible("status")
+            visible: stationRadio.sectionVisible("status") && !stationRadio.embeddedHeader
                 width: parent.width
                 text: "SELECTED // " + (stationRadio.selectedRef
                       ? String(stationRadio.selectedRef.id) : "--")
@@ -917,7 +796,7 @@ Rectangle {
             }
 
             QuietText {
-            visible: stationRadio.sectionVisible("status")
+            visible: stationRadio.sectionVisible("status") && !stationRadio.embeddedHeader
                 width: parent.width
                 text: "SHARED MPD STATE // "
                       + controller.playbackState.toUpperCase()
@@ -927,7 +806,7 @@ Rectangle {
             }
 
             QuietText {
-            visible: stationRadio.sectionVisible("status")
+            visible: stationRadio.sectionVisible("status") && !stationRadio.embeddedHeader
                 width: parent.width
                 text: "MPRIS EXTERNAL PLAYERS REMAIN A SEPARATE HI-FI MODE // WEATHER DOES NOT CLAIM THEIR CONTROL"
                 font.pixelSize: 9

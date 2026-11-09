@@ -12,6 +12,7 @@ const navSource = read("widgets/weather/StationSubjectNavigationPolicy.js");
 const previewSource = read("widgets/weather/StationSubjectNavigationPreviewPolicy.js");
 const mediaSource = read("widgets/weather/StationMediaSubjectPanelPolicy.js");
 const radio = read("widgets/weather/StationRadio.qml");
+const saved = read("widgets/weather/StationRadioSavedStrips.qml");
 const pane = read("widgets/weather/StationMediaSubjectPane.qml");
 const navigator = read("widgets/weather/StationSubjectNavigator.qml");
 const env = vm.createContext({});
@@ -63,12 +64,14 @@ test("native RADIO retains original search, presets, paging, favorites, recents 
   for(const call of [
     "stationRadio.searchPreset(index)",
     "stationRadio.nextPage()",
-    "stationRadio.recallSaved(modelData)",
     "stationRadio.playbackAction(\"play\")",
     "stationRadio.playbackAction(\"pause\")",
     "stationRadio.playbackAction(\"stop\")"
   ])assert.ok(radio.includes(call),call);
-  assert.match(radio,/MediaServices\.HeadlessMediaController\s*\{/);
+  assert.ok(radio.includes("onRecallRequested: function(item) { stationRadio.recallSaved(item); }"));
+  assert.ok(saved.includes("onClicked: strips.recallRequested(modelData)"));
+  assert.ok(saved.includes("onClicked: strips.removeRequested(modelData)"));
+  assert.ok(radio.includes("MediaServices.HeadlessMediaController {"));
   assert.match(radio,/radioClient: "weather-radio"/);
   assert.match(radio,/weather-radio-memory\.json/);
   assert.match(radio,/NO AUTOPLAY/);

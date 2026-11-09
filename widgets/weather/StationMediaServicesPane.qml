@@ -13,6 +13,7 @@ Rectangle {
     color: Colors.black
     clip: true
     property string viewMode: "runtime"
+    property bool embeddedHeader: false
     readonly property var routeRows: [
         {name:"NEWS // GDELT",owner:"StationNewsHub / StationDiscovery",
          state:"NOT MOUNTED ON SERVICES",scope:"REPORTS // EXPLICIT REQUEST"},
@@ -42,7 +43,8 @@ Rectangle {
             id: serviceTabs
             objectName: "media-m1-services-modes"
             width: parent.width
-            height: 25
+            height: services.embeddedHeader ? 0 : 25
+            visible: !services.embeddedHeader
             spacing: HeaderGeometry.tabSpacing
             Repeater {
                 model:[{id:"runtime",label:"RUNTIME // OWNERS"},

@@ -174,10 +174,15 @@ def _crawl_rows(doc):
         uri = page.get("url")
         if not isinstance(uri, str) or len(uri) > 400:
             raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
-        parts = urlsplit(uri)
-        if (parts.scheme != "https" or parts.hostname != "quotes.toscrape.com"
-                or parts.port is not None or parts.username or parts.password
-                or uri in seen):
+        try:
+            parts = urlsplit(uri)
+            accepted = (parts.scheme == "https"
+                        and parts.hostname == "quotes.toscrape.com"
+                        and parts.port is None
+                        and not parts.username and not parts.password)
+        except ValueError as exc:
+            raise IndexErrorSafe("INVALID_SOURCE_SCHEMA") from exc
+        if not accepted or uri in seen:
             raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
         seen.add(uri)
         try:

@@ -107,3 +107,16 @@ The earlier complete [C4b run #42552472817](https://github.com/kudokudo1/The-Pos
 **Diagnostic-only follow-up proposal:** replace the unsupported listing with documented `systemd-inhibit --list --no-pager`; add bounded read-only `busctl status org.freedesktop.login1` to distinguish service-owner availability from a timed-out `ListInhibitors`; allow the host a maximum 32-second evidence-drain after the exact known rollback error, waiting only for `C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_JOURNAL_END` **following the most recent error**. If a full sample is not collected, report `incomplete_bounded` and still fail. No reboot, rollback, poweroff, inhibitor override, policy, OS-origin, signed-host, production or acceptance check is changed by these diagnostics.
 
 **NEXT / VERIFY:** Run new exact-head static/security contracts and inspect complete signed C4b real VM again; owner must attribute the logind/broker interaction before authorizing a change to the actual rollback or runtime. Preserve draft PR #1571, issue #1568 open, production HOLD and operator acceptance gate.
+
+## Successor checkpoint // 2026-11-09 // login1 bus ownership hypothesis
+
+Exact prior head fb9bf065fed88782720a6e4e87483e553a25fd41 produced:
+- C4b #42558730574 FAIL after first-boot signed/SELinux/security gates passed. C4B_HOST_KNOWN_OS_ERROR_EVIDENCE // sample_complete confirms the 32-second evidence-drain now works; real second boot/removal still missing.
+- The read-only busctl status org.freedesktop.login1 probe reports "Failed to get credentials: No such device or address" even while systemd-logind and dbus-broker units report active/running. systemd-inhibit --list times out (124), and ListInhibitors returns "Call failed: Connection timed out". The actual RPM-OSTree command reports "Checking systemd inhibitor locks: Timeout was reached".
+- C2v #42558730541 PASS genuine second boot; C4a #42558730520 FAIL in Fedora ISO download (curl 18, broken pipe) before VM; C2x #42558730569 FAIL Fedora download SSL timeout (curl 28) before VM. Grammar PASS.
+
+This raises a specific but unproven hypothesis: the C4b test-only D-Bus broker restart may cause login1 to lose or fail to reacquire its bus name even though logind's systemd unit stays active. Historical upstream reports describe related behavior, but are not proof for Fedora Silverblue 44. No fix is authorized from inference alone.
+
+New diagnostic-only evidence: the C2v guest controller now performs three bounded, read-only C4b-only phase snapshots to UART1 around the unchanged signed policy gate and unchanged C4b runtime: BEFORE_C4B_POLICY, AFTER_C4B_POLICY, AFTER_C4B_RUNTIME. Each queries org.freedesktop.DBus.GetNameOwner for org.freedesktop.login1, then records both unit states, with a defined diagnostic return code and no state modification. These probes cannot grant acceptance. Original policy, C3b origin, rpm-ostree rollback, SELinux protections, CI-only guest and second-real-boot acceptance are unchanged.
+
+Next: compare exact-head phase snapshots to determine precisely when (if at all) org.freedesktop.login1 becomes unowned; only then seek C4b runtime owner review for a minimum correction. Keep PR #1571 DRAFT/unmerged; issue #1568 OPEN; production HOLD.

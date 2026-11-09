@@ -169,6 +169,37 @@ class C2vRollbackEvidenceContract(unittest.TestCase):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, observer)
 
+    def test_04b_c4b_only_logind_phase_comparison_is_read_only(self):
+        src = self.guest
+        begin = src.index("c4b_logind_phase_probe() {")
+        end = src.index("\nstagefile=/var/lib/c2v-transaction-stage", begin)
+        helper = src[begin:end]
+        self.assertIn('[[ -f "$c4b_mode" && -c /dev/ttyS1 ]] || return 0', helper)
+        self.assertIn("org.freedesktop.DBus GetNameOwner s org.freedesktop.login1", helper)
+        self.assertIn("C4B_DIAG_LOGIND_PHASE_OWNER_RC //", helper)
+        self.assertIn("C4B_DIAG_LOGIND_PHASE_UNITS_END", helper)
+        self.assertIn("5s", helper)
+        self.assertIn("4s", helper)
+        self.assertIn(">/dev/ttyS1 2>&1 || true", helper)
+        for forbidden in (
+            "systemctl restart", "systemctl stop", "systemctl reboot",
+            "systemctl poweroff", "rpm-ostree rollback", "C2V_PASS //",
+            "C4B_PASS //", "setenforce", "busctl set-property",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, helper)
+        baseline = src.index("c4b_logind_phase_probe BEFORE_C4B_POLICY")
+        policy = src.index('/usr/bin/bash "$c4b_policy_gate" booted', baseline)
+        after_policy = src.index("c4b_logind_phase_probe AFTER_C4B_POLICY", policy)
+        runtime = src.index("c4b_execute booted", after_policy)
+        after_runtime = src.index("c4b_logind_phase_probe AFTER_C4B_RUNTIME", runtime)
+        rollback = src.index('echo rollback_pending > "$stagefile"', after_runtime)
+        self.assertLess(baseline, policy)
+        self.assertLess(policy, after_policy)
+        self.assertLess(after_policy, runtime)
+        self.assertLess(runtime, after_runtime)
+        self.assertLess(after_runtime, rollback)
+
     def test_05_host_progress_and_os_error_still_fail_closed(self):
         src = self.host
         for marker in (

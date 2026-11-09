@@ -213,6 +213,40 @@ C2V_ROLLBACK_OBSERVER
     echo 'C2V_DIAG_ROLLBACK_OBSERVER_NOT_READY // non-authoritative'
   fi
 }
+# Compare the logind D-Bus name before and after C4b's test-only
+# policy/runtime sequence. This is observation, not a repair or gate.
+c4b_logind_phase_probe() {
+  [[ -f "$c4b_mode" && -c /dev/ttyS1 ]] || return 0
+  local checkpoint="$1" probe_rc
+  local owner_output=/run/c4b-logind-phase-owner.log
+  {
+    printf 'C4B_DIAG_LOGIND_PHASE_BEGIN // %s\n' "$checkpoint"
+    # Ask the bus broker itself for the name owner. This does not
+    # activate login1 or request a reboot.
+    if timeout --signal=TERM --kill-after=1s 5s \
+        busctl --system --timeout=3s call \
+          org.freedesktop.DBus /org/freedesktop/DBus \
+          org.freedesktop.DBus GetNameOwner s org.freedesktop.login1 \
+          > "$owner_output" 2>&1; then
+      echo 'C4B_DIAG_LOGIND_PHASE_OWNER_RC // 0'
+    else
+      probe_rc="$?"
+      echo "C4B_DIAG_LOGIND_PHASE_OWNER_RC // $probe_rc"
+    fi
+    head -c 500 "$owner_output" 2>/dev/null || true
+    echo
+    echo 'C4B_DIAG_LOGIND_PHASE_UNITS_BEGIN'
+    timeout --signal=TERM --kill-after=1s 4s systemctl show \
+      systemd-logind.service dbus-broker.service --no-pager \
+      -p ActiveState -p SubState -p MainPID -p Result 2>&1 |
+      head -c 900 || true
+    echo
+    echo 'C4B_DIAG_LOGIND_PHASE_UNITS_END'
+    printf 'C4B_DIAG_LOGIND_PHASE_END // %s\n' "$checkpoint"
+  } >/dev/ttyS1 2>&1 || true
+  return 0
+}
+
 stagefile=/var/lib/c2v-transaction-stage
 pkg=postapollo-connections-c2t-fixture
 data=/mnt/c2v-offline
@@ -777,10 +811,13 @@ C2V_WORKER
     if [[ -f "$c4b_mode" ]]; then
       [[ -s "$c4b_gate" && -s "$c4b_policy_gate" ]] ||
         failure "C4B_RUNTIME_OR_SIGNED_POLICY_GATE_LOST_AFTER_REBOOT"
+      c4b_logind_phase_probe BEFORE_C4B_POLICY
       /usr/bin/bash "$c4b_policy_gate" booted ||
         failure "C4B_SIGNED_COMPOSED_POLICY_NOT_VALID_AFTER_REBOOT"
+      c4b_logind_phase_probe AFTER_C4B_POLICY
       c4b_execute booted ||
         failure "C4B_CONFINED_RUNTIME_NOT_VERIFIED"
+      c4b_logind_phase_probe AFTER_C4B_RUNTIME
     fi
     echo "C2V_PASS // LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT"
     echo rollback_pending > "$stagefile"

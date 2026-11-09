@@ -1,0 +1,57 @@
+name: Connections C3e-J isolated read-only witness peer (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eReadOnlyWitnessPeer.py"
+      - "tests/connections/test_connections_c3ej_witness_peer.py"
+      - ".github/workflows/connections-c3ej-readonly-witness-peer.yml"
+      - "docs/connections-c3ej-readonly-witness-peer.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-witness-peer:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Syntax and deny-only host safety
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tests/connections/c3e_release_trust/C3eReadOnlyWitnessPeer.py tests/connections/test_connections_c3ej_witness_peer.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path('services/connections')
+          assert 'readonly property bool credentialActionsEnabled: false' in (base/'ConnectionsBroker.qml').read_text()
+          assert 'readonly property bool hostAuthenticated: false' in (base/'ConnectionsRequestStatus.qml').read_text()
+          for f in (*base.glob('*.qml'), *base.glob('*.js'), base/'qmldir'):
+              assert 'C3eReadOnlyWitnessPeer' not in f.read_text(), f
+          print('C3EJ_PASS // PRODUCTION_HOST_AND_CREDENTIALS_DENIED')
+          PY
+      - name: Real Linux process sender credential and forwarded-FD refusal
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ej_witness_peer.py
+          echo 'C3EJ_PASS // KERNEL_CONNECTED_AND_MESSAGE_SENDER_MATCH_READ_ONLY'
+      - name: Existing signed release, supervised crash and witness regressions
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ei_supervised_supersession.py
+          python3 -B tests/connections/test_connections_c3eh_operator_recovery_gate.py
+          python3 -B tests/connections/test_connections_c3eg_split_commit_recovery.py
+          python3 -B tests/connections/test_connections_c3ef_rollback_witness.py
+          echo 'C3EJ_PASS // EXISTING_SIGNED_RECOVERY_REGRESSIONS'
+      - name: Explicit non-production limit
+        run: |
+          set -euo pipefail
+          grep -Fq 'No production' docs/connections-c3ej-readonly-witness-peer.md
+          grep -Fq 'not a rollback-resistant' docs/connections-c3ej-readonly-witness-peer.md
+          grep -Fq 'SCM_CREDENTIALS' tests/connections/c3e_release_trust/C3eReadOnlyWitnessPeer.py
+          echo 'C3EJ_LIMITATION // SAME_UID_TEST_PEER_NOT_TRUST_ROOT'

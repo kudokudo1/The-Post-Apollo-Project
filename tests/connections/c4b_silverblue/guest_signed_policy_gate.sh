@@ -69,6 +69,27 @@ case "$phase" in
       die "INVALID_POLICY_SIGNATURE"
     fi
     echo "C4B_PASS // SIGNED_POLICY_VERIFIED_WITH_SEPARATE_TEST_ONLY_KEYRING"
+    # C4a already verified the C3d RPM signature against its isolated
+    # disposable keyring before the first boot. Retain only the PUBLIC,
+    # signed RPM input inside root-owned C4b assets for a second independent
+    # signature/header check while the real service is running after reboot.
+    # Do not change C2v's common ISO mount lifecycle or store a private key.
+    c3d_source="$media/c3d-status.rpm"
+    c3d_saved=/var/lib/c4b-runtime-assets/c3d-status.rpm
+    [[ -f "$c3d_source" && ! -L "$c3d_source" &&
+       -d /var/lib/c4b-runtime-assets &&
+       "$(stat -c '%u:%g:%a' /var/lib/c4b-runtime-assets)" == 0:0:700 &&
+       -d /var/lib/c4a-test-only-rpm-keyring ]] ||
+      die "SIGNED_C3D_MEASUREMENT_INPUTS_UNAVAILABLE"
+    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}\\n' "$c3d_source")" == \\
+       postapollo-connections-c3d-ci-status\ 0.1\ noarch ]] ||
+      die "SIGNED_C3D_MEASUREMENT_PACKAGE_MISMATCH"
+    install -m 0600 "$c3d_source" "$c3d_saved" ||
+      die "SIGNED_C3D_MEASUREMENT_COPY_REFUSED"
+    [[ "$(sha256sum "$c3d_source" | awk '{print $1}')" == \\
+       "$(sha256sum "$c3d_saved" | awk '{print $1}')" ]] ||
+      die "SIGNED_C3D_MEASUREMENT_COPY_CHANGED"
+    echo "C4B_PASS // SIGNED_C3D_PUBLIC_RPM_SNAPSHOT_RETAINED_FOR_RUNNING_OBSERVATION"
     ;;
   booted)
     [[ -f "$mode" ]] || die "MISSING_RUNTIME_OPT_IN"

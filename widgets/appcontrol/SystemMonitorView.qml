@@ -44,8 +44,15 @@ required property var controller
                         anchors.fill: parent
                         anchors.margins: 7
                         color: Colors.black
-                        border.width: 1
-                        border.color: systemMonitorBody.accent
+                        border.width:
+                            controller.savedSystemWatchSourceId ===
+                                String(systemMonitorBody.safeComponent.id || "")
+                            && controller.savedSystemWatchBoxId === "utilization" ? 3 : 1
+                        border.color:
+                            controller.savedSystemWatchSourceId ===
+                                String(systemMonitorBody.safeComponent.id || "")
+                            && controller.savedSystemWatchBoxId === "utilization"
+                            ? Colors.magenta : systemMonitorBody.accent
 
                         RectangularShadow {
                             anchors.fill: parent
@@ -154,8 +161,15 @@ required property var controller
                         anchors.fill: parent
                         anchors.margins: 7
                         color: Colors.black
-                        border.width: 1
-                        border.color: systemMonitorBody.accent
+                        border.width:
+                            controller.savedSystemWatchSourceId ===
+                                String(systemMonitorBody.safeComponent.id || "")
+                            && controller.savedSystemWatchBoxId === "metric" ? 3 : 1
+                        border.color:
+                            controller.savedSystemWatchSourceId ===
+                                String(systemMonitorBody.safeComponent.id || "")
+                            && controller.savedSystemWatchBoxId === "metric"
+                            ? Colors.magenta : systemMonitorBody.accent
 
                         RectangularShadow {
                             anchors.fill: parent

@@ -51,7 +51,8 @@ var GROUPS = {
         {label:"NEWS // ALL",path:"media/news/full",key:"news"},
         {label:"WATCH",path:"media/watch/live",key:"watch"},
         {label:"RADIO // ALL",path:"media/radio/full",key:"radio"},
-        {label:"CREATORS",path:"media/creators/saved",key:"creators"}
+        {label:"CREATORS",path:"media/creators/saved",key:"creators"},
+        {label:"SERVICES",path:"media/services/health",key:"services"}
     ],
     magick:[
         {label:"OVERVIEW",path:"magick/overview",key:"overview"},

@@ -663,6 +663,28 @@ def preview_batch_trash(raw_paths, extra_folder=""):
         return {"ok": False, "kind": "preview-batch", "error": "PLAN_SAVE_FAILED"}
 
 
+def trash_batch_now(raw_paths, confirmation, extra_folder=""):
+    """One user action: validate selected Gallery originals and GIO-trash.
+
+    The same preview signature and one-use plan protections still apply,
+    but no extra UI confirmation or separate user gesture is needed.
+    The literal confirmation token represents the explicit Trash button.
+    """
+    if confirmation != "MOVE_TO_TRASH":
+        return {"ok": False, "kind": "trash-batch-now",
+                "error": "CONFIRMATION_REQUIRED"}
+    plan = preview_batch_trash(raw_paths, extra_folder)
+    if not plan.get("ok") or not plan.get("planId"):
+        return {"ok": False, "kind": "trash-batch-now",
+                "error": str(plan.get("error") or "PREVIEW_FAILED")}
+    # Retain the existing one-use 10m plan, file-change checks, and
+    # recoverable GIO operation, all in the SAME CLI process.
+    result = trash_batch(plan["planId"], confirmation)
+    if result.get("ok"):
+        result["kind"] = "trash-batch-now"
+    return result
+
+
 def trash_batch(token, confirmation):
     """Consume one short-lived plan and move verified items to GIO Trash."""
     if confirmation != "MOVE_TO_TRASH" or not PLAN_PATTERN.fullmatch(token or ""):
@@ -1353,6 +1375,10 @@ def main(argv=None):
     batch_trash = command.add_parser("trash-batch")
     batch_trash.add_argument("plan_id")
     batch_trash.add_argument("confirmation")
+    batch_now = command.add_parser("trash-batch-now")
+    batch_now.add_argument("paths_json")
+    batch_now.add_argument("confirmation")
+    batch_now.add_argument("--folder", default="")
     options = parser.parse_args(argv)
 
     if options.action == "status":
@@ -1394,6 +1420,9 @@ def main(argv=None):
         result = preview_batch_trash(options.paths_json, options.folder)
     elif options.action == "trash-batch":
         result = trash_batch(options.plan_id, options.confirmation)
+    elif options.action == "trash-batch-now":
+        result = trash_batch_now(options.paths_json, options.confirmation,
+                                 options.folder)
     else:
         result = trash_plan(options.plan_id, options.confirmation)
     print(json.dumps(result, ensure_ascii=True, separators=(",", ":")))

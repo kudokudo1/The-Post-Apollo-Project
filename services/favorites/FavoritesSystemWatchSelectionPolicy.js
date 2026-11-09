@@ -60,7 +60,7 @@ function plan(row) {
             || row.owner!=="appcontrol" || row.provider!=="appcontrol"
             || row.category!=="CPU++" || row.menu!=="SYSTEM"
             || row.readOnly!==true || row.isFavorite!==true
-            || row.resolved!==true || typeof row.key!=="string"
+            || typeof row.key!=="string"
             || (row.kind!=="item" && row.kind!=="monitor-watch")
             || row.favoriteType!==(row.kind==="item"?"FAVORITE":"METRIC WATCH"))
         return deny("UNSUPPORTED_RESOURCE");

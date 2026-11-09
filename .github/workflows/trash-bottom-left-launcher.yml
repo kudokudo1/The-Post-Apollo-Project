@@ -7,7 +7,8 @@ on:
       - modules/Trash.qml
       - modules/Power.qml
       - components/DockButton.qml
-      - tests/trash/test_bottom_left_launcher.py
+      - tests/trash/**
+      - scripts/trash/**
       - .github/workflows/trash-bottom-left-launcher.yml
   push:
     paths:
@@ -15,7 +16,8 @@ on:
       - modules/Trash.qml
       - modules/Power.qml
       - components/DockButton.qml
-      - tests/trash/test_bottom_left_launcher.py
+      - tests/trash/**
+      - scripts/trash/**
       - .github/workflows/trash-bottom-left-launcher.yml
 
 permissions:
@@ -29,5 +31,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-      - name: Verify Trash launcher, Power geometry, and no file operations
+      - name: Verify Trash launcher, scoped GIO adapter, and deletion safeguards
         run: python3 -m unittest discover -s tests/trash -p 'test_*.py' -v

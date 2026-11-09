@@ -102,7 +102,7 @@ assert.notStrictEqual(Scope.scopeKey('vesktop','sender','Alice'),
  'case-sensitive sender IDs must never collapse');
 const fallback=Scope.scopeOptionsFor(entry('','','','', 'Mom'),'vesktop','');
 assert.strictEqual(fallback[0].kind,'title');
-assert.strictEqual(fallback[0].verified,false);
+assert.strictEqual(fallback[0].structured,false);
 assert.strictEqual(fallback[1].kind,'app');
 // Generic headers like "Vesktop" and "New message" do not identify a
 // person or channel. Do not present them as exact per-sender mute choices.

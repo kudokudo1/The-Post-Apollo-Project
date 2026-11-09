@@ -200,7 +200,9 @@ class C3eKProtectedWitnessTests(unittest.TestCase):
     def test_04_forwarded_connection_fd_from_child_refused(self):
         client = self._client()
         self._server(client)
-        self.assertEqual(self._ask(client, "forward")["reply"],
+        result = self._ask(client, "forward")
+        self.assertIn("reply", result, "C3EK_FORWARD_DIAG %r" % result)
+        self.assertEqual(result["reply"],
                          {"error": "REFUSED", "authorized": False})
 
     def test_05_write_operation_refused_with_ledger_unchanged(self):

@@ -420,7 +420,9 @@ PanelWindow {
     // window-local and cannot take over another visible widget's controls.
     readonly property bool standardKeysAvailable:
         menuOpen && (!relationshipFocusModeActive || relationshipFocused)
-        && !(selectedModeIndex === 6 && settingsLocationPane.editingText)
+        && !(selectedModeIndex === 6 && settingsSubMode === "LOCATION"
+             && (settingsLocationPane.editingText
+                 || settingsLocationOverviewPane.editingText))
         && !(selectedModeIndex === 6 && settingsSubMode === "CONNECTIONS"
              && settingsConnectionsDetails.editingText)
         && !(selectedModeIndex === 4 && favoritesDetailsPane.editingText)
@@ -981,48 +983,63 @@ PanelWindow {
 
         // U8d // The badge and X share one top header band. Neither overlaps
         // the cyan divider, and the close control uses normal red rules.
-        ActionButton {
+        // U9a // Same canonical × glyph, red framing and text glow as
+        // Hospital/Git header closes. The field is BLACK at all times.
+        // Top row height is coordinated with the divider beneath it.
+        Rectangle {
             id: cpuPlusCloseButton
             anchors.top: parent.top
             anchors.right: parent.right
-            anchors.topMargin: 5
-            anchors.rightMargin: 12
+            anchors.topMargin: 4
+            anchors.rightMargin: 10
             z: 8
-            width: 27
-            height: 22
-            label: "✕"
-            labelPixelSize: 15
-            contentPadding: 4
-            accentColor: Colors.red
-            destructive: true
-            idleFillColor: Colors.black
-            hoverFillColor: Colors.red
-            pressedFillColor: Colors.red
-            hoverForegroundColor: Colors.black
-            pressedForegroundColor: Colors.black
-            hoverBorderColor: Colors.red
-            pressedBorderColor: Colors.red
-            idleContentGlowColor: Colors.red
-            hoverContentGlowColor: Colors.red
-            pressedContentGlowColor: Colors.red
-            contentGlowPressedOpacity: 0.72
-            softGlowEnabled: true
-            idleSoftGlowColor: Colors.red
-            hoverSoftGlowColor: Colors.red
-            pressedSoftGlowColor: Colors.red
-            softGlowIdleOpacity: 0.48
-            softGlowHoverOpacity: 0.70
-            softGlowPressedOpacity: 0.70
-            onLeftClicked: cpuPlusWindow.close()
+            width: 40
+            height: 34
+            color: Colors.black
+            border.width: 1
+            border.color: cpuPlusCloseMouse.pressed
+                          ? Colors.black : Colors.red
+
+            RectangularShadow {
+                anchors.fill: parent
+                spread: 4
+                z: -1
+                opacity: cpuPlusCloseMouse.containsMouse ? 0.58 : 0.38
+                color: cpuPlusCloseMouse.pressed
+                       ? Colors.black : Colors.red
+            }
+
+            NotoText {
+                anchors.centerIn: parent
+                anchors.verticalCenterOffset: 2
+                text: "×"
+                font.pixelSize: 31
+                color: Colors.red
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    radius: 7
+                    samples: 9
+                    opacity: 0.58
+                    color: Colors.red
+                    transparentBorder: true
+                }
+            }
+            MouseArea {
+                id: cpuPlusCloseMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: cpuPlusWindow.close()
+            }
         }
 
         Rectangle {
             id: cpuPlusInternetIndicator
-            anchors.top: cpuPlusCloseButton.top
+            anchors.verticalCenter: cpuPlusCloseButton.verticalCenter
             anchors.right: cpuPlusCloseButton.left
             anchors.rightMargin: 8
             width: 156
-            height: cpuPlusCloseButton.height
+            height: 22
             color: Colors.black
             border.width: 1
             border.color: cpuPlusWindow.internetStatusColor
@@ -1063,11 +1080,11 @@ PanelWindow {
 
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: modeRailHeader.bottom
+            anchors.top: cpuPlusCloseButton.bottom
 
             anchors.leftMargin: 10
             anchors.rightMargin: 10
-            anchors.topMargin: 12
+            anchors.topMargin: 3
 
             height: 2
 
@@ -1395,7 +1412,7 @@ PanelWindow {
                 ? (cpuPlusWindow.settingsSubMode === "TIME"
                    ? "TIME // BASIC CONTROLS"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
-                     ? "CONNECTIONS // OVERVIEW" : "SETTINGS // OVERVIEW")
+                     ? "CONNECTIONS // OVERVIEW" : "LOCATION // EXPLORE")
                 : cpuPlusWindow.selectedModeIndex === 4
                 ? "FAVORITES++ // SOURCES"
                 : cpuPlusWindow.selectedModeIndex === 5
@@ -1730,7 +1747,7 @@ PanelWindow {
                     ? (cpuPlusWindow.settingsSubMode === "TIME"
                        ? "CLOCK // CONTROL"
                        : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
-                         ? "SHARED // STATUS" : "SETTINGS STATE")
+                         ? "SHARED // STATUS" : "CURRENT // CONTEXT")
                     : cpuPlusWindow.selectedModeIndex === 4
                     ? "FAVORITES // SAVED STATE"
                     : cpuPlusWindow.selectedModeIndex === 5
@@ -1783,7 +1800,8 @@ PanelWindow {
             // control pane, not the inert instrument placeholder.
             visible: !(cpuPlusWindow.selectedModeIndex === 6
                        && (cpuPlusWindow.settingsSubMode === "TIME"
-                           || cpuPlusWindow.settingsSubMode === "CONNECTIONS"))
+                           || cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+                           || cpuPlusWindow.settingsSubMode === "LOCATION"))
                      && cpuPlusWindow.selectedModeIndex !== 5
                      && cpuPlusWindow.selectedModeIndex !== 4
             anchors.left: parent.left
@@ -1853,6 +1871,26 @@ PanelWindow {
         NeonScrollBar {
             flickable: sharedInstrumentScroll
             visible: sharedInstrumentScroll.visible && scrollable
+        }
+
+        // SETTINGS // LOCATION uses all three existing CPU++ bays.
+        // The wide left side is for search and transient Explore controls.
+        CpuPlusSettingsLocationOverviewPane {
+            id: settingsLocationOverviewPane
+            registry: PlaceRegistry
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "LOCATION"
+            onHomeCandidateRequested: function(candidate) {
+                settingsLocationPane.fillHomeCandidate(candidate);
+            }
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedStateHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 11
+            anchors.rightMargin: 11
+            anchors.topMargin: 8
+            anchors.bottomMargin: 9
         }
 
         CpuPlusSettingsConnectionsOverviewPane {
@@ -2009,7 +2047,7 @@ PanelWindow {
                 ? (cpuPlusWindow.settingsSubMode === "TIME"
                    ? "TIME // ACTIVE"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
-                     ? "CONNECTIONS // SOURCES" : "SETTINGS // CATEGORIES")
+                     ? "CONNECTIONS // SOURCES" : "LOCATION // SAVED")
                 : cpuPlusWindow.selectedModeIndex === 4
                 ? "FAVORITES // SELECT"
                 : cpuPlusWindow.selectedModeIndex === 5
@@ -2286,42 +2324,20 @@ PanelWindow {
             }
         }
 
-        Column {
-            id: settingsCategorySummary
+        CpuPlusSettingsLocationSelectionPane {
+            id: settingsLocationSelectionPane
+            registry: PlaceRegistry
+            durationKey: settingsLocationOverviewPane.durationKey
             visible: cpuPlusWindow.selectedModeIndex === 6
-                      && cpuPlusWindow.settingsSubMode === "LOCATION"
-            anchors.top: targetSubModeStrip.bottom
+                     && cpuPlusWindow.settingsSubMode === "LOCATION"
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.topMargin: 20
-            anchors.leftMargin: 14
-            anchors.rightMargin: 14
-            spacing: 9
-
-            GohuText {
-                text: cpuPlusWindow.settingsSubMode === "TIME"
-                      ? "TIME // CONFIGURATION" : "LOCATION // CONTEXT"
-                color: Colors.cyan
-                font.pixelSize: 12
-            }
-            QuietText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                text: cpuPlusWindow.settingsSubMode === "TIME"
-                      ? "CALIBRATION // DAYLIGHT SAVING // SYNC"
-                      : "HOME // EXPLORE // SUBJECT OVERRIDES"
-                font.pixelSize: 10
-            }
-            SecondaryText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                text: cpuPlusWindow.settingsSubMode === "TIME"
-                      ? "DISPLAY OFFSET // " + TimeSettings.displayOffsetLabel
-                      : PlaceRegistry.hasHome
-                        ? "HOME // " + PlaceRegistry.homePlace.label
-                        : "HOME NOT YET CONFIGURED"
-                font.pixelSize: 10
-            }
+            anchors.top: targetSubModeStrip.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 9
+            anchors.rightMargin: 9
+            anchors.topMargin: 8
+            anchors.bottomMargin: 9
         }
 
         CpuPlusSettingsConnectionsListPane {
@@ -2841,7 +2857,7 @@ PanelWindow {
                   ? (cpuPlusWindow.settingsSubMode === "TIME"
                      ? "TIME // ADVANCED"
                      : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
-                       ? "CONNECTIONS // ACCESS" : "LOCATION // SETTINGS")
+                       ? "CONNECTIONS // ACCESS" : "LOCATION // EDIT HOME")
                   : cpuPlusWindow.selectedModeIndex === 4
                   ? "FAVORITES // MANAGE"
                   : cpuPlusWindow.selectedModeIndex === 5

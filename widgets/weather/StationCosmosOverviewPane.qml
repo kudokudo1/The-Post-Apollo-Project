@@ -125,6 +125,7 @@ Rectangle {
                 ]
                 delegate: ActionButton {
                     required property var modelData
+                    objectName: "cosmos-c44-overview-button"
                     width: HeaderGeometry.buttonWidth(overviewModeRail.width,3)
                     height: HeaderGeometry.tabHeight
                     contentPadding: 1

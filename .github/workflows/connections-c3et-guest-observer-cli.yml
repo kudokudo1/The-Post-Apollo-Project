@@ -1,0 +1,53 @@
+name: Connections C3e-T optional C4b guest observation CLI (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eTGuestObserverCLI.py"
+      - "tests/connections/test_connections_c3et_guest_observer_cli.py"
+      - ".github/workflows/connections-c3et-guest-observer-cli.yml"
+      - "docs/connections-c3et-guest-observer-cli.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nonroot-script-ci-cli-integration:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile and retain default deny
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eTGuestObserverCLI.py \
+            tests/connections/test_connections_c3et_guest_observer_cli.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          sudo -n id -u | grep -qx 0
+      - name: Real nonroot running process, guest CLI handoff and refusal
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true python3 -B tests/connections/test_connections_c3et_guest_observer_cli.py
+          echo "C3ET_PASS // C4B_OPTIONAL_CLI_WITH_REAL_NONROOT_PROCESS"
+      - name: Existing actual process and installed service origin regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true python3 -B tests/connections/test_connections_c3ep_running_python_source.py
+          python3 -B tests/connections/test_connections_c3b_origin.py
+          echo "C3ET_PASS // EXISTING_ACTUAL_PROCESS_AND_C3B_DENY"
+      - name: Preserve scope and no attested guest claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'not C4b signed guest attestation' docs/connections-c3et-guest-observer-cli.md
+          grep -Fq '"installedGuestMeasured": False' tests/connections/c3e_release_trust/C3eTGuestObserverCLI.py
+          grep -Fq '"credentialActionsEnabled": False' tests/connections/c3e_release_trust/C3eTGuestObserverCLI.py
+          echo "C3ET_LIMITATION // OPTIONAL_READ_ONLY_OWNER_HANDOFF"

@@ -1,0 +1,44 @@
+name: Hospital Surgery Inline Workforce Management
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalWorkforceManagerView.qml"
+      - "services/hospital/HospitalWorkforceManagerPolicy.js"
+      - "services/hospital/HospitalWorkforceRoomCreateService.qml"
+      - "tests/hospital/test_surgery_workforce_manager_policy.js"
+      - "tests/hospital/test_surgery_inline_workforce_ui_contracts.py"
+      - ".github/workflows/hospital-surgery-workforce-management.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalWorkforceManagerView.qml"
+      - "services/hospital/HospitalWorkforceManagerPolicy.js"
+      - "services/hospital/HospitalWorkforceRoomCreateService.qml"
+      - "tests/hospital/test_surgery_workforce_manager_policy.js"
+      - "tests/hospital/test_surgery_inline_workforce_ui_contracts.py"
+      - ".github/workflows/hospital-surgery-workforce-management.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inline-management-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and fail-closed worker/Room/Job preflight
+        run: |
+          node --check services/hospital/HospitalWorkforceManagerPolicy.js
+          node tests/hospital/test_surgery_workforce_manager_policy.js
+      - name: Verify embedded Surgery manager and existing UX contract
+        run: |
+          python3 tests/hospital/test_surgery_inline_workforce_ui_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py
+          python3 tests/hospital/test_worker_identity_editor_contracts.py
+          python3 tests/hospital/test_registered_worker_routes.py
+          python3 tests/hospital/test_assignment_manager_contracts.py
+          python3 tests/hospital/test_main_mode_keyboard_contracts.py

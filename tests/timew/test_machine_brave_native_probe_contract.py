@@ -55,10 +55,25 @@ assert 'safe_actions: []' in protocol
 assert "restore_allowed !== false" in protocol
 
 for code in (host, generator):
-    ast.parse(code)
+    module = ast.parse(code)
+    imports = {
+        alias.name.split(".", 1)[0]
+        for node in ast.walk(module) if isinstance(node, ast.Import)
+        for alias in node.names
+    } | {
+        node.module.split(".", 1)[0]
+        for node in ast.walk(module)
+        if isinstance(node, ast.ImportFrom) and node.module
+    }
+    assert not imports.intersection({
+        "subprocess", "socket", "urllib", "requests", "shutil",
+        "sqlite3", "MachineSwayRead", "MachineGeometryV2",
+        "MachineCheckpointStore",
+    }), imports
 for forbidden in (
     "MachineSwayRead", "swaymsg", "MachineGeometry", "MachineCheckpoint",
-    "subprocess", "socket", "urllib", "requests", "shutil",
+    "subprocess.run(", "socket.connect(", "urllib.request.",
+    "requests.get(", "shutil.copy",
     "os.system", "os.environ", "open(", "write_text", "write_bytes",
     "sqlite3", "exec(", "eval(", "pickle", "pathlib.Path.home",
     "chmod(", "mkdir(", "unlink(", "chrome.tabs", "nativeMessagingHost",

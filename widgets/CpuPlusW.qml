@@ -87,8 +87,18 @@ PanelWindow {
         })) return;
         selectedFavoriteCollectionId=collectionId;
         favoritesSelectorPane.filterMode="GROUP";
+        favoritesSelectorPane.menuFilter="ALL";
         selectedFavoriteKey=key || (section.rows.length
             ? section.rows[0].key : "");
+    }
+    // U8a // Presentation-only cleanup after an authorized CollectionsStore
+    // deletion; it never deletes an owner's original favorite.
+    function favoriteCollectionDeleted(id) {
+        if(selectedFavoriteCollectionId!==id)return;
+        selectedFavoriteCollectionId="";
+        selectedFavoriteKey="";
+        favoritesSelectorPane.menuFilter="ALL";
+        favoritesSelectorPane.filterMode="ALL";
     }
     // U5a injection point only. WeatherStationW owns the sole bookmark
     // writer and must explicitly expose its existing store before live use.
@@ -887,6 +897,10 @@ PanelWindow {
             color: Colors.magenta
         }
 
+        // U8a // Hide the temporary GLOW TEST selector. Keep its exact
+        // source for later diagnostics, together with the live env sampler,
+        // modeGlowExperiment state and independent ModeButton effects.
+        /*
         // Temporary test controls; do not replace the normal Main Mode rail.
         // Selecting B requires a close and reopen to exercise the detach.
         Row {
@@ -940,6 +954,24 @@ PanelWindow {
                     }
                 }
             }
+        }
+
+        */
+
+        ActionButton {
+            id: cpuPlusCloseButton
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: 5
+            anchors.rightMargin: 8
+            z: 8
+            width: 28
+            height: 27
+            label: "✕"
+            labelPixelSize: 15
+            accentColor: Colors.red
+            destructive: true
+            onLeftClicked: cpuPlusWindow.close()
         }
 
         Rectangle {
@@ -1808,6 +1840,7 @@ PanelWindow {
                 // The left dossier navigates only existing candidates.
                 // The middle selector keeps the actual filter/selection UI.
                 favoritesSelectorPane.filterMode = category;
+                favoritesSelectorPane.menuFilter = "ALL";
                 cpuPlusWindow.selectedFavoriteKey = key;
             }
             onCollectionRequested: function(collectionId) {
@@ -1815,6 +1848,9 @@ PanelWindow {
             }
             onCollectionMemberRequested: function(collectionId,key) {
                 cpuPlusWindow.openFavoriteCollection(collectionId,key);
+            }
+            onCollectionDeleteAccepted: function(collectionId) {
+                cpuPlusWindow.favoriteCollectionDeleted(collectionId);
             }
             anchors.left: parent.left
             anchors.right: parent.right

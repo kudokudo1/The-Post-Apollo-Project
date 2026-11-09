@@ -74,3 +74,40 @@ function build(candidates) {
     const total=groups.reduce(function(n,g){return n+g.count;},0);
     return {groups:groups,total:total,groupCount:groups.length};
 }
+
+
+// U8a // The same canonical source/menu grouping drives the bottom filter rail.
+// Never derive selectable controls from labels, provider commands or raw keys.
+function menusFor(candidates,category,collectionRows) {
+    const source=category==="GROUP" ? collectionRows
+        : candidates && candidates.rows;
+    const rows=Array.isArray(source) ? source.slice(0,MAX_ROWS) : [];
+    const result=[],seen=Object.create(null);
+    for(const row of rows) {
+        if(!row || typeof row!=="object"
+                || (category!=="ALL" && category!=="GROUP"
+                    && row.category!==category)) continue;
+        const key=String(row.category || "")+"|"+String(row.menu || "");
+        if(ORDER.indexOf(key)<0)continue;
+        const menu=String(row.menu || "");
+        if(!seen[menu]) {
+            seen[menu]=true;
+            result.push({menu:menu,order:ORDER.indexOf(key)});
+        }
+    }
+    result.sort(function(a,b){return a.order-b.order;});
+    return ["ALL"].concat(result.map(function(x){return x.menu;}));
+}
+// Literal dock/module glyphs for static modules; Weather is dynamic in its
+// dock, so use its conventional SUN fallback rather than a fake live reading.
+function mainIcon(category) {
+    const icons={
+        "ALL":"✦","GROUP":"▦",
+        "CPU++":"🖥","APP CTRL":"♱",
+        "WEATHER":"☀","NOTIFS":"🗒",
+        "RADIO":"♫","HOSPITAL":"⚚",
+        "CLOCK":"🕰","PLACES":"⌖","NEW":"✚"
+    };
+    return Object.prototype.hasOwnProperty.call(icons,category)
+        ? icons[category] : "";
+}

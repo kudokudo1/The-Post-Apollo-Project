@@ -1487,3 +1487,177 @@ test("U7a OPEN OWNER uses shell's existing windows and never forwards selected I
   }
   assert.match(shell,/function openApolloNotificationRoute\(destination\)/);
 });
+
+
+test("U8a secondary source/menu filters use only canonical dossier metadata",()=>{
+  const Dossier={};
+  load("services/favorites/FavoritesDossierIndexPolicy.js",Dossier);
+  const rows=[
+    {category:"APP CTRL",menu:"RUN",key:"safe1"},
+    {category:"APP CTRL",menu:"APPS",key:"safe2"},
+    {category:"APP CTRL",menu:"FILES",key:"safe3"},
+    {category:"APP CTRL",menu:"RUN",key:"safe4"},
+    {category:"CPU++",menu:"SYSTEM",key:"safe5"},
+    {category:"CPU++",menu:"KILL",key:"safe6"},
+    {category:"WEATHER",menu:"HOME",key:"safe7"},
+    {category:"APP CTRL",menu:"DELETE PRIVATE COMMAND",key:"unsafe"}
+  ];
+  const candidates={rows},before=plain(candidates);
+  assert.deepEqual(plain(Dossier.menusFor(candidates,"APP CTRL",[])),
+    ["ALL","APPS","FILES","RUN"]);
+  assert.deepEqual(plain(Dossier.menusFor(candidates,"CPU++",[])),
+    ["ALL","KILL","SYSTEM"]);
+  assert.deepEqual(plain(Dossier.menusFor(candidates,"WEATHER",[])),
+    ["ALL","HOME"]);
+  assert.deepEqual(plain(Dossier.menusFor(candidates,"GROUP",
+    [rows[4],rows[1]])),["ALL","APPS","SYSTEM"]);
+  assert.deepEqual(plain(Dossier.menusFor(null,"APP CTRL",null)),["ALL"]);
+  assert.ok(!JSON.stringify(Dossier.menusFor(candidates,"ALL",[]))
+    .includes("DELETE PRIVATE COMMAND"));
+  assert.deepEqual(plain(candidates),before);
+});
+test("U8a main category icons reflect source module glyphs",()=>{
+  const Dossier={};
+  load("services/favorites/FavoritesDossierIndexPolicy.js",Dossier);
+  for(const [category,component,glyph] of [
+    ["CPU++","modules/Cpu.qml","🖥"],
+    ["APP CTRL","modules/Applauncher.qml","♱"],
+    ["NOTIFS","modules/NotificationsHub.qml","🗒"],
+    ["HOSPITAL","modules/Hospital.qml","⚚"],
+    ["CLOCK","modules/Clock.qml","🕰"]
+  ]) {
+    assert.equal(Dossier.mainIcon(category),glyph);
+    assert.ok(read(component).includes(glyph),category);
+  }
+  for(const category of ["ALL","GROUP","WEATHER","RADIO","PLACES","NEW"])
+    assert.notEqual(Dossier.mainIcon(category),"",category);
+  assert.equal(Dossier.mainIcon("PRIVATE_MODE"),"");
+});
+test("U8a left dossier can collapse every group and keeps per-group toggle",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  assert.match(pane,/property alias collapseAllControl: collapseAllButton/);
+  assert.match(pane,/function allIndexGroupsCollapsed\(\)/);
+  assert.match(pane,/function toggleAllIndexGroups\(\)/);
+  assert.match(pane,/for\(const group of pane\.dossier\.groups\)/);
+  assert.match(pane,/collapsedIndexGroups=next/);
+  assert.match(pane,/pane\.toggleIndexGroup\(\s*dossierGroup\.section\.key\)/);
+  assert.match(pane,/label: pane\.allIndexGroupsCollapsed\(\) \? "EXPAND ALL" : "COLLAPSE ALL"/);
+});
+test("U8a bottom subfilters are scoped to the main category and are view-only",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const cpu=read("widgets/CpuPlusW.qml");
+  assert.match(pane,/property string menuFilter: "ALL"/);
+  assert.match(pane,/Dossier\.menusFor\(pane\.candidates,pane\.filterMode,pane\.menuSourceRows\)/);
+  assert.match(pane,/row\.category===pane\.filterMode/);
+  assert.match(pane,/row\.menu===pane\.menuFilter/);
+  assert.match(pane,/id: subfilterScroll/);
+  assert.match(pane,/id: subfilterButtons/);
+  assert.match(pane,/id: menuFilterPrev/);
+  assert.match(pane,/id: menuFilterNext/);
+  assert.match(pane,/subfilterScroll\.contentX-140/);
+  assert.match(pane,/subfilterScroll\.contentX\+140/);
+  assert.match(pane,/onLeftClicked: pane\.menuFilter=modelData/);
+  assert.match(cpu,/favoritesSelectorPane\.menuFilter = "ALL"/);
+  assert.match(cpu,/favoritesSelectorPane\.menuFilter="ALL"/);
+  const section=pane.slice(pane.indexOf("id: subfilterScroll"),
+    pane.indexOf('id: details\n'));
+  assert.doesNotMatch(section,/setFavorite|deleteCollection|Process\s*\{|execDetached|ownerNavigationRequested/);
+});
+test("U8a red left-side collection delete uses two clicks and the original writer",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const cpu=read("widgets/CpuPlusW.qml");
+  const store=read("services/favorites/FavoritesCollectionsStore.qml");
+  const native=read("components/FavoritesCollectionPanel.qml");
+  const start=pane.indexOf("id: leftCollectionDelete");
+  const end=pane.indexOf('id: dossierScroll',start);
+  assert.ok(start>=0 && end>start);
+  const section=pane.slice(start,end);
+  assert.match(section,/label: collectionGroup\.confirmDelete \? "SURE\?" : "✕"/);
+  assert.match(section,/accentColor: Colors\.red/);
+  assert.match(section,/destructive: true/);
+  assert.match(section,/if \(!collectionGroup\.confirmDelete\)/);
+  assert.match(section,/pane\.collectionsOwner\.deleteCollection\(id\)/);
+  assert.match(section,/pane\.collectionDeleteAccepted\(id\)/);
+  assert.match(store,/function deleteCollection\(id\)/);
+  assert.match(native,/id: deleteButton[\s\S]*?accentColor: Colors\.red/);
+  assert.match(cpu,/function favoriteCollectionDeleted\(id\)/);
+  assert.match(cpu,/selectedFavoriteCollectionId=""/);
+  assert.match(cpu,/onCollectionDeleteAccepted: function\(collectionId\)/);
+});
+test("U8a CPU++ red X closes through the established lifecycle while glow probe code remains",()=>{
+  const cpu=read("widgets/CpuPlusW.qml");
+  assert.match(cpu,/id: cpuPlusCloseButton/);
+  const close=cpu.slice(cpu.indexOf("id: cpuPlusCloseButton"),
+    cpu.indexOf("id: modeRailHeaderLine"));
+  assert.match(close,/label: "✕"/);
+  assert.match(close,/accentColor: Colors\.red/);
+  assert.match(close,/destructive: true/);
+  assert.match(close,/onLeftClicked: cpuPlusWindow\.close\(\)/);
+  assert.match(cpu,/\/\*\s*\/\/ Temporary test controls/);
+  assert.match(cpu,/id: sampledGlowTestControls/);
+  assert.match(cpu,/id: sampledGlowTestControls[\s\S]*?modeGlowExperiment = modelData\.value[\s\S]*?\*\//);
+  assert.match(cpu,/readonly property string glowStartupChoice:/);
+  assert.match(cpu,/property int modeGlowExperiment:/);
+  assert.match(cpu,/primaryGlowEnabled:/);
+  assert.match(cpu,/labelGlowEnabled:/);
+});
+
+
+test("U8a collapse-all transitions execute on the actual index functions",()=>{
+  const source=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const first=source.indexOf("    function toggleIndexGroup(key) {");
+  const last=source.indexOf("    function revealSelectedInSelector() {",first);
+  assert.ok(first>=0&&last>first);
+  const scope={pane:{dossier:{groups:[
+    {key:"APP CTRL|RUN"},{key:"CPU++|SYSTEM"},{key:"WEATHER|HOME"}
+  ]},collapsedIndexGroups:{}},dossierScroll:{contentY:84}};
+  Object.defineProperty(scope,"collapsedIndexGroups",{
+    get(){return scope.pane.collapsedIndexGroups;},
+    set(value){scope.pane.collapsedIndexGroups=value;}
+  });
+  const ctx=vm.createContext(scope);
+  vm.runInContext(source.slice(first,last),ctx);
+  assert.equal(scope.allIndexGroupsCollapsed(),false);
+  scope.toggleAllIndexGroups();
+  assert.equal(scope.allIndexGroupsCollapsed(),true);
+  assert.equal(scope.dossierScroll.contentY,0);
+  assert.deepEqual(plain(scope.pane.collapsedIndexGroups),{
+    "APP CTRL|RUN":true,"CPU++|SYSTEM":true,"WEATHER|HOME":true
+  });
+  scope.toggleIndexGroup("CPU++|SYSTEM");
+  assert.equal(scope.allIndexGroupsCollapsed(),false);
+  assert.equal(scope.pane.collapsedIndexGroups["CPU++|SYSTEM"],false);
+  scope.toggleAllIndexGroups();
+  assert.equal(scope.allIndexGroupsCollapsed(),true);
+  scope.toggleAllIndexGroups();
+  assert.deepEqual(plain(scope.pane.collapsedIndexGroups),{});
+  assert.equal(scope.allIndexGroupsCollapsed(),false);
+});
+test("U8a two-click red left collection delete invokes store only on confirmation",()=>{
+  const source=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const start=source.indexOf("id: leftCollectionDelete");
+  const after=source.slice(start);
+  const marker="onLeftClicked: {";
+  const a=after.indexOf(marker),b=after.indexOf("\n                                    }\n                                }\n",a);
+  assert.ok(start>=0 && a>=0 && b>a);
+  const action=after.slice(a+marker.length,b);
+  const calls=[];
+  const scope={
+    collectionGroup:{confirmDelete:false,section:{id:"c7"}},
+    pane:{
+      collectionsOwner:{deleteCollection(id){calls.push("delete:"+id);return true;}},
+      collectionDeleteAccepted(id){calls.push("accepted:"+id);}
+    }
+  };
+  const context=vm.createContext(scope);
+  vm.runInContext("function click() {"+action+"\n}",context);
+  scope.click();
+  assert.equal(scope.collectionGroup.confirmDelete,true);
+  assert.deepEqual(calls,[]);
+  scope.click();
+  assert.deepEqual(calls,["delete:c7","accepted:c7"]);
+  const policy=read("services/favorites/FavoritesCollectionsPolicy.js");
+  assert.match(policy,/action\.type==="delete"/);
+  // Collection deletion is only a grouping writer, not the original owner.
+  assert.doesNotMatch(action,/setFavorite|execDetached|deleteFile|killProcess/);
+});

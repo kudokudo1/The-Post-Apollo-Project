@@ -87,6 +87,7 @@ PanelWindow {
     property bool huntAutoRounds: true
     property bool huntAutoPending: false
     property bool huntSettingsOpen: false
+    property bool huntPauseMenuOpen: false
     property bool huntScoped: false
     property bool huntHitFlash: false
     // Laser shot VFX is gameplay-only. No filesystem action is bound to it.
@@ -469,6 +470,7 @@ PanelWindow {
             huntHitFlash = false;
             huntShotEffect = null;
             huntSettingsOpen = false;
+            huntPauseMenuOpen = false;
             huntRoundSpeed = 1.0;
             huntRoundSpawnCount = huntSpawnCount;
             huntMouseActive = false;
@@ -669,21 +671,83 @@ PanelWindow {
         return true;
     }
 
+    // The only route to Settings is through the Pause overlay.
     function huntToggleSettings() {
-        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt")
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || !huntPauseMenuOpen)
             return false;
         huntSettingsOpen = !huntSettingsOpen;
-        if (huntSettingsOpen) {
-            huntPaused = true;
-            huntScoped = false;
-        }
+        huntPaused = true;
+        huntScoped = false;
         return true;
+    }
+
+    function huntResetDefaults() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || !huntPauseMenuOpen || !huntSettingsOpen)
+            return false;
+        // Restore options, NOT existing queued file selections, score
+        // or live target movement. New difficulty applies next round.
+        huntSpawnCount = 3;
+        huntTargetsPerTier = 1;
+        huntTargetsEvery = 5;
+        huntSpeedGainPercent = 10;
+        huntSpeedEvery = 5;
+        huntAutoRounds = true;
+        huntLastEvent = "SETTINGS // DEFAULTS RESTORED // NEXT ROUND";
+        feedback = "HUNT // DEFAULT SETTINGS RESTORED";
+        return true;
+    }
+
+    function huntRestartGame() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || !huntPauseMenuOpen)
+            return false;
+        // Keep the independent review queue. Restart only gameplay.
+        // Resetting the file selection silently would discard the
+        // operator's review decisions from earlier rounds or Batch/Swipe.
+        huntTargets = [];
+        huntHistory = [];
+        huntSparedPaths = [];
+        huntRound = 0;
+        huntTick = 0;
+        huntSecondsLeft = 25;
+        huntShots = 0;
+        huntHits = 0;
+        huntMisses = 0;
+        huntCombo = 0;
+        huntScore = 0;
+        huntRoundSpeed = 1.0;
+        huntRoundSpawnCount = huntSpawnCount;
+        huntRoundComplete = false;
+        huntAutoPending = false;
+        huntScoped = false;
+        huntHitFlash = false;
+        huntShotEffect = null;
+        huntLaserCycle = 0;
+        huntSettingsOpen = false;
+        huntPauseMenuOpen = false;
+        huntPaused = true;
+        batchPreview = null;
+        batchReviewKey = "";
+        huntLastEvent = "GAME RESTARTED // ROUND 1";
+        feedback = "HUNT // GAME RESTART // TRASH QUEUE PRESERVED ("
+                   + batchPaths.length + ")";
+        const started = huntStartRound();
+        if (!started) {
+            // Remain on the Pause menu if there is no eligible media.
+            huntPauseMenuOpen = true;
+            huntPaused = true;
+            feedback = "HUNT // RESTARTED // LOAD ELIGIBLE MEDIA // QUEUE PRESERVED";
+        }
+        return started;
     }
 
     function huntSetScoped(enabled) {
         if (activeView !== "cleanup" || cleanupTechnique !== "hunt"
                 || busy || huntPaused || huntRoundComplete
-                || huntTargets.length === 0 || huntSettingsOpen) {
+                || huntTargets.length === 0 || huntSettingsOpen
+                || huntPauseMenuOpen) {
             huntScoped = false;
             return false;
         }
@@ -693,7 +757,8 @@ PanelWindow {
 
     function huntAutoStartNext() {
         if (!huntAutoPending || !huntAutoRounds || busy
-                || huntSettingsOpen || activeView !== "cleanup"
+                || huntSettingsOpen || huntPauseMenuOpen
+                || activeView !== "cleanup"
                 || cleanupTechnique !== "hunt" || !huntRoundComplete)
             return false;
         // One shot only. A depleted library or full queue must NOT start
@@ -866,6 +931,8 @@ PanelWindow {
         huntHistory = [];
         huntAutoPending = false;
         huntScoped = false;
+        huntPauseMenuOpen = false;
+        huntSettingsOpen = false;
         huntHitFlash = false;
         huntShotEffect = null;
         huntRoundSpeed = HuntMotion.speedForRound(
@@ -934,12 +1001,23 @@ PanelWindow {
     }
 
     function huntTogglePause() {
-        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
-                || huntRoundComplete || huntTargets.length === 0)
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt")
             return false;
-        huntPaused = !huntPaused;
-        if (huntPaused) huntScoped = false;
-        huntLastEvent = huntPaused ? "PAUSED // NO SHOTS" : "RESUMED // HUNT";
+        if (huntPauseMenuOpen) {
+            // Resume existing round if it has active targets; if a round
+            // ended, return to the board and allow the normal auto-next.
+            huntPauseMenuOpen = false;
+            huntSettingsOpen = false;
+            huntPaused = huntRoundComplete || huntTargets.length === 0;
+            huntLastEvent = huntPaused ? "ROUND COMPLETE // READY"
+                                      : "RESUMED // HUNT";
+        } else {
+            huntPauseMenuOpen = true;
+            huntSettingsOpen = false;
+            huntPaused = true;
+            huntScoped = false;
+            huntLastEvent = "PAUSED // MENU OPEN";
+        }
         return true;
     }
 
@@ -3000,6 +3078,7 @@ PanelWindow {
                                         camera.huntShotEffect = null;
                                         camera.huntAutoPending = false;
                                         camera.huntSettingsOpen = false;
+                                        camera.huntPauseMenuOpen = false;
                                     }
                                     camera.cleanupTechnique = modelData.id;
                                     camera.huntMouseActive = false;

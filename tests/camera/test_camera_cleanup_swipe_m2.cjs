@@ -163,11 +163,20 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /cursorShape: camera\.huntPaused/);
     assert.match(cleanup, /Qt\.BlankCursor/);
     assert.match(cleanup, /id: huntHitWash/);
-    assert.match(cleanup, /huntHitFlash \? 0\.045 : 0\.0/);
+    assert.match(cleanup, /camera\.huntHitFlash\s*&& huntLaserLayer\.impactReached/);
+    assert.match(cleanup, /\? 0\.045 : 0\.0/);
     assert.match(cleanup, /id: huntHitAnimalEcho/);
     assert.match(cleanup, /id: huntLaserLayer/);
     assert.match(cleanup, /id: huntLaserFlight/);
-    assert.match(cleanup, /HuntMotion\.laserEntryPoint\(shot\.aimX\)/);
+    assert.match(cleanup, /HuntMotion\.laserTrajectory\(/);
+    assert.match(cleanup, /readonly property real tailProgress:/);
+    assert.match(cleanup, /readonly property real visibleStreak:/);
+    assert.match(cleanup, /readonly property bool impactReached:/);
+    assert.match(cleanup, /huntLaserLayer\.impactReached/);
+    assert.match(cleanup, /huntLaserLayer\.trajectory\.entryProgress/);
+    assert.match(cleanup, /duration: 180/);
+    assert.match(cleanup, /interval: 320/);
+    assert.doesNotMatch(cleanup, /huntLaserLayer\.length \* huntLaserLayer\.progress/);
     assert.match(cleanup, /impact\.x \/ huntArena\.width/);
     assert.match(cleanup, /impact\.y \/ huntArena\.height/);
     assert.doesNotMatch(cleanup, /readonly property real muzzleX: width \* 0\.5/);
@@ -1229,4 +1238,68 @@ test("Reset Defaults re-arms Auto Next for a finished round when re-enabled", ()
     assert.equal(s.huntRound,2);
     assert.equal(s.huntAutoPending,false);
     assert.equal(s.called.length,0);
+});
+
+
+test("Laser trajectory enters from below playfield and strikes exact cursor", () => {
+    const cases=[
+        {x:0.0,y:0.0},{x:0.2,y:0.35},{x:0.5,y:0.5},
+        {x:0.93,y:0.8},{x:1,y:1}
+    ];
+    for(const {x,y} of cases) {
+        const trajectory=motion.laserTrajectory(x,y);
+        assert.ok(trajectory.originY>1,"gun starts outside arena");
+        assert.equal(trajectory.aimX,x);
+        assert.equal(trajectory.aimY,y);
+        assert.ok(trajectory.entryX>=0&&trajectory.entryX<=1);
+        assert.ok(trajectory.entryProgress>=0&&trajectory.entryProgress<=1);
+        const atEdge=trajectory.originX +
+            (trajectory.aimX-trajectory.originX)*
+            trajectory.entryProgress;
+        const yAtEdge=trajectory.originY +
+            (trajectory.aimY-trajectory.originY)*
+            trajectory.entryProgress;
+        assert.ok(Math.abs(atEdge-trajectory.entryX)<1e-10);
+        assert.ok(Math.abs(yAtEdge-1)<1e-10);
+    }
+    const left=motion.laserTrajectory(0.08,0.35);
+    const right=motion.laserTrajectory(0.92,0.35);
+    assert.ok(left.originX<right.originX);
+});
+
+test("Laser geometry safely clamps non-finite and out-of-range aim input", () => {
+    const samples=[
+        [NaN,Infinity],[Infinity,NaN],[-8,3],[5,-3],[null,undefined]
+    ];
+    for(const [x,y] of samples) {
+        const p=motion.laserTrajectory(x,y);
+        for(const val of [p.originX,p.originY,p.aimX,p.aimY,
+                          p.entryX,p.entryProgress])
+            assert.ok(Number.isFinite(val));
+        assert.ok(p.aimX>=0&&p.aimX<=1);
+        assert.ok(p.aimY>=0&&p.aimY<=1);
+        assert.ok(p.entryProgress>=0&&p.entryProgress<=1);
+    }
+});
+
+test("Laser impact feedback follows bolt arrival, while shots stay immediate", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.huntStartRound();
+    const record=s.huntTargets[0];
+    assert.equal(s.huntFire(record.path,0.3,0.4),true);
+    assert.equal(s.huntHitFlash,true);
+    assert.equal(s.huntShots,1);
+    assert.deepEqual(Array.from(s.batchPaths),[record.path]);
+    assert.equal(s.called.length,0);
+    // Visual only: explicit QML arrival gate ensures the world/animal
+    // wash does not precede the moving projectile's collision.
+    assert.match(qml, /camera\.huntHitFlash\s*&& huntLaserLayer\.impactReached/);
+    assert.match(qml, /opacity: huntLaserLayer\.impactReached\s*\? 0\.40 : 0/);
+    assert.match(qml, /visible: huntLaserLayer\.impactReached\s*\n\s*text: "HIT"/);
+    assert.match(qml, /huntLaserLayer\.tailX/);
+    assert.match(qml, /huntLaserLayer\.tailY/);
+    assert.equal(s.huntUndo(),true);
+    assert.equal(s.batchPaths.length,0);
+    assert.equal(s.huntShotEffect,null);
 });

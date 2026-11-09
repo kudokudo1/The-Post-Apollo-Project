@@ -3646,7 +3646,9 @@ PanelWindow {
                             }
                             Timer {
                                 id: huntHitFlashTimer
-                                interval: 220
+                                // 180ms of flight followed by a short
+                                // 140ms arrival echo. Kept under one-third second.
+                                interval: 320
                                 repeat: false
                                 running: camera.huntShotEffect !== null
                                 onTriggered: {
@@ -4023,7 +4025,9 @@ PanelWindow {
                                         z: 70
                                         color: camera.huntShotEffect
                                                ? camera.huntShotEffect.color : Colors.cyan
-                                        opacity: camera.huntHitFlash ? 0.045 : 0.0
+                                        opacity: camera.huntHitFlash
+                                                 && huntLaserLayer.impactReached
+                                                 ? 0.045 : 0.0
                                         visible: opacity > 0
                                         Behavior on opacity {
                                             NumberAnimation { duration: 100 }
@@ -4041,64 +4045,126 @@ PanelWindow {
                                         // attached to that aim and begins below the
                                         // visible arena, like a hand-held waist gun,
                                         // not a fixed weapon on the game board.
-                                        readonly property var entryPoint:
-                                            HuntMotion.laserEntryPoint(shot.aimX)
-                                        readonly property real muzzleX: width * entryPoint.x
-                                        readonly property real muzzleY: height * entryPoint.y
-                                        readonly property real impactX: width * shot.aimX
-                                        readonly property real impactY: height * shot.aimY
+                                        readonly property var trajectory:
+                                            HuntMotion.laserTrajectory(
+                                                shot.aimX, shot.aimY)
+                                        readonly property real muzzleX:
+                                            width * trajectory.originX
+                                        readonly property real muzzleY:
+                                            height * trajectory.originY
+                                        readonly property real impactX:
+                                            width * trajectory.aimX
+                                        readonly property real impactY:
+                                            height * trajectory.aimY
                                         readonly property real dx: impactX - muzzleX
                                         readonly property real dy: impactY - muzzleY
-                                        readonly property real length: Math.sqrt(dx * dx + dy * dy)
-                                        readonly property real angle: Math.atan2(dy, dx) * 180 / Math.PI
+                                        readonly property real length:
+                                            Math.sqrt(dx * dx + dy * dy)
+                                        readonly property real angle:
+                                            Math.atan2(dy, dx) * 180 / Math.PI
+                                        // A compact moving bolt, NOT a beam that
+                                        // grows all the way from the player's waist.
+                                        readonly property real streakPixels:
+                                            Math.min(42, Math.max(18, length * 0.14))
+                                        readonly property real tailProgress:
+                                            Math.max(0, progress - streakPixels
+                                                     / Math.max(1, length))
+                                        readonly property real tailX:
+                                            muzzleX + dx * tailProgress
+                                        readonly property real tailY:
+                                            muzzleY + dy * tailProgress
+                                        readonly property real visibleStreak:
+                                            length * (progress - tailProgress)
+                                        readonly property bool impactReached:
+                                            progress >= 0.999
                                         NumberAnimation {
                                             id: huntLaserFlight
                                             target: huntLaserLayer
                                             property: "progress"
                                             from: 0
                                             to: 1
-                                            duration: 145
+                                            duration: 180
                                             easing.type: Easing.OutCubic
                                         }
                                         Rectangle {
-                                            x: huntLaserLayer.muzzleX
-                                            y: huntLaserLayer.muzzleY - height / 2
-                                            width: huntLaserLayer.length * huntLaserLayer.progress
+                                            // Outer faint streak follows the bolt's
+                                            // tail rather than illuminating its path.
+                                            visible: huntLaserLayer.progress > 0
+                                                     && !huntLaserLayer.impactReached
+                                            x: huntLaserLayer.tailX
+                                            y: huntLaserLayer.tailY - height / 2
+                                            width: huntLaserLayer.visibleStreak
                                             height: 5
                                             radius: 2
                                             rotation: huntLaserLayer.angle
                                             transformOrigin: Item.Left
                                             color: huntLaserLayer.shot.color
-                                            opacity: 0.17
+                                            opacity: 0.14
                                         }
                                         Rectangle {
-                                            x: huntLaserLayer.muzzleX
-                                            y: huntLaserLayer.muzzleY - height / 2
-                                            width: huntLaserLayer.length * huntLaserLayer.progress
+                                            visible: huntLaserLayer.progress > 0
+                                                     && !huntLaserLayer.impactReached
+                                            x: huntLaserLayer.tailX
+                                            y: huntLaserLayer.tailY - height / 2
+                                            width: huntLaserLayer.visibleStreak
                                             height: 2
                                             radius: 1
                                             rotation: huntLaserLayer.angle
                                             transformOrigin: Item.Left
                                             color: huntLaserLayer.shot.color
-                                            opacity: 0.82
+                                            opacity: 0.78
                                         }
                                         Rectangle {
+                                            visible: huntLaserLayer.progress > 0
+                                                     && !huntLaserLayer.impactReached
                                             x: huntLaserLayer.muzzleX
                                                + huntLaserLayer.dx * huntLaserLayer.progress
                                                - width / 2
                                             y: huntLaserLayer.muzzleY
                                                + huntLaserLayer.dy * huntLaserLayer.progress
                                                - height / 2
-                                            width: 8
-                                            height: 8
+                                            width: 7
+                                            height: 7
                                             radius: 4
                                             color: huntLaserLayer.shot.color
-                                            opacity: 0.85
+                                            opacity: 0.88
+                                        }
+                                        Rectangle {
+                                            // Small light only when the bolt
+                                            // crosses the bottom viewport boundary.
+                                            x: huntLaserLayer.width
+                                               * huntLaserLayer.trajectory.entryX
+                                               - width / 2
+                                            y: huntLaserLayer.height - height / 2
+                                            width: 15
+                                            height: 5
+                                            radius: 3
+                                            color: huntLaserLayer.shot.color
+                                            opacity: huntLaserLayer.progress
+                                                        >= huntLaserLayer.trajectory.entryProgress
+                                                     && huntLaserLayer.progress
+                                                        < huntLaserLayer.trajectory.entryProgress + 0.14
+                                                     ? 0.28 : 0
+                                        }
+                                        Rectangle {
+                                            // A small contact spark when the laser
+                                            // arrives. Never global/fullscreen.
+                                            visible: huntLaserLayer.impactReached
+                                                     && huntLaserLayer.shot.hit
+                                            x: huntLaserLayer.impactX - width / 2
+                                            y: huntLaserLayer.impactY - height / 2
+                                            width: 14
+                                            height: 14
+                                            radius: 7
+                                            color: "transparent"
+                                            border.width: 2
+                                            border.color: huntLaserLayer.shot.color
+                                            opacity: 0.50
                                         }
                                     }
-                                    // The original target disappears from the playable
-                                    // list immediately, so a short-lived echo at its
-                                    // actual drawn bounds shows the RED impact on it.
+                                    // Gameplay removes the target immediately, but
+                                    // the captured thumbnail stays visible during
+                                    // flight. It turns RED only after impact.
                                     Item {
                                         id: huntHitAnimalEcho
                                         z: 77
@@ -4116,7 +4182,10 @@ PanelWindow {
                                             anchors.fill: parent
                                             radius: 5
                                             color: Colors.black
-                                            border.color: Colors.red
+                                            border.color: huntLaserLayer.impactReached
+                                                          ? Colors.red
+                                                          : camera.huntTargetColor(
+                                                              huntHitAnimalEcho.shot.profile)
                                             border.width: 2
                                             Image {
                                                 anchors.fill: parent
@@ -4132,10 +4201,12 @@ PanelWindow {
                                                 anchors.fill: parent
                                                 radius: 4
                                                 color: Colors.red
-                                                opacity: 0.40
+                                                opacity: huntLaserLayer.impactReached
+                                                         ? 0.40 : 0
                                             }
                                             GohuText {
                                                 anchors.centerIn: parent
+                                                visible: huntLaserLayer.impactReached
                                                 text: "HIT"
                                                 font.pixelSize: 12
                                                 color: Colors.white

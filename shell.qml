@@ -18,6 +18,7 @@ import qs.services.hub
 import qs.services.location
 import qs.services.time
 import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy
+import "services/favorites/FavoritesAppSelectionPolicy.js" as AppFavoriteSelection
 import qs.services.notifications
 
 import QtQuick.Effects
@@ -238,6 +239,18 @@ PanelWindow {
         function onApolloNavigationRequested(destination) {
             shellRoot.openApolloNotificationRoute(destination);
         }
+    }
+
+    // U7b-C: AppControl-specific desktop selection, never a generic executor.
+    // Shell admits only conservative installed-app IDs; the owner rechecks
+    // favorite membership and the live DesktopEntries inventory.
+    function openApolloSavedApp(desktopId) {
+        if(!AppFavoriteSelection.validDesktopId(desktopId))
+            return false;
+        if(!appControlWindow.selectSavedApplication(desktopId))
+            return false;
+        shellRoot.requestControlKeyboard("appcontrol","favorites-saved-app");
+        return true;
     }
 
     // U7b: separate exact-item path. Shell checks the fixed route allowlist,
@@ -1142,6 +1155,12 @@ PanelWindow {
                 onFavoriteExactNavigationRequested: function(owner,route) {
                     // A failed/stale owner request leaves CPU++ open.
                     if(shellRoot.openApolloFavoriteItem(owner,route))
+                        cpuPlusWindow.close();
+                }
+                onFavoriteAppSelectionRequested: function(desktopId) {
+                    // Only the AppControl owner can select its installed app;
+                    // denied/stale favorites keep CPU++ open.
+                    if(shellRoot.openApolloSavedApp(desktopId))
                         cpuPlusWindow.close();
                 }
                 onTelegramAccessRequested: {

@@ -130,7 +130,9 @@ class RecordIndexTests(unittest.TestCase):
         (self.data / "weather-event-archive-v1.json").write_bytes(b"x" * 100)
         self.save(self.data / "weather-dossier-archive-v1.json",
                   {"schema": "unknown", "entries": []})
-        with patch.object(indexer, "MAX_EVENT_DOC_BYTES", 50):
+        limited_sources = ((indexer.SOURCES[0][0], indexer.SOURCES[0][1],
+                            indexer.SOURCES[0][2], 50),) + indexer.SOURCES[1:]
+        with patch.object(indexer, "SOURCES", limited_sources):
             result = indexer.index(str(self.data), self.home)
         self.assertEqual(result["total"], 0)
         self.assertEqual(result["sources"][0]["state"], "SOURCE_UNSAFE_OR_OVERSIZE")

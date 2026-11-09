@@ -64,7 +64,7 @@ class C3eQSignedEvidenceTests(unittest.TestCase):
         base = Path(self.temp.name)
         self.report = base / "evidence.json"
         self.sig = base / "evidence.sig"
-        self.challenge = b"CI-challenge-with-fixed-32-bytes!"
+        self.challenge = b"CI-challenge-with-fixed-32-bytes"
         self.assertEqual(len(self.challenge), 32)
         self.rpm = "a" * 64
         self.script = "b" * 64

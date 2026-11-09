@@ -26,7 +26,7 @@ check('HospitalWorkforceManagerView {' in host
       "Manager must use existing durable PX records inside scrolling roster")
 check('root.workforceManagerExpanded = false;' in host,
       "Surgery reset or SHOW BRANCHES must close the nested manager")
-check('label: "EDIT NAME"' in host and 'function openRosterIdentityEditor' in host,
+check('text: "EDIT NAME"' in host and 'function openRosterIdentityEditor' in host,
       "Existing rename editor remains independently accessible")
 for label in ("ROOM", "CHAT", "QUICK", "LINKS"):
     block = host.split('label: "' + label + '"', 1)[1][:230]
@@ -35,9 +35,9 @@ for label in ("ROOM", "CHAT", "QUICK", "LINKS"):
 check('softGlowEnabled: true' in (ROOT / "components/HospitalActionButton.qml").read_text(),
       "Existing single outer glow remains active")
 for marker in ('mode: "WORKER"', 'mode === "ROOM"', 'mode === "JOB"',
-               'id: workerNameField', 'id: roomNameField',
-               'id: roomRepositoryField', 'id: jobGoalField',
-               'id: jobPermissionsField', 'model: root.doctors.slice(',
+               'id: workerNameField', 'id:roomNameField',
+               'id:roomRepositoryField', 'id:jobGoalField',
+               'id:jobPermissionsField', 'model: root.doctors.slice(',
                'model: root.rooms.slice(',
                'role: root.workerRole', 'source: "'):
     if marker == 'source: "':

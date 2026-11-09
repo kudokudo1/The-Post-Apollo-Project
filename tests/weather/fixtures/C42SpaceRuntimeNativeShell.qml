@@ -27,6 +27,21 @@ ShellRoot {
     }
     QtObject {
         id: synthetic
+        // Hidden legacy SPACE controls bind these full shared-service fields,
+        // even though sourceOnly does not render that large page.
+        property bool ready: true
+        property bool loading: false
+        property var kpHistory: []
+        property var kpHistorySummary: ({
+            bins:0,hours:0,maxKp:-1,averageKp:-1,activeBins:0,
+            stormBins:0,latestDelta:0,latestA:-1,
+            latestStationCount:-1,minStationCount:-1
+        })
+        property string kpText: "3.3"
+        property string solarWindText: "717 KM/S"
+        property string bzText: "1.0 nT"
+        property string bzLabel: "NORTHWARD"
+        property string solarFluxText: "128 SFU"
         property bool kpReady: true
         property bool kpLoading: false
         property real kp: 3.3
@@ -114,7 +129,7 @@ ShellRoot {
                     return root.fail("EXPANDED_SERVICES_NOT_AVAILABLE");
                 const reportFor="swpc-alerts";
                 hub.selectedServiceId=reportFor;
-                if(!hub.serviceBrief.includes("NO CURRENT PROVIDER REPORT"))
+                if(!hub.serviceBrief.includes("SOURCE INACTIVE // VIEW-SCOPED"))
                     return root.fail("INACTIVE_PROVIDER_MISLABELED");
                 hub.viewMode="directory";
                 root.phase=2;return;

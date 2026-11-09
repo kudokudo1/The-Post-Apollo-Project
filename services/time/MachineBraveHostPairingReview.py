@@ -85,6 +85,8 @@ def review_independent_observations(browser, host):
         raise PairingReviewError("INVALID BROWSER WINDOWS")
     if _count(browser["counts"]["browser_windows"], MAX_BROWSER_WINDOWS) != len(windows):
         raise PairingReviewError("BROWSER WINDOW COUNT MISMATCH")
+    _count(browser["counts"]["tabs"], MAX_TOTAL_TABS)
+    _count(browser["counts"]["pinned_tabs"], MAX_TOTAL_TABS)
     total, pinned, focused, ids = 0, 0, [], set()
     for window in windows:
         _fields(window, ("temporary_browser_window_id",
@@ -171,6 +173,8 @@ def review_independent_observations(browser, host):
             or not isinstance(host["workspace"], str)
             or not 1 <= len(host["output"]) <= MAX_NAME
             or not 1 <= len(host["workspace"]) <= MAX_NAME
+            or any(ord(c) < 32 or ord(c) == 127
+                   for c in host["output"] + host["workspace"])
             or host["same_focused_client_in_two_reads"] is not True):
         raise PairingReviewError("INVALID FOCUSED BRAVE OBSERVATION")
     base["host_focused_brave_reported"] = True

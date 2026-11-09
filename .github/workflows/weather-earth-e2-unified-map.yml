@@ -15,6 +15,7 @@ on:
       - 'widgets/weather/StationSubjectNavigator.qml'
       - 'tests/weather/test_earth_e2_unified_map.js'
       - 'tests/weather/test_earth_e3_pinned_controls.js'
+      - 'tests/weather/test_earth_e4_ground_split.js'
       - 'tests/weather/fixtures/E2EarthUnifiedNativeShell.qml'
       - '.github/workflows/weather-earth-e2-unified-map.yml'
   workflow_dispatch:
@@ -34,6 +35,7 @@ jobs:
           node --test \
             tests/weather/test_earth_e2_unified_map.js \
             tests/weather/test_earth_e3_pinned_controls.js \
+            tests/weather/test_earth_e4_ground_split.js \
             tests/weather/test_earth_subject_panels_e1.js \
             tests/weather/test_index_earth_cutover_m28h.js \
             tests/weather/test_workspace_landing_w1.js \

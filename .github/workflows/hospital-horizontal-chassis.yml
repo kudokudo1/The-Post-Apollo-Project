@@ -1,0 +1,39 @@
+name: Hospital Horizontal Chassis
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalW.qml"
+      - "services/hospital/HospitalHorizontalChassisPolicy.js"
+      - "tests/hospital/test_hospital_horizontal_chassis.js"
+      - "tests/hospital/test_hospital_horizontal_chassis_contracts.py"
+      - ".github/workflows/hospital-horizontal-chassis.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalW.qml"
+      - "services/hospital/HospitalHorizontalChassisPolicy.js"
+      - "tests/hospital/test_hospital_horizontal_chassis.js"
+      - "tests/hospital/test_hospital_horizontal_chassis_contracts.py"
+      - ".github/workflows/hospital-horizontal-chassis.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  horizontal-width-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify four size levels, bounds, and no-op skip
+        run: |
+          node --check services/hospital/HospitalHorizontalChassisPolicy.js
+          node tests/hospital/test_hospital_horizontal_chassis.js
+      - name: Verify frame continuity, header, and existing Surgery
+        run: |
+          python3 tests/hospital/test_hospital_horizontal_chassis_contracts.py
+          python3 tests/hospital/test_surgery_first_open_contracts.py
+          python3 tests/hospital/test_surgery_inline_workforce_ui_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py
+          python3 tests/hospital/test_main_mode_keyboard_contracts.py

@@ -10,6 +10,7 @@ import "../services/hospital/HospitalWorkforceRosterPolicy.js" as WorkforceRoste
 import "../services/hospital/HospitalWorkerAttentionPolicy.js" as WorkerAttentionPolicy
 import "../services/hospital/HospitalWorkerConnectionPolicy.js" as WorkerConnectionPolicy
 import "../services/hospital/HospitalSurgeryStartupPolicy.js" as SurgeryStartupPolicy
+import "../services/hospital/HospitalHorizontalChassisPolicy.js" as SurgeryWidthPolicy
 import "../services/github"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
@@ -1024,8 +1025,28 @@ PanelWindow {
         root.scheduleRoomEntryAudit(root.selectedRoomTeam);
     }
 
-    // 700px content chassis + 44px floor-selector lane.
-    property int panelWidth: 744
+    // Same full-height mapped window; only its horizontal content width steps.
+    // The original 744px chassis (700 + 44px floor lane) remains the default.
+    property int panelWidthLevel: 0
+    readonly property int panelDisplayWidth:
+        root.screen ? root.screen.width : 744 + panelLeftMargin + glowGutter
+    readonly property int panelWidth: SurgeryWidthPolicy.panelWidth(
+        panelWidthLevel, panelDisplayWidth, panelLeftMargin, glowGutter)
+    readonly property bool canNarrowHospital:
+        SurgeryWidthPolicy.canStep(panelWidthLevel, -1,
+            panelDisplayWidth, panelLeftMargin, glowGutter)
+    readonly property bool canWidenHospital:
+        SurgeryWidthPolicy.canStep(panelWidthLevel, 1,
+            panelDisplayWidth, panelLeftMargin, glowGutter)
+
+    function stepHospitalWidth(direction) {
+        const next = SurgeryWidthPolicy.step(panelWidthLevel, direction,
+            panelDisplayWidth, panelLeftMargin, glowGutter);
+        if (next === panelWidthLevel)
+            return false;
+        panelWidthLevel = next;
+        return true;
+    }
     // Notifications' *visible* WindowPanelFrame is inset by frameInset=8
     // at BOTH ends of its stretched layer-shell window. Match that real
     // content rectangle rather than comparing physical screen heights.
@@ -3680,7 +3701,10 @@ PanelWindow {
                     anchors {
                         left: parent.left
                         top: parent.top
+                        right: hospitalHeaderActions.left
+                        rightMargin: 10
                     }
+                    elide: Text.ElideRight
 
                     text:
                         root.operationsSurface === "reception"
@@ -3747,6 +3771,40 @@ PanelWindow {
                     }
 
                     spacing: 8
+
+                    // Finance-style geometry controls, rotated horizontal.
+                    // They resize this SAME PanelWindow; no new window, Room,
+                    // Provider command, or vertical extent is created.
+                    ActionButton {
+                        id: narrowHospitalButton
+                        width: 30
+                        height: 30
+                        label: "←"
+                        labelPixelSize: 17
+                        accentColor: Colors.cyan
+                        contentGlowEnabled: false
+                        available: root.canNarrowHospital
+                        Accessible.name: "Narrow Hospital window"
+                        onLeftClicked: {
+                            root.stepHospitalWidth(-1);
+                            root.keyboardOwnershipRequested();
+                        }
+                    }
+                    ActionButton {
+                        id: widenHospitalButton
+                        width: 30
+                        height: 30
+                        label: "→"
+                        labelPixelSize: 17
+                        accentColor: Colors.magenta
+                        contentGlowEnabled: false
+                        available: root.canWidenHospital
+                        Accessible.name: "Widen Hospital window"
+                        onLeftClicked: {
+                            root.stepHospitalWidth(1);
+                            root.keyboardOwnershipRequested();
+                        }
+                    }
 
                     Rectangle {
                         id: intercomButton

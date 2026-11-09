@@ -202,7 +202,7 @@ class CameraBatchM1Tests(unittest.TestCase):
         with patch.object(camera.shutil, "which", return_value="/usr/bin/gio"), \
                 patch.object(camera.subprocess, "run",
                              side_effect=[Mock(returncode=0),
-                                          Mock(returncode=1, stderr=b"Trash unavailable\\nDetails")]):
+                                          Mock(returncode=1, stderr=b"Trash unavailable\nDetails")]):
             result = camera.trash_batch(plan["planId"], "MOVE_TO_TRASH")
         self.assertEqual(result["failed"], 1)
         self.assertEqual(result["unmovedPaths"], [str(self.b)])

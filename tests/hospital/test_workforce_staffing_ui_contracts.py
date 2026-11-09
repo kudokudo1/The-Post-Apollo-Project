@@ -5,6 +5,7 @@ root = Path(__file__).resolve().parents[2]
 host = (root / "widgets/HospitalW.qml").read_text()
 manager = (root / "widgets/HospitalWorkforceManagerView.qml").read_text()
 policy = (root / "services/hospital/HospitalWorkforceStaffingPolicy.js").read_text()
+worker = (root / "widgets/HospitalRegisteredWorkerView.qml").read_text()
 assignment_reader = (root / "services/hospital/HospitalWorkerAttachmentPreviewService.qml").read_text()
 errors = []
 
@@ -46,8 +47,30 @@ check('root.staffingPlan.blockers.slice(' in manager
 check('function reviewStaffing()' in manager
       and 'root.staffingReviewKey = root.staffingSignature;' in manager
       and 'function openStaffingRoom()' in manager
-      and 'root.openRoomRequested(id);' in manager,
+      and 'root.openRoomRequested(id, prepared);' in manager,
       "Review pins registry snapshot for inspection then only navigates")
+check('signal openRoomRequested(string roomId, var selection)' in manager
+      and 'root.staffingReviewKey === root.staffingSignature' in manager
+      and 'root.staffingPlan.readyForReview' in manager,
+      "Carry choices only when exact reviewed source is still valid")
+check('onOpenRoomRequested: function(roomId, selection)' in host
+      and 'root.rosterFocusedStaffingSelection = valid ? proposed : ({});' in host
+      and 'root.openRosterSession(row,' in host
+      and 'valid ? "attachPreview" : "connections"' in host,
+      "Route reviewed choices to existing Room attachment preview, otherwise CONNECTIONS")
+check('property var initialAttachmentSelection: ({})' in worker
+      and 'initialMode === "attachPreview"' in worker
+      and 'root.openAttachmentPreview()' in worker
+      and 'root.previewAssignmentId = String(prepared.assignmentId)' in worker
+      and 'root.previewDoctorId = String(prepared.doctorId)' in worker
+      and 'root.previewProviderId = String(prepared.providerId)' in worker,
+      "Preselect candidate in existing preview without an automatic submit")
+worker_activation = worker.split('onActiveChanged: {',1)[1].split('onPreviewAssignmentIdChanged:',1)[0]
+check('confirmAttachment()' not in worker_activation
+      and 'attachmentAction.attach(' not in worker_activation,
+      "Opening worker view must never confirm attachment")
+check('STAFFING HANDOFF REFUSED // ROOM OR ACTIVE ASSIGNMENT CHANGED' in worker,
+      "Stale or foreign Room and Assignment selections fall back to connections")
 check('onStaffingPlanChanged: staffingReviewKey = ""' in manager
       and 'onSelectedStaffDoctorIdChanged: staffingReviewKey = ""' in manager
       and 'onSelectedStaffProviderIdChanged: staffingReviewKey = ""' in manager,

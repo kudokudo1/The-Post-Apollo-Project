@@ -45,6 +45,8 @@ function fixture() {
 test("METRIC WATCH resolves chip/device-qualified SYSTEM source and exact saved box",()=>{
     const target=row(systemId,"metric");
     assert.equal(Watch.plan(target).ok,true);
+    // A stale/missing live owner snapshot must not block opening a local view.
+    assert.equal(Watch.plan({...target,resolved:false}).ok,true);
     const token=Watch.plan(target).token;
     assert.match(token,/^w-[0-9a-f]{16}$/);
     assert.equal(Watch.resolveVisible(token,[live(diskId),live(systemId)]).sourceId,systemId);
@@ -105,7 +107,6 @@ test("malformed resource identities, labels masquerading as IDs and unsafe box t
     }
     for(const edited of [
         {...row(systemId,"metric"),readOnly:false},
-        {...row(systemId,"metric"),resolved:false},
         {...row(systemId,"metric"),category:"APP CTRL"},
         {...row(systemId,"metric"),kind:"task-watch"},
         {...row(systemId,"metric"),favoriteType:"FAVORITE"},

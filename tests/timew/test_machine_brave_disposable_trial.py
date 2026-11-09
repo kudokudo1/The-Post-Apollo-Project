@@ -30,6 +30,19 @@ def new_root():
 
 
 # Every write is in a unique, private /tmp fixture, not the user's profile.
+# A caller-defined TMPDIR must never redirect trial writes into HOME.
+old_tmp = os.environ.get("TMPDIR")
+os.environ["TMPDIR"] = "/home/UNTRUSTED-NON-TEMP"
+try:
+    temp_override_root = new_root()
+    assert temp_override_root.parent == Path("/tmp")
+finally:
+    if old_tmp is None:
+        os.environ.pop("TMPDIR", None)
+    else:
+        os.environ["TMPDIR"] = old_tmp
+    shutil.rmtree(temp_override_root)
+
 root = new_root()
 try:
     profile = root / "profile"
@@ -49,7 +62,7 @@ try:
     assert result["brave_user_data_dir"] == str(profile)
     assert result["registration_scoped_to_disposable_profile"] is True
     assert result["host_source_matches_repo"] is True
-    for key in ("browser_launched", "local_transport_tested",
+    for key in ("browser_launched_by_tool", "local_transport_tested",
                 "extension_origin_authenticated", "window_identity_verified",
                 "session_capture_allowed", "restore_allowed"):
         assert result[key] is False
@@ -133,7 +146,7 @@ cli_root = Path(created["trial_root"])
 try:
     assert created["status"] == "disposable_trial_initialized"
     assert created["registration_present"] is False
-    assert created["browser_launched"] is False
+    assert created["browser_launched_by_tool"] is False
     assert not (cli_root / "profile" / "NativeMessagingHosts").exists()
     registered = cli_call("register", str(cli_root), EXT_ID)
     assert registered.returncode == 0 and not registered.stderr

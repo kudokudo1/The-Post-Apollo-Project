@@ -11,6 +11,9 @@ Rectangle {
     color: Colors.black
     property string subjectRoute: ""
     property real runtimeNowMs: Date.now()
+    // Disposable native fixtures can inspect layout without activating
+    // RadioBrowser, MPD, GDELT or creator-feed requests. True by default.
+    property bool providerActivationAllowed: true
     signal newsMapRequested(var payload)
     signal routeRequested(string path)
 
@@ -135,7 +138,7 @@ Rectangle {
     Component {
         id: newsComponent
         StationNewsHub {
-            stationOpen: mediaPane.visible
+            stationOpen: mediaPane.visible && mediaPane.providerActivationAllowed
             subjectRoute: mediaPane.subjectRoute
             embeddedHeader: true
             runtimeNowMs: mediaPane.runtimeNowMs
@@ -148,7 +151,7 @@ Rectangle {
     Component {
         id: radioComponent
         StationRadio {
-            stationOpen: mediaPane.visible
+            stationOpen: mediaPane.visible && mediaPane.providerActivationAllowed
             subjectRoute: mediaPane.subjectRoute
             embeddedHeader: true
         }
@@ -215,7 +218,7 @@ Rectangle {
                 StationNewsHub {
                     id: overviewNewsHub
                     anchors.fill: parent
-                    stationOpen: mediaPane.visible
+                    stationOpen: mediaPane.visible && mediaPane.providerActivationAllowed
                     // REPORTS is still the initial visible NEWS feed.
                     // The contextual C44 header now selects all six
                     // original NEWS categories on this same mounted hub.
@@ -244,7 +247,7 @@ Rectangle {
                     id: overviewRadio
                     objectName: "media-m3-overview-full-radio"
                     anchors.fill: parent
-                    stationOpen: mediaPane.visible
+                    stationOpen: mediaPane.visible && mediaPane.providerActivationAllowed
                     // Use the identical RADIO mode/preset/saved/transport
                     // contract as MEDIA → RADIO // ALL. No compact bypass.
                     subjectRoute: "media/radio/full"

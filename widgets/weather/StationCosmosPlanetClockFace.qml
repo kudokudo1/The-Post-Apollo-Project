@@ -16,6 +16,9 @@ Item {
     property string civilDate: ""
     property string sourceStatus: "SOURCE WAITING"
     property bool sourceReady: false
+    property bool compactInPlanets: false
+    property bool controlledSelection: false
+    signal planetPicked(string name)
     property int localCivilMinute: -1
     property string selectedPlanet: "ALL"
     property string selectedKind: "ALL"
@@ -84,9 +87,10 @@ Item {
              : kind === "transit" ? Colors.magenta : Colors.orange;
     }
     function pickPlanet(name) {
-        selectedPlanet = name;
+        if (!controlledSelection) selectedPlanet = name;
         lockedEvent = null;
         hoveredEvent = null;
+        planetPicked(name);
     }
     function pickKind(kind) {
         selectedKind = kind;
@@ -359,11 +363,12 @@ Item {
             clip: true
             Column {
                 anchors.fill: parent
-                anchors.margins: 5
-                spacing: 2
+                anchors.margins: face.compactInPlanets ? 2 : 5
+                spacing: face.compactInPlanets ? 1 : 2
                 GohuText {
                     width: parent.width
-                    height: 12
+                    height: face.compactInPlanets ? 0 : 12
+                    visible: !face.compactInPlanets
                     text: "EVENT // R · T · S"
                     font.pixelSize: 9
                     color: Colors.magenta
@@ -394,7 +399,8 @@ Item {
                 }
                 QuietText {
                     width: parent.width
-                    height: 16
+                    height: face.compactInPlanets ? 0 : 16
+                    visible: !face.compactInPlanets
                     text: face.selectedEvent
                         ? PlanetPolicy.eventDetail(face.selectedEvent)
                         : "CLICK R / T / S ON THE DIAL"
@@ -430,7 +436,8 @@ Item {
 
                 QuietText {
                     width: parent.width
-                    height: 10
+                    height: face.compactInPlanets ? 0 : 10
+                    visible: !face.compactInPlanets
                     text: "PLANET // INNER MER → OUTER SAT"
                     font.pixelSize: 8
                     color: Colors.cyan
@@ -440,7 +447,8 @@ Item {
                     id: planetFilters
                     objectName: "cosmos-c28-planet-filters"
                     width: parent.width
-                    height: 20
+                    height: face.compactInPlanets ? 0 : 20
+                    visible: !face.compactInPlanets
                     spacing: 2
                     Repeater {
                         model: ["ALL","MERCURY","VENUS","MARS","JUPITER","SATURN"]
@@ -462,7 +470,8 @@ Item {
                     id: kindFilters
                     objectName: "cosmos-c28-event-type-filters"
                     width: parent.width
-                    height: 21
+                    height: face.compactInPlanets ? 0 : 21
+                    visible: !face.compactInPlanets
                     spacing: 3
                     Repeater {
                         model: [
@@ -568,7 +577,8 @@ Item {
 
                 QuietText {
                     width: parent.width
-                    height: 11
+                    height: face.compactInPlanets ? 0 : 11
+                    visible: !face.compactInPlanets
                     text: face.events.length>0
                         ? Day.ordinal(face.events,face.selectedEvent)
                           + " // DATED USNO EVENTS"
@@ -587,7 +597,8 @@ Item {
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 12
+        height: face.compactInPlanets ? 0 : 12
+        visible: !face.compactInPlanets
         text: "ANGLE = LOCAL TIME // RING = PLANET // NO ORBITS OR RETROGRADE INFERENCE"
         font.pixelSize: 8
         color: Colors.orange

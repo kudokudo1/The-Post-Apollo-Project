@@ -27,6 +27,8 @@ assert '"source": "CPU++"' in src
 assert '"sourceId": "cpu-plus-resource-pressure"' in src
 assert '"origin": "apollo"' in src
 assert '"domain": "system"' in src
+assert '"resourceId": kind' in src
+assert '"resourceLabel": label' in src
 assert '"severity": recovered ? "normal"' in src
 assert '"sampling": "existing active monitoring only"' in src
 assert "process control" not in src.lower()
@@ -160,6 +162,8 @@ assert.strictEqual(sent.length,1);
 assert.strictEqual(sent[0].title,'CPU++ // MEMORY PRESSURE');
 assert.strictEqual(sent[0].severity,'warning');
 assert.strictEqual(sent[0].context.metric,'memory');
+assert.strictEqual(sent[0].context.resourceId,'memory');
+assert.strictEqual(sent[0].context.resourceLabel,'MEMORY');
 assert.strictEqual(sent[0].context.origin,'apollo');
 assert.strictEqual(sent[0].context.domain,'system');
 assert.strictEqual(sent[0].metrics.swapPercent,95);
@@ -169,6 +173,9 @@ snapshot(97.2,98,98,10500);
 assert.strictEqual(sent.filter(x=>x.severity==='critical').length,2,
   'both memory and storage can escalate independently');
 assert(sent.some(x=>x.title==='CPU++ // ROOT STORAGE CRITICAL'));
+assert(sent.some(x=>x.context.resourceId==='storage'
+                   && x.context.resourceLabel==='ROOT STORAGE'
+                   && x.context.eventType==='resource-pressure-critical'));
 runtime.NotificationsService.historyReady=false;
 snapshot(86,86,40,12400);
 assert.strictEqual(sent.length,3,'history loading must not send');

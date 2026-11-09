@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationCosmosDetailPolicy.js" as Details
+import "StationCosmosPlanetDayWheelPolicy.js" as DayWheel
 
 // C39 // One compact, source-backed current USNO celestial observation.
 // The 12-field C6 inspector stays available through DETAILS, not squeezed
@@ -21,6 +22,7 @@ Rectangle {
         ? celestialSource.snapshot : null
     readonly property var records: Details.records("planets",snapshot,null,null,false)
     readonly property int recordCount: records.length
+    readonly property int selectablePlanetCount: DayWheel.PLANETS.length
     readonly property int currentIndex: {
         if (!recordCount) return -1;
         if (selectedPlanet === "ALL") return 0;
@@ -44,10 +46,8 @@ Rectangle {
     readonly property string utcSample: snapshot
         ? String(snapshot.time || "--") + "Z" : "--"
     function stepPlanet(delta) {
-        if (!recordCount) return;
-        const i=currentIndex < 0 ? (delta<0 ? recordCount-1 : 0)
-            : (currentIndex+delta+recordCount)%recordCount;
-        planetPicked(String(records[i].name || "").toUpperCase());
+        const target = DayWheel.adjacentPlanet(selectedPlanet, delta);
+        if (target) planetPicked(target);
     }
 
     Row {
@@ -63,7 +63,7 @@ Rectangle {
             label: "◀"
             labelPixelSize: 9
             contentPadding: 0
-            available: strip.recordCount>0
+            available: strip.selectablePlanetCount>0
             onClicked: strip.stepPlanet(-1)
         }
         Column {
@@ -92,7 +92,7 @@ Rectangle {
             label: "▶"
             labelPixelSize: 9
             contentPadding: 0
-            available: strip.recordCount>0
+            available: strip.selectablePlanetCount>0
             onClicked: strip.stepPlanet(1)
         }
         Column {

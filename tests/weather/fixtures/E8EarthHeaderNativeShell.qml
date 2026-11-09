@@ -128,7 +128,15 @@ ShellRoot {
                         ["oldDivider",oldDivider],["host",host],["plot",plot]
                     ].filter(function(pair){return !pair[1];})
                      .map(function(pair){return pair[0];}).join(",");
-                    return root.fail("MISSING_NODES // "+missing);
+                    const childNames=rail && rail.children
+                        ?rail.children.map(function(ch){
+                            return String(ch.objectName||"") + ":"
+                                +String(ch.label||"");
+                        }).join("|"):"--";
+                    return root.fail("MISSING_NODES // "+missing
+                        +" // topic="+String(header.overviewMode)
+                        +" // model="+String(header.tabs.length)
+                        +" // buttons="+childNames);
                 }
                 return;
             }

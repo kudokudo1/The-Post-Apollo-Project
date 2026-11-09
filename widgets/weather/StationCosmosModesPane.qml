@@ -651,7 +651,10 @@ Rectangle {
                 : cosmosModePane.celnav.loading ? "SOURCE RECEIVING"
                 : cosmosModePane.celnav.ready ? "SOURCE RECEIVED"
                 : cosmosModePane.celnav.errorText || "USNO SOURCE WAITING"
-            selectedIndex: cosmosModePane.skyDetailsIndex
+            // C6 initializes kind by resetting selectedIndex to zero.
+            // Reapply the strip's chosen source record after QML creation.
+            // C6's own PREV/NEXT then remain the sole navigation owners.
+            Component.onCompleted: selectedIndex = cosmosModePane.skyDetailsIndex
         }
     }
     Component {

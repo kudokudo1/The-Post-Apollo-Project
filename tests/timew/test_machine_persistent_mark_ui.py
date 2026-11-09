@@ -28,7 +28,7 @@ for item in (
     'id: machinePersistentMarkRow',
     'id: machinePersistentMarkInput',
     'id: machinePersistentMarkButton',
-    'label: "MARK NOW"',
+    '"MARK NOW"',  # ActionButton label is conditional on saving state
     'maximumLength: 40',
     'onTextEdited: timew.machinePersistentMarkDraft = text',
     'onAccepted: timew.machineRequestPersistentMark()',

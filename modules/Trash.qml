@@ -894,5 +894,137 @@ PanelWindow {
                 text: trashLauncher.status
             }
         }
+
+        // BURN ALL has its own displaced confirmation surface. It is NOT
+        // the little inline BURN row: repeating the click at the original
+        // lower-right button coordinate must never invoke Gio empty.
+        Rectangle {
+            id: burnAllConfirmMenu
+            anchors.fill: parent
+            z: 90
+            visible: trashLauncher.confirmMode === "all"
+            color: Colors.black
+            radius: 0
+            border.width: 2
+            border.color: Colors.orange
+
+            // Prevent a click through the overlay to the original BURN ALL
+            // button or the rest of the file action controls.
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                onClicked: function(mouse) { mouse.accepted = true; }
+            }
+
+            Column {
+                width: Math.min(parent.width - 30, 355)
+                anchors.centerIn: parent
+                spacing: 15
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 18
+                    color: Colors.red
+                    horizontalAlignment: Text.AlignHCenter
+                    text: "⚠︎ BURN ALL // FINAL REVIEW"
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 2
+                    color: Colors.orange
+                }
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 12
+                    color: Colors.yellow
+                    wrapMode: Text.WordWrap
+                    text: "SCOPE // SYSTEM TRASH (INCLUDING OTHER MOUNTS)"
+                }
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 14
+                    color: Colors.white
+                    wrapMode: Text.WordWrap
+                    text: "ITEMS TO DESTROY // " + trashLauncher.confirmCount
+                }
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 11
+                    color: Colors.cyan
+                    wrapMode: Text.WordWrap
+                    text: "This permanently empties the existing Linux Trash. It does NOT purge Hospital, Finance or other future record stores. The backend will recheck item count and inventory revision."
+                }
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 11
+                    color: Colors.orange
+                    wrapMode: Text.WordWrap
+                    text: "MOVE YOUR POINTER TO THE SEPARATE CONFIRM BUTTON. REPEATING THE ORIGINAL CLICK CANNOT BURN."
+                }
+
+                Row {
+                    width: parent.width
+                    height: 43
+                    spacing: 12
+
+                    // The destructive action is topologically away from the
+                    // original bottom-right BURN ALL button. It can only be
+                    // armed by actual pointer arrival at this left-side area.
+                    Item {
+                        id: burnAllRemoteTarget
+                        width: Math.max(145, parent.width - 131)
+                        height: 43
+
+                        HoverHandler {
+                            id: burnAllArrival
+                            onHoveredChanged: {
+                                if (hovered && trashLauncher.confirmMode === "all")
+                                    trashLauncher.burnAllPointerRelocated = true;
+                            }
+                        }
+
+                        ActionButton {
+                            id: confirmAllRemoteButton
+                            anchors.fill: parent
+                            label: trashLauncher.burnAllPointerRelocated
+                                   ? "CONFIRM BURN ALL" : "MOVE HERE TO ARM"
+                            labelPixelSize: 10
+                            accentColor: Colors.red
+                            destructive: true
+                            available: trashLauncher.confirmMode === "all"
+                                       && !trashLauncher.busy
+                                       && trashLauncher.burnAllPointerRelocated
+                                       && trashLauncher.confirmCount > 0
+                                       && trashLauncher.confirmCount === trashLauncher.total
+                                       && trashLauncher.confirmRevision === trashLauncher.revision
+                            onLeftClicked: trashLauncher.confirmBurn()
+                        }
+                    }
+
+                    ActionButton {
+                        id: cancelAllBurnButton
+                        width: 119
+                        height: 43
+                        label: "CANCEL // SAFE"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        onLeftClicked: trashLauncher.clearConfirmation()
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 10
+                    color: Colors.green
+                    text: "CANCEL RETURNS TO TRASH // NOTHING IS DELETED"
+                    wrapMode: Text.WordWrap
+                }
+            }
+        }
     }
 }

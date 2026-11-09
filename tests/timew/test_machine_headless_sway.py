@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT / "services" / "time"))
 from MachineMoveJournal import MoveJournal
 from MachineMoveApproval import MoveApprovalGate
 from MachineWindowMovePilot import MoveRefused, execute_one, preview_one
+from MachineMoveApply import apply_one, ApplyError
 from MachineWindowResolver import _walk_live
 
 APP = "machine-ci-window"
@@ -126,7 +127,7 @@ with tempfile.TemporaryDirectory(prefix="machine-m1m-") as tmp:
         commands = []
         def move_command(argv, **kw):
             commands.append(argv)
-            assert len(commands) == 1, "more than one move attempted"
+            assert len(commands) <= 2, "unexpected extra move attempted"
             assert argv[:4] == ["swaymsg", "-r", "-t", "command"]
             assert re.fullmatch(
                 r"\[con_id=[1-9][0-9]*\] move --no-auto-back-and-forth "
@@ -244,6 +245,47 @@ with tempfile.TemporaryDirectory(prefix="machine-m1m-") as tmp:
         except MoveRefused:
             pass
         assert len(commands) == 1
+        # M1q: exercise the new bridge against the same private headless
+        # compositor. Reposition this disposable test client to workspace 1,
+        # then require a fresh exact-action phrase and another journaled move.
+        command('[app_id="' + APP + '"] move container to workspace 1')
+        wait_for(lambda: len([x for x in windows()
+                             if x["app_id"] == APP and x["workspace"] == "1"]) == 1,
+                 label="M1q fresh source workspace")
+        candidate = {
+            "app_id": APP, "status": "candidate",
+            "reason": "UNIQUE LIVE WINDOW; NOT YET APPROVED",
+            "target_workspace": "2", "current_workspace": "1",
+            "live_con_id": selected["con_id"],
+        }
+        request_payload = {
+            "checkpoint_id": checkpoint_id, "document": saved,
+            "candidate": candidate,
+            "confirmation_text": "MOVE " + APP + " FROM 1 TO 2",
+        }
+        apply_opts = {
+            "read_runner": read, "command_runner": move_command,
+            "checkpoint_loader": lambda cid: {
+                "status": "loaded",
+                "checkpoint": {"id": checkpoint_id},
+                "document": saved,
+            },
+            "journal_factory": lambda unused: journal,
+        }
+        wrong = dict(request_payload, confirmation_text="MOVE THE WRONG WINDOW")
+        try:
+            apply_one(wrong, **apply_opts)
+            raise AssertionError("M1q accepted wrong exact-action phrase")
+        except ApplyError:
+            pass
+        assert len(commands) == 1, "rejected M1q request dispatched a command"
+        applied = apply_one(request_payload, **apply_opts)
+        assert applied["status"] == "verified_moved", applied
+        assert len(commands) == 2
+        assert journal.pending() == []
+        assert len([x for x in windows()
+                    if x["app_id"] == APP and x["workspace"] == "2"]) == 1
+        print("MACHINE M1q: REAL ISOLATED SWAY BRIDGE MOVE PASS")
         print("MACHINE M1m: HEADLESS REAL SWAY MOVE PASS / ISOLATED IPC / JOURNALED")
     finally:
         for p in clients:

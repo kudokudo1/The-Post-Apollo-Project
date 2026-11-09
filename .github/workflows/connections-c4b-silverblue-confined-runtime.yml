@@ -35,6 +35,7 @@ jobs:
           bash -n tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
           python3 -B tests/connections/test_connections_c4b_silverblue_contract.py
           python3 -B tests/connections/test_connections_c4d_guest_observation_export.py
+          python3 -B tests/connections/test_connections_c4d_uart_relay_review.py
           python3 -B tests/connections/test_connections_c4a_silverblue_contract.py
           python3 -B tests/connections/test_connections_c3b_origin.py
           python3 -B tests/connections/test_connections_c3d_provenance_contract.py

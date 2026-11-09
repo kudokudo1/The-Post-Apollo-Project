@@ -705,15 +705,17 @@ Item {
             border.color: favoritesSearchInput.activeFocus
                 ? Colors.magenta : Colors.cyan
 
+            // Center both hint and typed text in the available terminal
+            // width, excluding the destructive clear button on the right.
             QuietText {
-                anchors.left: parent.left
-                anchors.leftMargin: 8
+                anchors.horizontalCenter: favoritesSearchInput.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width-36
+                width: favoritesSearchInput.width
                 visible: favoritesSearchInput.text.length===0
                 text: "⌕  SEARCH // NAME, MENU, PLACE..."
                 font.pixelSize: 9
                 color: Colors.cyan
+                horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
             }
             TextInput {
@@ -726,9 +728,17 @@ Item {
                 height: 22
                 font.family: GohuFont.family
                 font.pixelSize: 11
-                color: Colors.white
+                horizontalAlignment: TextInput.AlignHCenter
+                color: Colors.magenta
                 selectionColor: Colors.magenta
                 selectedTextColor: Colors.black
+                // Use the native TextInput cursor position and blink; only
+                // override the artwork. Orange is reserved for the caret.
+                cursorDelegate: Rectangle {
+                    width: 2
+                    height: favoritesSearchInput.font.pixelSize+4
+                    color: Colors.orange
+                }
                 maximumLength: 120
                 selectByMouse: true
                 clip: true
@@ -760,8 +770,37 @@ Item {
                 label: "×"
                 labelPixelSize: 16
                 available: favoritesSearchInput.text.length>0
-                accentColor: Colors.magenta
+                accentColor: Colors.red
+                destructive: true
                 idleFillColor: Colors.black
+                hoverFillColor: Colors.black
+                pressedFillColor: Colors.black
+                selectedFillColor: Colors.black
+                keyboardSelectedFillColor: Colors.black
+                idleForegroundColor: Colors.red
+                hoverForegroundColor: Colors.red
+                pressedForegroundColor: Colors.red
+                selectedForegroundColor: Colors.red
+                keyboardSelectedForegroundColor: Colors.red
+                idleBorderColor: Colors.red
+                hoverBorderColor: Colors.red
+                pressedBorderColor: Colors.red
+                selectedBorderColor: Colors.red
+                keyboardSelectedBorderColor: Colors.red
+                idleContentGlowColor: Colors.red
+                hoverContentGlowColor: Colors.red
+                pressedContentGlowColor: Colors.red
+                selectedContentGlowColor: Colors.red
+                keyboardSelectedContentGlowColor: Colors.red
+                idleSoftGlowColor: Colors.red
+                hoverSoftGlowColor: Colors.red
+                pressedSoftGlowColor: Colors.red
+                selectedSoftGlowColor: Colors.red
+                keyboardSelectedSoftGlowColor: Colors.red
+                contentGlowIdleOpacity: 0.52
+                contentGlowHoverOpacity: 0.80
+                softGlowIdleOpacity: 0.32
+                softGlowHoverOpacity: 0.66
                 onLeftClicked: favoritesSearchInput.text=""
             }
         }

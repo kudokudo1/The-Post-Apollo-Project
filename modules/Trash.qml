@@ -12,6 +12,33 @@ PanelWindow {
     id: trashLauncher
 
     property bool menuOpen: false
+
+    // Four chassis sizes share ONE mapped PanelWindow. The dock button never
+    // changes its 50x50 geometry or 25px-left/20px-bottom position.
+    property string chassisSize: "compact"
+    readonly property var chassisSizes: ["compact", "medium", "large", "full"]
+    readonly property int usableWidth: screen ? screen.width : 2560
+    readonly property int usableHeight: screen ? screen.height : 1440
+    readonly property int frameWidth: Math.max(320, Math.min(
+        chassisSize === "compact" ? 420
+        : chassisSize === "medium" ? 620
+        : chassisSize === "large" ? 900 : usableWidth - 55,
+        usableWidth - 55))
+    readonly property int frameHeight: Math.max(330, Math.min(
+        chassisSize === "compact" ? 450
+        : chassisSize === "medium" ? 570
+        : chassisSize === "large" ? 730 : usableHeight - 120,
+        usableHeight - 120))
+    readonly property bool burnWarning:
+        confirmMode !== "" || pendingAction === "burn"
+        || pendingAction === "burn-all"
+
+    function stepChassis(direction) {
+        const index = chassisSizes.indexOf(chassisSize);
+        chassisSize = chassisSizes[Math.max(0, Math.min(
+            chassisSizes.length - 1, index + direction))];
+    }
+
     property bool busy: false
     property string pendingAction: ""
     property var items: []
@@ -50,7 +77,8 @@ PanelWindow {
         menuOpen = !menuOpen;
         clearConfirmation();
         if (menuOpen) {
-            trashMenu.forceActiveFocus();
+            // Open is visual/pointer-only. Do not steal keyboard ownership
+            // from the currently focused desktop application.
             refresh(true);
         }
     }
@@ -196,13 +224,16 @@ PanelWindow {
         right: 0
     }
 
-    implicitWidth: 450
-    implicitHeight: 540
+    implicitWidth: frameWidth + 30
+    implicitHeight: frameHeight + 90
 
     color: "transparent"
+    // OnDemand allows the text filter to accept keyboard input when clicked,
+    // without claiming Exclusive focus merely because the panel is open.
     WlrLayershell.keyboardFocus: menuOpen
-                                    ? WlrKeyboardFocus.Exclusive
+                                    ? WlrKeyboardFocus.OnDemand
                                     : WlrKeyboardFocus.None
+    focusable: menuOpen
 
     // Only the visible button and, when open, the panel take pointer input.
     mask: Region {
@@ -220,8 +251,8 @@ PanelWindow {
 
     Item {
         id: trashArea
-        width: 450
-        height: 540
+        width: trashLauncher.implicitWidth
+        height: trashLauncher.implicitHeight
         anchors.left: parent.left
         anchors.bottom: parent.bottom
 
@@ -275,20 +306,30 @@ PanelWindow {
         }
     }
 
-    Rectangle {
+    // Use the same reusable frame family as Finance/AppControl panels.
+    // Burn arming affects only this panel's outline and halo; the dock's
+    // magenta OPEN identity and the user's data are otherwise unchanged.
+    WindowPanelFrame {
         id: trashMenu
         x: 15
-        y: 10
-        width: 420
-        height: 450
+        y: 15
+        width: trashLauncher.frameWidth
+        height: trashLauncher.frameHeight
         z: 1
         radius: 5
-        color: Colors.black
-        border.width: 1
-        border.color: Colors.green
+        fillColor: Colors.black
+        fillOpacity: 0.95
+        borderWidth: 1
+        borderColor: trashLauncher.burnWarning ? Colors.orange : Colors.green
+        glowVisible: trashLauncher.menuOpen
+        glowColor: trashLauncher.burnWarning ? Colors.red : Colors.green
+        closeGlowSpread: 6
+        closeGlowOpacity: 0.56
+        wideGlowSpread: 12
+        wideGlowOpacity: 0.20
 
         visible: trashLauncher.menuOpen
-        focus: trashLauncher.menuOpen
+        focus: false
 
         Keys.onPressed: function(event) {
             if (event.key === Qt.Key_Escape) {
@@ -311,20 +352,61 @@ PanelWindow {
                 spacing: 6
 
                 GohuText {
-                    width: parent.width - 40
+                    width: parent.width - 112
                     height: parent.height
-                    text: "TRASH // INDEX"
+                    text: "TRASH // INDEX // " + trashLauncher.chassisSize.toUpperCase()
                     color: Colors.magenta
                     font.pixelSize: 14
                     verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                }
+
+                // Finance-style in-place size stepping: no extra window.
+                ActionButton {
+                    id: collapseTrashButton
+                    width: 28
+                    height: 28
+                    label: "↓"
+                    labelPixelSize: 17
+                    accentColor: Colors.cyan
+                    available: trashLauncher.chassisSize !== "compact"
+                    onLeftClicked: trashLauncher.stepChassis(-1)
                 }
 
                 ActionButton {
+                    id: expandTrashButton
+                    width: 28
+                    height: 28
+                    label: "↑"
+                    labelPixelSize: 17
+                    accentColor: Colors.magenta
+                    available: trashLauncher.chassisSize !== "full"
+                    onLeftClicked: trashLauncher.stepChassis(1)
+                }
+
+                // Finance red-close treatment, using the shared ActionButton
+                // rather than duplicating free-standing shadows/MouseArea.
+                ActionButton {
+                    id: closeTrashButton
                     width: 34
                     height: 28
-                    label: "X"
-                    labelPixelSize: 12
-                    accentColor: Colors.magenta
+                    label: "×"
+                    labelPixelSize: 20
+                    contentPadding: 4
+                    accentColor: Colors.red
+                    destructive: true
+                    softGlowEnabled: true
+                    idleSoftGlowColor: Colors.red
+                    hoverSoftGlowColor: Colors.red
+                    pressedSoftGlowColor: Colors.red
+                    softGlowIdleOpacity: 0.48
+                    softGlowHoverOpacity: 0.70
+                    wideGlowEnabled: true
+                    idleWideGlowColor: Colors.red
+                    hoverWideGlowColor: Colors.red
+                    pressedWideGlowColor: Colors.red
+                    wideGlowIdleOpacity: 0.22
+                    wideGlowHoverOpacity: 0.32
                     onLeftClicked: trashLauncher.toggle()
                 }
             }

@@ -3051,7 +3051,6 @@ PanelWindow {
                         readonly property var scopeOptions:
                             NotificationsService.scopeOptionsFor(notificationEntry.scopeEntry)
                         property int targetScopeIndex: 0
-                        property bool targetWholeApp: false
                         // Delegates are recycled: scope must never leak from
                         // one history record into a different notification.
                         property bool emailDeckOpen: false
@@ -3067,7 +3066,6 @@ PanelWindow {
                             ? NotificationsService.emailActionsFor(notificationEntry.notificationId) : []
                         onNotificationIdChanged: {
                             targetScopeIndex = 0;
-                            targetWholeApp = false;
                             emailDeckOpen = false;
                         }
                         readonly property string websiteKey: NotificationsService.websiteKey(
@@ -3075,6 +3073,7 @@ PanelWindow {
                         readonly property var targetScope: scopeOptions.length > 0
                             ? scopeOptions[Math.max(0, Math.min(scopeOptions.length - 1, targetScopeIndex))]
                             : ({ kind: "app", key: appKey, label: "APP", verified: true })
+                        readonly property bool targetWholeApp: targetScope.kind === "app"
                         readonly property bool targetingWebsite: targetScope.kind === "website"
                         readonly property string targetKey: targetScope.key
                         readonly property string targetLabel: source + " // " + targetScope.label
@@ -3097,7 +3096,6 @@ PanelWindow {
                             if (scopeOptions.length < 2)
                                 return;
                             targetScopeIndex = (targetScopeIndex + 1) % scopeOptions.length;
-                            targetWholeApp = targetScope.kind === "app";
                         }
 
                         readonly property var classification: root.classificationFor(notificationEntry.source, notificationEntry.sourceId, notificationEntry.category, notificationEntry.severity)

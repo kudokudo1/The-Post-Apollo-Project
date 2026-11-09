@@ -831,6 +831,180 @@ PanelWindow {
     readonly property string machineUtcNow:
         MachineTimelinePolicy.utcStamp(localClock.date.getTime())
 
+    // MACHINE v2: SAVE captures and persists without a preview prerequisite.
+    // CUSTOMIZE is a separate explicit, capture-bound inspection transaction.
+    property bool machineSaveBridgeBusy: false
+    property string machineSaveBridgeAction: ""
+    property string machineSaveBridgePayload: ""
+    property string machineSaveBridgeStatus: "READY // SAVE DESKTOP"
+    property string machineCheckpointDraft: ""
+    property bool machineCustomOpen: false
+    property bool machineAdvancedOpen: false
+    property var machineCustomReview: null
+    property var machineCustomExcluded: ({})
+    property string machineCustomInspectKind: "windows"
+    property int machineCustomInspectIndex: 0
+    readonly property var machineCustomItems: machineCustomReview
+        ? (machineCustomReview[machineCustomInspectKind] || []) : []
+    readonly property var machineCustomItem:
+        machineCustomInspectIndex >= 0 && machineCustomInspectIndex < machineCustomItems.length
+        ? machineCustomItems[machineCustomInspectIndex] : null
+    readonly property var machineCustomPolicyPreview: machineCustomReview
+        ? ({
+            preview_only: true, kind: "sway-layout-metadata-preview",
+            outputs: machineCustomReview.outputs,
+            workspaces: machineCustomReview.workspaces,
+            windows: machineCustomReview.windows
+        }) : null
+    readonly property var machineCustomValidation:
+        MachineSelectionPolicy.validate(machineCustomPolicyPreview, machineCustomExcluded)
+
+    function machineBeginSaveBridge(action, request) {
+        if (!menuOpen || selectedMode !== "machine"
+                || machineSaveBridgeBusy || machineStoreBusy
+                || machineCaptureBusy || machineAutoRestoreBusy)
+            return;
+        if (action !== "inspect" && action !== "save")
+            return;
+        machineSaveBridgeBusy = true;
+        machineSaveBridgeAction = action;
+        machineSaveBridgePayload = action === "save" ? JSON.stringify(request) : "";
+        machineSaveBridgeStatus = action === "inspect"
+                                ? "CUSTOMIZE // READING DESKTOP"
+                                : "SAVING DESKTOP // VERIFYING LAYOUT";
+        machineSaveBridgeProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"), action]);
+    }
+
+    function machineSaveLabel() {
+        const name = machineCheckpointDraft.trim();
+        return name.length ? name : "DESKTOP CHECKPOINT";
+    }
+
+    function machineRequestFullSave() {
+        machineBeginSaveBridge("save", {
+            label: machineSaveLabel(), review: null, selection: null
+        });
+    }
+
+    function machineRequestCustomInspect() {
+        if (machineSaveBridgeBusy)
+            return;
+        machineCustomReview = null;
+        machineCustomExcluded = ({});
+        machineCustomInspectIndex = 0;
+        machineBeginSaveBridge("inspect", null);
+    }
+
+    function machineToggleCustomize() {
+        if (machineSaveBridgeBusy)
+            return;
+        machineCustomOpen = !machineCustomOpen;
+        if (machineCustomOpen && !machineCustomReview)
+            machineRequestCustomInspect();
+    }
+
+    function machineStepCustomInspect(delta) {
+        const n = machineCustomItems.length;
+        if (n > 0)
+            machineCustomInspectIndex = (machineCustomInspectIndex + delta + n) % n;
+    }
+
+    function machineChooseCustomKind(kind) {
+        if (kind !== "outputs" && kind !== "workspaces" && kind !== "windows")
+            return;
+        machineCustomInspectKind = kind;
+        machineCustomInspectIndex = 0;
+    }
+
+    function machineCustomIncluded(kind, index) {
+        return machineCustomExcluded[kind + ":" + index] !== true;
+    }
+
+    function machineToggleCustomItem() {
+        if (!machineCustomReview || !machineCustomItem || machineSaveBridgeBusy)
+            return;
+        const key = machineCustomInspectKind + ":" + machineCustomInspectIndex;
+        const next = Object.assign({}, machineCustomExcluded);
+        if (next[key] === true)
+            delete next[key];
+        else
+            next[key] = true;
+        machineCustomExcluded = next;
+        machineSaveBridgeStatus = "CUSTOMIZE // UNSAVED SELECTION";
+    }
+
+    function machineCustomLocateIssue() {
+        if (!machineCustomValidation.issues.length)
+            return;
+        const first = machineCustomValidation.issues[0];
+        machineCustomInspectKind = first.kind;
+        machineCustomInspectIndex = first.index;
+    }
+
+    function machineRequestCustomSave() {
+        if (!machineCustomReview || machineSaveBridgeBusy
+                || machineCustomValidation.status !== "ready")
+            return;
+        const review = machineCustomReview;
+        const selected = {
+            outputs: review.outputs.filter(function(_, i) {
+                return timew.machineCustomIncluded("outputs", i);
+            }).map(function(x) { return x.connector; }),
+            workspaces: review.workspaces.filter(function(_, i) {
+                return timew.machineCustomIncluded("workspaces", i);
+            }).map(function(x) { return x.name; }),
+            windows: review.windows.filter(function(_, i) {
+                return timew.machineCustomIncluded("windows", i);
+            }).map(function(x) { return x.window_key; })
+        };
+        machineBeginSaveBridge("save", {
+            label: machineSaveLabel(), review: review.review, selection: selected
+        });
+    }
+
+    function machineAcceptSaveBridge(data) {
+        if (!data || typeof data.status !== "string") {
+            machineSaveBridgeStatus = "INVALID SAVE RESPONSE";
+            return;
+        }
+        if (data.status === "error") {
+            machineSaveBridgeStatus = "SAVE BLOCKED // " + String(data.reason || "UNKNOWN");
+            return;
+        }
+        if (machineSaveBridgeAction === "inspect" && data.status === "ready"
+                && data.kind === "machine-save-review-v2" && data.read_only === true
+                && data.review && typeof data.review.digest === "string"
+                && Array.isArray(data.outputs) && Array.isArray(data.workspaces)
+                && Array.isArray(data.windows)) {
+            machineCustomReview = data;
+            machineCustomInspectKind = "windows";
+            machineCustomInspectIndex = 0;
+            machineSaveBridgeStatus = "CUSTOMIZE // CHOOSE WHAT TO SAVE";
+            return;
+        }
+        if (machineSaveBridgeAction === "save" && data.status === "saved"
+                && data.geometry_available === true && data.checkpoint
+                && typeof data.checkpoint.id === "string") {
+            machineSavedCheckpoints = [data.checkpoint].concat(
+                machineSavedCheckpoints.filter(function(x) {
+                    return x.id !== data.checkpoint.id;
+                })).slice(0, 30);
+            machineSavedIndex = 0;
+            machineOpenedCheckpoint = null;
+            machineRestorePlan = null;
+            machineLayoutComparison = null;
+            machineInvalidateResolver();
+            machineCustomReview = null;
+            machineCustomExcluded = ({});
+            machineCustomOpen = false;
+            machineStoreStatus = "SAVED // GEOMETRY CHECKPOINT";
+            machineSaveBridgeStatus = "SAVED // DESKTOP GEOMETRY STORED";
+            return;
+        }
+        machineSaveBridgeStatus = "UNEXPECTED SAVE RESPONSE";
+    }
+
     // Capture requires a deliberate click, never menu-open or background polling.
     property bool machineCaptureBusy: false
     property var machineCapturePreview: null

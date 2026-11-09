@@ -63,7 +63,7 @@ assert.equal(retire.deletesHistory,false);
 rejected("retirement",{doctorId:"existing"},"still owns a Room");
 rejected("retirement",{doctorId:"unassigned",doctors:[{id:"unassigned",status:"ACTIVE"}],
     sessions:[{id:"s1",doctorId:"unassigned",status:"OPERATING",activePid:51}]},
-    "nonterminal Session");
+    "unreleased Session");
 rejected("retirement",{doctorId:"unassigned",doctors:[{id:"unassigned",status:"RELEASED"}]},
     "already released");
 rejected("retirement",{doctorId:"no-such-doctor"},"Select a registered worker");

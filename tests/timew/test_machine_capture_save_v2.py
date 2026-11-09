@@ -88,9 +88,11 @@ def fake_clock():
     return dt.datetime(2026, 11, 9, 8, 50, tzinfo=dt.timezone(dt.timedelta(hours=-5)))
 
 
-def fail(message, *, first=None, second=None, key_factory=keys(), label="TEST",
+def fail(message, *, first=None, second=None, key_factory=None, label="TEST",
          store_adapter=None):
     read, calls = reader(first or fixture(), second)
+    if key_factory is None:
+        key_factory = keys()
     args = {"label": label, "read_runner": read, "clock": fake_clock,
             "key_factory": key_factory}
     if store_adapter is not None:

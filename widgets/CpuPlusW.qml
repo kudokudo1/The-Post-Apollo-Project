@@ -422,7 +422,8 @@ PanelWindow {
         menuOpen && (!relationshipFocusModeActive || relationshipFocused)
         && !(selectedModeIndex === 6 && settingsSubMode === "LOCATION"
              && (settingsLocationPane.editingText
-                 || settingsLocationOverviewPane.editingText))
+                 || settingsLocationOverviewPane.editingText
+                 || settingsLocationSelectionPane.editingText))
         && !(selectedModeIndex === 6 && settingsSubMode === "CONNECTIONS"
              && settingsConnectionsDetails.editingText)
         && !(selectedModeIndex === 4 && favoritesDetailsPane.editingText)
@@ -993,8 +994,8 @@ PanelWindow {
             anchors.topMargin: 4
             anchors.rightMargin: 10
             z: 8
-            width: 40
-            height: 34
+            width: 36
+            height: 30
             color: Colors.black
             border.width: 1
             border.color: cpuPlusCloseMouse.pressed
@@ -1011,9 +1012,9 @@ PanelWindow {
 
             NotoText {
                 anchors.centerIn: parent
-                anchors.verticalCenterOffset: 2
+                anchors.verticalCenterOffset: 1
                 text: "×"
-                font.pixelSize: 31
+                font.pixelSize: 27
                 color: Colors.red
                 layer.enabled: true
                 layer.effect: DropShadow {
@@ -1880,9 +1881,6 @@ PanelWindow {
             registry: PlaceRegistry
             visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "LOCATION"
-            onHomeCandidateRequested: function(candidate) {
-                settingsLocationPane.fillHomeCandidate(candidate);
-            }
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom
@@ -2330,6 +2328,12 @@ PanelWindow {
             durationKey: settingsLocationOverviewPane.durationKey
             visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "LOCATION"
+            onHomeCandidateRequested: function(candidate) {
+                settingsLocationPane.fillHomeCandidate(candidate);
+            }
+            onExploreCandidateRequested: function(candidate) {
+                settingsLocationOverviewPane.fillExploreCandidate(candidate);
+            }
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: targetSubModeStrip.bottom

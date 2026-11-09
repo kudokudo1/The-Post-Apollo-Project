@@ -147,8 +147,8 @@ function preview(a) {
 }
 // Exact PX succession request contract, READ ONLY. This never grants authority.
 // A list of Sessions is not ordered by the SQLite insertion rowid used by PX;
-// multiple historical Sessions therefore require a newer authoritative check,
-// rather than guessing the predecessor from a display order.
+// multiple historical Sessions therefore require explicit selection and a
+// newer authoritative PX check, rather than guessing from display order.
 function successionContract(a) {
     const source = a || {};
     const plan = source.plan || {};
@@ -156,6 +156,7 @@ function successionContract(a) {
     const sameRoom = arr(source.sessions).filter(function(s) {
         return v((s || {}).roomId) === v(plan.roomId);
     });
+    const selectedPreviousId = v(source.previousSessionId);
     const blockers = [];
     function block(message) { blockers.push(message); }
     if (source.sessionsLoaded !== true)
@@ -169,9 +170,13 @@ function successionContract(a) {
         block("Pinned Room, previous staffing, Assignment or Git Bed is incomplete");
     if (sameRoom.length === 0)
         block("No recorded predecessor Session; cannot construct a PX succession request");
-    else if (sameRoom.length > 1)
-        block("Multiple historical Room Sessions; latest insertion order must be verified by PX");
-    const previous = sameRoom.length === 1 ? sameRoom[0] : null;
+    else if (sameRoom.length > 1 && !selectedPreviousId)
+        block("Multiple historical Room Sessions; select the exact predecessor for PX latest-order verification");
+    const previous = selectedPreviousId
+        ? sameRoom.filter(function(s) { return id(s) === selectedPreviousId; })[0] || null
+        : sameRoom.length === 1 ? sameRoom[0] : null;
+    if (selectedPreviousId && !previous)
+        block("Selected predecessor Session is not in this Room registry");
     if (previous) {
         if (!id(previous))
             block("Recorded predecessor has no exact Session ID");
@@ -208,7 +213,7 @@ function successionContract(a) {
         // PX command capability and last-moment database check are still absent.
         mutationAuthorized: false,
         status: ready
-            ? "PREDECESSOR PINNED // OPERATOR AUTHORITY NOT VERIFIED"
+            ? "PREDECESSOR PINNED // PX LATEST ORDER + OPERATOR AUTHORITY NOT VERIFIED"
             : "ATOMIC SUCCESSION PRECONDITIONS NOT SATISFIED",
         disclaimer: "NO SUCCESSION SUBMITTED // SESSION RELEASE IS RECORDED, NOT A LIVE BROWSER HEARTBEAT"
     };

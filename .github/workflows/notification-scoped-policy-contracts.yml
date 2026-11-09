@@ -7,6 +7,7 @@ on:
       - "services/notifications/**"
       - "widgets/notifications/NotificationsHubW.qml"
       - "tests/notifications/test_notification_scoped_policies.py"
+      - "tests/notifications/test_notification_hard_block.py"
       - ".github/workflows/notification-scoped-policy-contracts.yml"
   push:
     branches:
@@ -15,6 +16,7 @@ on:
       - "services/notifications/**"
       - "widgets/notifications/NotificationsHubW.qml"
       - "tests/notifications/test_notification_scoped_policies.py"
+      - "tests/notifications/test_notification_hard_block.py"
       - ".github/workflows/notification-scoped-policy-contracts.yml"
 
 permissions:
@@ -29,6 +31,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Test scoped identities and popup policy gating
         run: python3 tests/notifications/test_notification_scoped_policies.py
+      - name: Verify hard BLOCK never reaches popup or saved history
+        run: python3 tests/notifications/test_notification_hard_block.py
       - name: Test existing website and app policy inheritance
         run: python3 tests/notifications/test_notification_website_scope.py
       - name: Test notification policy source contracts

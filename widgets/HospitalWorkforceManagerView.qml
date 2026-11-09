@@ -121,7 +121,9 @@ Column {
         assignments: inlineAssignment.assignments
     })
     signal rosterRefreshRequested()
-    signal openRoomRequested(string roomId)
+    // Read-only candidate handoff to the existing nested attachment preview.
+    // This signal cannot authorize or execute a PX Session mutation.
+    signal openRoomRequested(string roomId, var selection)
 
     width: parent ? parent.width : 350
     height: visible ? implicitHeight : 0
@@ -183,8 +185,17 @@ Column {
             root.outcome = "OPEN ROOM REFUSED // SELECT A REGISTERED ROOM";
             return false;
         }
+        const prepared = root.staffingReviewKey
+            && root.staffingReviewKey === root.staffingSignature
+            && root.staffingPlan.readyForReview
+            ? {
+                roomId: root.staffingPlan.roomId,
+                assignmentId: root.staffingPlan.assignmentId,
+                doctorId: root.staffingPlan.doctorId,
+                providerId: root.staffingPlan.providerId
+            } : null;
         root.staffingReviewKey = "";
-        root.openRoomRequested(id);
+        root.openRoomRequested(id, prepared);
         return true;
     }
     function planFor(kind) {
@@ -1010,7 +1021,7 @@ Column {
             width: parent.width
             text: root.staffingReviewKey
                 && root.staffingReviewKey === root.staffingSignature
-                ? "REVIEWED // EXACT IDs PINNED FOR INSPECTION ONLY"
+                ? "REVIEWED // OPEN ROOM WILL PRESELECT IDS IN EXISTING ATTACHMENT PREVIEW; CONFIRM STILL SEPARATE"
                 : "NO STAFFING WRITER // Backend authority and atomic ownership check still required"
             color: root.staffingReviewKey ? Colors.cyan : Colors.orange
             font.pixelSize: 9

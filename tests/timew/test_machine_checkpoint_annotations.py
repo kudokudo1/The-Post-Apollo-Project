@@ -83,10 +83,10 @@ try:
         assert prior["display_name"] == "Original work desktop"
         assert prior["note"] == "" and prior["revision"] == 0
         assert prior["read_only"] and not prior["capture_modified"]
-        assert not any(TABLE in name for name in
-                       sqlite3.connect(path).execute(
-                           "SELECT name FROM sqlite_master").fetchall()
-                       for name in name)
+        with sqlite3.connect(path) as conn:
+            table_names = {row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'")}
+            assert TABLE not in table_names
 
         added = save_pair(v1, geometry)
         geometry_id = added["checkpoint"]["id"]

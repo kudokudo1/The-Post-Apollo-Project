@@ -119,8 +119,8 @@ ShellRoot {
             } else if(root.phase==="map") {
                 const m=root.map();
                 if(!m || m.mapNewsMentionRows.length!==1)return;
-                if(navigator.currentPath!=="earth/maps/overview"
-                    || navigator.indexOpen || m.earthMapOnly!==true
+                if(navigator.currentPath!=="earth/maps/events"
+                    || navigator.indexOpen || m.earthMapOnly!==true || m.earthPinnedMap!==true
                     || m.newsMentionOverlay.articleTitle!==
                        "SYNTHETIC M28A LOCATION ARTICLE") {
                     root.fail("WRONG_SUBJECT_ROUTE_OR_OVERLAY");return;
@@ -149,7 +149,7 @@ ShellRoot {
                 if(!m || navigator.newsMentionOverlay!==null)return;
                 if(m.mapNewsMentionRows.length!==0
                     || m.selectedMapNewsMention!==null
-                    || navigator.currentPath!=="earth/maps/overview") {
+                    || navigator.currentPath!=="earth/maps/events") {
                     root.fail("CLEAR_LEFT_STALE_CONTEXT");return;
                 }
                 root.done=true;

@@ -27,7 +27,7 @@ test("E5 adjusts existing cards without changing the data meaning or source owne
         "compactEarthAir ? 18 : 22",
         "compactEarthEnvironment ? 82 : 112",
         "compactEarthEnvironment ? 78 : 112",
-        "ground.officialAlerts.slice(0, 2)",
+        "visible: !ground.compactEarthEnvironment || index < 2",
         "SHOWING 2 OF",
         "MORE: WEATHER / HAZARDS / ALERTS",
         "ground.airQualityForecast",

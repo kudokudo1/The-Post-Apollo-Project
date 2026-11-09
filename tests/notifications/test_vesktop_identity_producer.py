@@ -108,7 +108,7 @@ assert.equal(id.scopedDiscordEvent(ev(other),serverCh,a,new Set([other]),new Set
  'mismatched channel identity refused');
 assert.equal(id.scopedDiscordEvent(ev(),{...serverCh,id:other},a,allow,new Set()),null);
 assert.equal(id.scopedDiscordEvent(ev(),{...serverCh,guild_id:'',type:9},
- allow,new Set()),null);
+ a,allow,new Set()),null, 'unrecognized Discord channel type must fail closed');
 
 const dmEvent=id.scopedDiscordEvent(ev(dm),{id:dm,type:1,name:'Direct chat'},
  a,allow,new Set());

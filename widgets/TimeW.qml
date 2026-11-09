@@ -983,9 +983,24 @@ PanelWindow {
             machineSaveBridgeStatus = "CUSTOMIZE // CHOOSE WHAT TO SAVE";
             return;
         }
+        if (machineSaveBridgeAction === "save"
+                && data.status === "saved_unverified" && data.checkpoint
+                && typeof data.checkpoint.id === "string") {
+            machineStoreStatus = "SAVE RECORDED // READBACK NOT VERIFIED";
+            machineSaveBridgeStatus = "SAVE MAY BE STORED // OPEN STORED TO CHECK";
+            return;
+        }
         if (machineSaveBridgeAction === "save" && data.status === "saved"
                 && data.geometry_available === true && data.checkpoint
-                && typeof data.checkpoint.id === "string") {
+                && typeof data.checkpoint.id === "string"
+                && data.verification
+                && data.verification.status === "readback_verified"
+                && data.verification.geometry === true
+                && data.verification.legacy === true
+                && data.verification.counts
+                && data.verification.counts.outputs === data.checkpoint.counts.outputs
+                && data.verification.counts.workspaces === data.checkpoint.counts.workspaces
+                && data.verification.counts.windows === data.checkpoint.counts.windows) {
             machineSavedCheckpoints = [data.checkpoint].concat(
                 machineSavedCheckpoints.filter(function(x) {
                     return x.id !== data.checkpoint.id;
@@ -998,8 +1013,11 @@ PanelWindow {
             machineCustomReview = null;
             machineCustomExcluded = ({});
             machineCustomOpen = false;
-            machineStoreStatus = "SAVED // GEOMETRY CHECKPOINT";
-            machineSaveBridgeStatus = "SAVED // DESKTOP GEOMETRY STORED";
+            machineStoreStatus = "SAVED // GEOMETRY READBACK VERIFIED";
+            machineSaveBridgeStatus = "SAVED + VERIFIED // "
+                + data.verification.counts.outputs + " MON // "
+                + data.verification.counts.workspaces + " WS // "
+                + data.verification.counts.windows + " WINDOWS";
             return;
         }
         machineSaveBridgeStatus = "UNEXPECTED SAVE RESPONSE";
@@ -1697,8 +1715,13 @@ PanelWindow {
             timew.machineSaveBridgeBusy = false;
             timew.machineSaveBridgePayload = "";
             if (exitCode !== 0
-                    && !timew.machineSaveBridgeStatus.startsWith("SAVE BLOCKED"))
-                timew.machineSaveBridgeStatus = "SAVE OR CAPTURE UNAVAILABLE";
+                    && !timew.machineSaveBridgeStatus.startsWith("SAVE BLOCKED")
+                    && !timew.machineSaveBridgeStatus.startsWith("SAVED")
+                    && !timew.machineSaveBridgeStatus.startsWith("SAVE MAY BE STORED"))
+                timew.machineSaveBridgeStatus =
+                    timew.machineSaveBridgeAction === "save"
+                    ? "SAVE OUTCOME UNKNOWN // CHECK STORED BEFORE RETRY"
+                    : "CUSTOMIZE CAPTURE UNAVAILABLE";
         }
     }
 

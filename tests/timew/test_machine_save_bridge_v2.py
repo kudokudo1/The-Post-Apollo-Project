@@ -147,6 +147,11 @@ try:
         result = save_request(custom_request, read_runner=runner)
         assert len(calls) == 6
         assert result["status"] == "saved"
+        assert result["verification"] == {
+            "status": "readback_verified",
+            "counts": {"outputs": 2, "workspaces": 2, "windows": 1},
+            "geometry": True, "legacy": True,
+        }
         assert result["checkpoint"]["counts"]["windows"] == 1
         saved_id = result["checkpoint"]["id"]
         geo = load_geometry(saved_id)["geometry"]
@@ -160,9 +165,44 @@ try:
         result_full = save_request(full_request, read_runner=full)
         assert len(six) == 6
         assert result_full["status"] == "saved"
+        assert result_full["verification"]["status"] == "readback_verified"
+        assert result_full["verification"]["counts"] == {
+            "outputs": 2, "workspaces": 2, "windows": 3,
+        }
         assert result_full["checkpoint"]["counts"]["windows"] == 3
         assert len(legacy.listing()["checkpoints"]) == 2
         assert load_geometry(saved_id)["geometry"] == geo
+
+        # The actual commit already happened. An independent read-back error
+        # must report the saved UUID as unverified, never fabricate failure
+        # before storage or encourage a blind duplicate retry.
+        def broken_readback(checkpoint_id):
+            raise OSError("synthetic read-only lookup failure")
+        before_unverified = len(legacy.listing()["checkpoints"])
+        read_runner, _ = reader(frame)
+        unverified = save_request(
+            full_request, read_runner=read_runner,
+            geometry_reader=broken_readback)
+        assert unverified["status"] == "saved_unverified"
+        assert unverified["verification"] == {"status": "readback_unavailable"}
+        assert unverified["checkpoint"]["id"] != saved_id
+        assert len(legacy.listing()["checkpoints"]) == before_unverified + 1
+        # This synthetic failure does not damage or rewrite the actual data.
+        assert load_geometry(unverified["checkpoint"]["id"])["status"] == "loaded"
+
+        # Disagreeing read-back counts are likewise not advertised verified.
+        real_readback = load_geometry
+        def wrong_counts(checkpoint_id):
+            record = copy.deepcopy(real_readback(checkpoint_id))
+            record["geometry"]["windows"].pop()
+            return record
+        count_runner, _ = reader(frame)
+        mismatch = save_request(
+            full_request, read_runner=count_runner,
+            geometry_reader=wrong_counts)
+        assert mismatch["status"] == "saved_unverified"
+        assert mismatch["verification"]["status"] == "readback_unavailable"
+        assert load_geometry(mismatch["checkpoint"]["id"])["status"] == "loaded"
 
         # A stable desktop where the wrong monitor is selected is refused
         # before changing the user's persistent checkpoints.

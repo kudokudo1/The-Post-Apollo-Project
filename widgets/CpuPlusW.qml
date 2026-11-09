@@ -1714,6 +1714,13 @@ PanelWindow {
             id: settingsConnectionsOverview
             visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+            onIdManagementRequested: {
+                if (cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 6
+                        && cpuPlusWindow.settingsSubMode === "CONNECTIONS") {
+                    cpuPlusWindow.selectMode(5);
+                    cpuPlusWindow.selectLocalManagementSection("IDS");
+                }
+            }
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom

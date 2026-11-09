@@ -1,0 +1,50 @@
+name: CPU++ Universal Sign-In V1 visual integration
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/ConnectionsUnifiedSignInPolicy.js'
+      - 'widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml'
+      - 'widgets/CpuPlusW.qml'
+      - 'tests/cpuplus/test_cpuplus_universal_signin_control_center.cjs'
+      - 'docs/cpuplus-universal-signin-visual-v1.md'
+      - '.github/workflows/cpuplus-universal-signin-visual-v1.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/connections/ConnectionsUnifiedSignInPolicy.js'
+      - 'widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml'
+      - 'widgets/CpuPlusW.qml'
+      - 'tests/cpuplus/test_cpuplus_universal_signin_control_center.cjs'
+      - '.github/workflows/cpuplus-universal-signin-visual-v1.yml'
+permissions:
+  contents: read
+jobs:
+  visual-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Universal Sign-In truthful status and navigation
+        run: node tests/cpuplus/test_cpuplus_universal_signin_control_center.cjs
+      - name: Existing CPU++ Connections, deny-only and account editor behavior
+        run: |
+          node tests/cpuplus/test_cpuplus_connections_c1.js
+          node tests/cpuplus/test_connections_broker_c2a.js
+          node tests/cpuplus/test_cpuplus_telegram_connection_entry.cjs
+          node --test tests/cpuplus/test_cpuplus_telegram_status_projection.cjs
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_connections_local_account_editor.py' -v
+      - name: Existing CPU++ identity host pane and settings layout
+        run: |
+          python3 tests/cpuplus/test_cpuplus_identity_host_context_v0.py
+          python3 tests/components/test_cpuplus_settings_mode_contracts.py
+      - name: Qt6 QML parser for affected UI
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          for q in widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml widgets/CpuPlusW.qml; do
+            QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat "$q" >/dev/null
+          done

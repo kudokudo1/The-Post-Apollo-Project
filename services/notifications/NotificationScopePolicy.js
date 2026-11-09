@@ -45,7 +45,7 @@ function scopeFromHints(hints) {
 function scopeKey(appKey, kind, scopeId) {
     const app = token(appKey).toLowerCase();
     const value = token(scopeId);
-    if (!app || !value || !/^(sender|conversation|server|channel|event|title)$/.test(kind))
+    if (!app || !value || !/^(sender|conversation|server|channel|resource|resourceEvent|event|title)$/.test(kind))
         return "";
     // Existing policy stores lowercase keys. Encode UTF-16 code units in
     // fixed-width hexadecimal so case-sensitive sender IDs and literal
@@ -104,9 +104,35 @@ function scopeOptionsFor(entry, appKey, websiteKey) {
     if (s.senderId)
         add("sender", s.senderId, "SENDER // " + label(s.senderName, s.senderId), true);
 
-    // Apollo event families can be independently managed when the producer
-    // supplied a stable explicit event type.
+    // A producer-declared resource identity is stable within its APP.
+    // Old CPU++ pressure history stored only "metric"; accept it exclusively
+    // for that known producer and explicit pressure event family. Never parse
+    // arbitrary titles, bodies or numeric readings to guess a resource.
     const eventId = stableId(ctx.eventType);
+    const legacyPressure = token(e.sourceId).toLowerCase() === "cpu-plus-resource-pressure"
+        && /^resource-pressure-(warning|critical|recovered)$/.test(eventId);
+    let resourceId = stableId(ctx.resourceId);
+    if (!resourceId && legacyPressure
+            && (ctx.metric === "memory" || ctx.metric === "storage"))
+        resourceId = ctx.metric;
+    const defaultName = resourceId === "memory" ? "MEMORY"
+        : resourceId === "storage" ? "ROOT STORAGE"
+        : resourceId.toUpperCase();
+    const resourceName = label(ctx.resourceLabel, defaultName);
+    if (resourceId && eventId) {
+        const displayEvent = legacyPressure
+            ? eventId.slice("resource-pressure-".length).toUpperCase()
+            : eventId.toUpperCase();
+        // Length-prefix the first component, avoiding separator collisions.
+        const pair = resourceId.length + ":" + resourceId + ":" + eventId;
+        add("resourceEvent", pair,
+            "RESOURCE + EVENT // " + resourceName + " // " + displayEvent, true);
+    }
+    if (resourceId)
+        add("resource", resourceId, "RESOURCE // " + resourceName, true);
+
+    // EVENT remains intentionally cross-resource. Existing EVENT rules and
+    // saved keys retain their exact meaning and are never migrated.
     if (eventId)
         add("event", eventId, "EVENT // " + eventId, true);
 

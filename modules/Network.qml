@@ -43,6 +43,23 @@ DockButton {
                ? speed : -1;
     }
 
+    // U8d // Existing Network dock owns BOTH the nmcli observation and
+    // the HTTPS health probe. CPU++ receives only coarse read-only status,
+    // never addresses, SSIDs, endpoints, commands or a second Process.
+    readonly property var internetHealthSnapshot: ({
+        localLinkAvailable: networkInternetHealthProducer.localLinkAvailable === true,
+        linkKnownDown: networkInternetHealthProducer.localLinkAvailable !== true
+            && networkLinkProducer.linkState
+            && ((networkLinkProducer.linkState.wifi || {}).stable==="down"
+                || (networkLinkProducer.linkState.ethernet || {}).stable==="down")
+            && (networkLinkProducer.linkState.wifi || {}).stable!=="up"
+            && (networkLinkProducer.linkState.ethernet || {}).stable!=="up",
+        reachability: String(
+            (networkInternetHealthProducer.reachabilityState || {}).stable || ""),
+        lastSampleMs: Number(
+            (networkInternetHealthProducer.reachabilityState || {}).lastSampleMs || 0)
+    })
+
     contentGlowEnabled: false
 
     // Modulate shadow COLOR alpha; the source layer never changes opacity.

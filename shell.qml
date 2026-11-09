@@ -1167,6 +1167,9 @@ PanelWindow {
                 appControlWindow: appControlWindow
                 systemTelemetry: sharedSystemTelemetry
                 fanControl: sharedFanControl
+                // The existing Network dock does the probing. CPU++ only
+                // consumes a bounded read-only reachability summary.
+                internetHealthObservation: sharedNetworkDock.internetHealthSnapshot
                 // U5a/U5c: connect only copied, read-only Weather owner
                 // snapshots. No Weather/Radio writer or player QObject passes.
                 weatherHomeFavoritesSource:

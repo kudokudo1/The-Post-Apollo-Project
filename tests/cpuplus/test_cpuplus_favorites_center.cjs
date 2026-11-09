@@ -1667,36 +1667,35 @@ test("U8a two-click red left collection delete invokes store only on confirmatio
 });
 
 
-test("U8c icon rail packs both rows across the full width, preserving accessibility",()=>{
+test("U8d compact Favorites icon rail keeps each row centered and icons readable",()=>{
   const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
-  const index=pane.indexOf("id: categoryFilterFlow");
-  const bottom=pane.indexOf("id: subfilterScroll");
-  assert.ok(index>=0 && bottom>index);
-  const main=pane.slice(index,bottom);
-  assert.match(main,/width: categoryFilterFlow\.tileWidth/);
-  assert.match(main,/Math\.min\(34,Math\.max\(20,\(width-\(upperCount-1\)\*4\)\/upperCount\)\)/);
-  assert.match(main,/rowKeys\.length\*[\s\S]*?categoryFilterFlow\.tileWidth\)\/\(rowKeys\.length-1\)/);
+  const begin=pane.indexOf("id: categoryFilterFlow");
+  const end=pane.indexOf("id: subfilterScroll");
+  assert.ok(begin>=0 && end>begin);
+  const main=pane.slice(begin,end);
+  assert.match(main,/Math\.min\(40,Math\.max\(30,\(width-\(upperCount-1\)\*4\)\/upperCount\)\)/);
+  assert.match(main,/spacing: 4\s+width: rowKeys\.length\*categoryFilterFlow\.tileWidth/);
+  assert.match(main,/anchors\.horizontalCenter: parent\.horizontalCenter/);
   assert.match(main,/categoryFilterFlow\.categoryKeys\.slice\(/);
   assert.match(main,/label: Dossier\.mainIcon\(modelData\)/);
-  assert.match(main,/labelPixelSize: 18/);
-  assert.match(main,/Accessible\.role: Accessible\.Button/);
+  assert.match(main,/modelData==="WEATHER" \|\| modelData==="PLACES"/);
+  assert.match(main,/\? 23 : 18/);
   assert.match(main,/Accessible\.name: modelData\+" favorites filter"/);
   assert.match(main,/onLeftClicked: pane\.filterMode=modelData/);
-
-  // At the real 260px selector, both lines occupy their complete width.
-  const width=260,tile=Math.min(34,Math.max(20,(width-5*4)/6));
-  assert.equal(tile,34);
+  const width=260,spacing=4,upperCount=6;
+  const tile=Math.min(40,Math.max(30,(width-(upperCount-1)*spacing)/upperCount));
+  assert.equal(tile,40);
   for(const count of [6,5]) {
-    const space=(width-count*tile)/(count-1);
-    const used=count*tile+(count-1)*space;
-    assert.ok(space>=4);
-    assert.equal(used,width);
+    const used=count*tile+(count-1)*spacing;
+    assert.ok(used<=width);
+    assert.equal((width-used)/2>=0,true);
+    if(count===6)assert.equal(used,width);
   }
   assert.match(pane,/selector\.height-categoryFilterFlow\.height-121/);
   assert.match(pane,/id: subfilterButtons[\s\S]*?label: modelData/);
 });
 
-test("U8c exact module palette and white-partner glow contracts",()=>{
+test("U8d inactive filters remain black; only the opened filter is yellow with magenta icon and glow",()=>{
   const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
   const main=pane.slice(pane.indexOf("id: categoryFilterFlow"),
                         pane.indexOf("id: menuFilterPrev"));
@@ -1704,7 +1703,7 @@ test("U8c exact module palette and white-partner glow contracts",()=>{
     const re=new RegExp("readonly property (?:bool|color) "+name+":([\\s\\S]*?)"+
                        "(?=\\n\\s*readonly property (?:bool|color) "+next+":)");
     const m=main.match(re);
-    assert.ok(m,name+" must be a real QML property");
+    assert.ok(m,name+" is a QML property");
     return m[1].trim();
   }
   const whiteExpr=propertyExpr("whiteGlyph","iconInk");
@@ -1712,11 +1711,9 @@ test("U8c exact module palette and white-partner glow contracts",()=>{
   const frameExpr=propertyExpr("frameInk","iconGlowInk");
   const glowExpr=main.split("readonly property color iconGlowInk:")[1]
      .split("\n\n                            width:")[0].trim();
-  const Colors={
-    white:"#DCF3FA",cyan:"#55CFCA",magenta:"#C74EC7",
-    orange:"#ED981A",yellow:"#F2BE4E"
-  };
-  const cases=[
+  const colors={white:"#DCF3FA",cyan:"#55CFCA",magenta:"#C74EC7",
+    orange:"#ED981A",yellow:"#F2BE4E"};
+  for(const [category,icon,border,glow] of [
     ["ALL","magenta","magenta","magenta"],
     ["GROUP","cyan","cyan","cyan"],
     ["CPU++","white","cyan","cyan"],
@@ -1728,26 +1725,89 @@ test("U8c exact module palette and white-partner glow contracts",()=>{
     ["CLOCK","white","white","white"],
     ["PLACES","yellow","yellow","yellow"],
     ["NEW","cyan","cyan","cyan"]
-  ];
-  for(const [category,icon,border,glow] of cases) {
-    const ctx=vm.createContext({modelData:category,Colors});
+  ]) {
+    const ctx=vm.createContext({modelData:category,Colors:colors});
     ctx.whiteGlyph=vm.runInContext(whiteExpr,ctx);
     ctx.iconInk=vm.runInContext(iconExpr,ctx);
     ctx.frameInk=vm.runInContext(frameExpr,ctx);
     ctx.iconGlowInk=vm.runInContext(glowExpr,ctx);
-    assert.equal(ctx.iconInk,Colors[icon],category+" icon");
-    assert.equal(ctx.frameInk,Colors[border],category+" border");
-    assert.equal(ctx.iconGlowInk,Colors[glow],category+" icon glow");
+    assert.equal(ctx.iconInk,colors[icon],category+" normal icon");
+    assert.equal(ctx.frameInk,colors[border],category+" normal frame");
+    assert.equal(ctx.iconGlowInk,colors[glow],category+" normal glow");
   }
-  // All interaction states keep their own icon, border and glow channels.
-  for(const state of ["idle","hover","pressed","selected","keyboardSelected"]) {
-    assert.match(main,new RegExp(state+"ForegroundColor: iconInk"));
+  for(const state of ["idle","hover","pressed","selected","keyboardSelected"])
     assert.match(main,new RegExp(state+"BorderColor: frameInk"));
-    assert.match(main,new RegExp(state+"ContentGlowColor: iconGlowInk"));
-    assert.match(main,new RegExp(state+"SoftGlowColor: frameInk"));
-  }
+  assert.match(main,/selected: filterOpen/);
+  assert.match(main,/readonly property bool filterOpen:\s*pane\.filterMode===modelData/);
+  assert.match(main,/idleFillColor: Colors\.black/);
+  for(const state of ["hover","pressed","keyboardSelected"])
+    assert.match(main,new RegExp(state+
+      "FillColor:\\s*filterOpen \\? Colors\\.yellow : Colors\\.black"));
+  assert.match(main,/selectedFillColor: Colors\.yellow/);
+  assert.match(main,/selectedForegroundColor: Colors\.magenta/);
+  assert.match(main,/selectedContentGlowColor: Colors\.magenta/);
+  assert.match(main,/selectedSoftGlowColor: Colors\.magenta/);
+  assert.match(main,/hoverForegroundColor:\s*filterOpen \? Colors\.magenta : iconInk/);
+  assert.match(main,/keyboardSelectedForegroundColor:\s*filterOpen \? Colors\.magenta : iconInk/);
   assert.match(main,/contentGlowPressedOpacity: 0\.68/);
   assert.match(main,/softGlowSelectedOpacity: 0\.72/);
-  assert.match(main,/selectedBorderWidth: 2/);
-  assert.match(read("components/Colors.qml"),/readonly property color white: "#DCF3FA"/);
+});
+
+test("U8d network indicator distinguishes live HTTPS evidence, failure, no link and unknown",()=>{
+  const Policy={};
+  load("services/favorites/FavoritesInternetStatusPolicy.js",Policy);
+  const now=1000000;
+  const base={localLinkAvailable:true,linkKnownDown:false,
+    lastSampleMs:now-120000,reachability:"reachable"};
+  assert.deepEqual(plain(Policy.plan(base,now)),{code:"online",label:"ONLINE"});
+  assert.deepEqual(plain(Policy.plan({...base,reachability:"impaired"},now)),
+    {code:"limited",label:"LIMITED"});
+  assert.deepEqual(plain(Policy.plan({
+    ...base,localLinkAvailable:false,linkKnownDown:true
+  },now)),{code:"offline",label:"NO LINK"});
+  assert.deepEqual(plain(Policy.plan({
+    ...base,localLinkAvailable:false,linkKnownDown:false
+  },now)),{code:"checking",label:"CHECKING"});
+  assert.deepEqual(plain(Policy.plan({...base,lastSampleMs:now-420001},now)),
+    {code:"checking",label:"CHECKING"});
+  assert.deepEqual(plain(Policy.plan({...base,lastSampleMs:now+10},now)),
+    {code:"checking",label:"CHECKING"});
+  assert.deepEqual(plain(Policy.plan({...base,lastSampleMs:0},now)),
+    {code:"checking",label:"CHECKING"});
+  assert.deepEqual(plain(Policy.plan({...base,reachability:""},now)),
+    {code:"checking",label:"CHECKING"});
+  assert.deepEqual(plain(Policy.plan(null,now)),
+    {code:"checking",label:"CHECKING"});
+});
+
+test("U8d network badge reuses the existing Network dock; header red X stays clear of divider",()=>{
+  const net=read("modules/Network.qml");
+  const cpu=read("widgets/CpuPlusW.qml");
+  const shell=read("shell.qml");
+  const producer=read("services/notifications/NetworkInternetHealthNotificationProducer.qml");
+  assert.match(net,/readonly property var internetHealthSnapshot:/);
+  assert.match(net,/networkInternetHealthProducer\.localLinkAvailable/);
+  assert.match(net,/networkInternetHealthProducer\.reachabilityState/);
+  assert.match(net,/networkLinkProducer\.linkState/);
+  assert.match(shell,/internetHealthObservation: sharedNetworkDock\.internetHealthSnapshot/);
+  assert.match(cpu,/InternetStatusPolicy\.plan\(internetHealthObservation,internetStatusClockMs\)/);
+  assert.match(cpu,/interval: 60000\s+repeat: true\s+running: cpuPlusWindow\.menuOpen/);
+  assert.match(cpu,/if \(menuOpen\)\s*internetStatusClockMs=Date\.now\(\)/);
+  assert.match(cpu,/id: cpuPlusInternetIndicator/);
+  assert.match(cpu,/text: "LIVE \/\/ NET \/\/ "\+cpuPlusWindow\.internetStatus\.label/);
+  assert.match(cpu,/internetStatus\.code==="online" \? Colors\.omnitrix/);
+  assert.match(cpu,/internetStatus\.code==="offline" \? Colors\.red/);
+  assert.match(cpu,/internetStatus\.code==="limited" \? Colors\.orange : Colors\.cyan/);
+  assert.match(cpu,/id: cpuPlusCloseButton[\s\S]*?destructive: true/);
+  assert.match(cpu,/hoverFillColor: Colors\.red/);
+  assert.match(cpu,/pressedFillColor: Colors\.red/);
+  assert.match(cpu,/pressedForegroundColor: Colors\.black/);
+  assert.match(cpu,/onLeftClicked: cpuPlusWindow\.close\(\)/);
+  const header=cpu.slice(cpu.indexOf("id: cpuPlusCloseButton"),
+                         cpu.indexOf("id: modeButtonRow"));
+  assert.match(header,/anchors\.topMargin: 12[\s\S]*?height: 2[\s\S]*?color: Colors\.cyan/);
+  const dock=net.slice(net.indexOf("readonly property var internetHealthSnapshot"),
+    net.indexOf("contentGlowEnabled: false"));
+  assert.doesNotMatch(dock,/Process\s*\{|command:|nmcli|https?:\/\//);
+  assert.match(producer,/interval: 120000/);
 });

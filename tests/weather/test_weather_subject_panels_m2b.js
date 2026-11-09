@@ -213,7 +213,7 @@ test("WEATHER map does not fetch or plot non-weather events", () => {
   // Full source-row lists are now partitioned by DOMAIN:
   // WEATHER map has none; EARTH's original map renderer keeps full source
   // controls via its migrated route without a duplicate CLASSIC loader.
-  assert.match(discovery,/model: stationDiscovery.domain === "map"\s*&& !stationDiscovery.earthMapOnly && source.ready\s*\? stationDiscovery.visibleRows : \[\]/);
+  assert.match(discovery,/model: stationDiscovery.domain === "map"\s*&& !stationDiscovery\.earthMapOnly && source.ready\s*\? stationDiscovery\.visibleRows : \[\]/);
   assert.match(discovery,/model: stationDiscovery.domain === "map"\s*&& stationDiscovery.earthMapOnly\s*&& stationDiscovery.earthLayerEnabled\("eonet"\)\s*&& source.ready\s*\? stationDiscovery.mapCompanionEonetRows : \[\]/);
   assert.match(discovery,/weatherLayerEnabled\("smoke"\)/);
   assert.match(discovery,/weatherLayerEnabled\("radar"\)/);

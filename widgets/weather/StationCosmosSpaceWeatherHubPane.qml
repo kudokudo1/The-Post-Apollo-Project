@@ -145,7 +145,9 @@ Rectangle {
         objectName: "cosmos-c42-space-dashboard"
         anchors.fill: parent
         anchors.margins: HeaderGeometry.inset
-        spacing: HeaderGeometry.ruleToContent
+        // Exact 6/18/27/2/65 header stages are fixed; only the content
+        // beneath uses normal three-pixel row spacing.
+        spacing: 0
 
         Row {
             id: mainHeader
@@ -175,7 +177,7 @@ Rectangle {
         Item {
             id: headerSpacer
             width: parent.width
-            height: HeaderGeometry.columnHeaderGap()
+            height: HeaderGeometry.titleToTabs
         }
         Row {
             id: viewRail
@@ -206,7 +208,7 @@ Rectangle {
             id: dividerSlot
             objectName: "cosmos-c44-space-divider-slot"
             width: parent.width
-            height: HeaderGeometry.columnRuleSlotHeight()
+            height: HeaderGeometry.tabsToRule + HeaderGeometry.ruleHeight
             Rectangle {
                 objectName: "cosmos-c44-space-divider"
                 anchors.left: parent.left
@@ -216,6 +218,18 @@ Rectangle {
                 color: Colors.cyan
             }
         }
+        Item {
+            id: headerContentGap
+            width: parent.width
+            height: HeaderGeometry.ruleToContent
+        }
+        Column {
+            id: bodyContent
+            width: parent.width
+            height: Math.max(0, hubBody.height - mainHeader.height
+                - headerSpacer.height - viewRail.height
+                - dividerSlot.height - headerContentGap.height)
+            spacing: HeaderGeometry.ruleToContent
         Row {
             id: metrics
             objectName: "cosmos-c42-space-metrics"
@@ -278,11 +292,9 @@ Rectangle {
             objectName: "cosmos-c42-space-services"
             visible: spaceHub.viewMode !== "directory"
             width: parent.width
-            height: visible ? Math.max(1,hubBody.height
-                - mainHeader.height - headerSpacer.height
-                - viewRail.height - dividerSlot.height
+            height: visible ? Math.max(1,bodyContent.height
                 - metrics.height - serviceReport.height - footer.height
-                - 7*hubBody.spacing) : 0
+                - 3*bodyContent.spacing) : 0
             Column {
                 anchors.fill: parent
                 spacing: 2
@@ -424,10 +436,8 @@ Rectangle {
             objectName: "cosmos-c42-space-directory"
             visible: spaceHub.viewMode === "directory"
             width: parent.width
-            height: visible ? Math.max(1,hubBody.height
-                - mainHeader.height - headerSpacer.height
-                - viewRail.height - dividerSlot.height - footer.height
-                - 5*hubBody.spacing) : 0
+            height: visible ? Math.max(1,bodyContent.height
+                - footer.height - bodyContent.spacing) : 0
             Grid {
                 id: cardsGrid
                 anchors.fill: parent
@@ -492,6 +502,7 @@ Rectangle {
             font.pixelSize: 8
             color: Colors.cyan
             elide: Text.ElideRight
+        }
         }
     }
 }

@@ -1,0 +1,38 @@
+name: "Notification history capacity contracts"
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "services/notifications/NotificationsService.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "tests/notifications/test_notification_history_capacity.py"
+      - ".github/workflows/notification-history-capacity-contracts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/notifications/NotificationsService.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "tests/notifications/test_notification_history_capacity.py"
+      - ".github/workflows/notification-history-capacity-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  capacity:
+    name: Synthetic 1250-notification paging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify persistent retention and bounded list rebuilds
+        run: python3 tests/notifications/test_notification_history_capacity.py
+
+      - name: Preserve existing Notification Control Bay scroll speed
+        run: python3 tests/notifications/test_notification_scroll_speed.py
+
+      - name: Preserve popup dismiss and focus contracts
+        run: python3 tests/notifications/test_notification_popup_input_contracts.py

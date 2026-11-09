@@ -1,0 +1,33 @@
+name: TimeW MACHINE M2 custom checkpoint selection
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineCaptureSelectionV2.py"
+      - "services/time/MachineCaptureSaveV2.py"
+      - "tests/timew/test_machine_capture_selection_v2.py"
+      - "tests/timew/test_machine_capture_selection_v2_contract.py"
+      - "docs/timew-machine-m2-custom-selection.md"
+      - ".github/workflows/timew-machine-m2-selection.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  custom-capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Keep custom scope dormant and nonexecuting
+        run: python3 -B -I tests/timew/test_machine_capture_selection_v2_contract.py
+      - name: Verify customized and all-inclusive SAVE share one atomic transaction
+        run: python3 -B -I tests/timew/test_machine_capture_selection_v2.py
+      - name: Verify existing automatic save and v1/v2 storage regressions
+        run: |
+          python3 -B -I tests/timew/test_machine_capture_save_v2.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_checkpoint_store.py
+          python3 -B -I tests/timew/test_machine_geometry_v2.py
+          python3 -B -I tests/timew/test_machine_floating_con.py

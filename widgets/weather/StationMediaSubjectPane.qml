@@ -222,7 +222,10 @@ Rectangle {
                     // REPORTS is still the initial visible NEWS feed.
                     // The contextual C44 header now selects all six
                     // original NEWS categories on this same mounted hub.
-                    subjectRoute: "media/news/full"
+                    subjectRoute: "media/news/reports"
+                    // Preserve the existing focused REPORTS data route
+                    // while allowing NEWS filters in the overview C44 rail.
+                    overviewChannelFilters: true
                     section: "REPORTS"
                     embeddedHeader: true
                     runtimeNowMs: mediaPane.runtimeNowMs

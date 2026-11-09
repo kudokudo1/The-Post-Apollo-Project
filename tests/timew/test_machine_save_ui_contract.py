@@ -60,6 +60,18 @@ assert 'data.verification.legacy === true' in ui
 assert 'SAVED + VERIFIED // ' in ui
 assert 'SAVE MAY BE STORED // OPEN STORED TO CHECK' in ui
 assert 'SAVE OUTCOME UNKNOWN // CHECK STORED BEFORE RETRY' in ui
+assert 'machineVerifySelectedGeometry()' in ui
+assert 'label: "VERIFY SAVED GEOMETRY"' in ui or '"VERIFY SAVED GEOMETRY"' in ui
+assert 'machineGeometryVerifyStatus' in ui
+assert 'machineSaveBridgeAction === "verify"' in ui
+assert '"verify", machineGeometryVerifyId' in ui
+assert '"machine-stored-geometry-verification"' in ui
+assert '"geometry_verified"' in ui
+assert '"legacy_only"' in ui
+assert 'SAVED // GEOMETRY CHECK AVAILABLE IN STORED' in ui
+assert 'EXACT RESTORE + BRAVE TABS UNFINISHED' in ui
+assert "inspect_checkpoint" in bridge
+assert '"verify"' in bridge
 assert '_verified_receipt' in bridge
 assert '"readback_verified"' in bridge
 assert '"saved_unverified"' in bridge

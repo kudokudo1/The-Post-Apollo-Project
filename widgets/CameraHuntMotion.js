@@ -27,12 +27,29 @@ function speedForRound(gainPercent, every, round) {
 // the arena and tracks that aim. The beam enters the visible scene toward
 // the exact clicked location instead of launching from a fixed deck turret.
 function laserEntryPoint(cursorAimX) {
-    var x = clamp(Number(cursorAimX), 0, 1);
-    if (!Number.isFinite(x))
-        x = 0.5;
+    var requestedX = Number(cursorAimX);
+    var x = clamp(Number.isFinite(requestedX) ? requestedX : 0.5, 0, 1);
     return {
         x: clamp(x + (x <= 0.5 ? -0.085 : 0.085), 0.02, 0.98),
         y: 1.14
+    };
+}
+
+// Normalized, immutable beam geometry. The bolt begins BELOW the clipped
+// arena, crosses its bottom edge, and terminates at the exact cursor click.
+// The entryProgress gives a tiny flash at the edge, NOT a fixed deck gun.
+function laserTrajectory(cursorAimX, cursorAimY) {
+    var rawX = Number(cursorAimX);
+    var rawY = Number(cursorAimY);
+    var aimX = clamp(Number.isFinite(rawX) ? rawX : 0.5, 0, 1);
+    var aimY = clamp(Number.isFinite(rawY) ? rawY : 0.5, 0, 1);
+    var origin = laserEntryPoint(aimX);
+    var entryProgress = clamp((1 - origin.y) / (aimY - origin.y), 0, 1);
+    return {
+        originX: origin.x, originY: origin.y,
+        aimX: aimX, aimY: aimY,
+        entryX: clamp(origin.x + (aimX - origin.x) * entryProgress, 0, 1),
+        entryProgress: entryProgress
     };
 }
 

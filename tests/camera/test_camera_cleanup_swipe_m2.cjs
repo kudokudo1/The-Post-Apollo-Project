@@ -41,6 +41,7 @@ function createState() {
         swipeHistory:[],
         huntTargets:[],
         huntHistory:[],
+        huntSparedPaths:[],
         huntRound:0,
         huntTick:0,
         huntSecondsLeft:25,
@@ -958,11 +959,13 @@ test("Screen recordings remain visible but safe and cannot be fired into Hunt Tr
     assert.equal(s.huntShotSerial,0);
     assert.equal(s.huntKeepProtected(protectedTarget.path),true);
     assert.equal(s.batchPaths.length,0);
+    assert.deepEqual(Array.from(s.huntSparedPaths),[protectedTarget.path]);
     assert.equal(s.huntShots,0);
     assert.equal(s.huntHits,0);
     assert.equal(s.huntTargets.length,1);
     assert.equal(s.huntUndo(),true);
     assert.equal(s.huntTargets.length,2);
+    assert.equal(s.huntSparedPaths.length,0);
     assert.equal(s.batchPaths.length,0);
     assert.equal(s.huntKeepProtected(protectedTarget.path),true);
     const screenshot=s.huntTargets.find(x=>x.mediaType==="screenshot");
@@ -990,5 +993,47 @@ test("Shot effects do not mutate file records, and Undo clears laser and hit cue
     assert.equal(s.huntHitFlash,false);
     assert.equal(s.huntShotEffect,null);
     assert.equal(s.batchPaths.length,0);
+    assert.equal(s.called.length,0);
+});
+
+
+test("Spared screen recordings do not respawn in later rounds", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=[
+        {path:"/tmp/preserved-screen.mp4",name:"screen_001.mp4",
+         mediaType:"screen-video"},
+        {path:"/tmp/photo.png",name:"photo.png",mediaType:"other-image"},
+        {path:"/tmp/again.jpg",name:"again.jpg",mediaType:"other-image"}
+    ];
+    assert.equal(s.huntStartRound(),true);
+    const safe=s.huntTargets.find(t=>t.protected);
+    assert.equal(s.huntKeepProtected(safe.path),true);
+    assert.equal(s.huntTargets.some(t=>t.path===safe.path),false);
+    // Complete round without deleting screen media.
+    while(s.huntTargets.length)
+        s.huntFire(s.huntTargets[0].path);
+    assert.equal(s.huntAutoStartNext(),false);
+    assert.equal(s.huntTargets.length,0);
+    assert.equal(s.huntSparedPaths.includes(safe.path),true);
+    assert.equal(s.batchPaths.includes(safe.path),false);
+    assert.equal(s.called.length,0);
+});
+
+test("Time-out spares protected videos without queuing them for Trash", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=[
+        {path:"/tmp/safe-screen.mp4",name:"safe-screen.mp4",
+         mediaType:"screen-video"}
+    ];
+    assert.equal(s.huntStartRound(),true);
+    for(let i=0;i<250;i++)
+        s.huntAdvance();
+    assert.equal(s.huntRoundComplete,true);
+    assert.deepEqual(Array.from(s.huntSparedPaths),["/tmp/safe-screen.mp4"]);
+    assert.equal(s.batchPaths.length,0);
+    assert.equal(s.huntAutoStartNext(),false);
+    assert.equal(s.huntAutoPending,false);
     assert.equal(s.called.length,0);
 });

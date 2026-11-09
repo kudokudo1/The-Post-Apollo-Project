@@ -637,6 +637,8 @@ PanelWindow {
         property color activeColor: Colors.orange
 
         property int labelPixelSize: 11
+        // Only opt in for symbols missing from the pixel-font character map.
+        property string symbolFontFamily: ""
 
         signal triggered
 
@@ -699,6 +701,8 @@ PanelWindow {
 
             text: miniButton.label
 
+            font.family: miniButton.symbolFontFamily !== ""
+                ? miniButton.symbolFontFamily : "GohuFont 11 Nerd Font Mono"
             font.pixelSize: miniButton.labelPixelSize
 
             color: {
@@ -3564,17 +3568,20 @@ PanelWindow {
                                     }
                                 }
 
-                                // Permanent scoped intake refusal. The
-                                // standalone U+20E0 symbol is operator-chosen.
-                                // Existing history remains for UNBLOCK.
+                                // Permanent scoped intake refusal.
+                                // U+271E is a standalone glyph (unlike U+20E0);
+                                // render with symbol fallback rather than
+                                // relying on the Gohu pixel-font glyph set.
+                                // Active inherits MiniButton's yellow fill,
+                                // orange border/icon and orange text/frame glow.
                                 MiniButton {
                                     width: 28
                                     height: 28
-                                    label: "⃠"
+                                    label: "✞"
+                                    symbolFontFamily: "Noto Sans Symbols 2"
                                     labelPixelSize: 19
                                     active: notificationEntry.blocked
-                                    activeColor: Colors.red
-                                    danger: notificationEntry.selectedBlocked
+                                    activeColor: Colors.orange
                                     enabled: NotificationsService.policyReady
                                         && NotificationsService.policyStatus !== "parse-error"
                                         && NotificationsService.policyStatus !== "load-error"

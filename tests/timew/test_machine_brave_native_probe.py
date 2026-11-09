@@ -16,7 +16,7 @@ from MachineBraveNativeProbe import (
 
 HOST = ROOT / "services/time/MachineBraveNativeProbe.py"
 ORIGIN = "chrome-extension://" + "a" * 32 + "/"
-CHALLENGE = str(uuid.UUID(int=2048))
+CHALLENGE = str(uuid.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
 REQUEST = {
     "kind": "machine-brave-native-transport-request-v1",
     "challenge": CHALLENGE,

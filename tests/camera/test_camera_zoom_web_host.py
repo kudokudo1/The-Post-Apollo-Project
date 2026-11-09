@@ -90,7 +90,7 @@ class ZoomWebHostTests(unittest.TestCase):
     def test_zoom_browser_owns_scroll_and_the_footer_cannot_cover_buttons(self):
         self.assertIn('visible: camera.activeView !== "zoom"', QML)
         self.assertIn('height: frame.height - 169', QML)
-        self.assertIn('Zoom is hosted by the sibling zoomViewport instead.', QML)
+        self.assertIn('Cleanup now renders in Trash++; Zoom uses its native bay.', QML)
         self.assertNotIn('height: camera.activeView === "zoom" && camera.zoomWebDocked', QML)
         self.assertIn('visible: camera.activeView !== "zoom"', QML)
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebVisualHeld', QML)

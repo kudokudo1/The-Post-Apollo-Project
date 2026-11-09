@@ -91,6 +91,8 @@ function trashHarness(overrides={}) {
         activeMode:"trash",
         lifecycleModes:["cleanup","archive","trash","burn"],
         busy:false,
+        researchBusy:false,
+        researchBurnId:"",
         cameraCleanupBusy:false,
         confirmMode:"",
         cameraCleanupController:camera,

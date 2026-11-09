@@ -5,6 +5,7 @@ on:
     paths:
       - shell.qml
       - modules/Trash.qml
+      - widgets/CameraW.qml
       - modules/Power.qml
       - components/DockButton.qml
       - tests/trash/**
@@ -14,6 +15,7 @@ on:
     paths:
       - shell.qml
       - modules/Trash.qml
+      - widgets/CameraW.qml
       - modules/Power.qml
       - components/DockButton.qml
       - tests/trash/**
@@ -33,3 +35,5 @@ jobs:
           python-version: "3.x"
       - name: Verify Trash launcher, scoped GIO adapter, and deletion safeguards
         run: python3 -m unittest discover -s tests/trash -p 'test_*.py' -v
+      - name: Verify Camera Cleanup handoff preserves shared queue and authority
+        run: node --test tests/trash/test_camera_cleanup_handoff.cjs

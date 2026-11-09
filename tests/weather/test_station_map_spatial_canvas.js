@@ -106,7 +106,8 @@ assert.match(ui, /MapProjection\.plottable\(source \? source\.rows : \[\]\)/);
 assert.match(ui, /title: "SPATIAL PLOT \/\/ GDACS \+ USGS QUAKES \+ EONET \+ FIRMS \+ NEWS"/);
 assert.match(ui, /id: mapPlot/);
 assert.match(ui, /height: stationDiscovery\.earthPinnedMap\s*\? pinnedMapHost\.height : 270/);
-assert.match(ui, /parent: stationDiscovery\.earthPinnedMap\s*\? pinnedMapHost : mapCanvasSection/);
+assert.match(ui, /parent: mapCanvasSection/);
+assert.match(ui, /ParentChange\s*\{\s*target: mapPlot\s*parent: pinnedMapHost\s*x: 0\s*y: 0/);
 assert.equal((ui.match(/id: mapPlot\b/g)||[]).length,1,
     "one original mapPlot item reused by pinned EARTH and legacy scroll views");
 assert.match(ui, /id: mapPanArea/);

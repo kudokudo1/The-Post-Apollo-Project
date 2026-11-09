@@ -47,7 +47,7 @@ assert "timew.machineAdvancedOpen" in restore_pane
 assert "timew.machineSaveAdvancedOpen" not in restore_pane
 # Duplicate root properties are a QML loader fatal error, not just a style issue.
 root_properties = re.findall(
-    r"^    (?:readonly )?property\\s+\\w+\\s+(\\w+)\\s*[:=]",
+    r"^    (?:readonly )?property\s+\w+\s+(\w+)\s*[:=]",
     ui, flags=re.MULTILINE)
 assert root_properties, "Root QML properties unavailable"
 assert len(root_properties) == len(set(root_properties)), "Duplicate TimeW root property"

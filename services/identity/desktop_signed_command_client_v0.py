@@ -49,10 +49,14 @@ class SignedIdentityCommandClient:
     def __init__(self, *, socket_path: Path,
                  pinned_host_public_key: Ed25519PublicKey,
                  trusted_server_peer: Callable[[KernelPeer], bool],
-                 active_seat: Callable[[], bool]) -> None:
+                 active_seat: Callable[[], bool],
+                 enrolled_origin_consistent: Callable[[KernelPeer], bool] | None = None
+                 ) -> None:
         if (not isinstance(socket_path, Path) or not socket_path.is_absolute()
                 or not isinstance(pinned_host_public_key, Ed25519PublicKey)
-                or not callable(trusted_server_peer) or not callable(active_seat)):
+                or not callable(trusted_server_peer) or not callable(active_seat)
+                or (enrolled_origin_consistent is not None
+                    and not callable(enrolled_origin_consistent))):
             raise ValueError("Pinned host key, absolute path and owner trust guards required")
         if len(os.fsencode(str(socket_path))) > 100:
             raise ValueError("Unix command socket path too long")
@@ -60,6 +64,9 @@ class SignedIdentityCommandClient:
         self._key = pinned_host_public_key
         self._verify_server = trusted_server_peer
         self._active_seat = active_seat
+        # Optional ADDITIONAL independently enrolled process corroboration.
+        # Never replaces trusted_server_peer, seat, or pinned signature key.
+        self._enrolled_origin = enrolled_origin_consistent
         self._instance: str | None = None
         self._sequence = 0
         self._request_id: str | None = None
@@ -95,7 +102,9 @@ class SignedIdentityCommandClient:
         try:
             return (peer.uid == os.geteuid()
                     and self._active_seat() is True
-                    and self._verify_server(peer) is True)
+                    and self._verify_server(peer) is True
+                    and (self._enrolled_origin is None
+                         or self._enrolled_origin(peer) is True))
         except Exception:
             return False
 

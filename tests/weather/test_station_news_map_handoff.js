@@ -50,7 +50,7 @@ const earthPane = read("widgets/weather/StationEarthSubjectPane.qml");
 assert.match(navigator,/property var newsMentionOverlay: null/);
 assert.match(navigator,/function showNewsMentionsOnEarth\(payload\)/);
 assert.match(navigator,/MapProjection\.plottable\(payload\.locations\)/);
-assert.match(navigator,/chooseRoute\("earth\/maps\/overview"\)/);
+assert.match(navigator,/chooseRoute\("earth\/maps\/events"\)/);
 assert.match(navigator,/newsMentionOverlay = incoming/);
 assert.match(navigator,/function clearNewsMentions\(\)/);
 assert.match(earthPane,/newsMentionOverlay: earthPane\.newsMentionOverlay/);

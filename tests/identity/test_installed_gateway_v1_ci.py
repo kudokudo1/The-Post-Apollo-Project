@@ -13,6 +13,7 @@ key enrollment, production login, or test-fixture promotion is permitted.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path
 import pwd
@@ -369,6 +370,62 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
             self.assertFalse(self.witness.consistent(self.peer))
         finally:
             _run("sudo", "-n", "chmod", "0555", target)
+        self.assertTrue(self.witness.consistent(self.peer))
+
+    def test_d_installed_python_module_replacement_and_symlink_refused(self):
+        # A real module changed *after* the supervised Python process loaded
+        # it still invalidates the signed installed release evidence.
+        target = PREFIX + "desktop_context_projection_v0.py"
+        original = self.path / "original-module.py"
+        corrupted = self.path / "altered-module.py"
+        shutil.copyfile(target, original)
+        corrupted.write_bytes(original.read_bytes() + b"\n# altered after install\n")
+        try:
+            _run("sudo", "-n", "install", "-o", "root", "-g", "root",
+                 "-m", "0555", str(corrupted), target)
+            self.assertFalse(self.witness.consistent(self.peer))
+        finally:
+            _run("sudo", "-n", "install", "-o", "root", "-g", "root",
+                 "-m", "0555", str(original), target)
+        self.assertTrue(self.witness.consistent(self.peer))
+        # Existing dpkg pathname is not enough: a symlink must be refused.
+        relocated = PREFIX + "ci-module-temporary-backup"
+        try:
+            _run("sudo", "-n", "mv", target, relocated)
+            _run("sudo", "-n", "ln", "-s", relocated, target)
+            self.assertFalse(self.witness.consistent(self.peer))
+        finally:
+            subprocess.run(["sudo", "-n", "rm", "-f", target],
+                           check=True, capture_output=True, text=True)
+            _run("sudo", "-n", "mv", relocated, target)
+        self.assertTrue(self.witness.consistent(self.peer))
+
+    def test_e_signed_policy_wrong_module_and_unit_identity_refused(self):
+        def witness_signed(policy):
+            raw = installed_canonical(policy)
+            return InstalledGatewayWitness(
+                signed_release=raw,
+                release_signature=self.root.sign(DOMAIN + raw),
+                pinned_release_root=self.root.public_key(),
+                minimum_epoch=2, minimum_sequence=7,
+                expected_pid=self.pid, expected_start_ticks=self.ticks,
+                expected_uid=self.uid, expected_gid=self.gid,
+                expected_cgroup=self.cgroup, expected_lsm=self.lsm,
+                expected_receipt_key_sha256=_key_digest(self.signer),
+                expected_package_file=self.deb)
+        base = json.loads(self.release)
+        mutated = dict(base)
+        mutated["files"] = dict(base["files"])
+        mutated["files"][PREFIX + "desktop_context_projection_v0.py"] = "f"*64
+        self.assertFalse(witness_signed(mutated).consistent(self.peer))
+        mutated = dict(base, unit="post-apollo-identity-ci-not-running.service")
+        self.assertFalse(witness_signed(mutated).consistent(self.peer))
+        mutated = dict(base, epoch=1)
+        with self.assertRaises(WitnessRefused):
+            witness_signed(mutated)
+        mutated = dict(base, role="post-apollo.connections.status-host.v1")
+        with self.assertRaises(WitnessRefused):
+            witness_signed(mutated)
         self.assertTrue(self.witness.consistent(self.peer))
 
     def test_z_restart_and_receipt_key_rotation_require_new_enrollment(self):

@@ -48,7 +48,7 @@ test("M2 MEDIA overview/watch/creators keep global nav; SERVICES uses its own he
     assert.match(header,/activeMode === "services" \? servicesSections/);
     assert.match(header,/mediaHeader\.servicesModeRequested\(modelData\.id\)/);
     assert.match(media,/loadedServices\.viewMode=mode/);
-    assert.match(media,/StationMediaServicesPane\\s*\\{/);
+    assert.ok(media.includes("StationMediaServicesPane {"));
     assert.match(media,/embeddedHeader: true/);
     assert.match(services,/property bool embeddedHeader: false/);
     assert.match(services,/visible: !services\.embeddedHeader/);

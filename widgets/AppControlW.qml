@@ -8615,6 +8615,22 @@ PanelWindow {
         Qt.callLater(function(){ appControlWindow.tryResumeFavoriteSelection(); });
         return true; // The destination is OPEN, even if the item is missing.
     }
+    // QML JsonAdapter uses property list<string>, NOT a native JS Array.
+    // The policy's Array.isArray validation is correct for its input, but
+    // passing the QML list directly always fails the type contract. Copy
+    // this read-only snapshot into a plain JS Array at the owning boundary.
+    function originalFavoriteKeysForSelection() {
+        const source=favoriteStore.favoriteKeys;
+        if(!source || typeof source.length!=="number"
+                || !Number.isInteger(source.length)
+                || source.length<0 || source.length>4096)
+            return [];
+        const keys=[];
+        for(let i=0;i<source.length;i++)
+            keys.push(source[i]);
+        return keys;
+    }
+
     function tryResumeFavoriteSelection() {
         const p=pendingFavoriteSelection;
         if(!p || !menuOpen || selectedModeIndex!==p.mode) return false;
@@ -8622,14 +8638,14 @@ PanelWindow {
         if(p.kind==="app") {
             const installed=[...DesktopEntries.applications.values];
             if(!AppFavoriteSelection.ownerAllows(
-                    p.value,favoriteStore.favoriteKeys,installed)) return false;
+                    p.value,originalFavoriteKeysForSelection(),installed)) return false;
             index=AppFavoriteSelection.selectedIndex(
                 p.value,[...filteredApps.values]);
             if(index<0) return false;
             rememberedAppKey=p.value;
         } else if(p.kind==="system") {
             if(!SystemFavoriteSelection.ownerAllows(
-                    p.value,favoriteStore.favoriteKeys,systemRows))
+                    p.value,originalFavoriteKeysForSelection(),systemRows))
                 return false;
             index=SystemFavoriteSelection.selectedIndex(
                 p.value,[...systemResults.values]);
@@ -8670,13 +8686,13 @@ PanelWindow {
         searchInput.text="";
         const installed=[...DesktopEntries.applications.values];
         if (!AppFavoriteSelection.ownerAllows(
-                desktopId,favoriteStore.favoriteKeys,installed))
+                desktopId,originalFavoriteKeysForSelection(),installed))
             return deferFavoriteSelection("app",desktopId,appsModeIndex,
                 "SAVED APP NOT FOUND IN CURRENT INVENTORY // APPS IS OPEN");
         const index=AppFavoriteSelection.selectedIndex(
             desktopId,[...filteredApps.values]);
         if(index<0 || !AppFavoriteSelection.ownerAllows(
-                desktopId,favoriteStore.favoriteKeys,
+                desktopId,originalFavoriteKeysForSelection(),
                 [...DesktopEntries.applications.values]))
             return deferFavoriteSelection("app",desktopId,appsModeIndex,
                 "SAVED APP NOT AVAILABLE IN APPS LIST // APPS IS OPEN");
@@ -8690,7 +8706,7 @@ PanelWindow {
             if (!menuOpen || selectedModeIndex!==appsModeIndex
                     || rememberedAppKey!==desktopId
                     || !AppFavoriteSelection.ownerAllows(
-                        desktopId,favoriteStore.favoriteKeys,
+                        desktopId,originalFavoriteKeysForSelection(),
                         [...DesktopEntries.applications.values]))
                 return;
             const now=AppFavoriteSelection.selectedIndex(
@@ -8711,13 +8727,13 @@ PanelWindow {
         searchInput.text="";
         const snapshot=Array.isArray(systemRows) ? systemRows.slice() : [];
         if(!SystemFavoriteSelection.ownerAllows(
-                metric,favoriteStore.favoriteKeys,snapshot))
+                metric,originalFavoriteKeysForSelection(),snapshot))
             return deferFavoriteSelection("system",metric,systemModeIndex,
                 "SAVED SYSTEM READING NOT FOUND // SYSTEM IS OPEN");
         const index=SystemFavoriteSelection.selectedIndex(
             metric,[...systemResults.values]);
         if(index<0 || !SystemFavoriteSelection.ownerAllows(
-                metric,favoriteStore.favoriteKeys,systemRows))
+                metric,originalFavoriteKeysForSelection(),systemRows))
             return deferFavoriteSelection("system",metric,systemModeIndex,
                 "SAVED SYSTEM READING UNAVAILABLE // SYSTEM IS OPEN");
         clearFavoriteNavigation();
@@ -8728,7 +8744,7 @@ PanelWindow {
         Qt.callLater(function() {
             if(!menuOpen || selectedModeIndex!==systemModeIndex
                     || !SystemFavoriteSelection.ownerAllows(
-                        metric,favoriteStore.favoriteKeys,systemRows))
+                        metric,originalFavoriteKeysForSelection(),systemRows))
                 return;
             const now=SystemFavoriteSelection.selectedIndex(
                 metric,[...systemResults.values]);

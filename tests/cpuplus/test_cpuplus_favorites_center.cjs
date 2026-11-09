@@ -1933,6 +1933,8 @@ test("U9b sticky middle place search scrolls matches but never scrolls its query
   assert.match(middle,/height: implicitHeight/);
   assert.match(middle,/anchors\.top: placeSearchPanel\.bottom/);
   assert.match(middle,/id: selectedPlacesScroll/);
+  assert.match(middle,/y: selectedPlacesScroll\.y/);
+  assert.match(middle,/height: selectedPlacesScroll\.height/);
   assert.match(middle,/onUseForHome: function\(candidate\)/);
   assert.match(middle,/onUseForExplore: function\(candidate\)/);
   assert.match(search,/property bool compactPinned: false/);

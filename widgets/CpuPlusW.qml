@@ -1558,12 +1558,35 @@ PanelWindow {
             }
         }
 
+        // SETTINGS → CONNECTIONS now uses the previously empty upper-left
+        // identity region. The line and SHARED // STATUS section stay below.
+        // Thermal/System continue to use selectedMonitorIdentity unchanged.
+        CpuPlusUniversalSignInHeaderPane {
+            id: universalSignInUpperPane
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+            height: visible ? implicitHeight : 0
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedHeaderLine.bottom
+            anchors.topMargin: visible ? 6 : 0
+            onIdManagementRequested: {
+                if (cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 6
+                        && cpuPlusWindow.settingsSubMode === "CONNECTIONS") {
+                    cpuPlusWindow.selectMode(5);
+                    cpuPlusWindow.selectLocalManagementSection("IDS");
+                }
+            }
+        }
+
         Item {
             id: sharedStateHeader
 
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: selectedMonitorIdentity.bottom
+            anchors.top: universalSignInUpperPane.visible
+                         ? universalSignInUpperPane.bottom
+                         : selectedMonitorIdentity.bottom
 
             anchors.leftMargin: 8
             anchors.rightMargin: 8
@@ -1714,13 +1737,6 @@ PanelWindow {
             id: settingsConnectionsOverview
             visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
-            onIdManagementRequested: {
-                if (cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 6
-                        && cpuPlusWindow.settingsSubMode === "CONNECTIONS") {
-                    cpuPlusWindow.selectMode(5);
-                    cpuPlusWindow.selectLocalManagementSection("IDS");
-                }
-            }
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom

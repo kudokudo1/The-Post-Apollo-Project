@@ -364,8 +364,7 @@ Rectangle {
         anchors.rightMargin: 8
         anchors.topMargin: 2
         spacing: 3
-        visible: stationRadio.sectionVisible("search")
-            && !stationRadio.compactOverview
+        visible: !stationRadio.compactOverview
         height: visible ? implicitHeight : 0
             Row {
             visible: stationRadio.sectionVisible("search")

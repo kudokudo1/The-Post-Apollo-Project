@@ -145,7 +145,7 @@ Item {
                 onAccepted: meaning.requestSource()
             }
 
-            ActionButton {
+            AngelActionButton {
                 id: sourceButton
                 width: 116
                 height: parent.height
@@ -156,7 +156,7 @@ Item {
                 available: meaning.sourceEligible && !sourceProcess.running
                 onLeftClicked: meaning.requestSource()
             }
-            ActionButton {
+            AngelActionButton {
                 id: favoriteNumberButton
                 width: 34
                 height: parent.height
@@ -166,7 +166,9 @@ Item {
                 readonly property string favoriteKey:
                     Journal.favoriteKey(meaning.digits)
                 selected: FavoritesDefaultStore.isFavorite(favoriteKey)
-                selectedFillColor: Colors.black
+                // A favorited number is the one deliberate filled control.
+                selectedFillColor: Qt.rgba(Colors.magenta.r, Colors.magenta.g,
+                                           Colors.magenta.b, 0.28)
                 selectedForegroundColor: Colors.magenta
                 selectedBorderColor: Colors.magenta
                 accentColor: selected ? Colors.magenta : Colors.white

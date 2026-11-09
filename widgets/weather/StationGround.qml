@@ -794,7 +794,7 @@ Rectangle {
         Column {
             visible: ground.sectionVisible("alerts")
             width: parent.width
-            spacing: 8
+            spacing: ground.compactEarthEnvironment ? 3 : 8
 
             Row {
                 width: parent.width
@@ -861,13 +861,14 @@ Rectangle {
             }
 
             Repeater {
-                model: ground.officialAlerts
+                model: ground.compactEarthEnvironment
+                    ? ground.officialAlerts.slice(0, 2) : ground.officialAlerts
 
                 delegate: Rectangle {
                     required property var modelData
 
                     width: groundContent.width
-                    height: 126
+                    height: ground.compactEarthEnvironment ? 54 : 126
                     color: Colors.dark
                     border.width: 1
                     border.color: modelData.listingState === "RECHECK PENDING"
@@ -876,8 +877,8 @@ Rectangle {
 
                     Column {
                         anchors.fill: parent
-                        anchors.margins: 9
-                        spacing: 4
+                        anchors.margins: ground.compactEarthEnvironment ? 5 : 9
+                        spacing: ground.compactEarthEnvironment ? 2 : 4
 
                         Row {
                             width: parent.width
@@ -921,6 +922,7 @@ Rectangle {
 
                         QuietText {
                             width: parent.width
+                            visible: !ground.compactEarthEnvironment
                             text: "AREA // " + (modelData.area || "NOT PROVIDED")
                                   + " // CERTAINTY "
                                   + String(modelData.certainty || "UNKNOWN").toUpperCase()
@@ -937,6 +939,7 @@ Rectangle {
 
                         QuietText {
                             width: parent.width
+                            visible: !ground.compactEarthEnvironment
                             text: "ISSUER // " + (modelData.issuer || "NWS")
                                   + " // OFFICIAL API PRODUCT, NOT FORECAST INFERENCE"
                             elide: Text.ElideRight
@@ -945,6 +948,15 @@ Rectangle {
                     }
                 }
             }
+        }
+
+        QuietText {
+            visible: ground.compactEarthEnvironment && ground.officialAlerts.length > 2
+            width: parent.width
+            text: "SHOWING 2 OF " + ground.officialAlerts.length
+                + " ALERTS // MORE: WEATHER / HAZARDS / ALERTS"
+            font.pixelSize: 10
+            color: Colors.yellow
         }
 
         StationSectionDivider {
@@ -2831,7 +2843,7 @@ Rectangle {
 
             Rectangle {
                 width: 360
-                height: 112
+                height: ground.compactEarthEnvironment ? 82 : 112
                 color: Colors.dark
                 border.width: 1
                 border.color: ground.heatBandColor(
@@ -2840,8 +2852,8 @@ Rectangle {
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 9
-                    spacing: 5
+                    anchors.margins: ground.compactEarthEnvironment ? 5 : 9
+                    spacing: ground.compactEarthEnvironment ? 2 : 5
 
                     SecondaryText {
                         text: "NWS HEAT INDEX // SHADE"
@@ -2898,7 +2910,7 @@ Rectangle {
 
             Rectangle {
                 width: Math.max(0, parent.width - 372)
-                height: 112
+                height: ground.compactEarthEnvironment ? 82 : 112
                 color: Colors.dark
                 border.width: 1
                 border.color: ground.fireWeatherAlertRows.length > 0
@@ -2906,8 +2918,8 @@ Rectangle {
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 9
-                    spacing: 5
+                    anchors.margins: ground.compactEarthEnvironment ? 5 : 9
+                    spacing: ground.compactEarthEnvironment ? 2 : 5
 
                     SecondaryText {
                         text: "FIRE WEATHER // OFFICIAL + LOCAL OBS"
@@ -2960,19 +2972,19 @@ Rectangle {
             visible: ground.sectionVisible("heat-fire") && (ground.fireWeatherAlertRows.length > 0)
 
             Repeater {
-                model: ground.fireWeatherAlertRows.slice(0, 3)
+                model: ground.fireWeatherAlertRows.slice(0, ground.compactEarthEnvironment ? 1 : 3)
 
                 delegate: Rectangle {
                     required property var modelData
                     width: parent.width
-                    height: 58
+                    height: ground.compactEarthEnvironment ? 40 : 58
                     color: Colors.dark
                     border.width: 1
                     border.color: Colors.red
 
                     Column {
                         anchors.fill: parent
-                        anchors.margins: 7
+                        anchors.margins: ground.compactEarthEnvironment ? 4 : 7
                         spacing: 3
 
                         GohuText {
@@ -3525,15 +3537,15 @@ Rectangle {
                         required property var modelData
                         width: Math.max(0, (seismicEventRow.width
                                             - 2 * seismicEventRow.spacing) / 3)
-                        height: 112
+                        height: ground.compactEarthEnvironment ? 78 : 112
                         color: Colors.dark
                         border.width: 1
                         border.color: Colors.cyan
 
                         Column {
                             anchors.fill: parent
-                            anchors.margins: 8
-                            spacing: 4
+                            anchors.margins: ground.compactEarthEnvironment ? 5 : 8
+                            spacing: ground.compactEarthEnvironment ? 2 : 4
 
                             Row {
                                 width: parent.width
@@ -3541,7 +3553,7 @@ Rectangle {
 
                                 GohuText {
                                     text: "M " + modelData.magnitude.toFixed(1)
-                                    font.pixelSize: 23
+                                    font.pixelSize: ground.compactEarthEnvironment ? 20 : 23
                                     color: Colors.green
                                 }
 

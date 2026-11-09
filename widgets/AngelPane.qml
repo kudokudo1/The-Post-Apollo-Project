@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import Quickshell
 import qs.services.time
+import qs.services.favorites
 import "../components"
 import "../services/time/AngelObservationPolicy.js" as AngelPolicy
 
@@ -12,18 +13,20 @@ Item {
     property double currentEpochMs: 0
     property string selectedId: ""
     property string pendingDeleteId: ""
+    property string editingNoteId: ""
     property string activeFilter: "all"
     property string activeView: "journal"
     property string meaningSelection: ""
     readonly property bool editingText:
         manualDigitsInput.activeFocus || angelSearchInput.activeFocus
-        || angelMeaningPane.editingText
+        || noteField.activeFocus || angelMeaningPane.editingText
     readonly property var clockCandidate:
         AngelPolicy.clockCapture(
             TimeSettings.adjustedEpochMs(currentEpochMs))
     readonly property var filteredRows:
         AngelPolicy.filter(AngelObservationsStore.observations,
-                           angelSearchInput.text, activeFilter)
+                           angelSearchInput.text, activeFilter,
+                           FavoritesDefaultStore.favoriteKeys)
     readonly property var selectedObservation:
         AngelObservationsStore.observations.find(function(row) {
             return row.id === pane.selectedId;
@@ -36,6 +39,9 @@ Item {
         {key: "sequence", label: "SEQ"},
         {key: "add", label: "ADD"},
         {key: "subtract", label: "SUB"},
+        {key: "multiply", label: "MUL"},
+        {key: "divide", label: "DIV"},
+        {key: "favorite", label: "FAV"},
         {key: "other", label: "OTHER"},
         {key: "err", label: "ERR"}
     ]
@@ -69,6 +75,29 @@ Item {
                 displayCalibrationMs: TimeSettings.displayOffsetMs,
                 captureMode: mode
             }, observedAtMs);
+    }
+
+    function editObservationNote(row) {
+        if (!row)
+            return;
+        pane.selectedId = row.id;
+        pane.pendingDeleteId = "";
+        pane.editingNoteId = row.id;
+        noteField.text = String(row.note || "");
+        noteField.forceActiveFocus();
+    }
+
+    function closeNoteEditor() {
+        pane.editingNoteId = "";
+        noteField.focus = false;
+    }
+
+    function saveNote() {
+        if (pane.editingNoteId === "" || !AngelObservationsStore.writable)
+            return;
+        if (AngelObservationsStore.saveObservationNote(
+                    pane.editingNoteId, noteField.text))
+            closeNoteEditor();
     }
 
     function recordClock() {
@@ -249,12 +278,25 @@ Item {
             opacity: 0.6
         }
 
-        GohuText {
+        Row {
             width: parent.width
-            text: "HISTORY // " + pane.filteredRows.length
-                  + " SHOWN / " + AngelObservationsStore.total + " SAVED"
-            font.pixelSize: 12
-            color: Colors.white
+            height: 18
+            spacing: 4
+            GohuText {
+                text: "HISTORY // " + pane.filteredRows.length
+                font.pixelSize: 12
+                color: Colors.magenta
+            }
+            GohuText {
+                text: "SHOWN //"
+                font.pixelSize: 12
+                color: Colors.white
+            }
+            GohuText {
+                text: AngelObservationsStore.total + " SAVED"
+                font.pixelSize: 12
+                color: Colors.orange
+            }
         }
 
         TextField {
@@ -343,7 +385,8 @@ Item {
         Item {
             id: angelHistoryArea
             width: parent.width
-            height: Math.max(96, angelJournalView.height - 325)
+            height: Math.max(96, angelJournalView.height - 325
+                                 - (noteEditor.visible ? 40 : 0))
 
             ListView {
                 id: angelHistoryList
@@ -357,44 +400,83 @@ Item {
                 interactive: contentHeight > height
                 model: pane.filteredRows
 
-                delegate: ActionButton {
-                    readonly property bool isMarkedErr:
-                        modelData.errMarked === true
+                delegate: Item {
+                    id: observationEntry
+                    readonly property bool isMarkedErr: modelData.errMarked === true
+                    readonly property string numberKey:
+                        AngelPolicy.favoriteKey(modelData.digits)
+                    readonly property bool isFavoriteNumber:
+                        FavoritesDefaultStore.isFavorite(numberKey)
                     width: angelHistoryList.width
-                    // Two compact lines preserve pattern information while
-                    // making the recorded calendar date easy to scan.
                     height: 47
-                    label: (isMarkedErr ? "ERR* // " : "")
-                           + modelData.digits + " // "
-                           + AngelPolicy.patternTags(modelData.digits).join("+")
-                           + "\nDATE // " + AngelPolicy.observedDate(modelData)
-                           + " // " + modelData.displayTime
-                    labelPixelSize: 10
-                    labelHorizontalAlignment: Text.AlignLeft
-                    contentPadding: 5
-                    trackLabelGlowLocally: true
-                    // Only an explicit per-observation ERR mark turns a row
-                    // red. Unmatched OTHER rows remain white, even in ERR.
-                    accentColor: isMarkedErr ? Colors.red : Colors.white
-                    hoverFillColor: isMarkedErr ? Colors.black : Colors.yellow
-                    hoverForegroundColor: isMarkedErr ? Colors.red : Colors.orange
-                    hoverBorderColor: isMarkedErr ? Colors.red : Colors.orange
-                    hoverContentGlowColor: isMarkedErr ? Colors.red : Colors.orange
-                    hoverSoftGlowColor: isMarkedErr ? Colors.red : Colors.orange
-                    pressedFillColor: isMarkedErr ? Colors.red : Colors.magenta
-                    pressedForegroundColor: isMarkedErr ? Colors.white : Colors.black
-                    pressedBorderColor: isMarkedErr ? Colors.red : Colors.magenta
-                    pressedContentGlowColor: isMarkedErr ? Colors.red : Colors.black
-                    pressedSoftGlowColor: isMarkedErr ? Colors.red : Colors.orange
-                    selected: pane.selectedId === modelData.id
-                    selectedFillColor: isMarkedErr ? Colors.red : Colors.yellow
-                    selectedForegroundColor: isMarkedErr ? Colors.white : Colors.magenta
-                    selectedBorderColor: isMarkedErr ? Colors.red : Colors.magenta
-                    selectedContentGlowColor: isMarkedErr ? Colors.red : Colors.magenta
-                    selectedSoftGlowColor: isMarkedErr ? Colors.red : Colors.magenta
-                    onLeftClicked: {
-                        pane.selectedId = modelData.id;
-                        pane.pendingDeleteId = "";
+
+                    ActionButton {
+                        id: observationSelect
+                        width: Math.max(0, parent.width - 68)
+                        height: parent.height
+                        label: (observationEntry.isMarkedErr ? "ERR* // " : "")
+                               + modelData.digits + " // "
+                               + AngelPolicy.patternTags(modelData.digits).join("+")
+                               + "\nDATE // " + AngelPolicy.observedDate(modelData)
+                               + " // " + modelData.displayTime
+                        labelPixelSize: 10
+                        labelHorizontalAlignment: Text.AlignLeft
+                        contentPadding: 5
+                        trackLabelGlowLocally: true
+                        accentColor: observationEntry.isMarkedErr ? Colors.red
+                            : observationEntry.isFavoriteNumber ? Colors.magenta
+                            : Colors.white
+                        hoverFillColor: observationEntry.isMarkedErr ? Colors.black : Colors.yellow
+                        hoverForegroundColor: observationEntry.isMarkedErr ? Colors.red : Colors.orange
+                        hoverBorderColor: observationEntry.isMarkedErr ? Colors.red : Colors.orange
+                        hoverContentGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.orange
+                        hoverSoftGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.orange
+                        pressedFillColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta
+                        pressedForegroundColor: observationEntry.isMarkedErr ? Colors.white : Colors.black
+                        pressedBorderColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta
+                        pressedContentGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.black
+                        pressedSoftGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.orange
+                        selected: pane.selectedId === modelData.id
+                        selectedFillColor: observationEntry.isMarkedErr ? Colors.red : Colors.yellow
+                        selectedForegroundColor: observationEntry.isMarkedErr ? Colors.white : Colors.magenta
+                        selectedBorderColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta
+                        selectedContentGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta
+                        selectedSoftGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta
+                        onLeftClicked: {
+                            pane.selectedId = modelData.id;
+                            pane.pendingDeleteId = "";
+                        }
+                    }
+                    ActionButton {
+                        id: favoriteObservation
+                        x: observationSelect.width + 4
+                        width: 30
+                        height: parent.height
+                        label: "★"
+                        labelPixelSize: 13
+                        contentPadding: 2
+                        accentColor: observationEntry.isFavoriteNumber
+                                     ? Colors.magenta : Colors.white
+                        selected: observationEntry.isFavoriteNumber
+                        selectedFillColor: Colors.black
+                        selectedForegroundColor: Colors.magenta
+                        selectedBorderColor: Colors.magenta
+                        available: FavoritesDefaultStore.canEdit
+                        onLeftClicked: FavoritesDefaultStore.toggleFavorite(
+                                           observationEntry.numberKey)
+                    }
+                    ActionButton {
+                        id: noteObservation
+                        x: favoriteObservation.x + favoriteObservation.width + 4
+                        width: 30
+                        height: parent.height
+                        label: "+"
+                        labelPixelSize: 14
+                        contentPadding: 2
+                        accentColor: modelData.note ? Colors.orange : Colors.cyan
+                        selected: pane.editingNoteId === modelData.id
+                        available: AngelObservationsStore.writable
+                        onLeftClicked: pane.editObservationNote(modelData)
                     }
                 }
             }
@@ -426,6 +508,61 @@ Item {
                 text: AngelObservationsStore.total === 0
                       ? "NO OBSERVATIONS // RECORD ONE"
                       : "NO MATCHES // CHANGE SEARCH OR FILTER"
+            }
+        }
+
+        Row {
+            id: noteEditor
+            width: parent.width
+            height: visible ? 33 : 0
+            visible: pane.editingNoteId !== ""
+            spacing: 5
+
+            TextField {
+                id: noteField
+                width: Math.max(0, parent.width - saveNoteButton.width
+                                - cancelNoteButton.width - parent.spacing * 2)
+                height: parent.height
+                placeholderText: "NOTE FOR SELECTED SIGHTING"
+                placeholderTextColor: Colors.cyan
+                color: Colors.magenta
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.black
+                font.family: "GohuFont 11 Nerd Font Mono"
+                font.pixelSize: 11
+                maximumLength: AngelPolicy.MAX_NOTE_LENGTH
+                selectByMouse: true
+                background: Rectangle {
+                    color: Colors.black
+                    border.width: 1
+                    border.color: noteField.activeFocus ? Colors.magenta : Colors.cyan
+                }
+                onAccepted: pane.saveNote()
+                Keys.onPressed: function(event) {
+                    if (event.key === Qt.Key_Escape) {
+                        pane.closeNoteEditor();
+                        event.accepted = true;
+                    }
+                }
+            }
+            ActionButton {
+                id: saveNoteButton
+                width: 54
+                height: parent.height
+                label: "SAVE"
+                labelPixelSize: 9
+                accentColor: Colors.orange
+                available: AngelObservationsStore.writable
+                onLeftClicked: pane.saveNote()
+            }
+            ActionButton {
+                id: cancelNoteButton
+                width: 60
+                height: parent.height
+                label: "CANCEL"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                onLeftClicked: pane.closeNoteEditor()
             }
         }
 
@@ -471,13 +608,14 @@ Item {
                        && pane.selectedObservation.errMarked === true
                        ? "CLEAR ERR" : "MARK ERR"
                 labelPixelSize: 9
-                accentColor: Colors.yellow
+                accentColor: Colors.red
                 trackLabelGlowLocally: true
+                destructive: true
                 selected: pane.selectedObservation !== null
                           && pane.selectedObservation.errMarked === true
-                selectedFillColor: Colors.yellow
-                selectedForegroundColor: Colors.magenta
-                selectedBorderColor: Colors.magenta
+                selectedFillColor: Colors.red
+                selectedForegroundColor: Colors.white
+                selectedBorderColor: Colors.red
                 available: pane.selectedObservation !== null
                            && AngelObservationsStore.writable
                 onLeftClicked: {

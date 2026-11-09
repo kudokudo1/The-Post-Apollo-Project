@@ -2,6 +2,7 @@
 """TimeW SAVE UI source contract: primary SAVE has no preview prerequisite."""
 from pathlib import Path
 import ast
+import re
 
 root = Path(__file__).resolve().parents[2]
 ui = (root / "widgets/TimeW.qml").read_text()
@@ -16,7 +17,7 @@ for value in (
     'machineRequestFullSave()', 'machineRequestCustomInspect()',
     'machineRequestCustomSave()', 'machineCustomReview',
     'machineCustomExcluded', 'machineCustomValidation',
-    'machineCustomOpen', 'machineAdvancedOpen',
+    'machineCustomOpen', 'machineSaveAdvancedOpen', 'machineAdvancedOpen',
     'label: "SAVE DESKTOP"', 'label: "SAVE SELECTED DESKTOP"',
     'text: "LOCAL CLOCK // " + timew.clockReadoutText',
     'onLeftClicked: timew.machineRequestFullSave()',
@@ -34,7 +35,24 @@ for value in (
     else:
         assert value in ui, value
 assert 'id: machineLegacyControls' in ui
+assert 'visible: timew.machineSaveAdvancedOpen' in ui
 assert 'visible: timew.machineAdvancedOpen' in ui
+# SAVE's ADVANCED must not toggle the existing RESTORE DETAILS state.
+save_pane = ui.split("id: machineCaptureViewport", 1)[1].split(
+    "id: machineStoredViewport", 1)[0]
+restore_pane = ui.split("id: machineStoredViewport", 1)[1]
+assert "timew.machineSaveAdvancedOpen" in save_pane
+assert "timew.machineAdvancedOpen" not in save_pane
+assert "timew.machineAdvancedOpen" in restore_pane
+assert "timew.machineSaveAdvancedOpen" not in restore_pane
+# Duplicate root properties are a QML loader fatal error, not just a style issue.
+root_properties = re.findall(
+    r"^    (?:readonly )?property\s+\w+\s+(\w+)\s*[:=]",
+    ui, flags=re.MULTILINE)
+assert root_properties, "Root QML properties unavailable"
+assert len(root_properties) == len(set(root_properties)), "Duplicate TimeW root property"
+assert root_properties.count("machineAdvancedOpen") == 1
+assert root_properties.count("machineSaveAdvancedOpen") == 1
 assert 'machineSaveBridgePayload + String.fromCharCode(10)' in ui
 assert 'review: null, selection: null' in ui
 assert 'review: review.review, selection: selected' in ui

@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "services/time/MachineGeometryV2.py"
+      - "services/time/MachineSwayRead.py"
+      - "services/time/MachineWindowResolver.py"
+      - "tests/timew/test_machine_floating_con.py"
       - "tests/timew/test_machine_geometry_headless_sway.py"
       - "tests/timew/test_machine_geometry_headless_contract.py"
       - "docs/timew-machine-m2-headless-geometry-evidence.md"
@@ -30,4 +33,7 @@ jobs:
       - name: Preserve synthetic capture and legacy v1 schema
         run: |
           python3 -B -I tests/timew/test_machine_geometry_v2.py
+          python3 -B -I tests/timew/test_machine_floating_con.py
           python3 -B -I tests/timew/test_machine_checkpoint_store.py
+          python3 -B -I tests/timew/test_machine_sway_read.py
+          python3 -B -I tests/timew/test_machine_window_resolver.py

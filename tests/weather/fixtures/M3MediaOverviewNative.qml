@@ -57,7 +57,22 @@ ShellRoot {
             const transport=find(media,"media-m1-radio-transport-fixed");
             const header=find(media,"media-m1-global-fixed-header");
             if(!overview||!overviewScroll||!news||!radioBay||!radio
-                ||!fixedSearch||!saved||!directory||!transport||!header)return;
+                ||!fixedSearch||!saved||!directory||!transport||!header) {
+                if(root.ticks>=8) {
+                    const nodes=[
+                        ["overview",overview],["scroll",overviewScroll],
+                        ["news",news],["radioBay",radioBay],
+                        ["radio",radio],["search",fixedSearch],
+                        ["saved",saved],["directory",directory],
+                        ["transport",transport],["header",header]];
+                    const missing=nodes.filter(function(pair){return !pair[1];})
+                        .map(function(pair){return pair[0];}).join(",");
+                    return root.fail("MISSING_NODES // "+missing
+                        +" // childCount="+String(media.children.length)
+                        +" // paneKind="+String(media.kind));
+                }
+                return;
+            }
             if(root.phase===0) {
                 const modes=Workspace.tabsFor("media/overview");
                 const live=find(header,"media-m2-mode-live");

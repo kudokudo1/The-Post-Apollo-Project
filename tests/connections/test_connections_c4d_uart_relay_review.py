@@ -43,7 +43,7 @@ class DirectGuestRelayReview(unittest.TestCase):
         self.source = guest.split(needle, 1)[1].split(
             "\nC4B_SINGLE_UART_RELAY\n", 1)[0]
 
-    def relay(self, payload: bytes, *, regular_target=False):
+    def relay(self, payload: bytes, *, regular_target=False, with_stdout=False):
         path = Path(self.tmp.name) / "c4b-runtime.log"
         path.write_bytes(payload)
         master, slave = pty.openpty()
@@ -64,7 +64,7 @@ class DirectGuestRelayReview(unittest.TestCase):
             observed = os.read(master, 4096) if ready else b""
             if regular_target:
                 self.assertEqual(target.read_bytes(), b"unchanged")
-            return observed
+            return (observed, p.stdout) if with_stdout else observed
         finally:
             os.close(master)
             os.close(slave)
@@ -138,14 +138,51 @@ class DirectGuestRelayReview(unittest.TestCase):
 
     def test_05_guest_source_placement_and_deny_only(self):
         code = GUEST.read_text()
+        # Original signed C4c probe is validated while the service is running.
+        # Mirror a validated *past* observation only after first-boot cleanup,
+        # just before the unchanged controller's final 110-line log relay.
         self.assertLess(code.index("C4B_RUNNING_HOST_PROBE\n"),
+                        code.index("stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN"))
+        self.assertLess(code.index("stage BOOTED_RUNTIME_ACCEPTED"),
                         code.index("C4B_SINGLE_UART_RELAY"))
         self.assertLess(code.index("C4B_SINGLE_UART_RELAY"),
-                        code.index("stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN"))
+                        code.index('echo "C4B_PASS // RUNTIME_USERS_VENV_CLEANED_POLICY_RETAINED_FOR_ROLLBACK"'))
         for v in ("os.O_NOFOLLOW", "os.O_NONBLOCK",
                   "hostAuthenticated=False", "productionAuthority=False",
                   'echo "C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED"'):
             self.assertIn(v, code)
+
+    def test_09_old_report_outside_last_16k_mirrored_into_controller_tail(self):
+        # Earlier C4c report can be buried by benign teardown logging. The
+        # final relay validates the bounded ORIGINAL inode, not just its tail.
+        raw = b"booted phase\n" + report() + b"\n" + b"normal teardown\n" * 2400
+        emitted, host_tail = self.relay(raw, with_stdout=True)
+        self.assertEqual(emitted, report() + b"\n")
+        self.assertEqual(host_tail.count(report()), 1)
+        self.assertIn(b"C4D_UART_DIAG // ONE_VALID_RECORD_WRITTEN_TO_UART", host_tail)
+        # A controller echo of the latest runtime lines will include the
+        # mirrored line even if it wasn't present in an earlier tail.
+        controller_log = raw + host_tail + b"C4B_PASS // RUNTIME_USERS_CLEANED\n"
+        self.assertIn(report(), b"\n".join(controller_log.splitlines()[-110:]))
+
+    def test_10_invalid_report_never_mirrored_to_controller_console(self):
+        for raw in (report(hostAuthenticated=True) + b"\n",
+                    report() + b"\n" + report() + b"\n",
+                    PREFIX + b'{"bad":true}\n'):
+            with self.subTest(case=raw[:44]):
+                serial, controller = self.relay(raw, with_stdout=True)
+                self.assertEqual(serial, b"")
+                self.assertNotIn(PREFIX, controller)
+
+    def test_11_bounded_full_instrument_log_read_and_existing_c2v_tail(self):
+        code = GUEST.read_text()
+        self.assertIn("log = os.read(fd, st.st_size + 1)", code)
+        self.assertIn("not 0 < st.st_size <= 2 * 1024 * 1024", code)
+        c2v = (ROOT / "tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh").read_text()
+        self.assertIn("tail -n 110 /var/tmp/c4b-runtime.log", c2v)
+        self.assertIn('echo "C4B_CONTROLLER_GUEST_LOG_BEGIN"', c2v)
+        self.assertIn('print(payload.decode("ascii").rstrip("\\n"), flush=True)', code)
+
 
 
 if __name__ == "__main__":

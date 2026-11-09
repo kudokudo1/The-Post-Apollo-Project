@@ -482,10 +482,48 @@ except (Refused, OSError, KeyError, ValueError, UnicodeError) as exc:
           (str(exc) if isinstance(exc, Refused) else type(exc).__name__), flush=True)
     sys.exit(2)
 C4B_RUNNING_HOST_PROBE
+  echo "C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED"
+
+  stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN
+  timeout --signal=TERM --kill-after=5s 60s systemctl stop "$unit" ||
+    fail "SERVICE_STOP_FAILED"
+  check_released
+  echo "C4B_PASS // SERVICE_STOP_RELEASES_DBUS_NAME"
+  rm -f -- /var/lib/postapollo-c2r-ci-denied /opt/c4b/BusPolicyClient.py
+  rmdir /opt/c4b || fail "CLIENT_DIRECTORY_CLEANUP_FAILED"
+  [[ -d /opt/postapollo-c2o-venv ]] ||
+    fail "OFFLINE_VENV_MISSING_AT_CLEANUP"
+  rm -rf -- /opt/postapollo-c2o-venv
+  userdel c4b-reader && userdel c4b-outsider &&
+    userdel postapollo-connections || fail "TEST_USER_REMOVAL_FAILED"
+  # Fedora shadow-utils may automatically remove the user's matching
+  # private primary group during userdel. This is already the desired
+  # result, not a failed cleanup. Other test groups must still be removed
+  # explicitly, and every user/group must be absent after these commands.
+  groupdel c4b-clients || fail "CLIENT_GROUP_REMOVAL_FAILED"
+  groupdel postapollo-status-readers || fail "READER_GROUP_REMOVAL_FAILED"
+  if getent group postapollo-connections >/dev/null; then
+    groupdel postapollo-connections || fail "SERVICE_GROUP_REMOVAL_FAILED"
+  else
+    echo "C4B_DIAG // SERVICE_PRIMARY_GROUP_ALREADY_ABSENT_AFTER_USERDEL"
+  fi
+  check_accounts_absent
+  echo "C4B_PASS // TEST_USERS_AND_GROUPS_FULLY_ABSENT"
+  # The custom policy is part of the booted deployment and MUST NOT be
+  # removed at runtime. Only the real OSTree rollback may remove it.
+  stage COMPOSED_POLICY_RETAINED_FOR_ROLLBACK
+  timeout 15s semodule -l | grep -Fq postapollo_connections ||
+    fail "COMPOSED_POLICY_VANISHED_PREMATURELY"
+  check_accounts_absent
+  check_released
+  check_logind_bus_health AFTER_C4B_RUNTIME_CLEANUP
+  stage BOOTED_RUNTIME_ACCEPTED
+  echo complete > "$donefile"
   # C4d test-only export bridge: the signed-process observer above prints into
   # /var/tmp/c4b-runtime.log, whereas the C4d host reads guest ttyS0.
-  # The controller's bounded log tail is not guaranteed to contain this early
-  # observation. Relay ONE independently validated diagnostic line directly.
+  # At the END of first-boot checks, emit ONE validated diagnostic line to
+  # the private log (which the unchanged controller relays to ttyS0), then
+  # optionally try a direct bounded UART copy. Neither channel is authority.
   # Serial I/O is strictly best effort and must NEVER grant host authority or
   # change the signed service's acceptance/rollback lifecycle.
   if [[ -c /dev/ttyS0 ]]; then
@@ -579,6 +617,10 @@ def write_all_serial(fd, payload):
 
 try:
     payload = selected_line(sys.argv[1]) + b"\n"
+    # C2v already safely forwards the last 110 runtime-log lines after the
+    # whole first-boot C4b phase. Mirror ONE validated self-observation at
+    # that point; its separate guest serial is diagnostic only, never authority.
+    print(payload.decode("ascii").rstrip("\\n"), flush=True)
     fd = os.open(sys.argv[2], os.O_WRONLY | os.O_NOCTTY | os.O_NONBLOCK |
                  os.O_CLOEXEC | os.O_NOFOLLOW)
     try:
@@ -599,43 +641,6 @@ except (OSError, ValueError, UnicodeError, KeyError, TypeError) as exc:
     print("C4D_UART_DIAG // " + reason.replace(" ", "_"), flush=True)
 C4B_SINGLE_UART_RELAY
   fi
-  echo "C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED"
-
-  stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN
-  timeout --signal=TERM --kill-after=5s 60s systemctl stop "$unit" ||
-    fail "SERVICE_STOP_FAILED"
-  check_released
-  echo "C4B_PASS // SERVICE_STOP_RELEASES_DBUS_NAME"
-  rm -f -- /var/lib/postapollo-c2r-ci-denied /opt/c4b/BusPolicyClient.py
-  rmdir /opt/c4b || fail "CLIENT_DIRECTORY_CLEANUP_FAILED"
-  [[ -d /opt/postapollo-c2o-venv ]] ||
-    fail "OFFLINE_VENV_MISSING_AT_CLEANUP"
-  rm -rf -- /opt/postapollo-c2o-venv
-  userdel c4b-reader && userdel c4b-outsider &&
-    userdel postapollo-connections || fail "TEST_USER_REMOVAL_FAILED"
-  # Fedora shadow-utils may automatically remove the user's matching
-  # private primary group during userdel. This is already the desired
-  # result, not a failed cleanup. Other test groups must still be removed
-  # explicitly, and every user/group must be absent after these commands.
-  groupdel c4b-clients || fail "CLIENT_GROUP_REMOVAL_FAILED"
-  groupdel postapollo-status-readers || fail "READER_GROUP_REMOVAL_FAILED"
-  if getent group postapollo-connections >/dev/null; then
-    groupdel postapollo-connections || fail "SERVICE_GROUP_REMOVAL_FAILED"
-  else
-    echo "C4B_DIAG // SERVICE_PRIMARY_GROUP_ALREADY_ABSENT_AFTER_USERDEL"
-  fi
-  check_accounts_absent
-  echo "C4B_PASS // TEST_USERS_AND_GROUPS_FULLY_ABSENT"
-  # The custom policy is part of the booted deployment and MUST NOT be
-  # removed at runtime. Only the real OSTree rollback may remove it.
-  stage COMPOSED_POLICY_RETAINED_FOR_ROLLBACK
-  timeout 15s semodule -l | grep -Fq postapollo_connections ||
-    fail "COMPOSED_POLICY_VANISHED_PREMATURELY"
-  check_accounts_absent
-  check_released
-  check_logind_bus_health AFTER_C4B_RUNTIME_CLEANUP
-  stage BOOTED_RUNTIME_ACCEPTED
-  echo complete > "$donefile"
   echo "C4B_PASS // RUNTIME_USERS_VENV_CLEANED_POLICY_RETAINED_FOR_ROLLBACK"
 else
   stage ROLLBACK_RECHECK_BEGIN

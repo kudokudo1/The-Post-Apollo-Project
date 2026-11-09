@@ -5057,6 +5057,28 @@ PanelWindow {
                             width: parent.width
                             spacing: 14
                             visible: timew.machineAdvancedOpen
+                            GohuText {
+                                width: parent.width
+                                visible: !!timew.machineAutoRestoreResult
+                                text: "RESTORE RESULTS // EACH SAVED APP"
+                                color: Colors.cyan
+                                font.pixelSize: 11
+                            }
+                            Repeater {
+                                model: timew.machineAutoRestoreResult
+                                       ? timew.machineAutoRestoreResult.items : []
+                                delegate: GohuText {
+                                    width: parent.width
+                                    text: modelData.app_id + " // "
+                                          + modelData.outcome.toUpperCase()
+                                          + " // " + modelData.reason
+                                    color: modelData.outcome === "skipped"
+                                           || modelData.outcome === "pending"
+                                           ? Colors.orange : Colors.cyan
+                                    font.pixelSize: 10
+                                    wrapMode: Text.Wrap
+                                }
+                            }
                         Row {
                             width: parent.width
                             height: 35

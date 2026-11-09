@@ -194,7 +194,7 @@ Q.policyReady=false;Q.policyStatus='loading';
 Q.appendNotification({id:'corrupt-policy',source:'Allowed App',sourceId:'allowed'});
 Q.policyReady=true;Q.policyStatus='parse-error';
 Q.reconcilePendingPolicyDeliveries();
-assert.strictEqual(Q.activeNotifications.count,1,'bad policy should not release queued popup');
+assert.strictEqual(Q.activeNotifications.count,0,'bad policy must hide existing and queued popups');
 
 // A native sender may close its event before the policy file is ready.
 // That event must not be resurrected when policy loading completes.

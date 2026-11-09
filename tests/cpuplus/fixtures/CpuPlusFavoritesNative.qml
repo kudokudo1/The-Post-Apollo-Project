@@ -308,8 +308,25 @@ ShellRoot {
                             || defaults.mutations || collections.renameCalls!==1) {
                         root.fail("U7C_UNSAFE_APP_SELECTION");return;
                     }
-                    root.done=true;
                     console.log("U7C_PASS // EXACT_DESKTOP_ENTRY_SELECTION_NO_EXECUTION");
+                    // U7b-D sensor appears only AFTER the old U4/U6 tests,
+                    // preserving their original counts and row positions.
+                    fakeAppControl.systemRows=[{
+                        id:"system:cpu",name:"CPU",label:"CPU",
+                        _systemRecord:true
+                    }];
+                    appFavorites.favoriteKeys=appFavorites.favoriteKeys.concat(
+                        ["system|system%3Acpu"]);
+                    root.testStage=12;
+                }
+                onSystemSelectionRequested: function(metric) {
+                    if(root.testStage!==14 || metric!=="cpu"
+                            || time.removals || places.removals
+                            || defaults.mutations || collections.renameCalls!==1) {
+                        root.fail("U7D_UNSAFE_SYSTEM_SELECTION");return;
+                    }
+                    root.done=true;
+                    console.log("U7D_PASS // EXACT_SYSTEM_CORE_SELECTION_NO_ACTIONS");
                     Qt.quit();
                 }
             }
@@ -626,6 +643,32 @@ ShellRoot {
                     appButton.width/2,appButton.height/2);
                 root.testStage=11;
                 console.log("U7C_ITEM_READY // x="+Math.round(pt.x)
+                    +" y="+Math.round(pt.y));
+            } else if(root.testStage===12) {
+                const item=root.options.rows.find(function(row) {
+                    return row.owner==="appcontrol"
+                        && row.menu==="SYSTEM"
+                        && row.category==="CPU++"
+                        && row.favoriteType==="FAVORITE"
+                        && row.item==="CPU";
+                });
+                if(!item) return;
+                root.selectedKey=item.key;
+                root.testStage=13;
+            } else if(root.testStage===13) {
+                const metricButton=detail.exactNavigationControl;
+                if(!root.selection || root.selection.menu!=="SYSTEM"
+                        || root.selection.category!=="CPU++"
+                        || !detail.systemSelection.ok
+                        || detail.systemSelection.metric!=="cpu"
+                        || !metricButton || !metricButton.available
+                        || metricButton.label!=="OPEN ITEM") {
+                    root.fail("U7D_SYSTEM_BUTTON_NOT_READY");return;
+                }
+                const pt=metricButton.mapToItem(win.contentItem,
+                    metricButton.width/2,metricButton.height/2);
+                root.testStage=14;
+                console.log("U7D_ITEM_READY // x="+Math.round(pt.x)
                     +" y="+Math.round(pt.y));
             }
         }

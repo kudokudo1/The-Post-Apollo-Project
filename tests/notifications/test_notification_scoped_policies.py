@@ -20,6 +20,10 @@ assert "property var pendingPolicyDeliveryIds: []" in s
 assert 'const suppressed = !policyReady' in s
 assert 'root.reconcilePendingPolicyDeliveries();' in s
 assert "function inheritedSuppressionFor(entry, selectedKey)" in s
+assert "function inheritedPolicyOwnerKey(entry, selectedKey)" in s
+assert "function selectInheritedPolicyScope()" in h
+assert '"originalTitle": String(entry.originalTitle || entry.title || "")' in h
+assert "originalTitle: notificationEntry.originalTitle" in h
 assert "function shouldSuppressScoped(entry)" in s
 assert "function isFavoriteForNotification(entry)" in s
 
@@ -124,7 +128,8 @@ const S={String,Number,Math,Array,Date:Clock,encodeURIComponent,
 };
 const names=['sourceKey','websiteKey','scopeOptionsFor','favoriteIndex','isFavorite',
  'setFavorite','toggleFavorite','isFavoriteForNotification','policyIndex','policyFor',
- 'isDnd','isSnoozed','shouldSuppress','shouldSuppressScoped','inheritedSuppressionFor',
+ 'isDnd','isSnoozed','shouldSuppress','shouldSuppressScoped',
+ 'inheritedPolicyOwnerKey','inheritedSuppressionFor',
  'ensurePolicy','markPoliciesChanged','suppressActiveForKey','compactPolicy',
  'setDnd','toggleDnd','snoozeApp','clearSnooze'];
 vm.runInNewContext(names.map(n=>extract(source,n)).join('\n'),S);
@@ -142,7 +147,17 @@ assert.strictEqual(S.shouldSuppressScoped(sB),false);
 assert.strictEqual(S.shouldSuppressScoped(dmA),false);
 assert.deepStrictEqual(S.activeNotifications.rows.map(x=>x.id),['b','d1']);
 assert.strictEqual(S.inheritedSuppressionFor(sA,key(sA,'channel')),true);
+assert.strictEqual(S.inheritedPolicyOwnerKey(sA,key(sA,'channel')), key(sA,'server'));
 assert.strictEqual(S.inheritedSuppressionFor(sA,key(sA,'app')),false);
+assert.strictEqual(S.inheritedPolicyOwnerKey(sA,key(sA,'app')), '');
+const UI = {scopeOptions:opt(sA), inheritedPolicyKey:key(sA,'server'),targetScopeIndex:0};
+vm.runInNewContext(extract(fs.readFileSync(process.argv[3],'utf8'),'selectInheritedPolicyScope'),UI);
+assert.strictEqual(UI.selectInheritedPolicyScope(),true);
+assert.strictEqual(UI.scopeOptions[UI.targetScopeIndex].kind,'server',
+ 'first DND/ZZ click should visibly select blocking server');
+UI.inheritedPolicyKey='';
+assert.strictEqual(UI.selectInheritedPolicyScope(),false,
+ 'second click may now change the explicitly selected parent');
 S.setDnd(key(sA,'server'),'vesktop','Vesktop // SERVER guild-a',false);
 S.snoozeApp(key(dmA,'conversation'),'vesktop','Vesktop // DM alice');
 assert.strictEqual(S.shouldSuppressScoped(dmA),true);
@@ -211,5 +226,5 @@ Q.reconcilePendingPolicyDeliveries();
 assert(!Q.activeNotifications.rows.some(e=>e.id==='closed-startup'));
 console.log('Scoped sender/server/channel/DM, TITLE, favorites, and startup gate: PASS');
 """
-subprocess.run(["node", "-e", NODE, str(SERVICE), str(SCOPE)], check=True)
+subprocess.run(["node", "-e", NODE, str(SERVICE), str(SCOPE), str(HUB)], check=True)
 print("Notification scoped policy contracts: PASS")

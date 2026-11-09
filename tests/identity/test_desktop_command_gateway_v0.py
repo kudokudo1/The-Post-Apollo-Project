@@ -10,16 +10,19 @@ import http.client
 import json
 import os
 from pathlib import Path
+import secrets
 import socket
 import stat
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "services" / "identity"))
 
+import desktop_command_gateway_v0 as gateway_module
 from desktop_command_gateway_v0 import (
     COMMAND_SOCKET, COMMAND_SCHEMA, RECEIPT_SCHEMA,
     IdentityCommandGateway, KernelPeer,
@@ -639,6 +642,41 @@ class GatewayIntegrationTests(unittest.TestCase):
         self._check_rejected(self._recover(old_id))
         self._check_rejected(self._begin())
         self.assertFalse(self.hosts[0].started)
+        self.assertFalse((self.dir / "identity-display-v0.sock").exists())
+
+    def test_recovery_rejects_random_id_collision_with_any_older_request(self):
+        self.peer_allowed = self.consent_allowed = self.recover_allowed = True
+        self.gateway.start()
+        first = self._begin()["requestId"]
+        self.assertEqual(self._cancel(first)["state"], "CANCELLED")
+        second = self._recover(first)["requestId"]
+        self.assertNotEqual(first, second)
+        self.assertEqual(self._cancel(second)["state"], "CANCELLED")
+        self.assertEqual(self.factory_calls, 2)
+        original_token = secrets.token_urlsafe
+        calls = [0]
+
+        def collide_after_native_pkce(n):
+            # Native PKCE uses 64-byte verifier, then two 32-byte tokens
+            # (state + nonce), before the gateway mints a request ID.
+            if n == 32:
+                calls[0] += 1
+                if calls[0] == 3:
+                    return first  # Collision with NON-adjacent old request.
+            return original_token(n)
+
+        with patch.object(gateway_module.secrets, "token_urlsafe",
+                          side_effect=collide_after_native_pkce):
+            self._check_rejected(self._recover(second))
+        self.assertEqual(calls[0], 3, "Test exercised mint-time collision")
+        self.assertEqual(self.factory_calls, 3)
+        self.assertFalse(self.hosts[0].started)
+        self.assertFalse(self.hosts[1].started)
+        self.assertFalse(self.hosts[2].started)
+        self._check_rejected(self._status(first))
+        self._check_rejected(self._status(second))
+        self._check_rejected(self._recover(second))
+        self._check_rejected(self._begin())
         self.assertFalse((self.dir / "identity-display-v0.sock").exists())
 
     def test_host_loss_cannot_recover_by_restoring_seat(self):

@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import threading
@@ -161,6 +163,107 @@ class C4dSerialCaptureTests(unittest.TestCase):
         self.addCleanup(writer.join)
         self.assertEqual(C.capture(self.root, self.done, poll=.005),
                          observation())
+
+
+    def _collector_cli(self, ready, output):
+        return [
+            sys.executable, "-B", str(SOURCE),
+            "--runner-temp", str(self.root),
+            "--complete", str(self.done),
+            "--output", str(output),
+            "--ready", str(ready),
+        ]
+
+    def test_15_delayed_observer_ready_then_fresh_guest_directory_is_accepted(self):
+        # Discriminating regression for the exact failed C4d run. No directory
+        # exists BEFORE the monitor starts. The new live directory is created
+        # only AFTER the monitor's checked readiness barrier.
+        self.boot.rmdir()
+        private = self.root / "c4d-private"
+        private.mkdir(mode=0o700)
+        ready = private / "observer-ready"
+        output = private / "C4B_OBSERVED.txt"
+        env = {**os.environ, "GITHUB_ACTIONS": "true"}
+        child = subprocess.Popen(
+            self._collector_cli(ready, output), env=env,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            for _ in range(300):
+                if ready.exists() or child.poll() is not None:
+                    break
+                time.sleep(.01)
+            self.assertIsNone(child.poll(), "observer exited before ready")
+            self.assertEqual(ready.read_bytes(), b"READY\n")
+            self.assertEqual(ready.stat().st_mode & 0o777, 0o600)
+            self.assertFalse(self.boot.exists())
+            self.boot.mkdir(mode=0o700)
+            self.payload(observation())
+            self.done.write_text("PASS\n")
+            stdout, stderr = child.communicate(timeout=12)
+            self.assertEqual(child.returncode, 0, stderr.decode(errors="replace"))
+            self.assertEqual(output.read_bytes(), observation() + b"\n")
+            self.assertIn(b"C4D_PASS // ONE_BOUNDED_ACTUAL_GUEST_SERIAL_OBSERVATION_EXPORTED",
+                          stdout)
+        finally:
+            if child.poll() is None:
+                child.kill()
+                child.communicate(timeout=5)
+
+    def test_16_actual_preexisting_stale_directory_still_refuses(self):
+        private = self.root / "c4d-private"
+        private.mkdir(mode=0o700)
+        ready = private / "observer-ready"
+        output = private / "C4B_OBSERVED.txt"
+        env = {**os.environ, "GITHUB_ACTIONS": "true"}
+        result = subprocess.run(self._collector_cli(ready, output),
+                                env=env, capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(b"STALE_C2V_BOOT_DIRECTORY_BEFORE_MONITOR", result.stderr)
+        self.assertFalse(ready.exists())
+        self.assertFalse(output.exists())
+
+    def test_17_forged_ready_file_does_not_bypass_collector_preflight(self):
+        self.boot.rmdir()
+        private = self.root / "c4d-private"
+        private.mkdir(mode=0o700)
+        ready = private / "observer-ready"
+        ready.symlink_to(self.root / "attacker-controlled")
+        output = private / "C4B_OBSERVED.txt"
+        env = {**os.environ, "GITHUB_ACTIONS": "true"}
+        result = subprocess.run(self._collector_cli(ready, output),
+                                env=env, capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(b"OBSERVER_READINESS_SCOPE_REFUSED", result.stderr)
+        self.assertTrue(ready.is_symlink())
+        self.assertFalse(output.exists())
+
+    def test_18_insecure_output_directory_cannot_emit_ready(self):
+        self.boot.rmdir()
+        private = self.root / "c4d-private"
+        private.mkdir(mode=0o755)
+        ready = private / "observer-ready"
+        output = private / "C4B_OBSERVED.txt"
+        env = {**os.environ, "GITHUB_ACTIONS": "true"}
+        result = subprocess.run(self._collector_cli(ready, output),
+                                env=env, capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(b"OUTPUT_DIRECTORY_NOT_PRIVATE", result.stderr)
+        self.assertFalse(ready.exists())
+        self.assertFalse(output.exists())
+
+    def test_19_workflow_waits_for_ready_before_unchanged_c2v_boot(self):
+        workflow = (Path(__file__).resolve().parents[2] /
+                    ".github/workflows/connections-c4b-silverblue-confined-runtime.yml").read_text()
+        self.assertIn('if compgen -G "$RUNNER_TEMP/c2v-silverblue-*" >/dev/null', workflow)
+        self.assertIn('--ready "$evidence/observer-ready" &', workflow)
+        self.assertIn('C4D_PASS // OBSERVER_READY_BEFORE_C2V_BOOT', workflow)
+        self.assertIn('OBSERVER_STARTUP_READY_TIMEOUT', workflow)
+        self.assertIn('OBSERVER_EXITED_BEFORE_READY', workflow)
+        self.assertLess(workflow.index('observer_ready=0'),
+                        workflow.index('timeout 3550s bash tests/connections/c2v_silverblue/boot_official_silverblue.sh'))
+        self.assertIn('[[ "$vm_rc" == 0 ]]', workflow)
+        self.assertIn('wait "$observer_pid"', workflow)
+        self.assertIn('if-no-files-found: error', workflow)
 
 
 if __name__ == "__main__":

@@ -880,7 +880,10 @@ PanelWindow {
         return NotificationsService.sourceKey(sourceId, source);
     }
 
-    function scopeTag(kind) {
+    function scopeTag(kind, detailLabel) {
+        if (kind === "conversation")
+            return String(detailLabel || "").indexOf("DM // ") === 0
+                ? "DM" : "CHAT";
         const labels = {
             "app": "APP", "website": "SITE", "title": "TITLE",
             "sender": "SENDER", "conversation": "CHAT", "group": "GROUP",
@@ -3488,7 +3491,8 @@ PanelWindow {
                                     + "  //  " + notificationEntry.severity.toUpperCase()
                                     + "  //  " + (notificationEntry.targetScope.kind === "title"
                                         ? "TITLE EXACT, NOT VERIFIED SENDER"
-                                        : "SCOPE " + root.scopeTag(notificationEntry.targetScope.kind))
+                                        : "SCOPE " + root.scopeTag(notificationEntry.targetScope.kind,
+                                        notificationEntry.targetScope.label))
 
                                 pixelSize: root.notificationMetaFontSize
 
@@ -3906,7 +3910,8 @@ PanelWindow {
                                     height: 24
                                     visible: notificationEntry.scopeOptions.length > 1
                                     label: notificationEntry.targetWholeApp ? "APP"
-                                        : root.scopeTag(notificationEntry.targetScope.kind)
+                                        : root.scopeTag(notificationEntry.targetScope.kind,
+                                        notificationEntry.targetScope.label)
                                             + (notificationEntry.inheritedRule ? "*" : "")
                                     labelPixelSize: 9
                                     active: !notificationEntry.targetWholeApp

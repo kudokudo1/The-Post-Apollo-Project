@@ -324,8 +324,12 @@ Singleton {
         const pending = pendingPolicyDeliveryIds;
         pendingPolicyDeliveryIds = [];
         if (!policyReady || policyStatus === "parse-error"
-                || policyStatus === "load-error")
+                || policyStatus === "load-error") {
+            // A file reload may fail after popups were already admitted.
+            // Fail closed for the live popup surface; retain history.
+            activeNotifications.clear();
             return;
+        }
         for (let i = activeNotifications.count - 1; i >= 0; i--) {
             const active = activeNotifications.get(i);
             if (shouldSuppress(active.sourceId, active.source, active.websiteHost)

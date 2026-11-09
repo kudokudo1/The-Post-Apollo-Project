@@ -16,7 +16,7 @@ test("M4 overview has no outer Flickable; NEWS and RADIO bays are both anchored 
     assert.doesNotMatch(media,/objectName:\s*"media-m3-overview-scroll"/);
     assert.match(media,/objectName: "media-m3-news-top-bay"/);
     assert.match(media,/objectName: "media-m3-full-radio-bottom-bay"/);
-    assert.ok(media.includes("height: Math.max(52,Math.min(110,mediaOverview.height - 166))"));
+    assert.ok(media.includes("height: Math.max(52,Math.min(110,mediaOverview.height - 158))"));
     assert.ok(media.includes("anchors.top: reportsBay.bottom"));
     assert.ok(media.includes("anchors.bottom: parent.bottom"));
     assert.ok(media.includes('subjectRoute: "media/news/reports"'));

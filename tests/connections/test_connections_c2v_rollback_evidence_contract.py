@@ -165,7 +165,53 @@ class C2vRollbackEvidenceContract(unittest.TestCase):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, observer)
 
-    def test_05_no_diagnostics_can_create_a_success_signal(self):
+    def test_05_host_progress_and_os_error_still_fail_closed(self):
+        src = self.host
+        for marker in (
+            "C2V_HOST_PHASE // iteration=",
+            "C4B_HOST_OBSERVER_BYTES // iteration=",
+            "C4B_HOST_RECENT_OBSERVER_MARKER //",
+            "C2V_HOST_STALL_WARNING //",
+            "C4B_HOST_KNOWN_OS_ERROR //",
+            "C2V_HOST_FAILURE_PHASE //",
+            "C2V_HOST_FAILURE_REASON //",
+            "LOGIND_INHIBITOR_TIMEOUT",
+            "OBSERVATION_DEADLINE_EXHAUSTED",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, src)
+        # Phase and stale-UART information is observational. In particular,
+        # silence alone may not terminate or falsely accept a real boot.
+        self.assertIn("if (( i - last_guest_byte_progress_iteration >= 180 && i % 30 == 0 )); then", src)
+        self.assertIn("no_serial_growth_for_at_least_360s", src)
+        self.assertEqual(src.count("result=LOGIND_INHIBITOR_TIMEOUT"), 1)
+        self.assertIn("error: Checking systemd inhibitor locks: Timeout was reached", src)
+        self.assertIn("C2V_ROLLBACK_COMMAND_BEGIN // actual rpm-ostree rollback --reboot", src)
+        self.assertIn("if [[ \"$result\" != PASS ]]; then", src)
+        self.assertIn("C2V_BLOCKED // SILVERBLUE_LAYER_REBOOT_ROLLBACK_RESULT=$result", src)
+        self.assertIn("C4B_HOST_DIAGNOSTIC_UART_BEGIN", src)
+        self.assertIn("C4B_PASS // SIGNED_POLICY_RPM_AND_TEST_KEYRING_REMOVED_BY_ROLLBACK", src)
+        self.assertIn("C4B_PASS // SIGNED_CONFINED_FAKE_HOST_STOPPED_AND_REAL_SILVERBLUE_ROLLBACK", src)
+        self.assertIn("C2V_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER", src)
+        self.assertIn("for i in $(seq 1 700); do", src)
+        for forbidden in (
+            "result=PASS #",
+            "result=PASS; #",
+            "systemctl reboot -i",
+            "--check-inhibitors=no",
+            "--ignore-inhibitors",
+            "rpm-ostree rollback --reboot || true",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, src)
+        # The authoritative host PASS must precede checks for C4a/C4b
+        # exact signed removal markers; no diagnostics can create these.
+        self.assertLess(
+            src.index("if [[ \"$result\" != PASS ]]; then"),
+            src.index("C4B_PASS // SIGNED_POLICY_RPM_AND_TEST_KEYRING_REMOVED_BY_ROLLBACK"),
+        )
+
+    def test_06_no_diagnostics_can_create_a_success_signal(self):
         source = self.guest
         begin = source.index("c2v_rollback_failure_diagnostic() {")
         end = source.index("\ntrap 'rc=$?;", begin)

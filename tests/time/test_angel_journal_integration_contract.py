@@ -125,45 +125,73 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertEqual(STORE.count("FileView {"), 1)
         self.assertNotIn("FileView {", PANE)
 
-    def test_err_color_identity_without_recoloring_unmatched_other_rows(self):
-        # Filter and history delegates must use the SAME user-mark flag,
-        # but automatic OTHER classification must not turn rows red.
-        filter_section = PANE.split("id: angelPatternFilters", 1)[1].split(
+    def test_semantic_filter_and_entry_colors_are_consistent(self):
+        # ERR is an explicit per-sighting review; other unmatched rows
+        # do not become red. Favorites take magenta; otherwise the first
+        # structural pattern determines the row identity.
+        filters = PANE.split("id: angelPatternFilters", 1)[1].split(
             "id: angelHistoryArea", 1)[0]
-        row_section = PANE.split("delegate: Item {", 1)[1].split(
+        entries = PANE.split("delegate: Item {", 1)[1].split(
             "onLeftClicked: {", 1)[0]
+        self.assertIn('case "favorite": return Colors.magenta;', PANE)
+        self.assertIn('case "mirror": return Colors.yellow;', PANE)
+        self.assertIn('case "add": return Colors.orange;', PANE)
+        self.assertIn('case "subtract": return Colors.blue;', PANE)
+        self.assertIn('case "multiply": return Colors.cyan;', PANE)
+        self.assertIn('case "divide": return Colors.green;', PANE)
+        self.assertIn('case "err": return Colors.red;', PANE)
+        self.assertIn('default: return Colors.white;', PANE)
+        self.assertIn('key === "sequence" ? Colors.yellow : filterInk(key)', PANE)
+        self.assertIn("readonly property color ink: pane.filterInk(modelData.key)", filters)
+        self.assertIn("idleBorderColor: edge", filters)
+        self.assertIn("selectedFillColor: pane.wash(ink, 0.24)", filters)
 
-        self.assertIn('modelData.key === "err"', filter_section)
-        self.assertIn("readonly property bool isErrFilter:", filter_section)
-        self.assertIn("accentColor: isErrFilter ? Colors.red : Colors.white",
-                      filter_section)
-        self.assertIn("selectedFillColor: isErrFilter ? Colors.red : Colors.yellow",
-                      filter_section)
-        self.assertIn("selectedForegroundColor: isErrFilter ? Colors.white : Colors.magenta",
-                      filter_section)
-        self.assertIn("selectedBorderColor: isErrFilter ? Colors.red : Colors.magenta",
-                      filter_section)
-        self.assertIn("selectedContentGlowColor: isErrFilter ? Colors.red : Colors.magenta",
-                      filter_section)
-        self.assertIn("hoverForegroundColor: isErrFilter ? Colors.red : Colors.orange",
-                      filter_section)
+        self.assertIn("readonly property bool isMarkedErr:", entries)
+        self.assertIn("modelData.errMarked === true", entries)
+        self.assertIn("isMarkedErr ? Colors.red", entries)
+        self.assertIn("isFavoriteNumber ? Colors.magenta", entries)
+        self.assertIn("pane.filterInk(pattern)", entries)
+        self.assertIn("pane.filterEdge(pattern)", entries)
+        self.assertIn("accentColor: observationEntry.entryInk", entries)
+        self.assertIn("idleBorderColor: observationEntry.entryEdge", entries)
+        self.assertIn("idleFillColor: observationEntry.isFavoriteNumber", entries)
+        self.assertIn("selectedFillColor: pane.wash(observationEntry.entryEdge, 0.24)", entries)
+        self.assertNotIn("matchesFilter(", entries)
+        self.assertNotIn("activeFilter ===", entries)
 
-        self.assertIn("readonly property bool isMarkedErr:", row_section)
-        self.assertIn("modelData.errMarked === true", row_section)
-        self.assertIn("accentColor: observationEntry.isMarkedErr ? Colors.red",
-                      row_section)
-        self.assertIn("selectedFillColor: observationEntry.isMarkedErr ? Colors.red : Colors.yellow",
-                      row_section)
-        self.assertIn("selectedForegroundColor: observationEntry.isMarkedErr ? Colors.white : Colors.magenta",
-                      row_section)
-        self.assertIn("selectedBorderColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta",
-                      row_section)
-        self.assertIn("selectedContentGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta",
-                      row_section)
-        self.assertIn("hoverForegroundColor: observationEntry.isMarkedErr ? Colors.red : Colors.orange",
-                      row_section)
-        self.assertNotIn("matchesFilter(", row_section)
-        self.assertNotIn("activeFilter ===", row_section)
+    def test_angel_buttons_do_not_fill_on_idle_hover_or_press(self):
+        local_button = (ROOT / "widgets/AngelActionButton.qml").read_text(
+            encoding="utf-8")
+        meaning = (ROOT / "widgets/AngelMeaningPane.qml").read_text(
+            encoding="utf-8")
+        self.assertIn("ActionButton {", local_button)
+        self.assertIn("idleFillColor: Colors.black", local_button)
+        self.assertIn(
+            "hoverFillColor: selected ? selectedFillColor : idleFillColor",
+            local_button)
+        self.assertIn(
+            "pressedFillColor: selected ? selectedFillColor : idleFillColor",
+            local_button)
+        self.assertIn(
+            "hoverForegroundColor: selected ? selectedForegroundColor : idleForegroundColor",
+            local_button)
+        self.assertEqual(PANE.count("AngelActionButton {"), 13)
+        self.assertEqual(meaning.count("AngelActionButton {"), 2)
+        self.assertIn("x: 0", PANE.split("id: favoriteObservation", 1)[1]
+                      .split("id: noteObservation", 1)[0])
+        self.assertIn("x: favoriteObservation.width + 4", PANE)
+        self.assertIn("x: observationSelect.x + observationSelect.width + 4", PANE)
+
+    def test_counter_words_and_slashes_are_white(self):
+        header = PANE.split('text: "HISTORY //"', 1)[1].split(
+            'id: angelSearchInput', 1)[0]
+        self.assertIn("color: Colors.white", header)
+        self.assertIn("text: String(pane.filteredRows.length)", header)
+        self.assertIn("color: Colors.magenta", header)
+        self.assertIn('text: "SHOWN //"', header)
+        self.assertIn("text: String(AngelObservationsStore.total)", header)
+        self.assertIn("color: Colors.orange", header)
+        self.assertIn('text: "SAVED"', header)
 
     def test_favorite_and_note_seams_use_existing_owners(self):
         self.assertIn("import qs.services.favorites", PANE)
@@ -179,7 +207,7 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn('id: noteField', PANE)
         self.assertIn('id: noteEditor', PANE)
         self.assertIn("AngelPolicy.MAX_NOTE_LENGTH", PANE)
-        self.assertIn("HISTORY // ", PANE)
+        self.assertIn('text: "HISTORY //"', PANE)
         self.assertIn("Colors.magenta", PANE)
         self.assertIn("Colors.orange", PANE)
         err_button = PANE.split("id: errMarkButton", 1)[1].split(

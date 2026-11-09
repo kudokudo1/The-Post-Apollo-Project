@@ -7,6 +7,11 @@ on:
       - "widgets/HospitalWorkforceManagerView.qml"
       - "widgets/HospitalRegisteredWorkerView.qml"
       - "services/hospital/HospitalWorkforceStaffingPolicy.js"
+      - "services/hospital/HospitalFirstBedVerificationPolicy.js"
+      - "services/hospital/HospitalFirstBedProbeService.qml"
+      - "tests/hospital/test_first_bed_verification_policy.js"
+      - "tests/hospital/test_first_bed_verification_ui_contracts.py"
+      - "tests/hospital/test_first_bed_probe_fixture.py"
       - "tests/hospital/test_workforce_staffing_policy.js"
       - "tests/hospital/test_workforce_staffing_ui_contracts.py"
       - ".github/workflows/hospital-surgery-staffing-readiness.yml"
@@ -18,6 +23,11 @@ on:
       - "widgets/HospitalWorkforceManagerView.qml"
       - "widgets/HospitalRegisteredWorkerView.qml"
       - "services/hospital/HospitalWorkforceStaffingPolicy.js"
+      - "services/hospital/HospitalFirstBedVerificationPolicy.js"
+      - "services/hospital/HospitalFirstBedProbeService.qml"
+      - "tests/hospital/test_first_bed_verification_policy.js"
+      - "tests/hospital/test_first_bed_verification_ui_contracts.py"
+      - "tests/hospital/test_first_bed_probe_fixture.py"
       - "tests/hospital/test_workforce_staffing_policy.js"
       - "tests/hospital/test_workforce_staffing_ui_contracts.py"
       - ".github/workflows/hospital-surgery-staffing-readiness.yml"
@@ -34,6 +44,8 @@ jobs:
         run: |
           node --check services/hospital/HospitalWorkforceStaffingPolicy.js
           node tests/hospital/test_workforce_staffing_policy.js
+          node --check services/hospital/HospitalFirstBedVerificationPolicy.js
+          node tests/hospital/test_first_bed_verification_policy.js
       - name: Ensure inline Surgery view never mutates workers
         run: |
           python3 tests/hospital/test_workforce_staffing_ui_contracts.py
@@ -41,3 +53,5 @@ jobs:
           python3 tests/hospital/test_workforce_job_activation_ui_contracts.py
           python3 tests/hospital/test_workforce_roster_ui_contracts.py
           python3 tests/hospital/test_registered_worker_routes.py
+          python3 tests/hospital/test_first_bed_verification_ui_contracts.py
+          python3 tests/hospital/test_first_bed_probe_fixture.py

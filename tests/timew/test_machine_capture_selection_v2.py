@@ -145,7 +145,6 @@ refused({"outputs": ["DP-3"], "workspaces": ["2"]}, "EXCLUDED MONITOR")
 refused({"outputs": ["DP-3"], "windows": [C]}, "EXCLUDED WORKSPACE")
 refused({"workspaces": ["1"], "windows": [C]}, "EXCLUDED WORKSPACE")
 refused({"mystery": [A]}, "UNKNOWN SELECTION FIELDS")
-refused(None, "THIS MUST NOT BE CALLED") if False else None
 
 
 def make_runner():

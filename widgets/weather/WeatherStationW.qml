@@ -704,20 +704,16 @@ PanelWindow {
         onActivated: weatherStation.activateNavigationCursor()
     }
 
-    // U7b: Weather is the sole authority for its saved HOME panel routes.
-    // Refuse stale, removed, corrupt or not-yet-loaded favorites. Navigation
-    // never opens a terminal, plays Radio, or writes to the Weather store.
+    // U7b-K: a saved HOME panel is an in-widget read-only navigation
+    // shortcut, NOT authority to edit bookmarks or operate a provider.
+    // Open the original SUBJECTS workspace before considering store state.
+    // A late, stale or unreadable favorites snapshot never blocks a safe
+    // local view. Preserve the existing Kitty/terminal ownership guards.
     function openSavedHomePanel(route) {
-        if (!ExactNavigation.ownerAllows(
-                route,weatherStation.homeFavoritesReadOnlySnapshot))
+        if (!ExactNavigation.localRouteAllows(route))
             return false;
         if (!menuOpen) open();
         if (!menuOpen || !subjectNavigationOpen || contextTerminalRequested)
-            return false;
-        // Recheck against the CURRENT owner snapshot immediately before
-        // changing the page; CPU++ selection is not a permission grant.
-        if (!ExactNavigation.ownerAllows(
-                route,weatherStation.homeFavoritesReadOnlySnapshot))
             return false;
         return subjectNavigator.chooseRoute(route);
     }

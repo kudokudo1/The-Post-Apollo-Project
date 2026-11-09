@@ -1,0 +1,27 @@
+name: TimeW MACHINE M1q one-window apply (synthetic)
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineMoveApply.py"
+      - "services/time/MachineWindowMovePilot.py"
+      - "services/time/MachineMoveApproval.py"
+      - "services/time/MachineMoveJournal.py"
+      - "services/time/MachineCheckpointStore.py"
+      - "tests/timew/test_machine_move_apply.py"
+      - ".github/workflows/timew-machine-apply.yml"
+  workflow_dispatch:
+
+jobs:
+  synthetic-one-window-apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test scoped apply with fake Sway and temporary SQLite
+        run: python3 -B -I tests/timew/test_machine_move_apply.py
+      - name: Preserve existing move/consent/journal behavior
+        run: |
+          python3 -B -I tests/timew/test_machine_window_move_pilot.py
+          python3 -B -I tests/timew/test_machine_move_approval_reconciliation.py
+          python3 -B -I tests/timew/test_machine_move_journal.py

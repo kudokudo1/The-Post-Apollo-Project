@@ -145,12 +145,14 @@ with tempfile.TemporaryDirectory() as tmp:
 
     def uncertain(argv, **kwargs):
         sway.commands.append(argv)
+        sway.duplicate = True  # postflight identity becomes ambiguous
         return SimpleNamespace(stdout=b'invalid', returncode=1)
 
     opts["command_runner"] = uncertain
     result = apply_one(payload(), **opts)
     assert result["status"] == "uncertain_requires_manual_review"
     assert len(MoveJournal(db).pending()) == 1
+    sway.duplicate = False  # next action viable, but pending journal blocks it
     refuses(payload(), opts)
     assert len(sway.commands) == 1, "pending must block repeat dispatch"
 

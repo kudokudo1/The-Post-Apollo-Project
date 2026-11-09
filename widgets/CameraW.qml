@@ -421,6 +421,20 @@ PanelWindow {
         return true;
     }
 
+    function suspendHostedCleanup() {
+        // Leaving Trash++ pauses Hunt's timers/visual effects, but never
+        // erases Camera's single validated selection queue.
+        huntPaused = true;
+        huntAutoPending = false;
+        huntScoped = false;
+        huntMouseActive = false;
+        huntMouseMovingTicks = 0;
+        huntHitFlash = false;
+        huntShotEffect = null;
+        huntSettingsOpen = false;
+        huntPauseMenuOpen = false;
+    }
+
     function openCleanupFromTrash(requestedMode) {
         // This selects the actual Cleanup UI HOSTED INSIDE Trash++, not
         // Camera's now-removed page. No Camera window is opened here.

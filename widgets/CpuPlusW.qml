@@ -1565,6 +1565,11 @@ PanelWindow {
             id: universalSignInUpperPane
             visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+            // Closing the menu or changing modes revokes the read-only
+            // Identity Center status view and any in-flight response.
+            panelActive: cpuPlusWindow.menuOpen
+                         && cpuPlusWindow.selectedModeIndex === 6
+                         && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
             height: visible ? implicitHeight : 0
             anchors.left: parent.left
             anchors.right: parent.right

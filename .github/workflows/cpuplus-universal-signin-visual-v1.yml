@@ -4,20 +4,25 @@ on:
   pull_request:
     paths:
       - 'services/connections/ConnectionsUnifiedSignInPolicy.js'
+      - 'services/connections/ConnectionsIdentityJourneyPolicy.js'
       - 'widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml'
       - 'widgets/cpuplus/CpuPlusUniversalSignInHeaderPane.qml'
       - 'widgets/CpuPlusW.qml'
       - 'tests/cpuplus/test_cpuplus_universal_signin_control_center.cjs'
+      - 'tests/cpuplus/test_cpuplus_universal_signin_journey_v2.cjs'
       - 'docs/cpuplus-universal-signin-visual-v1.md'
+      - 'docs/cpuplus-universal-signin-journey-v2.md'
       - '.github/workflows/cpuplus-universal-signin-visual-v1.yml'
   push:
-    branches: [main, 'feat/cpuplus-signin-*']
+    branches: [main, 'feat/cpuplus-signin-*', 'feat/cpuplus-universal-signin-*']
     paths:
       - 'services/connections/ConnectionsUnifiedSignInPolicy.js'
+      - 'services/connections/ConnectionsIdentityJourneyPolicy.js'
       - 'widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml'
       - 'widgets/cpuplus/CpuPlusUniversalSignInHeaderPane.qml'
       - 'widgets/CpuPlusW.qml'
       - 'tests/cpuplus/test_cpuplus_universal_signin_control_center.cjs'
+      - 'tests/cpuplus/test_cpuplus_universal_signin_journey_v2.cjs'
       - '.github/workflows/cpuplus-universal-signin-visual-v1.yml'
 permissions:
   contents: read
@@ -32,6 +37,8 @@ jobs:
           node-version: '22'
       - name: Universal Sign-In truthful status and navigation
         run: node tests/cpuplus/test_cpuplus_universal_signin_control_center.cjs
+      - name: Universal Sign-In V2 read-only Identity Center journey and stale view denial
+        run: node tests/cpuplus/test_cpuplus_universal_signin_journey_v2.cjs
       - name: Existing CPU++ Connections, deny-only and account editor behavior
         run: |
           node tests/cpuplus/test_cpuplus_connections_c1.js

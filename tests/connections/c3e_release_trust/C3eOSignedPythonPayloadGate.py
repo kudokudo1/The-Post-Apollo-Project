@@ -181,10 +181,21 @@ def verify(*, rpm_file: Path, public_key: Path, pinned_fingerprint: str,
             deny("SIGNED_HOST_SHEBANG_REFUSED")
         unit = extracted / "usr/lib/systemd/system/postapollo-connections-status.service"
         body = unit.read_text()
-        if (body.count("ExecStart=/usr/libexec/post-apollo/connections-status-host --read-only")
-                != 1 or "NoNewPrivileges=yes" not in body or
-                "RestrictAddressFamilies=AF_UNIX" not in body or
-                "IPAddressDeny=any" not in body or "[Install]" in body):
+        # systemd ignores comments; the canonical unit deliberately has a
+        # comment saying "no [Install] stanza". Check ACTIVE directives,
+        # never count a comment as an actual install/enablement section.
+        active = [line.strip() for line in body.splitlines()
+                  if line.strip() and not line.lstrip().startswith(("#", ";"))]
+        required = {
+            "ExecStart=/usr/libexec/post-apollo/connections-status-host --read-only",
+            "NoNewPrivileges=yes", "RestrictAddressFamilies=AF_UNIX",
+            "IPAddressDeny=any", "Restart=no", "DynamicUser=no",
+            "CapabilityBoundingSet=", "AmbientCapabilities=",
+        }
+        if (active.count("[Service]") != 1 or
+                active.count("ExecStart=/usr/libexec/post-apollo/connections-status-host --read-only") != 1 or
+                not required.issubset(set(active)) or
+                "[Install]" in active):
             deny("SIGNED_UNIT_SCOPE_REFUSED")
         return {
             "schema": SCHEMA, "rpm_sha256": rpm_digest,

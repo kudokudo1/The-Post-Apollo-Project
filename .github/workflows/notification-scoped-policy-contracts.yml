@@ -8,6 +8,8 @@ on:
       - "widgets/notifications/NotificationsHubW.qml"
       - "tests/notifications/test_notification_scoped_policies.py"
       - "tests/notifications/test_notification_messaging_identity.py"
+      - "tests/notifications/test_vesktop_identity_producer.py"
+      - "integrations/vesktop/postApolloNotificationBridge/**"
       - "tests/notifications/test_notification_resource_scopes.py"
       - "tests/notifications/test_resource_pressure_producer.py"
       - "tests/notifications/test_notification_hard_block.py"
@@ -20,6 +22,8 @@ on:
       - "widgets/notifications/NotificationsHubW.qml"
       - "tests/notifications/test_notification_scoped_policies.py"
       - "tests/notifications/test_notification_messaging_identity.py"
+      - "tests/notifications/test_vesktop_identity_producer.py"
+      - "integrations/vesktop/postApolloNotificationBridge/**"
       - "tests/notifications/test_notification_resource_scopes.py"
       - "tests/notifications/test_resource_pressure_producer.py"
       - "tests/notifications/test_notification_hard_block.py"
@@ -39,6 +43,8 @@ jobs:
         run: python3 tests/notifications/test_notification_scoped_policies.py
       - name: Verify contact, group, DM and email thread isolation
         run: python3 tests/notifications/test_notification_messaging_identity.py
+      - name: Verify opt-in Vesktop native-identity producer and FDO hints
+        run: python3 tests/notifications/test_vesktop_identity_producer.py
       - name: Verify resource-specific DND, ZZ, BLOCK and Favorites
         run: python3 tests/notifications/test_notification_resource_scopes.py
       - name: Verify CPU++ producer emits typed resource identity

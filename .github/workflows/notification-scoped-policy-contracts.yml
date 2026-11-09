@@ -35,3 +35,15 @@ jobs:
         run: python3 tests/notifications/test_notification_policy_contracts.py
       - name: Preserve popup input and two-click contracts
         run: python3 tests/notifications/test_notification_popup_input_contracts.py
+
+      - name: Sweep remaining notification regressions without unrelated Weather route
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test_file in tests/notifications/test_*.py; do
+            if [[ "${test_file}" == "tests/notifications/test_apollo_destination_routing.py" ]]; then
+              echo "SKIP known stale Weather-owned navigation assertion"
+              continue
+            fi
+            python3 "${test_file}"
+          done

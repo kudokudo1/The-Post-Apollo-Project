@@ -295,6 +295,31 @@ for i in $(seq 1 700); do
      grep -a -Fq 'error: Checking systemd inhibitor locks: Timeout was reached' "$tmp/c4b-diagnostic-serial.log"; then
     echo 'C4B_HOST_KNOWN_OS_ERROR // logind inhibitor timeout during actual rollback, no real second-boot PASS'
     result=LOGIND_INHIBITOR_TIMEOUT
+    # The observer may have just recorded the CLI error but still be inside
+    # its read-only logind probes. Preserve up to 32s of bounded evidence;
+    # NEVER accept a second-boot PASS after this terminal OS error.
+    c4b_evidence_complete=0
+    for sample_wait in $(seq 1 16); do
+      if awk '
+        index($0, "error: Checking systemd inhibitor locks: Timeout was reached") {
+          seen_error=1; sample_done=0
+        }
+        seen_error && index($0, "C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_JOURNAL_END") {
+          sample_done=1
+        }
+        END { exit !(seen_error && sample_done) }
+      ' "$tmp/c4b-diagnostic-serial.log"; then
+        c4b_evidence_complete=1
+        break
+      fi
+      if ! kill -0 "$pid" 2>/dev/null; then break; fi
+      sleep 2
+    done
+    if [[ "$c4b_evidence_complete" == 1 ]]; then
+      echo 'C4B_HOST_KNOWN_OS_ERROR_EVIDENCE // sample_complete'
+    else
+      echo 'C4B_HOST_KNOWN_OS_ERROR_EVIDENCE // incomplete_bounded'
+    fi
     break
   fi
   if ! kill -0 "$pid" 2>/dev/null; then

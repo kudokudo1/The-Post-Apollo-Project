@@ -132,9 +132,23 @@ for n in $(seq 1 55); do
         -p ActiveState -p SubState -p Result -p MainPID \
         -p ExecMainCode -p ExecMainStatus || true
       echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_UNIT_END'
+      # Distinguish a reachable D-Bus service owner from a logind method
+      # that accepts connections but cannot answer inhibitor queries.
+      # Read-only D-Bus metadata, bounded, and never a success signal.
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_OWNER_BEGIN'
+      if timeout --signal=TERM --kill-after=2s 6s \
+          busctl --system --no-pager status org.freedesktop.login1 \
+          > /run/c2v-login1-owner-probe.log 2>&1; then
+        echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_OWNER_RC // 0'
+      else
+        probe_rc="$?"
+        echo "C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_OWNER_RC // $probe_rc"
+      fi
+      head -c 1400 /run/c2v-login1-owner-probe.log 2>/dev/null || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_OWNER_END'
       echo 'C2V_DIAG_ROLLBACK_OBSERVER_INHIBITORS_BEGIN'
       if timeout --signal=TERM --kill-after=2s 7s \
-          loginctl list-inhibitors --no-pager > /run/c2v-inhibitor-probe.log 2>&1; then
+          systemd-inhibit --list --no-pager > /run/c2v-inhibitor-probe.log 2>&1; then
         echo 'C2V_DIAG_ROLLBACK_OBSERVER_INHIBITORS_RC // 0'
       else
         probe_rc="$?"

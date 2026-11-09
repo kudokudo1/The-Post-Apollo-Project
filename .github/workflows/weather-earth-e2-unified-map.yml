@@ -20,6 +20,7 @@ on:
       - 'tests/weather/test_earth_e4_ground_split.js'
       - 'tests/weather/test_earth_e5_ground_no_scroll.js'
       - 'tests/weather/test_earth_e6_overview.js'
+      - 'tests/weather/test_earth_e7_overview.js'
       - 'tests/weather/fixtures/E6EarthOverviewNativeShell.qml'
       - 'tests/weather/fixtures/E5GroundNoScroll.qml'
       - 'tests/weather/fixtures/E2EarthUnifiedNativeShell.qml'
@@ -44,6 +45,7 @@ jobs:
             tests/weather/test_earth_e4_ground_split.js \
             tests/weather/test_earth_e5_ground_no_scroll.js \
             tests/weather/test_earth_e6_overview.js \
+            tests/weather/test_earth_e7_overview.js \
             tests/weather/test_earth_subject_panels_e1.js \
             tests/weather/test_index_earth_cutover_m28h.js \
             tests/weather/test_workspace_landing_w1.js \
@@ -147,6 +149,7 @@ jobs:
           cat "$work/overview-native.log"
           test "$rc" -eq 0
           grep -F "E6_NATIVE_PASS // HALF_MAP_THREE_TOPIC_ARROWS_NO_DUPLICATE_MAP" "$work/overview-native.log"
+          grep -F "E7_NATIVE_PASS // COSMOS_RAIL_MICROCHARTS_NO_OVERVIEW_SCROLLBAR" "$work/overview-native.log"
           if grep -E 'E6_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/overview-native.log"; then
             exit 1
           fi

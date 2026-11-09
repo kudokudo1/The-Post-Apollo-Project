@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "StationEarthOverviewPolicy.js" as Overview
 import "StationGroundEnvironmentPolicy.js" as Environment
+import "StationSubjectHeaderGeometry.js" as HeaderGeometry
 
 // E6 // Read-only summary companion beneath the ONE persistent EARTH map.
 // Three arrow-driven topics reuse Weather Station data already on the root.
@@ -32,19 +33,58 @@ Rectangle {
     readonly property var summary:
         Overview.summarize(topicIndex,riverSource,weatherService,
                            nwsAlertSource,seismicSource,heatIndex,fireProducts)
+    readonly property var charts:
+        Overview.microcharts(topicIndex,riverSource,weatherService,
+                             nwsAlertSource,seismicSource,heatIndex,fireProducts)
 
+    // E7 // COSMOS C44 main rail: direct entry into the three existing
+    // detailed menus. The retained arrows below change only the summary.
+    Row {
+        id: overviewMainRail
+        objectName: "earth-e7-overview-main-rail"
+        anchors.top: parent.top
+        anchors.topMargin: 2
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: HeaderGeometry.inset
+        anchors.rightMargin: HeaderGeometry.inset
+        height: HeaderGeometry.tabHeight
+        spacing: HeaderGeometry.tabSpacing
+        Repeater {
+            model: Overview.TOPICS
+            delegate: ActionButton {
+                required property var modelData
+                objectName: "earth-e7-main-" + modelData.id
+                width: HeaderGeometry.buttonWidth(overviewMainRail.width,3)
+                height: HeaderGeometry.tabHeight
+                label: modelData.label
+                labelPixelSize: 10
+                contentPadding: 1
+                selected: overview.currentTopic.id === modelData.id
+                accentColor: Colors.cyan
+                onClicked: overview.openTopicRequested(modelData.id)
+            }
+        }
+    }
+    Rectangle {
+        id: mainDivider
+        objectName: "earth-e7-overview-divider"
+        anchors.top: overviewMainRail.bottom
+        anchors.topMargin: HeaderGeometry.tabsToRule
+        anchors.left: overviewMainRail.left
+        anchors.right: overviewMainRail.right
+        height: HeaderGeometry.ruleHeight
+        color: Colors.cyan
+    }
     Row {
         id: topicNavigation
         objectName: "earth-e6-overview-arrows"
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.leftMargin: 6
-        anchors.rightMargin: 6
+        anchors.top: mainDivider.bottom
         anchors.topMargin: 2
-        height: 23
+        anchors.left: overviewMainRail.left
+        anchors.right: overviewMainRail.right
+        height: 18
         spacing: 4
-
         ActionButton {
             objectName: "earth-e6-prev"
             width: 33
@@ -61,7 +101,7 @@ Rectangle {
                             -3*topicNavigation.spacing)
             height: parent.height
             text: "EARTH // " + overview.summary.title
-            font.pixelSize: 12
+            font.pixelSize: 11
             color: Colors.magenta
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
@@ -87,70 +127,53 @@ Rectangle {
             onClicked: overview.topicIndex = Overview.wrap(overview.topicIndex+1)
         }
     }
-
     Rectangle {
         id: summaryRule
         objectName: "earth-e6-summary-divider"
         anchors.top: topicNavigation.bottom
-        anchors.topMargin: 2
+        anchors.topMargin: 1
         anchors.left: topicNavigation.left
         anchors.right: topicNavigation.right
-        height: 2
+        height: 1
         color: Colors.cyan
     }
-
     QuietText {
         id: topicCaption
         objectName: "earth-e6-topic-caption"
         anchors.top: summaryRule.bottom
-        anchors.topMargin: 2
+        anchors.topMargin: 1
         anchors.left: topicNavigation.left
         anchors.right: topicNavigation.right
-        height: 12
+        height: 10
         font.pixelSize: 9
         text: overview.summary.subtitle
         elide: Text.ElideRight
         color: Colors.orange
     }
-
-    ActionButton {
-        id: fullMenu
-        objectName: "earth-e6-open-topic"
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 3
-        anchors.right: topicNavigation.right
-        height: 21
-        width: 128
-        label: "OPEN FULL MENU"
-        labelPixelSize: 9
-        contentPadding: 1
-        accentColor: Colors.magenta
-        onClicked: overview.openTopicRequested(overview.currentTopic.id)
-    }
-
+    // E7 // The footer uses only a thin baseline. The former full-menu
+    // button is gone, leaving four smaller cards with room for graphs.
     QuietText {
         id: sourceFooter
         objectName: "earth-e6-source-footer"
-        anchors.left: topicNavigation.left
-        anchors.right: fullMenu.left
-        anchors.rightMargin: 5
-        anchors.verticalCenter: fullMenu.verticalCenter
-        height: 12
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 2
+        anchors.left: overviewMainRail.left
+        anchors.right: overviewMainRail.right
+        height: 10
         font.pixelSize: 8
         color: Colors.cyan
         elide: Text.ElideRight
         text: overview.summary.footer
     }
-
     Row {
         id: summaryCards
         objectName: "earth-e6-summary-cards"
-        anchors.left: topicNavigation.left
-        anchors.right: topicNavigation.right
+        anchors.left: overviewMainRail.left
+        anchors.right: overviewMainRail.right
         anchors.top: topicCaption.bottom
-        anchors.topMargin: 3
-        anchors.bottom: fullMenu.top
-        anchors.bottomMargin: 3
+        anchors.topMargin: 2
+        anchors.bottom: sourceFooter.top
+        anchors.bottomMargin: 2
         spacing: 4
         clip: true
 
@@ -158,6 +181,8 @@ Rectangle {
             model: overview.summary.cards
             delegate: Rectangle {
                 required property var modelData
+                required property int index
+                readonly property var plot: overview.charts[index]
                 objectName: "earth-e6-metric"
                 width: Math.max(1,(summaryCards.width
                     -3*summaryCards.spacing)/4)
@@ -168,34 +193,108 @@ Rectangle {
                 clip: true
 
                 QuietText {
+                    id: cardLabel
+                    anchors.top: parent.top
+                    anchors.topMargin: 2
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: 4
-                    height: 10
+                    anchors.leftMargin: 3
+                    anchors.rightMargin: 3
+                    height: 9
                     font.pixelSize: 8
                     text: modelData.label
                     elide: Text.ElideRight
                     color: Colors.orange
                 }
                 GohuText {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.margins: 4
-                    height: 18
-                    font.pixelSize: 14
+                    id: cardValue
+                    anchors.top: cardLabel.bottom
+                    anchors.topMargin: 1
+                    anchors.left: cardLabel.left
+                    anchors.right: cardLabel.right
+                    height: 17
+                    font.pixelSize: 13
                     text: modelData.value
                     elide: Text.ElideRight
                     color: Colors.white
                     verticalAlignment: Text.AlignVCenter
                 }
-                QuietText {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.margins: 4
+                Row {
+                    id: microChart
+                    objectName: "earth-e7-microchart"
+                    anchors.top: cardValue.bottom
+                    anchors.topMargin: 1
+                    anchors.left: cardLabel.left
+                    anchors.right: cardLabel.right
                     height: 10
+                    spacing: 2
+                    clip: true
+                    QuietText {
+                        width: 48
+                        height: parent.height
+                        font.pixelSize: 7
+                        text: plot.caption
+                        color: Colors.cyan
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    Item {
+                        id: plotRegion
+                        width: Math.max(1,microChart.width-48-microChart.spacing)
+                        height: microChart.height
+                        Rectangle {
+                            objectName: "earth-e7-meter-track"
+                            visible: plot.type === "meter"
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: 4
+                            color: Colors.black
+                            border.width: 1
+                            border.color: Colors.magenta
+                            Rectangle {
+                                width: plot.values.length && plot.values[0] !== null
+                                    ? Math.max(0,parent.width*plot.values[0]) : 0
+                                height: parent.height
+                                color: Colors.cyan
+                            }
+                        }
+                        Row {
+                            objectName: "earth-e7-bar-strip"
+                            visible: plot.type !== "meter"
+                            anchors.fill: parent
+                            spacing: 2
+                            Repeater {
+                                model: plot.type === "meter" ? [] : plot.values
+                                delegate: Item {
+                                    required property var modelData
+                                    width: Math.max(1,(plotRegion.width
+                                        -Math.max(0,plot.values.length-1)*2)
+                                        /Math.max(1,plot.values.length))
+                                    height: plotRegion.height
+                                    Rectangle {
+                                        anchors.bottom: parent.bottom
+                                        width: parent.width
+                                        height: modelData === null ? 1
+                                            : plot.type === "marks" ? 4
+                                            : Math.max(1,Math.round(
+                                                parent.height*modelData))
+                                        color: modelData === null
+                                            ? Colors.magenta : Colors.cyan
+                                        opacity: modelData === null ? 0.25
+                                            : modelData <= 0 ? 0.16 : 1.0
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                QuietText {
+                    anchors.left: cardLabel.left
+                    anchors.right: cardLabel.right
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 2
+                    height: 9
                     font.pixelSize: 8
                     text: modelData.detail
                     elide: Text.ElideRight

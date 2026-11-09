@@ -121,8 +121,16 @@ Column {
         }
         armedKind = kind;
         armedKey = signature(kind);
-        outcome = "REVIEW READY // " + kind
-            + " // confirm only if these names, target and permissions are correct";
+        const detail = kind === "CREATE_WORKER"
+            ? p.name + " // ROLE " + p.role + " // ID " + p.id
+            : kind === "CREATE_ROOM"
+            ? p.name + " // PATIENT " + p.repository + " // ID " + p.id
+            : kind === "RETIRE"
+            ? "WORKER " + p.id + " // PRESERVE ALL ROOM/SESSION HISTORY"
+            : "ROOM " + p.roomId + " // " + jobTitleField.value
+                + " // AUTH " + p.permissions.join(", ");
+        outcome = "REVIEW READY // " + detail
+            + " // CONFIRM SAVES ONLY THIS RECORD";
         return true;
     }
     function confirm(kind) {
@@ -172,8 +180,11 @@ Column {
     }
     onActiveChanged: {
         disarm();
-        if (active && !roomRepositoryField.value)
-            roomRepositoryField.value = suggestedRepository;
+        if (active)
+            Qt.callLater(function() {
+                if (root.active && !roomRepositoryField.value)
+                    roomRepositoryField.value = root.suggestedRepository;
+            });
     }
     onRoomsChanged: disarm()
     onSessionsChanged: disarm()

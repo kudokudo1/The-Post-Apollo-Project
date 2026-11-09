@@ -257,6 +257,7 @@ PanelWindow {
     ]
     property bool listKeyboardSelectionActive: false
     property string managerSelectionSection: "dnd"
+    property string managerPolicyMode: "dnd" // dnd | zz | favorites
     // Do not take mode keys from the search editor or destructive dialogs.
     readonly property bool standardKeysAvailable:
         menuOpen && keyboardActive && !searchInput.activeFocus
@@ -327,6 +328,7 @@ PanelWindow {
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable && root.activeFilter === "manager"
         onActivated: {
+            root.managerPolicyMode = "dnd";
             root.managerSelectionSection = "dnd";
             root.listKeyboardSelectionActive = false;
         }
@@ -336,6 +338,7 @@ PanelWindow {
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable && root.activeFilter === "manager"
         onActivated: {
+            root.managerPolicyMode = "favorites";
             root.managerSelectionSection = "favorites";
             root.listKeyboardSelectionActive = false;
         }
@@ -391,6 +394,10 @@ PanelWindow {
 
     ListModel {
         id: managerDndPolicies
+    }
+
+    ListModel {
+        id: managerVisiblePolicies
     }
 
     Timer {
@@ -453,6 +460,12 @@ PanelWindow {
     onSearchQueryChanged: {
         listKeyboardSelectionActive = false;
         root.scheduleFilteredModelRebuild();
+    }
+
+    onManagerPolicyModeChanged: {
+        managerSelectionSection = managerPolicyMode === "favorites" ? "favorites" : "dnd";
+        listKeyboardSelectionActive = false;
+        root.rebuildManagerDndPolicies();
     }
 
     Component.onCompleted: {
@@ -1165,6 +1178,7 @@ PanelWindow {
 
     function rebuildManagerDndPolicies() {
         managerDndPolicies.clear();
+        managerVisiblePolicies.clear();
 
         for (var i = 0; i < NotificationsService.sourcePolicies.count; i++) {
             var policy = NotificationsService.sourcePolicies.get(i);
@@ -1173,13 +1187,17 @@ PanelWindow {
             if (policy.dnd !== true && snoozeUntil <= Date.now())
                 continue;
 
-            managerDndPolicies.append({
+            const row = {
                 "appKey": String(policy.appKey || ""),
                 "source": String(policy.source || ""),
                 "sourceId": String(policy.sourceId || ""),
                 "dnd": policy.dnd === true,
                 "snoozeUntil": snoozeUntil
-            });
+            };
+            managerDndPolicies.append(row);
+            if ((managerPolicyMode === "dnd" && row.dnd)
+                    || (managerPolicyMode === "zz" && !row.dnd))
+                managerVisiblePolicies.append(row);
         }
     }
 
@@ -2548,14 +2566,52 @@ PanelWindow {
                         }
                         anchors.topMargin: 14
 
-                        Item {
-                            id: dndManagerSection
+                        Row {
+                            id: managerRuleTabs
                             anchors {
                                 top: parent.top
                                 left: parent.left
                                 right: parent.right
                             }
-                            height: Math.max(0, (parent.height - 14) / 2)
+                            height: 32
+                            spacing: 7
+                            readonly property real tabWidth: (width - spacing * 2) / 3
+                            MiniButton {
+                                width: parent.tabWidth
+                                height: 30
+                                label: "DND"
+                                active: root.managerPolicyMode === "dnd"
+                                activeColor: Colors.magenta
+                                onTriggered: root.managerPolicyMode = "dnd"
+                            }
+                            MiniButton {
+                                width: parent.tabWidth
+                                height: 30
+                                label: "ZZ"
+                                active: root.managerPolicyMode === "zz"
+                                activeColor: Colors.orange
+                                onTriggered: root.managerPolicyMode = "zz"
+                            }
+                            MiniButton {
+                                width: parent.tabWidth
+                                height: 30
+                                label: "FAVORITES"
+                                active: root.managerPolicyMode === "favorites"
+                                activeColor: Colors.magenta
+                                onTriggered: root.managerPolicyMode = "favorites"
+                            }
+                        }
+
+                        Item {
+                            id: dndManagerSection
+                            visible: root.managerPolicyMode !== "favorites"
+                            anchors {
+                                top: managerRuleTabs.bottom
+                                bottom: parent.bottom
+                                left: parent.left
+                                right: parent.right
+                            }
+                            anchors.topMargin: 8
 
                             GlowText {
                                 id: dndManagerTitle
@@ -2567,7 +2623,9 @@ PanelWindow {
                                 anchors.leftMargin: 4
                                 anchors.rightMargin: 4
                                 height: 24
-                                text: "DND / ZZ RULES  //  " + managerDndPolicies.count
+                                text: root.managerPolicyMode === "zz"
+                                    ? "SNOOZED // " + managerVisiblePolicies.count
+                                    : "DO NOT DISTURB // " + managerVisiblePolicies.count
                                 pixelSize: 13
                                 textColor: Colors.magenta
                                 glowColor: Colors.magenta
@@ -2590,7 +2648,9 @@ PanelWindow {
                                 anchors.leftMargin: 4
                                 anchors.rightMargin: 4
                                 height: 18
-                                text: "DND // ALLOW   •   ZZ // WAKE OR AUTO-EXPIRE"
+                                text: root.managerPolicyMode === "zz"
+                                    ? "Timed suppression // WAKE or automatic expiry"
+                                    : "Indefinite suppression // ALLOW to restore popups"
                                 font.pixelSize: 10
                                 color: Colors.white
                                 opacity: 0.72
@@ -2608,7 +2668,7 @@ PanelWindow {
                                 clip: true
                                 spacing: 8
                                 boundsBehavior: Flickable.StopAtBounds
-                                model: managerDndPolicies
+                                model: managerVisiblePolicies
 
                                 delegate: Rectangle {
                                     id: dndRule
@@ -2708,10 +2768,11 @@ PanelWindow {
                             }
                             GlowText {
                                 anchors.centerIn: dndManagerList
-                                visible: managerDndPolicies.count === 0
+                                visible: managerVisiblePolicies.count === 0
                                 width: dndManagerList.width - 40
                                 height: 30
-                                text: "NO ACTIVE DND OR ZZ RULES"
+                                text: root.managerPolicyMode === "zz"
+                                    ? "NO ACTIVE ZZ RULES" : "NO ACTIVE DND RULES"
                                 pixelSize: 12
                                 textColor: Colors.cyan
                                 glowColor: Colors.cyan
@@ -2721,13 +2782,14 @@ PanelWindow {
 
                         Item {
                             id: favoriteManagerSection
+                            visible: root.managerPolicyMode === "favorites"
                             anchors {
-                                top: dndManagerSection.bottom
+                                top: managerRuleTabs.bottom
                                 bottom: parent.bottom
                                 left: parent.left
                                 right: parent.right
                             }
-                            anchors.topMargin: 14
+                            anchors.topMargin: 8
 
                             GlowText {
                                 id: favoriteManagerTitle

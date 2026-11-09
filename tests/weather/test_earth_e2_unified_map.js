@@ -110,13 +110,15 @@ test("E2 WATER uses the existing ground engine for three isolated bodies, GROUND
  assert.equal(ground.visibleFor("ground","earth/water/coast","coast"),true);
  assert.equal(ground.visibleFor("ground","earth/water/rivers","seismic"),false);
  assert.equal(ground.visibleFor("ground","earth/ground/full","seismic"),true);
+ assert.equal(ground.visibleFor("ground","earth/ground/full","lightning"),false);
  for(const x of ["rivers","marine","coast"])
    assert.equal(ground.visibleFor("ground","earth/ground/full",x),false);
  for(const source of ["river","marine","coastal","lightning","seismic"]){
    const paths={river:"earth/water/rivers",marine:"earth/water/marine",
       coastal:"earth/water/coast",lightning:"earth/ground/full",
       seismic:"earth/ground/full"};
-   assert.equal(ground.needsSource(paths[source],source),true,source);
+   assert.equal(ground.needsSource(paths[source],source),
+     source!=="lightning",source);
  }
  assert.equal((waterPane.match(/StationGround\s*\{/g)||[]).length,1);
  assert.equal((earthPane.match(/StationGround\s*\{/g)||[]).length,1);

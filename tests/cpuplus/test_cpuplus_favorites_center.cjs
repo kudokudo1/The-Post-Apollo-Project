@@ -1844,7 +1844,10 @@ test("U9a / U9b LOCATION separates Explore, pinned search/saved, and Home editin
   assert.match(overview,/function fillExploreCandidate\(candidate\)/);
   assert.match(overview,/property alias durationKey: explorePanel\.durationKey/);
   assert.match(overview,/explorePanel\.fillDestination\(candidate\)/);
-  assert.match(overview,/SHARED CONTEXT \/\/ LOCATION/);
+  assert.match(cpu,/SHARED CONTEXT \/\/ /);
+  assert.match(cpu,/PlaceRegistry\.contextKind/);
+  assert.match(cpu,/PlaceRegistry\.effectivePlace\.label/);
+  assert.match(cpu,/LOCATION \/\/ EXPLORE/);
   assert.match(selection,/CpuPlusPlaceSearchPanel \{/);
   assert.match(selection,/compactPinned: true/);
   assert.match(selection,/onUseForHome: function\(candidate\)/);
@@ -1917,5 +1920,77 @@ test("U9a close reuses Hospital's exact U+00D7 glyph, frame and red glow on blac
   assert.match(hospital,/id: hospitalCloseButton[\s\S]*?width: 40[\s\S]*?height: 34/);
   assert.match(cpu,/anchors\.top: cpuPlusCloseButton\.bottom/);
   assert.match(cpu,/anchors\.topMargin: 3[\s\S]*?height: 2[\s\S]*?color: Colors\.cyan/);
+  assert.match(cpu,/text: "LIVE \/\/ NET \/\/ "\+cpuPlusWindow\.internetStatus\.label/);
+});
+
+
+test("U9b sticky middle place search scrolls matches but never scrolls its query controls",()=>{
+  const middle=read("widgets/cpuplus/CpuPlusSettingsLocationSelectionPane.qml");
+  const search=read("widgets/cpuplus/CpuPlusPlaceSearchPanel.qml");
+  assert.match(middle,/id: placeSearchPanel/);
+  assert.match(middle,/compactPinned: true/);
+  assert.match(middle,/resultsViewportLimit: Math\.max\(50,Math\.min\(108,/);
+  assert.match(middle,/height: implicitHeight/);
+  assert.match(middle,/anchors\.top: placeSearchPanel\.bottom/);
+  assert.match(middle,/id: selectedPlacesScroll/);
+  assert.match(middle,/onUseForHome: function\(candidate\)/);
+  assert.match(middle,/onUseForExplore: function\(candidate\)/);
+  assert.match(search,/property bool compactPinned: false/);
+  assert.match(search,/property int resultsViewportLimit: 108/);
+  const parent=search.indexOf("id: searchContent");
+  const buttons=search.indexOf("id: runSearchButton",parent);
+  const matches=search.indexOf("id: matchesScroll",parent);
+  assert.ok(parent>=0 && buttons>parent && matches>buttons);
+  assert.match(search,/contentHeight: matchesBody\.implicitHeight/);
+  assert.match(search,/searchPanel\.compactPinned[\s\S]*?matchesBody\.implicitHeight/);
+  assert.match(search,/visible: searchPanel\.compactPinned && scrollable/);
+  assert.match(search,/searchPanel\.useForHome\(resultCard\.modelData\)/);
+  assert.match(search,/searchPanel\.useForExplore\(resultCard\.modelData\)/);
+  assert.doesNotMatch(search,/registry\.saveHome|registry\.exploreHere|registry\.returnHome/);
+  // Both selection signals still only prepare the existing editors.
+  const cpu=read("widgets/CpuPlusW.qml");
+  assert.match(cpu,/onHomeCandidateRequested: function\(candidate\) \{\s*settingsLocationPane\.fillHomeCandidate\(candidate\)/);
+  assert.match(cpu,/onExploreCandidateRequested: function\(candidate\) \{\s*settingsLocationOverviewPane\.fillExploreCandidate\(candidate\)/);
+});
+
+test("U9b shared context is above Explore, with active location directly below its actions",()=>{
+  const cpu=read("widgets/CpuPlusW.qml");
+  const overview=read("widgets/cpuplus/CpuPlusSettingsLocationOverviewPane.qml");
+  const explore=read("widgets/cpuplus/CpuPlusExploreLocationPanel.qml");
+  const parentHeader=cpu.indexOf('id: sharedInstrumentHeader');
+  const shared=cpu.indexOf('"SHARED CONTEXT // "',parentHeader);
+  const exploreHeading=cpu.indexOf('"LOCATION // EXPLORE"',shared);
+  assert.ok(parentHeader>=0 && shared>parentHeader && exploreHeading>shared);
+  assert.match(cpu,/PlaceRegistry\.effectivePlace\.label/);
+  assert.match(cpu,/PlaceRegistry\.effectivePlace\.latitude/);
+  assert.match(cpu,/PlaceRegistry\.effectivePlace\.longitude/);
+  assert.doesNotMatch(overview,/CpuPlusPlaceSearchPanel \{/);
+  assert.doesNotMatch(overview,/height: 109/);
+  assert.match(overview,/CpuPlusExploreLocationPanel \{/);
+  const inputs=explore.indexOf('"DESTINATION NAME"');
+  const duration=explore.indexOf('"EXPLORATION DURATION"');
+  const exploreAction=explore.indexOf('id: startExploreButton');
+  const returnAction=explore.indexOf('id: returnHomeButton');
+  const active=explore.indexOf('"ACTIVE // "');
+  const feedback=explore.indexOf('text: explorePanel.feedback');
+  assert.ok(inputs>=0 && duration>inputs && exploreAction>duration
+    && returnAction>exploreAction && active>returnAction && feedback>active);
+  assert.match(explore,/explorePanel\.registry\.exploreHere\(/);
+  assert.match(explore,/explorePanel\.registry\.returnHome\(\)/);
+  assert.match(cpu,/settingsLocationSelectionPane\.editingText/);
+});
+
+test("U9b smaller canonical CPU++ close preserves red-on-black and divider clearance",()=>{
+  const cpu=read("widgets/CpuPlusW.qml");
+  const close=cpu.slice(cpu.indexOf('id: cpuPlusCloseButton'),
+    cpu.indexOf('id: cpuPlusInternetIndicator'));
+  assert.match(close,/width: 36\s+height: 30/);
+  assert.match(close,/text: "×"/);
+  assert.match(close,/font\.pixelSize: 27/);
+  assert.match(close,/color: Colors\.black/);
+  assert.match(close,/border\.color: cpuPlusCloseMouse\.pressed/);
+  assert.match(close,/color: Colors\.red/);
+  assert.match(close,/onClicked: cpuPlusWindow\.close\(\)/);
+  assert.match(cpu,/anchors\.top: cpuPlusCloseButton\.bottom/);
   assert.match(cpu,/text: "LIVE \/\/ NET \/\/ "\+cpuPlusWindow\.internetStatus\.label/);
 });

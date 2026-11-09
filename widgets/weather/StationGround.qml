@@ -747,7 +747,8 @@ Rectangle {
 
             GohuText {
                 visible: ground.subjectRoute !== ""
-                text: "⌁  WEATHER"
+                text: ground.subjectRoute.indexOf("earth/") === 0
+                    ? "⌁  EARTH" : "⌁  WEATHER"
                 font.pixelSize: 24
                 color: Colors.green
             }
@@ -1014,13 +1015,17 @@ Rectangle {
             width: parent.width
             spacing: 6
             visible: ground.subjectRoute.indexOf("weather/water/rivers") === 0
+                || ground.subjectRoute.indexOf("earth/water/rivers") === 0
+            readonly property string riverBase:
+                ground.subjectRoute.indexOf("earth/") === 0
+                ? "earth/water/rivers" : "weather/water/rivers"
             Repeater {
                 model: [
-                    {label:"ALL",path:"weather/water/rivers"},
-                    {label:"GAUGES",path:"weather/water/rivers/gauges"},
-                    {label:"NEARBY",path:"weather/water/rivers/nearby"},
-                    {label:"FLOOD",path:"weather/water/rivers/flood"},
-                    {label:"HYDROGRAPH",path:"weather/water/rivers/hydrograph"}
+                    {label:"ALL",path:parent.riverBase},
+                    {label:"GAUGES",path:parent.riverBase+"/gauges"},
+                    {label:"NEARBY",path:parent.riverBase+"/nearby"},
+                    {label:"FLOOD",path:parent.riverBase+"/flood"},
+                    {label:"HYDROGRAPH",path:parent.riverBase+"/hydrograph"}
                 ]
                 delegate: ModeButton {
                     required property var modelData
@@ -1039,6 +1044,7 @@ Rectangle {
         QuietText {
             width: parent.width
             visible: ground.subjectRoute.indexOf("weather/water/rivers/") === 0
+                || ground.subjectRoute.indexOf("earth/water/rivers/") === 0
             text: "FOCUS // " + SubjectPanelPolicy.riverFocusForRoute(
                 ground.subjectRoute).toUpperCase()
             color: Colors.magenta
@@ -1436,6 +1442,7 @@ Rectangle {
             QuietText {
                 width: parent.width
                 visible: ground.subjectRoute === "weather/water/rivers/nearby"
+                    || ground.subjectRoute === "earth/water/rivers/nearby"
                          && riverService.ready && !!riverService.gauge
                          && riverService.nearbyGauges.length <= 1
                 text: "ONLY ONE NWPS GAUGE RETURNED // NO NEARBY COMPARISON AVAILABLE"

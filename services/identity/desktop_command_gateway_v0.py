@@ -266,7 +266,12 @@ class IdentityCommandGateway:
                 peer = _peer(conn)
                 raw = bytearray()
                 while len(raw) <= _MAX_REQUEST and b"\n" not in raw:
-                    data = conn.recv(_MAX_REQUEST + 2 - len(raw))
+                    try:
+                        data = conn.recv(_MAX_REQUEST + 2 - len(raw))
+                    except socket.timeout:
+                        # An incomplete packet is a bounded denial, not a
+                        # half-open login request or a raw exception.
+                        break
                     if not data:
                         break
                     raw.extend(data)

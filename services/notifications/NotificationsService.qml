@@ -48,6 +48,8 @@ Singleton {
 
     // Bound persistent history so rendering/search/filter cost cannot
     // grow forever over the lifetime of the desktop session.
+    // Durable retention preference. Default preserves the accepted 300-item
+    // behavior; deliberate user changes may retain up to 5,000 records.
     property int maxHistoryEntries: 300
     property int notificationsRevision: 0
 
@@ -703,9 +705,30 @@ Singleton {
         return normalTimeoutMs;
     }
 
+    function normalizeHistoryCapacity(value) {
+        const candidate = Number(value);
+        if (!Number.isFinite(candidate))
+            return 300;
+        return Math.max(300, Math.min(5000, Math.round(candidate / 100) * 100));
+    }
+
+    function setMaxHistoryEntries(value) {
+        const next = normalizeHistoryCapacity(value);
+        if (maxHistoryEntries === next)
+            return false;
+        const oldCount = notifications.count;
+        maxHistoryEntries = next;
+        pruneHistory();
+        if (notifications.count !== oldCount)
+            markNotificationsChanged();
+        scheduleHistorySave();
+        return true;
+    }
+
     function pruneHistory() {
-        while (notifications.count > maxHistoryEntries)
-            notifications.remove(0);
+        const surplus = notifications.count - maxHistoryEntries;
+        if (surplus > 0)
+            notifications.remove(0, surplus);
     }
 
     function appendNotification(notification) {
@@ -927,13 +950,16 @@ Singleton {
 
         return {
             "version": historyVersion,
+            "maxHistoryEntries": maxHistoryEntries,
             "savedAt": Date.now(),
             "notifications": entries
         };
     }
 
     function historyToJson() {
-        return JSON.stringify(historyDocument(), null, 4) + "\n";
+        // Compact JSON avoids thousands of unnecessary indentation/newline
+        // bytes as the retention limit grows. The schema remains unchanged.
+        return JSON.stringify(historyDocument()) + "\n";
     }
 
     // ===== HISTORY STORAGE ======================================
@@ -964,6 +990,7 @@ Singleton {
 
         historyFile.setText(JSON.stringify({
             "version": historyVersion,
+            "maxHistoryEntries": maxHistoryEntries,
             "savedAt": Date.now(),
             "notifications": []
         }, null, 4) + "\n");
@@ -991,6 +1018,13 @@ Singleton {
             historyStatus = "parse-error";
             return false;
         }
+
+        // Read the limit from the SAME durable file before pruning. An
+        // independent async settings file could otherwise load too late and
+        // silently delete records above the temporary 300-item default.
+        if (document && !Array.isArray(document)
+                && document.maxHistoryEntries !== undefined)
+            maxHistoryEntries = normalizeHistoryCapacity(document.maxHistoryEntries);
 
         // Allows an old raw-array history file too.
         const entries = Array.isArray(document) ? document : Array.isArray(document.notifications) ? document.notifications : [];

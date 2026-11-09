@@ -204,6 +204,7 @@ def main() -> int:
     parser.add_argument("--runner-temp", type=Path, required=True)
     parser.add_argument("--complete", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--ready", type=Path, required=True)
     args = parser.parse_args()
     if os.environ.get("GITHUB_ACTIONS") != "true":
         reject("CI_RUNNER_REQUIRED")
@@ -220,6 +221,19 @@ def main() -> int:
         reject("OUTPUT_DIRECTORY_NOT_PRIVATE")
     if args.output.exists() or args.output.is_symlink():
         reject("OUTPUT_ALREADY_EXISTS")
+    # Signal readiness only AFTER all pre-existing-directory and output-path
+    # safety checks. The CI parent MUST wait before starting C2v/QEMU; otherwise
+    # C2v's fresh boot directory can be mistaken for a stale old directory.
+    if (args.ready.parent != args.output.parent or
+            args.ready.name != "observer-ready" or
+            os.path.lexists(args.ready)):
+        reject("OBSERVER_READINESS_SCOPE_REFUSED")
+    ready_fd = os.open(args.ready, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                       os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    with os.fdopen(ready_fd, "wb") as signal:
+        signal.write(b"READY\\n")
+        signal.flush()
+        os.fsync(signal.fileno())
     line = capture(root, args.complete)
     fd = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                  os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)

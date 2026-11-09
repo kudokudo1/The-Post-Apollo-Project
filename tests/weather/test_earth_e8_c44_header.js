@@ -65,7 +65,7 @@ test("E8 overview full menu controls live in the header ABOVE the map, never twi
 test("E8 all EARTH screens preserve their C44 header on the correct owner",()=>{
     assert.match(parent,/readonly property bool mapFamily: kind === "map"/);
     assert.match(header,/EARTH \/\/ OVERVIEW/);
-    assert.match(header,/EARTH \/\/ MAP \/\/ EVENTS/);
+    assert.match(header,/EARTH \/\/ MAP \/ EVENTS/);
     assert.match(header,/\{id:"full",label:"FULL MAP",path:"earth\/maps\/full"\}/);
     assert.match(parent,/objectName: "earth-e4-ground-title"/);
     assert.match(parent,/objectName: "earth-e4-ground-tabs"/);

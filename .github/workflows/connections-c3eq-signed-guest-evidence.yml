@@ -1,0 +1,60 @@
+name: Connections C3e-Q signed guest evidence challenge (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eQSignedGuestEvidence.py"
+      - "tests/connections/test_connections_c3eq_signed_guest_evidence.py"
+      - ".github/workflows/connections-c3eq-signed-guest-evidence.yml"
+      - "docs/connections-c3eq-signed-guest-evidence.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-ci-evidence:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify syntax and no production key/host switch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile tests/connections/c3e_release_trust/C3eQSignedGuestEvidence.py tests/connections/test_connections_c3eq_signed_guest_evidence.py
+          command -v gpg
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('services/connections')
+          assert "readonly property bool credentialActionsEnabled: false" in (p/'ConnectionsBroker.qml').read_text()
+          assert "readonly property bool hostAuthenticated: false" in (p/'ConnectionsRequestStatus.qml').read_text()
+          for f in (*p.glob('*.qml'),*p.glob('*.js'),p/'qmldir'):
+              assert 'C3eQSignedGuestEvidence' not in f.read_text()
+          print('C3EQ_PASS // NO_ACTIVE_HOST_OR_CREDENTIAL_GRANT')
+          PY
+      - name: Real detached OpenPGP signature challenge and adversarial refusal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3eq_signed_guest_evidence.py
+          echo "C3EQ_PASS // SIGNED_EXACT_CHALLENGE_AND_IN_MEMORY_REPLAY_REFUSAL"
+      - name: Existing C3e-P/N and signed recovery refusal
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true python3 -B tests/connections/test_connections_c3ep_running_python_source.py
+          sudo -n python3 -B tests/connections/test_connections_c3en_origin_witness_handoff.py
+          python3 -B tests/connections/test_connections_c3ei_supervised_supersession.py
+          echo "C3EQ_PASS // EXISTING_RUNNING_SCRIPT_AND_RELEASE_GATES"
+      - name: Confirm limitations
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'not attested guest reality' docs/connections-c3eq-signed-guest-evidence.md
+          grep -Fq '"signedGuestOriginAuthenticated": False' tests/connections/c3e_release_trust/C3eQSignedGuestEvidence.py
+          echo "C3EQ_LIMITATION // TEST_SIGNER_AND_VOLATILE_CHALLENGE_NOT_PRODUCTION"

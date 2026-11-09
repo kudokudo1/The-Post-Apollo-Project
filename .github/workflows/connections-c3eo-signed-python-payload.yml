@@ -1,0 +1,81 @@
+name: Connections C3e-O signed Python host RPM payload provenance (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eOSignedPythonPayloadGate.py"
+      - "tests/connections/test_connections_c3eo_signed_python_payload.py"
+      - ".github/workflows/connections-c3eo-signed-python-payload.yml"
+      - "docs/connections-c3eo-signed-python-payload.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-signed-python-host-payload:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Source syntax and default-deny checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile tests/connections/c3e_release_trust/C3eOSignedPythonPayloadGate.py \
+            tests/connections/test_connections_c3eo_signed_python_payload.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 -B tests/connections/test_connections_c3b_origin.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('services/connections')
+          assert 'readonly property bool credentialActionsEnabled: false' in (p/'ConnectionsBroker.qml').read_text()
+          assert 'readonly property bool hostAuthenticated: false' in (p/'ConnectionsRequestStatus.qml').read_text()
+          for f in (*p.glob('*.qml'),*p.glob('*.js'),p/'qmldir'):
+              assert 'C3eOSignedPythonPayloadGate' not in f.read_text(),f
+          print('C3EO_PASS // DEFAULT_DENY_AND_NO_PRODUCTION_CALLER')
+          PY
+
+      - name: Build C3d real signed RPM in disposable Fedora container
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v podman
+          mkdir -p "$RUNNER_TEMP/c3eo-build"
+          podman run --rm --network=host \
+            --mount "type=bind,src=$PWD,dst=/src,ro" \
+            --mount "type=bind,src=$RUNNER_TEMP/c3eo-build,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/c3d_provenance/build_signed_ci_status.sh
+          (cd "$RUNNER_TEMP/c3eo-build" && sha256sum --check --status c3d-artifact-manifest.sha256)
+          test "$(find "$RUNNER_TEMP/c3eo-build" -maxdepth 1 -type f | wc -l)" -eq 4
+          echo 'C3EO_PASS // REAL_DISPOSABLE_C3D_SIGNED_RPM_BUILT'
+
+      - name: Verify real RPM signature and extracted Python host bytes in Fedora
+        shell: bash
+        run: |
+          set -euo pipefail
+          podman run --rm --network=host \
+            --mount "type=bind,src=$PWD,dst=/src,ro" \
+            --mount "type=bind,src=$RUNNER_TEMP/c3eo-build,dst=/package,ro" \
+            -e GITHUB_ACTIONS=true \
+            -e C3EO_RPM=/package/c3d-status.rpm \
+            -e C3EO_PUBLIC=/package/c3d-disposable-public.asc \
+            -e C3EO_FINGERPRINT=/package/c3d-public-fingerprint.txt \
+            fedora:44 /usr/bin/bash -ec '
+              dnf -y --setopt=install_weak_deps=False install python3 rpm cpio gnupg2
+              cd /src
+              python3 -B tests/connections/test_connections_c3eo_signed_python_payload.py
+              echo "C3EO_PASS // SIGNED_RPM_PYTHON_SCRIPT_UNIT_POLICY_EXACT_BYTES"
+            '
+
+      - name: Preserve correct non-production interpretation
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'does not measure a running installed process' docs/connections-c3eo-signed-python-payload.md
+          grep -Fq 'installedGuestMeasured": False' tests/connections/c3e_release_trust/C3eOSignedPythonPayloadGate.py
+          echo 'C3EO_LIMITATION // SIGNED_ARTIFACT_NOT_RUNNING_C4B_HOST_OR_LIVE_AUTHORITY'

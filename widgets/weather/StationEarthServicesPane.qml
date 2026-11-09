@@ -50,7 +50,7 @@ Rectangle {
         height: HeaderGeometry.tabHeight
         spacing: HeaderGeometry.tabSpacing
         Repeater {
-            model: [{id:"runtime",label:"RUNTIME"},
+            model: [{id:"runtime",label:"LIVE FEED // RUNTIME"},
                     {id:"sources",label:"SOURCE DIRECTORY"}]
             delegate: ActionButton {
                 required property var modelData
@@ -93,7 +93,7 @@ Rectangle {
             QuietText {
                 width: Math.max(1,parent.width*0.64)
                 text: services.viewMode === "runtime"
-                    ? "LIVE SOURCES // " + services.runtimeRows.length
+                    ? "LIVE FEED // CURRENT SOURCE REPORTS // " + services.runtimeRows.length
                     : "EXISTING SOURCE DIRECTORY // " + services.sourceRows.length
                 font.pixelSize: 9
                 color: Colors.cyan

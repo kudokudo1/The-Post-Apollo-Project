@@ -123,6 +123,43 @@ for n in $(seq 1 55); do
         tail -c 900 /run/c2v-rpm-ostree-rollback-command.log || true
       fi
       echo 'C2V_DIAG_ROLLBACK_OBSERVER_COMMAND_OUTPUT_END'
+      # Rpm-ostree's automatic reboot can fail while querying logind
+      # inhibitors. Identify a live D-Bus/logind error without bypassing
+      # inhibitors, altering policies, or initiating a separate reboot.
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_UNIT_BEGIN'
+      timeout --signal=TERM --kill-after=2s 5s systemctl show \
+        systemd-logind.service dbus-broker.service --no-pager \
+        -p ActiveState -p SubState -p Result -p MainPID \
+        -p ExecMainCode -p ExecMainStatus || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_UNIT_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_INHIBITORS_BEGIN'
+      if timeout --signal=TERM --kill-after=2s 7s \
+          loginctl list-inhibitors --no-pager > /run/c2v-inhibitor-probe.log 2>&1; then
+        echo 'C2V_DIAG_ROLLBACK_OBSERVER_INHIBITORS_RC // 0'
+      else
+        probe_rc="$?"
+        echo "C2V_DIAG_ROLLBACK_OBSERVER_INHIBITORS_RC // $probe_rc"
+      fi
+      head -c 1800 /run/c2v-inhibitor-probe.log 2>/dev/null || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_INHIBITORS_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_BUS_BEGIN'
+      if timeout --signal=TERM --kill-after=2s 7s \
+          busctl --system --timeout=5s call \
+            org.freedesktop.login1 /org/freedesktop/login1 \
+            org.freedesktop.login1.Manager ListInhibitors \
+            > /run/c2v-login1-bus-probe.log 2>&1; then
+        echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_BUS_RC // 0'
+      else
+        probe_rc="$?"
+        echo "C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_BUS_RC // $probe_rc"
+      fi
+      head -c 1800 /run/c2v-login1-bus-probe.log 2>/dev/null || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_BUS_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_JOURNAL_BEGIN'
+      timeout --signal=TERM --kill-after=2s 5s journalctl -b \
+        -u systemd-logind.service -u dbus-broker.service \
+        --no-pager -n 16 2>&1 | head -c 2200 || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_JOURNAL_END'
     fi
   } >/dev/ttyS1 2>&1 || true
   [[ -e /run/c2v-rpm-rollback-observer-finished ]] && break

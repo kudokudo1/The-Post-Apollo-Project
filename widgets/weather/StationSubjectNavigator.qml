@@ -637,6 +637,9 @@ Rectangle {
         subjectRoute: browser.currentPath
         newsMentionOverlay: browser.newsMentionOverlay
         onNewsMapClearRequested: browser.clearNewsMentions()
+        onRouteRequested: function(path) {browser.chooseRoute(path);}
+        nwsAlertSource: browser.nwsAlertSource
+        liveHistoryStore: browser.liveHistoryStore
         seismicSource: browser.seismicSource
         lightningSource: browser.lightningSource
         riverSource: browser.riverSource

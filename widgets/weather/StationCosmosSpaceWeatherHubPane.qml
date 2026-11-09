@@ -16,6 +16,9 @@ Rectangle {
     // The last COSMOS page is a summary + service report. Directory mode
     // preserves the previous eight instrument links without a separate page.
     property string viewMode: "dashboard"
+    // Isolated native tests can inspect the presentation without NOAA calls.
+    // Production defaults to true; only the displayed SPACE page owns feeds.
+    property bool activateLiveFeeds: true
     property string selectedServiceId: "space-kp"
     // One pre-existing SPACE source owner, hidden visually, active only
     // while the SPACE end-page is mounted. No duplicate NOAA fetchers.
@@ -25,6 +28,7 @@ Rectangle {
         width: 1
         height: 1
         opacity: 0
+        visible: spaceHub.visible && spaceHub.activateLiveFeeds
         sourceOnly: true
         subjectRoute: "cosmos/space-weather/full"
         spaceService: spaceHub.spaceService
@@ -161,7 +165,7 @@ Rectangle {
             QuietText {
                 width: 122
                 height: parent.height
-                text: "LIVE // " + spaceHub.runtimeSummary.ready
+                text: "READY // " + spaceHub.runtimeSummary.ready
                       + "/" + spaceHub.runtimeSummary.total
                 color: Colors.cyan
                 font.pixelSize: 9

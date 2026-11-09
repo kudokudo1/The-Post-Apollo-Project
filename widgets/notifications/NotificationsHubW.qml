@@ -2480,9 +2480,14 @@ PanelWindow {
 
                             height: 18
 
-                            text: "ZZ suppresses new popups from that source for this long."
+                            text: NotificationsService.policyStatus === "parse-error"
+                                    || NotificationsService.policyStatus === "load-error"
+                                ? "POLICY FILE ERROR // POPUPS HELD UNTIL RECOVERED"
+                                : "ZZ mutes the selected scope; history is retained."
                             font.pixelSize: 10
-                            color: Colors.white
+                            color: NotificationsService.policyStatus === "parse-error"
+                                    || NotificationsService.policyStatus === "load-error"
+                                ? Colors.red : Colors.white
                             opacity: 0.78
                         }
 
@@ -2737,6 +2742,9 @@ PanelWindow {
                                         label: dndRule.dnd ? "ALLOW" : "WAKE"
                                         labelPixelSize: 10
                                         active: false
+                                        enabled: NotificationsService.policyReady
+                                            && NotificationsService.policyStatus !== "parse-error"
+                                            && NotificationsService.policyStatus !== "load-error"
                                         onTriggered: {
                                             if (dndRule.dnd)
                                                 NotificationsService.setDnd(dndRule.appKey,
@@ -2903,6 +2911,9 @@ PanelWindow {
                                         labelPixelSize: 10
                                         active: true
                                         activeColor: Colors.magenta
+                                        enabled: NotificationsService.favoritesReady
+                                            && NotificationsService.favoritesStatus !== "parse-error"
+                                            && NotificationsService.favoritesStatus !== "load-error"
                                         onTriggered: {
                                             NotificationsService.setFavorite(favoriteRule.appKey, favoriteRule.sourceId, favoriteRule.source, false);
                                         }
@@ -3256,6 +3267,9 @@ PanelWindow {
                                 z: 2
 
                                 active: notificationEntry.selectedFavorite
+                                enabled: NotificationsService.favoritesReady
+                                    && NotificationsService.favoritesStatus !== "parse-error"
+                                    && NotificationsService.favoritesStatus !== "load-error"
 
                                 activeColor: Colors.magenta
 
@@ -3438,6 +3452,9 @@ PanelWindow {
 
                                     active: notificationEntry.snoozed
                                     enabled: !notificationEntry.inheritedRule
+                                        && NotificationsService.policyReady
+                                        && NotificationsService.policyStatus !== "parse-error"
+                                        && NotificationsService.policyStatus !== "load-error"
 
                                     activeColor: Colors.orange
 
@@ -3460,6 +3477,9 @@ PanelWindow {
 
                                     active: notificationEntry.dnd
                                     enabled: !notificationEntry.inheritedRule
+                                        && NotificationsService.policyReady
+                                        && NotificationsService.policyStatus !== "parse-error"
+                                        && NotificationsService.policyStatus !== "load-error"
 
                                     activeColor: Colors.orange
 

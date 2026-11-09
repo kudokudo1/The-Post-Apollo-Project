@@ -158,7 +158,10 @@ class C3eKProtectedWitnessTests(unittest.TestCase):
         client.stdin.write(json.dumps(data) + "\n")
         client.stdin.flush()
         line = client.stdout.readline()
-        self.assertTrue(line, "C3EK_CLIENT_NO_REPLY status=%r" % client.poll())
+        if not line:
+            error = client.stderr.read()
+            self.fail("C3EK_CLIENT_NO_REPLY status=%r stderr=%r" %
+                      (client.poll(), error[-3000:]))
         value = json.loads(line)
         self.assertEqual(client.wait(timeout=5), 0)
         return value

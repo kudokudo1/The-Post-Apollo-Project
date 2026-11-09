@@ -51,6 +51,24 @@ ShellRoot {
         onTriggered: {
             root.ticks++;
             if(root.ticks>30)return root.fail("TIMEOUT");
+            // OVERVIEW intentionally unmounts SERVICES. Verify its two
+            // fixed bays before inspecting the old SERVICES tree.
+            if(root.phase===4) {
+                const news=find(media,"media-m3-news-top-bay");
+                const radio=find(media,"media-m3-full-radio-bottom-bay");
+                const feed=find(media,"media-m5-publisher-rss-owner");
+                if(!news||!radio) {
+                    if(root.ticks>15)return root.fail("OVERVIEW_NOT_MOUNTED");
+                    return;
+                }
+                if(feed ||news.height<60 ||radio.y+radio.height>media.height+1
+                    ||!media.loadedNews)
+                    return root.fail("OVERVIEW_HEIGHT_OR_NEWS_OWNER");
+                root.done=true;
+                console.log("M5_NATIVE_PASS // SERVICES_RSS_ONLY_NEWS_PLUS8_FIXED_RADIO");
+                Qt.quit();
+                return;
+            }
             const services=find(media,"media-m1-services");
             const runtime=find(media,"media-m5-runtime-content");
             const sources=find(media,"media-m5-source-content");
@@ -113,18 +131,7 @@ ShellRoot {
                 media.subjectRoute="media/overview";
                 root.phase=4;return;
             }
-            if(root.phase===4) {
-                const news=find(media,"media-m3-news-top-bay");
-                const radio=find(media,"media-m3-full-radio-bottom-bay");
-                const feed=find(media,"media-m5-publisher-rss-owner");
-                if(!news||!radio||feed ||news.height<60
-                    ||radio.y+radio.height>media.height+1
-                    ||media.loadedNews===null)
-                    return root.fail("OVERVIEW_HEIGHT_OR_NEWS_OWNER");
-                root.done=true;
-                console.log("M5_NATIVE_PASS // SERVICES_RSS_ONLY_NEWS_PLUS8_FIXED_RADIO");
-                Qt.quit();
-            }
+
         }
     }
 }

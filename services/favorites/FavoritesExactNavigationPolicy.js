@@ -27,9 +27,21 @@ function plan(row) {
     return deny("UNKNOWN_OR_STALE_IDENTITY");
 }
 
-// WEATHER OWNER MUST recheck its current single-writer snapshot immediately
-// before chooseRoute(). A CPU++ plan is only a navigation *request*, and a
-// saved item might have been unpinned between selection and owner dispatch.
+// U7b-K // Read-only local navigation is not a permission or bookmark write.
+// The existing six HOME routes are public in-widget pages, so the owning
+// Weather UI can display them even if the favorites store is still loading,
+// saving, stale or unavailable. This validation NEVER accepts an arbitrary
+// external URL, command, path, terminal, station or provider action.
+function localRouteAllows(route) {
+    return WeatherHome.validPanel(route);
+}
+
+// Snapshot-based membership remains useful for read-only catalog diagnostics,
+// but it is not a prerequisite for opening an already-known HOME view.
+// The snapshot-membership diagnostic checks the original Weather store.
+// A CPU++ plan is only a navigation request, not a writer or permission grant.
+// Navigation uses localRouteAllows() instead, leaving this read-only diagnostic
+// available for catalog freshness checks.
 function ownerAllows(route,snapshot) {
     if (!WeatherHome.validPanel(route) || !snapshot
             || typeof snapshot!=="object" || Array.isArray(snapshot)

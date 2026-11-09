@@ -121,10 +121,81 @@ test("U7b shell, CPU++ and Weather owner form an allowlisted exact-item chain",(
     const ownerPath=weather.split("function openSavedHomePanel(route) {")[1]
         .split("function openNotificationView(view) {")[0];
     assert.ok(ownerPath);
-    assert.equal((ownerPath.match(/ExactNavigation\.ownerAllows\(/g)||[]).length,2);
+    assert.equal((ownerPath.match(/ExactNavigation\.ownerAllows\(/g)||[]).length,0);
+    assert.match(ownerPath,/ExactNavigation\.localRouteAllows\(route\)/);
     assert.match(ownerPath,/subjectNavigator\.chooseRoute\(route\)/);
     assert.match(ownerPath,/!menuOpen \|\| !subjectNavigationOpen \|\| contextTerminalRequested/);
     assert.doesNotMatch(ownerPath,/toggleCardFavorite|replacePanelFavorites|FileView|playStation|launchSubjectTerminal/);
+});
+
+
+test("Weather HOME local route validation permits only the original six in-widget panels",()=>{
+    for(const route of known)
+        assert.equal(Exact.localRouteAllows(route),true,route);
+    for(const route of ["home/private","home/overview","media/radio/full",
+                        "tools/terminal/star-map","https://example.com",
+                        "home/auto?command=run","../home/quick",null,{},[]])
+        assert.equal(Exact.localRouteAllows(route),false,String(route));
+});
+function weatherOwnerFixture(overrides={}) {
+    const weather=read("widgets/weather/WeatherStationW.qml");
+    const method=weather.split("    function openSavedHomePanel(route) {")[1]
+        .split("    // Notifications retain historical view tokens")[0];
+    assert.ok(method);
+    const trace=[];
+    const scope={
+        menuOpen:false,
+        subjectNavigationOpen:false,
+        contextTerminalRequested:false,
+        homeFavoritesReadOnlySnapshot:null,
+        ExactNavigation:Exact,
+        subjectNavigator:{chooseRoute(route){trace.push("choose:"+route);return true;}},
+        open(){trace.push("open");scope.subjectNavigationOpen=true;scope.menuOpen=true;},
+        ...overrides
+    };
+    vm.runInContext("function openSavedHomePanel(route) {"+method,
+        vm.createContext(scope),{filename:"WeatherStationW.qml/openSavedHomePanel"});
+    return {scope,trace};
+}
+test("Weather HOME opens before data readiness and selects the exact known local route",()=>{
+    for(const route of known) {
+        const fixture=weatherOwnerFixture();
+        assert.equal(fixture.scope.openSavedHomePanel(route),true,route);
+        assert.deepEqual(fixture.trace,["open","choose:"+route],route);
+        assert.equal(fixture.scope.menuOpen,true);
+        assert.equal(fixture.scope.subjectNavigationOpen,true);
+    }
+});
+test("Weather HOME navigation is not blocked by loading, saving, removed, or corrupt favorites",()=>{
+    for(const snapshotState of ["loading","saving","error","unsupported","disconnected","ready"]) {
+        const x=weatherOwnerFixture({
+            homeFavoritesReadOnlySnapshot:{
+                storageState:snapshotState,panelRoutes:[],cardKeys:["invalid"]
+            }
+        });
+        assert.equal(x.scope.openSavedHomePanel("home/health"),true,snapshotState);
+        assert.deepEqual(x.trace,["open","choose:home/health"]);
+    }
+});
+test("Weather HOME refuses invalid routes and preserves active terminal sessions",()=>{
+    const invalid=weatherOwnerFixture();
+    assert.equal(invalid.scope.openSavedHomePanel("tools/terminal/star-map"),false);
+    assert.deepEqual(invalid.trace,[]);
+    const running=weatherOwnerFixture({
+        menuOpen:true,subjectNavigationOpen:true,contextTerminalRequested:true
+    });
+    assert.equal(running.scope.openSavedHomePanel("home/quick"),false);
+    assert.deepEqual(running.trace,[]);
+    const blocked=weatherOwnerFixture({
+        open(){blocked.trace.push("terminal-still-active");}
+    });
+    assert.equal(blocked.scope.openSavedHomePanel("home/quick"),false);
+    assert.deepEqual(blocked.trace,["terminal-still-active"]);
+    const failed=weatherOwnerFixture({
+        subjectNavigator:{chooseRoute(route){failed.trace.push("choose:"+route);return false;}}
+    });
+    assert.equal(failed.scope.openSavedHomePanel("home/quick"),false);
+    assert.deepEqual(failed.trace,["open","choose:home/quick"]);
 });
 
 test("U7b native fixture explicitly clicks OPEN ITEM after OPEN OWNER",()=>{

@@ -14,6 +14,8 @@ from MachineBraveDisposableTrial import (
     HOST_FILE, MARKER,
 )
 
+import MachineBraveDisposableTrial as trial
+
 EXT_ID = "a" * 32
 
 
@@ -96,6 +98,22 @@ try:
     assert verify_trial(str(root)) == result
     host.write_bytes(host.read_bytes() + b"\n# modified\n")
     refused(lambda: verify_trial(str(root)))
+finally:
+    shutil.rmtree(root)
+
+# An interrupted O_EXCL write cannot leave a partially registered host.
+root = new_root()
+try:
+    partial = root / "partially-written-native-host"
+    original = trial.os.fdopen
+    def fail_open(fd, mode):
+        raise OSError("injected file-wrapper failure")
+    trial.os.fdopen = fail_open
+    try:
+        refused(lambda: trial._write_exclusive(partial, b"partial", 0o600))
+    finally:
+        trial.os.fdopen = original
+    assert not partial.exists()
 finally:
     shutil.rmtree(root)
 

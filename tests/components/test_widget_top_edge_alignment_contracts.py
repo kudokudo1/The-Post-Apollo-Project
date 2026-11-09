@@ -165,8 +165,15 @@ for workarea_y in (-1080, 0, 42, 82, 1440):
     initial_y = round(workarea_y)
     assert initial_y == workarea_y
 
-# Other widget panel widths, top-edge geometry and visibility lifetimes remain.
-assert "property int panelWidth: 744" in hospital
+# Hospital retains its 744px original width, now as the default for a
+# horizontally stepped, screen-clamped chassis. Vertical top/bottom geometry
+# and the other widgets' geometry remain independent of those width steps.
+hospital_width = source("services/hospital/HospitalHorizontalChassisPolicy.js")
+assert "property int panelWidthLevel: 0" in hospital
+assert "readonly property int panelWidth: SurgeryWidthPolicy.panelWidth(" in hospital
+assert "const HOSPITAL_WIDTH_STEPS = [744, 984, 1224, 1464]" in hospital_width
+assert "anchors.topMargin: root.frameInset" in hospital
+assert "height: root.panelHeight" in hospital
 assert "property int defaultPanelWidth: 1210" in social
 assert "property int panelHeight: 790" in git
 assert "visible: true" in hospital and "visible: true" in git

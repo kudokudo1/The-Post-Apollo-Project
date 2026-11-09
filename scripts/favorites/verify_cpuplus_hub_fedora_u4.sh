@@ -240,6 +240,31 @@ read -r sx sy <<<"$system_coords"
 [ -n "$sx" ] && [ -n "$sy" ] ||
   { cat "$log"; echo "U7D_FAIL // invalid SYSTEM button geometry"; exit 1; }
 xdotool mousemove --window "$window" "$sx" "$sy" click 1
+# U7b-E // Two intentional, distinct native OPEN ITEM clicks. No fan
+# control API, telemetry write or original favorite store mutation.
+for phase in TEMP FAN; do
+  marker="U7E_"$phase"_READY // x="
+  for ((i=0;i<100;i++)); do
+    if grep -F 'U4_FAIL' "$log" >/dev/null; then
+      cat "$log"; echo "U7E_FAIL // fixture before $phase click"; exit 1
+    fi
+    if grep -F "$marker" "$log" >/dev/null; then
+      break
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      cat "$log"; echo "U7E_FAIL // exited before $phase click"; exit 1
+    fi
+    sleep 0.1
+  done
+  grep -F "$marker" "$log" >/dev/null ||
+    { cat "$log"; echo "U7E_FAIL // missing $phase OPEN ITEM"; exit 1; }
+  thermal_coords="$(grep -F "$marker" "$log" | tail -n 1 |
+    sed -E 's/.*x=([0-9]+) y=([0-9]+).*/\1 \2/')"
+  read -r tx ty <<<"$thermal_coords"
+  [ -n "$tx" ] && [ -n "$ty" ] ||
+    { cat "$log"; echo "U7E_FAIL // invalid $phase coordinates"; exit 1; }
+  xdotool mousemove --window "$window" "$tx" "$ty" click 1
+done
 set +e
 wait "$pid"
 rc="$?"
@@ -269,6 +294,10 @@ grep -F 'U7C_PASS // EXACT_DESKTOP_ENTRY_SELECTION_NO_EXECUTION' "$log" >/dev/nu
   { echo "U7C_FAIL // exact saved app selection was not verified"; exit 1; }
 grep -F 'U7D_PASS // EXACT_SYSTEM_CORE_SELECTION_NO_ACTIONS' "$log" >/dev/null ||
   { echo "U7D_FAIL // exact SYSTEM core metric selection was not verified"; exit 1; }
+grep -F 'U7E_PASS // EXACT_TEMPERATURE_SELECTION' "$log" >/dev/null ||
+  { echo "U7E_FAIL // temperature route was not verified"; exit 1; }
+grep -F 'U7E_PASS // EXACT_THERMAL_AND_FAN_SELECTION_NO_ACTIONS' "$log" >/dev/null ||
+  { echo "U7E_FAIL // native thermal and fan item clicks were not verified"; exit 1; }
 if find "$work/data" -type f | grep -q .; then
   echo "U4_FAIL // manager created a writer file"; exit 1
 fi

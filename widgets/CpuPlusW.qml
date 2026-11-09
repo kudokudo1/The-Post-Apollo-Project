@@ -27,6 +27,8 @@ PanelWindow {
     signal favoriteAppSelectionRequested(string desktopId)
     // U7b-D: one fixed core SYSTEM metric token, not a monitor action.
     signal favoriteSystemSelectionRequested(string metric)
+    // U7b-E: short opaque thermal selector, never hardware/process action.
+    signal favoriteThermalSelectionRequested(string token)
     property var telegramConnectionObservation: null
     property var appControlWindow
     required property var systemTelemetry
@@ -2808,6 +2810,9 @@ PanelWindow {
             }
             onSystemSelectionRequested: function(metric) {
                 cpuPlusWindow.favoriteSystemSelectionRequested(metric);
+            }
+            onThermalSelectionRequested: function(token) {
+                cpuPlusWindow.favoriteThermalSelectionRequested(token);
             }
             anchors.left: parent.left
             anchors.right: parent.right

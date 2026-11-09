@@ -20,6 +20,7 @@ import qs.services.time
 import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy
 import "services/favorites/FavoritesAppSelectionPolicy.js" as AppFavoriteSelection
 import "services/favorites/FavoritesSystemSelectionPolicy.js" as SystemFavoriteSelection
+import "services/favorites/FavoritesThermalSelectionPolicy.js" as ThermalFavoriteSelection
 import qs.services.notifications
 
 import QtQuick.Effects
@@ -240,6 +241,17 @@ PanelWindow {
         function onApolloNavigationRequested(destination) {
             shellRoot.openApolloNotificationRoute(destination);
         }
+    }
+
+    // U7b-E: opaque thermal/fan selector only. AppControl resolves against
+    // its original saved keys and live sensor rows, never executes a fan action.
+    function openApolloSavedThermal(token) {
+        if(!ThermalFavoriteSelection.validToken(token))
+            return false;
+        if(!appControlWindow.selectSavedThermal(token))
+            return false;
+        shellRoot.requestControlKeyboard("appcontrol","favorites-thermal-reading");
+        return true;
     }
 
     // U7b-D: SYSTEM view selection is fixed to a four-token allowlist. The
@@ -1178,6 +1190,11 @@ PanelWindow {
                 onFavoriteSystemSelectionRequested: function(metric) {
                     // No sensor/device path or control action crosses shell.
                     if(shellRoot.openApolloSavedSystemMetric(metric))
+                        cpuPlusWindow.close();
+                }
+                onFavoriteThermalSelectionRequested: function(token) {
+                    // Refusal leaves CPU++ on the selected favorite.
+                    if(shellRoot.openApolloSavedThermal(token))
                         cpuPlusWindow.close();
                 }
                 onTelegramAccessRequested: {

@@ -325,8 +325,50 @@ ShellRoot {
                             || defaults.mutations || collections.renameCalls!==1) {
                         root.fail("U7D_UNSAFE_SYSTEM_SELECTION");return;
                     }
-                    root.done=true;
                     console.log("U7D_PASS // EXACT_SYSTEM_CORE_SELECTION_NO_ACTIONS");
+                    // New telemetry and saved entries appear only after all
+                    // earlier U4/U6/U7 assertions have finished.
+                    fakeAppControl.thermalRows=[{
+                        id:"thermal:k10temp:Tctl",name:"Tctl",label:"Tctl",
+                        chip:"k10temp",sensorKind:"temperature",
+                        _thermalRecord:true
+                    }];
+                    fakeAppControl.fanRows=[{
+                        id:"fan:nct6775:CPU Fan",name:"CPU Fan",label:"CPU Fan",
+                        chip:"nct6775",sensorKind:"fan",_thermalRecord:true
+                    }];
+                    appFavorites.favoriteKeys=appFavorites.favoriteKeys.concat([
+                        "thermal|thermal%3Ak10temp%3ATctl",
+                        "thermal|fan%3Anct6775%3ACPU%20Fan"
+                    ]);
+                    root.testStage=15;
+                }
+                onThermalSelectionRequested: function(token) {
+                    if(!detail.thermalSelection.ok
+                            || token!==detail.thermalSelection.token
+                            || time.removals || places.removals
+                            || defaults.mutations || collections.renameCalls!==1) {
+                        root.fail("U7E_UNSAFE_THERMAL_TOKEN");return;
+                    }
+                    if(root.testStage===17) {
+                        if(!/^t-[0-9a-f]{16}$/.test(token)) {
+                            root.fail("U7E_UNSAFE_TEMP_TOKEN");return;
+                        }
+                        console.log("U7E_PASS // EXACT_TEMPERATURE_SELECTION");
+                        const fan=root.options.rows.find(function(row) {
+                            return row.owner==="appcontrol" && row.menu==="THERMAL"
+                                && row.item==="CPU Fan" && row.category==="CPU++";
+                        });
+                        if(!fan) {root.fail("U7E_FAN_MISSING");return;}
+                        root.selectedKey=fan.key;
+                        root.testStage=18;
+                        return;
+                    }
+                    if(root.testStage!==19 || !/^f-[0-9a-f]{16}$/.test(token)) {
+                        root.fail("U7E_UNSAFE_FAN_TOKEN");return;
+                    }
+                    root.done=true;
+                    console.log("U7E_PASS // EXACT_THERMAL_AND_FAN_SELECTION_NO_ACTIONS");
                     Qt.quit();
                 }
             }
@@ -670,6 +712,32 @@ ShellRoot {
                 root.testStage=14;
                 console.log("U7D_ITEM_READY // x="+Math.round(pt.x)
                     +" y="+Math.round(pt.y));
+            } else if(root.testStage===15) {
+                const item=root.options.rows.find(function(row) {
+                    return row.owner==="appcontrol" && row.menu==="THERMAL"
+                        && row.item==="Tctl" && row.category==="CPU++"
+                        && row.favoriteType==="FAVORITE";
+                });
+                if(!item) return;
+                root.selectedKey=item.key;
+                root.testStage=16;
+            } else if(root.testStage===16 || root.testStage===18) {
+                const isFan=root.testStage===18;
+                const button=detail.exactNavigationControl;
+                const target=detail.thermalSelection;
+                if(!root.selection || root.selection.menu!=="THERMAL"
+                        || root.selection.category!=="CPU++"
+                        || !root.selection.readOnly
+                        || !target.ok || !button || !button.available
+                        || button.label!=="OPEN ITEM"
+                        || target.token.charAt(0)!==(isFan?"f":"t")) {
+                    root.fail("U7E_THERMAL_BUTTON_NOT_READY");return;
+                }
+                const pt=button.mapToItem(win.contentItem,
+                    button.width/2,button.height/2);
+                root.testStage=isFan?19:17;
+                console.log((isFan?"U7E_FAN_READY":"U7E_TEMP_READY")
+                    +" // x="+Math.round(pt.x)+" y="+Math.round(pt.y));
             }
         }
     }

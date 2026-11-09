@@ -1,0 +1,34 @@
+name: TimeW MACHINE read-only Brave/Sway focus witness
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineBraveFocusWitness.py"
+      - "services/time/MachineBraveHostPairingReview.py"
+      - "tests/timew/test_machine_brave_focus_witness.py"
+      - "tests/timew/test_machine_brave_focus_witness_contract.py"
+      - "docs/timew-machine-brave-focus-witness.md"
+      - ".github/workflows/timew-machine-brave-focus-witness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focus-witness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Forbid live browser connection, hidden write permissions and false identity grants
+        run: python3 -B -I tests/timew/test_machine_brave_focus_witness_contract.py
+      - name: Test two Sway focus reads, browser candidate rejection, incognito uncertainty and failure paths
+        run: python3 -B -I tests/timew/test_machine_brave_focus_witness.py
+      - name: Keep earlier Brave extension inventory, M2b through M2d2 and legacy checkpoint owner working
+        run: |
+          python3 -B -I tests/timew/test_machine_brave_topology_contract.py
+          python3 -B -I tests/timew/test_machine_session_identity_v2.py
+          python3 -B -I tests/timew/test_machine_adapter_registry.py
+          python3 -B -I tests/timew/test_machine_adapter_fixture_correlation.py
+          python3 -B -I tests/timew/test_machine_adapter_handshake_trial.py
+          python3 -B -I tests/timew/test_machine_checkpoint_store.py

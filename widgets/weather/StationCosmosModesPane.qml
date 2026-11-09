@@ -255,6 +255,7 @@ Rectangle {
 
     GohuText {
         id: titleText
+        objectName: "cosmos-c44-mode-title"
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
@@ -267,6 +268,7 @@ Rectangle {
     }
     Row {
         id: modeRail
+        objectName: "cosmos-c44-mode-tabs"
         anchors.top: titleText.bottom
         anchors.left: parent.left
         anchors.right: parent.right
@@ -294,6 +296,7 @@ Rectangle {
     }
     Rectangle {
         id: dividerLine
+        objectName: "cosmos-c44-mode-divider"
         anchors.top: modeRail.bottom
         anchors.topMargin: HeaderGeometry.tabsToRule
         anchors.left: parent.left
@@ -305,6 +308,7 @@ Rectangle {
     }
     Item {
         id: stage
+        objectName: "cosmos-c44-mode-stage"
         anchors.top: dividerLine.bottom
         anchors.bottom: footer.top
         anchors.left: parent.left

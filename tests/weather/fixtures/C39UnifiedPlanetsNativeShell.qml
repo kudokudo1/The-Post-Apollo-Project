@@ -124,12 +124,18 @@ ShellRoot {
             }
             if(root.phase===3) {
                 const details=root.find(focused.instrumentItem,"cosmos-c6-record-detail");
-                if(!details || details.recordCount!==2
-                    || details.selectedIndex!==1
+                if(!details) return; // asynchronous nested Loader
+                if(details.recordCount!==2 || details.selectedIndex!==1
                     || details.selectedName!=="JUPITER"
                     || details.facts.length!==12
-                    || details.facts[0].value!=="18.2°")
+                    || details.facts[0].value!=="18.2°") {
+                    console.log("C39_DETAILS_DIAG // count="+details.recordCount
+                        +" index="+details.selectedIndex
+                        +" name="+details.selectedName
+                        +" facts="+details.facts.length
+                        +" alt="+(details.facts[0]?details.facts[0].value:"NONE"));
                     return root.fail("TWELVE_FACT_DETAILS_NOT_RECOVERABLE");
+                }
                 focused.skyDetailsExpanded=false;
                 focused.planetSubmode="day";
                 root.phase=4;

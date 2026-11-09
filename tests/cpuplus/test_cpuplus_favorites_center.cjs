@@ -247,7 +247,8 @@ test("CPU++ imports all AppControl owner lists, with seven source filters and re
   ]) assert.ok(cpu.includes(field),field);
   assert.match(cpu,/FavoritesManagement\.list\(/);
   assert.match(panel,/model: \["ALL","GROUP","CPU\+\+","APP CTRL","WEATHER","NOTIFS","RADIO","HOSPITAL","CLOCK","PLACES","NEW"\]/);
-  assert.match(panel,/height: 121/);
+  assert.match(panel,/id: categoryFilterFlow/);
+  assert.match(panel,/height: Math\.ceil\(11\/columns\)\*\(30\+spacing\)-spacing/);
   assert.match(panel,/modelData\.readOnly\?"READ ONLY"/);
   assert.match(panel,/pane\.selectedResource && !pane\.selectedResource\.readOnly/);
   assert.match(panel,/APP CONTROL-OWNED \/\/ READ ONLY/);

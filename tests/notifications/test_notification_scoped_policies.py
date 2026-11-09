@@ -149,6 +149,15 @@ assert.strictEqual(S.isFavoriteForNotification(dmA),false);
 S.setFavorite(fallback[0].key,'vesktop','Vesktop // TITLE EXACT Mom',true);
 assert.strictEqual(S.isFavoriteForNotification(entry('','','','','Mom')),true);
 assert.strictEqual(S.isFavoriteForNotification(entry('','','','','Mom!')),false);
+// Actions made while preferences are loading must be rejected, not silently
+// overwritten by the eventual FileView load.
+S.policyReady=false;
+assert.strictEqual(S.setDnd(key(sA,'server'),'vesktop','Vesktop',true),false);
+assert.strictEqual(S.snoozeApp(key(sA,'server'),'vesktop','Vesktop'),false);
+S.policyReady=true;
+S.favoritesReady=false;
+assert.strictEqual(S.setFavorite(key(sA,'sender'),'vesktop','Vesktop',true),false);
+S.favoritesReady=true;
 
 // Policy file not ready: retain history, withhold popup. After successful
 // load, admit only nonexpired events which are not suppressed.
@@ -176,6 +185,20 @@ Q.appendNotification({id:'corrupt-policy',source:'Allowed App',sourceId:'allowed
 Q.policyReady=true;Q.policyStatus='parse-error';
 Q.reconcilePendingPolicyDeliveries();
 assert.strictEqual(Q.activeNotifications.count,1,'bad policy should not release queued popup');
+
+// A native sender may close its event before the policy file is ready.
+// That event must not be resurrected when policy loading completes.
+Q.liveExternalNotifications={'closed-startup':{notification:{}}};
+Q.externalActionsRevision=0;
+vm.runInNewContext(extract(source,'releaseExternalNotification'),Q);
+Q.policyReady=false;Q.policyStatus='loading';
+Q.appendNotification({id:'closed-startup',source:'Allowed App',sourceId:'allowed'});
+assert(Q.pendingPolicyDeliveryIds.includes('closed-startup'));
+Q.releaseExternalNotification('closed-startup');
+assert(!Q.pendingPolicyDeliveryIds.includes('closed-startup'));
+Q.policyReady=true;Q.policyStatus='ready';
+Q.reconcilePendingPolicyDeliveries();
+assert(!Q.activeNotifications.rows.some(e=>e.id==='closed-startup'));
 console.log('Scoped sender/server/channel/DM, TITLE, favorites, and startup gate: PASS');
 """
 subprocess.run(["node", "-e", NODE, str(SERVICE), str(SCOPE)], check=True)

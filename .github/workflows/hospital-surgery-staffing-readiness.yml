@@ -5,6 +5,7 @@ on:
     paths:
       - "widgets/HospitalW.qml"
       - "widgets/HospitalWorkforceManagerView.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
       - "services/hospital/HospitalWorkforceStaffingPolicy.js"
       - "tests/hospital/test_workforce_staffing_policy.js"
       - "tests/hospital/test_workforce_staffing_ui_contracts.py"
@@ -15,6 +16,7 @@ on:
     paths:
       - "widgets/HospitalW.qml"
       - "widgets/HospitalWorkforceManagerView.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
       - "services/hospital/HospitalWorkforceStaffingPolicy.js"
       - "tests/hospital/test_workforce_staffing_policy.js"
       - "tests/hospital/test_workforce_staffing_ui_contracts.py"

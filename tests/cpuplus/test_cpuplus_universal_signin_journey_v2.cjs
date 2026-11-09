@@ -106,7 +106,7 @@ for(const str of [
     'label: upperSignIn.statusExpanded',
     '"HIDE SIGN-IN STATUS" : "VIEW SIGN-IN STATUS"',
     'onClicked: upperSignIn.statusExpanded = !upperSignIn.statusExpanded',
-    'height: visible ? Math.min(journeyBody.implicitHeight + 4, 184) : 0',
+    'height: visible ? Math.min(journeyBody.implicitHeight + 4, 204) : 0',
     'text: upperSignIn.journey.displayStatus',
     'text: upperSignIn.journey.displayGuidance',
     'text: upperSignIn.journey.hostStep',

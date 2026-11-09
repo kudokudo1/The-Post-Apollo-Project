@@ -3,6 +3,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import "../components"
+import qs.services.favorites
 import "../services/time/AngelInterpretationPolicy.js" as Interpret
 import "../services/time/AngelObservationPolicy.js" as Journal
 
@@ -112,7 +113,7 @@ Item {
             TextField {
                 id: numberInput
                 width: Math.max(0, parent.width - sourceButton.width
-                                - parent.spacing)
+                                - favoriteNumberButton.width - parent.spacing * 2)
                 height: parent.height
                 text: meaning.initialDigits
                 placeholderText: "NUMBER // EXACT DIGITS"
@@ -154,6 +155,24 @@ Item {
                 trackLabelGlowLocally: true
                 available: meaning.sourceEligible && !sourceProcess.running
                 onLeftClicked: meaning.requestSource()
+            }
+            ActionButton {
+                id: favoriteNumberButton
+                width: 34
+                height: parent.height
+                label: "★"
+                labelPixelSize: 13
+                contentPadding: 2
+                readonly property string favoriteKey:
+                    Journal.favoriteKey(meaning.digits)
+                selected: FavoritesDefaultStore.isFavorite(favoriteKey)
+                selectedFillColor: Colors.black
+                selectedForegroundColor: Colors.magenta
+                selectedBorderColor: Colors.magenta
+                accentColor: selected ? Colors.magenta : Colors.white
+                available: Journal.validDigits(meaning.digits)
+                           && FavoritesDefaultStore.canEdit
+                onLeftClicked: FavoritesDefaultStore.toggleFavorite(favoriteKey)
             }
         }
 

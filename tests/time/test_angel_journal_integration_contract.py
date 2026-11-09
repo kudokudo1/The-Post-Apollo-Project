@@ -116,7 +116,7 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn('id: errMarkButton', PANE)
         self.assertIn('"CLEAR ERR" : "MARK ERR"', PANE)
         self.assertIn('AngelObservationsStore.toggleErrObservation(pane.selectedId)', PANE)
-        self.assertIn('label: (isMarkedErr ? "ERR* // " : "")', PANE)
+        self.assertIn('label: (observationEntry.isMarkedErr ? "ERR* // " : "")', PANE)
         self.assertIn('OTHER = NO PATTERN // ERR = OTHER + USER-MARKED', PANE)
         self.assertIn('row.errMarked === undefined', POLICY)
         self.assertIn('errMarked: row.errMarked === true', POLICY)
@@ -130,7 +130,7 @@ class AngelJournalContracts(unittest.TestCase):
         # but automatic OTHER classification must not turn rows red.
         filter_section = PANE.split("id: angelPatternFilters", 1)[1].split(
             "id: angelHistoryArea", 1)[0]
-        row_section = PANE.split("delegate: ActionButton {", 1)[1].split(
+        row_section = PANE.split("delegate: Item {", 1)[1].split(
             "onLeftClicked: {", 1)[0]
 
         self.assertIn('modelData.key === "err"', filter_section)
@@ -150,20 +150,41 @@ class AngelJournalContracts(unittest.TestCase):
 
         self.assertIn("readonly property bool isMarkedErr:", row_section)
         self.assertIn("modelData.errMarked === true", row_section)
-        self.assertIn("accentColor: isMarkedErr ? Colors.red : Colors.white",
+        self.assertIn("accentColor: observationEntry.isMarkedErr ? Colors.red",
                       row_section)
-        self.assertIn("selectedFillColor: isMarkedErr ? Colors.red : Colors.yellow",
+        self.assertIn("selectedFillColor: observationEntry.isMarkedErr ? Colors.red : Colors.yellow",
                       row_section)
-        self.assertIn("selectedForegroundColor: isMarkedErr ? Colors.white : Colors.magenta",
+        self.assertIn("selectedForegroundColor: observationEntry.isMarkedErr ? Colors.white : Colors.magenta",
                       row_section)
-        self.assertIn("selectedBorderColor: isMarkedErr ? Colors.red : Colors.magenta",
+        self.assertIn("selectedBorderColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta",
                       row_section)
-        self.assertIn("selectedContentGlowColor: isMarkedErr ? Colors.red : Colors.magenta",
+        self.assertIn("selectedContentGlowColor: observationEntry.isMarkedErr ? Colors.red : Colors.magenta",
                       row_section)
-        self.assertIn("hoverForegroundColor: isMarkedErr ? Colors.red : Colors.orange",
+        self.assertIn("hoverForegroundColor: observationEntry.isMarkedErr ? Colors.red : Colors.orange",
                       row_section)
         self.assertNotIn("matchesFilter(", row_section)
         self.assertNotIn("activeFilter ===", row_section)
+
+    def test_favorite_and_note_seams_use_existing_owners(self):
+        self.assertIn("import qs.services.favorites", PANE)
+        self.assertIn("FavoritesDefaultStore.toggleFavorite(", PANE)
+        self.assertIn("FavoritesDefaultStore.favoriteKeys", PANE)
+        self.assertIn('key: "favorite", label: "FAV"', PANE)
+        self.assertIn('key: "multiply", label: "MUL"', PANE)
+        self.assertIn('key: "divide", label: "DIV"', PANE)
+        self.assertIn("function editObservationNote(row)", PANE)
+        self.assertIn("function saveObservationNote(id, note)", STORE)
+        self.assertIn("Journal.setNote(document, id, note)", STORE)
+        self.assertIn('id: noteObservation', PANE)
+        self.assertIn('id: noteField', PANE)
+        self.assertIn('id: noteEditor', PANE)
+        self.assertIn("AngelPolicy.MAX_NOTE_LENGTH", PANE)
+        self.assertIn("HISTORY // ", PANE)
+        self.assertIn("Colors.magenta", PANE)
+        self.assertIn("Colors.orange", PANE)
+        err_button = PANE.split("id: errMarkButton", 1)[1].split(
+            "id: deleteButton", 1)[0]
+        self.assertIn("accentColor: Colors.red", err_button)
 
     def test_history_deletion_is_confirmed_and_red(self):
         self.assertIn('"CONFIRM ×" : "DELETE ×"', PANE)

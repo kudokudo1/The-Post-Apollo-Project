@@ -209,4 +209,41 @@ assert.equal(datedRoundTrip.ok, true);
 assert.deepEqual(copy(datedRoundTrip.document), copy(dated.document));
 assert.equal(policy.VERSION, 1);
 
+// Favorite membership is by exact digit string, not observation ID.
+const numberFavoriteKey = policy.favoriteKey("222");
+assert.equal(numberFavoriteKey, "fav1:local:angel:number:222");
+assert.equal(policy.favoriteKey("22:2"), "");
+assert.deepEqual(copy(policy.filter(errDoc.observations, "", "favorite",
+    [numberFavoriteKey]).map(x => x.id)), ["a2", "a1"]);
+assert.deepEqual(copy(policy.filter(errDoc.observations, "", "favorite",
+    []).map(x => x.id)), []);
+assert.equal(policy.FILTERS.includes("favorite"), true);
+
+// Multiplication and division are structural, integer triplet patterns.
+assert.equal(policy.matchesFilter("224", "multiply"), true);
+assert.equal(policy.matchesFilter("842", "divide"), true);
+assert.equal(policy.matchesFilter("804", "divide"), false, "division by zero");
+assert.equal(policy.matchesFilter("825", "divide"), false);
+assert.equal(policy.matchesFilter("224", "divide"), false);
+assert.equal(policy.matchesFilter("224", "add"), true, "filters can overlap");
+assert.deepEqual(copy(policy.patternTags("224")), ["ADD", "MULTIPLY"]);
+assert.equal(policy.FILTERS.includes("multiply"), true);
+assert.equal(policy.FILTERS.includes("divide"), true);
+
+// Notes are per sighting, bounded, opt-in, and backwards-compatible with v1.
+const noted = policy.setNote(errDoc, "a1", "First sighting");
+assert.equal(noted.ok, true);
+assert.equal(noted.document.observations[0].note, "First sighting");
+assert.equal(noted.document.observations[1].note, undefined);
+assert.equal(errDoc.observations[0].note, undefined, "stage does not mutate");
+assert.equal(policy.parse(JSON.stringify(noted.document)).ok, true);
+assert.equal(policy.setNote(errDoc, "a999", "note").reason, "UNKNOWN_ID");
+assert.equal(policy.setNote(errDoc, "a1", "x".repeat(281)).reason,
+    "INVALID_NOTE");
+const clearedNote = policy.setNote(noted.document, "a1", "");
+assert.equal(clearedNote.ok, true);
+assert.equal(clearedNote.document.observations[0].note, undefined);
+assert.equal(policy.parse(JSON.stringify(errDoc)).ok, true,
+    "pre-note journal remains loadable");
+
 console.log("ANGEL_OBSERVATION_POLICY_PASS");

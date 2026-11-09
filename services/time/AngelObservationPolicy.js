@@ -6,9 +6,10 @@
 var VERSION = 1;
 var MAX_ROWS = 4096;
 var MAX_DIGITS = 8;
+var MAX_NOTE_LENGTH = 280;
 var MAX_FILE_LENGTH = 2097152;
 var MAX_SEQUENCE = 1000000000;
-var FILTERS = ["all", "repeat", "mirror", "sequence", "add", "subtract", "other", "err"];
+var FILTERS = ["all", "repeat", "mirror", "sequence", "add", "subtract", "multiply", "divide", "favorite", "other", "err"];
 
 function integer(value, low, high) {
     return typeof value === "number" && isFinite(value)
@@ -19,6 +20,15 @@ function validDigits(value) {
     return typeof value === "string"
            && value.length >= 1 && value.length <= MAX_DIGITS
            && !/[^0-9]/.test(value);
+}
+
+function validNote(value) {
+    return typeof value === "string" && value.length <= MAX_NOTE_LENGTH
+           && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
+}
+
+function favoriteKey(digits) {
+    return validDigits(digits) ? "fav1:local:angel:number:" + encodeURIComponent(digits) : "";
 }
 
 function validZone(value) {
@@ -48,7 +58,8 @@ function validObservation(row) {
            && integer(row.displayCalibrationMs, -300000, 300000)
            && (row.captureMode === "clock" || row.captureMode === "manual")
            // v1 journals written before ERR existed have no mark property.
-           && (row.errMarked === undefined || typeof row.errMarked === "boolean");
+           && (row.errMarked === undefined || typeof row.errMarked === "boolean")
+            && (row.note === undefined || validNote(row.note));
 }
 
 function emptyDocument() {
@@ -86,7 +97,7 @@ function clone(document) {
     return {
         version: VERSION, nextId: document.nextId,
         observations: document.observations.map(function(row) {
-            return {
+            var saved = {
                 id: row.id, digits: row.digits,
                 observedAtMs: row.observedAtMs,
                 displayTime: row.displayTime,
@@ -96,6 +107,9 @@ function clone(document) {
                 captureMode: row.captureMode,
                 errMarked: row.errMarked === true
             };
+            if (row.note !== undefined)
+                saved.note = row.note;
+            return saved;
         })
     };
 }
@@ -179,6 +193,28 @@ function toggleErr(document, id) {
     };
 }
 
+// Notes belong to one observed event ID, not every occurrence of a number.
+function setNote(document, id, note) {
+    var check = validate(document);
+    if (!check.ok) return check;
+    if (!validNote(note))
+        return {ok: false, reason: "INVALID_NOTE"};
+    var index = document.observations.findIndex(function(row) {
+        return row.id === id;
+    });
+    if (index < 0)
+        return {ok: false, reason: "UNKNOWN_ID"};
+    var next = clone(document);
+    var clean = note.trim();
+    if (clean)
+        next.observations[index].note = clean;
+    else
+        delete next.observations[index].note;
+    if (JSON.stringify(next).length > MAX_FILE_LENGTH)
+        return {ok: false, reason: "JOURNAL_FULL"};
+    return {ok: true, document: next};
+}
+
 function repeat(digits) {
     return validDigits(digits) && digits.length > 1
            && digits.split("").every(function(ch) { return ch === digits[0]; });
@@ -211,6 +247,17 @@ function subtract(digits) {
            && Number(digits[0]) - Number(digits[1]) === Number(digits[2]);
 }
 
+function multiply(digits) {
+    return validDigits(digits) && digits.length === 3
+           && Number(digits[0]) * Number(digits[1]) === Number(digits[2]);
+}
+
+function divide(digits) {
+    return validDigits(digits) && digits.length === 3
+           && Number(digits[1]) !== 0
+           && Number(digits[0]) / Number(digits[1]) === Number(digits[2]);
+}
+
 function patternTags(digits) {
     if (!validDigits(digits)) return [];
     var tags = [];
@@ -219,6 +266,8 @@ function patternTags(digits) {
     if (sequence(digits)) tags.push("SEQUENCE");
     if (add(digits)) tags.push("ADD");
     if (subtract(digits)) tags.push("SUBTRACT");
+    if (multiply(digits)) tags.push("MULTIPLY");
+    if (divide(digits)) tags.push("DIVIDE");
     if (tags.length === 0) tags.push("OTHER");
     return tags;
 }
@@ -232,6 +281,8 @@ function matchesFilter(digits, kind) {
     case "sequence": return sequence(digits);
     case "add": return add(digits);
     case "subtract": return subtract(digits);
+    case "multiply": return multiply(digits);
+    case "divide": return divide(digits);
     case "other": return patternTags(digits)[0] === "OTHER";
     case "err": return patternTags(digits)[0] === "OTHER";
     default: return false;
@@ -253,7 +304,7 @@ function observedDate(row) {
     return date.toISOString().slice(0, 10);
 }
 
-function filter(observations, query, kind) {
+function filter(observations, query, kind, favoriteKeys) {
     if (!Array.isArray(observations)
             || typeof query !== "string" || query.length > MAX_DIGITS
             || (query !== "" && !/^[0-9]+$/.test(query))
@@ -262,9 +313,12 @@ function filter(observations, query, kind) {
     return observations.filter(function(row) {
         return validObservation(row)
                && row.digits.indexOf(query) !== -1
-               && (kind === "err"
-                   ? (row.errMarked === true || matchesFilter(row.digits, "other"))
-                   : matchesFilter(row.digits, kind));
+               && (kind === "favorite"
+                   ? (Array.isArray(favoriteKeys)
+                      && favoriteKeys.indexOf(favoriteKey(row.digits)) !== -1)
+                   : kind === "err"
+                     ? (row.errMarked === true || matchesFilter(row.digits, "other"))
+                     : matchesFilter(row.digits, kind));
     }).sort(function(a, b) {
         return b.observedAtMs - a.observedAtMs
                || Number(b.id.slice(1)) - Number(a.id.slice(1));

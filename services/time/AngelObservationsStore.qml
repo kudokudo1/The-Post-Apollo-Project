@@ -81,6 +81,10 @@ Scope {
         return stage(Journal.toggleErr(document, id));
     }
 
+    function saveObservationNote(id, note) {
+        return stage(Journal.setNote(document, id, note));
+    }
+
     FileView {
         id: journalFile
         path: angel.storagePath

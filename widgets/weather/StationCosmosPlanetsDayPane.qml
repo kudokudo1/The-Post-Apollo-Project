@@ -44,14 +44,26 @@ Rectangle {
         if(events.length) lockedEvent=Events.stepEvent(events,inspectedEvent,direction);
     }
     onLockedEventChanged: {
-        if(lockedEvent && lockedEvent.minute!==undefined)
+        if(lockedEvent && lockedEvent.minute!==undefined) {
             viewStartMinute=Events.revealStart(lockedEvent.minute,viewStartMinute,viewSpan);
+            // A clicked dated event also selects its source planet for
+            // the fixed SKY NOW reading. Do not invent a current position.
+            if(controlledSelection && lockedEvent.planet
+                && selectedPlanet!==lockedEvent.planet)
+                planetPicked(lockedEvent.planet);
+        }
     }
     onCivilDateChanged: {
         viewStartMinute=0;windowHours=24;lockedEvent=null;hoveredEvent=null;
     }
     onDatedRowsChanged: {lockedEvent=null;hoveredEvent=null;}
-    onSelectedPlanetChanged: {lockedEvent=null;hoveredEvent=null;}
+    onSelectedPlanetChanged: {
+        // Retain the inspected event when the same planet was selected
+        // through its marker; clear only unrelated old selections.
+        if(!lockedEvent || lockedEvent.planet!==selectedPlanet)
+            lockedEvent=null;
+        hoveredEvent=null;
+    }
 
     Column {
         id: content

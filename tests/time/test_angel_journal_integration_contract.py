@@ -150,6 +150,9 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn("readonly property color ink: pane.filterInk(modelData.key)", filters)
         self.assertIn("idleBorderColor: edge", filters)
         self.assertIn("selected: pane.activeFilter === modelData.key", filters)
+        self.assertIn("highlightWhenSelected: true", filters)
+        self.assertIn("selectedForegroundColor: Colors.magenta", filters)
+        self.assertIn("selectedContentGlowColor: Colors.magenta", filters)
 
         self.assertIn("readonly property bool isMarkedErr:", entries)
         self.assertIn("modelData.errMarked === true", entries)
@@ -160,10 +163,13 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn("accentColor: observationEntry.entryInk", entries)
         self.assertIn("idleBorderColor: observationEntry.entryEdge", entries)
         self.assertIn("selected: pane.selectedId === modelData.id", entries)
+        self.assertIn("highlightWhenSelected: true", entries)
+        self.assertIn("selectedForegroundColor: Colors.magenta", entries)
+        self.assertIn("selectedContentGlowColor: Colors.magenta", entries)
         self.assertNotIn("matchesFilter(", entries)
         self.assertNotIn("activeFilter ===", entries)
 
-    def test_angel_buttons_use_one_black_fill_across_all_states(self):
+    def test_angel_selected_open_yellow_fill_with_magenta_glow(self):
         local_button = (ROOT / "widgets/AngelActionButton.qml").read_text(
             encoding="utf-8")
         meaning = (ROOT / "widgets/AngelMeaningPane.qml").read_text(
@@ -171,20 +177,33 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn("ActionButton {", local_button)
         self.assertIn("readonly property color fixedFillColor: Colors.black",
                       local_button)
-        for state in ("idle", "hover", "pressed", "selected",
-                      "keyboardSelected"):
+        self.assertIn("readonly property color activeFillColor: Colors.yellow",
+                      local_button)
+        self.assertIn("property bool highlightWhenSelected: false",
+                      local_button)
+        for state in ("idle", "hover", "pressed", "keyboardSelected"):
             self.assertIn(state + "FillColor: fixedFillColor", local_button)
-        self.assertIn("color: fixedFillColor", local_button)
-        # Wide/soft RectangularShadow shapes can tint entire rows even when
-        # the underlying Rectangle paints black; Angel keeps text glow only.
+        self.assertIn("selectedFillColor: activeFillColor", local_button)
+        self.assertIn(
+            "color: highlightWhenSelected && selected ? activeFillColor : fixedFillColor",
+            local_button)
+        self.assertIn("selectedForegroundColor: Colors.magenta", local_button)
+        self.assertIn("selectedBorderColor: Colors.magenta", local_button)
+        self.assertIn("selectedContentGlowColor: Colors.magenta", local_button)
+        # Filled rectangular shadows caused the earlier visual failure.
         self.assertIn("softGlowEnabled: false", local_button)
         self.assertIn("wideGlowEnabled: false", local_button)
         self.assertIn("contentGlowEnabled: true", local_button)
         self.assertNotIn("RectangularShadow {", local_button)
-        # No child may override the single fill, including favorite / ERR.
+        # Only active view/filter/history/note use the yellow selection fill.
+        self.assertEqual(PANE.count("highlightWhenSelected: true"), 5)
+        self.assertNotIn("highlightWhenSelected: true", meaning)
+        for control in ("favoriteObservation", "errMarkButton"):
+            block = PANE.split("id: " + control, 1)[1].split(
+                "onLeftClicked:", 1)[0]
+            self.assertNotIn("highlightWhenSelected: true", block)
         for content in (PANE, meaning):
             self.assertNotIn("FillColor:", content)
-            self.assertNotIn("pane.wash(", content)
         self.assertEqual(PANE.count("AngelActionButton {"), 13)
         self.assertEqual(meaning.count("AngelActionButton {"), 2)
         self.assertIn("x: 0", PANE.split("id: favoriteObservation", 1)[1]

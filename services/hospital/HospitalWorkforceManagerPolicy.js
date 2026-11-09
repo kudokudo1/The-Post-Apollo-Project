@@ -36,7 +36,20 @@ function room(a) {
         blockers.push("Repository must be owner/name");
     if (rows(source.rooms).some(r => v(r.id || r.roomId) === id))
         blockers.push("Room ID already exists. Nothing may be overwritten");
+    const existingPatients = rows(source.rooms).filter(function(r) {
+        return v(r.repository).toLowerCase() === repository.toLowerCase()
+            && v(r.patientId);
+    });
+    const patientIds = existingPatients.map(r => v(r.patientId))
+        .filter((id, i, values) => values.indexOf(id) === i);
+    if (patientIds.length > 1)
+        blockers.push("Patient ID ambiguous for this repository");
+    const patientId = patientIds.length === 1 ? patientIds[0] : repository;
+    const existingLabel = existingPatients.filter(r => v(r.patientId) === patientId
+        && v(r.patientLabel))[0];
+    const patientLabel = existingLabel ? v(existingLabel.patientLabel) : repository;
     return {ready: blockers.length === 0, blockers, id, name, repository,
+        patientId, patientLabel,
         mutationAuthorized: false, createsSession: false, assignsDoctor: false,
         branch: "", bedPath: ""};
 }

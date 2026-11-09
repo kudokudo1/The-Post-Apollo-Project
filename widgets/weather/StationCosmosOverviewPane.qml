@@ -93,7 +93,8 @@ Rectangle {
         id: dashboard
         anchors.fill: parent
         anchors.margins: HeaderGeometry.inset
-        spacing: HeaderGeometry.ruleToContent
+        // Fixed C44 stages; inner instrument content retains its own spacing.
+        spacing: 0
 
         GohuText {
             id: consoleHeader
@@ -109,7 +110,7 @@ Rectangle {
         Item {
             id: headerSpacer
             width: parent.width
-            height: HeaderGeometry.columnHeaderGap()
+            height: HeaderGeometry.titleToTabs
         }
         Row {
             id: overviewModeRail
@@ -140,7 +141,7 @@ Rectangle {
             id: dividerSlot
             objectName: "cosmos-c44-overview-divider-slot"
             width: parent.width
-            height: HeaderGeometry.columnRuleSlotHeight()
+            height: HeaderGeometry.tabsToRule + HeaderGeometry.ruleHeight
             Rectangle {
                 objectName: "cosmos-c44-overview-divider"
                 anchors.left: parent.left
@@ -151,15 +152,26 @@ Rectangle {
             }
         }
 
+        Item {
+            id: headerContentGap
+            width: parent.width
+            height: HeaderGeometry.ruleToContent
+        }
+        Column {
+            id: overviewContent
+            width: parent.width
+            height: Math.max(0,dashboard.height - consoleHeader.height
+                - headerSpacer.height - overviewModeRail.height
+                - dividerSlot.height - headerContentGap.height)
+            spacing: HeaderGeometry.ruleToContent
         Rectangle {
             id: skyInstrumentFrame
             objectName: "cosmos-c44-overview-stage"
             width: parent.width
             // Leave a fixed lower rack; do not make the outer dashboard scroll.
-            height: Math.max(0,dashboard.height-consoleHeader.height
-                    -headerSpacer.height-overviewModeRail.height-dividerSlot.height
+            height: Math.max(0,overviewContent.height
                     -spaceHeader.height-spaceMetricRow.height
-                    -6*dashboard.spacing)
+                    -2*overviewContent.spacing)
             color: Colors.black
             border.width: 1
             border.color: Colors.magenta
@@ -265,6 +277,7 @@ Rectangle {
                     }
                 }
             }
+        }
         }
     }
 }

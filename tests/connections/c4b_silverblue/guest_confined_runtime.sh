@@ -560,16 +560,19 @@ def selected_line(path):
         if (not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid()
                 or st.st_nlink != 1 or not 0 < st.st_size <= 2 * 1024 * 1024):
             raise ValueError("unsafe guest runtime log")
-        os.lseek(fd, max(0, st.st_size - 16384), os.SEEK_SET)
-        tail = os.read(fd, 16385)
+        # The original signed-service record may be farther back than the
+        # last 16 KiB after teardown. Read the whole bounded, verified inode
+        # instead of silently discarding a valid earlier observation.
+        log = os.read(fd, st.st_size + 1)
         after = os.fstat(fd)
-        if (len(tail) > 16384 or
-                (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns) !=
-                (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)):
+        if (len(log) != st.st_size or
+                (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+                != (after.st_dev, after.st_ino, after.st_size,
+                    after.st_mtime_ns, after.st_ctime_ns)):
             raise ValueError("runtime log changed")
     finally:
         os.close(fd)
-    matched = [x.rstrip(b"\r") for x in tail.split(b"\n")
+    matched = [x.rstrip(b"\r") for x in log.split(b"\n")
                if x.startswith(PREFIX)]
     if len(matched) != 1 or len(matched[0]) > 2048:
         raise ValueError("exactly one bounded record required")
@@ -620,7 +623,7 @@ try:
     # C2v already safely forwards the last 110 runtime-log lines after the
     # whole first-boot C4b phase. Mirror ONE validated self-observation at
     # that point; its separate guest serial is diagnostic only, never authority.
-    print(payload.decode("ascii").rstrip("\\n"), flush=True)
+    print(payload.decode("ascii").rstrip("\n"), flush=True)
     fd = os.open(sys.argv[2], os.O_WRONLY | os.O_NOCTTY | os.O_NONBLOCK |
                  os.O_CLOEXEC | os.O_NOFOLLOW)
     try:

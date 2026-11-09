@@ -145,6 +145,75 @@ function preview(a) {
         disclaimer:"NO ROOM MUTATION // NO NEW SESSION // NO WORKER START // NO BROWSER ATTACHMENT"
     };
 }
+// Exact PX succession request contract, READ ONLY. This never grants authority.
+// A list of Sessions is not ordered by the SQLite insertion rowid used by PX;
+// multiple historical Sessions therefore require a newer authoritative check,
+// rather than guessing the predecessor from a display order.
+function successionContract(a) {
+    const source = a || {};
+    const plan = source.plan || {};
+    const room = (source.snapshot || {}).room || {};
+    const sameRoom = arr(source.sessions).filter(function(s) {
+        return v((s || {}).roomId) === v(plan.roomId);
+    });
+    const blockers = [];
+    function block(message) { blockers.push(message); }
+    if (source.sessionsLoaded !== true)
+        block("PX Session registry not verified for the transfer");
+    if (plan.previewable !== true || plan.mutationAuthorized !== false)
+        block("Recovery preview has blockers or is not safely read-only");
+    if (!v(plan.roomId) || v(room.id) !== v(plan.roomId)
+            || !v(room.providerId) || !v(room.doctorId)
+            || !v(room.assignmentId) || !v(room.repository)
+            || !v(room.branch) || !v(room.bedPath))
+        block("Pinned Room, previous staffing, Assignment or Git Bed is incomplete");
+    if (sameRoom.length === 0)
+        block("No recorded predecessor Session; cannot construct a PX succession request");
+    else if (sameRoom.length > 1)
+        block("Multiple historical Room Sessions; latest insertion order must be verified by PX");
+    const previous = sameRoom.length === 1 ? sameRoom[0] : null;
+    if (previous) {
+        if (!id(previous))
+            block("Recorded predecessor has no exact Session ID");
+        if (["COMPLETE", "ENDED", "FAILED"].indexOf(u(previous.status)) < 0
+                || !v(previous.endedAt) || Number(previous.activePid || 0) !== 0
+                || !Number.isFinite(Number(previous.activePid || 0)))
+            block("Predecessor Session has not been explicitly released");
+        if (v(previous.doctorId) !== v(room.doctorId)
+                || v(previous.providerId) !== v(room.providerId))
+            block("Predecessor Doctor/Provider differs from pinned Room staffing");
+        if (v(previous.workingDirectory) !== v(room.bedPath))
+            block("Predecessor Session Bed differs from pinned Room Bed");
+    }
+    const ready = blockers.length === 0;
+    return {
+        readyForAuthorityCheck: ready,
+        previousSessionId: previous ? id(previous) : "",
+        previousDoctorId: v(room.doctorId),
+        previousProviderId: v(room.providerId),
+        blockers: blockers,
+        pinnedRequest: ready ? {
+            roomId: v(plan.roomId),
+            previousSessionId: id(previous),
+            previousDoctorId: v(room.doctorId),
+            previousProviderId: v(room.providerId),
+            successorDoctorId: v(plan.successorDoctorId),
+            successorProviderId: v(plan.providerId),
+            assignmentId: v(plan.assignmentId),
+            repository: v(room.repository),
+            branch: v(room.branch),
+            bedPath: v(room.bedPath)
+        } : null,
+        // A freshly minted new Session ID, caller-authenticated permission,
+        // PX command capability and last-moment database check are still absent.
+        mutationAuthorized: false,
+        status: ready
+            ? "PREDECESSOR PINNED // OPERATOR AUTHORITY NOT VERIFIED"
+            : "ATOMIC SUCCESSION PRECONDITIONS NOT SATISFIED",
+        disclaimer: "NO SUCCESSION SUBMITTED // SESSION RELEASE IS RECORDED, NOT A LIVE BROWSER HEARTBEAT"
+    };
+}
+
 function briefing(a) {
     const input = a || {};
     const p = preview(input);

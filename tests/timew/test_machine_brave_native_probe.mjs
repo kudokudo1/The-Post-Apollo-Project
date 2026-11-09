@@ -4,7 +4,7 @@ import {
   REQUEST_KIND, RESPONSE_KIND
 } from "../../integrations/machine/brave-topology/native-probe-protocol.mjs";
 
-const nonce = "00000000-0000-4000-8000-000000000123";
+const nonce = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 assert.equal(NATIVE_HOST_NAME, "org.postapollo.machine_brave_probe");
 assert.deepEqual(makeProbeRequest(nonce), {
   kind: REQUEST_KIND, challenge: nonce

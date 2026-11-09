@@ -18,8 +18,12 @@ on:
       - 'tests/weather/test_media_subject_panels_d1.js'
       - 'tests/weather/test_media_m1_fixed_regions.js'
       - 'tests/weather/test_media_m2_context_rails.js'
+      - 'tests/weather/test_media_m3_overview_full_radio.js'
+      - 'tests/weather/test_workspace_landing_w1.js'
+      - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
       - 'tests/weather/fixtures/M1MediaFixedRadio.qml'
       - 'tests/weather/fixtures/M2MediaContextNative.qml'
+      - 'tests/weather/fixtures/M3MediaOverviewNative.qml'
       - '.github/workflows/weather-media-subject-panels-d1.yml'
   workflow_dispatch:
 
@@ -46,6 +50,8 @@ jobs:
           node --test tests/weather/test_media_subject_panels_d1.js
           node --test tests/weather/test_media_m1_fixed_regions.js
           node --test tests/weather/test_media_m2_context_rails.js
+          node --test tests/weather/test_media_m3_overview_full_radio.js
+          node --test tests/weather/test_workspace_landing_w1.js
           node --test tests/weather/test_media_full_visual_parity_m28t.js
   native-fixed-radio:
     runs-on: ubuntu-latest
@@ -101,5 +107,20 @@ jobs:
           test "$rc" -eq 0
           grep -F "M2_NATIVE_PASS // CONTEXTUAL_RAILS_PINNED_TEN_ACROSS_RADIO_SQUARES" "$work/m2-native.log"
           if grep -E 'M2_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/m2-native.log"; then
+            exit 1
+          fi
+
+          cp "$root/tests/weather/fixtures/M3MediaOverviewNative.qml" "$work/config/shell.qml"
+          rc=0
+          timeout --signal=TERM --kill-after=3s 40s \
+            env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
+            XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            quickshell --no-color -p "$work/config/shell.qml" \
+            > "$work/m3-native.log" 2>&1 || rc=$?
+          cat "$work/m3-native.log"
+          test "$rc" -eq 0
+          grep -F "M3_NATIVE_PASS // NEWS_TOP_FULL_RADIO_BOTTOM_SERVICES_TAB" "$work/m3-native.log"
+          if grep -E 'M3_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/m3-native.log"; then
             exit 1
           fi

@@ -246,9 +246,12 @@ test("CPU++ imports all AppControl owner lists, with seven source filters and re
     "FavoritesStore.favoriteTaskMetricKeys"
   ]) assert.ok(cpu.includes(field),field);
   assert.match(cpu,/FavoritesManagement\.list\(/);
-  assert.match(panel,/model: \["ALL","GROUP","CPU\+\+","APP CTRL","WEATHER","NOTIFS","RADIO","HOSPITAL","CLOCK","PLACES","NEW"\]/);
+  assert.match(panel,/readonly property var categoryKeys:/);
+  assert.match(panel,/"ALL","GROUP","CPU\+\+","APP CTRL","WEATHER","NOTIFS"/);
+  assert.match(panel,/"RADIO","HOSPITAL","CLOCK","PLACES","NEW"/);
   assert.match(panel,/id: categoryFilterFlow/);
-  assert.match(panel,/height: Math\.ceil\(11\/columns\)\*\(30\+spacing\)-spacing/);
+  assert.match(panel,/readonly property int upperCount: Math\.ceil\(categoryKeys\.length\/2\)/);
+  assert.match(panel,/height: 2\*30\+spacing/);
   assert.match(panel,/modelData\.readOnly\?"READ ONLY"/);
   assert.match(panel,/pane\.selectedResource && !pane\.selectedResource\.readOnly/);
   assert.match(panel,/APP CONTROL-OWNED \/\/ READ ONLY/);
@@ -1664,57 +1667,87 @@ test("U8a two-click red left collection delete invokes store only on confirmatio
 });
 
 
-test("U8b main Favorites filters are compact, icon-only and accessible by source name",()=>{
+test("U8c icon rail packs both rows across the full width, preserving accessibility",()=>{
   const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
   const index=pane.indexOf("id: categoryFilterFlow");
   const bottom=pane.indexOf("id: subfilterScroll");
   assert.ok(index>=0 && bottom>index);
   const main=pane.slice(index,bottom);
-  assert.match(main,/width: 38/);
-  assert.match(main,/height: 30/);
+  assert.match(main,/width: categoryFilterFlow\.tileWidth/);
+  assert.match(main,/Math\.min\(34,Math\.max\(20,\(width-\(upperCount-1\)\*4\)\/upperCount\)\)/);
+  assert.match(main,/rowKeys\.length\*[\s\S]*?categoryFilterFlow\.tileWidth\)\/\(rowKeys\.length-1\)/);
+  assert.match(main,/categoryFilterFlow\.categoryKeys\.slice\(/);
   assert.match(main,/label: Dossier\.mainIcon\(modelData\)/);
-  assert.doesNotMatch(main,/label: Dossier\.mainIcon\(modelData\)\s*\+/);
   assert.match(main,/labelPixelSize: 18/);
   assert.match(main,/Accessible\.role: Accessible\.Button/);
   assert.match(main,/Accessible\.name: modelData\+" favorites filter"/);
   assert.match(main,/onLeftClicked: pane\.filterMode=modelData/);
-  // Two rows at current 260px width; responsive Flow can grow at narrower sizes.
-  const columns=Math.max(1,Math.floor((260+4)/(38+4)));
-  assert.equal(columns,6);
-  assert.equal(Math.ceil(11/columns)*(30+4)-4,64);
+
+  // At the real 260px selector, both lines occupy their complete width.
+  const width=260,tile=Math.min(34,Math.max(20,(width-5*4)/6));
+  assert.equal(tile,34);
+  for(const count of [6,5]) {
+    const space=(width-count*tile)/(count-1);
+    const used=count*tile+(count-1)*space;
+    assert.ok(space>=4);
+    assert.equal(used,width);
+  }
   assert.match(pane,/selector\.height-categoryFilterFlow\.height-121/);
-  // The bottom row retains readable text subfilters.
-  assert.match(main,/\/\/ Secondary source\/menu filters remain pinned/);
   assert.match(pane,/id: subfilterButtons[\s\S]*?label: modelData/);
 });
 
-test("U8b category icons take verified module colors; Notifications and Time remain white",()=>{
+test("U8c exact module palette and white-partner glow contracts",()=>{
   const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
   const main=pane.slice(pane.indexOf("id: categoryFilterFlow"),
                         pane.indexOf("id: menuFilterPrev"));
-  assert.match(main,/modelData==="WEATHER" \? Colors\.yellow/);
-  assert.match(main,/modelData==="HOSPITAL"/);
-  assert.match(main,/hospitalModule \? Colors\.magenta/);
-  assert.match(main,/modelData==="NOTIFS" \|\| modelData==="CLOCK"/);
-  assert.match(main,/whiteModule \? Colors\.white : Colors\.cyan/);
-  assert.match(main,/hoverAccent:\s*whiteModule \? Colors\.white/);
-  assert.match(main,/accentColor: moduleAccent/);
-  for(const state of [
-    "hoverForegroundColor","hoverBorderColor",
-    "hoverContentGlowColor","hoverSoftGlowColor"
-  ]) assert.match(main,new RegExp(state+": hoverAccent"));
-  for(const state of [
-    "selectedForegroundColor","selectedFillColor","selectedBorderColor",
-    "selectedContentGlowColor","selectedSoftGlowColor",
-    "keyboardSelectedBorderColor","keyboardSelectedContentGlowColor",
-    "keyboardSelectedSoftGlowColor"
-  ]) assert.match(main,new RegExp(state+":\\s*whiteModule \\? Colors\\."));
-  assert.match(main,/whiteModule \|\| hospitalModule/);
-  assert.match(main,/pressedFillColor:\s*whiteModule \|\| hospitalModule/);
-  assert.match(main,/selectedFillColor:\s*whiteModule \? Colors\.dark : Colors\.yellow/);
+  function propertyExpr(name,next) {
+    const re=new RegExp("readonly property (?:bool|color) "+name+":([\\s\\S]*?)"+
+                       "(?=\\n\\s*readonly property (?:bool|color) "+next+":)");
+    const m=main.match(re);
+    assert.ok(m,name+" must be a real QML property");
+    return m[1].trim();
+  }
+  const whiteExpr=propertyExpr("whiteGlyph","iconInk");
+  const iconExpr=propertyExpr("iconInk","frameInk");
+  const frameExpr=propertyExpr("frameInk","iconGlowInk");
+  const glowExpr=main.split("readonly property color iconGlowInk:")[1]
+     .split("\n\n                            width:")[0].trim();
+  const Colors={
+    white:"#DCF3FA",cyan:"#55CFCA",magenta:"#C74EC7",
+    orange:"#ED981A",yellow:"#F2BE4E"
+  };
+  const cases=[
+    ["ALL","magenta","magenta","magenta"],
+    ["GROUP","cyan","cyan","cyan"],
+    ["CPU++","white","cyan","cyan"],
+    ["APP CTRL","cyan","cyan","cyan"],
+    ["WEATHER","orange","orange","orange"],
+    ["NOTIFS","white","white","white"],
+    ["RADIO","magenta","cyan","magenta"],
+    ["HOSPITAL","white","magenta","magenta"],
+    ["CLOCK","white","white","white"],
+    ["PLACES","yellow","yellow","yellow"],
+    ["NEW","cyan","cyan","cyan"]
+  ];
+  for(const [category,icon,border,glow] of cases) {
+    const ctx=vm.createContext({modelData:category,Colors});
+    ctx.whiteGlyph=vm.runInContext(whiteExpr,ctx);
+    ctx.iconInk=vm.runInContext(iconExpr,ctx);
+    ctx.frameInk=vm.runInContext(frameExpr,ctx);
+    ctx.iconGlowInk=vm.runInContext(glowExpr,ctx);
+    assert.equal(ctx.iconInk,Colors[icon],category+" icon");
+    assert.equal(ctx.frameInk,Colors[border],category+" border");
+    assert.equal(ctx.iconGlowInk,Colors[glow],category+" icon glow");
+  }
+  // All interaction states keep their own icon, border and glow channels.
+  for(const state of ["idle","hover","pressed","selected","keyboardSelected"]) {
+    assert.match(main,new RegExp(state+"ForegroundColor: iconInk"));
+    assert.match(main,new RegExp(state+"BorderColor: frameInk"));
+    assert.match(main,new RegExp(state+"ContentGlowColor: iconGlowInk"));
+    assert.match(main,new RegExp(state+"SoftGlowColor: frameInk"));
+  }
+  assert.match(main,/contentGlowPressedOpacity: 0\.68/);
+  assert.match(main,/softGlowSelectedOpacity: 0\.72/);
   assert.match(main,/selectedBorderWidth: 2/);
-  assert.match(read("modules/Weather.qml"),/openFillColor: Colors\.yellow/);
-  assert.match(read("modules/Hospital.qml"),/normalContentGlowColor: Colors\.magenta/);
-  assert.match(read("modules/NotificationsHub.qml"),/normalForegroundColor: Colors\.white/);
-  assert.match(read("modules/Clock.qml"),/Colors\.white/);
+  assert.match(read("components/Colors.qml"),/readonly property color white: "#DCF3FA"/);
 });

@@ -18,6 +18,9 @@ Rectangle {
     property string subjectRoute: ""
     // MEDIA M1: native SUBJECTS already has a fixed COSMOS C44 title.
     property bool embeddedHeader: false
+    // OVERVIEW can show the six original NEWS channel filters without
+    // changing its existing focused GDELT REPORTS source route.
+    property bool overviewChannelFilters: false
     // Contextual NEWS channel rail in the parent delegates to this owner.
     function selectSection(nextSection) {
         if (Catalog.sections.indexOf(nextSection) < 0)
@@ -30,6 +33,7 @@ Rectangle {
     // six-tab channel controls and the same GDELT report inspector.
     readonly property bool usesOriginalChannelTabs:
         subjectRoute === "" || MediaPanelPolicy.isFullNews(subjectRoute)
+        || (overviewChannelFilters && subjectRoute === "media/news/reports")
     readonly property string effectiveSection: usesOriginalChannelTabs
         ? section : MediaPanelPolicy.catalogSectionFor(subjectRoute)
     onSubjectRouteChanged: {

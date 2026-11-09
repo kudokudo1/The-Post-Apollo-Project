@@ -63,3 +63,61 @@ export function scopedDiscordEvent(event: any, channel: any, selfId: unknown,
     }
     return result;
 }
+
+
+function oneLineLabel(value: unknown): string {
+    if (typeof value !== "string") return "";
+    return value.trim().replace(/[\\r\\n\\x00-\\x1f\\x7f]/g, " ").slice(0, 80);
+}
+
+// Pure command-argument builder, shared by native code and contract tests.
+// It does NOT execute a process. Only this fixed, generic notification is
+// possible through the paired native helper.
+export function notificationArgs(raw: unknown): string[] | null {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const m = raw as Record<string, unknown>;
+    const accountId = discordSnowflake(m.accountId);
+    const senderId = discordSnowflake(m.senderId);
+    const messageId = discordSnowflake(m.messageId);
+    const channelId = discordSnowflake(m.channelId);
+    if (!accountId || !senderId || !messageId || !channelId
+            || accountId === senderId) return null;
+    const guildId = discordSnowflake(m.guildId);
+    const groupId = discordSnowflake(m.groupId);
+    const conversationId = discordSnowflake(m.conversationId);
+    const kind = m.conversationType;
+    if ((guildId && (groupId || conversationId || kind))
+            || (!guildId && (!conversationId || conversationId !== channelId))
+            || (!guildId && kind !== "group" && kind !== "direct")
+            || (kind === "group" && groupId !== channelId)
+            || (kind === "direct" && groupId))
+        return null;
+
+    const hints: Array<[string, string]> = [
+        ["desktop-entry", "vesktop"],
+        ["category", "im.received"],
+        ["x-post-apollo-account-id", accountId],
+        ["x-post-apollo-sender-id", senderId]
+    ];
+    if (guildId) {
+        hints.push(["x-post-apollo-server-id", guildId]);
+        hints.push(["x-post-apollo-channel-id", channelId]);
+        const channelName = oneLineLabel(m.channelName);
+        if (channelName) hints.push(["x-post-apollo-channel-name", channelName]);
+    } else {
+        hints.push(["x-post-apollo-conversation-id", conversationId]);
+        hints.push(["x-post-apollo-conversation-type", String(kind)]);
+        if (groupId) hints.push(["x-post-apollo-group-id", groupId]);
+        const conversationName = oneLineLabel(m.conversationName);
+        if (conversationName)
+            hints.push(["x-post-apollo-conversation-name", conversationName]);
+    }
+    const senderName = oneLineLabel(m.senderName);
+    if (senderName) hints.push(["x-post-apollo-sender-name", senderName]);
+    const args = ["--app-name=Vesktop", "--urgency=normal", "--expire-time=6500"];
+    for (const [key, value] of hints)
+        args.push("--hint=string:" + key + ":" + value);
+    args.push("--", "Discord // New message",
+        "Incoming message from an explicitly allowed Discord conversation");
+    return args;
+}

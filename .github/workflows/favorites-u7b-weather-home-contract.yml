@@ -8,6 +8,8 @@ on:
       - "services/weather/WeatherHomeFavoritesPolicy.js"
       - "tests/cpuplus/test_favorites_exact_navigation_u7b.cjs"
       - "services/favorites/FavoritesAppSelectionPolicy.js"
+      - "services/favorites/FavoritesSystemSelectionPolicy.js"
+      - "tests/cpuplus/test_favorites_system_selection_u7bd.cjs"
       - "tests/cpuplus/test_favorites_app_selection_u7bc.cjs"
       - "widgets/AppControlW.qml"
       - "widgets/cpuplus/CpuPlusFavoritesHubPane.qml"
@@ -24,6 +26,8 @@ on:
       - "services/weather/WeatherHomeFavoritesPolicy.js"
       - "tests/cpuplus/test_favorites_exact_navigation_u7b.cjs"
       - "services/favorites/FavoritesAppSelectionPolicy.js"
+      - "services/favorites/FavoritesSystemSelectionPolicy.js"
+      - "tests/cpuplus/test_favorites_system_selection_u7bd.cjs"
       - "tests/cpuplus/test_favorites_app_selection_u7bc.cjs"
       - "widgets/AppControlW.qml"
       - "widgets/cpuplus/CpuPlusFavoritesHubPane.qml"
@@ -47,3 +51,4 @@ jobs:
         run: |
           node --test tests/cpuplus/test_favorites_exact_navigation_u7b.cjs
           node --test tests/cpuplus/test_favorites_app_selection_u7bc.cjs
+          node --test tests/cpuplus/test_favorites_system_selection_u7bd.cjs

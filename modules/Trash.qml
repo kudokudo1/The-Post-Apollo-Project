@@ -12,6 +12,19 @@ PanelWindow {
     id: trashLauncher
 
     property bool menuOpen: false
+    // Lifecycle navigation is presentation-only until owner-specific
+    // record adapters are approved. Only "trash" has destructive authority.
+    property string activeMode: "trash"
+    readonly property var lifecycleModes: ["cleanup", "archive", "trash", "burn"]
+
+    function setMode(nextMode) {
+        const requested = String(nextMode || "");
+        if (busy || confirmMode !== ""
+                || lifecycleModes.indexOf(requested) < 0)
+            return false;
+        activeMode = requested;
+        return true;
+    }
 
     // Four chassis sizes share ONE mapped PanelWindow. The dock button never
     // changes its 50x50 geometry or 25px-left/20px-bottom position.
@@ -70,6 +83,7 @@ PanelWindow {
     property string confirmName: ""
     property string confirmRevision: ""
     property int confirmCount: 0
+    property bool burnAllPointerRelocated: false
 
     readonly property var filteredItems: items.filter(function(item) {
         const needle = String(trashSearch.text || "").trim().toLowerCase();
@@ -85,6 +99,7 @@ PanelWindow {
         confirmName = "";
         confirmRevision = "";
         confirmCount = 0;
+        burnAllPointerRelocated = false;
     }
 
     function toggle() {
@@ -194,13 +209,20 @@ PanelWindow {
         confirmMode = "all";
         confirmRevision = revision;
         confirmCount = total;
+        burnAllPointerRelocated = false;
     }
 
     function confirmBurn() {
         if (busy) return;
         if (confirmMode === "item" && confirmUri) {
             run("burn", ["burn", confirmUri, confirmOriginal, "BURN_CONFIRMED"]);
-        } else if (confirmMode === "all" && confirmCount > 0) {
+        } else if (confirmMode === "all" && confirmCount > 0
+                   && burnAllPointerRelocated
+                   && activeMode === "trash"
+                   && confirmRevision === revision
+                   && confirmCount === total) {
+            // Pointer must arrive at the remote confirmation target. Backend
+            // independently revalidates the count/revision before emptying.
             run("burn-all", ["burn-all", confirmRevision,
                              String(confirmCount), "BURN_ALL_CONFIRMED"]);
         }
@@ -424,7 +446,8 @@ PanelWindow {
                 GohuText {
                     width: parent.width - 184
                     height: parent.height
-                    text: "TRASH // INDEX // " + trashLauncher.chassisSize.toUpperCase()
+                    text: "TRASH++ // " + trashLauncher.activeMode.toUpperCase()
+                          + " // " + trashLauncher.chassisSize.toUpperCase()
                     color: Colors.magenta
                     font.pixelSize: 14
                     verticalAlignment: Text.AlignVCenter
@@ -507,8 +530,34 @@ PanelWindow {
             }
 
             Row {
+                id: trashLifecycleModes
+                width: parent.width
+                height: 28
+                spacing: 5
+
+                Repeater {
+                    model: ["CLEANUP", "ARCHIVE", "TRASH", "BURN"]
+                    delegate: ActionButton {
+                        required property string modelData
+                        width: (trashLifecycleModes.width - 15) / 4
+                        height: 28
+                        label: modelData
+                        labelPixelSize: 10
+                        accentColor: modelData === "BURN"
+                                     ? Colors.red : Colors.cyan
+                        selected: trashLauncher.activeMode
+                                  === modelData.toLowerCase()
+                        available: !trashLauncher.busy
+                        onLeftClicked: trashLauncher.setMode(
+                                           modelData.toLowerCase())
+                    }
+                }
+            }
+
+            Row {
                 width: parent.width
                 height: 23
+                visible: trashLauncher.activeMode === "trash"
                 spacing: 7
 
                 GohuText {
@@ -533,6 +582,7 @@ PanelWindow {
 
             TextField {
                 id: trashSearch
+                visible: trashLauncher.activeMode === "trash"
                 width: parent.width
                 height: 33
                 placeholderText: "FILTER THIS PAGE // FILE NAME OR LOCATION"
@@ -550,9 +600,10 @@ PanelWindow {
 
             Item {
                 id: trashListBox
+                visible: trashLauncher.activeMode === "trash"
                 width: parent.width
-                height: Math.max(100, trashMenu.height - 250
-                                 - (trashLauncher.confirmMode !== "" ? 46 : 0))
+                height: Math.max(95, trashMenu.height - 290
+                                 - (trashLauncher.confirmMode === "item" ? 46 : 0))
 
                 ListView {
                     id: trashFileList
@@ -655,6 +706,7 @@ PanelWindow {
             Row {
                 width: parent.width
                 height: 26
+                visible: trashLauncher.activeMode === "trash"
                 spacing: 6
 
                 ActionButton {
@@ -701,6 +753,7 @@ PanelWindow {
             Row {
                 width: parent.width
                 height: 32
+                visible: trashLauncher.activeMode === "trash"
                 spacing: 8
 
                 GohuText {
@@ -727,8 +780,8 @@ PanelWindow {
 
             Rectangle {
                 width: parent.width
-                height: trashLauncher.confirmMode === "" ? 0 : 40
-                visible: trashLauncher.confirmMode !== ""
+                height: trashLauncher.confirmMode === "item" ? 40 : 0
+                visible: trashLauncher.confirmMode === "item"
                 color: Colors.dark
                 border.width: 1
                 border.color: Colors.red
@@ -745,10 +798,7 @@ PanelWindow {
                         font.pixelSize: 10
                         verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
-                        text: trashLauncher.confirmMode === "all"
-                              ? "BURN ALL " + trashLauncher.confirmCount
-                                + " ITEMS? // IRREVERSIBLE"
-                              : "BURN // " + trashLauncher.confirmName
+                        text: "BURN // " + trashLauncher.confirmName
                     }
 
                     ActionButton {
@@ -769,6 +819,67 @@ PanelWindow {
                         destructive: true
                         available: !trashLauncher.busy
                         onLeftClicked: trashLauncher.confirmBurn()
+                    }
+                }
+            }
+
+            Item {
+                id: lifecyclePreparation
+                width: parent.width
+                height: Math.max(145, trashMenu.height - 175)
+                visible: trashLauncher.activeMode !== "trash"
+
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 13
+
+                    GohuText {
+                        width: parent.width
+                        height: 30
+                        font.pixelSize: 15
+                        color: Colors.yellow
+                        text: trashLauncher.activeMode.toUpperCase()
+                              + " // LIFECYCLE WORKSPACE"
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 2
+                        color: Colors.cyan
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 11
+                        color: Colors.white
+                        text: trashLauncher.activeMode === "cleanup"
+                              ? "CAMERA // BATCH // SWIPE // HUNT"
+                              : trashLauncher.activeMode === "archive"
+                              ? "ARCHIVE // RETAIN AND RETRIEVE"
+                              : "BURN // VERIFIED DELETION ONLY"
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 11
+                        color: Colors.cyan
+                        text: trashLauncher.activeMode === "cleanup"
+                              ? "Camera owns the existing Cleanup queue. Cross-widget routing is not connected yet. For now, use Camera // Cleanup."
+                              : trashLauncher.activeMode === "archive"
+                              ? "No record stores are connected to Universal Archive yet. Hospital, Company and Finance retain their own authorization and recovery."
+                              : "Only SYSTEM TRASH currently supports Burn. This mode cannot delete Hospital reports, finance records or arbitrary files."
+                    }
+
+                    ActionButton {
+                        width: 156
+                        height: 32
+                        label: "VIEW SYSTEM TRASH"
+                        labelPixelSize: 10
+                        accentColor: Colors.green
+                        onLeftClicked: trashLauncher.setMode("trash")
                     }
                 }
             }

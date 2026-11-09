@@ -10,7 +10,7 @@ This three-file Vencord userplugin registers a `MESSAGE_CREATE` Flux listener, r
 
 The renderer passes that object to one bounded native IPC method. The native method **only** invokes `notify-send` with a generic headline/body, plus the `x-post-apollo-*` freedesktop notification hints already recognized by `NotificationsConverter.qml`. No Discord message body, attachments, token, message content, or HTTP request is forwarded. The native method cannot choose arbitrary paths, programs, commands, notification text or URLs.
 
-The existing Post-Apollo notification pipeline receives the structured hints and applies **BLOCK before history** and **DND/ZZ before popups**. Source IDs are `vesktop` and account/sender/server/channel/group/DM identities remain scoped independently. Rate-limits are 12 forwarded events per minute in native code, 256 renderer-side and 128 native in-memory recent IDs.
+The existing Post-Apollo notification pipeline receives the structured hints and applies **BLOCK before history** and **DND/ZZ before popups**. The desktop-entry ID follows `dev.vencord.Vesktop` inside that Flatpak (detected from `FLATPAK_ID`) and `vesktop` for the native-install fallback, so app-wide rules use the same source namespace where the native notifications use that ID. Account/sender/server/channel/group/DM identities remain scoped independently. Rate-limits are 12 forwarded events per minute in native code, 256 renderer-side and 128 native in-memory recent IDs.
 
 ## Installation and activation are NOT automatic
 

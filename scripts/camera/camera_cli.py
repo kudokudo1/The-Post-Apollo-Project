@@ -614,8 +614,9 @@ def preview_batch_trash(raw_paths, extra_folder=""):
     roots, gallery_records, truncated = scan_gallery(extra_folder)
     if roots is None:
         return {"ok": False, "kind": "preview-batch", "error": "FOLDER_NOT_PERMITTED"}
-    if truncated:
-        return {"ok": False, "kind": "preview-batch", "error": "SCAN_TRUNCATED"}
+    # A global scan can be partial because of an unrelated deep or large
+    # directory. Positive Gallery membership for every explicitly selected
+    # file is enough; never admit an item missing from the bounded scan.
     inventory = {row["path"]: row for row in gallery_records}
     records = []
     total_bytes = 0
@@ -624,7 +625,8 @@ def preview_batch_trash(raw_paths, extra_folder=""):
     # Gallery scan. Reject the whole preview on any stale/invalid selection.
     for raw in paths:
         if raw not in inventory:
-            return {"ok": False, "kind": "preview-batch", "error": "NOT_IN_GALLERY"}
+            return {"ok": False, "kind": "preview-batch",
+                    "error": "SCAN_TRUNCATED" if truncated else "NOT_IN_GALLERY"}
         target = Path(raw)
         if (target.suffix.lower() not in MEDIA_EXTS or
                 safe_user_folder(str(target.parent)) != target.parent):

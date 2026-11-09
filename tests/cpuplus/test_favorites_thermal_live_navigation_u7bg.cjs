@@ -134,6 +134,49 @@ test("pending exact selection resolves when live telemetry appears, not when sto
   assert.equal(s.favoriteNavigationNotice,"");
   assert.equal(s.pendingFavoriteSelection,null);
 });
+test("QML list<string> saved state is array-like, not a JS Array; owner copies it before APP and SYSTEM checks",()=>{
+  function qmlList(values){
+    const out={length:values.length};
+    for(let i=0;i<values.length;i++)out[i]=values[i];
+    return out;
+  }
+  const appId="org.example.Demo.desktop";
+  const qmlApps=qmlList([appId]);
+  assert.equal(Array.isArray(qmlApps),false);
+  assert.equal(AppFavoriteSelection.ownerAllows(
+    appId,qmlApps,[{id:appId,name:"Demo"}]),false,
+    "unconverted QML list recreates the user's silent owner refusal");
+  const a=fixture(),s=a.scope;
+  s.favoriteStore.favoriteKeys=qmlApps;
+  s.DesktopEntries.applications.values=[{id:appId,name:"Demo"}];
+  s.filteredApps.values=[{id:appId,name:"Demo"}];
+  assert.equal(s.selectSavedApplication(appId),true);
+  assert.equal(s.menuOpen,true);
+  assert.equal(s.selectedModeIndex,s.appsModeIndex);
+  assert.equal(s.selectedResultIndex,0);
+  assert.equal(s.favoriteNavigationNotice,"");
+
+  const source={id:"system:cpu",name:"CPU",_systemRecord:true};
+  const qmlSystem=qmlList(["system|system%3Acpu"]);
+  assert.equal(SystemFavoriteSelection.ownerAllows("cpu",qmlSystem,[source]),false);
+  const t=fixture(),owner=t.scope;
+  owner.favoriteStore.favoriteKeys=qmlSystem;
+  owner.systemRows=[source];owner.systemResults.values=[source];
+  assert.equal(owner.selectSavedSystemMetric("cpu"),true);
+  assert.equal(owner.menuOpen,true);
+  assert.equal(owner.selectedModeIndex,owner.systemModeIndex);
+  assert.equal(owner.selectedResultIndex,0);
+  assert.equal(owner.favoriteNavigationNotice,"");
+  assert.equal(Array.isArray(owner.originalFavoriteKeysForSelection()),true);
+
+  // Existing duplicate-favorite safety is not erased by the conversion.
+  const d=fixture(),duplicate=d.scope;
+  duplicate.favoriteStore.favoriteKeys=qmlList(["system|system%3Acpu","system|system%3Acpu"]);
+  duplicate.systemRows=[source];duplicate.systemResults.values=[source];
+  assert.equal(duplicate.selectSavedSystemMetric("cpu"),true);
+  assert.equal(duplicate.selectedResultIndex,-1);
+  assert.match(duplicate.favoriteNavigationNotice,/SYSTEM IS OPEN/);
+});
 test("source wiring uses live owner resolver for all thermal paths and retains other favorites policies",()=>{
   const p=read("services/favorites/FavoritesThermalSelectionPolicy.js");
   assert.match(p,/function resolveVisible\(token,thermalRows,fanRows\)/);

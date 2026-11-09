@@ -292,6 +292,10 @@ PanelWindow {
     // A prepared resync is an explicit, view-scoped confirmation request.
     // Closing or leaving this CPU++ TIME surface must not leave it armed.
     onMenuOpenChanged: {
+        // Refresh age semantics immediately when the indicator becomes
+        // visible, not only on the next 60s display timer.
+        if (menuOpen)
+            internetStatusClockMs=Date.now();
         if (!menuOpen && selectedModeIndex === 6
                 && settingsSubMode === "TIME")
             TimeSettings.cancelResync();

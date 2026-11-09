@@ -82,7 +82,7 @@ const S={
  BrowserSiteIdentity:{hostnameFor:host=>host||''},
  NotificationScopePolicy:scope,policyReady:true,policyStatus:'ready',
  pendingPolicyIntakeEntries:[],pendingPolicyDeliveryIds:[],
- policyVersion:1,defaultSnoozeDurationMs:86400000,
+ policyVersion:1,policyRevision:0,defaultSnoozeDurationMs:86400000,
  historyEnabled:true,historyReady:true,revisions:0,saves:0,
  normalize:x=>x,timeoutFor:()=>5000,pruneHistory(){},
  scheduleHistorySave(){},schedulePolicySave(){this.saves++;},

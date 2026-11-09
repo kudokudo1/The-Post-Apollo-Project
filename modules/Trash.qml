@@ -83,40 +83,26 @@ PanelWindow {
             acceptedButtons: Qt.LeftButton
             open: trashLauncher.menuOpen
 
-            // Reuse DockButton's exact hover/press/open state priority and
-            // Power's numeric glow recipe; Trash retains its own green identity.
+            // Match top-row DockButton glow strengths, radii and spreads
+            // by inheriting its numeric defaults rather than Power's
+            // intentionally subdued overrides. Color planes stay independent:
+            // closed icon = white with Omnitrix sampled glow;
+            // closed chassis = green; open = yellow + magenta icon/glows.
             normalForegroundColor: Colors.white
             hoverForegroundColor: Colors.white
             pressedForegroundColor: Colors.white
-            openForegroundColor: Colors.white
+            openForegroundColor: Colors.magenta
 
-            normalContentGlowColor: Colors.green
-            hoverContentGlowColor: Colors.green
-            pressedContentGlowColor: Colors.green
+            normalContentGlowColor: Colors.omnitrix
+            hoverContentGlowColor: Colors.omnitrix
+            pressedContentGlowColor: Colors.omnitrix
+
             normalDockGlowColor: Colors.green
             hoverDockGlowColor: Colors.green
             pressedDockGlowColor: Colors.green
-            openGlowColor: Colors.green
+
             openFillColor: Colors.yellow
-
-            contentGlowIdleOpacity: 0.30
-            contentGlowHoverOpacity: 0.50
-            contentGlowPressedOpacity: 0.70
-            contentGlowIdleRadius: 19
-            contentGlowHoverRadius: 19
-            contentGlowPressedRadius: 19
-            contentGlowIdleSamples: 17
-            contentGlowHoverSamples: 17
-            contentGlowPressedSamples: 17
-
-            softGlowSpread: 1
-            softGlowIdleOpacity: 0.50
-            softGlowHoverOpacity: 0.70
-            softGlowPressedOpacity: 0.90
-
-            wideGlowIdleOpacity: 0.0
-            wideGlowHoverOpacity: 0.0
-            wideGlowPressedOpacity: 0.0
+            openGlowColor: Colors.magenta
 
             // The sampled glow follows the actual rendered glyph at every
             // interaction state, instead of painting a detached silhouette.

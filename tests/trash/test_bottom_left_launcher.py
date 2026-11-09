@@ -73,45 +73,59 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertEqual(trash_bottom, power_bottom)
         self.assertEqual(trash_bottom, 20)
 
-    def test_reuses_dock_button_states_with_green_glow_and_white_glyph(self):
+    def test_top_row_glow_strengths_and_independent_color_planes(self):
         self.assertIn("DockButton {", TRASH)
         self.assertIn("readonly property bool hovered:", DOCK)
         self.assertIn("readonly property bool pressed:", DOCK)
         self.assertIn("readonly property bool energized:", DOCK)
         self.assertIn("open: trashLauncher.menuOpen", TRASH)
+
+        # The white glyph stays white while closed/hovered/pressed, then
+        # follows the canonical yellow/magenta selected state.
         for field in (
             "normalForegroundColor", "hoverForegroundColor",
-            "pressedForegroundColor", "openForegroundColor"
+            "pressedForegroundColor"
         ):
             self.assertIn(field + ": Colors.white", TRASH)
+        self.assertIn("openForegroundColor: Colors.magenta", TRASH)
+        self.assertIn("openFillColor: Colors.yellow", TRASH)
+
+        # The sampled glyph glow is a distinct Omnitrix-green layer.
+        # The chassis is ordinary green; open overrides both to magenta.
         for field in (
             "normalContentGlowColor", "hoverContentGlowColor",
-            "pressedContentGlowColor", "normalDockGlowColor",
-            "hoverDockGlowColor", "pressedDockGlowColor", "openGlowColor"
+            "pressedContentGlowColor"
+        ):
+            self.assertIn(field + ": Colors.omnitrix", TRASH)
+        for field in (
+            "normalDockGlowColor", "hoverDockGlowColor",
+            "pressedDockGlowColor"
         ):
             self.assertIn(field + ": Colors.green", TRASH)
-        self.assertIn("openFillColor: Colors.yellow", TRASH)
+        self.assertIn("openGlowColor: Colors.magenta", TRASH)
         self.assertIn('text: "♻︎"', TRASH)
         self.assertIn("contentGlowSource: trashGlyph", TRASH)
         self.assertIn("color: trashButton.foregroundColor", TRASH)
 
-        power_button = section(POWER, "        DockButton {", "            onHoverEntered:")
+        # Inherit every numerical glow setting from the same DockButton
+        # component used by the top-row AppLauncher/Camera modules.
         trash_button = section(TRASH, "        DockButton {", "            onLeftClicked:")
         for field in (
             "contentGlowIdleOpacity", "contentGlowHoverOpacity",
-            "contentGlowPressedOpacity", "contentGlowIdleRadius",
+            "contentGlowPressedOpacity", "contentGlowOpenOpacity",
+            "contentGlowIdleRadius", "contentGlowActiveRadius",
             "contentGlowHoverRadius", "contentGlowPressedRadius",
-            "contentGlowIdleSamples", "contentGlowHoverSamples",
-            "contentGlowPressedSamples", "softGlowSpread",
-            "softGlowIdleOpacity", "softGlowHoverOpacity",
-            "softGlowPressedOpacity", "wideGlowIdleOpacity",
-            "wideGlowHoverOpacity", "wideGlowPressedOpacity"
+            "contentGlowOpenRadius", "contentGlowIdleSamples",
+            "contentGlowActiveSamples", "contentGlowHoverSamples",
+            "contentGlowPressedSamples", "contentGlowOpenSamples",
+            "softGlowSpread", "softGlowIdleOpacity",
+            "softGlowHoverOpacity", "softGlowPressedOpacity",
+            "softGlowOpenOpacity", "wideGlowSpread",
+            "wideGlowIdleOpacity", "wideGlowHoverOpacity",
+            "wideGlowPressedOpacity", "wideGlowOpenOpacity"
         ):
-            self.assertEqual(
-                re.search(r"\b" + field + r":\s*([0-9.]+)", trash_button).group(1),
-                re.search(r"\b" + field + r":\s*([0-9.]+)", power_button).group(1),
-                field
-            )
+            self.assertRegex(DOCK, r"\b" + field + r"\s*:")
+            self.assertNotRegex(trash_button, r"\b" + field + r"\s*:")
 
     def test_ipc_handler_type_is_imported_before_use(self):
         # IpcHandler is exported by Quickshell.Io, not base Quickshell.

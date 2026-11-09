@@ -1649,5 +1649,132 @@ PanelWindow {
                 }
             }
         }
+
+        // This modal is a separate, distant target from the per-row BURN
+        // action. It only authorizes deleting an already-trashed, locally
+        // managed demo research COPY, never any source-owned original.
+        Rectangle {
+            id: managedResearchBurnConfirm
+            anchors.fill: parent
+            z: 95
+            visible: trashLauncher.researchBurnId !== ""
+            color: Colors.black
+            radius: 0
+            border.width: 2
+            border.color: Colors.orange
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                onClicked: function(mouse) { mouse.accepted = true; }
+            }
+
+            Column {
+                anchors.centerIn: parent
+                width: Math.min(parent.width - 30, 360)
+                spacing: 14
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 17
+                    text: "BURN SAVED COPY // FINAL REVIEW"
+                    color: Colors.red
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 2
+                    color: Colors.orange
+                }
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 11
+                    color: Colors.yellow
+                    text: "SCOPE // ONE TRASH++ DEMO RESEARCH COPY"
+                    wrapMode: Text.WordWrap
+                }
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 13
+                    color: Colors.white
+                    elide: Text.ElideRight
+                    text: trashLauncher.researchBurnTitle
+                }
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 11
+                    color: Colors.cyan
+                    wrapMode: Text.WordWrap
+                    text: "This permanently deletes only the managed copy from Trash++'s own record store. The original demo scrape, Hospital reports, Finance and Weather archives are NOT touched. The backend rechecks the record identity and revision."
+                }
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 10
+                    color: Colors.orange
+                    wrapMode: Text.WordWrap
+                    text: "MOVE POINTER TO THE SEPARATE LEFT CONFIRM TARGET."
+                }
+
+                Row {
+                    width: parent.width
+                    height: 43
+                    spacing: 12
+
+                    Item {
+                        id: managedResearchRemoteTarget
+                        width: Math.max(145, parent.width - 131)
+                        height: 43
+
+                        HoverHandler {
+                            id: managedResearchArrival
+                            onHoveredChanged: {
+                                if (hovered && trashLauncher.researchBurnId !== "")
+                                    trashLauncher.researchBurnPointerRelocated = true;
+                            }
+                        }
+
+                        ActionButton {
+                            id: confirmManagedResearchBurn
+                            anchors.fill: parent
+                            label: trashLauncher.researchBurnPointerRelocated
+                                   ? "CONFIRM COPY BURN" : "MOVE HERE TO ARM"
+                            labelPixelSize: 10
+                            accentColor: Colors.red
+                            destructive: true
+                            available: !trashLauncher.researchBusy
+                                       && trashLauncher.researchBurnId !== ""
+                                       && trashLauncher.researchBurnPointerRelocated
+                                       && trashLauncher.researchBurnRevision
+                                          === trashLauncher.researchRevision
+                            onLeftClicked: trashLauncher.confirmResearchBurn()
+                        }
+                    }
+
+                    ActionButton {
+                        id: cancelManagedResearchBurn
+                        width: 119
+                        height: 43
+                        label: "CANCEL // SAFE"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        onLeftClicked: trashLauncher.clearResearchBurn()
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 10
+                    color: Colors.green
+                    text: "CANCEL RETURNS TO YOUR RECORDS // NOTHING IS BURNED"
+                    wrapMode: Text.WordWrap
+                }
+            }
+        }
     }
 }

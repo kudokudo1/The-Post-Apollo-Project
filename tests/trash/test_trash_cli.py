@@ -41,9 +41,11 @@ class TrashBackendTests(unittest.TestCase):
         self.assertTrue(data["ok"])
         self.assertEqual(data["total"], 2)
         self.assertTrue(data["complete"])
-        self.assertEqual(data["items"][0]["name"], "Camera 1.png")
-        self.assertEqual(data["items"][0]["original"], str(self.first))
-        self.assertEqual(data["items"][0]["uri"], "trash:///Camera%201.png")
+        by_uri = {item["uri"]: item for item in data["items"]}
+        self.assertEqual(by_uri["trash:///Camera%201.png"]["name"], "Camera 1.png")
+        self.assertEqual(by_uri["trash:///Camera%201.png"]["original"],
+                         str(self.first))
+        self.assertEqual(len(by_uri), 2)
         self.assertEqual(len(data["revision"]), 64)
         self.assertEqual(run.call_args.args[0], ["/usr/bin/gio", "trash", "--list"])
         with patch.object(trash, "_run", return_value=result(self.rows)):

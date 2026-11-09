@@ -204,6 +204,20 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             summary = [(x["app_id"], x["workspace"], x["floating"])
                        for x in rows if x["app_id"] in APP_IDS]
             print("HEADLESS PLACEMENT SUMMARY:", summary, flush=True)
+            # List only fixture app IDs and Sway node types. This reveals
+            # whether floating windows become floating_con rather than con.
+            shapes = []
+            def inspect_shape(node, workspace=None):
+                if node.get("type") == "workspace":
+                    workspace = node.get("name")
+                if node.get("app_id") in APP_IDS:
+                    shapes.append((node.get("type"), node.get("app_id"),
+                                   workspace, node.get("floating")))
+                for key in ("nodes", "floating_nodes"):
+                    for child in node.get(key, []):
+                        inspect_shape(child, workspace)
+            inspect_shape(get("get_tree"))
+            print("HEADLESS NODE SHAPES:", shapes, flush=True)
             print("HEADLESS WORKSPACES:", [
                 (x["name"], x["output"]) for x in get("get_workspaces")
                 if x["name"] in ("1", "2")], flush=True)

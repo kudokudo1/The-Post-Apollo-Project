@@ -167,6 +167,7 @@ def _safe_script_digest(path: Path, *, disposable: bool, expected_uid: int) -> s
         if (not stat.S_ISREG(before.st_mode) or before.st_uid != owner
                 or before.st_nlink != 1
                 or (stat.S_IMODE(before.st_mode) & 0o022) != 0
+                or (not disposable and stat.S_IMODE(before.st_mode) != 0o555)
                 or not 1 <= before.st_size <= _MAX_SCRIPT):
             raise OriginRefused("Unsafe installed script bytes")
         digest = hashlib.sha256()

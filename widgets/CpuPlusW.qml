@@ -1413,7 +1413,9 @@ PanelWindow {
                 ? (cpuPlusWindow.settingsSubMode === "TIME"
                    ? "TIME // BASIC CONTROLS"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
-                     ? "CONNECTIONS // OVERVIEW" : "LOCATION // EXPLORE")
+                     ? "CONNECTIONS // OVERVIEW"
+                     : "SHARED CONTEXT // "
+                       + String(PlaceRegistry.contextKind || "UNKNOWN"))
                 : cpuPlusWindow.selectedModeIndex === 4
                 ? "FAVORITES++ // SOURCES"
                 : cpuPlusWindow.selectedModeIndex === 5
@@ -1748,7 +1750,7 @@ PanelWindow {
                     ? (cpuPlusWindow.settingsSubMode === "TIME"
                        ? "CLOCK // CONTROL"
                        : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
-                         ? "SHARED // STATUS" : "CURRENT // CONTEXT")
+                         ? "SHARED // STATUS" : "LOCATION // EXPLORE")
                     : cpuPlusWindow.selectedModeIndex === 4
                     ? "FAVORITES // SAVED STATE"
                     : cpuPlusWindow.selectedModeIndex === 5
@@ -1771,6 +1773,24 @@ PanelWindow {
                         : Colors.cyan
                     transparentBorder: true
                 }
+            }
+
+            // U9b // Shared-context name and coordinates occupy the
+            // previously unused right portion of the LOCATION section bar.
+            QuietText {
+                visible: cpuPlusWindow.selectedModeIndex === 6
+                         && cpuPlusWindow.settingsSubMode === "LOCATION"
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.rightMargin: 10
+                width: Math.max(0,parent.width-170)
+                font.pixelSize: 9
+                elide: Text.ElideRight
+                text: PlaceRegistry.effectivePlace
+                      ? String(PlaceRegistry.effectivePlace.label || "")
+                        +" // "+Number(PlaceRegistry.effectivePlace.latitude).toFixed(3)
+                        +"°, "+Number(PlaceRegistry.effectivePlace.longitude).toFixed(3)+"°"
+                      : "NO HOME CONFIGURED"
             }
 
             Rectangle {

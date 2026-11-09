@@ -307,7 +307,8 @@ Rectangle {
     })
 
     readonly property bool solarImageActive:
-        CosmosPanelPolicy.visibleFor("space", subjectRoute, "suvi")
+        !space.sourceOnly
+        && CosmosPanelPolicy.visibleFor("space", subjectRoute, "suvi")
 
     property string solarImageMode: "195"
     property string solarImageUrl: ""

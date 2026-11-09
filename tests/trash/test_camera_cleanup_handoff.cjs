@@ -57,12 +57,12 @@ function cameraHarness(overrides={}) {
         batchPreview: {id: "expired"},
         batchReviewKey: "expired",
         calls: [],
-        hideZoomWeb() { this.calls.push("hide-zoom"); },
+        hideZoomWeb() { ctx.calls.push("hide-zoom"); },
         loadGallery(append, where) {
-            this.calls.push("scan:" + where);
-            this.activeView = where;
-            this.galleryRequestedView = where;
-            this.busy = true;
+            ctx.calls.push("scan:" + where);
+            ctx.activeView = where;
+            ctx.galleryRequestedView = where;
+            ctx.busy = true;
             return true;
         },
         Qt: {callLater() {}},
@@ -152,8 +152,8 @@ test("bad technique and busy/native-capture/zoom states refuse without mutation"
 });
 
 test("Trash request does not invent deletion authority or close on failed handoff", ()=>{
-    assert.doesNotMatch(trashRequestSource, /trashQueuedNow|trashBatch|gio|burn-all/);
-    assert.doesNotMatch(handoffSource, /trashQueuedNow|trashBatch|gio|burn-all/);
+    assert.doesNotMatch(trashRequestSource, /trashQueuedNow|trashBatch|\\bgio\\b|burn-all/);
+    assert.doesNotMatch(handoffSource, /trashQueuedNow|trashBatch|\\bgio\\b|burn-all/);
     assert.match(cameraSource, /function trashQueuedNow\(\)/);
     assert.match(cameraSource, /"trash-batch-now", JSON\.stringify\(batchPaths\)/);
     assert.match(cameraSource, /"MOVE_TO_TRASH", "--folder", cleanupCustomFolder/);
@@ -162,4 +162,46 @@ test("Trash request does not invent deletion authority or close on failed handof
     assert.match(trashRequestSource, /activeMode !== "cleanup"/);
     assert.match(trashRequestSource, /cameraCleanupBusy/);
     assert.match(trashRequestSource, /confirmMode !== ""/);
+});
+
+function trashHarness(overrides={}) {
+    const ctx={
+        menuOpen:true,
+        busy:false,
+        cameraCleanupBusy:false,
+        confirmMode:"",
+        activeMode:"cleanup",
+        status:"",
+        requests:[],
+        cleanupRequested(mode) { ctx.requests.push(mode); },
+        clearConfirmation() {ctx.confirmMode="";},
+        ...overrides
+    };
+    vm.createContext(ctx);
+    vm.runInContext(trashRequestSource + "\n" + trashResultSource,ctx);
+    return ctx;
+}
+
+test("request is read-only, rejects busy/wrong-mode and keeps panel open on failure", ()=>{
+    const ctx=trashHarness();
+    assert.equal(vm.runInContext('requestCameraCleanup("swipe")',ctx),true);
+    assert.deepEqual(Array.from(ctx.requests),["swipe"]);
+    assert.equal(ctx.menuOpen,true);
+    assert.equal(vm.runInContext('finishCleanupHandoff(false,"swipe")',ctx),false);
+    assert.equal(ctx.menuOpen,true);
+    assert.match(ctx.status,/CAMERA BUSY OR UNAVAILABLE/);
+
+    const blocked=[
+        {busy:true}, {cameraCleanupBusy:true},
+        {confirmMode:"all"}, {activeMode:"trash"}, {menuOpen:false}
+    ];
+    for (const override of blocked) {
+        const sample=trashHarness(override);
+        assert.equal(vm.runInContext('requestCameraCleanup("hunt")',sample),false);
+        assert.equal(sample.requests.length,0);
+    }
+    assert.equal(vm.runInContext('requestCameraCleanup("burn-all")',ctx),false);
+    assert.equal(ctx.requests.length,1);
+    assert.equal(vm.runInContext('finishCleanupHandoff(true,"swipe")',ctx),true);
+    assert.equal(ctx.menuOpen,false);
 });

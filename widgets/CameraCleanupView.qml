@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
+import "CameraHuntMotion.js" as HuntMotion
 import "../components"
 
 // CLEANUP // transplanted verbatim from Camera's former page. The single
@@ -913,7 +914,7 @@ Column {
                 id: huntAutoNextTimer
                 interval: 1250
                 repeat: false
-                running: camera.menuOpen && camera.huntAutoRounds
+                running: camera.hostedCleanupActive && camera.huntAutoRounds
                          && camera.huntAutoPending
                          && !camera.huntSettingsOpen
                          && !camera.huntPauseMenuOpen
@@ -947,7 +948,7 @@ Column {
                 id: huntClock
                 interval: 100
                 repeat: true
-                running: camera.menuOpen
+                running: camera.hostedCleanupActive
                          && camera.activeView === "cleanup"
                          && camera.cleanupTechnique === "hunt"
                          && !camera.busy && !camera.huntPaused

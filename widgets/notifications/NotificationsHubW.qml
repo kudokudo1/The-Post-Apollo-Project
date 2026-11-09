@@ -20,8 +20,24 @@ PanelWindow {
     // Opt-in freeze isolation. Keep the durable notification service and
     // popups live; only defer THIS closed window's filtered history ListModel.
     readonly property bool hiddenHistoryRebuildPauseEnabled:
-        String(Quickshell.env("POST_APOLLO_NOTIFICATIONS_HIDDEN_REBUILD_PAUSED") || "").trim() === "1"
+        String(Quickshell.env("POST_APOLLO_NOTIFICATIONS_HIDDEN_REBUILD_PAUSED") || "").trim() !== "0"
     property bool hiddenHistoryRebuildDeferred: false
+
+    // A small QML ListModel is the render window, not the history archive.
+    // Filters scan in bounded event-loop slices before displaying pages.
+    property var filteredRows: []
+    property var filterScanRows: []
+    property int filterScanIndex: 0
+    property bool filterBuildInProgress: false
+    property int filterVisibleTarget: 0
+    readonly property int filterPageSize: 100
+
+    // Moving the slider is a preview. APPLY is the only durable mutation,
+    // especially important when a smaller limit would discard old records.
+    property int pendingHistoryCapacity: 300
+    readonly property bool historyCapacityDirty:
+        pendingHistoryCapacity !== NotificationsService.maxHistoryEntries
+    readonly property real historyCapacityRatio: (pendingHistoryCapacity - 300) / 4700
 
     function reportBgRebuild(startedAtMs, scanned) {
         const now = Date.now();
@@ -216,6 +232,14 @@ PanelWindow {
         NotificationsService.setScrollSpeed(0.5 + ratio * 6.5);
     }
 
+    function previewHistoryCapacity(pointerX, railWidth) {
+        if (railWidth <= 0)
+            return;
+        const ratio = Math.max(0, Math.min(1, Number(pointerX) / railWidth));
+        pendingHistoryCapacity =
+            NotificationsService.normalizeHistoryCapacity(300 + ratio * 4700);
+    }
+
     // Post-Apollo semantic green.
     // Use this everywhere this file means "green".
     property color omnitrixGreen: "#00F782"
@@ -368,6 +392,20 @@ PanelWindow {
     }
 
     Timer {
+        id: filteredScanTimer
+        interval: 1
+        repeat: false
+        onTriggered: root.scanFilteredNotificationsChunk()
+    }
+
+    Timer {
+        id: filteredRenderTimer
+        interval: 1
+        repeat: false
+        onTriggered: root.appendFilteredPageBatch()
+    }
+
+    Timer {
         id: filteredModelRefreshTimer
 
         interval: 0
@@ -389,6 +427,10 @@ PanelWindow {
 
         function onNotificationsRevisionChanged() {
             root.scheduleFilteredModelRebuild();
+        }
+        function onMaxHistoryEntriesChanged() {
+            if (!root.menuOpen || !root.historyCapacityDirty)
+                root.pendingHistoryCapacity = NotificationsService.maxHistoryEntries;
         }
 
         function onPolicyRevisionChanged() {
@@ -412,6 +454,7 @@ PanelWindow {
     }
 
     Component.onCompleted: {
+        pendingHistoryCapacity = NotificationsService.maxHistoryEntries;
         if (hiddenHistoryRebuildPauseEnabled)
             console.warn("SYNTAGMA_BG_PROBE // notifications hidden-history rebuild PAUSED while closed");
         root.scheduleFilteredModelRebuild();
@@ -926,6 +969,9 @@ PanelWindow {
     }
 
     function scheduleFilteredModelRebuild() {
+        // Cancel any stale partial scan or render from the previous query.
+        filteredScanTimer.stop();
+        filteredRenderTimer.stop();
         if (hiddenHistoryRebuildPauseEnabled && !menuOpen) {
             hiddenHistoryRebuildDeferred = true;
             filteredModelRefreshTimer.stop();
@@ -1009,18 +1055,29 @@ PanelWindow {
     }
 
     function rebuildFilteredNotifications() {
-        const traceStartMs = bgLagProbeEnabled ? Date.now() : 0;
+        filteredScanTimer.stop();
+        filteredRenderTimer.stop();
         filteredNotifications.clear();
-
+        filteredRows = [];
+        filterScanRows = [];
+        filterScanIndex = 0;
+        filterVisibleTarget = 0;
         if (root.activeFilter === "manager") {
-            if (traceStartMs)
-                reportBgRebuild(traceStartMs, NotificationsService.notifications.count);
+            filterBuildInProgress = false;
             return;
         }
+        filterBuildInProgress = true;
+        filteredScanTimer.start();
+    }
 
-        // Sort presentation only; do not reorder or rewrite durable history.
-        const rows = [];
-        for (let i = 0; i < NotificationsService.notifications.count; i++) {
+    function scanFilteredNotificationsChunk() {
+        if (!filterBuildInProgress)
+            return;
+        const traceStartMs = bgLagProbeEnabled ? Date.now() : 0;
+        const total = NotificationsService.notifications.count;
+        const end = Math.min(total, filterScanIndex + 64);
+        const rows = filterScanRows;
+        for (let i = filterScanIndex; i < end; i++) {
             const entry = NotificationsService.notifications.get(i);
             const classification = root.classificationFor(entry.source, entry.sourceId, entry.category, entry.severity);
             const facets = NotificationFacets.facetsFor(entry);
@@ -1052,17 +1109,42 @@ PanelWindow {
                 }
             });
         }
-
+        filterScanIndex = end;
+        if (traceStartMs)
+            reportBgRebuild(traceStartMs, end - (end >= 64 ? end - 64 : 0));
+        if (end < total) {
+            filteredScanTimer.start();
+            return;
+        }
+        // Sort only the small, in-memory matching metadata array, without
+        // touching the durable archive or growing thousands of QML delegates.
         rows.sort(function(a, b) {
             const aTime = Math.max(a.data.updatedAt, a.data.createdAt);
             const bTime = Math.max(b.data.updatedAt, b.data.createdAt);
             return (bTime - aTime) || (b.ordinal - a.ordinal);
         });
-        for (let j = 0; j < rows.length; j++)
-            filteredNotifications.append(rows[j].data);
+        filteredRows = rows;
+        filterScanRows = [];
+        filterBuildInProgress = false;
+        appendNextFilteredPage();
+    }
 
-        if (traceStartMs)
-            reportBgRebuild(traceStartMs, NotificationsService.notifications.count);
+    function appendNextFilteredPage() {
+        if (filterBuildInProgress || filterVisibleTarget > filteredNotifications.count)
+            return;
+        filterVisibleTarget = Math.min(filteredRows.length,
+                                       filteredNotifications.count + filterPageSize);
+        if (filterVisibleTarget > filteredNotifications.count)
+            filteredRenderTimer.start();
+    }
+
+    function appendFilteredPageBatch() {
+        const rows = filteredRows;
+        const end = Math.min(filterVisibleTarget, filteredNotifications.count + 24);
+        for (let j = filteredNotifications.count; j < end; j++)
+            filteredNotifications.append(rows[j].data);
+        if (filteredNotifications.count < filterVisibleTarget)
+            filteredRenderTimer.start();
     }
 
     function rebuildManagerDndPolicies() {
@@ -1965,6 +2047,133 @@ PanelWindow {
                         onTriggered: NotificationsService.toggleScrollSpeedLock()
                     }
                 }
+
+                // History capacity is independent of display page size.
+                // This slider previews only. Applying a smaller limit can
+                // permanently prune older records, so it is never a drag side effect.
+                Row {
+                    id: historyCapacityControls
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        topMargin: 114
+                        leftMargin: 22
+                        rightMargin: 22
+                    }
+                    height: 30
+                    spacing: 10
+
+                    GlowText {
+                        width: 104
+                        height: parent.height
+                        text: "HISTORY LIMIT"
+                        pixelSize: 11
+                        textColor: Colors.cyan
+                        glowColor: Colors.cyan
+                    }
+
+                    GlowText {
+                        width: 55
+                        height: parent.height
+                        text: String(root.pendingHistoryCapacity)
+                        pixelSize: 12
+                        textColor: Colors.white
+                        glowColor: Colors.cyan
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    Item {
+                        id: historyCapacitySlider
+                        width: Math.max(100, historyCapacityControls.width
+                                        - 104 - 55 - 70
+                                        - historyCapacityControls.spacing * 3)
+                        height: parent.height
+
+                        Rectangle {
+                            id: historyCapacityRail
+                            x: 8
+                            width: parent.width - 16
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: 6
+                            color: Colors.black
+                            border.width: 1
+                            border.color: Colors.cyan
+                            radius: 2
+
+                            Rectangle {
+                                width: parent.width * root.historyCapacityRatio
+                                height: parent.height
+                                color: Colors.magenta
+                                radius: 2
+                            }
+                        }
+
+                        Rectangle {
+                            width: 14
+                            height: 20
+                            radius: 3
+                            x: historyCapacityRail.x + historyCapacityRail.width
+                                * root.historyCapacityRatio - width / 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: root.historyCapacityDirty ? Colors.yellow : Colors.white
+                            border.width: 1
+                            border.color: Colors.magenta
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onPressed: function(mouse) {
+                                root.previewHistoryCapacity(
+                                    mouse.x - historyCapacityRail.x,
+                                    historyCapacityRail.width);
+                            }
+                            onPositionChanged: function(mouse) {
+                                if (pressed)
+                                    root.previewHistoryCapacity(
+                                        mouse.x - historyCapacityRail.x,
+                                        historyCapacityRail.width);
+                            }
+                        }
+                    }
+
+                    MiniButton {
+                        width: 70
+                        height: 28
+                        label: root.historyCapacityDirty ? "APPLY" : "SAVED"
+                        labelPixelSize: 10
+                        active: root.historyCapacityDirty
+                        activeColor: Colors.magenta
+                        danger: root.pendingHistoryCapacity < NotificationsService.notifications.count
+                        onTriggered: {
+                            if (root.historyCapacityDirty)
+                                NotificationsService.setMaxHistoryEntries(
+                                    root.pendingHistoryCapacity);
+                        }
+                    }
+                }
+
+                GlowText {
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        topMargin: 155
+                        leftMargin: 22
+                        rightMargin: 22
+                    }
+                    height: 38
+                    pixelSize: 10
+                    text: root.pendingHistoryCapacity < NotificationsService.notifications.count
+                        ? "WARNING // APPLY WILL DELETE OLDEST HISTORY ABOVE NEW LIMIT"
+                        : NotificationsService.notifications.count
+                          + " STORED // 300–5000 CAPACITY // 100-ITEM STEPS"
+                    textColor: root.pendingHistoryCapacity < NotificationsService.notifications.count
+                        ? Colors.orange : Colors.cyan
+                    glowColor: textColor
+                    wrapMode: Text.WordWrap
+                }
             }
 
             // ===== CLEAR-ALL CONFIRMATION ========================
@@ -2646,8 +2855,18 @@ PanelWindow {
                     }
 
                     footer: Item {
-                        width: 1
-                        height: 12
+                        width: historyList.width
+                        height: root.filteredRows.length > filteredNotifications.count ? 44 : 12
+                        MiniButton {
+                            anchors.centerIn: parent
+                            width: 152
+                            height: 29
+                            visible: root.filteredRows.length > filteredNotifications.count
+                            label: "MORE HISTORY"
+                            labelPixelSize: 10
+                            activeColor: Colors.magenta
+                            onTriggered: root.appendNextFilteredPage()
+                        }
                     }
 
                     delegate: Item {

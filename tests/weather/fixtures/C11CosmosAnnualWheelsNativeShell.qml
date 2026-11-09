@@ -129,6 +129,8 @@ ShellRoot {
             const forecastModes=find(forecast,"magick-m7-annual-subject-tabs");
             const forecastOutlook=find(forecast,"magick-m7-forecast-outlook");
             const forecastCanvas=find(forecast,"magick-m7-annual-wheel-canvas");
+            const moonTitle=find(moon,"cosmos-c44-moon-year-header");
+            const forecastTitle=find(forecast,"cosmos-c44-moon-year-header");
             const yearRail=find(moon,"cosmos-c11-moon-year-mode-rail");
             const forecastRail=find(forecast,"cosmos-c11-moon-year-mode-rail");
             const yearDivider=find(moon,"cosmos-c23-moon-year-divider");
@@ -155,6 +157,15 @@ ShellRoot {
                     || !yearTab.selected || forecastOverview.selected)
                     return root.fail("MOON_C18_FULL_WIDTH_MODE_RAIL_FAILED");
                 const yearRailAt=yearRail.mapToItem(moon,0,0);
+                const moonTitleAt=moonTitle ? moonTitle.mapToItem(moon,0,0) : null;
+                const forecastTitleAt=forecastTitle
+                    ? forecastTitle.mapToItem(forecast,0,0) : null;
+                if(!moonTitleAt || !forecastTitleAt
+                    || moonTitleAt.y!==6 || forecastTitleAt.y!==6
+                    || moonTitle.height!==18 || forecastTitle.height!==18
+                    || moonTitle.width!==438 || forecastTitle.width!==438
+                    || yearRailAt.y!==28)
+                    return root.fail("C44_MOON_YEAR_HEADER_NOT_ALIGNED");
                 const yearDividerAt=yearDivider
                     ? yearDivider.mapToItem(moon,0,0) : null;
                 const forecastDividerAt=forecastDivider
@@ -170,9 +181,11 @@ ShellRoot {
                     || forecastStageAt.y!==forecastDividerAt.y+2+3
                     || yearDividerAt.x!==6 || forecastDividerAt.x!==6)
                     return root.fail("C23_MOON_YEAR_HEADER_DIVIDER_BROKEN");
-                if(moonCanvas.width<400 || moonCanvas.height<220
+                // C44 adds a real 18px title to MOON (not SUN), so the
+                // original 276px fixture retains a useful ~205px wheel.
+                if(moonCanvas.width<400 || moonCanvas.height<190
                     || sunCanvas.width<400 || sunCanvas.height<250
-                    || forecastOutlook.width<400 || forecastOutlook.height<215)
+                    || forecastOutlook.width<400 || forecastOutlook.height<190)
                     return root.fail("SMALL_OR_CLIPPED_MOON_INSTRUMENT");
                 if(ml.calendarSource.loading || sl.calendarSource.loading
                     || fl.calendarSource.active || fl.calendarSource.loading)

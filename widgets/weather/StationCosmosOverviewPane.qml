@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
+import "StationSubjectHeaderGeometry.js" as HeaderGeometry
 
 // COSMOS C2 // A fixed observation console, not two long reports
 // squeezed into halves. All readouts reuse the existing root services.
@@ -91,24 +92,31 @@ Rectangle {
     Column {
         id: dashboard
         anchors.fill: parent
-        anchors.margins: 6
-        spacing: 3
+        anchors.margins: HeaderGeometry.inset
+        spacing: HeaderGeometry.ruleToContent
 
-        Row {
+        GohuText {
             id: consoleHeader
+            objectName: "cosmos-c44-overview-title"
             width: parent.width
-            height: 19
-            spacing: 4
-
-            GohuText {
-                width: Math.max(75,consoleHeader.width-214)
-                height: parent.height
-                verticalAlignment: Text.AlignVCenter
-                text: "COSMOS // OVERVIEW"
-                font.pixelSize: 11
-                color: Colors.magenta
-                elide: Text.ElideRight
-            }
+            height: HeaderGeometry.titleHeight
+            verticalAlignment: Text.AlignVCenter
+            text: "COSMOS // OVERVIEW"
+            font.pixelSize: 12
+            color: Colors.magenta
+            elide: Text.ElideRight
+        }
+        Item {
+            id: headerSpacer
+            width: parent.width
+            height: HeaderGeometry.columnHeaderGap()
+        }
+        Row {
+            id: overviewModeRail
+            objectName: "cosmos-c44-overview-mode-rail"
+            width: parent.width
+            height: HeaderGeometry.tabHeight
+            spacing: HeaderGeometry.tabSpacing
             Repeater {
                 model: [
                     {label:"SUN",path:"cosmos/sun/position"},
@@ -117,24 +125,41 @@ Rectangle {
                 ]
                 delegate: ActionButton {
                     required property var modelData
-                    width: 66
-                    height: 18
+                    objectName: "cosmos-c44-overview-button"
+                    width: HeaderGeometry.buttonWidth(overviewModeRail.width,3)
+                    height: HeaderGeometry.tabHeight
                     contentPadding: 1
                     label: modelData.label
-                    labelPixelSize: 9
+                    labelPixelSize: 10
                     accentColor: Colors.cyan
                     onClicked: overview.routeRequested(modelData.path)
                 }
             }
         }
+        Item {
+            id: dividerSlot
+            objectName: "cosmos-c44-overview-divider-slot"
+            width: parent.width
+            height: HeaderGeometry.columnRuleSlotHeight()
+            Rectangle {
+                objectName: "cosmos-c44-overview-divider"
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: HeaderGeometry.ruleHeight
+                color: Colors.cyan
+            }
+        }
 
         Rectangle {
             id: skyInstrumentFrame
+            objectName: "cosmos-c44-overview-stage"
             width: parent.width
             // Leave a fixed lower rack; do not make the outer dashboard scroll.
             height: Math.max(0,dashboard.height-consoleHeader.height
+                    -headerSpacer.height-overviewModeRail.height-dividerSlot.height
                     -spaceHeader.height-spaceMetricRow.height
-                    -3*dashboard.spacing)
+                    -6*dashboard.spacing)
             color: Colors.black
             border.width: 1
             border.color: Colors.magenta

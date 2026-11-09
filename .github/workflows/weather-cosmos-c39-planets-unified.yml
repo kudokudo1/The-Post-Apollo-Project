@@ -8,8 +8,10 @@ on:
       - 'widgets/weather/StationCosmosPlanetsDayPane.qml'
       - 'widgets/weather/StationCosmosPlanetClockFace.qml'
       - 'widgets/weather/StationCosmosPlanetsSkyStrip.qml'
+      - 'widgets/weather/StationCosmosPlanetDayWheelPolicy.js'
       - 'tests/weather/test_cosmos_c38_planets_day.js'
       - 'tests/weather/test_cosmos_c39_unified_planets.js'
+      - 'tests/weather/test_cosmos_c40_planet_arrows.js'
       - 'tests/weather/fixtures/C39UnifiedPlanetsNativeShell.qml'
       - 'tests/weather/fixtures/C5PopulatedNativeShell.qml'
       - '.github/workflows/weather-cosmos-c39-planets-unified.yml'
@@ -29,6 +31,7 @@ jobs:
         run: |
           node --test \
             tests/weather/test_cosmos_c39_unified_planets.js \
+            tests/weather/test_cosmos_c40_planet_arrows.js \
             tests/weather/test_cosmos_c38_planets_day.js \
             tests/weather/test_cosmos_c5_empty_repair.js \
             tests/weather/test_cosmos_c6_details.js \

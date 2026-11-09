@@ -101,6 +101,9 @@ ShellRoot {
                     || strip.currentRecord.name!=="MARS"
                     || timeline.rows.length!==5 || timeline.events.length!==6)
                     return root.fail("PLANETS_DAY_EVENTS_AND_SKY_STRIP_NOT_RENDERED");
+                // ALL has no selected ring planet; C40 right-arrow starts
+                // at Mercury. Explicitly choose Mars to verify Mars → Jupiter.
+                focused.planetSelection="MARS";
                 strip.stepPlanet(1);
                 if(focused.planetSelection!=="JUPITER"
                     || strip.currentRecord.name!=="JUPITER"
@@ -117,6 +120,52 @@ ShellRoot {
                     return root.fail("DAY_RING_NOT_EMBEDDED");
                 if(!root.find(ring,"cosmos-c28-clock-dial-canvas"))
                     return root.fail("CIRCULAR_CLOCK_NOT_PRESERVED");
+
+                // C40 // Reproduce the real bug: USNO current sky reports
+                // SATURN alone while the five day-ring planets still exist.
+                // Both arrows must work in both directions despite missing
+                // observations, and a missing planet must not borrow Saturn's
+                // altitude or azimuth.
+                const strip=root.find(focused.instrumentItem,"cosmos-c39-fixed-sky-now");
+                const previousSnapshot=focused.celnav.snapshot;
+                focused.celnav.snapshot={
+                    date:focused.civilDate,time:"16:46",
+                    planets:[{name:"SATURN",altitude:13.5,
+                              azimuth:222,direction:"SW"}],
+                    stars:[],constellations:[]
+                };
+                focused.planetSelection="SATURN";
+                if(!strip || strip.recordCount!==1
+                    || strip.selectedName!=="SATURN"
+                    || !strip.currentRecord)
+                    return root.fail("C40_SATURN_ONLY_FIXTURE_FAILED");
+                const checks=[
+                    [1,"MERCURY",false],
+                    [1,"VENUS",false],
+                    [1,"MARS",false],
+                    [1,"JUPITER",false],
+                    [1,"SATURN",true],
+                    [-1,"JUPITER",false],
+                    [-1,"MARS",false],
+                    [-1,"VENUS",false],
+                    [-1,"MERCURY",false],
+                    [-1,"SATURN",true]
+                ];
+                for(let i=0;i<checks.length;i++) {
+                    const entry=checks[i];
+                    strip.stepPlanet(entry[0]);
+                    if(focused.planetSelection!==entry[1]
+                        || ring.selectedPlanet!==entry[1]
+                        || strip.selectedName!==entry[1]
+                        || !!strip.currentRecord!==entry[2])
+                        return root.fail("C40_ARROW_CYCLE_"+i+"_"+entry[1]);
+                    if(!entry[2] && strip.sourceNote!=="NOT IN USNO SAMPLE")
+                        return root.fail("C40_MISSING_SOURCE_NOT_DISCLOSED");
+                }
+                // Restore full synthetic sample and previous source selection
+                // for the established C39 replay and 12-field detail checks.
+                focused.celnav.snapshot=previousSnapshot;
+                focused.planetSelection="JUPITER";
                 ring.startReplay();
                 if(!ring.replayMode || ring.replayPlaying)
                     return root.fail("CIRCULAR_REPLAY_BROKEN");

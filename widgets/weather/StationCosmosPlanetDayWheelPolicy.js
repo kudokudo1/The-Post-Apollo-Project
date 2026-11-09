@@ -8,6 +8,18 @@ var FORMAT = "post-apollo.weather.cosmos-day-wheel.v3d.v1";
 var PLANETS = ["MERCURY", "VENUS", "MARS", "JUPITER", "SATURN"];
 var KINDS = ["rise", "transit", "set"];
 
+// C40 // Navigation follows the fixed five-ring order, not the subset
+// returned by the current USNO celestial-navigation observation.
+// "ALL"/missing selection starts at Mercury when moving right and
+// Saturn when moving left. Empty USNO samples never trap the arrows.
+function adjacentPlanet(current, direction) {
+    if (direction !== -1 && direction !== 1) return "";
+    var index = PLANETS.indexOf(current);
+    if (index < 0)
+        return direction === 1 ? PLANETS[0] : PLANETS[PLANETS.length-1];
+    return PLANETS[(index + direction + PLANETS.length) % PLANETS.length];
+}
+
 function indexed(value, cap) {
     if (!value || typeof value === "string") return [];
     var n=Number(value.length);

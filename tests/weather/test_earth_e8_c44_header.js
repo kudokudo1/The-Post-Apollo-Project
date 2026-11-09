@@ -82,5 +82,6 @@ test("E8 all EARTH screens preserve their C44 header on the correct owner",()=>{
     assert.match(parent,/StationEarthWaterPane\s*\{/);
     assert.match(parent,/StationEarthServicesPane\s*\{/);
     assert.match(fixture,/E8_NATIVE_PASS/);
-    assert.match(fixture,/earth-e8-c44-header/);
+    assert.match(fixture,/Weather\.StationEarthMapHeader\s*\{/);
+    assert.match(fixture,/find\(header,"earth-e8-c44-title"\)/);
 });

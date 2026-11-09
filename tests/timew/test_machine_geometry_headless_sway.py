@@ -378,6 +378,11 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             assert cli_save.returncode == 0, "ISOLATED CLI SAVE FAILED"
             saved_cli = json.loads(cli_save.stdout)
             assert saved_cli["status"] == "saved"
+            assert saved_cli["verification"] == {
+                "status": "readback_verified",
+                "counts": {"outputs": 2, "workspaces": 2, "windows": 3},
+                "geometry": True, "legacy": True,
+            }
             assert saved_cli["checkpoint"]["counts"]["windows"] == 3
             cli_loaded = load_geometry(saved_cli["checkpoint"]["id"])
             assert cli_loaded["status"] == "loaded"

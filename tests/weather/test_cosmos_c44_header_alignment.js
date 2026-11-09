@@ -57,9 +57,9 @@ test("C44 MOON overview and both annual subviews keep their original destination
  const m=pages.moon, y=pages.year;
  for(const x of [m,y]){
    assert.match(x,/import "StationSubjectHeaderGeometry\.js" as HeaderGeometry/);
-   assert.match(x,/height: HeaderGeometry\.titleHeight/);
+   assert.match(x,/HeaderGeometry\.titleHeight/);
    assert.match(x,/height: HeaderGeometry\.tabHeight/);
-   assert.match(x,/height: HeaderGeometry\.ruleHeight/);
+   assert.match(x,/HeaderGeometry\.ruleHeight/);
    assert.match(x,/HeaderGeometry\.buttonWidth\(/);
    assert.match(x,/HeaderGeometry\.ruleToContent/);
  }

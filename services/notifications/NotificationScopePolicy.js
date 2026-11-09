@@ -30,8 +30,10 @@ function conversationKind(value) {
 // names and native IDs can legally contain '/' or ':'.
 function scopedIdentity(accountId, value) {
     const account = stableId(accountId);
-    const id = stableId(value);
-    if (!id)
+    const id = token(value);
+    // Public source IDs are validated individually by stableId(); this
+    // helper also accepts bounded composite IDs built from two valid parts.
+    if (!id || id.length > 400 || !/^[a-zA-Z0-9_.:@/+~-]+$/.test(id))
         return "";
     return account ? account.length + ":" + account + ":" + id : id;
 }
@@ -146,12 +148,14 @@ function scopeOptionsFor(entry, appKey, websiteKey) {
         add("conversation", scopedIdentity(s.accountId, s.conversationId),
             (s.conversationType === "direct" ? "DM // " : "CHAT // ")
                 + label(s.conversationName, s.conversationId), true);
-    if (s.channelId)
+    const channelId = s.channelId || (s.conversationType === "channel"
+        ? s.conversationId : "");
+    if (channelId)
         // Length-prefix server and account components separately to avoid
         // collision even if the native IDs contain '/' or ':'.
         add("channel", scopedIdentity(s.accountId,
-            s.serverId.length + ":" + s.serverId + ":" + s.channelId),
-            "CHANNEL // " + label(s.channelName, s.channelId), true);
+            s.serverId.length + ":" + s.serverId + ":" + channelId),
+            "CHANNEL // " + label(s.channelName || s.conversationName, channelId), true);
     if (s.serverId)
         add("server", scopedIdentity(s.accountId, s.serverId),
             "SERVER // " + label(s.serverName, s.serverId), true);

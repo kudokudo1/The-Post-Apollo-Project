@@ -28,7 +28,7 @@ for requirement in (
     assert requirement in PLUGIN_TEXT, requirement
 for requirement in (
     'execFile("notify-send", args',
-    'notificationArgs(raw)',
+    'notificationArgs(raw, desktopEntry)',
     'const PER_MINUTE = 12',
     'if (minuteCount >= PER_MINUTE || sent.has(messageId))',
     'return { status: "INVALID" }',

@@ -23,10 +23,10 @@ The repository adds services/time/MachineBraveDisposableTrial.py with three
 strict, explicit commands:
 
 - init: create a brand-new private postapollo-machine-brave-trial-* directory
-  in the current OS temporary directory; a fresh profile/ subdirectory and
+  directly under /tmp (ignores TMPDIR overrides); a fresh profile/ and
   a tiny UUID marker. Does not launch Brave or install anything.
 - register ROOT EXTENSION_ID: accept only a marked root directly under the
-  OS temporary directory, owned by the invoking user and private (0700).
+  /tmp directory, owned by the invoking user and private (0700).
   Copy ONLY the source-reviewed transport-only MachineBraveNativeProbe.py
   into the trial root as an executable, and write ONLY an exact-origin JSON
   host manifest into ROOT/profile/NativeMessagingHosts. Refuses existing
@@ -34,6 +34,11 @@ strict, explicit commands:
 - verify ROOT: read-only validation of exact host source bytes, executable
   mode, generated manifest path, single allowed extension origin, and
   private directories. Never starts a process or tests native messaging.
+
+The script refuses a symlinked /tmp and never trusts a custom TMPDIR to
+redirect these writes into a home directory. It reports only that **the
+tool** did not launch Brave; it cannot prove a separate browser process
+is not already running.
 
 No ~/.config/BraveSoftware, XDG desktop configuration, original browser
 profiles, TimeW checkpoints or Sway windows are touched by these routines.

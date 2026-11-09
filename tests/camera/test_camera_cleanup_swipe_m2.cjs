@@ -163,7 +163,8 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /cursorShape: camera\.huntPaused/);
     assert.match(cleanup, /Qt\.BlankCursor/);
     assert.match(cleanup, /id: huntHitWash/);
-    assert.match(cleanup, /huntHitFlash \? 0\.045 : 0\.0/);
+    assert.match(cleanup, /camera\.huntHitFlash\s*&& huntLaserLayer\.impactReached/);
+    assert.match(cleanup, /\? 0\.045 : 0\.0/);
     assert.match(cleanup, /id: huntHitAnimalEcho/);
     assert.match(cleanup, /id: huntLaserLayer/);
     assert.match(cleanup, /id: huntLaserFlight/);

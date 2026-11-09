@@ -1204,3 +1204,29 @@ test("Pause menu blocks auto-next until explicitly closed", () => {
     assert.equal(s.huntRound,2);
     assert.equal(s.called.length,0);
 });
+
+
+test("Reset Defaults re-arms Auto Next for a finished round when re-enabled", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=Array.from({length:12},(_,i)=>({
+        path:"/tmp/rearm"+i+".jpg",name:"rearm"+i+".jpg",mediaType:"image"
+    }));
+    s.huntStartRound();
+    s.huntSetAutoRounds(false);
+    while(s.huntTargets.length)s.huntFire(s.huntTargets[0].path);
+    assert.equal(s.huntRoundComplete,true);
+    assert.equal(s.huntAutoPending,false);
+    s.huntTogglePause();
+    s.huntToggleSettings();
+    assert.equal(s.huntResetDefaults(),true);
+    assert.equal(s.huntAutoRounds,true);
+    assert.equal(s.huntAutoPending,true);
+    assert.equal(s.huntAutoStartNext(),false,"pause overlay prevents auto start");
+    s.huntToggleSettings();
+    s.huntTogglePause();
+    assert.equal(s.huntAutoStartNext(),true);
+    assert.equal(s.huntRound,2);
+    assert.equal(s.huntAutoPending,false);
+    assert.equal(s.called.length,0);
+});

@@ -516,7 +516,8 @@ Singleton {
             if (until > 0 && until <= now) {
                 sourcePolicies.setProperty(i, "snoozeUntil", 0);
 
-                if (policy.dnd !== true)
+                // An expired ZZ can never delete a persistent BLOCK rule.
+                if (policy.blocked !== true && policy.dnd !== true)
                     sourcePolicies.remove(i);
 
                 changed = true;

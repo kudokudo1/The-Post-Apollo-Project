@@ -63,11 +63,12 @@ function needsSource(path, source) {
       || path === "earth/services/health";
   if (source === "eonet") return showsLayer(path,"eonet");
   if (source === "gdacs") return showsLayer(path,"gdacs");
-  // Original CLASSIC MAP also gives flood/lightning event context from the
-  // same root sources. They remain active only for this exact full route.
+  // E4: lightning's visible instrument lives in WEATHER / HAZARDS;
+  // EARTH event-map context and SERVICES may still inspect the shared source,
+  // but selecting EARTH GROUND no longer requests lightning.
   if (source === "lightning")
     return isFullMap(path) || isPinnedMap(path)
-      || path === "earth/ground/full" || path === "earth/services/health";
+      || path === "earth/services/health";
   if (source === "river")
     return isFullMap(path) || isPinnedMap(path)
       || path === "earth/ground/full" || path === "earth/services/health"

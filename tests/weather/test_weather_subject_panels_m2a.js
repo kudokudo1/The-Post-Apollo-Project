@@ -152,9 +152,9 @@ test("one live subject pane uses the already-wired shared sources", () => {
 
 test("no premature MAP or MAGICK activation and no new persistence writer", () => {
   const relocated=Object.keys(env.ROUTES).filter(x=>x.startsWith("earth/"));
-  assert.equal(relocated.length,8);
+  assert.equal(relocated.length,10);
   assert.ok(relocated.every(x=>x.startsWith("earth/water/")
-    || x==="earth/ground/full"));
+    || x.startsWith("earth/ground/")));
   assert.equal(env.kindForRoute("earth/geology/earthquakes"),"");
   for (const t of ["Process {","FileView {","Qt.callLater","fetch(","XMLHttpRequest","swaymsg"])
     assert.ok(!policySource.includes(t),"policy "+t);

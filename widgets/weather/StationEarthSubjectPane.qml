@@ -1,4 +1,6 @@
 import QtQuick
+import "../../components"
+import "StationSubjectHeaderGeometry.js" as HeaderGeometry
 import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
 
 // EARTH is one persistent StationDiscovery map instance across its routes.
@@ -10,6 +12,8 @@ Rectangle {
     color: Colors.black
 
     property string subjectRoute: ""
+    // E4 // Local GROUND submode; the outer EARTH bottom-route stays stable.
+    property string groundViewMode: "environment"
     // MEDIA-sourced article location context, not an EARTH source collector.
     property var newsMentionOverlay: null
     signal newsMapClearRequested()
@@ -111,17 +115,89 @@ Rectangle {
 
     Component {
         id: earthGroundComponent
-        StationGround {
-            subjectRoute: earthPane.subjectRoute
-            weatherService: earthPane.weatherService
-            nwsAlertSource: earthPane.nwsAlertSource
-            seismicSource: earthPane.seismicSource
-            lightningSource: earthPane.lightningSource
-            riverSource: earthPane.riverSource
-            persistentCacheStore: earthPane.persistentCacheStore
-            liveHistoryStore: earthPane.liveHistoryStore
-            runtimeNowMs: earthPane.runtimeNowMs
-            onRouteRequested: function(path) { earthPane.routeRequested(path); }
+
+        // E4 // Two fixed pages over ONE original StationGround renderer.
+        Rectangle {
+            id: groundShell
+            objectName: "earth-e4-ground-shell"
+            color: Colors.black
+            clip: true
+
+            GohuText {
+                id: groundTitle
+                objectName: "earth-e4-ground-title"
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: HeaderGeometry.inset
+                height: HeaderGeometry.titleHeight
+                text: "EARTH // GROUND"
+                font.pixelSize: 12
+                color: Colors.magenta
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            Row {
+                id: groundModes
+                objectName: "earth-e4-ground-tabs"
+                anchors.top: groundTitle.bottom
+                anchors.topMargin: HeaderGeometry.titleToTabs
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: HeaderGeometry.inset
+                anchors.rightMargin: HeaderGeometry.inset
+                height: HeaderGeometry.tabHeight
+                spacing: HeaderGeometry.tabSpacing
+
+                Repeater {
+                    model: [
+                        {key:"environment",label:"ENVIRONMENT"},
+                        {key:"air-pollen",label:"AIR // POLLEN"}
+                    ]
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: HeaderGeometry.buttonWidth(groundModes.width,2)
+                        height: HeaderGeometry.tabHeight
+                        label: modelData.label
+                        labelPixelSize: 10
+                        contentPadding: 1
+                        selected: earthPane.groundViewMode === modelData.key
+                        accentColor: Colors.cyan
+                        onClicked: earthPane.groundViewMode = modelData.key
+                    }
+                }
+            }
+
+            Rectangle {
+                id: groundRule
+                objectName: "earth-e4-ground-divider"
+                anchors.top: groundModes.bottom
+                anchors.topMargin: HeaderGeometry.tabsToRule
+                anchors.left: groundModes.left
+                anchors.right: groundModes.right
+                height: HeaderGeometry.ruleHeight
+                color: Colors.cyan
+            }
+
+            StationGround {
+                objectName: "earth-e4-one-ground-renderer"
+                anchors.top: groundRule.bottom
+                anchors.topMargin: HeaderGeometry.ruleToContent
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                subjectRoute: earthPane.groundViewMode === "air-pollen"
+                    ? "earth/ground/air-pollen" : "earth/ground/environment"
+                weatherService: earthPane.weatherService
+                nwsAlertSource: earthPane.nwsAlertSource
+                seismicSource: earthPane.seismicSource
+                lightningSource: earthPane.lightningSource
+                riverSource: earthPane.riverSource
+                persistentCacheStore: earthPane.persistentCacheStore
+                liveHistoryStore: earthPane.liveHistoryStore
+                runtimeNowMs: earthPane.runtimeNowMs
+                onRouteRequested: function(path) { earthPane.routeRequested(path); }
+            }
         }
     }
 }

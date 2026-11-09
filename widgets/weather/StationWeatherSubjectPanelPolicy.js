@@ -9,11 +9,15 @@ var ROUTES = {
   // M28-Q: complete original GROUND surface, including its 16 source/visual
   // sections. Preserve one original StationGround instance and scrollbar.
   "weather/ground/full": {page:"ground",full:true},
-  // E2: the original Ground renderer, but WATER and GROUND are distinct.
-  // Keep old WEATHER deep routes readable for existing bookmarks.
+  // E4: EARTH GROUND uses the same StationGround body in two non-overlapping
+  // fixed submodes. The original /full bookmark lands on ENVIRONMENT.
+  // WEATHER HAZARDS retains the original shared lightning instrument.
   "earth/ground/full": {page:"ground",sections:[
-    "header","runtime","alerts","lightning","heat-fire","air-pm",
-    "air-gases","pollen","air-forecast","seismic","source"]},
+    "alerts","heat-fire","seismic"]},
+  "earth/ground/environment": {page:"ground",sections:[
+    "alerts","heat-fire","seismic"]},
+  "earth/ground/air-pollen": {page:"ground",sections:[
+    "air-pm","air-gases","pollen","air-forecast","source"]},
   "earth/water/rivers": {page:"ground",sections:["rivers"]},
   "earth/water/rivers/gauges": {page:"ground",sections:["rivers"]},
   "earth/water/rivers/nearby": {page:"ground",sections:["rivers"]},
@@ -110,8 +114,9 @@ function needsSource(path, source) {
   if (path === "weather/ground/full")
     return ["river","lightning","marine","coastal","seismic"]
       .indexOf(source) >= 0;
-  if (path === "earth/ground/full")
-    return ["lightning","seismic"].indexOf(source) >= 0;
+  if (path === "earth/ground/full"
+      || path === "earth/ground/environment")
+    return source === "seismic";
   if (path.indexOf("earth/water/rivers") === 0)
     return source === "river";
   if (path === "earth/water/marine")

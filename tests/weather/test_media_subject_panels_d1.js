@@ -133,7 +133,7 @@ test("RADIO presents directory, favorites and transport without a duplicate MPD 
   assert.match(radio,/weather-radio-memory\.json/);
   assert.match(radio,/property string subjectRoute: ""/);
   assert.match(radio,/function sectionVisible\(group\)/);
-  assert.equal((radio.match(/stationRadio\.sectionVisible\("([^"]+)"\)/g)||[]).length,21);
+  assert.equal((radio.match(/stationRadio\.sectionVisible\("([^"]+)"\)/g)||[]).length,19);
   assert.match(radio,/sectionVisible\("directory"\)/);
   assert.match(radio,/label: "PLAY"/);
   assert.match(radio,/label: "PAUSE"/);
@@ -164,7 +164,7 @@ test("CLASSIC MEDIA behavior and NEWS-to-MAP handoff remain available", () => {
   assert.match(hub,/property string section: "LIVE"/);
   assert.match(hub,/subjectRoute === "" \|\| MediaPanelPolicy\.isFullNews\(subjectRoute\)/);
   assert.match(hub,/usesOriginalChannelTabs\s*\? section/);
-  assert.match(hub,/stationNewsHub\.usesOriginalChannelTabs \? 33 : 0/);
+  assert.match(hub,/stationNewsHub\.usesOriginalChannelTabs && !stationNewsHub\.embeddedHeader \? 33 : 0/);
   assert.match(hub,/path: Quickshell\.dataDir \+ "\/weather-news-creators\.json"/);
   assert.match(radio,/property bool stationOpen: true/);
   assert.match(browser,/StationWeatherSubjectPane\s*\{/);

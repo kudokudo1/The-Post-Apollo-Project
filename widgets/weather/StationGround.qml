@@ -16,6 +16,13 @@ Rectangle {
 
     // Optional WEATHER subject route. Empty keeps the exact CLASSIC page.
     property string subjectRoute: ""
+    // E5 compact visual treatment is strictly local to EARTH GROUND.
+    readonly property bool compactEarthAir: subjectRoute === "earth/ground/air-pollen"
+    readonly property bool compactEarthEnvironment: subjectRoute === "earth/ground/environment"
+    readonly property bool compactEarthGround: compactEarthAir || compactEarthEnvironment
+    readonly property real requiredContentHeight:
+        groundContent.y + groundContent.implicitHeight
+        + (compactEarthGround ? 4 : 12)
     signal routeRequested(string path)
     function sectionVisible(section) {
         return SubjectPanelPolicy.visibleFor("ground",subjectRoute,section);
@@ -721,18 +728,21 @@ Rectangle {
     // if the fixed-height window cannot contain everything at once.
     Flickable {
         id: groundScroll
+        objectName: "earth-e5-ground-viewport"
         anchors.fill: parent
         clip: true
+        interactive: !ground.compactEarthGround
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
-        contentHeight: Math.max(height, groundContent.y + groundContent.implicitHeight + 12)
+        contentHeight: Math.max(height, ground.requiredContentHeight)
 
         Column {
             id: groundContent
-            x: 20
-            y: 12
-            width: Math.max(0, groundScroll.width - 40)
-            spacing: 10
+            objectName: "earth-e5-ground-content"
+            x: ground.compactEarthGround ? 12 : 20
+            y: ground.compactEarthGround ? 3 : 12
+            width: Math.max(0, groundScroll.width - (ground.compactEarthGround ? 24 : 40))
+            spacing: ground.compactEarthGround ? 3 : 10
 
             Row {
             visible: ground.sectionVisible("header")
@@ -3643,6 +3653,6 @@ Rectangle {
         flickable: groundScroll
         handleStyle: "star"
         geometryHost: ground
-        visible: scrollable
+        visible: !ground.compactEarthGround && scrollable
     }
 }

@@ -93,6 +93,10 @@ assert(find(options,'server')&&find(options,'channel')&&find(options,'sender'));
 assert.notStrictEqual(find(options,'channel').key,
  Scope.scopeOptionsFor(sB,'vesktop','').find(x=>x.kind==='channel').key,
  'same channel name in different servers must not collide');
+assert.notStrictEqual(
+ Scope.scopeOptionsFor(entry('a/b','c','',''),'vesktop','').find(x=>x.kind==='channel').key,
+ Scope.scopeOptionsFor(entry('a','b/c','',''),'vesktop','').find(x=>x.kind==='channel').key,
+ 'slash-containing IDs cannot collide across distinct server/channel pairs');
 assert.notStrictEqual(Scope.scopeKey('vesktop','sender','Alice'),
  Scope.scopeKey('vesktop','sender','alice'),
  'case-sensitive sender IDs must never collapse');

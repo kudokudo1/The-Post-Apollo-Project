@@ -152,6 +152,7 @@ Rectangle {
 
         Rectangle {
             id: skyInstrumentFrame
+            objectName: "cosmos-c44-overview-stage"
             width: parent.width
             // Leave a fixed lower rack; do not make the outer dashboard scroll.
             height: Math.max(0,dashboard.height-consoleHeader.height

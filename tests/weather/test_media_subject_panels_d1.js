@@ -150,7 +150,10 @@ test("MEDIA overview has one NEWS and one RADIO bay while WATCH remains nearby",
   assert.equal((pane.match(/StationNewsHub\s*\{/g)||[]).length,2);
   assert.equal((pane.match(/StationRadio\s*\{/g)||[]).length,2);
   assert.match(pane,/subjectRoute: "media\/news\/reports"/);
-  assert.match(pane,/subjectRoute: "media\/overview"/);
+  assert.match(pane,/subjectRoute: "media\\/radio\\/full"/);
+  assert.match(pane,/objectName: "media-m3-overview-full-radio"/);
+  assert.match(pane,/objectName: "media-m3-news-top-bay"/);
+  assert.match(pane,/overviewChannelFilters: true/);
   assert.match(pane,/active: mediaPane\.visible && mediaPane\.kind !== ""/);
   assert.match(pane,/mediaPane\.kind === "radio"/);
   assert.match(pane,/onNewsMapRequested: function\(payload\)/);

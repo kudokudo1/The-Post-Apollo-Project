@@ -523,7 +523,7 @@ def unique(pairs):
     obj = {}
     for k, v in pairs:
         if k in obj:
-            raise ValueError("duplicate key")
+            raise ValueError("GUEST_OBSERVATION_DUPLICATE_KEY")
         obj[k] = v
     return obj
 
@@ -533,7 +533,7 @@ def selected_line(path):
         st = os.fstat(fd)
         if (not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid()
                 or st.st_nlink != 1 or not 0 < st.st_size <= 2 * 1024 * 1024):
-            raise ValueError("unsafe guest runtime log")
+            raise ValueError("GUEST_LOG_UNSAFE")
         # The original signed-service record may be farther back than the
         # last 16 KiB after teardown. Read the whole bounded, verified inode
         # instead of silently discarding a valid earlier observation.
@@ -543,35 +543,42 @@ def selected_line(path):
                 (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
                 != (after.st_dev, after.st_ino, after.st_size,
                     after.st_mtime_ns, after.st_ctime_ns)):
-            raise ValueError("runtime log changed")
+            raise ValueError("GUEST_LOG_CHANGED")
     finally:
         os.close(fd)
     matched = [x.rstrip(b"\r") for x in log.split(b"\n")
                if x.startswith(PREFIX)]
-    if len(matched) != 1 or len(matched[0]) > 2048:
-        raise ValueError("exactly one bounded record required")
+    if not matched:
+        raise ValueError("GUEST_OBSERVATION_MISSING")
+    if len(matched) != 1:
+        raise ValueError("GUEST_OBSERVATION_DUPLICATE")
+    if len(matched[0]) > 2048:
+        raise ValueError("GUEST_OBSERVATION_OVERSIZE")
     line = matched[0]
-    doc = json.loads(line[len(PREFIX):].decode("utf-8"), object_pairs_hook=unique)
+    try:
+        doc = json.loads(line[len(PREFIX):].decode("utf-8"), object_pairs_hook=unique)
+    except json.JSONDecodeError:
+        raise ValueError("GUEST_OBSERVATION_JSON_INVALID") from None
     if (type(doc) is not dict or set(doc) != FIELDS or doc["schema"] != SCHEMA
             or doc["systemd_unit"] != "postapollo-connections-status.service"
             or doc["selinux_enforcing"] is not True
             or any(doc[k] is not False for k in FALSE)
             or doc["signed_script_sha256"] != doc["running_script_sha256"]):
-        raise ValueError("diagnostic schema rejected")
+        raise ValueError("GUEST_OBSERVATION_SCHEMA_INVALID")
     for k in ("signed_rpm_sha256", "signed_script_sha256",
               "running_script_sha256", "interpreter_sha256"):
         if type(doc[k]) is not str or re.fullmatch("[0-9a-f]{64}", doc[k]) is None:
-            raise ValueError("digest rejected")
+            raise ValueError("GUEST_OBSERVATION_DIGEST_INVALID")
     for k in ("service_pid", "dbus_owner_pid", "service_uid", "service_gid"):
         if type(doc[k]) is not int or not 0 < doc[k] < 2147483648:
-            raise ValueError("process identity rejected")
+            raise ValueError("GUEST_OBSERVATION_PROCESS_INVALID")
     if doc["service_pid"] != doc["dbus_owner_pid"]:
-        raise ValueError("bus PID mismatch")
+        raise ValueError("GUEST_OBSERVATION_DBUS_PID_MISMATCH")
     ticks = doc["process_start_ticks"]
     if (type(ticks) is not str or not 1 <= len(ticks) <= 24
             or not ticks.isascii() or not ticks.isdecimal()
             or int(ticks) < 1 or str(int(ticks)) != ticks):
-        raise ValueError("start tick rejected")
+        raise ValueError("GUEST_OBSERVATION_START_INVALID")
     return line
 
 def write_all_serial(fd, payload):
@@ -592,30 +599,46 @@ def write_all_serial(fd, payload):
         sent += written
     return sent
 
+phase = "LOG_PREP"
 try:
     payload = selected_line(sys.argv[1]) + b"\n"
     # C2v already safely forwards the last 110 runtime-log lines after the
     # whole first-boot C4b phase. Mirror ONE validated self-observation at
     # that point; its separate guest serial is diagnostic only, never authority.
     print(payload.decode("ascii").rstrip("\n"), flush=True)
+    phase = "UART_OPEN"
     fd = os.open(sys.argv[2], os.O_WRONLY | os.O_NOCTTY | os.O_NONBLOCK |
                  os.O_CLOEXEC | os.O_NOFOLLOW)
     try:
         if not stat.S_ISCHR(os.fstat(fd).st_mode):
-            raise ValueError("not serial device")
+            raise ValueError("UART_NOT_CHARACTER_DEVICE")
+        phase = "UART_WRITE"
         if write_all_serial(fd, payload) != len(payload):
             raise ValueError("UART_WRITE_INCOMPLETE")
         print("C4D_UART_DIAG // ONE_VALID_RECORD_WRITTEN_TO_UART", flush=True)
     finally:
         os.close(fd)
 except (OSError, ValueError, UnicodeError, KeyError, TypeError) as exc:
-    # Diagnostic-only: fixed, bounded type/error label to the private log,
-    # NEVER signal signed process or real rollback success on UART failure.
-    reason = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
-    if len(reason) > 85 or not all(
-            c.isupper() or c.isdigit() or c in "_ " for c in reason):
-        reason = "UART_RELAY_REFUSED"
-    print("C4D_UART_DIAG // " + reason.replace(" ", "_"), flush=True)
+    # Only source-defined symbolic statuses cross the diagnostic UART.
+    # Arbitrary OS / JSON exceptions or guest log bytes are NEVER printed.
+    # These statuses are hints, not acceptance evidence or authorization.
+    allowed = frozenset((
+        "GUEST_OBSERVATION_DUPLICATE_KEY",
+        "GUEST_LOG_UNSAFE", "GUEST_LOG_CHANGED",
+        "GUEST_OBSERVATION_MISSING", "GUEST_OBSERVATION_DUPLICATE",
+        "GUEST_OBSERVATION_OVERSIZE", "GUEST_OBSERVATION_JSON_INVALID",
+        "GUEST_OBSERVATION_SCHEMA_INVALID",
+        "GUEST_OBSERVATION_DIGEST_INVALID",
+        "GUEST_OBSERVATION_PROCESS_INVALID",
+        "GUEST_OBSERVATION_DBUS_PID_MISMATCH",
+        "GUEST_OBSERVATION_START_INVALID",
+        "UART_NOT_CHARACTER_DEVICE", "UART_WRITE_TIMEOUT",
+        "UART_WRITE_ZERO", "UART_WRITE_INCOMPLETE",
+    ))
+    reason = str(exc) if type(exc) is ValueError else ""
+    if reason not in allowed:
+        reason = phase + "_REFUSED"
+    print("C4D_UART_DIAG // " + reason, flush=True)
 C4B_SINGLE_UART_RELAY
   fi
   rm -rf -- /opt/postapollo-c2o-venv

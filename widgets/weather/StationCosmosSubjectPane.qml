@@ -50,6 +50,8 @@ Rectangle {
         id: spaceHubComponent
         StationCosmosSpaceWeatherHubPane {
             spaceService: cosmosPane.spaceService
+            weatherService: cosmosPane.weatherService
+            liveHistoryStore: cosmosPane.liveHistoryStore
             runtimeNowMs: cosmosPane.runtimeNowMs
             onRouteRequested: function(path) {
                 cosmosPane.routeRequested(path)

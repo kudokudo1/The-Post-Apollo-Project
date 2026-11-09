@@ -251,8 +251,64 @@ Rectangle {
         )
     ]
 
+    // C42 // Read-only summaries of source records already owned here.
+    // The compact SPACE status page consumes these without creating readers,
+    // timestamps, derived event levels, or another provider.
+    function liveMetric(ready, value, decimals, suffix) {
+        if (!ready || value === null || value === undefined
+                || !isFinite(Number(value)))
+            return "--";
+        return Number(value).toFixed(decimals) + suffix;
+    }
+    readonly property var runtimeBriefs: ({
+        "space-kp": spaceService && spaceService.kpReady
+            ? "OBSERVED KP " + liveMetric(true,spaceService.kp,1,"")
+              + " // " + spaceService.kpLabel : "",
+        "space-wind": spaceService && spaceService.solarWindReady
+            ? "SOLAR WIND " + liveMetric(true,spaceService.solarWindSpeed,0," KM/S") : "",
+        "space-imf": spaceService && spaceService.magneticFieldReady
+            ? "IMF BT " + liveMetric(true,spaceService.magneticFieldBt,1," nT")
+              + " // BZ " + liveMetric(true,spaceService.magneticFieldBz,1," nT") : "",
+        "space-flux": spaceService && spaceService.solarFluxReady
+            ? "F10.7 " + liveMetric(true,spaceService.solarFlux,0," SFU") : "",
+        "aurora": auroraService.ready
+            ? "OVATION // N PEAK " + liveMetric(true,auroraService.northPeak,0,"/100")
+              + " // S PEAK " + liveMetric(true,auroraService.southPeak,0,"/100")
+              + (auroraService.localReady
+                 ? " // LOCAL " + liveMetric(true,auroraService.localIntensity,0,"/100")
+                 : " // LOCAL CELL UNAVAILABLE") : "",
+        "solar-flares": flareService.ready
+            ? "GOES FLARES // " + flareService.count24h + " EVENTS / 24H"
+              + (flareService.latest
+                 ? " // LATEST " + flareService.latest.classLabel
+                   + " PEAK " + flareService.latest.peakUtc
+                 : " // NO REPORTED PEAK") : "",
+        "xray-flux": xrayService.ready
+            ? "GOES XRS " + xrayService.classEquivalent.label
+              + " // SAMPLE " + xrayService.sampleUtc : "",
+        "swpc-alerts": alertService.ready
+            ? "SWPC " + alertService.count48h + " BULLETINS / 48H"
+              + (alertService.bulletins.length > 0
+                 ? " // " + String(alertService.bulletins[0].subject || "NO SUBJECT")
+                 : " // NO CURRENT BULLETIN") : "",
+        "solar-cycle": solarCycleService.ready && solarCycleService.summary.available
+            ? "NOAA MODEL " + solarCycleService.summary.modelMonth
+              + " // PREDICTED SSN " + liveMetric(true,solarCycleService.summary.predictedSsn,1,"")
+              : "",
+        "noaa-scales": scalesService.ready && scalesService.current.available
+            ? "NOAA " + scalesService.current.G.code + " / "
+              + scalesService.current.R.code + " / "
+              + scalesService.current.S.code + " // "
+              + scalesService.current.productStamp : "",
+        "kp-forecast": kpForecastService.ready && kpForecastService.summary.available
+            ? "KP OUTLOOK // MAX " + liveMetric(true,kpForecastService.summary.maxKp,1,"")
+              + " // " + kpForecastService.summary.displayedBins + " BINS"
+              : ""
+    })
+
     readonly property bool solarImageActive:
-        CosmosPanelPolicy.visibleFor("space", subjectRoute, "suvi")
+        !space.sourceOnly
+        && CosmosPanelPolicy.visibleFor("space", subjectRoute, "suvi")
 
     property string solarImageMode: "195"
     property string solarImageUrl: ""

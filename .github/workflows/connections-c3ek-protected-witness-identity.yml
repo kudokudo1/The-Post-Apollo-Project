@@ -1,0 +1,72 @@
+name: Connections C3e-K protected witness different Linux UID (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eProtectedWitnessPeer.py"
+      - "tests/connections/test_connections_c3ek_protected_witness.py"
+      - ".github/workflows/connections-c3ek-protected-witness-identity.yml"
+      - "docs/connections-c3ek-protected-witness-identity.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-separated-identity:
+    # Ubuntu runner is disposable. The root-run case must never be used on an
+    # operator machine, and it changes only a temporary /run/c3ek-ci-* fixture.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate source, host denial and test-only root boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eProtectedWitnessPeer.py \
+            tests/connections/test_connections_c3ek_protected_witness.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          test "$(id -u)" != "0"
+          sudo -n id -u | grep -qx 0
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("tests/connections/c3e_release_trust/C3eProtectedWitnessPeer.py").read_text()
+          assert 'DISPOSABLE_CI_ROOT_REQUIRED' in source
+          assert 'SCM_CREDENTIALS' in source
+          assert 'previous.read_floor(witness)' in source
+          assert 'mode=ro' in Path("tests/connections/c3e_release_trust/C3eReadOnlyWitnessPeer.py").read_text()
+          base = Path("services/connections")
+          assert "readonly property bool credentialActionsEnabled: false" in (base/"ConnectionsBroker.qml").read_text()
+          assert "readonly property bool hostAuthenticated: false" in (base/"ConnectionsRequestStatus.qml").read_text()
+          for p in (*base.glob("*.qml"), *base.glob("*.js"), base/"qmldir"):
+              assert "C3eProtectedWitnessPeer" not in p.read_text(), p
+          print("C3EK_PASS // CI_ONLY_ROOT_PROOF_PRODUCTION_AUTH_DISABLED")
+          PY
+      - name: Real distinct-UID root-owned witness access and Linux peer refusal
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n python3 -B tests/connections/test_connections_c3ek_protected_witness.py
+          echo "C3EK_PASS // REAL_DIFFERENT_UID_WITNESS_AND_KERNEL_SENDER_REFUSALS"
+      - name: Prior same-UID peer, signed release and crash-recovery regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ej_witness_peer.py
+          python3 -B tests/connections/test_connections_c3ei_supervised_supersession.py
+          python3 -B tests/connections/test_connections_c3eh_operator_recovery_gate.py
+          python3 -B tests/connections/test_connections_c3eg_split_commit_recovery.py
+          python3 -B tests/connections/test_connections_c3ef_rollback_witness.py
+          echo "C3EK_PASS // EXISTING_PEER_SIGNATURE_AND_CRASH_GATES"
+      - name: Deny production equivalence
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'not a production' docs/connections-c3ek-protected-witness-identity.md
+          grep -Fq 'no independent rollback protection' docs/connections-c3ek-protected-witness-identity.md
+          echo "C3EK_LIMITATION // DISPOSABLE_ROOT_VERSUS_NOBODY_NOT_A_DEPLOYED_HOST"

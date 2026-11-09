@@ -257,10 +257,10 @@ PanelWindow {
     ]
     property bool listKeyboardSelectionActive: false
     property string managerSelectionSection: "dnd"
-    property string managerPolicyMode: "dnd" // dnd | zz | favorites
+    property string managerPolicyMode: "dnd" // dnd | zz | block | favorites
 
     function cycleManagerPolicyMode(direction) {
-        const modes = ["dnd", "zz", "favorites"];
+        const modes = ["dnd", "zz", "block", "favorites"];
         const index = Math.max(0, modes.indexOf(managerPolicyMode));
         const step = Number(direction) < 0 ? -1 : 1;
         managerPolicyMode = modes[(index + step + modes.length) % modes.length];
@@ -1185,7 +1185,8 @@ PanelWindow {
             var policy = NotificationsService.sourcePolicies.get(i);
 
             const snoozeUntil = Number(policy.snoozeUntil || 0);
-            if (policy.dnd !== true && snoozeUntil <= Date.now())
+            if (policy.blocked !== true
+                    && policy.dnd !== true && snoozeUntil <= Date.now())
                 continue;
 
             const row = {
@@ -1193,11 +1194,13 @@ PanelWindow {
                 "source": String(policy.source || ""),
                 "sourceId": String(policy.sourceId || ""),
                 "dnd": policy.dnd === true,
-                "snoozeUntil": snoozeUntil
+                "snoozeUntil": snoozeUntil,
+                "blocked": policy.blocked === true
             };
             managerDndPolicies.append(row);
             if ((managerPolicyMode === "dnd" && row.dnd)
-                    || (managerPolicyMode === "zz" && !row.dnd))
+                    || (managerPolicyMode === "zz" && snoozeUntil > Date.now())
+                    || (managerPolicyMode === "block" && row.blocked))
                 managerVisiblePolicies.append(row);
         }
     }
@@ -2581,7 +2584,7 @@ PanelWindow {
                             }
                             height: 32
                             spacing: 7
-                            readonly property real tabWidth: (width - spacing * 2) / 3
+                            readonly property real tabWidth: (width - spacing * 3) / 4
                             MiniButton {
                                 width: parent.tabWidth
                                 height: 30
@@ -2597,6 +2600,14 @@ PanelWindow {
                                 active: root.managerPolicyMode === "zz"
                                 activeColor: Colors.orange
                                 onTriggered: root.managerPolicyMode = "zz"
+                            }
+                            MiniButton {
+                                width: parent.tabWidth
+                                height: 30
+                                label: "BLOCK"
+                                active: root.managerPolicyMode === "block"
+                                activeColor: Colors.red
+                                onTriggered: root.managerPolicyMode = "block"
                             }
                             MiniButton {
                                 width: parent.tabWidth
@@ -2629,9 +2640,11 @@ PanelWindow {
                                 anchors.leftMargin: 4
                                 anchors.rightMargin: 4
                                 height: 24
-                                text: root.managerPolicyMode === "zz"
-                                    ? "SNOOZED // " + managerVisiblePolicies.count
-                                    : "DO NOT DISTURB // " + managerVisiblePolicies.count
+                                text: root.managerPolicyMode === "block"
+                                    ? "BLOCKED // " + managerVisiblePolicies.count
+                                    : root.managerPolicyMode === "zz"
+                                        ? "SNOOZED // " + managerVisiblePolicies.count
+                                        : "DO NOT DISTURB // " + managerVisiblePolicies.count
                                 pixelSize: 13
                                 textColor: Colors.magenta
                                 glowColor: Colors.magenta
@@ -2654,9 +2667,11 @@ PanelWindow {
                                 anchors.leftMargin: 4
                                 anchors.rightMargin: 4
                                 height: 18
-                                text: root.managerPolicyMode === "zz"
-                                    ? "Timed suppression // WAKE or automatic expiry"
-                                    : "Indefinite suppression // ALLOW to restore popups"
+                                text: root.managerPolicyMode === "block"
+                                    ? "No new popup or history // UNBLOCK restores future delivery"
+                                    : root.managerPolicyMode === "zz"
+                                        ? "Timed suppression // WAKE or automatic expiry"
+                                        : "Indefinite suppression // ALLOW to restore popups"
                                 font.pixelSize: 10
                                 color: Colors.white
                                 opacity: 0.72
@@ -2683,6 +2698,7 @@ PanelWindow {
                                     required property string sourceId
                                     required property bool dnd
                                     required property double snoozeUntil
+                                    required property bool blocked
                                     width: dndManagerList.width
                                     height: 64
                                     color: "transparent"
@@ -2724,10 +2740,13 @@ PanelWindow {
                                         anchors.leftMargin: 12
                                         anchors.rightMargin: 10
                                         height: 16
-                                        text: dndRule.dnd
-                                            ? "DND // " + (dndRule.sourceId || dndRule.appKey)
-                                            : "ZZ UNTIL // " + Qt.formatDateTime(
-                                                new Date(dndRule.snoozeUntil), "MM/dd h:mm AP")
+                                        text: root.managerPolicyMode === "block"
+                                            ? "BLOCK // NO NEW HISTORY // "
+                                                + (dndRule.sourceId || dndRule.appKey)
+                                            : root.managerPolicyMode === "dnd"
+                                                ? "DND // " + (dndRule.sourceId || dndRule.appKey)
+                                                : "ZZ UNTIL // " + Qt.formatDateTime(
+                                                    new Date(dndRule.snoozeUntil), "MM/dd h:mm AP")
                                         font.pixelSize: 9
                                         color: Colors.cyan
                                         elide: Text.ElideRight
@@ -2741,14 +2760,19 @@ PanelWindow {
                                         anchors.rightMargin: 10
                                         width: 72
                                         height: 30
-                                        label: dndRule.dnd ? "ALLOW" : "WAKE"
+                                        label: root.managerPolicyMode === "block"
+                                            ? "UNBLOCK" : root.managerPolicyMode === "dnd"
+                                                ? "ALLOW" : "WAKE"
                                         labelPixelSize: 10
                                         active: false
                                         enabled: NotificationsService.policyReady
                                             && NotificationsService.policyStatus !== "parse-error"
                                             && NotificationsService.policyStatus !== "load-error"
                                         onTriggered: {
-                                            if (dndRule.dnd)
+                                            if (root.managerPolicyMode === "block")
+                                                NotificationsService.setBlocked(dndRule.appKey,
+                                                    dndRule.sourceId, dndRule.source, false);
+                                            else if (root.managerPolicyMode === "dnd")
                                                 NotificationsService.setDnd(dndRule.appKey,
                                                     dndRule.sourceId, dndRule.source, false);
                                             else
@@ -2780,8 +2804,10 @@ PanelWindow {
                                 visible: managerVisiblePolicies.count === 0
                                 width: dndManagerList.width - 40
                                 height: 30
-                                text: root.managerPolicyMode === "zz"
-                                    ? "NO ACTIVE ZZ RULES" : "NO ACTIVE DND RULES"
+                                text: root.managerPolicyMode === "block"
+                                    ? "NO BLOCKED SOURCES"
+                                    : root.managerPolicyMode === "zz"
+                                        ? "NO ACTIVE ZZ RULES" : "NO ACTIVE DND RULES"
                                 pixelSize: 12
                                 textColor: Colors.cyan
                                 glowColor: Colors.cyan
@@ -3103,6 +3129,13 @@ PanelWindow {
                             && (NotificationsService.isDnd(targetKey)
                                 || (targetingWebsite && NotificationsService.isDnd(appKey))
                                 || (!targetWholeApp && NotificationsService.isDnd(appKey)))
+                        readonly property string inheritedBlockKey:
+                            NotificationsService.policyRevision >= 0
+                            ? NotificationsService.inheritedBlockOwnerKey(scopeEntry, targetKey) : ""
+                        readonly property bool blocked: NotificationsService.policyRevision >= 0
+                            && NotificationsService.shouldBlockNotification(scopeEntry)
+                        readonly property bool selectedBlocked: NotificationsService.policyRevision >= 0
+                            && NotificationsService.isBlocked(targetKey)
                         readonly property bool favorite: NotificationsService.favoritesRevision >= 0
                             && NotificationsService.isFavoriteForNotification(scopeEntry)
                         readonly property bool selectedFavorite: NotificationsService.favoritesRevision >= 0
@@ -3123,6 +3156,18 @@ PanelWindow {
                                 return false;
                             for (let i = 0; i < scopeOptions.length; i++) {
                                 if (scopeOptions[i].key === inheritedPolicyKey) {
+                                    targetScopeIndex = i;
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }
+
+                        function selectInheritedBlockScope() {
+                            if (inheritedBlockKey === "")
+                                return false;
+                            for (let i = 0; i < scopeOptions.length; i++) {
+                                if (scopeOptions[i].key === inheritedBlockKey) {
                                     targetScopeIndex = i;
                                     return true;
                                 }
@@ -3447,8 +3492,10 @@ PanelWindow {
                             // The footer cycles exact rule targets: APP,
                             // SITE, declared sender/server/DM/channel/event,
                             // or explicitly labeled literal TITLE matching.
-                            // FAVS follows the selected scope; CLEAR ALL
-                            // remains app-wide;
+                            // FAVS and BLOCK follow the selected scope.
+                            // BLOCK rejects future matching intake BEFORE
+                            // history; CLEAR ALL still removes existing
+                            // history app-wide;
                             // X dismisses only this notification.
 
                             Row {
@@ -3513,6 +3560,28 @@ PanelWindow {
                                         if (notificationEntry.selectInheritedPolicyScope())
                                             return;
                                         NotificationsService.toggleDnd(notificationEntry.targetKey,
+                                            notificationEntry.sourceId, notificationEntry.targetLabel);
+                                    }
+                                }
+
+                                // Permanent scoped intake refusal. The
+                                // standalone U+20E0 symbol is operator-chosen.
+                                // Existing history remains for UNBLOCK.
+                                MiniButton {
+                                    width: 28
+                                    height: 28
+                                    label: "⃠"
+                                    labelPixelSize: 19
+                                    active: notificationEntry.blocked
+                                    activeColor: Colors.red
+                                    danger: notificationEntry.selectedBlocked
+                                    enabled: NotificationsService.policyReady
+                                        && NotificationsService.policyStatus !== "parse-error"
+                                        && NotificationsService.policyStatus !== "load-error"
+                                    onTriggered: {
+                                        if (notificationEntry.selectInheritedBlockScope())
+                                            return;
+                                        NotificationsService.toggleBlocked(notificationEntry.targetKey,
                                             notificationEntry.sourceId, notificationEntry.targetLabel);
                                     }
                                 }

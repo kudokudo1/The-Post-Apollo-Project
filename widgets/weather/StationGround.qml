@@ -741,11 +741,24 @@ Rectangle {
         Column {
             id: groundContent
             objectName: "earth-e5-ground-content"
-            x: ground.compactEarthGround ? 12 : 20
-            y: ground.compactEarthGround ? 3 : 12
-            width: Math.max(0, groundScroll.width - (ground.compactEarthGround ? 24 : 40))
-            spacing: ground.compactEarthEnvironment ? 2
-                : ground.compactEarthAir ? 3 : 10
+            x: 20
+            y: 12
+            width: Math.max(0, groundScroll.width - 40)
+            spacing: 10
+
+            // Preserve M8/M28 original GROUND geometry as the base state.
+            // The two E5 pages override it only while those routes are shown.
+            states: State {
+                name: "earth-e5-compact"
+                when: ground.compactEarthGround
+                PropertyChanges {
+                    target: groundContent
+                    x: 12
+                    y: 3
+                    width: Math.max(0, groundScroll.width - 24)
+                    spacing: ground.compactEarthEnvironment ? 2 : 3
+                }
+            }
 
             Row {
             visible: ground.sectionVisible("header")

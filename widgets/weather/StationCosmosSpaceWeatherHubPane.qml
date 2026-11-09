@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
+import "StationSubjectHeaderGeometry.js" as HeaderGeometry
 
 // COSMOS C4 // SPACE is a real directory of source-backed instruments.
 // The original scrollable SPACE // ALL remains in INDEX unchanged.
@@ -143,12 +144,14 @@ Rectangle {
         id: hubBody
         objectName: "cosmos-c42-space-dashboard"
         anchors.fill: parent
-        anchors.margins: 5
-        spacing: 3
+        anchors.margins: HeaderGeometry.inset
+        spacing: HeaderGeometry.ruleToContent
 
         Row {
+            id: mainHeader
+            objectName: "cosmos-c44-space-title"
             width: parent.width
-            height: 19
+            height: HeaderGeometry.titleHeight
             spacing: 4
             GohuText {
                 width: Math.max(1,parent.width-126)
@@ -169,12 +172,17 @@ Rectangle {
                 elide: Text.ElideRight
             }
         }
+        Item {
+            id: headerSpacer
+            width: parent.width
+            height: HeaderGeometry.columnHeaderGap()
+        }
         Row {
             id: viewRail
             objectName: "cosmos-c42-space-view-modes"
             width: parent.width
-            height: 22
-            spacing: 3
+            height: HeaderGeometry.tabHeight
+            spacing: HeaderGeometry.tabSpacing
             Repeater {
                 model: [
                     {label:"DASHBOARD",kind:"dashboard"},
@@ -182,8 +190,8 @@ Rectangle {
                 ]
                 delegate: ActionButton {
                     required property var modelData
-                    width: Math.max(1,(viewRail.width-viewRail.spacing)/2)
-                    height: 21
+                    width: HeaderGeometry.buttonWidth(viewRail.width,2)
+                    height: HeaderGeometry.tabHeight
                     label: modelData.label
                     labelPixelSize: 9
                     contentPadding: 0
@@ -191,6 +199,20 @@ Rectangle {
                     accentColor: Colors.cyan
                     onClicked: spaceHub.viewMode = modelData.kind
                 }
+            }
+        }
+        Item {
+            id: dividerSlot
+            objectName: "cosmos-c44-space-divider-slot"
+            width: parent.width
+            height: HeaderGeometry.columnRuleSlotHeight()
+            Rectangle {
+                objectName: "cosmos-c44-space-divider"
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: HeaderGeometry.ruleHeight
+                color: Colors.cyan
             }
         }
         Row {
@@ -256,9 +278,10 @@ Rectangle {
             visible: spaceHub.viewMode !== "directory"
             width: parent.width
             height: visible ? Math.max(1,hubBody.height
-                - 19 - viewRail.height - metrics.height
-                - serviceReport.height - footer.height
-                - 5*hubBody.spacing) : 0
+                - mainHeader.height - headerSpacer.height
+                - viewRail.height - dividerSlot.height
+                - metrics.height - serviceReport.height - footer.height
+                - 7*hubBody.spacing) : 0
             Column {
                 anchors.fill: parent
                 spacing: 2
@@ -401,8 +424,9 @@ Rectangle {
             visible: spaceHub.viewMode === "directory"
             width: parent.width
             height: visible ? Math.max(1,hubBody.height
-                - 19 - viewRail.height - footer.height
-                - 3*hubBody.spacing) : 0
+                - mainHeader.height - headerSpacer.height
+                - viewRail.height - dividerSlot.height - footer.height
+                - 5*hubBody.spacing) : 0
             Grid {
                 id: cardsGrid
                 anchors.fill: parent

@@ -205,6 +205,8 @@ for modifier in (
     lambda d: d["windows"][0].update(url="https://private.invalid"),
     lambda d: d["windows"][0].update(active_tab_index=99),
     lambda d: d["counts"].update(tabs=1),
+    lambda d: d["counts"].update(tabs=True),
+    lambda d: d["counts"].update(pinned_tabs=True),
     lambda d: d.update(cookie="PRIVATE"),
 ):
     forged = copy.deepcopy(browser)
@@ -219,6 +221,8 @@ for modifier in (
     lambda d: d.update(session_restorable=True),
     lambda d: d.update(action_allowed=True),
     lambda d: d.update(observation_id="BAD"),
+    lambda d: d.update(output="DP-3\\nSECRET"),
+    lambda d: d.update(workspace="1\\tPRIVATE"),
     lambda d: d.update(pid=1234),
     lambda d: d.update(safe_actions=["restore"]),
 ):

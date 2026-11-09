@@ -46,6 +46,20 @@ ShellRoot {
         onTriggered:{
             root.ticks++;
             if(root.ticks>35)return root.fail("TIMEOUT");
+            // Switching to SERVICES deliberately unmounts the OVERVIEW
+            // Loader. Verify the destination before looking for old nodes.
+            if(root.phase===3) {
+                const services=find(media,"media-m1-services");
+                if(!services ||media.kind!=="services") {
+                    if(root.ticks>12)
+                        return root.fail("SERVICES_BOTTOM_ROUTE_NOT_RESOLVED");
+                    return;
+                }
+                root.done=true;
+                console.log("M3_NATIVE_PASS // NEWS_TOP_FULL_RADIO_BOTTOM_SERVICES_TAB");
+                Qt.quit();
+                return;
+            }
             const overview=find(media,"media-m3-overview");
             const overviewScroll=find(media,"media-m3-overview-scroll");
             const news=find(media,"media-m3-news-top-bay");
@@ -115,14 +129,7 @@ ShellRoot {
                 media.subjectRoute="media/services/health";
                 root.phase=3;return;
             }
-            if(root.phase===3) {
-                const services=find(media,"media-m1-services");
-                if(!services ||media.kind!=="services")
-                    return root.fail("SERVICES_BOTTOM_ROUTE_NOT_RESOLVED");
-                root.done=true;
-                console.log("M3_NATIVE_PASS // NEWS_TOP_FULL_RADIO_BOTTOM_SERVICES_TAB");
-                Qt.quit();
-            }
+
         }
     }
 }

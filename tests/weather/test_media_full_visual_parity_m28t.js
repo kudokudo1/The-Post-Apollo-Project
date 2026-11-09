@@ -23,9 +23,11 @@ const originalRadioGroups=["header","source","search","directory","saved","trans
 
 test("M28-T adds exactly two complete native routes without losing the 17 original MEDIA destinations",()=>{
   const names=Object.keys(policy.ROUTES);
-  assert.equal(names.length,19);
-  assert.equal(names.filter(x=>x!==FULL_NEWS && x!==FULL_RADIO).length,17);
-  assert.equal(new Set(names).size,19);
+  assert.equal(names.length,20);
+  assert.equal(names.filter(x=>x!==FULL_NEWS && x!==FULL_RADIO
+    && x!=="media/services/health").length,17);
+  assert.equal(new Set(names).size,20);
+  assert.equal(policy.kindForRoute("media/services/health"),"services");
   for(const [route,kind,group] of [
     [FULL_NEWS,"news","NEWS // ALL ORIGINAL TABS AND REPORTS"],
     [FULL_RADIO,"radio","RADIO // ALL ORIGINAL CONTROLS"]
@@ -126,7 +128,7 @@ test("native MEDIA uses same original NEWS/RADIO components and preserves safe-m
   assert.equal((pane.match(/StationRadio\s*\{/g)||[]).length,2,
     "one direct original RADIO + one existing overview bay");
   assert.match(pane,/sourceComponent: mediaPane\.kind === "overview"/);
-  assert.match(pane,/\? radioComponent\s*:\s*newsComponent/);
+  assert.match(pane,/\? radioComponent\s*:\s*mediaPane\.kind === "services"\s*\? servicesComponent : newsComponent/);
   assert.match(pane,/active: mediaPane\.visible && mediaPane\.kind !== ""/);
   assert.match(pane,/subjectRoute: mediaPane\.subjectRoute/);
   assert.match(pane,/onNewsMapRequested: function\(payload\)/);

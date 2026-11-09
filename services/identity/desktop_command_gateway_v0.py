@@ -158,6 +158,7 @@ class IdentityCommandGateway:
         verified_peer: Callable[[KernelPeer], bool],
         active_seat: Callable[[], bool],
         approved_intent: Callable[[KernelPeer, str], bool],
+        secure_receipt_issuer: object | None = None,
     ) -> None:
         if (not isinstance(runtime_directory, Path)
                 or not runtime_directory.is_absolute()
@@ -173,6 +174,13 @@ class IdentityCommandGateway:
         self._verify_peer = verified_peer
         self._active_seat = active_seat
         self._approve = approved_intent
+        if secure_receipt_issuer is not None:
+            # Load crypto dependency ONLY in signed mode; old disposable
+            # unsigned host tests keep working without a trust store.
+            from signed_command_receipt_v0 import ReceiptIssuer
+            if not isinstance(secure_receipt_issuer, ReceiptIssuer):
+                raise ValueError("Owner-provisioned Ed25519 receipt issuer required")
+        self._secure_issuer = secure_receipt_issuer
         self._lock = threading.RLock()
         self._closing = threading.Event()
         self._server: _Server | None = None
@@ -344,7 +352,12 @@ class IdentityCommandGateway:
         parsed = _parse_command(raw)
         if parsed is None:
             return _receipt("UNAVAILABLE")
-        action, request_id = parsed
+        return self._dispatch_action(peer, *parsed)
+
+    def _dispatch_action(self, peer: KernelPeer, action: str,
+                         request_id: str | None) -> bytes:
+        # Signed mode calls this only after strict challenge/frame parsing;
+        # old test mode retains its already-reviewed exact legacy parser.
         if action == "BEGIN":
             return self._begin(peer)
         with self._lock:
@@ -370,6 +383,23 @@ class IdentityCommandGateway:
                 return self._recover(peer, request_id, phase)
             return _receipt("UNAVAILABLE")
 
+    def _invalidate_after_signing_failure(self) -> None:
+        """A missing/untrusted receipt must not leave login running orphaned.
+
+        Called under the command lock. Permanent closed admission until
+        operator/installed-host owner explicitly starts a NEW gateway.
+        """
+        self._closing.set()
+        old_host = self._host
+        self._host = None
+        self._request_id = None
+        self._owner_peer = None
+        if old_host is not None:
+            try:
+                old_host.close()
+            except Exception:
+                pass
+
     class _Handler(socketserver.BaseRequestHandler):
         def handle(self) -> None:
             conn = self.request
@@ -387,8 +417,29 @@ class IdentityCommandGateway:
                     if not data:
                         break
                     raw.extend(data)
-                response = self.server.owner._dispatch(peer, bytes(raw))
-                conn.sendall(response)
+                owner = self.server.owner
+                if owner._secure_issuer is None:
+                    # Legacy mode exists only for isolated compatibility CI;
+                    # signed clients reject every legacy/unsigned response.
+                    conn.sendall(owner._dispatch(peer, bytes(raw)))
+                else:
+                    # Production-mode CANDIDATE: signed request envelope only,
+                    # no legacy fallback, no client-supplied trust claims.
+                    from signed_command_receipt_v0 import parse_request
+                    parsed = parse_request(bytes(raw))
+                    if parsed is None:
+                        conn.sendall(_receipt("UNAVAILABLE"))
+                        return
+                    action, request_id, nonce = parsed
+                    with owner._lock:
+                        raw_receipt = owner._dispatch_action(peer, action, request_id)
+                        try:
+                            signed = owner._secure_issuer.seal(
+                                action, request_id, nonce, raw_receipt)
+                        except Exception:
+                            owner._invalidate_after_signing_failure()
+                            return
+                    conn.sendall(signed)
             except (OSError, TimeoutError, ValueError):
                 # No raw diagnostic/URL/secret is echoed to a client.
                 return

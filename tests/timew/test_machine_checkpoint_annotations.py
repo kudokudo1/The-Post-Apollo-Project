@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import uuid
@@ -160,6 +161,43 @@ try:
         assert old_anno["revision"] == 1
         assert get_annotation(legacy_id)["original_label"] == "Original work desktop"
 
+        # Exact -I launch path used by a future UI, with private notes sent
+        # through stdin rather than exposed as command-line arguments.
+        cli = ROOT / "services/time/MachineCheckpointNotesCLI.py"
+        read = subprocess.run(
+            ["python3", "-B", "-I", str(cli), "read", geometry_id],
+            capture_output=True, timeout=8)
+        assert read.returncode == 0, read.stderr
+        received = json.loads(read.stdout)
+        assert received["display_name"] == "Final desktop"
+        assert received["revision"] == 2 and received["read_only"]
+
+        request = {
+            "checkpoint_id": geometry_id, "display_name": "Named moment",
+            "note": "Private checkpoint annotation",
+            "expected_revision": 2,
+        }
+        write = subprocess.run(
+            ["python3", "-B", "-I", str(cli), "update"],
+            input=(json.dumps(request) + "\\n").encode("utf-8"),
+            capture_output=True, timeout=8)
+        assert write.returncode == 0, write.stderr
+        assert b"Private checkpoint annotation" not in write.stderr
+        received_update = json.loads(write.stdout)
+        assert received_update["display_name"] == "Named moment"
+        assert received_update["revision"] == 3
+        assert get_annotation(geometry_id)["note"] == request["note"]
+
+        stale = subprocess.run(
+            ["python3", "-B", "-I", str(cli), "update"],
+            input=(json.dumps(request) + "\\n").encode("utf-8"),
+            capture_output=True, timeout=8)
+        assert stale.returncode == 1
+        assert json.loads(stale.stdout) == {
+            "status": "error", "reason": "ANNOTATION REJECTED"}
+        assert request["note"].encode() not in stale.stdout
+        assert get_annotation(geometry_id)["revision"] == 3
+
         # All validation failures happen before a new mutation.
         for values, error in [
             ({"display_name": "", "note": ""}, "NAME"),
@@ -169,7 +207,7 @@ try:
             ({"display_name": "ok", "note": "bad\x00note"}, "NOTE"),
         ]:
             refused(lambda values=values: set_annotation(
-                geometry_id, expected_revision=2, **values),
+                geometry_id, expected_revision=3, **values),
                 error)
         refused(lambda: set_annotation(
             geometry_id, display_name="ok", note="ok",

@@ -190,6 +190,7 @@ Rectangle {
                 ]
                 delegate: ActionButton {
                     required property var modelData
+                    objectName: "cosmos-c44-space-button"
                     width: HeaderGeometry.buttonWidth(viewRail.width,2)
                     height: HeaderGeometry.tabHeight
                     label: modelData.label

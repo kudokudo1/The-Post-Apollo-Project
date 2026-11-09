@@ -8,7 +8,8 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "../..");
-const qml = fs.readFileSync(path.join(root, "widgets/CameraW.qml"), "utf8");
+const qml = fs.readFileSync(path.join(root, "widgets/CameraW.qml"), "utf8")
+    + "\n" + fs.readFileSync(path.join(root, "widgets/CameraCleanupView.qml"), "utf8");
 const motionSource = fs.readFileSync(
     path.join(root, "widgets/CameraHuntMotion.js"), "utf8");
 const motion = {};

@@ -841,6 +841,26 @@ Rectangle {
         discoveryScroll.contentY = 0;
     }
 
+    function inspectPinnedEvent(kind,row) {
+        if (!earthPinnedMap || !row) return false;
+        selectedMapEarthquake = null;
+        selectedMapGdacsEvent = null;
+        selectedMapHotspot = null;
+        selectedMapEvent = null;
+        selectedMapNewsMention = null;
+        if (kind === "quakes") selectedMapEarthquake = row;
+        else if (kind === "gdacs") selectedMapGdacsEvent = row;
+        else if (kind === "firms") selectedMapHotspot = row;
+        else if (kind === "eonet") selectedMapEvent = row;
+        else return false;
+        // The viewport does not scroll away and the selected event uses
+        // the original inspector and dossier identity.
+        if (isFinite(Number(row.latitude))
+            && isFinite(Number(row.longitude)))
+            applyMapView(MapProjection.fitRows([row],1.35));
+        return true;
+    }
+
     function closeMapInspector() {
         selectedMapEvent = null;
     }
@@ -3410,9 +3430,97 @@ Rectangle {
                     }
                 }
 
+                // E2 // Actual event rows from the same plotted source arrays,
+                // never a copied event pool. The map above stays pinned.
+                StationSectionDivider {
+                    width: parent.width
+                    visible: stationDiscovery.earthPinnedMap
+                        && stationDiscovery.earthLayerSelected("quakes")
+                    title: "USGS // EARTHQUAKES // "
+                        + stationDiscovery.mapEarthquakeRows.length
+                }
+                Repeater {
+                    model: stationDiscovery.earthPinnedMap
+                        && stationDiscovery.earthLayerSelected("quakes")
+                        ? stationDiscovery.mapEarthquakeRows : []
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: content.width
+                        height: 27
+                        labelPixelSize: 10
+                        contentPadding: 2
+                        accentColor: Colors.orange
+                        selected: stationDiscovery.selectedMapEarthquake
+                            === modelData
+                        label: "M" + modelData.magnitude + " // "
+                            + (modelData.place || modelData.title
+                               || modelData.coordinates || "USGS EVENT")
+                        onClicked: stationDiscovery.inspectPinnedEvent(
+                            "quakes",modelData)
+                    }
+                }
+
+                StationSectionDivider {
+                    width: parent.width
+                    visible: stationDiscovery.earthPinnedMap
+                        && stationDiscovery.earthLayerSelected("gdacs")
+                    title: "GDACS // DISASTER ALERTS // "
+                        + stationDiscovery.mapGdacsRows.length
+                }
+                Repeater {
+                    model: stationDiscovery.earthPinnedMap
+                        && stationDiscovery.earthLayerSelected("gdacs")
+                        ? stationDiscovery.mapGdacsRows : []
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: content.width
+                        height: 27
+                        labelPixelSize: 10
+                        contentPadding: 2
+                        accentColor: Colors.yellow
+                        selected: stationDiscovery.selectedMapGdacsEvent
+                            === modelData
+                        label: (modelData.name || "GDACS EVENT") + " // "
+                            + (modelData.alertLevel || "--")
+                        onClicked: stationDiscovery.inspectPinnedEvent(
+                            "gdacs",modelData)
+                    }
+                }
+
+                StationSectionDivider {
+                    width: parent.width
+                    visible: stationDiscovery.earthPinnedMap
+                        && stationDiscovery.earthLayerSelected("firms")
+                    title: "NASA FIRMS // HOTSPOTS // "
+                        + (firmsService.ready
+                            ? firmsService.hotspots.length : 0)
+                        + " // MANUAL FETCH ABOVE"
+                }
+                Repeater {
+                    model: stationDiscovery.earthPinnedMap
+                        && stationDiscovery.earthLayerSelected("firms")
+                        && firmsService.ready
+                        ? firmsService.hotspots : []
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: content.width
+                        height: 27
+                        labelPixelSize: 10
+                        contentPadding: 2
+                        accentColor: Colors.orange
+                        selected: stationDiscovery.selectedMapHotspot
+                            === modelData
+                        label: (modelData.acquiredUtc || "FIRMS HOTSPOT")
+                            + " // " + (modelData.coordinates || "--")
+                        onClicked: stationDiscovery.inspectPinnedEvent(
+                            "firms",modelData)
+                    }
+                }
+
                 StationSectionDivider {
                     width: parent.width
                     visible: stationDiscovery.earthLayerEnabled("eonet")
+                        && stationDiscovery.earthLayerSelected("eonet")
                     title: stationDiscovery.earthMapRoute === "earth/events/eonet"
                         ? "NASA EONET // FULL EVENT LIST"
                         : "EARTH MAP CONTEXT // EONET EVENTS IN VIEW"
@@ -3420,6 +3528,7 @@ Rectangle {
                 QuietText {
                     width: parent.width
                     visible: stationDiscovery.earthLayerEnabled("eonet")
+                        && stationDiscovery.earthLayerSelected("eonet")
                     text: stationDiscovery.earthMapRoute === "earth/events/eonet"
                         ? "ALL SOURCE EVENTS // SELECT TO INSPECT"
                         : "SHOWING " + stationDiscovery.mapCompanionEonetRows.length
@@ -3430,6 +3539,7 @@ Rectangle {
                 QuietText {
                     width: parent.width
                     visible: stationDiscovery.earthLayerEnabled("eonet")
+                             && stationDiscovery.earthLayerSelected("eonet")
                              && !source.ready
                     text: source.failed ? source.errorText
                           : source.retryWaitSeconds > 0
@@ -3443,6 +3553,7 @@ Rectangle {
                     model: stationDiscovery.domain === "map"
                             && stationDiscovery.earthMapOnly
                             && stationDiscovery.earthLayerEnabled("eonet")
+                            && stationDiscovery.earthLayerSelected("eonet")
                             && source.ready
                         ? stationDiscovery.mapCompanionEonetRows : []
                     delegate: discoveryRecordCard

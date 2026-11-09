@@ -88,6 +88,7 @@ class DesktopHostLifecycle:
         self._attempted = False
         self._allow_callback = False
         self._signed_in = False
+        self._cancelled = False
 
     @property
     def started(self) -> bool:
@@ -262,6 +263,45 @@ class DesktopHostLifecycle:
             if result != {"status": "LOGIN_PENDING"}:
                 self._allow_callback = False
             return result
+
+    def command_phase(self) -> str:
+        """Host-owned bounded login phase, never an authentication grant.
+
+        This method never returns credentials, subjects, identities, issuer
+        details, memberships, or URLs. The command server independently
+        authenticates the asking peer before exposing this status.
+        """
+        with self._lock:
+            if (self._status != "STARTED" or self._session is None
+                    or not self._seat_ok()):
+                return "HOST_LOST"
+            if self._signed_in:
+                return "AUTHENTICATED"
+            if self._cancelled:
+                return "CANCELLED"
+            if self._attempted:
+                return "PENDING" if self._allow_callback else "FAILED"
+            return "IDLE"
+
+    def cancel_pending_login(self) -> dict[str, object]:
+        """Cancel ONLY a pending callback, never an established session.
+
+        Serializes with _accept_callback under the SAME host lock: whichever
+        holds the lock first wins. If verification already completed, CANCEL
+        cannot revoke the signed-in session. Revocation invalidates any
+        pending code/state and the late callback is denied; no new attempt is
+        permitted on this one-shot lifecycle.
+        """
+        with self._lock:
+            if (self._status != "STARTED" or self._session is None
+                    or not self._seat_ok() or self._signed_in
+                    or self._cancelled or not self._attempted
+                    or not self._allow_callback):
+                return {"status": "UNAVAILABLE"}
+            self._allow_callback = False
+            self._cancelled = True
+            self._session.logout()
+            return {"status": "CANCELLED"}
 
     def logout(self) -> dict[str, object]:
         """Fail closed before any in-flight callback or HTTPS read finishes."""

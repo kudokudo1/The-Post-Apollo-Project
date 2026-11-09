@@ -840,6 +840,23 @@ PanelWindow {
     property string machineGeometryVerifyId: ""
     property string machineGeometryVerifyStatus: "NOT VERIFIED // READ-ONLY CHECK AVAILABLE"
     property var machineGeometryVerifyResult: null
+    // STORED name overlays are read-only; private notes load only on EDIT.
+    property var machineNotesNameOverlay: ({})
+    property bool machineNotesEditorOpen: false
+    property var machineNotesLoaded: null
+    property string machineNotesCheckpointId: ""
+    property string machineNotesDraftName: ""
+    property string machineNotesDraftText: ""
+    property string machineNotesStatus: "NOTES // SELECT A STORED CHECKPOINT"
+    readonly property bool machineNotesDirty: machineNotesEditorOpen
+        && machineNotesLoaded !== null
+        && (machineNotesDraftName !== machineNotesLoaded.display_name
+            || machineNotesDraftText !== machineNotesLoaded.note)
+    readonly property bool machineNotesInputValid:
+        machineNotesDraftName.trim().length > 0
+        && machineNotesDraftName.trim().length <= 48
+        && machineNotesDraftText.length <= 1024
+        && machineNotesDraftName.indexOf("\\n") < 0
     property string machineCheckpointDraft: ""
     property bool machineCustomOpen: false
     property bool machineSaveAdvancedOpen: false
@@ -893,6 +910,143 @@ PanelWindow {
         machineSaveBridgeProcess.exec(["python3", "-B", "-I",
             Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"),
             "verify", machineGeometryVerifyId]);
+    }
+
+    function machineNotesNameForItem(item) {
+        if (!item)
+            return "NO SAVED RECORD SELECTED";
+        const entry = machineNotesNameOverlay[item.id];
+        return entry && typeof entry.display_name === "string"
+            ? entry.display_name : item.label;
+    }
+
+    function machineNotesDiscard() {
+        machineNotesEditorOpen = false;
+        machineNotesLoaded = null;
+        machineNotesCheckpointId = "";
+        machineNotesDraftName = "";
+        machineNotesDraftText = "";
+        machineNotesStatus = "NOTES // CLOSED";
+    }
+
+    function machineRequestNotesList() {
+        if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
+                || machineSaveBridgeBusy || machineStoreBusy
+                || machineAutoRestoreBusy)
+            return;
+        machineSaveBridgeBusy = true;
+        machineSaveBridgeAction = "notes-list";
+        machineSaveBridgePayload = "";
+        machineSaveBridgeProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"),
+            "notes-list"]);
+    }
+
+    function machineRequestNotesRead() {
+        if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
+                || !machineSavedItem || machineSaveBridgeBusy
+                || machineStoreBusy || machineAutoRestoreBusy)
+            return;
+        machineNotesEditorOpen = true;
+        machineNotesCheckpointId = machineSavedItem.id;
+        machineNotesLoaded = null;
+        machineNotesDraftName = "";
+        machineNotesDraftText = "";
+        machineNotesStatus = "NOTES // LOADING SELECTED CHECKPOINT";
+        machineSaveBridgeBusy = true;
+        machineSaveBridgeAction = "notes-read";
+        machineSaveBridgePayload = "";
+        machineSaveBridgeProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"),
+            "notes-read", machineNotesCheckpointId]);
+    }
+
+    function machineSaveNotes() {
+        if (!machineNotesEditorOpen || !machineNotesLoaded || !machineSavedItem
+                || machineNotesLoaded.checkpoint_id !== machineSavedItem.id
+                || machineNotesCheckpointId !== machineSavedItem.id
+                || !machineNotesDirty || !machineNotesInputValid
+                || machineSaveBridgeBusy || machineStoreBusy
+                || machineAutoRestoreBusy)
+            return;
+        machineSaveBridgeBusy = true;
+        machineSaveBridgeAction = "notes-update";
+        machineSaveBridgePayload = JSON.stringify({
+            checkpoint_id: machineNotesCheckpointId,
+            display_name: machineNotesDraftName.trim(),
+            note: machineNotesDraftText,
+            expected_revision: machineNotesLoaded.revision
+        });
+        machineNotesStatus = "SAVING NOTES // ORIGINAL CAPTURE UNCHANGED";
+        machineSaveBridgeProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"),
+            "notes-update"]);
+    }
+
+    function machineAcceptNotesResponse(data) {
+        if (machineSaveBridgeAction === "notes-list") {
+            if (data.status !== "listed" || data.read_only !== true
+                    || !Array.isArray(data.items) || data.items.length > 30)
+                return;
+            const shown = {};
+            for (let i = 0; i < machineSavedCheckpoints.length; i++)
+                shown[machineSavedCheckpoints[i].id] = true;
+            const overlay = {};
+            for (let i = 0; i < data.items.length; i++) {
+                const row = data.items[i];
+                if (shown[row.checkpoint_id] && typeof row.display_name === "string")
+                    overlay[row.checkpoint_id] = {
+                        display_name: row.display_name,
+                        revision: row.revision
+                    };
+            }
+            machineNotesNameOverlay = overlay;
+            return;
+        }
+        if (!machineNotesEditorOpen || !machineSavedItem
+                || machineNotesCheckpointId !== machineSavedItem.id)
+            return;
+        if (data.status === "error") {
+            if (data.reason === "CHECKPOINT NOTES STALE") {
+                machineNotesLoaded = null;
+                machineNotesStatus = "NOTES STALE // REFRESH BEFORE EDITING";
+            } else {
+                machineNotesStatus = "NOTES REJECTED // CHECK INPUT OR STORE";
+            }
+            return;
+        }
+        const reading = machineSaveBridgeAction === "notes-read";
+        const updating = machineSaveBridgeAction === "notes-update";
+        if ((!reading && !updating)
+                || data.checkpoint_id !== machineNotesCheckpointId
+                || data.capture_modified !== false
+                || typeof data.display_name !== "string"
+                || typeof data.note !== "string"
+                || typeof data.revision !== "number"
+                || (reading && (data.status !== "loaded" || data.read_only !== true))
+                || (updating && (data.status !== "updated" || data.read_only !== false
+                    || !machineNotesLoaded || data.revision !== machineNotesLoaded.revision + 1))) {
+            machineNotesStatus = "INVALID NOTES RESPONSE";
+            return;
+        }
+        machineNotesLoaded = {
+            checkpoint_id: data.checkpoint_id,
+            display_name: data.display_name,
+            note: data.note,
+            revision: data.revision,
+            original_label: data.original_label
+        };
+        machineNotesDraftName = data.display_name;
+        machineNotesDraftText = data.note;
+        const next = Object.assign({}, machineNotesNameOverlay);
+        next[data.checkpoint_id] = {
+            display_name: data.display_name,
+            revision: data.revision
+        };
+        machineNotesNameOverlay = next;
+        machineNotesStatus = reading
+            ? "NOTES LOADED // ORIGINAL CAPTURE UNCHANGED"
+            : "NOTES SAVED // REVISION " + data.revision;
     }
 
     function machineSaveLabel() {
@@ -985,6 +1139,12 @@ PanelWindow {
     function machineAcceptSaveBridge(data) {
         if (!data || typeof data.status !== "string") {
             machineSaveBridgeStatus = "INVALID SAVE RESPONSE";
+            return;
+        }
+        if (machineSaveBridgeAction === "notes-list"
+                || machineSaveBridgeAction === "notes-read"
+                || machineSaveBridgeAction === "notes-update") {
+            machineAcceptNotesResponse(data);
             return;
         }
         if (machineSaveBridgeAction === "verify") {

@@ -91,9 +91,9 @@ test("MAP source rack is opened in-place into both original provider-owned map v
   assert.match(discovery,/if \(weatherMapOnly\)/);
   assert.match(discovery,/title: "SOURCE RACK \/\/ WHAT IS CONNECTED"/);
   assert.equal((discovery.match(
-    /visible: !stationDiscovery\.weatherMapOnly\s*\|\| stationDiscovery\.domain === "map"/g
+    /visible: !stationDiscovery\.earthPinnedMap\s*&& \(!stationDiscovery\.weatherMapOnly\s*\|\|\s*stationDiscovery\.domain === "map"\)/g
   )||[]).length,3,
-    "source health, source-rack divider and source rows remain visible in CLASSIC NEWS/RADIO as well as both maps");
+    "legacy source health and rows still show in CLASSIC/WEATHER and move to SERVICES for pinned EARTH");
   for(const literal of [
     "NATURAL EARTH // SHARED LOCAL CARTOGRAPHY",
     "USGS // OBSERVED EARTHQUAKES M2.5+",

@@ -11,6 +11,7 @@ ShellRoot {
     property int phase: 0
     property int ticks: 0
     property real pinnedY: -1
+    property real controlsY: -1
     property int initialMapCount: -1
     // Start on the original scrolling map route, as the real EARTH overview does.
     property bool pinned: false
@@ -105,13 +106,36 @@ ShellRoot {
                     || Math.abs(canvas.mapToItem(host,0,0).x)>0.15
                     || Math.abs(canvas.mapToItem(host,0,0).y)>0.15)
                     return root.fail("PINNED_MAP_RETAINED_OLD_SCROLL_OFFSET");
+                const controls=find(map,"earth-e3-pinned-map-controls");
+                const appearance=find(map,"earth-e3-pinned-appearance");
+                const manual=find(map,"earth-e3-pinned-manual");
+                const rack=find(map,"earth-e3-legacy-runtime-rack");
+                const sources=find(map,"earth-e3-legacy-source-rack");
+                const legacyFilter=find(map,"earth-e3-legacy-eonet-filter");
+                if(!controls || !appearance || !manual || !rack || !sources
+                        || !legacyFilter)
+                    return root.fail("E3_CONTROL_DECK_MISSING");
                 if(!host.visible || !filters.visible
                     || canvas.parent!==host
                     || !scroll.visible || canvas.height<=100
                     || host.width!==480 || canvas.width!==480
                     || count(map,"earth-e2-single-map-plot")!==1
-                    || scroll.y<host.y+host.height)
-                    return root.fail("NOT_ONE_PINNED_MAP");
+                    || controls.width!==host.width
+                    || !controls.visible || !appearance.visible || !manual.visible
+                    || controls.y < host.y+host.height
+                    || scroll.y < controls.y+controls.height
+                    || rack.visible || sources.visible || legacyFilter.visible)
+                    return root.fail("NOT_ONE_PINNED_MAP_WITH_E3_CONTROLS");
+                for(const key of ["borders","states","places","quakes","gdacs","reset"])
+                    if(!find(map,"earth-e3-map-"+key))
+                        return root.fail("E3_MAP_TOOL_MISSING_"+key);
+                for(const key of ["mrms","rainviewer","smoke","firms"])
+                    if(!find(map,"earth-e3-source-"+key))
+                        return root.fail("E3_MANUAL_SOURCE_MISSING_"+key);
+                for(const key of ["radar-history","manual-load","manual-clear"])
+                    if(!find(map,"earth-e3-"+key))
+                        return root.fail("E3_MANUAL_ACTION_MISSING_"+key);
+                root.controlsY=controls.mapToItem(map,0,0).y;
                 const keys=["all","quakes","eonet","gdacs","firms"];
                 const tabWidth=(480-16)/5;
                 for(let i=0;i<keys.length;i++) {
@@ -132,11 +156,20 @@ ShellRoot {
                 const scroll=find(map,"earth-e2-event-scroll");
                 if(!canvas || !scroll)return root.fail("MAP_LOST_AFTER_SCROLL");
                 const y=canvas.mapToItem(map,0,0).y;
+                const controls=find(map,"earth-e3-pinned-map-controls");
                 if(Math.abs(y-root.pinnedY)>0.15
+                    || !controls
+                    || Math.abs(controls.mapToItem(map,0,0).y-root.controlsY)>0.15
                     || map.earthFocusedLayer!=="quakes"
                     || !scroll.visible
                     || count(map,"earth-e2-single-map-plot")!==1)
-                    return root.fail("MAP_SCROLLED_OR_DUPLICATED");
+                    return root.fail("MAP_OR_E3_TOOLS_SCROLLED_OR_DUPLICATED");
+                // The deck switches manual sources while keeping the same map.
+                map.pinnedSourceMode="firms";
+                if(map.pinnedSourceMode!=="firms"
+                    || find(map,"earth-e3-manual-clear").available)
+                    return root.fail("E3_FIRMS_MANUAL_GATE_BROKEN");
+                map.pinnedSourceMode="mrms";
                 map.earthFocusedLayer="firms";
                 if(map.earthFocusedLayer!=="firms")
                     return root.fail("FIRE_FILTER_NOT_SELECTABLE");
@@ -147,7 +180,8 @@ ShellRoot {
                 const map=panel.item;
                 const host=find(map,"earth-e2-pinned-map-host");
                 const scroll=find(map,"earth-e2-event-scroll");
-                if(host.visible || scroll.visible)
+                const controls=find(map,"earth-e3-pinned-map-controls");
+                if(host.visible || scroll.visible || !controls || controls.visible)
                     return root.fail("SERVICE_VIEW_DOES_NOT_HIDE_MAP");
                 root.phase=3;return;
             }
@@ -176,7 +210,7 @@ ShellRoot {
                 if(!p.selectedSource || p.selectedSource.id!=="gdacs")
                     return root.fail("SOURCE_SELECTION_LOST");
                 root.done=true;
-                console.log("E2_NATIVE_PASS // PINNED_SINGLE_MAP_SCROLL_FILTERS_SERVICES");
+                console.log("E2_NATIVE_PASS // PINNED_SINGLE_MAP_SCROLL_FILTERS_SERVICES // E3_FIXED_CONTROLS");
                 Qt.quit();
             }
         }

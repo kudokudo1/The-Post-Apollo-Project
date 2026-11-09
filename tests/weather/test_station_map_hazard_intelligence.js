@@ -112,7 +112,8 @@ assert.match(ui, /id: mapFilterRail/);
 assert.match(ui, /delegate: ModeButton/);
 assert.match(ui, /bordered: false/);
 assert.match(ui, /selected: stationDiscovery\.mapFilter === modelData\.id/);
-assert.match(ui, /mapCategory: stationDiscovery\.mapCategoryForFilter/);
+assert.match(ui, /mapCategory: stationDiscovery\.earthPinnedMap\s*\? "" : stationDiscovery\.mapCategoryForFilter/);
+assert.match(ui, /id: mapFilterRail[\s\S]*?!stationDiscovery\.earthPinnedMap/);
 assert.match(ui, /title: "EVENT INSPECTOR \/\/ NASA EONET"/);
 for (const field of [
     "selectedMapEvent.category",

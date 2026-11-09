@@ -21,6 +21,7 @@ Item {
     property alias favoriteRowRepeater: savedItemRows
     property alias dossierGroupItems: dossierGroupRepeater
     property alias dossierScrollArea: dossierScroll
+    property alias collapseAllControl: collapseAllButton
     property alias collectionGroupItems: collectionGroupRepeater
     // Native fixture inspection of the existing group editor (no new action).
     property alias collectionPanel: collectionManager
@@ -32,6 +33,8 @@ Item {
     property var defaultOwner: null
     property var collectionsOwner: null
     property string filterMode: "ALL"
+    // Bottom menu row is local filtering, not an owner-side action.
+    property string menuFilter: "ALL"
     // Shared between all three CPU++ bays; selection alone never modifies an owner.
     property string selectedCollectionId: ""
     signal selectionRequested(string key)
@@ -40,6 +43,7 @@ Item {
     signal indexSelectionRequested(string key, string category)
     signal collectionRequested(string collectionId)
     signal collectionMemberRequested(string collectionId, string key)
+    signal collectionDeleteAccepted(string collectionId)
     // U7a: navigation asks the shell to open one of its existing widget views.
     // Never transmit the selected favorite's key/resource ID or command.
     signal ownerNavigationRequested(string owner, string view)
@@ -78,6 +82,20 @@ Item {
         next[key]=!next[key];
         collapsedIndexGroups=next;
     }
+    function allIndexGroupsCollapsed() {
+        return pane.dossier.groups.length>0
+            && pane.dossier.groups.every(function(group) {
+                return pane.collapsedIndexGroups[group.key]===true;
+            });
+    }
+    function toggleAllIndexGroups() {
+        const collapsed=!allIndexGroupsCollapsed();
+        const next={};
+        for(const group of pane.dossier.groups)
+            if(collapsed)next[group.key]=true;
+        collapsedIndexGroups=next;
+        dossierScroll.contentY=0;
+    }
     function revealSelectedInSelector() {
         if (pane.area!=="selector" || !pane.selectedResource) return;
         const pos=pane.choices.findIndex(function(row) {
@@ -91,7 +109,11 @@ Item {
             row.y-4));
     }
     onFilterModeChanged: {
+        menuFilter="ALL";
         if(pane.area==="selector") Qt.callLater(pane.revealSelectedInSelector);
+    }
+    onSelectedCollectionIdChanged: {
+        if(pane.filterMode==="GROUP") menuFilter="ALL";
     }
     readonly property bool editingText:
         area==="details" && collectionManager.visible
@@ -103,14 +125,18 @@ Item {
             Qt.callLater(pane.revealSelectedInSelector);
     }
 
-    readonly property var choices: {
-        if (pane.filterMode==="GROUP")
-            return CollectionView.rowsFor(pane.collectionView,pane.selectedCollectionId);
-        return candidates && Array.isArray(candidates.rows)
-            ? candidates.rows.filter(function(row) {
-                return filterMode==="ALL" || row.category===filterMode;
-            }) : [];
-    }
+    readonly property var menuSourceRows:
+        pane.filterMode==="GROUP"
+        ? CollectionView.rowsFor(pane.collectionView,pane.selectedCollectionId)
+        : pane.candidates && Array.isArray(pane.candidates.rows)
+          ? pane.candidates.rows : []
+    readonly property var menuOptions:
+        Dossier.menusFor(pane.candidates,pane.filterMode,pane.menuSourceRows)
+    readonly property var choices: pane.menuSourceRows.filter(function(row) {
+        return (pane.filterMode==="ALL" || pane.filterMode==="GROUP"
+                || row.category===pane.filterMode)
+            && (pane.menuFilter==="ALL" || row.menu===pane.menuFilter);
+    })
     readonly property var groupRecords:
         collectionsOwner ? collectionsOwner.collections : []
 
@@ -151,12 +177,28 @@ Item {
             font.pixelSize: 10
             elide: Text.ElideRight
         }
-        QuietText {
+        Row {
             width: parent.width
-            height: 13
-            text: "SOURCE // MENU // EXACT ITEM"
-            font.pixelSize: 9
-            elide: Text.ElideRight
+            height: 23
+            spacing: 5
+            QuietText {
+                width: Math.max(0,parent.width-collapseAllButton.width-parent.spacing)
+                height: parent.height
+                text: "SOURCE // MENU // EXACT ITEM"
+                font.pixelSize: 9
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+            }
+            ActionButton {
+                id: collapseAllButton
+                width: 91
+                height: 22
+                label: pane.allIndexGroupsCollapsed() ? "EXPAND ALL" : "COLLAPSE ALL"
+                labelPixelSize: 8
+                accentColor: Colors.cyan
+                available: pane.dossier.groupCount>0
+                onLeftClicked: pane.toggleAllIndexGroups()
+            }
         }
         Rectangle {
             width: parent.width
@@ -204,6 +246,7 @@ Item {
                             property alias memberItems: collectionMemberRepeater
                             width: collectionRows.width
                             spacing: 2
+                            property bool confirmDelete: false
                             Rectangle {
                                 id: collectionHeading
                                 width: parent.width
@@ -216,7 +259,7 @@ Item {
                                 GohuText {
                                     anchors.fill: parent
                                     anchors.leftMargin: 5
-                                    anchors.rightMargin: 3
+                                    anchors.rightMargin: 42
                                     verticalAlignment: Text.AlignVCenter
                                     text: collectionGroup.section.name+" // "
                                         +collectionGroup.section.available
@@ -245,6 +288,32 @@ Item {
                                             pane.collectionRequested(collectionGroup.section.id);
                                             event.accepted=true;
                                         }
+                                    }
+                                }
+                                // Only the original CollectionsStore can delete.
+                                // Two clicks prevent accidental loss of grouping.
+                                ActionButton {
+                                    id: leftCollectionDelete
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 3
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    z: 3
+                                    width: collectionGroup.confirmDelete ? 39 : 26
+                                    height: 23
+                                    label: collectionGroup.confirmDelete ? "SURE?" : "✕"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.red
+                                    destructive: true
+                                    available: pane.collectionsOwner !== null
+                                        && pane.collectionsOwner.canEdit
+                                    onLeftClicked: {
+                                        if (!collectionGroup.confirmDelete) {
+                                            collectionGroup.confirmDelete=true;
+                                            return;
+                                        }
+                                        const id=collectionGroup.section.id;
+                                        if(pane.collectionsOwner.deleteCollection(id))
+                                            pane.collectionDeleteAccepted(id);
                                     }
                                 }
                             }
@@ -326,7 +395,7 @@ Item {
         Flickable {
             id: dossierScroll
             width: parent.width
-            height: Math.max(0,overview.height-65-collectionSection.height-5)
+            height: Math.max(0,overview.height-75-collectionSection.height-5)
             clip: true
             contentWidth: width
             contentHeight: dossierRows.implicitHeight
@@ -484,7 +553,7 @@ Item {
                     required property string modelData
                     width: Math.max(1,(selector.width-8)/3)
                     height: 27
-                    label: modelData
+                    label: Dossier.mainIcon(modelData)+" "+modelData
                     labelPixelSize: 9
                     selected: pane.filterMode===modelData
                     accentColor: selected ? Colors.magenta : Colors.cyan
@@ -515,7 +584,7 @@ Item {
         Flickable {
             id: listScroll
             width: parent.width
-            height: Math.max(0,selector.height-198)
+            height: Math.max(0,selector.height-242)
             clip: true
             contentWidth: width
             contentHeight: listRows.implicitHeight
@@ -604,6 +673,36 @@ Item {
                         : "NO SUPPORTED SAVED ITEMS IN THIS FILTER"
                     wrapMode: Text.WordWrap
                     font.pixelSize: 10
+                }
+            }
+        }
+        // Secondary source/menu filters remain pinned below the scrollable
+        // list. Only canonical dossier menu names are offered here.
+        Flickable {
+            id: subfilterScroll
+            width: parent.width
+            height: 35
+            clip: true
+            interactive: contentWidth>width
+            boundsBehavior: Flickable.StopAtBounds
+            contentWidth: subfilterButtons.implicitWidth
+            contentHeight: height
+            Row {
+                id: subfilterButtons
+                height: 31
+                spacing: 4
+                Repeater {
+                    model: pane.menuOptions
+                    ActionButton {
+                        required property string modelData
+                        width: Math.max(54,Math.min(110,modelData.length*8+22))
+                        height: 29
+                        label: modelData
+                        labelPixelSize: 9
+                        selected: pane.menuFilter===modelData
+                        accentColor: selected ? Colors.magenta : Colors.cyan
+                        onLeftClicked: pane.menuFilter=modelData
+                    }
                 }
             }
         }

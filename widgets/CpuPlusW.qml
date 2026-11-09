@@ -426,7 +426,9 @@ PanelWindow {
                  || settingsLocationSelectionPane.editingText))
         && !(selectedModeIndex === 6 && settingsSubMode === "CONNECTIONS"
              && settingsConnectionsDetails.editingText)
-        && !(selectedModeIndex === 4 && favoritesDetailsPane.editingText)
+        && !(selectedModeIndex === 4
+             && (favoritesDetailsPane.editingText
+                 || favoritesSelectorPane.editingText))
         && !(selectedModeIndex === 6 && settingsSubMode === "TIME"
              && settingsTimeBasicsPane.zoneSearchFocused)
         && !(selectedModeIndex === 5

@@ -142,10 +142,10 @@ if [[ "$phase" == booted ]]; then
   [[ "$(systemctl is-enabled "$unit" 2>&1 || true)" == static ]] ||
     fail "SIGNED_SERVICE_MUST_BE_STATIC"
   check_released
-  # The C3d-signed D-Bus policy was composed into immutable /usr BEFORE the
-  # real Silverblue boot. The system bus loaded it at boot. Restarting the
-  # broker here risks losing login1 ownership before the OS rollback; instead
-  # validate signed package ownership and test the live deny-only policy.
+  # C3d-signed D-Bus policy was composed into immutable /usr BEFORE the
+  # real Silverblue boot. Do not assume it was loaded by the running broker:
+  # inspect the signed installed file then perform a non-disruptive config
+  # reload. Restarting the whole system bus risks breaking login1 rollback.
   stage DBUS_BOOT_COMPOSED_POLICY_CHECK_BEGIN
   dbus_policy=/usr/share/dbus-1/system.d/org.postapollo.ConnectionsStatus1.conf
   [[ -f "$dbus_policy" && ! -L "$dbus_policy" ]] ||
@@ -157,11 +157,45 @@ if [[ "$phase" == booted ]]; then
     fail "SIGNED_DBUS_POLICY_FILE_UNSAFE"
   [[ "$(systemctl is-active dbus-broker.service)" == active ]] ||
     fail "BOOTED_DBUS_BROKER_NOT_ACTIVE"
-  check_logind_bus_health BEFORE_C4B_DENIALS
+  check_logind_bus_health BEFORE_C4B_POLICY_RELOAD
+  broker_pid_before="$(systemctl show --value -p MainPID dbus-broker.service)"
+  [[ "$broker_pid_before" =~ ^[1-9][0-9]*$ &&
+     -r "/proc/$broker_pid_before/stat" ]] ||
+    fail "BOOTED_DBUS_BROKER_PID_UNAVAILABLE"
+  # /proc/PID/stat field 22 (start ticks) is field 20 after the ')' comm field.
+  broker_start_before="$(sed 's/^.*) //' "/proc/$broker_pid_before/stat" | awk '{print $20}')"
+  [[ "$broker_start_before" =~ ^[1-9][0-9]*$ ]] ||
+    fail "BOOTED_DBUS_BROKER_START_UNAVAILABLE"
+  login_owner_before="$(timeout --signal=TERM --kill-after=2s 8s \
+    busctl --system --timeout=5s call \
+      org.freedesktop.DBus /org/freedesktop/DBus \
+      org.freedesktop.DBus GetNameOwner s org.freedesktop.login1)" ||
+    fail "LOGIND_OWNER_PRE_RELOAD_UNAVAILABLE"
+  stage DBUS_POLICY_GRACEFUL_RELOAD_BEGIN
+  # The signed D-Bus policy arrived through the OSTree deployment; the
+  # first boot's broker may not have loaded the new policy. Reload config
+  # without stopping the bus or disconnecting logind/systemd clients.
+  timeout --signal=TERM --kill-after=5s 45s systemctl reload dbus-broker.service ||
+    fail "GUEST_ONLY_DBUS_CONFIG_RELOAD_FAILED"
+  broker_pid_after="$(systemctl show --value -p MainPID dbus-broker.service)"
+  [[ "$broker_pid_after" == "$broker_pid_before" &&
+     -r "/proc/$broker_pid_after/stat" ]] ||
+    fail "DBUS_BROKER_REPLACED_DURING_CONFIG_RELOAD"
+  broker_start_after="$(sed 's/^.*) //' "/proc/$broker_pid_after/stat" | awk '{print $20}')"
+  [[ "$broker_start_after" == "$broker_start_before" ]] ||
+    fail "DBUS_BROKER_IDENTITY_CHANGED_ON_CONFIG_RELOAD"
+  login_owner_after="$(timeout --signal=TERM --kill-after=2s 8s \
+    busctl --system --timeout=5s call \
+      org.freedesktop.DBus /org/freedesktop/DBus \
+      org.freedesktop.DBus GetNameOwner s org.freedesktop.login1)" ||
+    fail "LOGIND_OWNER_POST_RELOAD_UNAVAILABLE"
+  [[ "$login_owner_after" == "$login_owner_before" ]] ||
+    fail "LOGIND_OWNER_CHANGED_DURING_CONFIG_RELOAD"
+  check_logind_bus_health AFTER_C4B_POLICY_RELOAD
+  echo "C4B_PASS // SIGNED_DBUS_POLICY_RELOADED_WITHOUT_SYSTEM_BUS_RESTART"
   client_check c4b-reader claim OWN_REFUSED
   client_check c4b-outsider claim OWN_REFUSED
   echo "C4B_PASS // UNAUTHORIZED_DBUS_OWNERSHIP_REFUSED"
-  echo "C4B_PASS // BOOT_COMPOSED_DBUS_POLICY_EFFECTIVE_WITHOUT_BROKER_RESTART"
 
   stage EXPLICIT_SIGNED_FAKE_SERVICE_START_BEGIN
   timeout --signal=TERM --kill-after=5s 75s systemctl start "$unit" ||

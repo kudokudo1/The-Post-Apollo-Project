@@ -14,10 +14,12 @@ const ctx=vm.createContext({Date,Number,Math,isFinite,String,Array,Object});
 vm.runInContext(read("services/weather/WeatherRuntimePolicy.js")
     .replace(/^\.pragma library\s*$/m,""),ctx);
 
-test("C42 SPACE end-page retains original directory and adds dashboard/services as modes",()=>{
+test("C43 SPACE end-page has exactly DASHBOARD and DIRECTORY, with original routes",()=>{
  assert.match(hub,/property string viewMode: "dashboard"/);
- for(const mode of ["dashboard","services","directory"])
+ for(const mode of ["dashboard","directory"])
      assert.ok(hub.includes('kind:"'+mode+'"'),"missing "+mode);
+ assert.doesNotMatch(hub,/kind:"services"|label:"SERVICES"|viewMode === "services"/);
+ assert.match(hub,/Math\.max\(1,\(viewRail\.width-viewRail\.spacing\)\/2\)/);
  assert.equal((hub.match(/route:"cosmos\/space-weather\//g)||[]).length,7);
  assert.match(hub,/route:"cosmos\/sun\/activity"/);
  assert.match(hub,/routeRequested\(modelData.route\)/);
@@ -78,8 +80,7 @@ test("C42 status includes actual provider brief and avoids claiming missing data
  assert.match(hub,/readonly property string serviceBrief/);
  assert.match(hub,/statusOwner\.runtimeBriefs/);
  assert.match(hub,/NO CURRENT PROVIDER REPORT/);
- assert.match(hub,/readonly property string serviceOwnerNote/);
- assert.match(hub,/RuntimePolicy\.sourceSpec\(currentRuntime\.id\)/);
+ assert.doesNotMatch(hub,/serviceOwnerNote|SOURCE NOTES/);
  for(const wanted of [
     "OBSERVED KP","SOLAR WIND","IMF BT","F10.7","OVATION",
     "GOES FLARES","GOES XRS","BULLETINS / 48H","PREDICTED SSN",
@@ -89,6 +90,7 @@ test("C42 status includes actual provider brief and avoids claiming missing data
  assert.match(hub,/FRESHNESS \/\/ RX \/ OBS \/\/ CADENCE/);
  assert.match(hub,/RX = LOCAL RECEIVE AGE \/\/ OBS = PROVIDER SAMPLE AGE/);
  assert.match(hub,/objectName: "cosmos-c42-selected-service-report"/);
+ assert.match(hub,/height: visible \? 38 : 0/);
  assert.match(hub,/onTapped: spaceHub\.selectedServiceId =/);
 });
 

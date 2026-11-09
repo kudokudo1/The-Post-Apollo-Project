@@ -9,6 +9,18 @@ var ROUTES = {
   // M28-Q: complete original GROUND surface, including its 16 source/visual
   // sections. Preserve one original StationGround instance and scrollbar.
   "weather/ground/full": {page:"ground",full:true},
+  // E2: the original Ground renderer, but WATER and GROUND are distinct.
+  // Keep old WEATHER deep routes readable for existing bookmarks.
+  "earth/ground/full": {page:"ground",sections:[
+    "header","runtime","alerts","lightning","heat-fire","air-pm",
+    "air-gases","pollen","air-forecast","seismic","source"]},
+  "earth/water/rivers": {page:"ground",sections:["header","rivers"]},
+  "earth/water/rivers/gauges": {page:"ground",sections:["header","rivers"]},
+  "earth/water/rivers/nearby": {page:"ground",sections:["header","rivers"]},
+  "earth/water/rivers/flood": {page:"ground",sections:["header","rivers"]},
+  "earth/water/rivers/hydrograph": {page:"ground",sections:["header","rivers"]},
+  "earth/water/marine": {page:"ground",sections:["header","marine"]},
+  "earth/water/coast": {page:"ground",sections:["header","coast"]},
   // NOW + AIR aggregates original terrestrial readings in one scrollable
   // StationSky view; detailed ground air/gas/pollen pages stay independent.
   "weather/conditions/current": {page:"sky", sections:["header","runtime","current","atmosphere"]},
@@ -69,6 +81,10 @@ function visibleFor(page, path, section) {
 // retain their existing combined panels and source activation.
 var RIVER_ROUTE_FOCUS = {
   "weather/water/rivers/gauges":"gauges",
+  "earth/water/rivers/gauges":"gauges",
+  "earth/water/rivers/nearby":"nearby",
+  "earth/water/rivers/flood":"flood",
+  "earth/water/rivers/hydrograph":"hydrograph",
   "weather/water/rivers/nearby":"nearby",
   "weather/water/rivers/flood":"flood",
   "weather/water/rivers/hydrograph":"hydrograph"
@@ -94,6 +110,14 @@ function needsSource(path, source) {
   if (path === "weather/ground/full")
     return ["river","lightning","marine","coastal","seismic"]
       .indexOf(source) >= 0;
+  if (path === "earth/ground/full")
+    return ["lightning","seismic"].indexOf(source) >= 0;
+  if (path.indexOf("earth/water/rivers") === 0)
+    return source === "river";
+  if (path === "earth/water/marine")
+    return source === "marine";
+  if (path === "earth/water/coast")
+    return source === "coastal";
   if (source === "river")
     return path === "weather/water/rivers"
       || path.indexOf("weather/water/rivers/") === 0

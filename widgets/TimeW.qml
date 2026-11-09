@@ -5064,7 +5064,7 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
-                            text: "MARK // NAME A RESTORE CHECKPOINT"
+                            text: "MARK // NAME A DESKTOP CHECKPOINT"
                             color: Colors.magenta
                             font.pixelSize: 11
                         }

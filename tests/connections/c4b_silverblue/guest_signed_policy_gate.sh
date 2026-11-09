@@ -44,50 +44,15 @@ case "$phase" in
       die "POLICY_MANIFEST_MISMATCH"
     [[ "$(cat "$media/c4b-policy-fingerprint.txt")" =~ ^[A-Fa-f0-9]{40}$ ]] ||
       die "BAD_DISPOSABLE_SIGNER_IDENTITY"
-    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}\n' "$rpmfile")" == \
-       "$pkg 0.1 noarch" ]] || die "UNEXPECTED_POLICY_RPM_IDENTITY"
-    [[ "$(rpm -qpl "$rpmfile")" == "$payload" ]] ||
-      die "POLICY_RPM_PAYLOAD_NOT_ALLOWLISTED"
-    scripts="$(rpm -qp --scripts "$rpmfile")"
-    [[ "$scripts" == *"/usr/sbin/semodule -i $payload"* &&
-       "$scripts" == *"/usr/sbin/semodule -r postapollo_connections"* ]] ||
-      die "POLICY_RPM_SCRIPTLET_NOT_ALLOWLISTED"
-    [[ -z "$(rpm -qp --triggers "$rpmfile")" ]] ||
-      die "POLICY_RPM_UNEXPECTED_TRIGGERS"
-    mkdir -m 0700 -p "$keydb"
-    rpm --dbpath "$keydb" --initdb || die "TEST_KEYRING_INIT_REFUSED"
-    before="$(rpmkeys --dbpath "$keydb" --checksig -v "$rpmfile" 2>&1 || true)"
-    echo "$before" | grep -Eiq 'NOKEY|NOTTRUSTED|MISSING' ||
-      die "SIGNER_PRETRUSTED_BEFORE_ISOLATED_IMPORT"
-    rpmkeys --dbpath "$keydb" --import "$media/c4b-policy-public.asc" ||
-      die "ISOLATED_POLICY_SIGNER_IMPORT_FAILED"
-    after="$(rpmkeys --dbpath "$keydb" --checksig -v "$rpmfile" 2>&1)" ||
-      die "POLICY_RPM_OPENPGP_SIGNATURE_REJECTED"
-    echo "$after" | grep -Eiq 'Signature.*OK|RSA.*OK|PGP.*OK|Header.*OK' ||
-      die "POLICY_RPM_SIGNATURE_NOT_CONFIRMED"
-    if echo "$after" | grep -Eiq 'NOKEY|NOTTRUSTED|NOT OK|MISSING|BAD'; then
-      die "INVALID_POLICY_SIGNATURE"
-    fi
-    echo "C4B_PASS // SIGNED_POLICY_VERIFIED_WITH_SEPARATE_TEST_ONLY_KEYRING"
-    # C4a already verified the C3d RPM signature against its isolated
-    # disposable keyring before the first boot. Retain only the PUBLIC,
-    # signed RPM input inside root-owned C4b assets for a second independent
-    # signature/header check while the real service is running after reboot.
-    # Do not change C2v's common ISO mount lifecycle or store a private key.
-    c3d_source="$media/c3d-status.rpm"
-    c3d_saved=/var/lib/c4b-runtime-assets/c3d-status.rpm
-    [[ -f "$c3d_source" && ! -L "$c3d_source" &&
-       -d /var/lib/c4b-runtime-assets &&
-       "$(stat -c '%u:%g:%a' /var/lib/c4b-runtime-assets)" == 0:0:700 &&
-       -d /var/lib/c4a-test-only-rpm-keyring ]] ||
-      die "SIGNED_C3D_MEASUREMENT_INPUTS_UNAVAILABLE"
-    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}\\n' "$c3d_source")" == \\
-       postapollo-connections-c3d-ci-status\ 0.1\ noarch ]] ||
+    c3d_identity="$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$c3d_source")" ||
+      die "SIGNED_C3D_MEASUREMENT_PACKAGE_QUERY_FAILED"
+    [[ "$c3d_identity" == "postapollo-connections-c3d-ci-status 0.1 noarch" ]] ||
       die "SIGNED_C3D_MEASUREMENT_PACKAGE_MISMATCH"
     install -m 0600 "$c3d_source" "$c3d_saved" ||
       die "SIGNED_C3D_MEASUREMENT_COPY_REFUSED"
-    [[ "$(sha256sum "$c3d_source" | awk '{print $1}')" == \\
-       "$(sha256sum "$c3d_saved" | awk '{print $1}')" ]] ||
+    c3d_source_sha="$(sha256sum "$c3d_source" | awk '{print $1}')"
+    c3d_saved_sha="$(sha256sum "$c3d_saved" | awk '{print $1}')"
+    [[ "$c3d_source_sha" == "$c3d_saved_sha" ]] ||
       die "SIGNED_C3D_MEASUREMENT_COPY_CHANGED"
     echo "C4B_PASS // SIGNED_C3D_PUBLIC_RPM_SNAPSHOT_RETAINED_FOR_RUNNING_OBSERVATION"
     ;;

@@ -65,7 +65,7 @@ for(const s of [
  'text: upperSignIn.signIn.providerStatus',
  'text: upperSignIn.signIn.batchStatus',
  'label: "OPEN ID MANAGEMENT"',
- 'onClicked: overview.idManagementRequested()',
+ 'onClicked: upperSignIn.idManagementRequested()',
  'INSPECT LOCAL HOST',
  'onClicked: ConnectionsHostObservation.inspect()',
  'identityHostConnected: false',

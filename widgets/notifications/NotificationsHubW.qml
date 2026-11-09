@@ -1115,6 +1115,8 @@ PanelWindow {
                     "source": String(entry.source || ""),
                     "sourceId": String(entry.sourceId || ""),
                     "title": String(entry.title || ""),
+                    // Keep the exact title used by the backend policy matcher.
+                    "originalTitle": String(entry.originalTitle || entry.title || ""),
                     "message": String(entry.message || ""),
                     "appIcon": String(entry.appIcon || ""),
                     "website": String(entry.website || ""),
@@ -3022,6 +3024,7 @@ PanelWindow {
                         required property string source
                         required property string sourceId
                         required property string title
+                        required property string originalTitle
                         required property string message
                         required property string appIcon
                         required property string website
@@ -3053,6 +3056,7 @@ PanelWindow {
                             website: notificationEntry.website,
                             websiteHost: notificationEntry.websiteHost,
                             title: notificationEntry.title,
+                            originalTitle: notificationEntry.originalTitle,
                             context: {
                                 notificationScope: JSON.parse(notificationEntry.scopeInfoJson || "{}"),
                                 eventType: notificationEntry.eventType
@@ -3087,8 +3091,10 @@ PanelWindow {
                         readonly property bool targetingWebsite: targetScope.kind === "website"
                         readonly property string targetKey: targetScope.key
                         readonly property string targetLabel: source + " // " + targetScope.label
-                        readonly property bool inheritedRule: NotificationsService.policyRevision >= 0
-                            && NotificationsService.inheritedSuppressionFor(scopeEntry, targetKey)
+                        readonly property string inheritedPolicyKey:
+                            NotificationsService.policyRevision >= 0
+                            ? NotificationsService.inheritedPolicyOwnerKey(scopeEntry, targetKey) : ""
+                        readonly property bool inheritedRule: inheritedPolicyKey !== ""
                         readonly property bool snoozed: NotificationsService.policyRevision >= 0
                             && (NotificationsService.isSnoozed(targetKey)
                                 || (targetingWebsite && NotificationsService.isSnoozed(appKey))
@@ -3106,6 +3112,22 @@ PanelWindow {
                             if (scopeOptions.length < 2)
                                 return;
                             targetScopeIndex = (targetScopeIndex + 1) % scopeOptions.length;
+                        }
+
+                        // An inherited APP/SITE/SERVER rule blocked both action
+                        // buttons without explaining why. The first click now
+                        // selects the actual blocking parent visibly. Only a
+                        // subsequent explicit click edits that broader rule.
+                        function selectInheritedPolicyScope() {
+                            if (inheritedPolicyKey === "")
+                                return false;
+                            for (let i = 0; i < scopeOptions.length; i++) {
+                                if (scopeOptions[i].key === inheritedPolicyKey) {
+                                    targetScopeIndex = i;
+                                    return true;
+                                }
+                            }
+                            return false;
                         }
 
                         readonly property var classification: root.classificationFor(notificationEntry.source, notificationEntry.sourceId, notificationEntry.category, notificationEntry.severity)
@@ -3448,17 +3470,20 @@ PanelWindow {
                                     width: 32
                                     height: 28
 
-                                    label: "ZZ"
+                                    label: notificationEntry.inheritedRule ? "ZZ*" : "ZZ"
 
                                     active: notificationEntry.snoozed
-                                    enabled: !notificationEntry.inheritedRule
-                                        && NotificationsService.policyReady
+                                    // Remain clickable when a parent rule is
+                                    // active; first click selects the parent.
+                                    enabled: NotificationsService.policyReady
                                         && NotificationsService.policyStatus !== "parse-error"
                                         && NotificationsService.policyStatus !== "load-error"
 
                                     activeColor: Colors.orange
 
                                     onTriggered: {
+                                        if (notificationEntry.selectInheritedPolicyScope())
+                                            return;
                                         if (NotificationsService.isSnoozed(notificationEntry.targetKey))
                                             NotificationsService.clearSnooze(notificationEntry.targetKey);
                                         else
@@ -3471,19 +3496,22 @@ PanelWindow {
                                     width: 38
                                     height: 28
 
-                                    label: "DND"
+                                    label: notificationEntry.inheritedRule ? "DND*" : "DND"
 
                                     labelPixelSize: 9
 
                                     active: notificationEntry.dnd
-                                    enabled: !notificationEntry.inheritedRule
-                                        && NotificationsService.policyReady
+                                    // An inherited mute routes to the parent
+                                    // scope, rather than disabling this button.
+                                    enabled: NotificationsService.policyReady
                                         && NotificationsService.policyStatus !== "parse-error"
                                         && NotificationsService.policyStatus !== "load-error"
 
                                     activeColor: Colors.orange
 
                                     onTriggered: {
+                                        if (notificationEntry.selectInheritedPolicyScope())
+                                            return;
                                         NotificationsService.toggleDnd(notificationEntry.targetKey,
                                             notificationEntry.sourceId, notificationEntry.targetLabel);
                                     }

@@ -4872,7 +4872,7 @@ Rectangle {
                 // Preserve the original complete CLASSIC MAP event list until
                 // all legacy capabilities pass the final SUBJECTS cutover.
                 model: stationDiscovery.domain === "map"
-                       && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap) && source.ready
+                       && !stationDiscovery.earthMapOnly && source.ready
                     ? stationDiscovery.visibleRows : []
                 visible: !stationDiscovery.weatherMapOnly
                          && stationDiscovery.earthLayerEnabled("eonet")

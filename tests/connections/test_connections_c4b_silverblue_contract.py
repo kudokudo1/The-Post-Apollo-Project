@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """C4b source contract: no host mutations; full acceptance needs real VM logs."""
 from pathlib import Path
+import ast
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -337,6 +338,60 @@ class C4bContracts(unittest.TestCase):
             "install -D -m 0644 %{_sourcedir}/org.postapollo.ConnectionsStatus1.conf.template",
             SIGNED_C3D_RPM_SPEC.read_text(),
         )
+
+    def test_050_running_signed_python_host_observed_in_real_c4b_guest(self):
+        script = GUEST.read_text()
+        gate = POLICY_GATE.read_text()
+        self.assertIn(
+            'c3d_saved=/var/lib/c4b-runtime-assets/c3d-status.rpm', gate)
+        self.assertIn(
+            'install -m 0600 "$c3d_source" "$c3d_saved"', gate)
+        self.assertIn(
+            "C4B_PASS // SIGNED_C3D_PUBLIC_RPM_SNAPSHOT_RETAINED_FOR_RUNNING_OBSERVATION",
+            gate)
+        self.assertIn(
+            '-s "$assets/c3d-status.rpm" ]] || fail "MISSING_OFFLINE_FIXTURES"',
+            script)
+        self.assertIn('stage SIGNED_C3D_RUNNING_HOST_MEASUREMENT_BEGIN', script)
+        self.assertIn('GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1', script)
+        self.assertIn('"$pid" "$assets/c3d-status.rpm"', script)
+        self.assertIn('SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED', script)
+        self.assertIn(
+            'C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED',
+            script)
+        self.assertLess(
+            script.index('C3B_OS_ORIGIN_VERIFICATION_BEGIN'),
+            script.index('SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED'))
+        self.assertLess(
+            script.index('SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED'),
+            script.index('stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN'))
+        begin = "import grp, hashlib, json, os, pwd, re, stat, subprocess, sys\n"
+        self.assertEqual(script.count(begin), 1)
+        python_body = begin + script.split(begin, 1)[1].split(
+            "\nC4B_RUNNING_HOST_PROBE", 1)[0]
+        ast.parse(python_body)
+        for needle in (
+            '"/run/ostree-booted"', '"MainPID", UNIT',
+            '"GetConnectionUnixProcessID"', '"GetConnectionUnixUser"',
+            '"/proc/{pid}/stat"', '"/proc/{pid}/exe"',
+            '"/proc/{pid}/cmdline"', '"/proc/{pid}/attr/current"',
+            '"/proc/{pid}/status"', '"NoNewPrivs:"',
+            '"--checksig", "-v", rpm',
+            r'"[%{FILENAMES}\t%{FILEDIGESTS}\n]"',
+            '"--read-only"', 'os.O_NOFOLLOW',
+            'signedGuestOriginAuthenticated=False',
+            'evidenceCryptographicallyAttested=False',
+            'hostAuthenticated=False', 'credentialActionsEnabled=False',
+            'productionAuthority=False',
+        ):
+            if needle == '"NoNewPrivs:"':
+                self.assertIn("NoNewPrivs:", python_body)
+            else:
+                self.assertIn(needle, python_body)
+        self.assertNotIn("rpm --import", python_body)
+        self.assertNotIn("systemctl enable", python_body)
+        self.assertNotIn("subprocess.Popen", python_body)
+        self.assertNotIn("os.system(", python_body)
 
     def test_05_fully_disposable_ci_and_production_deny_only(self):
         workflow = WORKFLOW.read_text()

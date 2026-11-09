@@ -69,6 +69,28 @@ case "$phase" in
       die "INVALID_POLICY_SIGNATURE"
     fi
     echo "C4B_PASS // SIGNED_POLICY_VERIFIED_WITH_SEPARATE_TEST_ONLY_KEYRING"
+    # C4a already verified C3d's public test RPM with its isolated signer
+    # keyring. Preserve only a root-owned public RPM copy across the real
+    # Silverblue reboot so C4b can recheck signed payload bytes against the
+    # same running C3b-verified service. No secret or private signing key.
+    c3d_source="$media/c3d-status.rpm"
+    c3d_saved=/var/lib/c4b-runtime-assets/c3d-status.rpm
+    [[ -f "$c3d_source" && ! -L "$c3d_source" &&
+       -d /var/lib/c4b-runtime-assets &&
+       "$(stat -c '%u:%g:%a' /var/lib/c4b-runtime-assets)" == 0:0:700 &&
+       -d /var/lib/c4a-test-only-rpm-keyring ]] ||
+      die "SIGNED_C3D_MEASUREMENT_INPUTS_UNAVAILABLE"
+    c3d_identity="$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$c3d_source")" ||
+      die "SIGNED_C3D_MEASUREMENT_PACKAGE_QUERY_FAILED"
+    [[ "$c3d_identity" == "postapollo-connections-c3d-ci-status 0.1 noarch" ]] ||
+      die "SIGNED_C3D_MEASUREMENT_PACKAGE_MISMATCH"
+    install -m 0600 "$c3d_source" "$c3d_saved" ||
+      die "SIGNED_C3D_MEASUREMENT_COPY_REFUSED"
+    c3d_source_sha="$(sha256sum "$c3d_source" | awk '{print $1}')"
+    c3d_saved_sha="$(sha256sum "$c3d_saved" | awk '{print $1}')"
+    [[ "$c3d_source_sha" == "$c3d_saved_sha" ]] ||
+      die "SIGNED_C3D_MEASUREMENT_COPY_CHANGED"
+    echo "C4B_PASS // SIGNED_C3D_PUBLIC_RPM_SNAPSHOT_RETAINED_FOR_RUNNING_OBSERVATION"
     ;;
   booted)
     [[ -f "$mode" ]] || die "MISSING_RUNTIME_OPT_IN"

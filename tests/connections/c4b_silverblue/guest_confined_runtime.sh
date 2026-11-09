@@ -84,7 +84,8 @@ if [[ "$phase" == booted ]]; then
      -s "$assets/postapollo_connections.pp" &&
      -s "$assets/dbus_next.whl" &&
      -s "$assets/C3bOriginCheck.py" &&
-     -s "$assets/BusPolicyClient.py" ]] || fail "MISSING_OFFLINE_FIXTURES"
+     -s "$assets/BusPolicyClient.py" &&
+     -s "$assets/c3d-status.rpm" ]] || fail "MISSING_OFFLINE_FIXTURES"
   echo "58948f9aff9db08316734c0be2a120f6dc502124d9642f55e90ac82ffb16a18b  $assets/dbus_next.whl" |
     sha256sum --check --status || fail "PINNED_DBUS_WHEEL_HASH_MISMATCH"
   stage BASELINE_CHECKS
@@ -295,6 +296,193 @@ C4B_C3B_DIR_DIAG
   client_check c4b-outsider approve METHOD_REFUSED
   client_check c4b-outsider claim OWN_REFUSED
   echo "C4B_PASS // EXACT_RUNTIME_ORIGIN_AND_DENY_ONLY_CLIENT_CALLS"
+  stage SIGNED_C3D_RUNNING_HOST_MEASUREMENT_BEGIN
+  # The signed RPM is copied by C4b's prelayer gate after C4a independently
+  # verifies it. Reverify its signature and signed file digests HERE, while
+  # the exact C3b-verified systemd/D-Bus service is alive. No new signer,
+  # transport, witness authority or production grant is created.
+  GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1 \
+    timeout --signal=TERM --kill-after=5s 60s "$python" -I -B - \
+      "$pid" "$assets/c3d-status.rpm" <<'C4B_RUNNING_HOST_PROBE' ||
+    fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"
+import grp, hashlib, json, os, pwd, re, stat, subprocess, sys
+from pathlib import Path
+
+HOST = "/usr/libexec/post-apollo/connections-status-host"
+UNIT = "postapollo-connections-status.service"
+BUS = "org.postapollo.ConnectionsStatus1"
+PKG = "postapollo-connections-c3d-ci-status"
+INTERPRETER = "/opt/postapollo-c2o-venv/bin/python3"
+KEYDB = "/var/lib/c4a-test-only-rpm-keyring"
+FILES = {HOST: 0o555,
+         "/usr/lib/systemd/system/" + UNIT: 0o644,
+         "/usr/share/dbus-1/system.d/" + BUS + ".conf": 0o644}
+
+class Refused(Exception): pass
+
+def refuse(code): raise Refused(code)
+
+def command(*args):
+    try:
+        p = subprocess.run(args, input=b"", capture_output=True, timeout=12)
+    except (OSError, subprocess.TimeoutExpired):
+        refuse("OBSERVATION_COMMAND_UNAVAILABLE")
+    if p.returncode or len(p.stdout) + len(p.stderr) > 32768:
+        refuse("OBSERVATION_COMMAND_REFUSED")
+    return (p.stdout + p.stderr).decode("utf-8", "strict").strip()
+
+def start(pid):
+    try:
+        ticks = Path(f"/proc/{pid}/stat").read_text().rsplit(") ", 1)[1].split()[19]
+    except (OSError, IndexError):
+        refuse("PROCESS_START_UNAVAILABLE")
+    if not ticks.isdecimal() or int(ticks) <= 0:
+        refuse("PROCESS_START_INVALID")
+    return ticks
+
+def hash_root_file(path, expected_mode, limit):
+    fd = None
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        st = os.fstat(fd)
+        if (not stat.S_ISREG(st.st_mode) or st.st_uid != 0 or st.st_gid != 0
+                or st.st_nlink != 1 or stat.S_IMODE(st.st_mode) != expected_mode
+                or not 0 < st.st_size <= limit):
+            refuse("SIGNED_FILE_UNSAFE")
+        h = hashlib.sha256()
+        counted = 0
+        while True:
+            block = os.read(fd, 65536)
+            if not block: break
+            counted += len(block)
+            if counted > limit: refuse("SIGNED_FILE_OVERSIZE")
+            h.update(block)
+        after = os.fstat(fd)
+        if (counted != st.st_size or
+                (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+                != (after.st_dev, after.st_ino, after.st_size,
+                    after.st_mtime_ns, after.st_ctime_ns)):
+            refuse("SIGNED_FILE_CHANGED")
+        return h.hexdigest(), st.st_dev, st.st_ino
+    except OSError:
+        refuse("SIGNED_FILE_OPEN_REFUSED")
+    finally:
+        if fd is not None: os.close(fd)
+
+def observe():
+    if (os.geteuid() != 0 or os.environ.get("GITHUB_ACTIONS") != "true"
+            or os.environ.get("POST_APOLLO_C4B_TEST_GUEST") != "1"
+            or not Path("/run/ostree-booted").exists()):
+        refuse("DISPOSABLE_SILVERBLUE_SCOPE_REFUSED")
+    if len(sys.argv) != 3 or not sys.argv[1].isdecimal():
+        refuse("PROCESS_ID_ARGUMENT_REFUSED")
+    pid = int(sys.argv[1])
+    rpm = sys.argv[2]
+    if (pid <= 1 or rpm != "/var/lib/c4b-runtime-assets/c3d-status.rpm"
+            or not Path(KEYDB).is_dir()
+            or stat.S_IMODE(os.stat(KEYDB).st_mode) != 0o700
+            or os.stat(KEYDB).st_uid != 0):
+        refuse("SIGNED_RPM_OR_KEYRING_SCOPE_REFUSED")
+    if command("systemctl", "show", "--value", "-p", "MainPID", UNIT) != str(pid):
+        refuse("SYSTEMD_MAINPID_CHANGED")
+    tick = start(pid)
+    uid = pwd.getpwnam("postapollo-connections").pw_uid
+    gid = grp.getgrnam("postapollo-connections").gr_gid
+    status = Path(f"/proc/{pid}/status").read_text()
+    if uid <= 0 or gid <= 0 or not re.search(r"^NoNewPrivs:\s*1$", status, re.M):
+        refuse("SERVICE_IDENTITY_OR_NO_NEW_PRIVILEGES_REFUSED")
+    for field, expected in (("Uid", uid), ("Gid", gid)):
+        line = re.search(r"^" + field + r":\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$", status, re.M)
+        if not line or any(int(v) != expected for v in line.groups()):
+            refuse("KERNEL_PROCESS_UID_GID_MISMATCH")
+    if ":postapollo_connections_t:" not in Path(f"/proc/{pid}/attr/current").read_text():
+        refuse("KERNEL_SELINUX_SERVICE_DOMAIN_MISMATCH")
+    owner = command("busctl", "--system", "--timeout=5s", "call",
+                    "org.freedesktop.DBus", "/org/freedesktop/DBus",
+                    "org.freedesktop.DBus", "GetNameOwner", "s", BUS)
+    m = re.fullmatch(r's "(:[0-9]+\.[0-9]+)"', owner)
+    if not m: refuse("DBUS_UNIQUE_OWNER_UNAVAILABLE")
+    unique = m.group(1)
+    base = ("busctl", "--system", "--timeout=5s", "call",
+            "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus")
+    if (command(*base, "GetConnectionUnixProcessID", "s", unique) != f"u {pid}"
+            or command(*base, "GetConnectionUnixUser", "s", unique) != f"u {uid}"):
+        refuse("KERNEL_SYSTEMD_DBUS_PROCESS_MISMATCH")
+    package_sha, _, _ = hash_root_file(rpm, 0o600, 4 * 1024 * 1024)
+    signature = command("rpmkeys", "--dbpath", KEYDB, "--checksig", "-v", rpm)
+    if (not re.search(r"(Signature|RSA|PGP|Header).*\bOK\b", signature, re.I)
+            or re.search(r"NOKEY|NOTTRUSTED|NOT OK|MISSING|BAD", signature, re.I)):
+        refuse("SIGNED_RPM_SIGNATURE_REFUSED")
+    if command("rpm", "-qp", "--qf", "%{NAME} %{VERSION} %{ARCH}", rpm) != (
+            PKG + " 0.1 noarch"):
+        refuse("SIGNED_RPM_PACKAGE_IDENTITY_REFUSED")
+    items = command("rpm", "-qp", "--qf", "[%{FILENAMES}\t%{FILEDIGESTS}\n]", rpm)
+    signed = {}
+    for line in items.splitlines():
+        entry = line.split("\t")
+        if (len(entry) != 2 or entry[0] in signed or
+                not re.fullmatch(r"[a-f0-9]{64}", entry[1])):
+            refuse("SIGNED_RPM_SHA256_HEADER_REFUSED")
+        signed[entry[0]] = entry[1]
+    if set(signed) != set(FILES): refuse("SIGNED_RPM_MEMBER_SET_REFUSED")
+    for name, mode in FILES.items():
+        if command("rpm", "-qf", "--qf", "%{NAME}", name) != PKG:
+            refuse("INSTALLED_FILE_RPM_OWNERSHIP_REFUSED")
+        if hash_root_file(name, mode, 128 * 1024)[0] != signed[name]:
+            refuse("INSTALLED_FILE_DIFFERS_FROM_SIGNED_RPM")
+    script_sha = signed[HOST]
+    if Path(HOST).open("rb").readline() != b"#!/opt/postapollo-c2o-venv/bin/python3\n":
+        refuse("SIGNED_PYTHON_SCRIPT_SHEBANG_REFUSED")
+    exe = os.stat(f"/proc/{pid}/exe")
+    interpreter = os.stat(INTERPRETER)
+    if (exe.st_dev, exe.st_ino) != (interpreter.st_dev, interpreter.st_ino):
+        refuse("RUNNING_KERNEL_INTERPRETER_INODE_REFUSED")
+    raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+    args = raw[:-1].split(b"\0") if raw.endswith(b"\0") and len(raw) <= 4096 else []
+    if (len(args) != 3 or os.fsdecode(args[1]) != HOST or args[2] != b"--read-only"
+            or os.path.realpath(os.fsdecode(args[0])) != os.path.realpath(INTERPRETER)):
+        refuse("RUNNING_SERVICE_INVOCATION_REFUSED")
+    # The interpreter is /proc/PID/exe, NOT the Python script's signed bytes.
+    h = hashlib.sha256()
+    fd = os.open(f"/proc/{pid}/exe", os.O_RDONLY | os.O_CLOEXEC)
+    try:
+        fst = os.fstat(fd)
+        if (fst.st_dev, fst.st_ino) != (exe.st_dev, exe.st_ino):
+            refuse("INTERPRETER_OPEN_IDENTITY_REFUSED")
+        size = 0
+        while True:
+            chunk = os.read(fd, 65536)
+            if not chunk: break
+            size += len(chunk)
+            if size > 128 * 1024 * 1024: refuse("INTERPRETER_SIZE_REFUSED")
+            h.update(chunk)
+        if size != fst.st_size: refuse("INTERPRETER_CHANGED_DURING_READ")
+    finally:
+        os.close(fd)
+    if (start(pid) != tick or
+            command("systemctl", "show", "--value", "-p", "MainPID", UNIT) != str(pid)
+            or Path(f"/proc/{pid}/cmdline").read_bytes() != raw or
+            hash_root_file(rpm, 0o600, 4 * 1024 * 1024)[0] != package_sha):
+        refuse("SIGNED_SERVICE_CHANGED_DURING_OBSERVATION")
+    return dict(schema="postapollo.connections.c4b-booted-signed-host-observation.v1",
+                signed_rpm_sha256=package_sha, signed_script_sha256=script_sha,
+                running_script_sha256=script_sha, interpreter_sha256=h.hexdigest(),
+                service_pid=pid, dbus_owner_pid=pid, process_start_ticks=tick,
+                service_uid=uid, service_gid=gid, systemd_unit=UNIT,
+                selinux_enforcing=True, signedGuestOriginAuthenticated=False,
+                evidenceCryptographicallyAttested=False, hostAuthenticated=False,
+                canApprove=False, credentialActionsEnabled=False,
+                productionAuthority=False)
+
+try:
+    print("C4B_OBSERVED // " + json.dumps(observe(), sort_keys=True, separators=(",", ":")),
+          flush=True)
+except (Refused, OSError, KeyError, ValueError, UnicodeError) as exc:
+    print("C4B_MEASUREMENT_REFUSED // " +
+          (str(exc) if isinstance(exc, Refused) else type(exc).__name__), flush=True)
+    sys.exit(2)
+C4B_RUNNING_HOST_PROBE
+  echo "C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED"
 
   stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN
   timeout --signal=TERM --kill-after=5s 60s systemctl stop "$unit" ||

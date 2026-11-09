@@ -101,7 +101,9 @@ test("C44 OVERVIEW promotes three small shortcuts into full-width nav and retain
  assert.match(s,/width: HeaderGeometry\.buttonWidth\(overviewModeRail\.width,3\)/);
  assert.match(s,/height: HeaderGeometry\.tabHeight/);
  assert.match(s,/objectName: "cosmos-c44-overview-divider"/);
- assert.match(s,/height: HeaderGeometry\.columnRuleSlotHeight\(\)/);
+ assert.match(s,/height: HeaderGeometry\.tabsToRule \+ HeaderGeometry\.ruleHeight/);
+ assert.match(s,/id: headerContentGap/);
+ assert.match(s,/id: overviewContent/);
  assert.match(s,/objectName: "cosmos-c44-overview-stage"/);
  for(const path of ["cosmos/sun/position","cosmos/moon/ephemeris",
         "cosmos/space-weather/overview","cosmos/space-weather/full"])

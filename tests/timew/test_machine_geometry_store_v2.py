@@ -92,7 +92,9 @@ assert "PRIVATE TITLE" not in json.dumps(validate_geometry(geo))
 assert "pid" not in json.dumps(validate_geometry(geo))
 
 def rejects(mutate_old=None, mutate_geom=None):
-    a, b = copy.deepcopy((old, geo))
+    # Clone independently: v1 and v2 must not share mutable rectangles,
+    # or modifying the legacy side also silently modifies the v2 fixture.
+    a, b = copy.deepcopy(old), copy.deepcopy(geo)
     if mutate_old:
         mutate_old(a)
     if mutate_geom:

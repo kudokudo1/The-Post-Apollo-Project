@@ -195,6 +195,29 @@ read -r ex ey <<<"$item_coords"
 [ -n "$ex" ] && [ -n "$ey" ] ||
   { cat "$log"; echo "U7B_FAIL // bad item navigation coordinates"; exit 1; }
 xdotool mousemove --window "$window" "$ex" "$ey" click 1
+# U7b-C // The same durable CPU++ details bay now points to a saved
+# installed-app ID. Click OPEN ITEM; it must emit just that ID and never
+# invoke the AppControl launcher or any provider write.
+for ((i=0;i<100;i++)); do
+  if grep -F 'U4_FAIL' "$log" >/dev/null; then
+    cat "$log"; echo "U7C_FAIL // fixture before saved app click"; exit 1
+  fi
+  if grep -F 'U7C_ITEM_READY // x=' "$log" >/dev/null; then
+    break
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    cat "$log"; echo "U7C_FAIL // exited before saved app click"; exit 1
+  fi
+  sleep 0.1
+done
+grep -F 'U7C_ITEM_READY // x=' "$log" >/dev/null ||
+  { cat "$log"; echo "U7C_FAIL // no OPEN ITEM for saved desktop application"; exit 1; }
+app_coords="$(grep -F 'U7C_ITEM_READY // x=' "$log" | tail -n 1 |
+  sed -E 's/.*x=([0-9]+) y=([0-9]+).*/\1 \2/')"
+read -r ax ay <<<"$app_coords"
+[ -n "$ax" ] && [ -n "$ay" ] ||
+  { cat "$log"; echo "U7C_FAIL // invalid app button geometry"; exit 1; }
+xdotool mousemove --window "$window" "$ax" "$ay" click 1
 set +e
 wait "$pid"
 rc="$?"
@@ -220,6 +243,8 @@ grep -F 'U7A_PASS // OWNER_VIEW_ONLY_NO_PROVIDER_ACTIONS' "$log" >/dev/null ||
   { echo "U7A_FAIL // fixed owner navigation click was not verified"; exit 1; }
 grep -F 'U7B_PASS // EXACT_HOME_PANEL_ONLY_NO_PROVIDER_ACTIONS' "$log" >/dev/null ||
   { echo "U7B_FAIL // exact-item click or route was not verified"; exit 1; }
+grep -F 'U7C_PASS // EXACT_DESKTOP_ENTRY_SELECTION_NO_EXECUTION' "$log" >/dev/null ||
+  { echo "U7C_FAIL // exact saved app selection was not verified"; exit 1; }
 if find "$work/data" -type f | grep -q .; then
   echo "U4_FAIL // manager created a writer file"; exit 1
 fi

@@ -44,9 +44,10 @@ assert 'legacy.connect(writable=False)' in owner
 assert 'BEGIN IMMEDIATE' in owner
 assert 'WHERE a.checkpoint_id IN' in owner
 assert 'SELECT a.checkpoint_id, a.display_name, a.revision' in owner
-assert 'note' not in owner.split('def list_annotation_names():', 1)[1].split(
-    'def set_annotation(', 1)[0].split('SELECT a.checkpoint_id', 1)[1].split(
-    'rows = conn.execute', 1)[-1] if False else True  # SQL list is explicitly allowlisted
+sql = owner.split('def list_annotation_names():', 1)[1].split(
+    'def set_annotation(', 1)[0]
+assert 'SELECT a.checkpoint_id, a.display_name, a.revision' in sql
+assert 'a.note' not in sql
 assert 'MachineCheckpointAnnotations' not in legacy
 assert 'SCHEMA_VERSION = 1' in legacy
 assert 'id: machineSaveBridgeProcess' in qml

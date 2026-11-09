@@ -10,10 +10,12 @@ Rectangle {
     color: Colors.black
     clip: true
     property string subjectRoute: ""
-    // C38 // PLANETS has SKY NOW and an opt-in dated-event instrument.
-    // The hidden StationSky source switches its USNO route; there is never
-    // a second concurrent USNO collector or a global source override.
-    property string planetSubmode: "sky"
+    // C39 // Two instruments share one PLANETS stage, while the dedicated
+    // SKY NOW strip always uses the existing live USNO celestial sample.
+    property string planetSubmode: "day"
+    property string planetSelection: "ALL"
+    property bool skyDetailsExpanded: false
+    property int skyDetailsIndex: 0
     property var weatherService: null
     property var spaceService: null
     property var liveHistoryStore: null
@@ -62,8 +64,7 @@ Rectangle {
                 && weatherService.longitude !== "";
         if (kind === "light")
             return !!twilight && twilight.available;
-        if (kind === "planet-clock"
-            || (kind === "planets" && planetSubmode === "day"))
+        if (kind === "planet-clock" || kind === "planets")
             return !!planetSource && planetSource.configured;
         if (kind === "planets" || kind === "stars")
             return !!celnav && celnav.configured;
@@ -76,7 +77,7 @@ Rectangle {
         return true;
     }
     readonly property var selectedProvider:
-        kind === "planet-clock" || (kind === "planets" && planetSubmode === "day")
+        kind === "planet-clock" || kind === "planets"
             ? planetSource
         : kind === "planets" || kind === "stars" ? celnav
         : kind === "meteors" ? meteorSource
@@ -176,10 +177,9 @@ Rectangle {
         sourceComponent: Component {
             StationSky {
                 sourceOnly: true
-                subjectRoute: cosmosModePane.kind === "planets"
-                    && cosmosModePane.planetSubmode === "day"
-                    ? "cosmos/planets-stars/planet-clock"
-                    : Modes.dataRoute(cosmosModePane.subjectRoute || "")
+                // C39 // Celestial-fix now gates both original USNO sources,
+                // without switching routes or mounting another StationSky.
+                subjectRoute: Modes.dataRoute(cosmosModePane.subjectRoute || "")
                 // Service pointers bound by the parent AFTER item creation.
             }
         }
@@ -365,6 +365,7 @@ Rectangle {
                 : cosmosModePane.kind === "meteors" ? "IAU MDC // SCROLL MIDDLE ONLY"
                 : cosmosModePane.kind === "eclipses" ? "NASA GSFC // GLOBAL DATES ONLY"
                 : cosmosModePane.kind === "stars" ? "USNO // NAVIGATION SAMPLE NOT FULL SKY"
+                : cosmosModePane.kind === "planets" ? "USNO // DATED EVENTS + CURRENT SKY FIX"
                 : cosmosModePane.kind === "solar-section" ? "NOAA // ONE INSTRUMENT"
                 : "SOURCE-BACKED // FOCUSED VIEW"
             color: Colors.cyan
@@ -537,24 +538,14 @@ Rectangle {
             clip: true
             Row {
                 id: planetsViews
-                objectName: "cosmos-c38-planets-inner-modes"
+                objectName: "cosmos-c39-planets-inner-modes"
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
                 height: 23
                 spacing: 4
                 ActionButton {
-                    width: Math.max(1,(planetsViews.width-8)/3)
-                    height: 22
-                    label: "SKY NOW"
-                    labelPixelSize: 9
-                    contentPadding: 0
-                    selected: cosmosModePane.planetSubmode === "sky"
-                    accentColor: Colors.cyan
-                    onClicked: cosmosModePane.planetSubmode = "sky"
-                }
-                ActionButton {
-                    width: Math.max(1,(planetsViews.width-8)/3)
+                    width: Math.max(1,(planetsViews.width-4)/2)
                     height: 22
                     label: "DAY EVENTS"
                     labelPixelSize: 9
@@ -564,27 +555,90 @@ Rectangle {
                     onClicked: cosmosModePane.planetSubmode = "day"
                 }
                 ActionButton {
-                    width: Math.max(1,(planetsViews.width-8)/3)
+                    width: Math.max(1,(planetsViews.width-4)/2)
                     height: 22
-                    label: "DAY RING // CLOCK"
+                    label: "DAY RING"
                     labelPixelSize: 9
                     contentPadding: 0
+                    selected: cosmosModePane.planetSubmode === "ring"
                     accentColor: Colors.yellow
-                    onClicked: cosmosModePane.routeRequested(
-                        "cosmos/planets-stars/planet-clock")
+                    onClicked: cosmosModePane.planetSubmode = "ring"
                 }
             }
             Loader {
                 id: planetsViewLoader
-                objectName: "cosmos-c38-planets-active-view"
+                objectName: "cosmos-c39-planets-active-instrument"
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: planetsViews.bottom
-                anchors.topMargin: 4
+                anchors.topMargin: 3
+                anchors.bottom: skyNowStrip.top
+                anchors.bottomMargin: 3
+                active: planetsLanding.visible && !cosmosModePane.skyDetailsExpanded
+                sourceComponent: cosmosModePane.planetSubmode === "ring"
+                    ? planetsRingComponent : planetsTimelineComponent
+            }
+            StationCosmosPlanetsSkyStrip {
+                id: skyNowStrip
+                objectName: "cosmos-c39-fixed-sky-now"
+                anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                active: planetsLanding.visible
-                sourceComponent: cosmosModePane.planetSubmode === "day"
-                    ? planetsTimelineComponent : planetsSkyComponent
+                height: 38
+                visible: !cosmosModePane.skyDetailsExpanded
+                celestialSource: cosmosModePane.celnav
+                selectedPlanet: cosmosModePane.planetSelection
+                onPlanetPicked: function(name) {
+                    cosmosModePane.planetSelection = name;
+                }
+                onDetailsRequested: function(index) {
+                    cosmosModePane.skyDetailsIndex = index;
+                    cosmosModePane.skyDetailsExpanded = true;
+                }
+            }
+            Rectangle {
+                id: detailOverlay
+                objectName: "cosmos-c39-sky-detail-overlay"
+                anchors.fill: parent
+                visible: cosmosModePane.skyDetailsExpanded
+                z: 5
+                color: Colors.black
+                clip: true
+                Row {
+                    id: overlayHeader
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 23
+                    spacing: 4
+                    GohuText {
+                        width: Math.max(1,overlayHeader.width-105)
+                        text: "SKY NOW // FULL SOURCE RECORD"
+                        font.pixelSize: 10
+                        color: Colors.magenta
+                        elide: Text.ElideRight
+                    }
+                    ActionButton {
+                        objectName: "cosmos-c39-close-sky-details"
+                        width: 101
+                        height: 22
+                        label: "BACK TO PLANETS"
+                        labelPixelSize: 8
+                        contentPadding: 0
+                        accentColor: Colors.cyan
+                        onClicked: cosmosModePane.skyDetailsExpanded = false
+                    }
+                }
+                Loader {
+                    objectName: "cosmos-c39-source-record-details"
+                    anchors.top: overlayHeader.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.topMargin: 3
+                    active: detailOverlay.visible
+                    sourceComponent: planetsSkyComponent
+                }
             }
         }
     }
@@ -593,12 +647,22 @@ Rectangle {
         StationCosmosDetailPane {
             kind: "planets"
             celestialSource: cosmosModePane.celnav
-            sourceStatus: cosmosModePane.sourceStatus
+            sourceStatus: !cosmosModePane.celnav ? "USNO SOURCE UNAVAILABLE"
+                : cosmosModePane.celnav.loading ? "SOURCE RECEIVING"
+                : cosmosModePane.celnav.ready ? "SOURCE RECEIVED"
+                : cosmosModePane.celnav.errorText || "USNO SOURCE WAITING"
+            selectedIndex: cosmosModePane.skyDetailsIndex
         }
     }
     Component {
         id: planetsTimelineComponent
         StationCosmosPlanetsDayPane {
+            compactInPlanets: true
+            controlledSelection: true
+            selectedPlanet: cosmosModePane.planetSelection
+            onPlanetPicked: function(name) {
+                cosmosModePane.planetSelection = name;
+            }
             datedRows: cosmosModePane.planetRows
             civilDate: cosmosModePane.civilDate
             sourceReady: !!cosmosModePane.planetSource
@@ -606,7 +670,25 @@ Rectangle {
             sourceStatus: cosmosModePane.sourceStatus
         }
     }
-
+    Component {
+        id: planetsRingComponent
+        StationCosmosPlanetClockFace {
+            objectName: "cosmos-c39-embedded-day-ring"
+            compactInPlanets: true
+            controlledSelection: true
+            selectedPlanet: cosmosModePane.planetSelection
+            onPlanetPicked: function(name) {
+                cosmosModePane.planetSelection = name;
+            }
+            datedRows: cosmosModePane.planetRows
+            civilDate: cosmosModePane.civilDate
+            localCivilMinute: cosmosModePane.skyFeed
+                ? cosmosModePane.skyFeed.focusedLocalMinute : -1
+            sourceReady: !!cosmosModePane.planetSource
+                && cosmosModePane.planetSource.ready
+            sourceStatus: cosmosModePane.sourceStatus
+        }
+    }
     Component {
         id: planetClock
         // C28 // The circular 24h dial is the focused CLOCK screen, not

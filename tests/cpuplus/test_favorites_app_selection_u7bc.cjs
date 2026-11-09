@@ -124,3 +124,17 @@ test("existing Weather exact-item path and original AppControl OPEN OWNER remain
   assert.match(pane,/pane\.exactNavigationRequested\(target\.owner,target\.route\)/);
   assert.match(pane,/label: pane\.selectedResource && pane\.selectedResource\.readOnly[\s\S]*?"OPEN ITEM"/);
 });
+
+test("native fixture covers real mouse click while keeping all original tests",()=>{
+  const fixture=read("tests/cpuplus/fixtures/CpuPlusFavoritesNative.qml");
+  const runner=read("scripts/favorites/verify_cpuplus_hub_fedora_u4.sh");
+  assert.match(fixture,/onAppSelectionRequested: function\(desktopId\)/);
+  assert.match(fixture,/desktopId!=="org\.example\.Demo\.desktop"/);
+  assert.match(fixture,/detail\.appSelection\.desktopId/);
+  assert.match(fixture,/U7C_PASS \/\/ EXACT_DESKTOP_ENTRY_SELECTION_NO_EXECUTION/);
+  assert.match(runner,/U7A_PASS/);
+  assert.match(runner,/U7B_PASS/);
+  assert.match(runner,/U7C_ITEM_READY/);
+  assert.match(runner,/U7C_PASS \/\/ EXACT_DESKTOP_ENTRY_SELECTION_NO_EXECUTION/);
+  assert.match(runner,/xdotool mousemove --window "\$window" "\$ax" "\$ay" click 1/);
+});

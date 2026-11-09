@@ -250,26 +250,34 @@ Singleton {
         return false;
     }
 
-    // A source-wide rule, website rule, or a more specific selected rule
-    // may be responsible. No child button can silently override its parent.
-    function inheritedSuppressionFor(entry, selectedKey) {
+    // A source-wide, website, or server rule can cause a child to appear
+    // muted. Return the *actual blocking parent's* key so card buttons can
+    // route the operator to that existing rule before changing anything.
+    // Never silently clear an APP rule from a TITLE, DM, or CHANNEL card.
+    function inheritedPolicyOwnerKey(entry, selectedKey) {
         const options = scopeOptionsFor(entry);
         const key = String(selectedKey || "");
         const selected = options.find(function(option) { return option.key === key; });
         if (!selected || selected.kind === "app")
-            return false;
-        const parents = selected.kind === "channel" ? ["app", "server"]
-            : selected.kind === "title" ? ["app", "website"]
+            return "";
+        const parents = selected.kind === "channel" ? ["server", "app"]
+            : selected.kind === "title" ? ["website", "app"]
             : ["app"];
         const now = Date.now();
-        for (let i = 0; i < options.length; i++) {
-            if (parents.indexOf(options[i].kind) === -1)
-                continue;
-            const p = policyFor(options[i].key);
-            if (p.dnd === true || Number(p.snoozeUntil || 0) > now)
-                return true;
+        for (let k = 0; k < parents.length; k++) {
+            for (let i = 0; i < options.length; i++) {
+                if (options[i].kind !== parents[k])
+                    continue;
+                const p = policyFor(options[i].key);
+                if (p.dnd === true || Number(p.snoozeUntil || 0) > now)
+                    return options[i].key;
+            }
         }
-        return false;
+        return "";
+    }
+
+    function inheritedSuppressionFor(entry, selectedKey) {
+        return inheritedPolicyOwnerKey(entry, selectedKey) !== "";
     }
 
     function ensurePolicy(appKey, sourceId, source) {

@@ -28,9 +28,13 @@ def section(source, before, after):
 
 class TrashBottomLeftLauncherTests(unittest.TestCase):
     def test_shell_mounts_one_bottom_left_trash_and_preserves_power(self):
-        self.assertEqual(SHELL.count("    Trash {}"), 1)
+        self.assertEqual(SHELL.count("    Trash {"), 1)
         self.assertEqual(SHELL.count("    Power {}"), 1)
-        self.assertLess(SHELL.index("    Trash {}"), SHELL.index("    Power {}"))
+        self.assertLess(SHELL.index("    Trash {"), SHELL.index("    Power {}"))
+        self.assertIn("id: trashWindow", SHELL)
+        self.assertIn("cameraCleanupQueueCount: cameraWindow.batchPaths.length", SHELL)
+        self.assertIn("cameraCleanupBusy: cameraWindow.busy", SHELL)
+        self.assertIn("onCleanupRequested: function(technique)", SHELL)
         self.assertIn("Tray {}", SHELL)
         self.assertIn("id: leftModules", SHELL)
 

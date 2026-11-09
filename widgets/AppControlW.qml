@@ -204,6 +204,9 @@ PanelWindow {
     }
 
     onSelectedResultIndexChanged: {
+        // Clicking another row after a failed exact link is a new selection.
+        if(pendingFavoriteSelection && selectedResultIndex>=0)
+            clearFavoriteNavigation();
         scheduleRunKillProbe();
         scheduleWindowAudioProbe();
         scheduleAppAudioProbe();

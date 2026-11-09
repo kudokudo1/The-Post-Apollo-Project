@@ -86,17 +86,19 @@ test("COSMOS wheel mode is fixed and leaves MAGICK free to choose all three mode
  assert.match(host,/anchors\.leftMargin: annualFocus\.contentInset/);
  assert.match(host,/anchors\.rightMargin: annualFocus\.contentInset/);
  assert.match(host,/anchors\.bottomMargin: annualFocus\.contentInset/);
- assert.match(host,/readonly property int contentInset: isMoon \? 6 : 0/);
+ assert.match(host,/readonly property int contentInset: isMoon \? HeaderGeometry\.inset : 0/);
  assert.match(host,/objectName: "cosmos-c11-back-to-moon"/);
  assert.match(moon,/readonly property int contentInset: 6/);
 });
 test("C19 COSMOS year and INDEX forecast offer two full-width main Moon modes",()=>{
  assert.match(host,/objectName: "cosmos-c11-moon-year-mode-rail"/);
- assert.match(host,/height: visible \? 27 : 0/);
+ assert.match(host,/id: annualHeader[\s\S]*?anchors\.top: parent\.top/);
+ assert.doesNotMatch(host,/anchors\.top: annualHeader\.bottom/);
+ assert.match(host,/height: visible \? HeaderGeometry\.tabHeight : 0/);
  for(const name of ["OVERVIEW","LUNAR YEAR"])
    assert.ok(host.includes('label: "'+name+'"'),name);
- assert.equal((host.match(/height: 27/g)||[]).length,2);
- assert.equal((host.match(/\(lunarModeRail\.width-lunarModeRail\.spacing\)\/2/g)||[]).length,2);
+ assert.equal((host.match(/height: HeaderGeometry\.tabHeight/g)||[]).length,2);
+ assert.equal((host.match(/HeaderGeometry\.buttonWidth\(lunarModeRail\.width,2\)/g)||[]).length,2);
  assert.match(host,/selected: annualFocus\.moonView !== "forecast"/);
  assert.doesNotMatch(host,/selected: annualFocus\.moonView === "forecast"/);
  assert.match(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/ephemeris"\)/);
@@ -108,10 +110,10 @@ test("C23 MOON year and INDEX forecast reuse the cyan header divider without mov
  assert.match(host,/id: moonHeaderDivider[\s\S]*?objectName: "cosmos-c23-moon-year-divider"/);
  assert.match(host,/id: moonHeaderDivider[\s\S]*?visible: annualFocus\.isMoon/);
  assert.match(host,/anchors\.top: lunarModeRail\.bottom/);
- assert.match(host,/anchors\.topMargin: visible \? 5 : 0/);
- assert.match(host,/height: visible \? 2 : 0\s*color: Colors\.cyan/);
+ assert.match(host,/anchors\.topMargin: visible \? HeaderGeometry\.tabsToRule : 0/);
+ assert.match(host,/height: visible \? HeaderGeometry\.ruleHeight : 0\s*color: Colors\.cyan/);
  assert.match(host,/anchors\.top: moonHeaderDivider\.bottom/);
- assert.match(host,/anchors\.topMargin: annualFocus\.isMoon \? 3 : 0/);
+ assert.match(host,/anchors\.topMargin: annualFocus\.isMoon \? HeaderGeometry\.ruleToContent : 0/);
  // Both MOON screens get 5px above the cyan rule and 3px beneath.
  // SUN remains unchanged at zero offset.
  assert.doesNotMatch(host,/anchors\.topMargin: annualFocus\.isMoon \? 4 : 0/);

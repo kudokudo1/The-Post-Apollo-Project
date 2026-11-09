@@ -1,22 +1,28 @@
 import QtQuick
 import "../../components"
 
-// CPU++ LOCATION // Wide left side. Search, active context and temporary
-// exploration are displayed here; PlaceRegistry remains their sole writer.
-// The Home search action only sends an edit-field fill request to the
-// existing right-side Home editor.
+// CPU++ LOCATION // Wide left bay: SHARED CONTEXT immediately above
+// the original temporary Explore editor. Search is pinned in the middle bay.
+// All persisted Explore operations still belong to PlaceRegistry.
 Item {
     id: locationOverview
     property var registry: null
-    signal homeCandidateRequested(var candidate)
-
     property alias durationKey: explorePanel.durationKey
-    readonly property bool editingText:
-        placeSearchPanel.editingText || explorePanel.editingText
+    readonly property bool editingText: explorePanel.editingText
     readonly property var currentPlace:
         registry ? registry.effectivePlace : null
     readonly property var activeExplore:
         registry ? registry.activeExplore : null
+
+    // A search result from the middle bay fills the LEFT editor only.
+    // Starting exploration always remains an explicit separate click.
+    function fillExploreCandidate(candidate) {
+        if (!candidate || typeof candidate!=="object")
+            return false;
+        explorePanel.fillDestination(candidate);
+        revealExploreEditor();
+        return true;
+    }
 
     function revealExploreEditor() {
         Qt.callLater(function() {
@@ -42,7 +48,7 @@ Item {
             spacing: 12
 
             GohuText {
-                text: "LOCATION // LIVE CONTEXT"
+                text: "SHARED CONTEXT // LOCATION"
                 color: Colors.cyan
                 font.pixelSize: 12
             }
@@ -95,25 +101,9 @@ Item {
                 }
             }
 
-            GohuText {
-                text: "FIND // LOCATION"
-                color: Colors.cyan
-                font.pixelSize: 11
-            }
-            CpuPlusPlaceSearchPanel {
-                id: placeSearchPanel
-                width: parent.width
-                onUseForHome: function(candidate) {
-                    locationOverview.homeCandidateRequested(candidate);
-                }
-                onUseForExplore: function(candidate) {
-                    explorePanel.fillDestination(candidate);
-                    locationOverview.revealExploreEditor();
-                }
-            }
-
-            // Wide interaction area for Explore duration and destination.
-            // Selecting a result does NOT start exploration automatically.
+            // This wide section stays directly beneath SHARED CONTEXT.
+            // Destination fields, duration and actions come first; the
+            // active-location status follows the actions inside this pane.
             CpuPlusExploreLocationPanel {
                 id: explorePanel
                 width: parent.width

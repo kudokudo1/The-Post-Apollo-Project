@@ -301,9 +301,27 @@ C4B_C3B_DIR_DIAG
   # verifies it. Reverify its signature and signed file digests HERE, while
   # the exact C3b-verified systemd/D-Bus service is alive. No new signer,
   # transport, witness authority or production grant is created.
+  #
+  # C4d: capture the REAL producer's exact stdout in a single disposable
+  # root-only file at generation time. The later diagnostic relay no longer
+  # relies on searching a shared runtime log that omitted the original
+  # C4B_OBSERVED record during genuine two-boot CI.
+  c4d_record_dir=/run/postapollo-c4d-observation
+  [[ ! -e "$c4d_record_dir" && ! -L "$c4d_record_dir" ]] ||
+    fail "C4D_PRODUCER_RECORD_DIRECTORY_PREEXISTS"
+  install -d -m 0700 "$c4d_record_dir" ||
+    fail "C4D_PRODUCER_PRIVATE_DIRECTORY_FAILED"
+  [[ "$(stat -c '%u:%g:%a:%h' "$c4d_record_dir")" == "0:0:700:2" ||
+     "$(stat -c '%u:%g:%a' "$c4d_record_dir")" == "0:0:700" ]] ||
+    fail "C4D_PRODUCER_DIRECTORY_UNSAFE"
+  c4d_record="$c4d_record_dir/observation.txt"
+  umask 077
+  # pipefail prevents a failed signed-process probe from being converted to
+  # success just because tee created a file; the original stdout is retained.
   GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1 \
     timeout --signal=TERM --kill-after=5s 60s "$python" -I -B - \
-      "$pid" "$assets/c3d-status.rpm" <<'C4B_RUNNING_HOST_PROBE' ||
+      "$pid" "$assets/c3d-status.rpm" <<'C4B_RUNNING_HOST_PROBE' | \
+    /usr/bin/tee -- "$c4d_record" ||
     fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"
 import grp, hashlib, json, os, pwd, re, stat, subprocess, sys
 from pathlib import Path
@@ -493,16 +511,16 @@ C4B_RUNNING_HOST_PROBE
   rmdir /opt/c4b || fail "CLIENT_DIRECTORY_CLEANUP_FAILED"
   [[ -d /opt/postapollo-c2o-venv ]] ||
     fail "OFFLINE_VENV_MISSING_AT_CLEANUP"
-  # C4d test-only export bridge: the signed-process observer above prints into
-  # /var/tmp/c4b-runtime.log, whereas the C4d host reads guest ttyS0.
-  # While the signed probe's isolated Python interpreter still exists, emit
-  # ONE bounded diagnostic line into the private log for the controller's
-  # final ttyS0 log-tail relay. A direct UART write is optional, not authority.
+  # C4d test-only export bridge: the signed-process observer's exact stdout
+  # was captured into a root-only /run file at generation time. The runtime
+  # log can be incomplete; a missing/unsafe producer capture must be REFUSED.
+  # Emit one validated diagnostic line into the runtime log before the isolated
+  # Python is deleted; the unchanged controller relays its final log tail.
   # Serial I/O is strictly best effort and must NEVER grant host authority or
   # change the signed service's acceptance/rollback lifecycle.
   if [[ -c /dev/ttyS0 ]]; then
     timeout --signal=TERM --kill-after=1s 6s "$python" -I -B - \
-      /var/tmp/c4b-runtime.log /dev/ttyS0 <<'C4B_SINGLE_UART_RELAY' || true
+      "$c4d_record" /dev/ttyS0 <<'C4B_SINGLE_UART_RELAY' || true
 import json, os, re, select, stat, sys, time
 
 PREFIX = b"C4B_OBSERVED // "
@@ -641,6 +659,14 @@ except (OSError, ValueError, UnicodeError, KeyError, TypeError) as exc:
     print("C4D_UART_DIAG // " + reason, flush=True)
 C4B_SINGLE_UART_RELAY
   fi
+  # The only first-boot record is now consumed. Check its inode before
+  # deletion; no artifacts persist into the second boot or production host.
+  [[ -f "$c4d_record" && ! -L "$c4d_record" &&
+     "$(stat -c '%u:%g:%a:%h' "$c4d_record")" == "0:0:600:1" ]] ||
+    fail "C4D_PRODUCER_CAPTURE_UNSAFE_AT_CLEANUP"
+  rm -f -- "$c4d_record"
+  rmdir -- "$c4d_record_dir" ||
+    fail "C4D_PRODUCER_PRIVATE_DIRECTORY_CLEANUP_FAILED"
   rm -rf -- /opt/postapollo-c2o-venv
   userdel c4b-reader && userdel c4b-outsider &&
     userdel postapollo-connections || fail "TEST_USER_REMOVAL_FAILED"

@@ -41,11 +41,14 @@ PanelWindow {
     property var trashPreview: null
     property var selectedTrashPreview: null
     property string lastTrashReceipt: ""
-    // One Camera deletion queue used by Batch now and future Swipe/Hunt
-    // presentations. Marking files is never equivalent to moving them.
-    // Mass deletion belongs to CLEANUP. BATCH and SWIPE share this queue;
-    // neither input mode can move files without an explicit backend plan.
+    // Camera Cleanup selection surfaces share ONE queue. Queue contents
+    // are not automatically deleted; explicit preview and confirmation
+    // are the only authority to move the selected files into GIO Trash.
     property string cleanupTechnique: "batch"
+    property bool cleanupQueueOpen: false
+    // A filter/search rescan preserves marks, but switching the allowed
+    // folder invalidates prior marks because backend authorization changes.
+    property string cleanupLoadedFolder: ""
     readonly property bool batchMode: activeView === "cleanup"
                                       && cleanupTechnique !== "desktop"
     property string cleanupSearchQuery: ""
@@ -444,7 +447,14 @@ PanelWindow {
             selectedPath = "";
             selectedRecord = null;
             selectedTrashPreview = null;
-            batchPaths = [];
+            // A routine refresh or filter change must not silently erase
+            // selections. The folder boundary is different: switching it
+            // clears marks because the backend's permitted scan roots change.
+            if (cleaning && cleanupCustomFolder !== cleanupLoadedFolder) {
+                batchPaths = [];
+                batchReceipt = "";
+                cleanupQueueOpen = false;
+            }
             batchPreview = null;
             batchReviewKey = "";
             swipeIndex = 0;
@@ -481,6 +491,8 @@ PanelWindow {
         } else if (!galleryHasMore) {
             return false;
         }
+        if (cleaning && append !== true)
+            cleanupLoadedFolder = cleanupCustomFolder;
         galleryRequestedView = destination;
         galleryRequestedQuery = cleaning ? cleanupSearchQuery.trim()
                                          : gallerySearch.text.trim();
@@ -542,6 +554,7 @@ PanelWindow {
         batchPaths = next;
         batchPreview = null;
         batchReviewKey = "";
+        batchReceipt = "";
         swipeHistory = [];
         huntHistory = [];
         return true;
@@ -568,18 +581,36 @@ PanelWindow {
         batchPaths = next;
         batchPreview = null;
         batchReviewKey = "";
+        batchReceipt = "";
         swipeHistory = [];
         huntHistory = [];
         return true;
     }
 
     function batchClear() {
-        if (busy) return false;
+        if (busy || !batchMode) return false;
         batchPaths = [];
         batchPreview = null;
         batchReviewKey = "";
+        batchReceipt = "";
         swipeHistory = [];
         huntHistory = [];
+        feedback = "QUEUE CLEARED // NO FILES MOVED";
+        return true;
+    }
+
+    function batchRemovePath(path) {
+        if (busy || !batchMode || !batchContains(path))
+            return false;
+        return batchToggle({path: String(path)});
+    }
+
+    function cleanupToggleQueue() {
+        if (busy || !batchMode)
+            return false;
+        cleanupQueueOpen = !cleanupQueueOpen;
+        // The user can inspect the queue without invalidating an already
+        // reviewed plan. Any selection mutation still invalidates that plan.
         return true;
     }
 
@@ -1152,6 +1183,12 @@ PanelWindow {
     function previewBatchTrash() {
         if (busy || !batchMode || batchPaths.length === 0)
             return false;
+        if (cleanupCustomFolder !== galleryRequestedFolder
+                || galleryRequestedView !== "cleanup") {
+            feedback = "QUEUE // SCAN CLEANUP FOLDER BEFORE REVIEW";
+            return false;
+        }
+        cleanupQueueOpen = true;
         batchPreview = null;
         batchReviewKey = JSON.stringify(batchPaths);
         return run("previewBatch", ["preview-batch", batchReviewKey,
@@ -1476,13 +1513,18 @@ PanelWindow {
                            + " FILES // NO FILES MOVED";
             }
         } else if (action === "trashBatch") {
-            batchReceipt = "BATCH TRASH // MOVED " + payload.moved
+            batchReceipt = "TRASH // MOVED " + payload.moved
                            + " // SKIPPED " + payload.skipped
                            + " // FAILED " + payload.failed;
             feedback = batchReceipt;
-            batchPaths = [];
+            // Preserve paths that could not be moved so the user can
+            // remove/re-review them. Never imply all files were trashed
+            // when the backend reports a partial result.
+            batchPaths = Array.isArray(payload.unmovedPaths)
+                         ? payload.unmovedPaths.slice() : [];
             batchReviewKey = "";
             batchPreview = null;
+            cleanupQueueOpen = true;
             swipeIndex = 0;
             swipeHistory = [];
             huntHistory = [];

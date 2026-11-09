@@ -14,6 +14,7 @@ Rectangle {
     property string subjectRoute: ""
     // E4 // Local GROUND submode; the outer EARTH bottom-route stays stable.
     property string groundViewMode: "environment"
+    readonly property bool overviewMode: subjectRoute === "earth/overview"
     // MEDIA-sourced article location context, not an EARTH source collector.
     property var newsMentionOverlay: null
     signal newsMapClearRequested()
@@ -43,7 +44,11 @@ Rectangle {
     Loader {
         id: earthLoader
         objectName: "earth-e2-one-persistent-map-owner"
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: earthPane.overviewMode ? Math.floor(earthPane.height/2)
+                                       : earthPane.height
         active: earthPane.visible && earthPane.kind !== ""
         sourceComponent: earthMapComponent
     }
@@ -55,6 +60,31 @@ Rectangle {
         active: earthPane.visible && earthPane.kind === "ground"
         sourceComponent: earthPane.subjectRoute.indexOf("earth/water/") === 0
             ? earthWaterComponent : earthGroundComponent
+    }
+
+    // E6 // The lower half of OVERVIEW is a read-only carousel. Its cards
+    // only observe existing source QObjects; the persistent map stays above.
+    StationEarthOverviewPane {
+        id: overviewSummary
+        objectName: "earth-e6-overview-lower-half"
+        visible: earthPane.overviewMode
+        anchors.top: earthLoader.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        weatherService: earthPane.weatherService
+        riverSource: earthPane.riverSource
+        nwsAlertSource: earthPane.nwsAlertSource
+        seismicSource: earthPane.seismicSource
+        onOpenTopicRequested: function(topicId) {
+            if (topicId === "water") {
+                earthPane.routeRequested("earth/water/rivers");
+            } else if (topicId === "pollen" || topicId === "environment") {
+                earthPane.groundViewMode = topicId === "pollen"
+                    ? "air-pollen" : "environment";
+                earthPane.routeRequested("earth/ground/full");
+            }
+        }
     }
 
     StationEarthServicesPane {
@@ -82,6 +112,8 @@ Rectangle {
             earthMapRoute: earthPane.kind === "services"
                 ? "earth/maps/events" : earthPane.subjectRoute
             earthPinnedMap: EarthPanelPolicy.isPinnedMap(earthPane.subjectRoute)
+                || earthPane.overviewMode
+            earthOverviewMode: earthPane.overviewMode
             earthServicesOnly: earthPane.kind === "services"
             newsMentionOverlay: earthPane.newsMentionOverlay
             onNewsMapClearRequested: earthPane.newsMapClearRequested()

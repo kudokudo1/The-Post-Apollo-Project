@@ -108,6 +108,9 @@ def rejects(mutate_old=None, mutate_geom=None):
 rejects(mutate_geom=lambda x: x["windows"][0].update({"url": "private"}))
 rejects(mutate_geom=lambda x: x["windows"][0].update({"rect": "broken"}))
 rejects(mutate_geom=lambda x: x["windows"][0].update({"window_key": KEY_C}))
+rejects(mutate_geom=lambda x: x["windows"][0]["rect"].update({"width": 1279}))
+rejects(mutate_geom=lambda x: x["workspaces"][0]["children"][0]["rect"]
+        .update({"height": 1400}))
 rejects(mutate_geom=lambda x: x["windows"][0].update({"output": "HDMI-A-1"}))
 rejects(mutate_geom=lambda x: x["workspaces"][0]["children"][0]
         .update({"window_key": None}))

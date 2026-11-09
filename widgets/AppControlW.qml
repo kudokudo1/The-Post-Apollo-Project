@@ -222,6 +222,10 @@ PanelWindow {
     }
 
     onSelectedModeIndexChanged: {
+        // Ordinary manual mode navigation cancels pending saved-item focus.
+        if (pendingFavoriteSelection
+                && selectedModeIndex!==pendingFavoriteSelection.mode)
+            clearFavoriteNavigation();
         if (menuOpen && selectedModeIndex === killModeIndex)
             fireKillRailOnce();
         scheduleRunKillProbe();
@@ -988,6 +992,11 @@ PanelWindow {
                     || appControlWindow.selectedModeIndex
                        === appControlWindow.systemModeIndex) {
                 Qt.callLater(function() {
+                    // A saved destination is either selected precisely or
+                    // explained. Never silently highlight unrelated row 0.
+                    if(appControlWindow.pendingFavoriteSelection
+                            && !appControlWindow.tryResumeFavoriteSelection())
+                        return;
                     const count =
                         appControlWindow.selectedModeIndex
                         === appControlWindow.thermalModeIndex
@@ -14139,6 +14148,36 @@ PanelWindow {
         // ========================================================
         // RESULTS
         // ========================================================
+
+        // Display the exact-item failure in AppControl itself, WITHOUT
+        // blocking the local menu transition or introducing a loading screen.
+        Rectangle {
+            id: favoriteNavigationNoticeBar
+            visible: appControlWindow.menuOpen
+                     && appControlWindow.favoriteNavigationNotice.length>0
+            enabled: false
+            anchors.left: resultList.left
+            anchors.right: resultList.right
+            anchors.top: resultList.top
+            anchors.topMargin: 3
+            anchors.leftMargin: 6
+            anchors.rightMargin: 6
+            height: 44
+            z: 320
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.orange
+
+            GohuText {
+                anchors.fill: parent
+                anchors.margins: 8
+                text: appControlWindow.favoriteNavigationNotice
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
 
         ListView {
             id: resultList
@@ -29228,6 +29267,7 @@ PanelWindow {
     // ============================================================
 
     onMenuOpenChanged: {
+        if(!menuOpen) clearFavoriteNavigation();
         if (menuOpen) {
             appControlWindow.favoritesFaceClickPulse = false;
             appControlWindow.favoritesFaceBlinking = false;

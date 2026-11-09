@@ -161,7 +161,7 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 14  # M1r single-window + one-click checkpoint restore processes
+assert window.count("Process {") == 15  # M1r single-window + one-click checkpoint restore processes
 assert "worldLookup.running" in window
 assert 'onLeftClicked:' in window
 assert 'timew.chooseWorldZone(modelData.id)' in window
@@ -756,8 +756,10 @@ assert 'function utcStamp(nowMs)' in machine_policy
 assert window.count("SystemClock {") == 1
 assert window.count("ElapsedTimer {") == 3
 assert window.count("\n    Timer {") == 3
-# MACHINE now has one read-only Sway capture Process and one guarded SQLite store Process.
-assert window.count("Process {") == 14  # M1r single-window + one-click checkpoint restore processes
+# MACHINE retains legacy preview/store Processes plus one explicit v2 SAVE bridge Process.
+assert window.count("Process {") == 15  # M1r single-window + one-click checkpoint restore processes
+assert "id: machineSaveBridgeProcess" in window
+assert 'Quickshell.shellPath("services/time/MachineSaveBridgeV2.py")' in window
 assert "id: machineCaptureProcess" in window
 assert "id: machineStoreProcess" in window
 assert "id: machineResolverProcess" in window

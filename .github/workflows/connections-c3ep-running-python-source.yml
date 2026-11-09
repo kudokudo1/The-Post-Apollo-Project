@@ -1,0 +1,66 @@
+name: Connections C3e-P live Python-script process measurement (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3ePRunningPythonSource.py"
+      - "tests/connections/test_connections_c3ep_running_python_source.py"
+      - ".github/workflows/connections-c3ep-running-python-source.yml"
+      - "docs/connections-c3ep-running-python-source.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ephemeral-running-script-observation:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read-only source and production-deny checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3ePRunningPythonSource.py \
+            tests/connections/test_connections_c3ep_running_python_source.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 -B tests/connections/test_connections_c3b_origin.py
+          test "$(id -u)" -ne 0
+          sudo -n id -u | grep -qx 0
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("tests/connections/c3e_release_trust/C3ePRunningPythonSource.py").read_text()
+          for marker in ('CI_ONLY_ROOT_OBSERVER_REQUIRED', 'GUEST_ONLY_SCRIPT_SCOPE',
+                         'PROCESS_INTERPRETER_MISMATCH', 'RUNNING_SCRIPT_SIGNED_PAYLOAD_MISMATCH',
+                         '"evidenceCryptographicallyAttested": False'):
+              assert marker in s, marker
+          q=Path('services/connections')
+          assert 'readonly property bool credentialActionsEnabled: false' in (q/'ConnectionsBroker.qml').read_text()
+          assert 'readonly property bool hostAuthenticated: false' in (q/'ConnectionsRequestStatus.qml').read_text()
+          print('C3EP_PASS // NO_PRODUCTION_HOST_OR_CREDENTIAL_PERMISSIONS')
+          PY
+      - name: Observe actual separately running nonroot Python script in kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true python3 -B tests/connections/test_connections_c3ep_running_python_source.py
+          echo "C3EP_PASS // LIVE_KERNEL_PROCESS_AND_ROOT_OWNED_SCRIPT_BYTES_MATCH_PIN"
+      - name: Preserve C3e-N installed-origin versus witness split and signed recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n python3 -B tests/connections/test_connections_c3en_origin_witness_handoff.py
+          python3 -B tests/connections/test_connections_c3ei_supervised_supersession.py
+          echo "C3EP_PASS // ORIGIN_COMPATIBILITY_NOT_AUTHORITY_AND_SIGNED_RECOVERY"
+      - name: Require no claimed guest or production attestation
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'not cryptographic attestation' docs/connections-c3ep-running-python-source.md
+          grep -Fq 'does not measure the C4b guest' docs/connections-c3ep-running-python-source.md
+          echo 'C3EP_LIMITATION // PROC_CMDLINE_AND_DISK_BYTES_NOT_SIGNED_GUEST_AUTHENTICATION'

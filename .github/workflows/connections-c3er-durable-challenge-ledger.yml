@@ -1,0 +1,70 @@
+name: Connections C3e-R durable signed-evidence challenge ledger (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eRDurableChallengeLedger.py"
+      - "tests/connections/test_connections_c3er_durable_challenge_ledger.py"
+      - ".github/workflows/connections-c3er-durable-challenge-ledger.yml"
+      - "docs/connections-c3er-durable-challenge-ledger.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  durable-challenge-replay-refusal:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Source syntax and deny-only production policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eRDurableChallengeLedger.py \
+            tests/connections/test_connections_c3er_durable_challenge_ledger.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          command -v gpg
+          sudo -n id -u | grep -qx 0
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/c3e_release_trust/C3eRDurableChallengeLedger.py").read_text()
+          assert "BEGIN IMMEDIATE" in source
+          assert "WHERE digest=? AND state='issued'" in source
+          assert "mode=rw" in source
+          assert "LEDGER_MISSING_REFUSE_NOT_BOOTSTRAP" in source
+          for field in ('"hostAuthenticated": False', '"credentialActionsEnabled": False', '"productionAuthority": False'):
+              assert field in source
+          connections=Path("services/connections")
+          assert "readonly property bool credentialActionsEnabled: false" in (connections/"ConnectionsBroker.qml").read_text()
+          assert "readonly property bool hostAuthenticated: false" in (connections/"ConnectionsRequestStatus.qml").read_text()
+          print("C3ER_PASS // SOURCE_DOES_NOT_ENABLE_PRODUCTION")
+          PY
+
+      - name: Real signed evidence one-use durable SQLite ledger and restart refusal
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true python3 -B tests/connections/test_connections_c3er_durable_challenge_ledger.py
+          echo "C3ER_PASS // DURABLE_SQLITE_RESTART_AND_CONCURRENT_REPLAY_REFUSAL"
+
+      - name: Retain existing C3e-Q and signed release regression behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3eq_signed_guest_evidence.py
+          python3 -B tests/connections/test_connections_c3ei_supervised_supersession.py
+          echo "C3ER_PASS // PRIOR_SIGNED_GUEST_EVIDENCE_AND_RELEASE_RECOVERY"
+
+      - name: Do not imply independent rollback protection
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "not independent rollback-resistant" docs/connections-c3er-durable-challenge-ledger.md
+          grep -Fq '"signedGuestOriginAuthenticated": False' tests/connections/c3e_release_trust/C3eRDurableChallengeLedger.py
+          echo "C3ER_LIMITATION // ROOT_OWNED_SOFTWARE_LEDGER_NOT_PRODUCTION_WITNESS"

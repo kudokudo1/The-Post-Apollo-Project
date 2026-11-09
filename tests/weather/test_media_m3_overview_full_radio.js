@@ -35,20 +35,20 @@ test("M3 MEDIA bottom rail exposes the existing SERVICES route as sixth mode",()
 test("M3 OVERVIEW keeps the original NEWS bay first, with the full real RADIO below",()=>{
     assert.match(media,/id: overviewComponent/);
     assert.match(media,/id: mediaOverview/);
-    assert.match(media,/id: overviewScroll/);
-    assert.match(media,/objectName: "media-m3-overview-scroll"/);
-    assert.match(media,/flickableDirection: Flickable\.VerticalFlick/);
-    assert.match(media,/contentHeight: reportsBay\.height \+ 8 \+ overviewRadioBay\.height/);
+    assert.doesNotMatch(media,/id: overviewScroll/);
+    assert.doesNotMatch(media,/Flickable\\s*\\{\\s*id: overviewScroll/);
     assert.match(media,/id: reportsBay/);
     assert.match(media,/objectName: "media-m3-news-top-bay"/);
-    assert.match(media,/height: Math\.max\(0,\(mediaOverview\.height - 8\) \/ 2\)/);
+    assert.ok(media.includes("height: Math.max(52,Math.min(110,mediaOverview.height - 166))"));
     assert.match(media,/id: overviewRadioBay/);
-    assert.match(media,/anchors\.top: reportsBay\.bottom/);
-    assert.match(media,/height: Math\.max\(360, mediaOverview\.height - reportsBay\.height - 8\)/);
+    assert.ok(media.includes("anchors.top: reportsBay.bottom"));
+    assert.ok(media.includes("anchors.bottom: parent.bottom"));
+    assert.ok(!media.includes("height: Math.max(360, mediaOverview.height"));
     assert.match(media,/id: overviewRadio/);
     assert.match(media,/objectName: "media-m3-overview-full-radio"/);
     assert.match(media,/subjectRoute: "media\/radio\/full"/);
-    assert.match(media,/embeddedHeader: false/);
+    assert.match(media,/embeddedHeader: true/);
+    assert.ok(media.includes("overviewDocked: true"));
     assert.equal((media.match(/StationRadio\s*\{/g)||[]).length,2);
     assert.equal((media.match(/StationNewsHub\s*\{/g)||[]).length,2);
     assert.match(media,/readonly property var favoritesBridgeSnapshot:\s*overviewRadio\.favoritesBridgeSnapshot/);

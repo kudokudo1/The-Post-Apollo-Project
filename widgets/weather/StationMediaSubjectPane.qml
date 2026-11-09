@@ -189,29 +189,19 @@ Rectangle {
                        ? mapped : Qt.rect(0, 0, 0, 0);
             }
 
-            // M3 // Keep NEWS first, in its original half-height bay.
-            // Full RADIO cannot fit in the previous 100px lower bay:
-            // its unchanged search + saved squares + transport alone
-            // exceed that height. Scroll the overview as a whole to
-            // reach a genuinely operable full RADIO below NEWS.
-            Flickable {
-                id: overviewScroll
-                objectName: "media-m3-overview-scroll"
-                anchors.fill: parent
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-                flickableDirection: Flickable.VerticalFlick
-                interactive: !overviewNewsHub.viewerOpen
-                contentWidth: width
-                contentHeight: reportsBay.height + 8 + overviewRadioBay.height
-
+            // M4 // NEWS and RADIO are two stationary instruments. There is
+            // deliberately NO parent Flickable; only the existing NEWS
+            // feed and RADIO station directory may scroll independently.
+            // Reserve real height for the docked full-radio controller.
             Rectangle {
                 id: reportsBay
                 objectName: "media-m3-news-top-bay"
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                height: Math.max(0,(mediaOverview.height - 8) / 2)
+                // NEWS stays above RADIO, and its existing feed is intact.
+                // At the 520x300 shell, the RADIO dock reserves 160px.
+                height: Math.max(52,Math.min(110,mediaOverview.height - 166))
                 clip: true
                 color: Colors.black
 
@@ -241,8 +231,8 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: reportsBay.bottom
-                anchors.topMargin: 8
-                height: Math.max(360, mediaOverview.height - reportsBay.height - 8)
+                anchors.topMargin: 6
+                anchors.bottom: parent.bottom
                 clip: true
                 color: Colors.black
 
@@ -254,9 +244,9 @@ Rectangle {
                     // Use the identical RADIO mode/preset/saved/transport
                     // contract as MEDIA → RADIO // ALL. No compact bypass.
                     subjectRoute: "media/radio/full"
-                    embeddedHeader: false
+                    embeddedHeader: true
+                    overviewDocked: true
                 }
-            }
             }
         }
     }

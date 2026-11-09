@@ -16,6 +16,7 @@ Rectangle {
     property string subjectRoute: ""
     readonly property bool compactOverview: subjectRoute === "media/overview"
     property bool embeddedHeader: false
+    property bool overviewDocked: false
     readonly property string headerStatus: controller.errorText !== ""
         ? controller.errorText
         : controller.busy ? "CONTROLLER WORKING"
@@ -373,9 +374,21 @@ Rectangle {
         spacing: 3
         visible: !stationRadio.compactOverview
         height: visible ? implicitHeight : 0
+            GohuText {
+                objectName: "media-m4-fixed-radio-label"
+                visible: stationRadio.overviewDocked
+                width: parent.width
+                height: stationRadio.overviewDocked ? 11 : 0
+                text: "◉ RADIO // NEWS FIRST // "
+                    + stationRadio.headerStatus
+                color: Colors.cyan
+                font.pixelSize: 10
+                elide: Text.ElideRight
+            }
             Row {
             visible: stationRadio.sectionVisible("search")
                 && !stationRadio.embeddedHeader
+                && !stationRadio.overviewDocked
                 id: presetRow
                 objectName: "media-m1-radio-preset-rail"
                 height: 26
@@ -404,11 +417,11 @@ Rectangle {
                 id: queryRow
                 objectName: "media-m1-radio-query-rail"
                 width: parent.width
-                height: 30
-                spacing: 8
+                height: stationRadio.overviewDocked ? 24 : 30
+                spacing: stationRadio.overviewDocked ? 3 : 8
 
                 ActionButton {
-                    width: 82
+                    width: stationRadio.overviewDocked ? 55 : 82
                     height: parent.height
                     label: "SEARCH"
                     labelPixelSize: 11
@@ -417,7 +430,9 @@ Rectangle {
                 }
 
                 Rectangle {
-                    width: Math.max(1, queryRow.width - 82 - 92 - 2 * queryRow.spacing)
+                    width: Math.max(1, queryRow.width
+                        - (stationRadio.overviewDocked ? 55+68 : 82+92)
+                        - 2 * queryRow.spacing)
                     height: queryRow.height
                     color: Colors.dark
                     border.width: 1
@@ -446,7 +461,7 @@ Rectangle {
                 }
 
                 ActionButton {
-                    width: 92
+                    width: stationRadio.overviewDocked ? 68 : 92
                     height: parent.height
                     label: "NEXT 50"
                     labelPixelSize: 10
@@ -458,7 +473,7 @@ Rectangle {
             }
 
             QuietText {
-            visible: stationRadio.sectionVisible("search")
+            visible: stationRadio.sectionVisible("search") && !stationRadio.overviewDocked
                 width: parent.width
                 text: "NAME / TAG:NEWS / TAG:TALK / COUNTRY:US / LANGUAGE:ENGLISH"
                 font.pixelSize: 10
@@ -478,7 +493,8 @@ Rectangle {
         anchors.topMargin: fixedSearch.visible ? 2 : 0
         visible: !stationRadio.compactOverview
             && stationRadio.sectionVisible("saved")
-        height: visible ? 88 : 0
+        compactDocked: stationRadio.overviewDocked
+        height: visible ? (stationRadio.overviewDocked ? 36 : 88) : 0
         favoriteItems: stationRadio.favoriteItems
         recentItems: stationRadio.recentItems
         canRecall: stationRadio.canOperate
@@ -681,6 +697,7 @@ Rectangle {
         spacing: 2
             StationSectionDivider {
             visible: stationRadio.sectionVisible("transport")
+                && !stationRadio.overviewDocked
                 width: parent.width
                 title: "STATION CONTROLS // SELECT → LOAD → PLAY"
             }
@@ -688,14 +705,14 @@ Rectangle {
             Row {
                 id: transportRow
                 objectName: "media-m1-radio-transport-row"
-                height: 29
+                height: stationRadio.overviewDocked ? 24 : 29
             visible: stationRadio.sectionVisible("transport")
                 width: parent.width
-                spacing: 8
+                spacing: stationRadio.overviewDocked ? 3 : 8
 
                 ActionButton {
                     width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
-                    height: 29
+                    height: transportRow.height
                     label: "SELECT"
                     labelPixelSize: 9
                     available: stationRadio.canOperate
@@ -705,7 +722,7 @@ Rectangle {
 
                 ActionButton {
                     width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
-                    height: 29
+                    height: transportRow.height
                     label: "LOAD"
                     labelPixelSize: 9
                     available: stationRadio.canOperate
@@ -716,7 +733,7 @@ Rectangle {
 
                 ActionButton {
                     width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
-                    height: 29
+                    height: transportRow.height
                     label: "ENTER"
                     labelPixelSize: 9
                     available: stationRadio.canOperate
@@ -726,7 +743,7 @@ Rectangle {
 
                 ActionButton {
                     width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
-                    height: 29
+                    height: transportRow.height
                     label: "PLAY"
                     labelPixelSize: 9
                     available: stationRadio.canPlaySelected
@@ -735,7 +752,7 @@ Rectangle {
 
                 ActionButton {
                     width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
-                    height: 29
+                    height: transportRow.height
                     label: "PAUSE"
                     labelPixelSize: 9
                     available: stationRadio.canTransport
@@ -744,7 +761,7 @@ Rectangle {
 
                 ActionButton {
                     width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
-                    height: 29
+                    height: transportRow.height
                     label: "STOP"
                     labelPixelSize: 9
                     available: stationRadio.canTransport
@@ -753,7 +770,7 @@ Rectangle {
 
                 ActionButton {
                     width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
-                    height: 29
+                    height: transportRow.height
                     label: stationRadio.highlightedFavorite
                            ? "UNFAVORITE" : "FAVORITE"
                     labelPixelSize: 8

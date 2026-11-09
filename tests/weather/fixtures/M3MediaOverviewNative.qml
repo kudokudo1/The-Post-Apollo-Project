@@ -11,6 +11,10 @@ ShellRoot {
     property bool done: false
     property int phase: 0
     property int ticks: 0
+    property real radioTopBefore: -1
+    property real newsTopBefore: -1
+    property real searchYBefore: -1
+    property real footerYBefore: -1
     function find(item,name) {
         if (!item) return null;
         if (item.objectName===name)return item;
@@ -70,11 +74,11 @@ ShellRoot {
             const directory=find(media,"media-m1-radio-directory-scroll");
             const transport=find(media,"media-m1-radio-transport-fixed");
             const header=find(media,"media-m1-global-fixed-header");
-            if(!overview||!overviewScroll||!news||!radioBay||!radio
+            if(!overview||!news||!radioBay||!radio
                 ||!fixedSearch||!saved||!directory||!transport||!header) {
                 if(root.ticks>=8) {
                     const nodes=[
-                        ["overview",overview],["scroll",overviewScroll],
+                        ["overview",overview],
                         ["news",news],["radioBay",radioBay],
                         ["radio",radio],["search",fixedSearch],
                         ["saved",saved],["directory",directory],
@@ -98,18 +102,23 @@ ShellRoot {
                     ||!media.loadedNews
                     ||media.loadedNews.section!=="REPORTS"
                     ||radio.subjectRoute!=="media/radio/full"
-                    ||radio.compactOverview ||radio.embeddedHeader
+                    ||radio.compactOverview ||!radio.embeddedHeader
+                    ||!radio.overviewDocked ||overviewScroll
                     ||news.y!==0
-                    ||Math.abs(news.height-(overview.height-8)/2)>1
+                    ||news.height<52 ||news.height>110
                     ||radioBay.y<news.y+news.height
-                    ||radioBay.height<360
-                    ||overviewScroll.contentHeight<=overviewScroll.height
+                    ||radioBay.y+radioBay.height>overview.height+1
+                    ||radioBay.height<145
                     ||!fixedSearch.visible ||!saved.visible ||!transport.visible
                     ||directory.height<15 ||directory.y<saved.y+saved.height
                     ||directory.y+directory.height>transport.y+1)
                     return root.fail("NEWS_FIRST_FULL_RADIO_BOUNDS // height="
                        +String(overview.height)+" radio="+String(radio.height)
                        +" dir="+String(directory.height));
+                root.radioTopBefore=radio.mapToItem(media,0,0).y;
+                root.newsTopBefore=news.mapToItem(media,0,0).y;
+                root.searchYBefore=fixedSearch.y;
+                root.footerYBefore=transport.y;
                 live.clicked(null);
                 root.phase=1;return;
             }
@@ -117,15 +126,21 @@ ShellRoot {
                 if(!media.loadedNews ||media.loadedNews.section!=="LIVE"
                     ||media.subjectRoute!=="media/overview")
                     return root.fail("OVERVIEW_NEWS_FILTER_LEFT_SCREEN");
-                overviewScroll.contentY=Math.max(0,
-                    overviewScroll.contentHeight-overviewScroll.height);
+                // Force scrollable synthetic directory content; the
+                // real provider is deliberately disabled in this fixture.
+                directory.contentHeight=directory.height+160;
+                directory.contentY=75;
                 root.phase=2;return;
             }
             if(root.phase===2) {
-                if(overviewScroll.contentY<=0
+                if(directory.contentY<=0
                     ||Math.abs(transport.y+transport.height-radio.height+3)>1
+                    ||radio.mapToItem(media,0,0).y!==root.radioTopBefore
+                    ||news.mapToItem(media,0,0).y!==root.newsTopBefore
+                    ||fixedSearch.y!==root.searchYBefore
+                    ||transport.y!==root.footerYBefore
                     ||!saved.visible||!fixedSearch.visible)
-                    return root.fail("SCROLL_LOST_FULL_RADIO_CONTROLS");
+                    return root.fail("DIRECTORY_SCROLL_MOVED_STATIONARY_INSTRUMENT");
                 media.subjectRoute="media/services/health";
                 root.phase=3;return;
             }

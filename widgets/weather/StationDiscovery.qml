@@ -1510,6 +1510,7 @@ Rectangle {
             ]
             delegate: ActionButton {
                 required property var modelData
+                objectName: "earth-e2-filter-" + modelData.key
                 width: Math.max(1,(pinnedEarthFilters.width
                     -4*pinnedEarthFilters.spacing)/5)
                 height: 27

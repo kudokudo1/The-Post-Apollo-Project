@@ -161,7 +161,7 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 13  # M1r separate explicit one-window Process
+assert window.count("Process {") == 14  # M1r single-window + one-click checkpoint restore processes
 assert "worldLookup.running" in window
 assert 'onLeftClicked:' in window
 assert 'timew.chooseWorldZone(modelData.id)' in window
@@ -757,7 +757,7 @@ assert window.count("SystemClock {") == 1
 assert window.count("ElapsedTimer {") == 3
 assert window.count("\n    Timer {") == 3
 # MACHINE now has one read-only Sway capture Process and one guarded SQLite store Process.
-assert window.count("Process {") == 13  # M1r separate explicit one-window Process
+assert window.count("Process {") == 14  # M1r single-window + one-click checkpoint restore processes
 assert "id: machineCaptureProcess" in window
 assert "id: machineStoreProcess" in window
 assert "id: machineResolverProcess" in window

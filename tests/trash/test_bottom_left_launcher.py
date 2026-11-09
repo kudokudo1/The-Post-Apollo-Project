@@ -113,6 +113,13 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
                 field
             )
 
+    def test_ipc_handler_type_is_imported_before_use(self):
+        # IpcHandler is exported by Quickshell.Io, not base Quickshell.
+        # Missing this import prevents the entire shell from starting.
+        self.assertIn("import Quickshell.Io", TRASH.split("PanelWindow {", 1)[0])
+        self.assertIn("IpcHandler {", TRASH)
+        self.assertIn("import Quickshell.Io", POWER.split("PanelWindow {", 1)[0])
+
     def test_open_close_mask_keyboard_and_placeholder_are_safe(self):
         self.assertIn("function toggle()", TRASH)
         self.assertIn("onLeftClicked: trashLauncher.toggle()", TRASH)

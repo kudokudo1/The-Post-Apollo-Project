@@ -64,7 +64,7 @@ def _peer(conn: socket.socket) -> KernelPeer:
 
 
 def _private_directory(path: Path) -> None:
-    if type(path) is not Path or not path.is_absolute():
+    if not isinstance(path, Path) or not path.is_absolute():
         raise ValueError("Existing absolute runtime directory required")
     info = path.lstat()
     if (not stat.S_ISDIR(info.st_mode)
@@ -143,7 +143,7 @@ class IdentityCommandGateway:
         active_seat: Callable[[], bool],
         approved_intent: Callable[[KernelPeer, str], bool],
     ) -> None:
-        if (type(runtime_directory) is not Path
+        if (not isinstance(runtime_directory, Path)
                 or not runtime_directory.is_absolute()
                 or not all(callable(fn) for fn in
                            (host_factory, verified_peer, active_seat,

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Post-Apollo MACHINE // Brave Window Inventory (Read-Only Pilot)",
+  "version": "0.1.0",
+  "description": "Explicit, local-only browser window and tab counts. No URLs, page titles, native host, restore or saved session access.",
+  "minimum_chrome_version": "110",
+  "incognito": "not_allowed",
+  "permissions": [],
+  "host_permissions": [],
+  "action": {
+    "default_title": "MACHINE // Inspect Brave windows locally",
+    "default_popup": "popup.html"
+  }
+}

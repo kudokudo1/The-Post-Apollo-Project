@@ -44,6 +44,13 @@ Rectangle {
         ? records[currentIndex] : null
     readonly property string selectedName: reading.planet
     readonly property string sourceNote: reading.sourceNote
+    readonly property string sourceText: reading.mode !== "unavailable"
+        ? sourceNote
+        : !celestialSource ? "SOURCE UNAVAILABLE"
+        : !celestialSource.configured ? "LOCATION UNAVAILABLE"
+        : celestialSource.loading ? "SOURCE RECEIVING"
+        : celestialSource.failed ? "SOURCE FAILED"
+        : sourceNote
     readonly property bool detailAvailable: reading.detailAvailable
     readonly property string utcSample: snapshot
         ? String(snapshot.time || "--") + "Z" : "--"
@@ -147,7 +154,7 @@ Rectangle {
             width: line.unit*0.17;height: line.height;spacing: 1
             QuietText {
                 width: parent.width;height: 10
-                text: strip.sourceNote
+                text: strip.sourceText
                 color: strip.currentRecord ? Colors.cyan : Colors.orange
                 font.pixelSize: 8;elide: Text.ElideRight
             }

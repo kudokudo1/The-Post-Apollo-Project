@@ -109,6 +109,7 @@ const S={String,Number,Math,Array,Date:Clock,encodeURIComponent,
  sourcePolicies:new Model(),activeNotifications:new Model(),favoriteSources:new Model(),
  policyRevision:0,favoritesRevision:0,defaultSnoozeDurationMs:60000,
  policyVersion:1,policyReady:true,policyStatus:'ready',
+ favoritesReady:true,favoritesStatus:'ready',
  schedulePolicySave(){},scheduleFavoritesSave(){},
 };
 const names=['sourceKey','websiteKey','scopeOptionsFor','favoriteIndex','isFavorite',

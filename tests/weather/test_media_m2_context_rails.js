@@ -30,7 +30,7 @@ test("M2 RADIO contextual rail delegates exact preset search to the one mounted 
 });
 
 test("M2 NEWS contextual section buttons live in C44; internal channel rail is suppressed only when embedded",()=>{
-    assert.match(header,/activeMode === "news" \? Catalog\.sections/);
+    assert.ok(header.includes('activeMode === "news" || activeMode === "overview" ? Catalog.sections'));
     assert.match(header,/mediaHeader\.newsSectionRequested\(modelData\)/);
     assert.match(media,/loadedNews\.selectSection\(section\)/);
     assert.match(media,/mediaPane\.routeRequested\("media\/news\/full"\)/);

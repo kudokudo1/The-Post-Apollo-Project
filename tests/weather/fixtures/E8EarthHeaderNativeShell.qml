@@ -118,7 +118,20 @@ ShellRoot {
             const plot=find(map,"earth-e2-single-map-plot");
             if(!title||!rail||!divider||!water||!pollen||!environment
                 ||!summaryCards||!arrows||!oldRail||!oldDivider
-                ||!host||!plot)return;
+                ||!host||!plot) {
+                if(root.ticks>8) {
+                    const missing=[
+                        ["title",title],["rail",rail],["divider",divider],
+                        ["water",water],["pollen",pollen],
+                        ["environment",environment],["cards",summaryCards],
+                        ["arrows",arrows],["oldRail",oldRail],
+                        ["oldDivider",oldDivider],["host",host],["plot",plot]
+                    ].filter(function(pair){return !pair[1];})
+                     .map(function(pair){return pair[0];}).join(",");
+                    return root.fail("MISSING_NODES // "+missing);
+                }
+                return;
+            }
             if(header.height!==Geometry.contentTop()
                 || Math.abs(title.y-Geometry.titleTop())>1
                 || Math.abs(rail.y-Geometry.tabsTop())>1

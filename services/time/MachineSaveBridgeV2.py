@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 import subprocess
 import sys
 import uuid
@@ -30,6 +31,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from MachineCaptureSaveV2 import (
     CaptureError, stable_geometry, geometry_digest, capture_and_save)
 from MachineCaptureSelectionV2 import SelectionError
+from MachineSwayRead import PreviewError
+from MachineGeometryV2 import GeometryError
+from MachineGeometryStoreV2 import GeometryStoreError
+from MachineCheckpointStore import StoreError
 
 MAX_REQUEST_BYTES = 65536
 MAX_RESPONSE_BYTES = 262144
@@ -136,11 +141,21 @@ def main(argv=None):
         print(raw)
         return 0
     except (BridgeError, CaptureError, SelectionError) as exc:
+        # These exceptions contain only bounded app-authored status values.
         print(json.dumps({"status": "error", "reason": str(exc)}))
         return 1
-    except (OSError, ValueError, TypeError) as exc:
-        # Never echo raw Sway payloads, private titles or SQLite messages.
-        print(json.dumps({"status": "error", "reason": "SAVE UNAVAILABLE"}))
+    except PreviewError:
+        print(json.dumps({"status": "error", "reason": "SWAY READ UNAVAILABLE"}))
+        return 1
+    except GeometryError:
+        print(json.dumps({"status": "error", "reason": "SWAY GEOMETRY UNSUPPORTED"}))
+        return 1
+    except (StoreError, GeometryStoreError, sqlite3.Error):
+        print(json.dumps({"status": "error", "reason": "CHECKPOINT STORE UNAVAILABLE"}))
+        return 1
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        # Do not echo raw Sway payloads, paths, private titles or SQL errors.
+        print(json.dumps({"status": "error", "reason": "SAVE BACKEND UNAVAILABLE"}))
         return 1
 
 

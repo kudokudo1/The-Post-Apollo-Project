@@ -282,6 +282,7 @@ Rectangle {
             model: cosmosModePane.modes || []
             delegate: ActionButton {
                 required property var modelData
+                objectName: "cosmos-c44-mode-button"
                 width: HeaderGeometry.buttonWidth(modeRail.width,
                     cosmosModePane.modeCount)
                 height: HeaderGeometry.tabHeight

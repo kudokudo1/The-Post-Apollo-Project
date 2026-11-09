@@ -5,19 +5,25 @@ on:
     paths:
       - 'services/identity/signed_command_receipt_v0.py'
       - 'services/identity/desktop_signed_command_client_v0.py'
+      - 'services/identity/signed_gateway_origin_probe_v0.py'
       - 'services/identity/desktop_command_gateway_v0.py'
       - 'tests/identity/test_desktop_signed_command_client_v0.py'
+      - 'tests/identity/test_signed_gateway_origin_probe_v0.py'
       - '.github/workflows/identity-center-signed-command-client-v0.yml'
       - 'docs/identity-center-signed-command-client-v0.md'
+      - 'docs/identity-center-gateway-origin-probe-v1.md'
   push:
     branches: [main, 'feat/identity-signed-receipt-*']
     paths:
       - 'services/identity/signed_command_receipt_v0.py'
       - 'services/identity/desktop_signed_command_client_v0.py'
+      - 'services/identity/signed_gateway_origin_probe_v0.py'
       - 'services/identity/desktop_command_gateway_v0.py'
       - 'tests/identity/test_desktop_signed_command_client_v0.py'
+      - 'tests/identity/test_signed_gateway_origin_probe_v0.py'
       - '.github/workflows/identity-center-signed-command-client-v0.yml'
       - 'docs/identity-center-signed-command-client-v0.md'
+      - 'docs/identity-center-gateway-origin-probe-v1.md'
 
 permissions:
   contents: read
@@ -38,9 +44,13 @@ jobs:
           python3 -m py_compile services/identity/desktop_command_gateway_v0.py
           python3 -m py_compile services/identity/signed_command_receipt_v0.py
           python3 -m py_compile services/identity/desktop_signed_command_client_v0.py
+          python3 -m py_compile services/identity/signed_gateway_origin_probe_v0.py
+          python3 -m py_compile tests/identity/test_signed_gateway_origin_probe_v0.py
           python3 -m py_compile tests/identity/test_desktop_signed_command_client_v0.py
       - name: Signed real AF_UNIX receipt, actual host callback and adversarial trust tests
         run: python3 -m unittest discover -s tests/identity -p 'test_desktop_signed_command_client_v0.py' -v
+      - name: Signed Identity gateway enrollment and actual Linux PID/start/argv/script measurement
+        run: python3 -m unittest discover -s tests/identity -p 'test_signed_gateway_origin_probe_v0.py' -v
       - name: Existing unsigned disposable gateway and Identity Center lifecycle
         run: |
           python3 -m unittest discover -s tests/identity -p 'test_desktop_command_gateway_v0.py' -v

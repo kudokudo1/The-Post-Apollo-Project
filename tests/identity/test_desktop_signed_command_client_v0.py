@@ -62,7 +62,7 @@ class SignedNativeCommandTests(unittest.TestCase):
             secure_receipt_issuer=issuer,
         )
 
-    def _client(self, *, key=None, guard=None, seat=None):
+    def _client(self, *, key=None, guard=None, seat=None, origin=None):
         return SignedIdentityCommandClient(
             socket_path=self.base.gateway.socket_path,
             pinned_host_public_key=key or self.key.public_key(),
@@ -71,6 +71,7 @@ class SignedNativeCommandTests(unittest.TestCase):
                 and isinstance(peer, KernelPeer)
                 and peer.uid == os.geteuid() and peer.pid == os.getpid()),
             active_seat=seat or (lambda: self.accept_seat),
+            enrolled_origin_consistent=origin,
         )
 
     def test_real_signed_request_to_actual_host_through_callback_recovery(self):
@@ -122,6 +123,30 @@ class SignedNativeCommandTests(unittest.TestCase):
         with self.assertRaises(ReceiptRejected):
             another.begin()
         self.assertEqual(self.base.factory_calls, 0)
+
+    def test_signed_client_requires_optional_enrolled_origin_on_every_command(self):
+        calls = []
+        allowed = [False]
+        def independent_process_observation(peer):
+            calls.append(peer)
+            return allowed[0]
+        client = self._client(origin=independent_process_observation)
+        with self.assertRaises(ReceiptRejected):
+            client.begin()
+        self.assertTrue(client.faulted)
+        self.assertEqual(self.base.factory_calls, 0)
+        self.assertTrue(calls)
+        allowed[0] = True
+        fresh = self._client(origin=independent_process_observation)
+        self.assertEqual(fresh.begin().phase, "REQUESTED")
+        allowed[0] = False
+        with self.assertRaises(ReceiptRejected):
+            fresh.status()
+        self.assertTrue(fresh.faulted)
+        allowed[0] = True
+        with self.assertRaises(ReceiptRejected):
+            fresh.status()
+        self.assertEqual(self.base.factory_calls, 1)
 
     def test_signed_client_rejects_wrong_pinned_key_no_fallback(self):
         wrong = self._client(key=Ed25519PrivateKey.generate().public_key())

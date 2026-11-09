@@ -52,7 +52,7 @@ for token in (
 # The wide left bay owns SHARED CONTEXT and the explicit Explore editor.
 for token in (
     "NOT YET WIRED",
-    "CpuPlusExploreLocationPanel { "id: explorePanel",
+    "CpuPlusExploreLocationPanel {", "id: explorePanel",
     "explorePanel.editingText", "function fillExploreCandidate(candidate)",
     "explorePanel.fillDestination(candidate)",
     "registry.effectivePlace",

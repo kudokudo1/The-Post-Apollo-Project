@@ -118,23 +118,15 @@ ShellRoot {
                 if(!hub.serviceBrief.includes("IMF BT 5.0 nT")
                    || !hub.serviceBrief.includes("BZ 1.0 nT"))
                     return root.fail("SOURCE_BRIEF_NOT_LIVE");
-                hub.viewMode="services";
+                hub.selectedServiceId="swpc-alerts";
+                if(!hub.serviceBrief.includes("SOURCE INACTIVE // VIEW-SCOPED"))
+                    return root.fail("INACTIVE_PROVIDER_MISLABELED");
+                if(report.height!==38)
+                    return root.fail("DASHBOARD_REPORT_RESIZED");
+                hub.viewMode="directory";
                 root.phase=1;return;
             }
             if(root.phase===1){
-                const metrics=root.find(hub,"cosmos-c42-space-metrics");
-                const report=root.find(hub,"cosmos-c42-selected-service-report");
-                if(metrics.visible || !report.visible || report.height!==55
-                   || !hub.serviceOwnerNote || !hub.runtimeRows[0].label)
-                    return root.fail("EXPANDED_SERVICES_NOT_AVAILABLE");
-                const reportFor="swpc-alerts";
-                hub.selectedServiceId=reportFor;
-                if(!hub.serviceBrief.includes("SOURCE INACTIVE // VIEW-SCOPED"))
-                    return root.fail("INACTIVE_PROVIDER_MISLABELED");
-                hub.viewMode="directory";
-                root.phase=2;return;
-            }
-            if(root.phase===2){
                 const directory=root.find(hub,"cosmos-c42-space-directory");
                 const services=root.find(hub,"cosmos-c42-space-services");
                 if(!directory || !directory.visible
@@ -142,9 +134,9 @@ ShellRoot {
                     return root.fail("ORIGINAL_DIRECTORY_MISSING");
                 hub.viewMode="dashboard";
                 hub.selectedServiceId="space-wind";
-                root.phase=3;return;
+                root.phase=2;return;
             }
-            if(root.phase===3){
+            if(root.phase===2){
                 if(!hub.serviceBrief.includes("SOLAR WIND 717 KM/S")
                    || hub.runtimeRows.length!==11
                    || !root.find(hub,"cosmos-c42-runtime-rows").visible)

@@ -117,7 +117,7 @@ class C3eRDurableReplayTests(unittest.TestCase):
             "expected_rpm_sha256=sys.argv[7], "
             "expected_script_sha256=sys.argv[8], "
             "expected_interpreter_sha256=sys.argv[9], "
-            "expected_service_pid=4881, expected_start_ticks='991337'); "
+            "expected_service_pid=4881, expected_start_ticks='991337')\\n"
             "try:\n r.consume(bytes.fromhex(sys.argv[10]), **args)\n"
             "except R.Refused as e:\n print(str(e)); sys.exit(3)\n"
             "sys.exit(0)"

@@ -33,8 +33,8 @@ from MachineCaptureSaveV2 import (
 from MachineCaptureSelectionV2 import SelectionError
 from MachineSwayRead import PreviewError
 from MachineGeometryV2 import GeometryError
-from MachineGeometryStoreV2 import GeometryStoreError
-from MachineCheckpointStore import StoreError
+from MachineGeometryStoreV2 import GeometryStoreError, load_geometry
+from MachineCheckpointStore import StoreError, load as load_legacy
 
 MAX_REQUEST_BYTES = 65536
 MAX_RESPONSE_BYTES = 262144
@@ -75,8 +75,53 @@ def inspect(*, read_runner=subprocess.run, namespace_factory=uuid.uuid4):
     }
 
 
+def _verified_receipt(saved, *, geometry_reader=load_geometry,
+                      legacy_reader=load_legacy):
+    """Read both committed rows through independent, read-only owners.
+
+    A failed read-back does NOT undo a committed transaction. Report the
+    checkpoint ID and an explicit unknown verification result so the UI
+    does not encourage blind duplicate saves.
+    """
+    if (not isinstance(saved, dict) or saved.get("status") != "saved"
+            or not isinstance(saved.get("checkpoint"), dict)
+            or not isinstance(saved["checkpoint"].get("id"), str)):
+        raise BridgeError("SAVE RESULT INVALID")
+    checkpoint = saved["checkpoint"]
+    checkpoint_id = checkpoint["id"]
+    try:
+        geometry = geometry_reader(checkpoint_id)
+        original = legacy_reader(checkpoint_id)
+        if (not isinstance(geometry, dict) or geometry.get("status") != "loaded"
+                or geometry.get("geometry_available") is not True
+                or geometry.get("checkpoint_id") != checkpoint_id
+                or geometry.get("read_only") is not True
+                or not isinstance(original, dict)
+                or original.get("status") != "loaded"
+                or original.get("read_only") is not True
+                or original.get("checkpoint", {}).get("id") != checkpoint_id
+                or original["checkpoint"] != checkpoint):
+            raise BridgeError("READBACK RECORDS DO NOT MATCH")
+        data = geometry["geometry"]
+        actual = {"outputs": len(data["outputs"]),
+                  "workspaces": len(data["workspaces"]),
+                  "windows": len(data["windows"])}
+        if actual != checkpoint["counts"]:
+            raise BridgeError("READBACK COUNTS DO NOT MATCH")
+        return dict(saved, verification={
+            "status": "readback_verified", "counts": actual,
+            "geometry": True, "legacy": True,
+        })
+    except (BridgeError, GeometryStoreError, StoreError, sqlite3.Error,
+            OSError, ValueError, TypeError, KeyError):
+        return dict(saved, status="saved_unverified", verification={
+            "status": "readback_unavailable",
+        })
+
+
 def save_request(request, *, read_runner=subprocess.run,
-                 store_adapter=None, key_factory=None):
+                 store_adapter=None, key_factory=None,
+                 geometry_reader=load_geometry, legacy_reader=load_legacy):
     """Single explicit SAVE call; no confirmation click or preview required."""
     if not isinstance(request, dict) or set(request) != {
             "label", "review", "selection"}:
@@ -112,7 +157,9 @@ def save_request(request, *, read_runner=subprocess.run,
         options["store_adapter"] = store_adapter
     if key_factory is not None:
         options["key_factory"] = key_factory
-    return capture_and_save(**options)
+    saved = capture_and_save(**options)
+    return _verified_receipt(saved, geometry_reader=geometry_reader,
+                             legacy_reader=legacy_reader)
 
 
 def _decode_request():

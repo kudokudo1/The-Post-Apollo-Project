@@ -49,20 +49,25 @@ for token in (
 ):
     assert token in location, token
 
-# The existing search and Explore controls live in the WIDE left bay.
+# The wide left bay owns SHARED CONTEXT and the explicit Explore editor.
 for token in (
     "SHARED CONTEXT", "NOT YET WIRED",
-    "CpuPlusPlaceSearchPanel {", "id: placeSearchPanel",
     "CpuPlusExploreLocationPanel {", "id: explorePanel",
-    "placeSearchPanel.editingText", "explorePanel.editingText",
+    "explorePanel.editingText", "function fillExploreCandidate(candidate)",
+    "explorePanel.fillDestination(candidate)",
     "registry.effectivePlace", "registry.contextKind",
     "property alias durationKey: explorePanel.durationKey",
 ):
     assert token in overview, token
+assert "CpuPlusPlaceSearchPanel {" not in overview
 
-# Saved Home/current point/bookmarks are a single middle selector.
+# The middle keeps FIND PLACE pinned above an independently scrolling
+# saved Home/bookmark list; matching results scroll inside SearchPanel.
 for token in (
-    "SAVED HOME", "NOT SET", "CURRENT // ACTIVE",
+    "SAVED HOME", "NOT SET", "CpuPlusPlaceSearchPanel {",
+    "id: placeSearchPanel", "compactPinned: true",
+    "anchors.top: placeSearchPanel.bottom",
+    "readonly property bool editingText: placeSearchPanel.editingText",
     "CpuPlusSavedPlacesPanel {", "id: savedPlacesPanel",
     "registry: locationSelection.registry",
     "durationKey: locationSelection.durationKey",
@@ -169,11 +174,12 @@ search_policy = (root / "services/location/PlaceSearchPolicy.js").read_text(enco
 for token in (
     "CpuPlusPlaceSearchPanel {", "id: placeSearchPanel",
     "onUseForHome:", "onUseForExplore:",
-    "explorePanel.fillDestination(candidate)",
     "placeSearchPanel.editingText",
-    "locationOverview.homeCandidateRequested(candidate)",
+    "locationSelection.homeCandidateRequested(candidate)",
+    "locationSelection.exploreCandidateRequested(candidate)",
 ):
-    assert token in overview, token
+    assert token in selector, token
+assert "settingsLocationOverviewPane.fillExploreCandidate(candidate)" in cpu
 for token in (
     "homeLabelInput.text=String(candidate.label",
     "homeLatitudeInput.text=String(candidate.latitude)",
@@ -183,6 +189,7 @@ for token in (
     assert token in location, token
 assert "settingsLocationPane.fillHomeCandidate(candidate)" in cpu
 assert "durationKey: settingsLocationOverviewPane.durationKey" in cpu
+assert "settingsLocationSelectionPane.editingText" in cpu
 assert location.count("registry.saveHome(") == 1
 assert "registry.saveHome(" not in overview
 assert "registry.saveHome(" not in selector

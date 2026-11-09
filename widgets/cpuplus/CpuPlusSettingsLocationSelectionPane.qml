@@ -123,8 +123,10 @@ Item {
     NeonScrollBar {
         flickable: selectedPlacesScroll
         x: parent.width-width
-        y: 0
-        height: parent.height
+        // The saved-places rail begins beneath the pinned query;
+        // it never overlays or scrolls the FIND PLACE header.
+        y: selectedPlacesScroll.y
+        height: selectedPlacesScroll.height
         visible: scrollable
     }
 }

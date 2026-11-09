@@ -43,7 +43,7 @@ sock.connect(request["socket"])
 operation = request["op"]
 if operation == "forward":
     program = ("import socket,sys; s=socket.socket(fileno=int(sys.argv[1]));"
-               "s.sendall(b'WITNESS-FLOOR-READ-V1');"
+               "s.settimeout(5); s.sendall(b'WITNESS-FLOOR-READ-V1');"
                "print(s.recv(4096).decode()); s.close()")
     child = subprocess.run([sys.executable, "-c", program, str(sock.fileno())],
                            pass_fds=(sock.fileno(),), stdout=subprocess.PIPE,

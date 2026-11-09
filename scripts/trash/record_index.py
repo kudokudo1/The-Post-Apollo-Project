@@ -196,9 +196,14 @@ def _crawl_rows(doc):
             raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
         if not isinstance(page.get("snippets"), list) or len(page["snippets"]) > 3:
             raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
-        rows.append(_row("RESEARCH // DEMO SCRAPE", "demo-scrape:" + uri,
-                         page["title"], ms, "QUOTES.TOSCRAPE.COM // DEMO EXPORT",
-                         "WEB SCRAPE"))
+        row = _row("RESEARCH // DEMO SCRAPE", "demo-scrape:" + uri,
+                   page["title"], ms, "QUOTES.TOSCRAPE.COM // DEMO EXPORT",
+                   "WEB SCRAPE")
+        # The original stays source-owned/read-only; these identifiers are
+        # only inputs for an explicit, validated independent SAVE COPY action.
+        row["sourceUrl"] = uri
+        row["sourceObservedAt"] = page["observedAt"]
+        rows.append(row)
     return rows
 
 

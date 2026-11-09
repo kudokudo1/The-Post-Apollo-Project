@@ -42,14 +42,14 @@ require_regex(
 )
 require_regex(
     SERVICE,
-    r"const suppressed = shouldSuppress\(entry\.sourceId, entry\.source, entry\.websiteHost\).*?if \(suppressed\).*?activeNotifications\.remove",
+    r"const suppressed = !policyReady.*?shouldSuppress\(entry\.sourceId, entry\.source, entry\.websiteHost\).*?shouldSuppressScoped\(entry\).*?if \(suppressed\).*?activeNotifications\.remove",
     "suppressed notifications must stay out of the popup model",
 )
 
 require(HUB, 'filterId: "manager"', "hub must expose a MANAGER mode")
 require(HUB, 'label: "MANAGER"', "manager control must be visibly labeled")
-require(HUB, 'text: "DO NOT DISTURB  //  " + managerDndPolicies.count', "manager must show DND sources")
-require(HUB, 'label: "ALLOW"', "manager must let the operator clear DND")
+require(HUB, 'text: "DND / ZZ RULES  //  " + managerDndPolicies.count', "manager must show scoped DND and ZZ rules")
+require(HUB, 'label: dndRule.dnd ? "ALLOW" : "WAKE"', "manager must clear DND or wake ZZ")
 for preset in ("1H", "6H", "12H", "1D", "3D", "7D"):
     require(HUB, f'label: "{preset}"', f"manager must expose {preset} snooze preset")
 require(HUB, "NotificationsService.snoozeApp(", "ZZ button must call backend snooze policy")
@@ -172,13 +172,13 @@ require(HUB, 'filterId: "favorites"', "hub must have a Favorites filter")
 require(HUB, 'label: "FAVS"', "compact Favorite filter fits eight buttons")
 require(HUB, 'root.activeFilter === "favorites"', "Favorites filter must be actionable")
 require(HUB, "NotificationsService.isFavorite(root.appKeyFor(sourceId, source))", "Favorites view must filter by source identity")
-require(HUB, "NotificationsService.toggleFavorite(notificationEntry.appKey, notificationEntry.sourceId, notificationEntry.source)", "card star must use persisted state")
+require(HUB, "NotificationsService.toggleFavorite(notificationEntry.targetKey", "card star must use the selected persisted scope")
 require(HUB, "model: NotificationsService.favoriteSources", "Manager must display all favorites, including sources without retained history")
 require(HUB, 'text: "FAVORITES  //  " + NotificationsService.favoriteSources.count', "Manager must display Favorites section")
 require(HUB, 'label: "UNFAV"', "Manager must allow removing a favorite")
 require(HUB, "NotificationsService.setFavorite(favoriteRule.appKey, favoriteRule.sourceId, favoriteRule.source, false)", "UNFAV must remove just favorite status")
-require(HUB, 'text: "DO NOT DISTURB  //  " + managerDndPolicies.count', "DND manager must remain available")
-require(HUB, 'label: "ALLOW"', "ALLOW policy control must remain intact")
+require(HUB, 'text: "DND / ZZ RULES  //  " + managerDndPolicies.count', "DND and ZZ manager must remain available")
+require(HUB, 'label: dndRule.dnd ? "ALLOW" : "WAKE"', "ALLOW and WAKE controls must remain intact")
 
 # The user's existing keyboard-owner protocol must remain authoritative.
 require(HUB, 'sequence: "Escape"', "Esc close shortcut")

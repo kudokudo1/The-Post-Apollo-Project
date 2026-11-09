@@ -545,83 +545,120 @@ Item {
         anchors.fill: parent
         spacing: 7
 
-        // U8b // Compact icon-only source filters. Module accent identities
-        // stay visible; text names remain in accessibility metadata.
-        Flow {
+        // U8c // Each row fills the available width. Preserve the readable
+        // 6+5 split without leaving a phantom empty button at the right.
+        // Icon, frame and halo identities are independent per module.
+        Column {
             id: categoryFilterFlow
             width: parent.width
+            height: 2*30+spacing
             spacing: 4
-            readonly property int columns:
-                Math.max(1,Math.floor((width+spacing)/(38+spacing)))
-            height: Math.ceil(11/columns)*(30+spacing)-spacing
-            Repeater {
-                model: ["ALL","GROUP","CPU++","APP CTRL","WEATHER","NOTIFS","RADIO","HOSPITAL","CLOCK","PLACES","NEW"]
-                ActionButton {
-                    required property string modelData
-                    readonly property bool whiteModule:
-                        modelData==="NOTIFS" || modelData==="CLOCK"
-                    readonly property bool hospitalModule:
-                        modelData==="HOSPITAL"
-                    readonly property color moduleAccent:
-                        modelData==="WEATHER" ? Colors.yellow
-                        : hospitalModule ? Colors.magenta
-                        : whiteModule ? Colors.white : Colors.cyan
-                    readonly property color hoverAccent:
-                        whiteModule ? Colors.white
-                        : hospitalModule ? Colors.magenta : Colors.orange
+            readonly property var categoryKeys: [
+                "ALL","GROUP","CPU++","APP CTRL","WEATHER","NOTIFS",
+                "RADIO","HOSPITAL","CLOCK","PLACES","NEW"
+            ]
+            readonly property int upperCount: Math.ceil(categoryKeys.length/2)
+            readonly property real tileWidth:
+                Math.min(34,Math.max(20,(width-(upperCount-1)*4)/upperCount))
 
-                    width: 38
+            Repeater {
+                model: 2
+                Row {
+                    required property int index
+                    readonly property var rowKeys: index===0
+                        ? categoryFilterFlow.categoryKeys.slice(
+                              0,categoryFilterFlow.upperCount)
+                        : categoryFilterFlow.categoryKeys.slice(
+                              categoryFilterFlow.upperCount)
+                    width: categoryFilterFlow.width
                     height: 30
-                    contentPadding: 2
-                    label: Dossier.mainIcon(modelData)
-                    labelPixelSize: 18
-                    Accessible.role: Accessible.Button
-                    Accessible.name: modelData+" favorites filter"
-                    selected: pane.filterMode===modelData
-                    accentColor: moduleAccent
-                    // Notifications and Time stay white in EVERY state,
-                    // including their fills/borders/halos. Hospital retains
-                    // its dedicated magenta treatment on hover and press.
-                    hoverFillColor:
-                        whiteModule ? Colors.dark : Colors.yellow
-                    hoverForegroundColor: hoverAccent
-                    hoverBorderColor: hoverAccent
-                    hoverContentGlowColor: hoverAccent
-                    hoverSoftGlowColor: hoverAccent
-                    pressedFillColor:
-                        whiteModule || hospitalModule
-                        ? Colors.dark : Colors.magenta
-                    pressedForegroundColor:
-                        whiteModule || hospitalModule
-                        ? moduleAccent : Colors.black
-                    pressedBorderColor:
-                        whiteModule || hospitalModule
-                        ? moduleAccent : Colors.black
-                    pressedContentGlowColor:
-                        whiteModule || hospitalModule
-                        ? moduleAccent : Colors.magenta
-                    pressedSoftGlowColor:
-                        whiteModule || hospitalModule
-                        ? moduleAccent : Colors.magenta
-                    selectedForegroundColor:
-                        whiteModule ? Colors.white : Colors.magenta
-                    keyboardSelectedForegroundColor: selectedForegroundColor
-                    keyboardSelectedBorderColor:
-                        whiteModule ? Colors.white : Colors.orange
-                    keyboardSelectedContentGlowColor:
-                        whiteModule ? Colors.white : Colors.orange
-                    keyboardSelectedSoftGlowColor:
-                        whiteModule ? Colors.white : Colors.orange
-                    selectedFillColor:
-                        whiteModule ? Colors.dark : Colors.yellow
-                    selectedBorderColor:
-                        whiteModule ? Colors.white : Colors.magenta
-                    selectedContentGlowColor:
-                        whiteModule ? Colors.white : Colors.magenta
-                    selectedSoftGlowColor:
-                        whiteModule ? Colors.white : Colors.magenta
-                    selectedBorderWidth: 2
-                    onLeftClicked: pane.filterMode=modelData
+                    spacing: rowKeys.length>1
+                        ? Math.max(4,(width-rowKeys.length*
+                            categoryFilterFlow.tileWidth)/(rowKeys.length-1))
+                        : 0
+
+                    Repeater {
+                        model: rowKeys
+                        ActionButton {
+                            required property string modelData
+                            // FAVORITES is the ALL/✦ filter.
+                            readonly property bool whiteGlyph:
+                                ["CPU++","HOSPITAL","NOTIFS","CLOCK"]
+                                    .indexOf(modelData)>=0
+                            readonly property color iconInk:
+                                whiteGlyph ? Colors.white
+                                : ["RADIO","ALL"].indexOf(modelData)>=0
+                                  ? Colors.magenta
+                                : modelData==="WEATHER" ? Colors.orange
+                                : modelData==="PLACES" ? Colors.yellow
+                                : Colors.cyan
+                            readonly property color frameInk:
+                                ["CPU++","RADIO"].indexOf(modelData)>=0
+                                ? Colors.cyan
+                                : ["HOSPITAL","ALL"].indexOf(modelData)>=0
+                                  ? Colors.magenta
+                                : ["NOTIFS","CLOCK"].indexOf(modelData)>=0
+                                  ? Colors.white
+                                : modelData==="WEATHER" ? Colors.orange
+                                : modelData==="PLACES" ? Colors.yellow
+                                : Colors.cyan
+                            // White icons inherit their partner's frame
+                            // glow. White-on-white retains a white glow.
+                            readonly property color iconGlowInk:
+                                whiteGlyph ? frameInk : iconInk
+
+                            width: categoryFilterFlow.tileWidth
+                            height: 30
+                            contentPadding: 2
+                            label: Dossier.mainIcon(modelData)
+                            labelPixelSize: 18
+                            Accessible.role: Accessible.Button
+                            Accessible.name: modelData+" favorites filter"
+                            selected: pane.filterMode===modelData
+                            accentColor: frameInk
+
+                            idleForegroundColor: iconInk
+                            hoverForegroundColor: iconInk
+                            pressedForegroundColor: iconInk
+                            selectedForegroundColor: iconInk
+                            keyboardSelectedForegroundColor: iconInk
+                            idleBorderColor: frameInk
+                            hoverBorderColor: frameInk
+                            pressedBorderColor: frameInk
+                            selectedBorderColor: frameInk
+                            keyboardSelectedBorderColor: frameInk
+                            idleContentGlowColor: iconGlowInk
+                            hoverContentGlowColor: iconGlowInk
+                            pressedContentGlowColor: iconGlowInk
+                            selectedContentGlowColor: iconGlowInk
+                            keyboardSelectedContentGlowColor: iconGlowInk
+                            idleSoftGlowColor: frameInk
+                            hoverSoftGlowColor: frameInk
+                            pressedSoftGlowColor: frameInk
+                            selectedSoftGlowColor: frameInk
+                            keyboardSelectedSoftGlowColor: frameInk
+
+                            idleFillColor: Colors.black
+                            hoverFillColor: Colors.dark
+                            pressedFillColor: Colors.dark
+                            selectedFillColor: Colors.dark
+                            keyboardSelectedFillColor: Colors.dark
+                            selectedBorderWidth: 2
+                            keyboardSelectedBorderWidth: 2
+                            contentGlowIdleOpacity: 0.52
+                            contentGlowHoverOpacity: 0.80
+                            contentGlowPressedOpacity: 0.68
+                            contentGlowSelectedOpacity: 0.82
+                            contentGlowKeyboardSelectedOpacity: 0.82
+                            softGlowIdleOpacity: 0.32
+                            softGlowHoverOpacity: 0.66
+                            softGlowPressedOpacity: 0.66
+                            softGlowSelectedOpacity: 0.72
+                            softGlowKeyboardSelectedOpacity: 0.72
+
+                            onLeftClicked: pane.filterMode=modelData
+                        }
+                    }
                 }
             }
         }

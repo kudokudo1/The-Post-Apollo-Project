@@ -839,7 +839,7 @@ PanelWindow {
     property string machineSaveBridgeStatus: "READY // SAVE DESKTOP"
     property string machineCheckpointDraft: ""
     property bool machineCustomOpen: false
-    property bool machineAdvancedOpen: false
+    property bool machineSaveAdvancedOpen: false
     property var machineCustomReview: null
     property var machineCustomExcluded: ({})
     property string machineCustomInspectKind: "windows"
@@ -4753,14 +4753,14 @@ PanelWindow {
                             ActionButton {
                                 width: (parent.width - 7) / 2
                                 height: parent.height
-                                label: timew.machineAdvancedOpen
+                                label: timew.machineSaveAdvancedOpen
                                        ? "ADVANCED // CLOSE" : "ADVANCED"
                                 labelPixelSize: 10
-                                accentColor: timew.machineAdvancedOpen
+                                accentColor: timew.machineSaveAdvancedOpen
                                              ? Colors.magenta : Colors.white
                                 available: !timew.machineSaveBridgeBusy
-                                onLeftClicked: timew.machineAdvancedOpen =
-                                               !timew.machineAdvancedOpen
+                                onLeftClicked: timew.machineSaveAdvancedOpen =
+                                               !timew.machineSaveAdvancedOpen
                             }
                         }
 
@@ -4969,7 +4969,7 @@ PanelWindow {
                         // None is a prerequisite for SAVE DESKTOP.
                         Column {
                             id: machineLegacyControls
-                            visible: timew.machineAdvancedOpen
+                            visible: timew.machineSaveAdvancedOpen
                             width: parent.width
                             spacing: 9
 

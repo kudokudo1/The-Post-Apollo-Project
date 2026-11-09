@@ -76,6 +76,9 @@ jobs:
       - name: Validate Notifications Control Bay scroll speed and lock
         run: python3 tests/notifications/test_notification_scroll_speed.py
 
+      - name: Validate notification capacity and time-sliced history projection
+        run: python3 tests/notifications/test_notification_history_capacity.py
+
       - name: Validate native notification click destination and website fallback
         run: python3 tests/notifications/test_notification_destination_routing.py
 

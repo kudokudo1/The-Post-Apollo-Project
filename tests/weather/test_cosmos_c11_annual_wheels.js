@@ -88,12 +88,16 @@ test("COSMOS wheel mode is fixed and leaves MAGICK free to choose all three mode
  assert.match(host,/anchors\.bottomMargin: annualFocus\.contentInset/);
  assert.match(host,/readonly property int contentInset: isMoon \? HeaderGeometry\.inset : 0/);
  assert.match(host,/objectName: "cosmos-c11-back-to-moon"/);
- assert.match(moon,/readonly property int contentInset: 6/);
+ assert.match(moon,/readonly property int contentInset: HeaderGeometry\.inset/);
 });
 test("C19 COSMOS year and INDEX forecast offer two full-width main Moon modes",()=>{
  assert.match(host,/objectName: "cosmos-c11-moon-year-mode-rail"/);
  assert.match(host,/id: annualHeader[\s\S]*?anchors\.top: parent\.top/);
- assert.doesNotMatch(host,/anchors\.top: annualHeader\.bottom/);
+ // The rail belongs below the header, but the header itself must not self-anchor.
+ const headerBlock=host.slice(host.indexOf('id: annualHeader'),
+                              host.indexOf('id: lunarModeRail'));
+ assert.match(headerBlock,/anchors\.top: parent\.top/);
+ assert.doesNotMatch(headerBlock,/anchors\.top: annualHeader\.bottom/);
  assert.match(host,/height: visible \? HeaderGeometry\.tabHeight : 0/);
  for(const name of ["OVERVIEW","LUNAR YEAR"])
    assert.ok(host.includes('label: "'+name+'"'),name);

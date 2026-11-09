@@ -27,6 +27,9 @@ sys.path.insert(0, str(ROOT / "services" / "time"))
 from MachineGeometryV2 import project_geometry, compare_to_v1
 from MachineSwayRead import normalize
 from MachineWindowResolver import _walk_live
+from MachineCaptureSaveV2 import capture_and_save
+from MachineGeometryStoreV2 import load_geometry
+import MachineCheckpointStore as legacy
 
 APP = "machine-geometry-test"
 FLOAT = "machine-geometry-float"
@@ -280,6 +283,37 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
         assert "pid" not in dumped
         assert "title" not in dumped
         assert "url" not in dumped
+
+        # Real end-to-end SAVE: two new read rounds against the exact same
+        # private compositor socket, then atomic v1 + v2 persistence under
+        # the same throwaway XDG root. Never touch the runner's home store.
+        previous_xdg = os.environ.get("XDG_DATA_HOME")
+        try:
+            os.environ["XDG_DATA_HOME"] = str(root / "data")
+            result = capture_and_save(
+                label="CI DESKTOP SAVE",
+                read_runner=lambda command, **options: run_ipc(command))
+            assert result["status"] == "saved", result
+            assert result["geometry_available"] is True
+            assert result["session_identity_verified"] is False
+            cid = result["checkpoint"]["id"]
+            old_saved = legacy.load(cid)
+            geometry_saved = load_geometry(cid)
+            assert old_saved["document"]["label"] == "CI DESKTOP SAVE"
+            assert old_saved["checkpoint"]["counts"]["windows"] == 3
+            assert geometry_saved["status"] == "loaded"
+            assert len(geometry_saved["geometry"]["outputs"]) == 2
+            assert len(geometry_saved["geometry"]["windows"]) == 3
+            assert len({w["window_key"] for w in geometry_saved["geometry"]["windows"]}) == 3
+            assert sum(w["floating"] for w in geometry_saved["geometry"]["windows"]) == 1
+            assert all(w["rect"]["width"] > 100 for w in geometry_saved["geometry"]["windows"])
+            assert legacy.db_path().parent.is_relative_to(root)
+            print("MACHINE M2 AUTOMATIC SAVE // REAL HEADLESS SWAY SQLITE PASS")
+        finally:
+            if previous_xdg is None:
+                os.environ.pop("XDG_DATA_HOME", None)
+            else:
+                os.environ["XDG_DATA_HOME"] = previous_xdg
         print("MACHINE M2 GEOMETRY // REAL HEADLESS SWAY PASS")
         print("2 virtual outputs // 2 tiled duplicate-app windows // 1 floating")
         print("exact rectangles and split hierarchy // v1 matching // no live operator access")

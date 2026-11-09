@@ -559,7 +559,7 @@ Item {
             ]
             readonly property int upperCount: Math.ceil(categoryKeys.length/2)
             readonly property real tileWidth:
-                Math.min(34,Math.max(20,(width-(upperCount-1)*4)/upperCount))
+                Math.min(40,Math.max(30,(width-(upperCount-1)*4)/upperCount))
 
             Repeater {
                 model: 2
@@ -570,12 +570,13 @@ Item {
                               0,categoryFilterFlow.upperCount)
                         : categoryFilterFlow.categoryKeys.slice(
                               categoryFilterFlow.upperCount)
-                    width: categoryFilterFlow.width
+                    // Compact 4px gaps; center the shorter second row
+                    // rather than spreading five icons across six slots.
+                    spacing: 4
+                    width: rowKeys.length*categoryFilterFlow.tileWidth
+                        +Math.max(0,rowKeys.length-1)*spacing
+                    anchors.horizontalCenter: parent.horizontalCenter
                     height: 30
-                    spacing: rowKeys.length>1
-                        ? Math.max(4,(width-rowKeys.length*
-                            categoryFilterFlow.tileWidth)/(rowKeys.length-1))
-                        : 0
 
                     Repeater {
                         model: rowKeys
@@ -611,38 +612,61 @@ Item {
                             height: 30
                             contentPadding: 2
                             label: Dossier.mainIcon(modelData)
-                            labelPixelSize: 18
+                            // Weather SUN and Location need a larger glyph
+                            // than the standard 18px face inside each tile.
+                            labelPixelSize:
+                                modelData==="WEATHER" || modelData==="PLACES"
+                                ? 23 : 18
                             Accessible.role: Accessible.Button
                             Accessible.name: modelData+" favorites filter"
-                            selected: pane.filterMode===modelData
+                            readonly property bool filterOpen:
+                                pane.filterMode===modelData
+                            selected: filterOpen
                             accentColor: frameInk
 
+                            // U8d // Only the currently opened filter gets
+                            // yellow fill + magenta icon/glows. Inactive
+                            // filters NEVER acquire a special filled state,
+                            // including after the menu is closed/reopened.
+                            idleFillColor: Colors.black
+                            hoverFillColor:
+                                filterOpen ? Colors.yellow : Colors.black
+                            pressedFillColor:
+                                filterOpen ? Colors.yellow : Colors.black
+                            selectedFillColor: Colors.yellow
+                            keyboardSelectedFillColor:
+                                filterOpen ? Colors.yellow : Colors.black
+
                             idleForegroundColor: iconInk
-                            hoverForegroundColor: iconInk
-                            pressedForegroundColor: iconInk
-                            selectedForegroundColor: iconInk
-                            keyboardSelectedForegroundColor: iconInk
+                            hoverForegroundColor:
+                                filterOpen ? Colors.magenta : iconInk
+                            pressedForegroundColor:
+                                filterOpen ? Colors.magenta : iconInk
+                            selectedForegroundColor: Colors.magenta
+                            keyboardSelectedForegroundColor:
+                                filterOpen ? Colors.magenta : iconInk
                             idleBorderColor: frameInk
                             hoverBorderColor: frameInk
                             pressedBorderColor: frameInk
                             selectedBorderColor: frameInk
                             keyboardSelectedBorderColor: frameInk
                             idleContentGlowColor: iconGlowInk
-                            hoverContentGlowColor: iconGlowInk
-                            pressedContentGlowColor: iconGlowInk
-                            selectedContentGlowColor: iconGlowInk
-                            keyboardSelectedContentGlowColor: iconGlowInk
+                            hoverContentGlowColor:
+                                filterOpen ? Colors.magenta : iconGlowInk
+                            pressedContentGlowColor:
+                                filterOpen ? Colors.magenta : iconGlowInk
+                            selectedContentGlowColor: Colors.magenta
+                            keyboardSelectedContentGlowColor:
+                                filterOpen ? Colors.magenta : iconGlowInk
                             idleSoftGlowColor: frameInk
-                            hoverSoftGlowColor: frameInk
-                            pressedSoftGlowColor: frameInk
-                            selectedSoftGlowColor: frameInk
-                            keyboardSelectedSoftGlowColor: frameInk
+                            hoverSoftGlowColor:
+                                filterOpen ? Colors.magenta : frameInk
+                            pressedSoftGlowColor:
+                                filterOpen ? Colors.magenta : frameInk
+                            selectedSoftGlowColor: Colors.magenta
+                            keyboardSelectedSoftGlowColor:
+                                filterOpen ? Colors.magenta : frameInk
 
-                            idleFillColor: Colors.black
-                            hoverFillColor: Colors.dark
-                            pressedFillColor: Colors.dark
-                            selectedFillColor: Colors.dark
-                            keyboardSelectedFillColor: Colors.dark
                             selectedBorderWidth: 2
                             keyboardSelectedBorderWidth: 2
                             contentGlowIdleOpacity: 0.52

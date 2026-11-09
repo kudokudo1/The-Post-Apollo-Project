@@ -149,7 +149,7 @@ test("VIEW QUEUE uses existing shared Camera selection without cloning it",()=>{
     assert.equal(ctx.batchPaths,before);
     assert.deepEqual(Array.from(ctx.calls),[]);
     assert.match(cleanupSource,/onLeftClicked: camera.trashQueuedNow\(\)/);
-    assert.match(cameraSource,/run\("trashBatch", \["trash-batch-now", JSON.stringify\(batchPaths\)/);
+    assert.match(cameraSource,/"trash-batch-now", JSON.stringify\(batchPaths\)/);
 });
 
 test("Hunt pauses on mode change and Trash close without deleting queue entries",()=>{

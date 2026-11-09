@@ -99,4 +99,56 @@ denied({overview:{...overview,handoff:null,checkpoint:null}},
 assert.match(ctx.briefing({...base,overview:{...overview,verified:false}}),
     /BRIEFING UNAVAILABLE/);
 assert.equal(run({sourceError:"outdated"}).mutationAuthorized,false);
+// Atomic succession is a different gate from read-only recovery preview.
+// A Room with no recorded predecessor may have a useful briefing, but has no
+// safely pinned request to feed to PX session-succeed.
+function transferFor(changes) {
+    const source = {...base,...(changes || {})};
+    return ctx.successionContract({
+        plan:ctx.preview(source), snapshot:source.snapshot,
+        sessions:source.sessions, sessionsLoaded:source.sessionsLoaded
+    });
+}
+function transferHeld(changes, phrase) {
+    const candidate = transferFor(changes);
+    assert.equal(candidate.readyForAuthorityCheck,false);
+    assert.equal(candidate.mutationAuthorized,false);
+    assert.equal(candidate.pinnedRequest,null);
+    assert(candidate.blockers.some(x=>x.includes(phrase)),
+        JSON.stringify(candidate.blockers)+" expected "+phrase);
+}
+transferHeld({}, "No recorded predecessor Session");
+const released = {id:"former",roomId:"room-map",
+    doctorId:"doctor-old",providerId:"mock",workingDirectory:"/tmp/map-bed",
+    status:"FAILED",endedAt:"2026-11-08",activePid:0};
+const ready = transferFor({sessions:[released]});
+assert.equal(ready.readyForAuthorityCheck,true);
+assert.equal(ready.previousSessionId,"former");
+assert.equal(ready.pinnedRequest.previousSessionId,"former");
+assert.equal(ready.pinnedRequest.previousDoctorId,"doctor-old");
+assert.equal(ready.pinnedRequest.previousProviderId,"mock");
+assert.equal(ready.pinnedRequest.successorDoctorId,"doctor-new");
+assert.equal(ready.pinnedRequest.successorProviderId,"hermes");
+assert.equal(ready.pinnedRequest.assignmentId,"42");
+assert.equal(ready.pinnedRequest.bedPath,"/tmp/map-bed");
+assert.equal(ready.mutationAuthorized,false);
+assert.match(ready.status,/AUTHORITY NOT VERIFIED/);
+transferHeld({sessions:[{...released,endedAt:""}]}, "not been explicitly released");
+transferHeld({sessions:[{...released,status:"WAITING"}]}, "not been explicitly released");
+transferHeld({sessions:[{...released,activePid:12}]}, "not been explicitly released");
+transferHeld({sessions:[{...released,activePid:"invalid"}]}, "not been explicitly released");
+transferHeld({sessions:[{...released,doctorId:"other"}]}, "Doctor/Provider differs");
+transferHeld({sessions:[{...released,providerId:"other"}]}, "Doctor/Provider differs");
+transferHeld({sessions:[{...released,workingDirectory:"/tmp/other"}]}, "Session Bed differs");
+transferHeld({sessions:[released,{...released,id:"older"}]},
+    "Multiple historical Room Sessions");
+transferHeld({sessions:[released],sessionsLoaded:false},
+    "Session registry not verified");
+transferHeld({sessions:[released],doctorId:"doctor-old"},
+    "Recovery preview has blockers");
+transferHeld({sessions:[released],snapshot:{room:{...room,providerId:""}}},
+    "pinned Room");
+transferHeld({sessions:[released],roomsLoaded:false},
+    "Recovery preview has blockers");
+
 console.log("HOSPITAL SUCCESSOR PREFLIGHT // PASS // scoped work and ownership, no auto-succession, blocked collisions and read-only handoff context");

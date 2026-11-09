@@ -51,8 +51,8 @@ test("mixed legacy pages split by subject, rather than moving whole pages", () =
   assert.equal(context.panelLanding("sky-hourly-forecast"), "weather/forecasts/hourly");
   assert.equal(context.panelLanding("sky-moon-usno"), "cosmos/moon/ephemeris");
   assert.equal(context.panelLanding("ground-usgs-seismic"), "earth/geology/earthquakes");
-  assert.equal(context.panelLanding("ground-coast-coops"), "weather/water/coast");
-  assert.equal(context.panelLanding("map-mrms-radar"), "weather/maps/radar");
+  assert.equal(context.panelLanding("ground-coast-coops"), "earth/water/coast");
+  assert.equal(context.panelLanding("map-mrms-radar"), "earth/maps/events");
   assert.equal(context.panelLanding("map-eonet-layer"), "earth/events/eonet");
   assert.equal(context.panelLanding("map-news-mentions"), "media/news/locations");
 });
@@ -86,7 +86,7 @@ test("cross-subject reuse is explicit and keeps source ownership independent", (
   assert.deepEqual(plain(context.relatedRoutes("moon")),
     ["cosmos/moon","magick/lunar-solar/moon","magick/astrology/charts"]);
   assert.deepEqual(plain(context.relatedRoutes("news-location")),
-    ["media/news/locations","earth/maps/overview"]);
+    ["media/news/locations","earth/maps/events"]);
   assert.deepEqual(plain(context.relatedRoutes("unknown")), []);
 });
 

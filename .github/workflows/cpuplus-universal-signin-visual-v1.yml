@@ -5,6 +5,7 @@ on:
     paths:
       - 'services/connections/ConnectionsUnifiedSignInPolicy.js'
       - 'widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml'
+      - 'widgets/cpuplus/CpuPlusUniversalSignInHeaderPane.qml'
       - 'widgets/CpuPlusW.qml'
       - 'tests/cpuplus/test_cpuplus_universal_signin_control_center.cjs'
       - 'docs/cpuplus-universal-signin-visual-v1.md'
@@ -14,6 +15,7 @@ on:
     paths:
       - 'services/connections/ConnectionsUnifiedSignInPolicy.js'
       - 'widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml'
+      - 'widgets/cpuplus/CpuPlusUniversalSignInHeaderPane.qml'
       - 'widgets/CpuPlusW.qml'
       - 'tests/cpuplus/test_cpuplus_universal_signin_control_center.cjs'
       - '.github/workflows/cpuplus-universal-signin-visual-v1.yml'
@@ -45,6 +47,6 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
-          for q in widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml widgets/CpuPlusW.qml; do
+          for q in widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml widgets/cpuplus/CpuPlusUniversalSignInHeaderPane.qml widgets/CpuPlusW.qml; do
             QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat "$q" >/dev/null
           done

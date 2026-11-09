@@ -47,6 +47,23 @@ assert.equal(room.createsSession,false);
 assert.equal(room.assignsDoctor,false);
 assert.equal(room.branch,"");
 assert.equal(room.bedPath,"");
+assert.equal(room.patientId,"owner/repo");
+assert.equal(room.patientLabel,"owner/repo");
+const reusedPatient = plan("room",{
+    id:"room-abcdef1234", name:"Another room", repository:"owner/repo",
+    rooms:[{id:"room-old",repository:"owner/repo",
+            patientId:"patient-keep",patientLabel:"Existing Patient"}]
+});
+assert.equal(reusedPatient.ready,true);
+assert.equal(reusedPatient.patientId,"patient-keep");
+assert.equal(reusedPatient.patientLabel,"Existing Patient");
+rejected("room",{
+    id:"room-abcdef1234",name:"Test",repository:"owner/repo",
+    rooms:[
+        {id:"r1",repository:"owner/repo",patientId:"patient-A"},
+        {id:"r2",repository:"owner/repo",patientId:"patient-B"}
+    ]
+},"Patient ID ambiguous");
 rejected("room",{id:"room-old",name:"Test",repository:"owner/repo"},"ID already exists");
 rejected("room",{id:"room-abcdef1234",name:"Test",repository:"not-a-repository"},
     "owner/name");
@@ -64,6 +81,14 @@ rejected("retirement",{doctorId:"existing"},"still owns a Room");
 rejected("retirement",{doctorId:"unassigned",doctors:[{id:"unassigned",status:"ACTIVE"}],
     sessions:[{id:"s1",doctorId:"unassigned",status:"OPERATING",activePid:51}]},
     "unreleased Session");
+rejected("retirement",{doctorId:"unassigned",
+    doctors:[{id:"unassigned",status:"ACTIVE"}],
+    sessions:[{id:"s1",doctorId:"unassigned",status:"COMPLETE",
+        endedAt:"2026-11-08",activePid:123}]}, "recorded active process");
+rejected("retirement",{doctorId:"unassigned",
+    doctors:[{id:"unassigned",status:"ACTIVE"}],
+    sessions:[{id:"s1",doctorId:"unassigned",status:"COMPLETE",
+        activePid:0}]}, "unreleased Session");
 rejected("retirement",{doctorId:"unassigned",doctors:[{id:"unassigned",status:"RELEASED"}]},
     "already released");
 rejected("retirement",{doctorId:"no-such-doctor"},"Select a registered worker");

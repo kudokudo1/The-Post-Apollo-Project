@@ -108,4 +108,26 @@ except RestoreError:
 else:
     raise AssertionError("missing stored checkpoint was accepted")
 
+# Native launcher boundary: never pass commands, paths, or shell fragments.
+from MachineRestoreCheckpoint import _start_app
+
+
+class FakeRun:
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, argv, **kwargs):
+        self.calls.append((argv, kwargs))
+        return type("Completed", (), {"returncode": 0})()
+
+
+fake_run = FakeRun()
+assert not _start_app("brave; rm -rf /", runner=fake_run)
+assert not _start_app("../../untrusted", runner=fake_run)
+assert not _start_app("quickshell", runner=fake_run)
+assert fake_run.calls == []
+assert _start_app("brave-browser", runner=fake_run)
+assert fake_run.calls[0][0] == ["gtk-launch", "brave-browser"]
+assert fake_run.calls[0][1]["shell"] is False
+
 print("MACHINE ONE CLICK // FAKE DESKTOP RESTORE PASS")

@@ -124,8 +124,8 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
             "wideGlowIdleOpacity", "wideGlowHoverOpacity",
             "wideGlowPressedOpacity", "wideGlowOpenOpacity"
         ):
-            self.assertRegex(DOCK, r"\\b" + field + r"\\s*:")
-            self.assertNotRegex(trash_button, r"\\b" + field + r"\\s*:")
+            self.assertRegex(DOCK, r"\b" + field + r"\s*:")
+            self.assertNotRegex(trash_button, r"\b" + field + r"\s*:")
 
     def test_ipc_handler_type_is_imported_before_use(self):
         # IpcHandler is exported by Quickshell.Io, not base Quickshell.

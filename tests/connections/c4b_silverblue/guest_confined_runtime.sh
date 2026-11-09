@@ -482,6 +482,99 @@ except (Refused, OSError, KeyError, ValueError, UnicodeError) as exc:
           (str(exc) if isinstance(exc, Refused) else type(exc).__name__), flush=True)
     sys.exit(2)
 C4B_RUNNING_HOST_PROBE
+  # C4d test-only export bridge: the signed-process observer above prints into
+  # /var/tmp/c4b-runtime.log, whereas the C4d host reads guest ttyS0.
+  # The controller's bounded log tail is not guaranteed to contain this early
+  # observation. Relay ONE independently validated diagnostic line directly.
+  # Serial I/O is strictly best effort and must NEVER grant host authority or
+  # change the signed service's acceptance/rollback lifecycle.
+  if [[ -c /dev/ttyS0 ]]; then
+    timeout --signal=TERM --kill-after=1s 6s "$python" -I -B - \
+      /var/tmp/c4b-runtime.log /dev/ttyS0 <<'C4B_SINGLE_UART_RELAY' || true
+import json, os, re, stat, sys
+
+PREFIX = b"C4B_OBSERVED // "
+SCHEMA = "postapollo.connections.c4b-booted-signed-host-observation.v1"
+FIELDS = frozenset((
+    "schema", "signed_rpm_sha256", "signed_script_sha256",
+    "running_script_sha256", "interpreter_sha256", "service_pid",
+    "dbus_owner_pid", "process_start_ticks", "service_uid", "service_gid",
+    "systemd_unit", "selinux_enforcing", "signedGuestOriginAuthenticated",
+    "evidenceCryptographicallyAttested", "hostAuthenticated", "canApprove",
+    "credentialActionsEnabled", "productionAuthority",
+))
+FALSE = ("signedGuestOriginAuthenticated", "evidenceCryptographicallyAttested",
+         "hostAuthenticated", "canApprove", "credentialActionsEnabled",
+         "productionAuthority")
+
+def unique(pairs):
+    obj = {}
+    for k, v in pairs:
+        if k in obj:
+            raise ValueError("duplicate key")
+        obj[k] = v
+    return obj
+
+def selected_line(path):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        st = os.fstat(fd)
+        if (not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid()
+                or st.st_nlink != 1 or not 0 < st.st_size <= 2 * 1024 * 1024):
+            raise ValueError("unsafe guest runtime log")
+        os.lseek(fd, max(0, st.st_size - 16384), os.SEEK_SET)
+        tail = os.read(fd, 16385)
+        after = os.fstat(fd)
+        if (len(tail) > 16384 or
+                (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns) !=
+                (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)):
+            raise ValueError("runtime log changed")
+    finally:
+        os.close(fd)
+    matched = [x.rstrip(b"\r") for x in tail.split(b"\n")
+               if x.startswith(PREFIX)]
+    if len(matched) != 1 or len(matched[0]) > 2048:
+        raise ValueError("exactly one bounded record required")
+    line = matched[0]
+    doc = json.loads(line[len(PREFIX):].decode("utf-8"), object_pairs_hook=unique)
+    if (type(doc) is not dict or set(doc) != FIELDS or doc["schema"] != SCHEMA
+            or doc["systemd_unit"] != "postapollo-connections-status.service"
+            or doc["selinux_enforcing"] is not True
+            or any(doc[k] is not False for k in FALSE)
+            or doc["signed_script_sha256"] != doc["running_script_sha256"]):
+        raise ValueError("diagnostic schema rejected")
+    for k in ("signed_rpm_sha256", "signed_script_sha256",
+              "running_script_sha256", "interpreter_sha256"):
+        if type(doc[k]) is not str or re.fullmatch("[0-9a-f]{64}", doc[k]) is None:
+            raise ValueError("digest rejected")
+    for k in ("service_pid", "dbus_owner_pid", "service_uid", "service_gid"):
+        if type(doc[k]) is not int or not 0 < doc[k] < 2147483648:
+            raise ValueError("process identity rejected")
+    if doc["service_pid"] != doc["dbus_owner_pid"]:
+        raise ValueError("bus PID mismatch")
+    ticks = doc["process_start_ticks"]
+    if (type(ticks) is not str or not 1 <= len(ticks) <= 24
+            or not ticks.isascii() or not ticks.isdecimal()
+            or int(ticks) < 1 or str(int(ticks)) != ticks):
+        raise ValueError("start tick rejected")
+    return line
+
+try:
+    payload = selected_line(sys.argv[1]) + b"\n"
+    fd = os.open(sys.argv[2], os.O_WRONLY | os.O_NOCTTY | os.O_NONBLOCK |
+                 os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        if not stat.S_ISCHR(os.fstat(fd).st_mode):
+            raise ValueError("not serial device")
+        if os.write(fd, payload) != len(payload):
+            raise ValueError("partial serial write")
+    finally:
+        os.close(fd)
+except (OSError, ValueError, UnicodeError, KeyError, TypeError):
+    # Diagnostic-only path: no console failure may alter real guest acceptance.
+    pass
+C4B_SINGLE_UART_RELAY
+  fi
   echo "C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED"
 
   stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN

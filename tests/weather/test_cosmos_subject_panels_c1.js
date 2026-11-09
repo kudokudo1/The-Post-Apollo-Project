@@ -220,7 +220,8 @@ test("C2 COSMOS overview shows interactive sky graphics and compact core SPACE r
   assert.match(dashboard,/MouseArea\s*\{/);
   assert.match(dashboard,/cursorShape: Qt.PointingHandCursor/);
 
-  assert.match(dashboard,/height: Math\.max\(0,dashboard\.height-consoleHeader\.height/);
+  assert.match(dashboard,/height: Math\.max\(0,overviewContent\.height/);
+  assert.match(dashboard,/id: overviewContent[\s\S]*?height: Math\.max\(0,dashboard\.height - consoleHeader\.height/);
   assert.match(dashboard,/anchors\.fill: parent/);
   assert.match(dashboard,/moonEphemeris: sourceSky\.moonObservation/);
   assert.match(dashboard,/currentSolarPosition: sourceSky\.currentSolarPosition/);

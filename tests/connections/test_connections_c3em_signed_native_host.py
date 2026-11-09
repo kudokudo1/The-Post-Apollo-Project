@@ -265,11 +265,9 @@ class C3eMSignedHostTests(unittest.TestCase):
         client = self.previous._start_client()
         # A *Python interpreter* may itself be a valid ELF, but it is not
         # the separately delegated signed native host executable.
-        self.refused("SIGNED_RUNNING_HOST_BYTES_MISMATCH", client,
+        self.refused("RUNNING_HOST_NOT_ROOT", client,
                      host_pid=client.pid,
-                     host_start=self.previous.fx.kernel_start(client.pid)
-                     if hasattr(self.previous.fx, "kernel_start")
-                     else L.k.kernel_start(client.pid))
+                     host_start=L.k.kernel_start(client.pid))
 
     def test_14_same_uid_client_cannot_read_root_private_ledger(self):
         client = self.previous._start_client()

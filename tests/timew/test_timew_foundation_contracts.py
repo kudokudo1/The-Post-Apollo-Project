@@ -743,7 +743,7 @@ assert 'handleStyle: "star"' in window
 assert 'handleColor: Colors.magenta' in window
 assert 'timew.removeMachineMarker(modelData.id)' in window
 assert 'MARKERS ARE TIMESTAMPS ONLY // LOST ON RESTART' in window
-assert 'NO SCREENSHOTS OR RESTORATION ACTIVE' in window
+assert 'NO SCREENSHOTS OR AUTOMATIC RESTORATION' in window
 assert 'MACHINE // LOCAL CHECKPOINTS' in window
 assert 'var MAX_MARKERS = 24;' in machine_policy
 assert 'var MAX_NAME_LENGTH = 48;' in machine_policy

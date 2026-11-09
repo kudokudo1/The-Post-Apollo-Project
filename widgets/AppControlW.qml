@@ -8585,7 +8585,7 @@ PanelWindow {
     // This function performs NO desktop launch, shell command, process action,
     // favorite write or action-trigger click. Never select by display name.
     function selectSavedApplication(desktopId) {
-        const installed=DesktopEntries.applications.values;
+        const installed=[...DesktopEntries.applications.values];
         if (!AppFavoriteSelection.ownerAllows(
                 desktopId,favoriteStore.favoriteKeys,installed))
             return false;
@@ -8597,10 +8597,10 @@ PanelWindow {
         switchMode(appsModeIndex,false);
         searchInput.text="";
         const index=AppFavoriteSelection.selectedIndex(
-            desktopId,filteredApps.values);
+            desktopId,[...filteredApps.values]);
         if (index<0 || !AppFavoriteSelection.ownerAllows(
                 desktopId,favoriteStore.favoriteKeys,
-                DesktopEntries.applications.values))
+                [...DesktopEntries.applications.values]))
             return false;
         rememberedAppKey=desktopId;
         selectedResultIndex=index;
@@ -8614,10 +8614,10 @@ PanelWindow {
                     || rememberedAppKey!==desktopId
                     || !AppFavoriteSelection.ownerAllows(
                         desktopId,favoriteStore.favoriteKeys,
-                        DesktopEntries.applications.values))
+                        [...DesktopEntries.applications.values]))
                 return;
             const now=AppFavoriteSelection.selectedIndex(
-                desktopId,filteredApps.values);
+                desktopId,[...filteredApps.values]);
             if(now<0) return;
             selectedResultIndex=now;
             resultList.positionViewAtIndex(now,ListView.Contain);

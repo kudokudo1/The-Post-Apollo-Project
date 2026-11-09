@@ -43,8 +43,38 @@ Rectangle {
             mediaPane.routeRequested("media/news/full");
     }
     function selectServiceMode(mode) {
-        if (loadedServices && (mode==="runtime" || mode==="sources"))
+        if (loadedServices && (mode==="runtime" || mode==="sources" || mode==="feeds"))
             loadedServices.viewMode=mode;
+    }
+
+    // NEWS remains the only GDELT owner. SERVICES receives only the last
+    // status observed while NEWS was mounted, never a second polling feed.
+    property var lastNewsRuntimeRows: []
+    property var lastNewsSourceRows: []
+    property string lastNewsFeedBadge: "NEWS NOT YET OBSERVED"
+    property double lastNewsObservedMs: 0
+    function captureNewsDiagnostics() {
+        const owner = mediaPane.loadedNews;
+        if (!owner || !owner.isReports || !owner.stationOpen)
+            return;
+        const runtime = Array.isArray(owner.runtimeRows) ? owner.runtimeRows : [];
+        const sources = Array.isArray(owner.newsSourceRows) ? owner.newsSourceRows : [];
+        lastNewsRuntimeRows = runtime.map(function(row) {
+            return {name:String(row.name || ""),state:String(row.state || "")};
+        });
+        lastNewsSourceRows = sources.map(function(row) {
+            return {name:String(row.name || ""),state:String(row.state || "")};
+        });
+        lastNewsFeedBadge = String(owner.feedBadge || "NEWS SOURCE WAITING");
+        lastNewsObservedMs = Date.now();
+    }
+    onLoadedNewsChanged: captureNewsDiagnostics()
+    Connections {
+        target: mediaPane.loadedNews
+        ignoreUnknownSignals: true
+        function onRuntimeRowsChanged() { mediaPane.captureNewsDiagnostics(); }
+        function onNewsSourceRowsChanged() { mediaPane.captureNewsDiagnostics(); }
+        function onFeedBadgeChanged() { mediaPane.captureNewsDiagnostics(); }
     }
 
     // Optional read-only window onto whichever Radio component is actually
@@ -132,7 +162,14 @@ Rectangle {
 
     Component {
         id: servicesComponent
-        StationMediaServicesPane { embeddedHeader: true }
+        StationMediaServicesPane {
+            embeddedHeader: true
+            stationOpen: mediaPane.visible && mediaPane.providerActivationAllowed
+            newsObservedMs: mediaPane.lastNewsObservedMs
+            newsFeedBadge: mediaPane.lastNewsFeedBadge
+            newsRuntimeRows: mediaPane.lastNewsRuntimeRows
+            newsSourceRows: mediaPane.lastNewsSourceRows
+        }
     }
 
     Component {
@@ -201,7 +238,7 @@ Rectangle {
                 anchors.top: parent.top
                 // NEWS stays above RADIO, and its existing feed is intact.
                 // At the 520x300 shell, the RADIO dock reserves 160px.
-                height: Math.max(52,Math.min(110,mediaOverview.height - 166))
+                height: Math.max(52,Math.min(110,mediaOverview.height - 158))
                 clip: true
                 color: Colors.black
 

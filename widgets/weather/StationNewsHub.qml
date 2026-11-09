@@ -81,6 +81,10 @@ Rectangle {
         isReports && reportsLoader.item
         && Array.isArray(reportsLoader.item.runtimeRows)
         ? reportsLoader.item.runtimeRows : []
+    readonly property var newsSourceRows:
+        isReports && reportsLoader.item
+        && Array.isArray(reportsLoader.item.plannedSources)
+        ? reportsLoader.item.plannedSources : []
     readonly property string feedBadge: isReports
         ? (reportsLoader.item ? reportsLoader.item.feedBadge : "NEWS // CONNECTING")
         : "NEWS // " + effectiveSection + " CATALOG"
@@ -255,6 +259,7 @@ Rectangle {
                 domain: "news"
                 stationOpen: stationNewsHub.stationOpen
                 newsSubjectRoute: stationNewsHub.subjectRoute
+                mediaNewsServicesSplit: true
                 runtimeNowMs: stationNewsHub.runtimeNowMs
                 onNewsMapRequested: function(payload) {
                     stationNewsHub.newsMapRequested(payload);

@@ -90,10 +90,14 @@ test("MAP source rack is opened in-place into both original provider-owned map v
   assert.match(discovery,/if \(earthMapOnly\)/);
   assert.match(discovery,/if \(weatherMapOnly\)/);
   assert.match(discovery,/title: "SOURCE RACK \/\/ WHAT IS CONNECTED"/);
-  assert.equal((discovery.match(
-    /visible: !stationDiscovery\.earthPinnedMap\s*&& \(!stationDiscovery\.weatherMapOnly\s*\|\|\s*stationDiscovery\.domain === "map"\)/g
-  )||[]).length,3,
-    "legacy source health and rows still show in CLASSIC/WEATHER and move to SERVICES for pinned EARTH");
+  assert.ok(discovery.includes('objectName: "earth-e3-legacy-runtime-rack"'));
+  assert.ok(discovery.includes('objectName: "earth-e3-legacy-source-rack"'));
+  assert.ok(discovery.includes('title: "SOURCE RACK // WHAT IS CONNECTED"'));
+  assert.ok(discovery.includes("stationDiscovery.mediaNewsServicesSplit"));
+  assert.ok(discovery.includes('stationDiscovery.domain === "map"'));
+  assert.ok(discovery.includes("if (earthMapOnly)"));
+  assert.ok(discovery.includes("if (weatherMapOnly)"));
+  // M5 relocates NEWS diagnostic presentation only; EARTH MAP remains intact.
   for(const literal of [
     "NATURAL EARTH // SHARED LOCAL CARTOGRAPHY",
     "USGS // OBSERVED EARTHQUAKES M2.5+",

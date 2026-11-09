@@ -36,7 +36,8 @@ Item {
     ]
     readonly property var servicesSections: [
         {id:"runtime",label:"RUNTIME // OWNERS"},
-        {id:"sources",label:"SOURCE DIRECTORY"}
+        {id:"sources",label:"SOURCE DIRECTORY"},
+        {id:"feeds",label:"PUBLISHER FEEDS"}
     ]
     readonly property var railItems:
         activeMode === "radio" ? radioPresets

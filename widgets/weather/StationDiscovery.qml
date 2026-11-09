@@ -29,6 +29,9 @@ Rectangle {
     property string domain: "map"
     // Existing GDELT, source cooldown and in-pane article inspector reused.
     property string newsSubjectRoute: ""
+    // MEDIA owns a dedicated SERVICES surface for RSS publisher feeds,
+    // runtime health and source racks. NEWS still owns GDELT headlines.
+    property bool mediaNewsServicesSplit: false
     function newsGroupVisible(group) {
         return MediaPanelPolicy.newsGroupVisible(newsSubjectRoute,group);
     }
@@ -1775,6 +1778,8 @@ Rectangle {
                 objectName: "earth-e3-legacy-runtime-rack"
                 // The pinned EARTH page no longer repeats SERVICES runtime.
                 visible: !stationDiscovery.earthPinnedMap
+                    && !(stationDiscovery.mediaNewsServicesSplit
+                         && stationDiscovery.domain === "news")
                     && (!stationDiscovery.weatherMapOnly
                         || stationDiscovery.domain === "map")
                 width: parent.width
@@ -1785,6 +1790,8 @@ Rectangle {
                 visible: !stationDiscovery.earthPinnedMap
                     && (!stationDiscovery.weatherMapOnly
                         || stationDiscovery.domain === "map")
+                    && !(stationDiscovery.mediaNewsServicesSplit
+                         && stationDiscovery.domain === "news")
                 width: parent.width
                 title: "SOURCE RACK // WHAT IS CONNECTED"
             }
@@ -1794,6 +1801,8 @@ Rectangle {
                 visible: !stationDiscovery.earthPinnedMap
                     && (!stationDiscovery.weatherMapOnly
                         || stationDiscovery.domain === "map")
+                    && !(stationDiscovery.mediaNewsServicesSplit
+                         && stationDiscovery.domain === "news")
                 width: parent.width
                 spacing: 5
 
@@ -1833,6 +1842,8 @@ Rectangle {
             StationSectionDivider {
                 visible: !stationDiscovery.weatherMapOnly
                     && !stationDiscovery.earthPinnedMap
+                    && !(stationDiscovery.mediaNewsServicesSplit
+                         && stationDiscovery.domain === "news")
                 width: parent.width
                 title: stationDiscovery.providerTitle
             }
@@ -3804,18 +3815,8 @@ Rectangle {
                 }
             }
 
-            // Publisher RSS stays separate from GDELT's filtered report,
-            // rate limit, and story grouping. No second NEWS controller.
-            StationPublisherFeeds {
-                width: parent.width
-                visible: stationDiscovery.domain === "news"
-                         && stationDiscovery.newsGroupVisible("request")
-                stationOpen: stationDiscovery.stationOpen
-                onHeadlineSelected: function(row) {
-                    stationDiscovery.openRow(row);
-                }
-            }
-
+            // Publisher RSS controls moved to MEDIA → SERVICES → FEEDS.
+            // NEWS/REPORTS keeps its original one GDELT article owner.
             Row {
                 id: newsTopicRail
                 width: parent.width

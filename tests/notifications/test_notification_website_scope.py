@@ -52,6 +52,7 @@ const S = {
   defaultSnoozeDurationMs: 86400000,
   policyVersion: 1,
   policyRevision: 0,
+  policyReady: true, policyStatus: 'ready',
   schedulePolicySave() {}
 };
 const functions = [

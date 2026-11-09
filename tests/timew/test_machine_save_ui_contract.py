@@ -54,6 +54,15 @@ assert len(root_properties) == len(set(root_properties)), "Duplicate TimeW root 
 assert root_properties.count("machineAdvancedOpen") == 1
 assert root_properties.count("machineSaveAdvancedOpen") == 1
 assert 'machineSaveBridgePayload + String.fromCharCode(10)' in ui
+assert 'data.verification.status === "readback_verified"' in ui
+assert 'data.verification.geometry === true' in ui
+assert 'data.verification.legacy === true' in ui
+assert 'SAVED + VERIFIED // ' in ui
+assert 'SAVE MAY BE STORED // OPEN STORED TO CHECK' in ui
+assert 'SAVE OUTCOME UNKNOWN // CHECK STORED BEFORE RETRY' in ui
+assert '_verified_receipt' in bridge
+assert '"readback_verified"' in bridge
+assert '"saved_unverified"' in bridge
 assert 'review: null, selection: null' in ui
 assert 'review: review.review, selection: selected' in ui
 assert 'MachineCaptureSaveV2' not in ui

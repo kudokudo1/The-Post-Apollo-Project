@@ -18,7 +18,7 @@ assert 'onLeftClicked: timew.requestMachineCapturePreview()' in window
 assert 'onLeftClicked: timew.stepMachineInspect(-1)' in window
 assert 'onLeftClicked: timew.stepMachineInspect(1)' in window
 assert 'id: machineMarkerList' in window
-assert '"NO SCREENSHOTS OR RESTORATION ACTIVE"' in window
+assert '"NO SCREENSHOTS OR AUTOMATIC RESTORATION"' in window
 assert 'function restoreDesktop(' not in window
 assert 'FileView {' not in window
 assert 'JsonAdapter {' not in window

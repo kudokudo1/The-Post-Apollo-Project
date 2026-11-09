@@ -45,7 +45,7 @@ test("M28-Q all 16 original GROUND section families survive unchanged in one SUB
     assert.equal(policy.visibleFor("ground","earth/geology/earthquakes","seismic"),false);
 });
 
-test("GROUND full page is a reachable leaf in the seven-family WEATHER workspace and INDEX",()=>{
+test("GROUND full survives in old WEATHER INDEX while EARTH owns its new main tab",()=>{
     const node=nav.findRoute(FULL);
     assert.ok(node);
     assert.equal(node.subject,"weather");
@@ -53,19 +53,20 @@ test("GROUND full page is a reachable leaf in the seven-family WEATHER workspace
     assert.equal(node.label,"GROUND // ALL ORIGINAL INSTRUMENTS");
     assert.equal(nav.findRoute("weather/ground").group,true);
     const tabs=workspace.tabsFor(FULL);
-    const ground=tabs.find(x=>x.key==="ground");
-    assert.ok(ground,"real WEATHER bottom row button must open complete GROUND");
-    assert.equal(ground.label,"GROUND");
-    assert.equal(ground.path,FULL);
-    assert.equal(workspace.selectedGroup(FULL),"ground");
+    assert.equal(tabs.some(x=>["ground","water","maps"].includes(x.key)),false);
     assert.equal(workspace.familyFor(FULL),"weather");
-    assert.equal(tabs.length,8);
-    assert.deepEqual(JSON.parse(JSON.stringify(
-        tabs.filter(x=>["water","hazards","conditions","forecasts"].includes(x.key))
-            .map(x=>x.path))),[
-        "weather/conditions/current","weather/forecasts/hourly",
-        "weather/water/rivers","weather/hazards/alerts"
-    ]);
+    assert.equal(tabs.length,5);
+    const earthTabs=workspace.tabsFor("earth/overview");
+    const ground=earthTabs.find(x=>x.key==="ground");
+    const water=earthTabs.find(x=>x.key==="water");
+    const map=earthTabs.find(x=>x.key==="map");
+    assert.ok(ground && water && map);
+    assert.equal(ground.label,"GROUND");
+    assert.equal(ground.path,"earth/ground/full");
+    assert.equal(water.path,"earth/water/rivers");
+    assert.equal(map.path,"earth/maps/events");
+    assert.equal(workspace.selectedGroup(ground.path),"ground");
+    assert.equal(workspace.familyFor(ground.path),"earth");
     assert.match(originalWorkspace,/model: surface\.activeTabs/);
     assert.match(originalWorkspace,/onTriggered: surface\.routeRequested\(modelData\.path\)/);
     assert.match(subjectNavigator,/function chooseRoute\(path\)/);

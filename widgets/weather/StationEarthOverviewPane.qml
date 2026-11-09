@@ -18,6 +18,9 @@ Rectangle {
     property var nwsAlertSource: null
     property var seismicSource: null
     property int topicIndex: 0
+    // E8 // The real EARTH workspace places the C44 rail above the map.
+    // Standalone source/native fixtures can retain the original E7 rail.
+    property bool embeddedHeader: false
     signal openTopicRequested(string topicId)
 
     readonly property var currentTopic: Overview.topic(topicIndex)
@@ -42,13 +45,14 @@ Rectangle {
     Row {
         id: overviewMainRail
         objectName: "earth-e7-overview-main-rail"
+        visible: !overview.embeddedHeader
         anchors.top: parent.top
         anchors.topMargin: 2
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: HeaderGeometry.inset
         anchors.rightMargin: HeaderGeometry.inset
-        height: HeaderGeometry.tabHeight
+        height: overview.embeddedHeader ? 0 : HeaderGeometry.tabHeight
         spacing: HeaderGeometry.tabSpacing
         Repeater {
             model: Overview.TOPICS
@@ -69,17 +73,19 @@ Rectangle {
     Rectangle {
         id: mainDivider
         objectName: "earth-e7-overview-divider"
+        visible: !overview.embeddedHeader
         anchors.top: overviewMainRail.bottom
         anchors.topMargin: HeaderGeometry.tabsToRule
         anchors.left: overviewMainRail.left
         anchors.right: overviewMainRail.right
-        height: HeaderGeometry.ruleHeight
+        height: overview.embeddedHeader ? 0 : HeaderGeometry.ruleHeight
         color: Colors.cyan
     }
     Row {
         id: topicNavigation
         objectName: "earth-e6-overview-arrows"
-        anchors.top: mainDivider.bottom
+        anchors.top: overview.embeddedHeader
+            ? parent.top : mainDivider.bottom
         anchors.topMargin: 2
         anchors.left: overviewMainRail.left
         anchors.right: overviewMainRail.right

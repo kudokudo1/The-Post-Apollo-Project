@@ -93,7 +93,7 @@ test("the real CPU++ mode order is exactly the requested suffix",()=>{
   const names=[...segment.matchAll(/name: "([^"]+)"/g)].map(x=>x[1]);
   assert.deepEqual(names,["OVERVIEW","PROCESS","THERMAL","SYSTEM",
                           "FAVORITES","ID MANAGEMENT","SETTINGS"]);
-  assert.match(src,/selectedModeIndex === 4 && favoritesDetailsPane\.editingText/);
+  assert.match(src,/selectedModeIndex === 4[\s\S]*?favoritesDetailsPane\.editingText[\s\S]*?favoritesSelectorPane\.editingText/);
   assert.match(src,/selectedModeIndex === 6 && settingsSubMode === "LOCATION"[\s\S]*?settingsLocationPane\.editingText[\s\S]*?settingsLocationOverviewPane\.editingText/);
   assert.match(src,/cpuPlusWindow\.selectMode\(index\)/);
   assert.match(src,/selectedModeIndex === 2 \|\| selectedModeIndex === 3/);
@@ -1693,7 +1693,7 @@ test("U8d compact Favorites icon rail keeps each row centered and icons readable
     assert.equal((width-used)/2>=0,true);
     if(count===6)assert.equal(used,width);
   }
-  assert.match(pane,/selector\.height-categoryFilterFlow\.height-121/);
+  assert.match(pane,/selector\.height-categoryFilterFlow\.height-favoritesSearchBar\.height-129/);
   assert.match(pane,/id: subfilterButtons[\s\S]*?label: modelData/);
 });
 
@@ -1737,8 +1737,11 @@ test("U8d inactive filters remain black; only the opened filter is yellow with m
     assert.equal(ctx.frameInk,colors[border],category+" normal frame");
     assert.equal(ctx.iconGlowInk,colors[glow],category+" normal glow");
   }
-  for(const state of ["idle","hover","pressed","selected","keyboardSelected"])
-    assert.match(main,new RegExp(state+"BorderColor: frameInk"));
+  assert.match(main,/idleBorderColor: frameInk/);
+  for(const state of ["hover","pressed","keyboardSelected"])
+    assert.match(main,new RegExp(state+
+      "BorderColor:\\s*filterOpen \\? Colors\\.magenta : frameInk"));
+  assert.match(main,/selectedBorderColor: Colors\.magenta/);
   assert.match(main,/selected: filterOpen/);
   assert.match(main,/readonly property bool filterOpen:\s*pane\.filterMode===modelData/);
   assert.match(main,/idleFillColor: Colors\.black/);
@@ -1995,4 +1998,128 @@ test("U9b smaller canonical CPU++ close preserves red-on-black and divider clear
   assert.match(close,/onClicked: cpuPlusWindow\.close\(\)/);
   assert.match(cpu,/anchors\.top: cpuPlusCloseButton\.bottom/);
   assert.match(cpu,/text: "LIVE \/\/ NET \/\/ "\+cpuPlusWindow\.internetStatus\.label/);
+});
+
+
+test("U9c search matches safe source names and types with unordered partial tokens",()=>{
+  const Search={};
+  load("services/favorites/FavoritesSearchPolicy.js",Search);
+  const sensor={
+    key:"fav1:secret:monitor-watch:private-sensor-secret",
+    resourceId:"hidden-device-id",
+    category:"CPU++",menu:"THERMAL",
+    item:"SENSOR 13",label:"THERMAL // SENSOR 13",
+    favoriteType:"METRIC WATCH",provider:"appcontrol",
+    kind:"monitor-watch",owner:"appcontrol"
+  };
+  for(const q of ["thermal sensor","sensor thermal","SENSOR 1",
+     "1", "sensor 13 thermal", "THeRm sEnS 1", "monitor thermal 13",
+     "watch thermal sensor","cpu thermal sensor"]) {
+    assert.equal(Search.matches(sensor,q),true,q);
+  }
+  for(const q of ["Maryland","sensor 99","cpu disk","unknown label"]) {
+    assert.equal(Search.matches(sensor,q),false,q);
+  }
+  const app={key:"SECRET_ONE",category:"APP CTRL",menu:"APPS",
+    label:"App control // Proton Mail",item:"Proton Mail",
+    favoriteType:"FAVORITE",owner:"appcontrol"};
+  for(const q of ["app CTRL","CTRL app","app, ctrl","control app",
+                  "appcontrol mail","mail proton app"]) {
+    assert.equal(Search.matches(app,q),true,q);
+  }
+  assert.equal(Search.matches(app,"one"),false,"private key excluded");
+  assert.equal(Search.matches({...app,label:"",item:"",menu:""}, "secret"),false);
+  assert.equal(Search.matches(sensor,"private-sensor-secret"),false);
+  assert.equal(Search.matches(sensor,"hidden-device-id"),false);
+  assert.equal(Search.matches(sensor,""),true);
+  assert.equal(Search.matches(sensor,"  "),true);
+});
+
+test("U9c search treats Maryland/MD and United States/USA as equivalent place terms",()=>{
+  const Search={};
+  load("services/favorites/FavoritesSearchPolicy.js",Search);
+  const spelled={category:"PLACES",menu:"PLACES",provider:"places",
+    label:"Baltimore, Maryland, United States",item:""};
+  const abbreviated={category:"PLACES",menu:"PLACES",provider:"places",
+    label:"Baltimore, MD, USA",item:""};
+  for(const row of [spelled,abbreviated]) {
+    for(const q of ["maryland united states","usa md","MD USA",
+                     "USA Maryland","United States MD",
+                     "states baltimore maryland","md baltimore USA",
+                     "balt  usa  md", "USA, MD"]) {
+      assert.equal(Search.matches(row,q),true,JSON.stringify([row.label,q]));
+    }
+    assert.equal(Search.matches(row,"virginia"),false);
+  }
+  const app={category:"APP CTRL",menu:"APPS",item:"Markdown Editor"};
+  assert.equal(Search.matches(app,"maryland"),false,
+    "embedded md in another word must not expand to Maryland");
+  assert.equal(Search.matches(app,"MD"),false,
+    "an abbreviation must not match unrelated words");
+  assert.equal(Search.matches({...app,label:"MD Reader"},"MD"),true,
+    "a visible exact abbreviation remains searchable");
+});
+
+test("U9c filters share yellow fill, magenta border, icon and glow in EVERY selected state",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const top=pane.slice(pane.indexOf("id: categoryFilterFlow"),
+     pane.indexOf("id: favoritesSearchBar"));
+  const menu=pane.slice(pane.indexOf("id: subfilterButtons"),
+     pane.indexOf("id: menuFilterNext"));
+  assert.match(top,/selected: filterOpen/);
+  assert.match(menu,/selected: filterOpen/);
+  for(const region of [top,menu]) {
+    assert.match(region,/selectedFillColor: Colors\.yellow/);
+    assert.match(region,/selectedBorderColor: Colors\.magenta/);
+    assert.match(region,/selectedForegroundColor: Colors\.magenta/);
+    assert.match(region,/selectedContentGlowColor: Colors\.magenta/);
+    assert.match(region,/selectedSoftGlowColor: Colors\.magenta/);
+    assert.match(region,/idleFillColor: Colors\.black/);
+    for(const state of ["hover","pressed","keyboardSelected"]) {
+      assert.match(region,new RegExp(state+
+        "FillColor:\\s*filterOpen \\? Colors\\.yellow : Colors\\.black"));
+      assert.match(region,new RegExp(state+
+        "BorderColor:\\s*filterOpen \\? Colors\\.magenta : "));
+      assert.match(region,new RegExp(state+
+        "ForegroundColor:\\s*filterOpen \\? Colors\\.magenta : "));
+      assert.match(region,new RegExp(state+
+        "ContentGlowColor:\\s*filterOpen \\? Colors\\.magenta : "));
+      assert.match(region,new RegExp(state+
+        "SoftGlowColor:\\s*filterOpen \\? Colors\\.magenta : "));
+    }
+  }
+  // Inactive main glyphs still preserve module-specific identities.
+  assert.match(top,/idleBorderColor: frameInk/);
+  assert.match(top,/idleForegroundColor: iconInk/);
+  assert.match(top,/idleContentGlowColor: iconGlowInk/);
+  assert.match(top,/idleSoftGlowColor: frameInk/);
+  assert.match(menu,/onLeftClicked: pane\.menuFilter=modelData/);
+  assert.match(top,/onLeftClicked: pane\.filterMode=modelData/);
+});
+
+test("U9c middle search is live, source-only and suppresses CPU++ hotkeys when focused",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const cpu=read("widgets/CpuPlusW.qml");
+  assert.match(pane,/FavoritesSearchPolicy\.js" as Search/);
+  assert.match(pane,/property alias searchQuery: favoritesSearchInput\.text/);
+  assert.match(pane,/Search\.matches\(row,pane\.searchQuery\)/);
+  assert.match(pane,/id: favoritesSearchBar/);
+  assert.match(pane,/id: favoritesSearchInput/);
+  assert.match(pane,/maximumLength: 120/);
+  assert.match(pane,/SEARCH \/\/ NAME, MENU, PLACE/);
+  assert.match(pane,/pane\.filterMode="ALL"/);
+  assert.match(pane,/pane\.menuFilter="ALL"/);
+  assert.match(pane,/listScroll\.contentY=0/);
+  assert.match(pane,/onLeftClicked: favoritesSearchInput\.text=""/);
+  assert.match(pane,/area==="selector" && favoritesSearchInput\.activeFocus/);
+  assert.match(cpu,/favoritesSelectorPane\.editingText/);
+  const searchUI=pane.slice(pane.indexOf("id: favoritesSearchBar"),
+    pane.indexOf("id: listScroll"));
+  for(const unsafe of ["Process {","execDetached(","setFavorite(",
+    "saveHome(","deleteCollection(","openUrl(","resourceId","row.key"])
+    assert.equal(searchUI.includes(unsafe),false,unsafe);
+  const policy=read("services/favorites/FavoritesSearchPolicy.js");
+  assert.match(policy,/var FIELDS=\[/);
+  for(const unsafe of ['"key"','"resourceId"','"command"','"url"'])
+    assert.equal(policy.includes(unsafe),false,unsafe);
 });

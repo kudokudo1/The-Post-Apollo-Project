@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "../../services/favorites/FavoritesDossierIndexPolicy.js" as Dossier
+import "../../services/favorites/FavoritesSearchPolicy.js" as Search
 import "../../services/favorites/FavoritesCollectionsViewPolicy.js" as CollectionView
 import "../../services/favorites/FavoritesOwnerNavigationPolicy.js" as OwnerNavigation
 import "../../services/favorites/FavoritesExactNavigationPolicy.js" as ExactNavigation
@@ -22,6 +23,7 @@ Item {
     property alias dossierGroupItems: dossierGroupRepeater
     property alias dossierScrollArea: dossierScroll
     property alias collapseAllControl: collapseAllButton
+    property alias searchQuery: favoritesSearchInput.text
     property alias collectionGroupItems: collectionGroupRepeater
     // Native fixture inspection of the existing group editor (no new action).
     property alias collectionPanel: collectionManager
@@ -119,8 +121,9 @@ Item {
         if(pane.filterMode==="GROUP") menuFilter="ALL";
     }
     readonly property bool editingText:
-        area==="details" && collectionManager.visible
-        && collectionManager.editingText
+        (area==="selector" && favoritesSearchInput.activeFocus)
+        || (area==="details" && collectionManager.visible
+            && collectionManager.editingText)
     property bool removeArmed: false
     onSelectedResourceChanged: {
         removeArmed=false;
@@ -138,7 +141,8 @@ Item {
     readonly property var choices: pane.menuSourceRows.filter(function(row) {
         return (pane.filterMode==="ALL" || pane.filterMode==="GROUP"
                 || row.category===pane.filterMode)
-            && (pane.menuFilter==="ALL" || row.menu===pane.menuFilter);
+            && (pane.menuFilter==="ALL" || row.menu===pane.menuFilter)
+            && Search.matches(row,pane.searchQuery);
     })
     readonly property var groupRecords:
         collectionsOwner ? collectionsOwner.collections : []
@@ -646,10 +650,13 @@ Item {
                             keyboardSelectedForegroundColor:
                                 filterOpen ? Colors.magenta : iconInk
                             idleBorderColor: frameInk
-                            hoverBorderColor: frameInk
-                            pressedBorderColor: frameInk
-                            selectedBorderColor: frameInk
-                            keyboardSelectedBorderColor: frameInk
+                            hoverBorderColor:
+                                filterOpen ? Colors.magenta : frameInk
+                            pressedBorderColor:
+                                filterOpen ? Colors.magenta : frameInk
+                            selectedBorderColor: Colors.magenta
+                            keyboardSelectedBorderColor:
+                                filterOpen ? Colors.magenta : frameInk
                             idleContentGlowColor: iconGlowInk
                             hoverContentGlowColor:
                                 filterOpen ? Colors.magenta : iconGlowInk
@@ -686,6 +693,78 @@ Item {
                 }
             }
         }
+        // U9c // Search the same visible, owner-approved saved entries.
+        // A new query starts globally; clicking a category afterwards
+        // intentionally narrows those results. No owner action is invoked.
+        Rectangle {
+            id: favoritesSearchBar
+            width: parent.width
+            height: 32
+            color: Colors.black
+            border.width: 1
+            border.color: favoritesSearchInput.activeFocus
+                ? Colors.magenta : Colors.cyan
+
+            QuietText {
+                anchors.left: parent.left
+                anchors.leftMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width-36
+                visible: favoritesSearchInput.text.length===0
+                text: "⌕  SEARCH // NAME, MENU, PLACE..."
+                font.pixelSize: 9
+                color: Colors.cyan
+                elide: Text.ElideRight
+            }
+            TextInput {
+                id: favoritesSearchInput
+                anchors.left: parent.left
+                anchors.leftMargin: 8
+                anchors.right: favoritesSearchClear.left
+                anchors.rightMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                height: 22
+                font.family: GohuFont.family
+                font.pixelSize: 11
+                color: Colors.white
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.black
+                maximumLength: 120
+                selectByMouse: true
+                clip: true
+                property bool searchWasEmpty: true
+                Accessible.role: Accessible.EditableText
+                Accessible.name: "Search saved favorites by any words in any order"
+                onTextChanged: {
+                    const entering=searchWasEmpty && text.trim().length>0;
+                    searchWasEmpty=text.trim().length===0;
+                    if(entering) {
+                        pane.filterMode="ALL";
+                        pane.menuFilter="ALL";
+                    }
+                    listScroll.contentY=0;
+                }
+                Keys.onEscapePressed: function(event) {
+                    if(text.length)text="";
+                    else focus=false;
+                    event.accepted=true;
+                }
+            }
+            ActionButton {
+                id: favoritesSearchClear
+                anchors.right: parent.right
+                anchors.rightMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                width: 23
+                height: 23
+                label: "×"
+                labelPixelSize: 16
+                available: favoritesSearchInput.text.length>0
+                accentColor: Colors.magenta
+                idleFillColor: Colors.black
+                onLeftClicked: favoritesSearchInput.text=""
+            }
+        }
         QuietText {
             width: parent.width
             text: pane.filterMode==="GROUP"
@@ -709,7 +788,7 @@ Item {
         Flickable {
             id: listScroll
             width: parent.width
-            height: Math.max(0,selector.height-categoryFilterFlow.height-121)
+            height: Math.max(0,selector.height-categoryFilterFlow.height-favoritesSearchBar.height-129)
             clip: true
             contentWidth: width
             contentHeight: listRows.implicitHeight
@@ -840,8 +919,52 @@ Item {
                             height: 29
                             label: modelData
                             labelPixelSize: 9
-                            selected: pane.menuFilter===modelData
-                            accentColor: selected ? Colors.magenta : Colors.cyan
+                            readonly property bool filterOpen:
+                                pane.menuFilter===modelData
+                            selected: filterOpen
+                            accentColor: Colors.cyan
+                            idleFillColor: Colors.black
+                            hoverFillColor:
+                                filterOpen ? Colors.yellow : Colors.black
+                            pressedFillColor:
+                                filterOpen ? Colors.yellow : Colors.black
+                            selectedFillColor: Colors.yellow
+                            keyboardSelectedFillColor:
+                                filterOpen ? Colors.yellow : Colors.black
+                            idleForegroundColor: Colors.cyan
+                            hoverForegroundColor:
+                                filterOpen ? Colors.magenta : Colors.cyan
+                            pressedForegroundColor:
+                                filterOpen ? Colors.magenta : Colors.cyan
+                            selectedForegroundColor: Colors.magenta
+                            keyboardSelectedForegroundColor:
+                                filterOpen ? Colors.magenta : Colors.cyan
+                            idleBorderColor: Colors.cyan
+                            hoverBorderColor:
+                                filterOpen ? Colors.magenta : Colors.cyan
+                            pressedBorderColor:
+                                filterOpen ? Colors.magenta : Colors.cyan
+                            selectedBorderColor: Colors.magenta
+                            keyboardSelectedBorderColor:
+                                filterOpen ? Colors.magenta : Colors.cyan
+                            idleContentGlowColor: Colors.cyan
+                            hoverContentGlowColor:
+                                filterOpen ? Colors.magenta : Colors.cyan
+                            pressedContentGlowColor:
+                                filterOpen ? Colors.magenta : Colors.cyan
+                            selectedContentGlowColor: Colors.magenta
+                            keyboardSelectedContentGlowColor:
+                                filterOpen ? Colors.magenta : Colors.cyan
+                            idleSoftGlowColor: Colors.cyan
+                            hoverSoftGlowColor:
+                                filterOpen ? Colors.magenta : Colors.cyan
+                            pressedSoftGlowColor:
+                                filterOpen ? Colors.magenta : Colors.cyan
+                            selectedSoftGlowColor: Colors.magenta
+                            keyboardSelectedSoftGlowColor:
+                                filterOpen ? Colors.magenta : Colors.cyan
+                            contentGlowPressedOpacity: 0.68
+                            softGlowSelectedOpacity: 0.72
                             onLeftClicked: pane.menuFilter=modelData
                         }
                     }

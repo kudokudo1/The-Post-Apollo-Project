@@ -156,11 +156,22 @@ ShellRoot {
         running: !root.done
         onTriggered: {
             root.ticks++;
-            if (root.ticks === 1 || root.ticks % 45 === 0)
+            if (root.ticks === 1 || root.ticks % 45 === 0) {
                 console.log("M26E_HEARTBEAT // " + root.sourceId
                     + " step=" + root.step
                     + " ready=" + archive.storageState
                     + " rev=" + archive.document.revision);
+                if (root.step === "positionSave") {
+                    const btn=root.saveButton(), scroller=root.scroll();
+                    const p=btn ? btn.mapToItem(map,btn.width/2,btn.height/2) : null;
+                    console.log("M26E_SAVE_GEOMETRY // x="+(p?p.x:"missing")
+                        +" y="+(p?p.y:"missing")
+                        +" contentY="+(scroller?scroller.contentY:"missing")
+                        +" contentH="+(scroller?scroller.contentHeight:"missing")
+                        +" scrollH="+(scroller?scroller.height:"missing")
+                        +" button="+!!btn);
+                }
+            }
             if (root.step === "boot") {
                 const correctState = ordinal === 1 ? "empty" : "ready";
                 if (archive.storageState !== correctState

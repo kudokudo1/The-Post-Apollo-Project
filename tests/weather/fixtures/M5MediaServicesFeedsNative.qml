@@ -56,7 +56,20 @@ ShellRoot {
             const sources=find(media,"media-m5-source-content");
             const feedLoader=find(media,"media-m5-publisher-feed-loader");
             const header=find(media,"media-m1-global-fixed-header");
-            if(!services||!runtime||!sources||!feedLoader||!header)return;
+            if(!services||!runtime||!sources||!feedLoader||!header) {
+                if(root.ticks>8) {
+                    const missing=[
+                        ["services",services],["runtime",runtime],
+                        ["sources",sources],["feedLoader",feedLoader],
+                        ["header",header]].filter(function(x){return !x[1];})
+                           .map(function(x){return x[0];}).join(",");
+                    return root.fail("MISSING_NODES // "+missing
+                        +" // mediaKind="+String(media.kind)
+                        +" // loaded="+String(media.loadedServices)
+                        +" // children="+String(media.children.length));
+                }
+                return;
+            }
             if(root.phase===0) {
                 const feedsButton=find(header,"media-m2-mode-feeds");
                 if(!feedsButton ||services.viewMode!=="runtime"

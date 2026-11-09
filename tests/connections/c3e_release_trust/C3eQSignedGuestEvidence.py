@@ -209,6 +209,9 @@ class OneUseTestChallenge:
         return {
             "schema": RECEIPT_SCHEMA,
             "signedEvidenceValidInCI": True,
+            # Hash the exact immutable bytes returned by detached-signature
+            # verification. NEVER reopen the caller-controlled source path.
+            "verifiedEvidenceSHA256": hashlib.sha256(signed).hexdigest(),
             "challengeConsumedInMemory": True,
             "signedGuestOriginAuthenticated": False,
             "installedGuestMeasured": False,

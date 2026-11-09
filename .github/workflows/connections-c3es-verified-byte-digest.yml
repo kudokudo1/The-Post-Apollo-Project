@@ -1,0 +1,67 @@
+name: Connections C3e-S signed evidence immutable verified-byte digest (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eQSignedGuestEvidence.py"
+      - "tests/connections/c3e_release_trust/C3eRDurableChallengeLedger.py"
+      - "tests/connections/test_connections_c3er_durable_challenge_ledger.py"
+      - ".github/workflows/connections-c3es-verified-byte-digest.yml"
+      - "docs/connections-c3es-verified-byte-digest.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verified-snapshot-no-second-read:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Syntax and exact signed byte digest source requirement
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eQSignedGuestEvidence.py \
+            tests/connections/c3e_release_trust/C3eRDurableChallengeLedger.py \
+            tests/connections/test_connections_c3er_durable_challenge_ledger.py
+          python3 -B - <<'PY'
+          from pathlib import Path
+          q=Path('tests/connections/c3e_release_trust/C3eQSignedGuestEvidence.py').read_text()
+          r=Path('tests/connections/c3e_release_trust/C3eRDurableChallengeLedger.py').read_text()
+          assert '"verifiedEvidenceSHA256": hashlib.sha256(signed).hexdigest()' in q
+          assert 'verified_receipt["verifiedEvidenceSHA256"]' in r
+          assert 'hashlib.sha256(Q.safe_bytes(' not in r
+          assert 'WHERE digest=? AND state=\'issued\'' in r
+          broker=Path('services/connections/ConnectionsBroker.qml').read_text()
+          status=Path('services/connections/ConnectionsRequestStatus.qml').read_text()
+          assert 'readonly property bool credentialActionsEnabled: false' in broker
+          assert 'readonly property bool hostAuthenticated: false' in status
+          print('C3ES_PASS // VERIFIED_DIGEST_NOT_SECOND_PATH_READ')
+          PY
+      - name: Protected durable challenge exact verified byte and swap tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true python3 -B tests/connections/test_connections_c3er_durable_challenge_ledger.py
+          echo 'C3ES_PASS // VERIFIED_SNAPSHOT_BYTES_STORED_AND_REPLAY_DENIED'
+      - name: Existing signed evidence and recovery regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3eq_signed_guest_evidence.py
+          python3 -B tests/connections/test_connections_c3ei_supervised_supersession.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          echo 'C3ES_PASS // PRIOR_SIGNATURE_AND_DENY_GATES'
+      - name: Confirm no installed guest or independently protected ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'not independently rollback-resistant' docs/connections-c3es-verified-byte-digest.md
+          grep -Fq 'not a real Silverblue guest measurement' docs/connections-c3es-verified-byte-digest.md
+          echo 'C3ES_LIMITATION // SAME_CI_ROOT_NOT_INDEPENDENT_PRODUCTION_ATTESTATION'

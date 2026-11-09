@@ -88,9 +88,9 @@ test("E3 preserves old scrolling CLASSIC MAP tools outside the pinned route",()=
   assert.match(discovery,/function selectMapFilter\(id\)/);
   assert.match(discovery,/id: mapFilterRail/);
   assert.match(discovery,/!stationDiscovery\.earthPinnedMap/);
-  assert.match(discovery,/onClicked: stationDiscovery\.mapShowCountryBorders =/);
-  assert.match(discovery,/onClicked: stationDiscovery\.mapShowEarthquakes =/);
-  assert.match(discovery,/onClicked: stationDiscovery\.fetchVisibleHotspots\(\)/);
+  assert.match(discovery,/onClicked:\s*stationDiscovery\.mapShowCountryBorders =/);
+  assert.match(discovery,/onClicked:\s*stationDiscovery\.mapShowEarthquakes =/);
+  assert.match(discovery,/onClicked:\s*stationDiscovery\.fetchVisibleHotspots\(\)/);
   assert.match(discovery,/onClicked:\s*stationDiscovery\.loadRadarSnapshot\(\)/);
   assert.match(discovery,/onClicked:\s*stationDiscovery\.loadSmokePolygons\(\)/);
   assert.match(discovery,/ParentChange\s*\{/);

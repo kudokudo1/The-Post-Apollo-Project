@@ -82,7 +82,7 @@ Item {
                                 onClicked: strips.recallRequested(modelData)
                             }
                             ToolTip.visible: recallHover.containsMouse
-                            ToolTip.text: modelData.title + " // RECALL"
+                            ToolTip.text: modelData.title + " // SAFE RECALL // VERIFY UUID // NO STORED STREAM URL // NO AUTOPLAY"
                             ActionButton {
                                 anchors.right: parent.right
                                 anchors.top: parent.top

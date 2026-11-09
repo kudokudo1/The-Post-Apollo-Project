@@ -4,6 +4,7 @@ import "../services/hospital"
 import "../services/hospital/HospitalWorkforceManagerPolicy.js" as ManagementPolicy
 import "../services/hospital/HospitalWorkforceJobActivationPolicy.js" as JobActivationPolicy
 import "../services/hospital/HospitalWorkforceStaffingPolicy.js" as StaffingPolicy
+import "../services/hospital/HospitalFirstBedVerificationPolicy.js" as BedPolicy
 
 // Collapsible content inside SURGERY → SHOW WORKERS, not a new Hospital route.
 // All writes require a separate operator REVIEW and CONFIRM. No AI turns.
@@ -14,6 +15,11 @@ Column {
     property var providerService: null
     property var rooms: []
     property var sessions: []
+    property var knownBeds: []
+    property bool bedsDiscovering: false
+    property string bedDiscoveryError: ""
+    property string selectedBedPath: ""
+    property int staffBedPage: 0
     property bool roomsLoaded: false
     property bool sessionsLoaded: false
     property string registryError: ""
@@ -46,6 +52,27 @@ Column {
         && Array.isArray(doctorService.doctors) ? doctorService.doctors : []
     readonly property var providers: providerService
         && Array.isArray(providerService.providers) ? providerService.providers : []
+    readonly property var selectedStaffingRoom: {
+        const rows = root.rooms.filter(function(r) {
+            return String((r || {}).id || (r || {}).roomId || "") === root.selectedRoomId;
+        });
+        return rows.length === 1 ? rows[0] : ({});
+    }
+    readonly property var bedChoices: BedPolicy.candidateRows({
+        room: root.selectedStaffingRoom,
+        rooms: root.rooms, roomsLoaded: root.roomsLoaded,
+        beds: root.knownBeds
+    })
+    readonly property var bedPlan: BedPolicy.assess({
+        room: root.selectedStaffingRoom,
+        rooms: root.rooms, roomsLoaded: root.roomsLoaded,
+        sessions: root.sessions, beds: root.knownBeds,
+        bedsDiscovering: root.bedsDiscovering,
+        selectedPath: root.selectedBedPath,
+        evidence: bedProbe.evidence,
+        evidenceChecked: bedProbe.verified,
+        evidenceBusy: bedProbe.checking
+    })
     readonly property var staffingPlan: StaffingPolicy.plan({
         roomId: root.selectedRoomId,
         doctorId: root.selectedStaffDoctorId,
@@ -121,6 +148,7 @@ Column {
         assignments: inlineAssignment.assignments
     })
     signal rosterRefreshRequested()
+    signal discoverBedsRequested()
     // Read-only candidate handoff to the existing nested attachment preview.
     // This signal cannot authorize or execute a PX Session mutation.
     signal openRoomRequested(string roomId, var selection)
@@ -158,6 +186,18 @@ Column {
         if (root.providerService && !root.providerService.refreshing)
             root.providerService.refresh();
         return assignmentsRequested;
+    }
+    function verifySelectedBed() {
+        root.staffingReviewKey = "";
+        if (!root.active || root.mode !== "STAFFING"
+                || !root.bedPlan.candidateSelectable || root.bedsDiscovering) {
+            root.outcome = "GIT BED HOLD // SELECT A CLEAN MATCHING WORKTREE";
+            return false;
+        }
+        const ok = bedProbe.verify(root.selectedBedPath);
+        root.outcome = ok ? "GIT VERIFY // READ-ONLY INSPECTION STARTED"
+                          : "GIT VERIFY HOLD // " + bedProbe.lastError;
+        return ok;
     }
     function reviewStaffing() {
         root.staffingReviewKey = "";
@@ -330,6 +370,9 @@ Column {
         selectedDraftAssignmentId = "";
         selectedStaffDoctorId = "";
         selectedStaffProviderId = "";
+        selectedBedPath = "";
+        staffBedPage = 0;
+        bedProbe.invalidate();
         staffDoctorPage = 0;
         staffProviderPage = 0;
         jobPage = 0;
@@ -337,17 +380,27 @@ Column {
     onSelectedDraftAssignmentIdChanged: activationArmKey = ""
     onSelectedStaffDoctorIdChanged: staffingReviewKey = ""
     onSelectedStaffProviderIdChanged: staffingReviewKey = ""
+    onSelectedBedPathChanged: {
+        staffingReviewKey = "";
+        bedProbe.invalidate();
+    }
+    onKnownBedsChanged: bedProbe.invalidate()
     onProvidersChanged: staffingReviewKey = ""
     onDoctorsChanged: staffingReviewKey = ""
     onActiveChanged: {
         disarm();
+        if (!active)
+            bedProbe.invalidate();
         if (active)
             Qt.callLater(function() {
                 if (root.active && !roomRepositoryField.value)
                     roomRepositoryField.value = root.suggestedRepository;
             });
     }
-    onRoomsChanged: disarm()
+    onRoomsChanged: {
+        disarm();
+        bedProbe.invalidate();
+    }
     onSessionsChanged: disarm()
     onRegistryErrorChanged: disarm()
     onStaffingPlanChanged: staffingReviewKey = ""
@@ -384,6 +437,9 @@ Column {
             roomNameField.value = "";
             root.rosterRefreshRequested();
         }
+    }
+    HospitalFirstBedProbeService {
+        id: bedProbe
     }
     HospitalWorkerAttachmentPreviewService {
         id: staffingAssignments
@@ -854,6 +910,113 @@ Column {
             count: root.rooms.length
             onPrevious: root.staffRoomPage--
             onNext: root.staffRoomPage++
+        }
+        Rectangle { width: root.width; height: 2; color: Colors.magenta }
+        GohuText {
+            width: parent.width
+            text: "GIT BED // VERIFY EXISTING WORKTREE BEFORE STAFFING"
+            font.pixelSize: 9
+            color: Colors.orange
+            wrapMode: Text.Wrap
+        }
+        GohuText {
+            width: parent.width
+            text: "This checks an existing local Git folder. It does not create, switch, clean or register a Bed. Only clean, non-live worktrees for this Room's repository are listed."
+            font.pixelSize: 9
+            color: Colors.blue
+            wrapMode: Text.Wrap
+        }
+        Repeater {
+            model: root.bedChoices.slice(root.staffBedPage * root.pageSize,
+                (root.staffBedPage + 1) * root.pageSize)
+            Rectangle {
+                required property var modelData
+                width: root.width
+                height: 36
+                color: Colors.black
+                border.width: 1
+                border.color: root.selectedBedPath === String(modelData.path || "")
+                    ? Colors.magenta : Colors.blue
+                GohuText {
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    text: String(modelData.label || "GIT BED")
+                        + " // " + String(modelData.branch || "DETACHED")
+                        + "\n" + String(modelData.path || "")
+                    font.pixelSize: 8
+                    color: Colors.white
+                    elide: Text.ElideRight
+                    wrapMode: Text.Wrap
+                    verticalAlignment: Text.AlignVCenter
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.selectedBedPath = String(modelData.path || "")
+                }
+            }
+        }
+        ManagerPageRow {
+            currentPage: root.staffBedPage
+            count: root.bedChoices.length
+            onPrevious: root.staffBedPage--
+            onNext: root.staffBedPage++
+        }
+        Row {
+            width: root.width
+            spacing: 6
+            HospitalActionButton {
+                width: (parent.width - 6) / 2
+                height: 30
+                label: "FIND BEDS"
+                accent: Colors.cyan
+                contentGlowEnabled: false
+                enabledAction: root.active && !root.bedsDiscovering
+                onTriggered: root.discoverBedsRequested()
+            }
+            HospitalActionButton {
+                width: (parent.width - 6) / 2
+                height: 30
+                label: "VERIFY BED"
+                accent: Colors.magenta
+                contentGlowEnabled: false
+                enabledAction: root.active && root.bedPlan.candidateSelectable
+                    && !bedProbe.checking
+                onTriggered: root.verifySelectedBed()
+            }
+        }
+        GohuText {
+            width: parent.width
+            text: root.bedPlan.status
+                + " // " + (root.selectedBedPath || "NO SELECTED BED")
+                + (bedProbe.checked ? " // CHECKED " + bedProbe.lastCheckedAt : "")
+                + (bedProbe.lastError ? "\nERROR // " + bedProbe.lastError : "")
+                + (root.bedDiscoveryError ? "\nDISCOVERY // " + root.bedDiscoveryError : "")
+            font.pixelSize: 9
+            color: root.bedPlan.verifiedForReview ? Colors.cyan : Colors.orange
+            wrapMode: Text.WrapAnywhere
+        }
+        GohuText {
+            width: parent.width
+            visible: root.bedPlan.verifiedForReview
+            text: "GIT VERIFIED // " + root.bedPlan.repository
+                + " // " + root.bedPlan.branch
+                + " // HEAD " + root.bedPlan.head.slice(0,12)
+                + "\nPX BED REGISTRATION STILL REQUIRES AUTHENTICATED APPROVAL."
+            font.pixelSize: 9
+            color: Colors.cyan
+            wrapMode: Text.WrapAnywhere
+        }
+        Repeater {
+            model: root.bedPlan.blockers.slice(0, 8)
+            GohuText {
+                required property string modelData
+                width: root.width
+                text: "BED HOLD // " + modelData
+                font.pixelSize: 9
+                color: Colors.orange
+                wrapMode: Text.Wrap
+            }
         }
         GohuText {
             width: parent.width

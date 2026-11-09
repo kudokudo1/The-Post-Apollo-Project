@@ -6377,12 +6377,21 @@ PanelWindow {
                     providerService: providerService
                     rooms: responsibilityService.durableRooms
                     sessions: responsibilityService.durableSessions
+                    knownBeds: floorService.allBeds
+                    bedsDiscovering: floorService.discovering
+                    bedDiscoveryError: floorService.lastError
                     roomsLoaded: responsibilityService.roomsLoaded
                     sessionsLoaded: responsibilityService.sessionsLoaded
                     registryError: responsibilityService.graphError
                     registryBusy: responsibilityService.graphLoading
                         || doctorService.refreshing
                     suggestedRepository: patientService.repository
+                    onDiscoverBedsRequested: {
+                        // Only refresh the existing read-only Git floor scan.
+                        // No branch switch, worktree creation or Room mutation.
+                        if (!floorService.discovering)
+                            floorService.discover();
+                    }
                     onRosterRefreshRequested: {
                         if (!responsibilityService.graphLoading)
                             responsibilityService.refreshDurableGraph();

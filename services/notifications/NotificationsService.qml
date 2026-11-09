@@ -8,6 +8,7 @@ import "." as NotificationsBackend
 import "BrowserSiteIdentity.js" as BrowserSiteIdentity
 import "ApolloNotificationRoute.js" as ApolloNotificationRoute
 import "EmailNotificationActions.js" as EmailNotificationActions
+import "NotificationScopePolicy.js" as NotificationScopePolicy
 import "mail/ProtonNativeDeliveryAudit.js" as ProtonNativeDeliveryAudit
 
 Singleton {
@@ -33,6 +34,9 @@ Singleton {
         String(Quickshell.env("POST_APOLLO_ARRAY_COPY_PROBE") || "").trim() === "1"
     property double protonNativeAuditLastMs: 0
     property ListModel sourcePolicies: ListModel {}
+    // New deliveries are held only while the policy file loads. Historical
+    // records are still stored and the native popup service stays mounted.
+    property var pendingPolicyDeliveryIds: []
     // Independent from DND/snooze: starring a source never suppresses it.
     property ListModel favoriteSources: ListModel {}
 
@@ -100,7 +104,8 @@ Singleton {
         const site = host === "youtu.be" || host === "youtube.com"
             || host.endsWith(".youtube.com") ? "youtube.com"
             : host.startsWith("www.") ? host.substring(4) : host;
-        return "website:" + encodeURIComponent(sourceKey(sourceId, source)) + "::" + site;
+        // Match the lowercase persistence contract for URL-escaped app IDs.
+        return "website:" + encodeURIComponent(sourceKey(sourceId, source)).toLowerCase() + "::" + site;
     }
 
     // Favorites are source-wide, just like the card star, but are persisted
@@ -120,7 +125,28 @@ Singleton {
         return favoriteIndex(appKey) !== -1;
     }
 
+    function scopeOptionsFor(entry) {
+        const e = entry || {};
+        return NotificationScopePolicy.scopeOptionsFor(
+            e, sourceKey(e.sourceId, e.source),
+            websiteKey(e.sourceId, e.source, e.websiteHost));
+    }
+
+    function isFavoriteForNotification(entry) {
+        const options = scopeOptionsFor(entry);
+        for (let i = 0; i < options.length; i++) {
+            if (isFavorite(options[i].key))
+                return true;
+        }
+        return false;
+    }
+
     function setFavorite(appKey, sourceId, source, enabled) {
+        // Never make a preference change which an in-flight file load might
+        // overwrite, or overwrite a malformed favorites file on accident.
+        if (!favoritesReady || favoritesStatus === "parse-error"
+                || favoritesStatus === "load-error")
+            return false;
         const key = String(appKey || sourceKey(sourceId, source)).trim().toLowerCase();
         if (key === "")
             return;
@@ -213,6 +239,39 @@ Singleton {
         return child.dnd === true || Number(child.snoozeUntil || 0) > Date.now();
     }
 
+    function shouldSuppressScoped(entry) {
+        const options = scopeOptionsFor(entry);
+        const now = Date.now();
+        for (let i = 0; i < options.length; i++) {
+            const p = policyFor(options[i].key);
+            if (p.dnd === true || Number(p.snoozeUntil || 0) > now)
+                return true;
+        }
+        return false;
+    }
+
+    // A source-wide rule, website rule, or a more specific selected rule
+    // may be responsible. No child button can silently override its parent.
+    function inheritedSuppressionFor(entry, selectedKey) {
+        const options = scopeOptionsFor(entry);
+        const key = String(selectedKey || "");
+        const selected = options.find(function(option) { return option.key === key; });
+        if (!selected || selected.kind === "app")
+            return false;
+        const parents = selected.kind === "channel" ? ["app", "server"]
+            : selected.kind === "title" ? ["app", "website"]
+            : ["app"];
+        const now = Date.now();
+        for (let i = 0; i < options.length; i++) {
+            if (parents.indexOf(options[i].kind) === -1)
+                continue;
+            const p = policyFor(options[i].key);
+            if (p.dnd === true || Number(p.snoozeUntil || 0) > now)
+                return true;
+        }
+        return false;
+    }
+
     function ensurePolicy(appKey, sourceId, source) {
         const key = String(appKey || sourceKey(sourceId, source)).trim().toLowerCase();
         let index = policyIndex(key);
@@ -250,8 +309,45 @@ Singleton {
             const entry = activeNotifications.get(i);
 
             if (sourceKey(entry.sourceId, entry.source) === key
-                    || websiteKey(entry.sourceId, entry.source, entry.websiteHost) === key)
+                    || websiteKey(entry.sourceId, entry.source, entry.websiteHost) === key
+                    || scopeOptionsFor(entry).some(function(option) {
+                        return option.key === key;
+                    }))
                 activeNotifications.remove(i);
+        }
+    }
+
+    // Saved policies may load after native delivery. Never display a popup
+    // until the policy gate has reached a known-good state. On success,
+    // re-check only the bounded events delivered during startup.
+    function reconcilePendingPolicyDeliveries() {
+        const pending = pendingPolicyDeliveryIds;
+        pendingPolicyDeliveryIds = [];
+        if (!policyReady || policyStatus === "parse-error"
+                || policyStatus === "load-error") {
+            // A file reload may fail after popups were already admitted.
+            // Fail closed for the live popup surface; retain history.
+            activeNotifications.clear();
+            return;
+        }
+        for (let i = activeNotifications.count - 1; i >= 0; i--) {
+            const active = activeNotifications.get(i);
+            if (shouldSuppress(active.sourceId, active.source, active.websiteHost)
+                    || shouldSuppressScoped(active))
+                activeNotifications.remove(i);
+        }
+        const now = Date.now();
+        for (let i = 0; i < pending.length; i++) {
+            const index = indexOfNotification(notifications, pending[i]);
+            if (index < 0)
+                continue;
+            const entry = notifications.get(index);
+            if (Number(entry.expiresAt || 0) <= now
+                    || shouldSuppress(entry.sourceId, entry.source, entry.websiteHost)
+                    || shouldSuppressScoped(entry))
+                continue;
+            if (indexOfNotification(activeNotifications, entry.id) === -1)
+                activeNotifications.append(entry);
         }
     }
 
@@ -266,6 +362,9 @@ Singleton {
     }
 
     function setDnd(appKey, sourceId, source, enabled) {
+        if (!policyReady || policyStatus === "parse-error"
+                || policyStatus === "load-error")
+            return false;
         const index = ensurePolicy(appKey, sourceId, source);
 
         sourcePolicies.setProperty(index, "dnd", enabled === true);
@@ -286,6 +385,9 @@ Singleton {
     }
 
     function snoozeApp(appKey, sourceId, source) {
+        if (!policyReady || policyStatus === "parse-error"
+                || policyStatus === "load-error")
+            return false;
         const index = ensurePolicy(appKey, sourceId, source);
         const until = Date.now() + Math.max(60000, Number(defaultSnoozeDurationMs || 0));
 
@@ -298,6 +400,9 @@ Singleton {
     }
 
     function clearSnooze(appKey) {
+        if (!policyReady || policyStatus === "parse-error"
+                || policyStatus === "load-error")
+            return false;
         const index = policyIndex(appKey);
 
         if (index === -1)
@@ -309,6 +414,9 @@ Singleton {
     }
 
     function setDefaultSnoozeDurationMs(durationMs) {
+        if (!policyReady || policyStatus === "parse-error"
+                || policyStatus === "load-error")
+            return false;
         const minimum = 60 * 1000;
         const maximum = 30 * 24 * 60 * 60 * 1000;
         const next = Math.max(minimum, Math.min(maximum, Number(durationMs || 0)));
@@ -418,6 +526,12 @@ Singleton {
 
     function releaseExternalNotification(eventId) {
         const id = String(eventId || "");
+        // The native sender may close a delivery while policy storage is
+        // still loading. Never replay that closed event as a new popup.
+        if (pendingPolicyDeliveryIds.length > 0)
+            pendingPolicyDeliveryIds = pendingPolicyDeliveryIds.filter(function(pendingId) {
+                return pendingId !== id;
+            });
         if (!Object.prototype.hasOwnProperty.call(liveExternalNotifications, id))
             return;
         const next = Object.assign({}, liveExternalNotifications);
@@ -771,7 +885,18 @@ Singleton {
 
         pruneHistory();
 
-        const suppressed = shouldSuppress(entry.sourceId, entry.source, entry.websiteHost);
+        // Missing/invalid policies must never accidentally admit a popup.
+        // Keep the history entry, then evaluate pending deliveries once the
+        // saved policy file is ready. Fail closed if policy JSON is corrupt.
+        const suppressed = !policyReady
+            || policyStatus === "parse-error" || policyStatus === "load-error"
+            || shouldSuppress(entry.sourceId, entry.source, entry.websiteHost)
+            || shouldSuppressScoped(entry);
+        if (!policyReady) {
+            const queued = pendingPolicyDeliveryIds.slice();
+            queued.push(String(entry.id));
+            pendingPolicyDeliveryIds = queued.slice(-32);
+        }
 
         if (suppressed) {
             if (activeIndex !== -1)
@@ -820,6 +945,15 @@ Singleton {
         const historyUpdated = updateModelNotification(notifications, notificationId, changes);
 
         const activeUpdated = updateModelNotification(activeNotifications, notificationId, changes);
+        if (activeUpdated) {
+            const index = indexOfNotification(activeNotifications, notificationId);
+            if (index !== -1) {
+                const active = activeNotifications.get(index);
+                if (shouldSuppress(active.sourceId, active.source, active.websiteHost)
+                        || shouldSuppressScoped(active))
+                    activeNotifications.remove(index);
+            }
+        }
 
         if (historyUpdated) {
             markNotificationsChanged();
@@ -1355,6 +1489,7 @@ Singleton {
             if (root.policyStatus !== "parse-error")
                 root.policyStatus = "ready";
 
+            root.reconcilePendingPolicyDeliveries();
             if (policyWasPruned && root.policyStatus !== "parse-error")
                 root.savePolicies();
         }
@@ -1365,10 +1500,12 @@ Singleton {
             if (error === FileViewError.FileNotFound) {
                 root.policyStatus = "new";
                 root.savePolicies();
+                root.reconcilePendingPolicyDeliveries();
                 return;
             }
 
             root.policyStatus = "load-error";
+            root.reconcilePendingPolicyDeliveries();
         }
 
         onSaved: {

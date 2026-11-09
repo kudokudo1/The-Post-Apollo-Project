@@ -257,6 +257,14 @@ PanelWindow {
     ]
     property bool listKeyboardSelectionActive: false
     property string managerSelectionSection: "dnd"
+    property string managerPolicyMode: "dnd" // dnd | zz | favorites
+
+    function cycleManagerPolicyMode(direction) {
+        const modes = ["dnd", "zz", "favorites"];
+        const index = Math.max(0, modes.indexOf(managerPolicyMode));
+        const step = Number(direction) < 0 ? -1 : 1;
+        managerPolicyMode = modes[(index + step + modes.length) % modes.length];
+    }
     // Do not take mode keys from the search editor or destructive dialogs.
     readonly property bool standardKeysAvailable:
         menuOpen && keyboardActive && !searchInput.activeFocus
@@ -326,19 +334,13 @@ PanelWindow {
         sequence: "Left"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable && root.activeFilter === "manager"
-        onActivated: {
-            root.managerSelectionSection = "dnd";
-            root.listKeyboardSelectionActive = false;
-        }
+        onActivated: root.cycleManagerPolicyMode(-1)
     }
     Shortcut {
         sequence: "Right"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable && root.activeFilter === "manager"
-        onActivated: {
-            root.managerSelectionSection = "favorites";
-            root.listKeyboardSelectionActive = false;
-        }
+        onActivated: root.cycleManagerPolicyMode(1)
     }
     Shortcut {
         sequence: "Tab"
@@ -391,6 +393,10 @@ PanelWindow {
 
     ListModel {
         id: managerDndPolicies
+    }
+
+    ListModel {
+        id: managerVisiblePolicies
     }
 
     Timer {
@@ -446,13 +452,19 @@ PanelWindow {
     onActiveFilterChanged: {
         listKeyboardSelectionActive = false;
         if (activeFilter === "manager")
-            managerSelectionSection = dndManagerList.count > 0 ? "dnd" : "favorites";
+            managerSelectionSection = managerPolicyMode === "favorites" ? "favorites" : "dnd";
         root.scheduleFilteredModelRebuild();
     }
 
     onSearchQueryChanged: {
         listKeyboardSelectionActive = false;
         root.scheduleFilteredModelRebuild();
+    }
+
+    onManagerPolicyModeChanged: {
+        managerSelectionSection = managerPolicyMode === "favorites" ? "favorites" : "dnd";
+        listKeyboardSelectionActive = false;
+        root.rebuildManagerDndPolicies();
     }
 
     Component.onCompleted: {
@@ -864,6 +876,15 @@ PanelWindow {
         return NotificationsService.sourceKey(sourceId, source);
     }
 
+    function scopeTag(kind) {
+        const labels = {
+            "app": "APP", "website": "SITE", "title": "TITLE",
+            "sender": "SENDER", "conversation": "DM",
+            "server": "SERVER", "channel": "CHAN", "event": "EVENT"
+        };
+        return labels[String(kind || "")] || "APP";
+    }
+
     // ===== CLASSIFICATION =========================================
     //
     // Legacy sender group remains the presentation/color-tone choice.
@@ -1085,7 +1106,7 @@ PanelWindow {
             const classification = root.classificationFor(entry.source, entry.sourceId, entry.category, entry.severity);
             const facets = NotificationFacets.facetsFor(entry);
             const reportKind = root.reportKindFor(entry);
-            if (!root.notificationMatches(entry.source, entry.sourceId, entry.title, entry.message, entry.category, entry.severity, classification.group, facets))
+            if (!root.notificationMatches(entry.source, entry.sourceId, entry.title, entry.message, entry.category, entry.severity, classification.group, facets, entry))
                 continue;
             rows.push({
                 ordinal: i,
@@ -1099,6 +1120,10 @@ PanelWindow {
                     "website": String(entry.website || ""),
                     "websiteHost": String(entry.websiteHost || ""),
                     "websiteIcon": String(entry.websiteIcon || ""),
+                    // Flat strings survive ListModel's typed-role conversion;
+                    // no QML callback or native action enters the model.
+                    "scopeInfoJson": JSON.stringify((entry.context || {}).notificationScope || {}),
+                    "eventType": String((entry.context || {}).eventType || ""),
                     "category": String(entry.category || "generic"),
                     "severity": String(entry.severity || "normal"),
                     "createdAt": Number(entry.createdAt || 0),
@@ -1152,18 +1177,26 @@ PanelWindow {
 
     function rebuildManagerDndPolicies() {
         managerDndPolicies.clear();
+        managerVisiblePolicies.clear();
 
         for (var i = 0; i < NotificationsService.sourcePolicies.count; i++) {
             var policy = NotificationsService.sourcePolicies.get(i);
 
-            if (policy.dnd !== true)
+            const snoozeUntil = Number(policy.snoozeUntil || 0);
+            if (policy.dnd !== true && snoozeUntil <= Date.now())
                 continue;
 
-            managerDndPolicies.append({
+            const row = {
                 "appKey": String(policy.appKey || ""),
                 "source": String(policy.source || ""),
-                "sourceId": String(policy.sourceId || "")
-            });
+                "sourceId": String(policy.sourceId || ""),
+                "dnd": policy.dnd === true,
+                "snoozeUntil": snoozeUntil
+            };
+            managerDndPolicies.append(row);
+            if ((managerPolicyMode === "dnd" && row.dnd)
+                    || (managerPolicyMode === "zz" && !row.dnd))
+                managerVisiblePolicies.append(row);
         }
     }
 
@@ -1185,13 +1218,14 @@ PanelWindow {
         return Math.round(milliseconds / 60000) + " MIN";
     }
 
-    function notificationMatches(source, sourceId, title, message, category, severity, filterGroup, facets) {
+    function notificationMatches(source, sourceId, title, message, category, severity, filterGroup, facets, entry) {
         // Warning is an overlapping severity view, not a source category.
         if (root.activeFilter === "warning") {
             if (!root.isWarning(category, severity))
                 return false;
         } else if (root.activeFilter === "favorites") {
-            if (!NotificationsService.isFavorite(root.appKeyFor(sourceId, source)))
+            if (!NotificationsService.isFavorite(root.appKeyFor(sourceId, source))
+                    && !NotificationsService.isFavoriteForNotification(entry))
                 return false;
         } else if (root.activeFilter !== "all"
                    && !NotificationFacets.matches(root.activeFilter, facets, false)) {
@@ -2446,9 +2480,14 @@ PanelWindow {
 
                             height: 18
 
-                            text: "ZZ suppresses new popups from that source for this long."
+                            text: NotificationsService.policyStatus === "parse-error"
+                                    || NotificationsService.policyStatus === "load-error"
+                                ? "POLICY FILE ERROR // POPUPS HELD UNTIL RECOVERED"
+                                : "ZZ mutes the selected scope; history is retained."
                             font.pixelSize: 10
-                            color: Colors.white
+                            color: NotificationsService.policyStatus === "parse-error"
+                                    || NotificationsService.policyStatus === "load-error"
+                                ? Colors.red : Colors.white
                             opacity: 0.78
                         }
 
@@ -2531,14 +2570,52 @@ PanelWindow {
                         }
                         anchors.topMargin: 14
 
-                        Item {
-                            id: dndManagerSection
+                        Row {
+                            id: managerRuleTabs
                             anchors {
                                 top: parent.top
                                 left: parent.left
                                 right: parent.right
                             }
-                            height: Math.max(0, (parent.height - 14) / 2)
+                            height: 32
+                            spacing: 7
+                            readonly property real tabWidth: (width - spacing * 2) / 3
+                            MiniButton {
+                                width: parent.tabWidth
+                                height: 30
+                                label: "DND"
+                                active: root.managerPolicyMode === "dnd"
+                                activeColor: Colors.magenta
+                                onTriggered: root.managerPolicyMode = "dnd"
+                            }
+                            MiniButton {
+                                width: parent.tabWidth
+                                height: 30
+                                label: "ZZ"
+                                active: root.managerPolicyMode === "zz"
+                                activeColor: Colors.orange
+                                onTriggered: root.managerPolicyMode = "zz"
+                            }
+                            MiniButton {
+                                width: parent.tabWidth
+                                height: 30
+                                label: "FAVORITES"
+                                active: root.managerPolicyMode === "favorites"
+                                activeColor: Colors.magenta
+                                onTriggered: root.managerPolicyMode = "favorites"
+                            }
+                        }
+
+                        Item {
+                            id: dndManagerSection
+                            visible: root.managerPolicyMode !== "favorites"
+                            anchors {
+                                top: managerRuleTabs.bottom
+                                bottom: parent.bottom
+                                left: parent.left
+                                right: parent.right
+                            }
+                            anchors.topMargin: 8
 
                             GlowText {
                                 id: dndManagerTitle
@@ -2550,7 +2627,9 @@ PanelWindow {
                                 anchors.leftMargin: 4
                                 anchors.rightMargin: 4
                                 height: 24
-                                text: "DO NOT DISTURB  //  " + managerDndPolicies.count
+                                text: root.managerPolicyMode === "zz"
+                                    ? "SNOOZED // " + managerVisiblePolicies.count
+                                    : "DO NOT DISTURB // " + managerVisiblePolicies.count
                                 pixelSize: 13
                                 textColor: Colors.magenta
                                 glowColor: Colors.magenta
@@ -2573,7 +2652,9 @@ PanelWindow {
                                 anchors.leftMargin: 4
                                 anchors.rightMargin: 4
                                 height: 18
-                                text: "Sources stay suppressed until explicitly ALLOWED."
+                                text: root.managerPolicyMode === "zz"
+                                    ? "Timed suppression // WAKE or automatic expiry"
+                                    : "Indefinite suppression // ALLOW to restore popups"
                                 font.pixelSize: 10
                                 color: Colors.white
                                 opacity: 0.72
@@ -2591,13 +2672,15 @@ PanelWindow {
                                 clip: true
                                 spacing: 8
                                 boundsBehavior: Flickable.StopAtBounds
-                                model: managerDndPolicies
+                                model: managerVisiblePolicies
 
                                 delegate: Rectangle {
                                     id: dndRule
                                     required property string appKey
                                     required property string source
                                     required property string sourceId
+                                    required property bool dnd
+                                    required property double snoozeUntil
                                     width: dndManagerList.width
                                     height: 64
                                     color: "transparent"
@@ -2639,7 +2722,10 @@ PanelWindow {
                                         anchors.leftMargin: 12
                                         anchors.rightMargin: 10
                                         height: 16
-                                        text: dndRule.sourceId !== "" ? dndRule.sourceId : dndRule.appKey
+                                        text: dndRule.dnd
+                                            ? "DND // " + (dndRule.sourceId || dndRule.appKey)
+                                            : "ZZ UNTIL // " + Qt.formatDateTime(
+                                                new Date(dndRule.snoozeUntil), "MM/dd h:mm AP")
                                         font.pixelSize: 9
                                         color: Colors.cyan
                                         elide: Text.ElideRight
@@ -2653,11 +2739,18 @@ PanelWindow {
                                         anchors.rightMargin: 10
                                         width: 72
                                         height: 30
-                                        label: "ALLOW"
+                                        label: dndRule.dnd ? "ALLOW" : "WAKE"
                                         labelPixelSize: 10
                                         active: false
+                                        enabled: NotificationsService.policyReady
+                                            && NotificationsService.policyStatus !== "parse-error"
+                                            && NotificationsService.policyStatus !== "load-error"
                                         onTriggered: {
-                                            NotificationsService.setDnd(dndRule.appKey, dndRule.sourceId, dndRule.source, false);
+                                            if (dndRule.dnd)
+                                                NotificationsService.setDnd(dndRule.appKey,
+                                                    dndRule.sourceId, dndRule.source, false);
+                                            else
+                                                NotificationsService.clearSnooze(dndRule.appKey);
                                         }
                                     }
                                 }
@@ -2682,10 +2775,11 @@ PanelWindow {
                             }
                             GlowText {
                                 anchors.centerIn: dndManagerList
-                                visible: managerDndPolicies.count === 0
+                                visible: managerVisiblePolicies.count === 0
                                 width: dndManagerList.width - 40
                                 height: 30
-                                text: "NO SOURCES ON DND"
+                                text: root.managerPolicyMode === "zz"
+                                    ? "NO ACTIVE ZZ RULES" : "NO ACTIVE DND RULES"
                                 pixelSize: 12
                                 textColor: Colors.cyan
                                 glowColor: Colors.cyan
@@ -2695,13 +2789,14 @@ PanelWindow {
 
                         Item {
                             id: favoriteManagerSection
+                            visible: root.managerPolicyMode === "favorites"
                             anchors {
-                                top: dndManagerSection.bottom
+                                top: managerRuleTabs.bottom
                                 bottom: parent.bottom
                                 left: parent.left
                                 right: parent.right
                             }
-                            anchors.topMargin: 14
+                            anchors.topMargin: 8
 
                             GlowText {
                                 id: favoriteManagerTitle
@@ -2735,7 +2830,7 @@ PanelWindow {
                                 anchors.leftMargin: 4
                                 anchors.rightMargin: 4
                                 height: 18
-                                text: "UNFAV removes the star, not saved notifications."
+                                text: "APP, SITE, SENDER, SERVER, DM, CHANNEL, TITLE & EVENT"
                                 font.pixelSize: 10
                                 color: Colors.white
                                 opacity: 0.72
@@ -2816,6 +2911,9 @@ PanelWindow {
                                         labelPixelSize: 10
                                         active: true
                                         activeColor: Colors.magenta
+                                        enabled: NotificationsService.favoritesReady
+                                            && NotificationsService.favoritesStatus !== "parse-error"
+                                            && NotificationsService.favoritesStatus !== "load-error"
                                         onTriggered: {
                                             NotificationsService.setFavorite(favoriteRule.appKey, favoriteRule.sourceId, favoriteRule.source, false);
                                         }
@@ -2929,6 +3027,8 @@ PanelWindow {
                         required property string website
                         required property string websiteHost
                         required property string websiteIcon
+                        required property string scopeInfoJson
+                        required property string eventType
                         required property string category
                         required property string severity
                         required property double createdAt
@@ -2944,12 +3044,23 @@ PanelWindow {
 
                         readonly property string appKey: root.appKeyFor(notificationEntry.sourceId, notificationEntry.source)
 
-                        readonly property bool favorite: NotificationsService.favoritesRevision >= 0 && NotificationsService.isFavorite(notificationEntry.appKey)
-
-                        // Website-capable cards default to the specific site.
-                        // The SITE/APP selector leaves legacy app-wide controls
-                        // available without changing CLEAR ALL or Favorites.
-                        property bool targetWholeApp: false
+                        // Per-card scope selection never changes the source's
+                        // global identity. The exact-title fallback is clearly
+                        // distinguished from structured sender/server IDs.
+                        readonly property var scopeEntry: ({
+                            source: notificationEntry.source,
+                            sourceId: notificationEntry.sourceId,
+                            website: notificationEntry.website,
+                            websiteHost: notificationEntry.websiteHost,
+                            title: notificationEntry.title,
+                            context: {
+                                notificationScope: JSON.parse(notificationEntry.scopeInfoJson || "{}"),
+                                eventType: notificationEntry.eventType
+                            }
+                        })
+                        readonly property var scopeOptions:
+                            NotificationsService.scopeOptionsFor(notificationEntry.scopeEntry)
+                        property int targetScopeIndex: 0
                         // Delegates are recycled: scope must never leak from
                         // one history record into a different notification.
                         property bool emailDeckOpen: false
@@ -2964,25 +3075,38 @@ PanelWindow {
                             && NotificationsService.externalActionsRevision >= 0
                             ? NotificationsService.emailActionsFor(notificationEntry.notificationId) : []
                         onNotificationIdChanged: {
-                            targetWholeApp = false;
+                            targetScopeIndex = 0;
                             emailDeckOpen = false;
                         }
                         readonly property string websiteKey: NotificationsService.websiteKey(
                             notificationEntry.sourceId, notificationEntry.source, notificationEntry.websiteHost)
-                        readonly property bool targetingWebsite: websiteKey !== "" && !targetWholeApp
-                        readonly property string targetKey: targetingWebsite ? websiteKey : appKey
-                        readonly property string targetLabel: targetingWebsite
-                            ? source + " // " + website : source
-                        readonly property bool inheritedRule: targetingWebsite
-                            && NotificationsService.policyRevision >= 0
-                            && (NotificationsService.isDnd(appKey)
-                                || NotificationsService.isSnoozed(appKey))
+                        readonly property var targetScope: scopeOptions.length > 0
+                            ? scopeOptions[Math.max(0, Math.min(scopeOptions.length - 1, targetScopeIndex))]
+                            : ({ kind: "app", key: appKey, label: "APP", verified: true })
+                        readonly property bool targetWholeApp: targetScope.kind === "app"
+                        readonly property bool targetingWebsite: targetScope.kind === "website"
+                        readonly property string targetKey: targetScope.key
+                        readonly property string targetLabel: source + " // " + targetScope.label
+                        readonly property bool inheritedRule: NotificationsService.policyRevision >= 0
+                            && NotificationsService.inheritedSuppressionFor(scopeEntry, targetKey)
                         readonly property bool snoozed: NotificationsService.policyRevision >= 0
                             && (NotificationsService.isSnoozed(targetKey)
-                                || (targetingWebsite && NotificationsService.isSnoozed(appKey)))
+                                || (targetingWebsite && NotificationsService.isSnoozed(appKey))
+                                || (!targetWholeApp && NotificationsService.isSnoozed(appKey)))
                         readonly property bool dnd: NotificationsService.policyRevision >= 0
                             && (NotificationsService.isDnd(targetKey)
-                                || (targetingWebsite && NotificationsService.isDnd(appKey)))
+                                || (targetingWebsite && NotificationsService.isDnd(appKey))
+                                || (!targetWholeApp && NotificationsService.isDnd(appKey)))
+                        readonly property bool favorite: NotificationsService.favoritesRevision >= 0
+                            && NotificationsService.isFavoriteForNotification(scopeEntry)
+                        readonly property bool selectedFavorite: NotificationsService.favoritesRevision >= 0
+                            && NotificationsService.isFavorite(targetKey)
+
+                        function cycleTargetScope() {
+                            if (scopeOptions.length < 2)
+                                return;
+                            targetScopeIndex = (targetScopeIndex + 1) % scopeOptions.length;
+                        }
 
                         readonly property var classification: root.classificationFor(notificationEntry.source, notificationEntry.sourceId, notificationEntry.category, notificationEntry.severity)
 
@@ -3142,7 +3266,10 @@ PanelWindow {
 
                                 z: 2
 
-                                active: notificationEntry.favorite
+                                active: notificationEntry.selectedFavorite
+                                enabled: NotificationsService.favoritesReady
+                                    && NotificationsService.favoritesStatus !== "parse-error"
+                                    && NotificationsService.favoritesStatus !== "load-error"
 
                                 activeColor: Colors.magenta
 
@@ -3151,7 +3278,8 @@ PanelWindow {
                                 labelPixelSize: 17
 
                                 onTriggered: {
-                                    NotificationsService.toggleFavorite(notificationEntry.appKey, notificationEntry.sourceId, notificationEntry.source);
+                                    NotificationsService.toggleFavorite(notificationEntry.targetKey,
+                                        notificationEntry.sourceId, notificationEntry.targetLabel);
                                 }
                             }
 
@@ -3278,7 +3406,11 @@ PanelWindow {
 
                                 z: 1
 
-                                text: notificationEntry.filterGroup.toUpperCase() + "  //  " + notificationEntry.severity.toUpperCase()
+                                text: notificationEntry.filterGroup.toUpperCase()
+                                    + "  //  " + notificationEntry.severity.toUpperCase()
+                                    + "  //  " + (notificationEntry.targetScope.kind === "title"
+                                        ? "TITLE EXACT, NOT VERIFIED SENDER"
+                                        : "SCOPE " + root.scopeTag(notificationEntry.targetScope.kind))
 
                                 pixelSize: root.notificationMetaFontSize
 
@@ -3290,9 +3422,11 @@ PanelWindow {
 
                             // ===== SOURCE-SCOPED / CARD CONTROLS =====
                             //
-                            // SITE/APP selects the DND/ZZ target from the
-                            // bottom row beside the Bring Here arrow.
-                            // FAVS and CLEAR ALL remain app-wide;
+                            // The footer cycles exact rule targets: APP,
+                            // SITE, declared sender/server/DM/channel/event,
+                            // or explicitly labeled literal TITLE matching.
+                            // FAVS follows the selected scope; CLEAR ALL
+                            // remains app-wide;
                             // X dismisses only this notification.
 
                             Row {
@@ -3318,6 +3452,9 @@ PanelWindow {
 
                                     active: notificationEntry.snoozed
                                     enabled: !notificationEntry.inheritedRule
+                                        && NotificationsService.policyReady
+                                        && NotificationsService.policyStatus !== "parse-error"
+                                        && NotificationsService.policyStatus !== "load-error"
 
                                     activeColor: Colors.orange
 
@@ -3340,6 +3477,9 @@ PanelWindow {
 
                                     active: notificationEntry.dnd
                                     enabled: !notificationEntry.inheritedRule
+                                        && NotificationsService.policyReady
+                                        && NotificationsService.policyStatus !== "parse-error"
+                                        && NotificationsService.policyStatus !== "load-error"
 
                                     activeColor: Colors.orange
 
@@ -3653,13 +3793,14 @@ PanelWindow {
                                 MiniButton {
                                     width: 44
                                     height: 24
-                                    visible: notificationEntry.websiteKey !== ""
+                                    visible: notificationEntry.scopeOptions.length > 1
                                     label: notificationEntry.targetWholeApp ? "APP"
-                                        : notificationEntry.inheritedRule ? "SITE*" : "SITE"
+                                        : root.scopeTag(notificationEntry.targetScope.kind)
+                                            + (notificationEntry.inheritedRule ? "*" : "")
                                     labelPixelSize: 9
                                     active: !notificationEntry.targetWholeApp
                                     activeColor: Colors.magenta
-                                    onTriggered: notificationEntry.targetWholeApp = !notificationEntry.targetWholeApp
+                                    onTriggered: notificationEntry.cycleTargetScope()
                                 }
 
                                 MiniButton {

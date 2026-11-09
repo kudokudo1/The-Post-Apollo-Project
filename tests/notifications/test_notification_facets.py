@@ -10,7 +10,7 @@ text = POLICY.read_text(encoding="utf-8")
 hub = HUB.read_text(encoding="utf-8")
 assert 'import "../../services/notifications/NotificationFacets.js" as NotificationFacets' in hub
 assert 'const facets = NotificationFacets.facetsFor(entry);' in hub
-assert 'classification.group, facets))' in hub
+assert 'classification.group, facets, entry))' in hub
 assert 'NotificationFacets.matches(root.activeFilter, facets, false)' in hub
 assert "function facetsFor(event)" in text
 assert "function matches(filter, facets, favorite)" in text
@@ -77,7 +77,8 @@ const runtime={
     isWarning:ctx.warning,
     appKeyFor:(sourceId,source)=>sourceId||source
   },
-  NotificationsService:{isFavorite:key=>key==='cpu-plus-system'},
+  NotificationsService:{isFavorite:key=>key==='cpu-plus-system',
+    isFavoriteForNotification:()=>false},
   NotificationFacets:{matches:ctx.matches}
 };
 vm.runInNewContext(hub.slice(start,end),runtime,{filename:'NotificationsHubW.qml::filter'});
@@ -85,7 +86,7 @@ function shown(view,event,facets) {
   runtime.root.activeFilter=view;
   return runtime.notificationMatches(
     event.source,event.sourceId,event.title||'',event.message||'',
-    event.category,event.severity,'apollo',facets
+    event.category,event.severity,'apollo',facets,event
   );
 }
 const report={source:'CPU++',sourceId:'cpu-plus-system',

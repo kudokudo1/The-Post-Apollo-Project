@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Services.Notifications
 import "BrowserSiteIdentity.js" as BrowserSiteIdentity
+import "NotificationScopePolicy.js" as NotificationScopePolicy
 
 Singleton {
     id: root
@@ -34,6 +35,9 @@ Singleton {
 
     function convert(notification) {
         const website = BrowserSiteIdentity.fromNotification(notification);
+        // Namespaced, sender-declared structured hints only. Vesktop and
+        // other apps may omit these; never infer a server/person from body.
+        const scope = NotificationScopePolicy.scopeFromHints(notification.hints || {});
         return {
             // A missing desktop entry is legitimate, especially for browsers.
             // Keep the sender's actual app name; policy keys continue to use
@@ -46,6 +50,7 @@ Singleton {
             "website": website.label,
             "websiteHost": website.host,
             "websiteIcon": website.icon,
+            "context": { "notificationScope": scope },
             "title": notification.summary,
             "message": notification.body,
             "originalTitle": notification.summary,

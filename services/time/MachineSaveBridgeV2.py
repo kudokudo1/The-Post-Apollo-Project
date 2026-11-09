@@ -162,6 +162,69 @@ def save_request(request, *, read_runner=subprocess.run,
                              legacy_reader=legacy_reader)
 
 
+def inspect_checkpoint(checkpoint_id, *, geometry_reader=load_geometry,
+                       legacy_reader=load_legacy):
+    """Read-only STORED verification; never access the live compositor.
+
+    A v1-only checkpoint is reported as such. A matching geometry record is
+    verified against the v1 checkpoint summary, without returning private
+    raw window trees, browser titles, or session identity claims.
+    """
+    if not isinstance(checkpoint_id, str):
+        raise BridgeError("INVALID CHECKPOINT ID")
+    try:
+        canonical = str(uuid.UUID(checkpoint_id))
+    except (ValueError, AttributeError) as exc:
+        raise BridgeError("INVALID CHECKPOINT ID") from exc
+    if canonical != checkpoint_id:
+        raise BridgeError("INVALID CHECKPOINT ID")
+
+    old = legacy_reader(canonical)
+    if (not isinstance(old, dict) or old.get("status") != "loaded"
+            or old.get("read_only") is not True
+            or not isinstance(old.get("checkpoint"), dict)
+            or old["checkpoint"].get("id") != canonical):
+        raise BridgeError("CHECKPOINT READ UNAVAILABLE")
+    existing_counts = old["checkpoint"].get("counts")
+    if (not isinstance(existing_counts, dict)
+            or set(existing_counts) != {"outputs", "workspaces", "windows"}
+            or any(type(x) is not int or x < 0 for x in existing_counts.values())):
+        raise BridgeError("CHECKPOINT READ UNAVAILABLE")
+
+    record = geometry_reader(canonical)
+    if not isinstance(record, dict) or record.get("checkpoint_id") != canonical:
+        raise BridgeError("GEOMETRY READ UNAVAILABLE")
+
+    base = {
+        "kind": "machine-stored-geometry-verification",
+        "checkpoint_id": canonical,
+        "read_only": True,
+        "exact_restore_verified": False,
+        "session_identity_verified": False,
+    }
+    if record.get("status") == "legacy_only" and record.get("read_only") is True:
+        return dict(base, status="legacy_only", geometry_available=False,
+                    counts=existing_counts)
+    if (record.get("status") != "loaded"
+            or record.get("read_only") is not True
+            or record.get("geometry_available") is not True
+            or not isinstance(record.get("geometry"), dict)):
+        raise BridgeError("GEOMETRY READ UNAVAILABLE")
+    actual = record["geometry"]
+    try:
+        counts = {name: len(actual[source])
+                  for name, source in (("outputs", "outputs"),
+                                       ("workspaces", "workspaces"),
+                                       ("windows", "windows"))}
+    except (KeyError, TypeError) as exc:
+        raise BridgeError("GEOMETRY READ UNAVAILABLE") from exc
+    if counts != existing_counts:
+        return dict(base, status="geometry_mismatch",
+                    geometry_available=True, counts=counts)
+    return dict(base, status="geometry_verified",
+                geometry_available=True, counts=counts)
+
+
 def _decode_request():
     raw = sys.stdin.buffer.readline(MAX_REQUEST_BYTES + 1)
     if (not raw or len(raw) > MAX_REQUEST_BYTES or not raw.endswith(b"\n")):
@@ -174,12 +237,15 @@ def _decode_request():
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    if argv not in (["inspect"], ["save"]):
+    if argv not in (["inspect"], ["save"]) and not (
+            len(argv) == 2 and argv[0] == "verify"):
         print(json.dumps({"status": "error", "reason": "INVALID ACTION"}))
         return 1
     try:
         if argv == ["inspect"]:
             result = inspect()
+        elif len(argv) == 2 and argv[0] == "verify":
+            result = inspect_checkpoint(argv[1])
         else:
             result = save_request(_decode_request())
         raw = json.dumps(result, ensure_ascii=False, separators=(",", ":"))

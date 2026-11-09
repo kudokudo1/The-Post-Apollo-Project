@@ -387,6 +387,22 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             cli_loaded = load_geometry(saved_cli["checkpoint"]["id"])
             assert cli_loaded["status"] == "loaded"
             assert len(cli_loaded["geometry"]["windows"]) == 3
+            # Verify the exact saved checkpoint using the real CLI's new
+            # read-only STORED action; no Sway query or additional DB write.
+            cli_verify = subprocess.run(
+                ["python3", "-B", "-I", bridge_cli, "verify",
+                 saved_cli["checkpoint"]["id"]],
+                env=bridge_env, capture_output=True, timeout=15)
+            assert cli_verify.returncode == 0, "STORED GEOMETRY CHECK FAILED"
+            checked_cli = json.loads(cli_verify.stdout)
+            assert checked_cli["kind"] == "machine-stored-geometry-verification"
+            assert checked_cli["status"] == "geometry_verified"
+            assert checked_cli["read_only"] is True
+            assert checked_cli["exact_restore_verified"] is False
+            assert checked_cli["counts"] == {
+                "outputs": 2, "workspaces": 2, "windows": 3,
+            }
+            print("MACHINE STORED // REAL HEADLESS SWAY V2 READBACK PASS")
             print("MACHINE PYTHON -I CLI // INSPECT AND SAVE TO PRIVATE SQLITE PASS")
             print("MACHINE M2 CUSTOM REVIEW-BOUND ONE-WINDOW SAVE // REAL SWAY PASS")
             print("MACHINE M2 CUSTOM SAVE // REAL HEADLESS SWAY SQLITE PASS")

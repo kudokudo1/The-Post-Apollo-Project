@@ -837,6 +837,9 @@ PanelWindow {
     property string machineSaveBridgeAction: ""
     property string machineSaveBridgePayload: ""
     property string machineSaveBridgeStatus: "READY // SAVE DESKTOP"
+    property string machineGeometryVerifyId: ""
+    property string machineGeometryVerifyStatus: "NOT VERIFIED // READ-ONLY CHECK AVAILABLE"
+    property var machineGeometryVerifyResult: null
     property string machineCheckpointDraft: ""
     property bool machineCustomOpen: false
     property bool machineSaveAdvancedOpen: false
@@ -874,6 +877,22 @@ PanelWindow {
                                 : "SAVING DESKTOP // VERIFYING LAYOUT";
         machineSaveBridgeProcess.exec(["python3", "-B", "-I",
             Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"), action]);
+    }
+
+    function machineVerifySelectedGeometry() {
+        if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
+                || !machineSavedItem || machineSaveBridgeBusy
+                || machineStoreBusy || machineAutoRestoreBusy)
+            return;
+        machineGeometryVerifyId = machineSavedItem.id;
+        machineGeometryVerifyResult = null;
+        machineGeometryVerifyStatus = "CHECKING STORED GEOMETRY // READ ONLY";
+        machineSaveBridgeAction = "verify";
+        machineSaveBridgeBusy = true;
+        machineSaveBridgePayload = "";
+        machineSaveBridgeProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"),
+            "verify", machineGeometryVerifyId]);
     }
 
     function machineSaveLabel() {
@@ -968,6 +987,41 @@ PanelWindow {
             machineSaveBridgeStatus = "INVALID SAVE RESPONSE";
             return;
         }
+        if (machineSaveBridgeAction === "verify") {
+            if (!machineSavedItem
+                    || machineGeometryVerifyId !== machineSavedItem.id)
+                return;
+            if (data.status === "error") {
+                machineGeometryVerifyStatus = "GEOMETRY CHECK FAILED // READ UNAVAILABLE";
+                machineGeometryVerifyResult = null;
+                return;
+            }
+            if (data.kind !== "machine-stored-geometry-verification"
+                    || data.checkpoint_id !== machineGeometryVerifyId
+                    || data.read_only !== true
+                    || data.exact_restore_verified !== false
+                    || data.session_identity_verified !== false) {
+                machineGeometryVerifyStatus = "INVALID GEOMETRY VERIFICATION";
+                machineGeometryVerifyResult = null;
+                return;
+            }
+            machineGeometryVerifyResult = data;
+            if (data.status === "geometry_verified"
+                    && data.geometry_available === true && data.counts
+                    && data.counts.outputs === machineSavedItem.counts.outputs
+                    && data.counts.workspaces === machineSavedItem.counts.workspaces
+                    && data.counts.windows === machineSavedItem.counts.windows)
+                machineGeometryVerifyStatus = "GEOMETRY VERIFIED // "
+                    + data.counts.outputs + " MON // "
+                    + data.counts.workspaces + " WS // "
+                    + data.counts.windows + " WINDOWS";
+            else if (data.status === "legacy_only"
+                     && data.geometry_available === false)
+                machineGeometryVerifyStatus = "LEGACY CHECKPOINT // NO V2 GEOMETRY";
+            else
+                machineGeometryVerifyStatus = "GEOMETRY VERIFICATION FAILED";
+            return;
+        }
         if (data.status === "error") {
             machineSaveBridgeStatus = "SAVE BLOCKED // " + String(data.reason || "UNKNOWN");
             return;
@@ -1013,6 +1067,9 @@ PanelWindow {
             machineCustomReview = null;
             machineCustomExcluded = ({});
             machineCustomOpen = false;
+            machineGeometryVerifyId = data.checkpoint.id;
+            machineGeometryVerifyResult = null;
+            machineGeometryVerifyStatus = "SAVED // GEOMETRY CHECK AVAILABLE IN STORED";
             machineStoreStatus = "SAVED // GEOMETRY READBACK VERIFIED";
             machineSaveBridgeStatus = "SAVED + VERIFIED // "
                 + data.verification.counts.outputs + " MON // "
@@ -1467,6 +1524,9 @@ PanelWindow {
         machineListCheckpoints();
     }
     function machineListCheckpoints() {
+        machineGeometryVerifyId = "";
+        machineGeometryVerifyResult = null;
+        machineGeometryVerifyStatus = "NOT VERIFIED // READ-ONLY CHECK AVAILABLE";
         machineStoreRequest("list", null, "");
     }
     function machineOpenSavedCheckpoint() {
@@ -1481,6 +1541,9 @@ PanelWindow {
     function machineStepSavedCheckpoint(delta) {
         if (machineAutoRestoreBusy)
             return;
+        machineGeometryVerifyId = "";
+        machineGeometryVerifyResult = null;
+        machineGeometryVerifyStatus = "NOT VERIFIED // READ-ONLY CHECK AVAILABLE";
         machineAutoRestoreResult = null;
         machineAutoRestoreStatus = "READY TO RESTORE";
         const n = machineSavedCheckpoints.length;
@@ -1714,6 +1777,12 @@ PanelWindow {
         onExited: function(exitCode, exitStatus) {
             timew.machineSaveBridgeBusy = false;
             timew.machineSaveBridgePayload = "";
+            if (exitCode !== 0 && timew.machineSaveBridgeAction === "verify") {
+                if (timew.machineSavedItem
+                        && timew.machineGeometryVerifyId === timew.machineSavedItem.id)
+                    timew.machineGeometryVerifyStatus = "GEOMETRY READ UNAVAILABLE";
+                return;
+            }
             if (exitCode !== 0
                     && !timew.machineSaveBridgeStatus.startsWith("SAVE BLOCKED")
                     && !timew.machineSaveBridgeStatus.startsWith("SAVED")
@@ -5580,6 +5649,40 @@ PanelWindow {
                             color: Colors.cyan
                             font.pixelSize: 11
                             elide: Text.ElideRight
+                        }
+                        Row {
+                            width: parent.width
+                            height: 34
+                            spacing: 8
+                            ActionButton {
+                                width: parent.width
+                                height: parent.height
+                                label: timew.machineSaveBridgeBusy
+                                       && timew.machineSaveBridgeAction === "verify"
+                                       ? "VERIFYING GEOMETRY..." : "VERIFY SAVED GEOMETRY"
+                                labelPixelSize: 11
+                                accentColor: Colors.cyan
+                                available: !!timew.machineSavedItem
+                                           && !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
+                                           && !timew.machineAutoRestoreBusy
+                                onLeftClicked: timew.machineVerifySelectedGeometry()
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineGeometryVerifyStatus
+                            color: timew.machineGeometryVerifyStatus.startsWith("GEOMETRY VERIFIED")
+                                   ? Colors.cyan : Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "VERIFY CHECKS SAVED DATA ONLY // EXACT RESTORE + BRAVE TABS UNFINISHED"
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
                         }
                         Row {
                             width: parent.width

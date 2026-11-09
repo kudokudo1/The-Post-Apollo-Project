@@ -15,7 +15,7 @@ test("E5 keeps only two EARTH GROUND routes non-scrolling, not CLASSIC or WEATHE
     assert.match(ground,/interactive: !ground\.compactEarthGround/);
     assert.match(ground,/visible: !ground\.compactEarthGround && scrollable/);
     assert.match(ground,/requiredContentHeight:/);
-    assert.match(ground,/contentHeight: Math\.max\(height, ground\.requiredContentHeight\)/);
+    assert.match(ground,/contentHeight: Math\.max\(height, groundContent\.y \+ groundContent\.implicitHeight \+ 12\)/);
     assert.match(ground,/onSubjectRouteChanged: \{/);
     assert.match(pane,/subjectRoute: earthPane\.groundViewMode === "air-pollen"/);
     assert.equal((pane.match(/StationGround\s*\{/g)||[]).length,1);

@@ -1414,7 +1414,7 @@ PanelWindow {
 
     function machineStoreRequest(action, data, id) {
         if (!menuOpen || selectedMode !== "machine" || machineStoreBusy
-                || machineAutoRestoreBusy)
+                || machineSaveBridgeBusy || machineAutoRestoreBusy)
             return;
         if (action !== "save" && action !== "list" && action !== "load")
             return;
@@ -4990,7 +4990,7 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
-                            text: "UTC // " + timew.machineUtcNow
+                            text: "LOCAL // " + timew.clockReadoutText
                             color: Colors.white
                             font.pixelSize: 11
                             elide: Text.ElideRight
@@ -5212,7 +5212,7 @@ PanelWindow {
                             ActionButton {
                                 width: (parent.width - 12) / 2
                                 height: parent.height
-                                label: "SAVE CHECKPOINT"
+                                label: "SAVE V1 METADATA"
                                 labelPixelSize: 10
                                 accentColor: timew.semanticColor
                                 available: !timew.machineStoreBusy && !timew.machineCaptureBusy
@@ -5239,7 +5239,7 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
-                            text: "MANUAL TIME MARKERS // MEMORY ONLY"
+                            text: "LEGACY MARKERS // MEMORY ONLY // NOT RESTORABLE"
                             color: Colors.white
                             font.pixelSize: 12
                         }

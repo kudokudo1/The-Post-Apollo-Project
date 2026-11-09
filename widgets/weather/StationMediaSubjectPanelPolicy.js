@@ -5,6 +5,8 @@
 var FORMAT = "post-apollo.weather.media-panels.d1.v1";
 var ROUTES = {
   "media/overview": {page:"overview"},
+  // M1: read-only dashboard metadata, no duplicate radio/NEWS source owner.
+  "media/services/health": {page:"services"},
   // M28-T: exact original CLASSIC NEWS channel tab bar + complete reports.
   // Retain focused NEWS routes and the existing one StationNewsHub.
   "media/news/full": {page:"news",section:"REPORTS",full:true},

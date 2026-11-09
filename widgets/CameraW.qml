@@ -3439,6 +3439,13 @@ PanelWindow {
                                 onTriggered: camera.huntAutoStartNext()
                             }
                             Timer {
+                                id: huntHitFlashTimer
+                                interval: 190
+                                repeat: false
+                                running: camera.huntHitFlash
+                                onTriggered: camera.huntHitFlash = false
+                            }
+                            Timer {
                                 id: huntClock
                                 interval: 100
                                 repeat: true
@@ -3558,7 +3565,9 @@ PanelWindow {
                                         enabled: !camera.huntPaused && !camera.busy
                                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                                         hoverEnabled: true
-                                        cursorShape: Qt.CrossCursor
+                                        // The arena renders its own bright crosshair.
+                                        cursorShape: camera.huntPaused
+                                                     ? Qt.ArrowCursor : Qt.BlankCursor
                                         onPositionChanged: function(mouse) {
                                             camera.huntSetPointer(mouse.x, mouse.y,
                                                                   huntArena.width,
@@ -3595,6 +3604,9 @@ PanelWindow {
                                         delegate: Item {
                                             id: huntTargetItem
                                             property var target: camera.huntTargets[index]
+                                            property bool hovered: false
+                                            readonly property color targetTint:
+                                                camera.huntTargetColor(target.profile)
                                             // Dense rounds preserve usable hitboxes.
                                             // Ox is larger and always above the other
                                             // thumbnail actors if targets overlap.
@@ -3619,7 +3631,7 @@ PanelWindow {
                                                 * target.yNorm
                                             width: unscopedWidth * camera.huntScopeScale
                                             height: unscopedHeight * camera.huntScopeScale
-                                            z: target.profile === "ox" ? 40 : 2
+                                            z: camera.huntTargetDepth(target.profile)
                                             // The magnified *hitbox* follows the actual
                                             // magnified thumbnail, not the old world rect.
                                             x: (unscopedX - huntArena.width * camera.huntMouseX)
@@ -3643,11 +3655,23 @@ PanelWindow {
                                                 }
                                             }
 
+                                            RectangularShadow {
+                                                anchors.fill: huntTargetPlate
+                                                z: -1
+                                                spread: huntTargetItem.hovered ? 10 : 5
+                                                color: huntTargetItem.targetTint
+                                                opacity: huntTargetItem.hovered ? 0.70 : 0.25
+                                                visible: !camera.huntPaused
+                                                Behavior on opacity {
+                                                    NumberAnimation { duration: 125 }
+                                                }
+                                            }
                                             Rectangle {
+                                                id: huntTargetPlate
                                                 anchors.fill: parent
                                                 radius: 5
-                                                border.width: 2
-                                                border.color: Colors.magenta
+                                                border.width: huntTargetItem.hovered ? 3 : 2
+                                                border.color: huntTargetItem.targetTint
                                                 color: Colors.black
                                                 clip: true
                                                 Image {
@@ -3668,14 +3692,14 @@ PanelWindow {
                                                     anchors.centerIn: parent
                                                     visible: huntTargetItem.target.mediaType.indexOf("video") >= 0
                                                     font.pixelSize: 12
-                                                    color: Colors.cyan
+                                                    color: huntTargetItem.targetTint
                                                     text: "VIDEO"
                                                 }
                                                 GohuText {
                                                     x: 3
                                                     y: 2
                                                     font.pixelSize: 9
-                                                    color: Colors.yellow
+                                                    color: huntTargetItem.targetTint
                                                     text: huntTargetItem.target.profile.toUpperCase()
                                                 }
                                                 GohuText {
@@ -3694,7 +3718,10 @@ PanelWindow {
                                                     enabled: !camera.huntPaused && !camera.busy
                                                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                                                     hoverEnabled: true
-                                                    cursorShape: Qt.CrossCursor
+                                                    cursorShape: camera.huntPaused
+                                                                 ? Qt.ArrowCursor : Qt.BlankCursor
+                                                    onEntered: huntTargetItem.hovered = true
+                                                    onExited: huntTargetItem.hovered = false
                                                     onPositionChanged: function(mouse) {
                                                         const position = mapToItem(
                                                             huntArena, mouse.x, mouse.y);
@@ -3725,6 +3752,60 @@ PanelWindow {
                                                     }
                                                 }
                                             }
+                                        }
+                                    }
+                                    // Non-interactive hit wash. Only a validated target
+                                    // click triggers it; a miss or right-click does not.
+                                    Rectangle {
+                                        id: huntHitWash
+                                        anchors.fill: parent
+                                        z: 70
+                                        color: Colors.red
+                                        opacity: camera.huntHitFlash ? 0.13 : 0.0
+                                        visible: opacity > 0
+                                        Behavior on opacity {
+                                            NumberAnimation { duration: 160 }
+                                        }
+                                    }
+                                    Item {
+                                        id: huntNormalCrosshair
+                                        width: 32
+                                        height: 32
+                                        z: 80
+                                        visible: camera.huntMouseActive
+                                                 && !camera.huntPaused
+                                                 && !camera.huntScoped
+                                                 && !camera.huntSettingsOpen
+                                        x: huntArena.width * camera.huntMouseX - width / 2
+                                        y: huntArena.height * camera.huntMouseY - height / 2
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 25
+                                            height: 25
+                                            radius: 13
+                                            color: "transparent"
+                                            border.width: 1
+                                            border.color: Colors.cyan
+                                            opacity: 0.75
+                                        }
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 1
+                                            height: 32
+                                            color: Colors.white
+                                        }
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 32
+                                            height: 1
+                                            color: Colors.white
+                                        }
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 5
+                                            height: 5
+                                            radius: 3
+                                            color: Colors.magenta
                                         }
                                     }
                                     Item {

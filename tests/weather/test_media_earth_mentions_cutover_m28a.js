@@ -50,10 +50,10 @@ const packet=()=>({
 
 test("MEDIA location handoff admits only plottable geo context and routes to EARTH",()=>{
   assert.equal(Routes.findRoute("media/news/locations").subject,"media");
-  assert.equal(Routes.findRoute("earth/maps/overview").subject,"earth");
+  assert.equal(Routes.findRoute("earth/maps/events").subject,"earth");
   const h=harness(),payload=packet();
   assert.equal(h.env.showNewsMentionsOnEarth(payload),true);
-  assert.deepEqual(h.navigations,["earth/maps/overview"]);
+  assert.deepEqual(h.navigations,["earth/maps/events"]);
   const saved=JSON.parse(JSON.stringify(h.env.newsMentionOverlay));
   assert.equal(saved.locations.length,1);
   assert.equal(saved.locations[0].id,"M28A-NEWS");
@@ -90,7 +90,7 @@ test("two MEDIA entry paths terminate in SUBJECTS EARTH without CLASSIC navigati
   assert.ok(!subjectBlock.includes("onNewsMapRequested"),
     "subject-native MEDIA handoff must never call root CLASSIC MAP");
   assert.ok(!subjectBlock.includes('currentView = "map"'));
-  assert.match(navText,/chooseRoute\("earth\/maps\/overview"\)/);
+  assert.match(navText,/chooseRoute\("earth\/maps\/events"\)/);
 });
 
 test("EARTH receives transient overlay, actual map marker and clear action",()=>{

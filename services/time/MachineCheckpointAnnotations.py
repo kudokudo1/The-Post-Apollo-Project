@@ -161,6 +161,9 @@ def set_annotation(checkpoint_id, *, display_name, note, expected_revision,
     try:
         conn.execute("PRAGMA foreign_keys=ON")
         with conn:
+            # Take the metadata write lock before validating revision or
+            # creating the sidecar. DDL and update then roll back together.
+            conn.execute("BEGIN IMMEDIATE")
             existing = _existing(conn, checkpoint_id)
             _table(conn)
             previous = conn.execute(

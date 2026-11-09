@@ -14,6 +14,7 @@ Rectangle {
 
     property bool stationOpen: true
     property string subjectRoute: ""
+    readonly property bool compactOverview: subjectRoute === "media/overview"
     function sectionVisible(group) {
         return MediaPanelPolicy.radioGroupVisible(subjectRoute,group);
     }
@@ -351,59 +352,25 @@ Rectangle {
 
     color: Colors.black
 
-    Flickable {
-        id: radioScroll
-        anchors.fill: parent
-        contentWidth: width
-        contentHeight: content.implicitHeight + 22
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
-
-        Column {
-            id: content
-            x: 18
-            y: 10
-            width: Math.max(0, radioScroll.width - 36)
-            spacing: 10
-
-            Row {
-            visible: stationRadio.sectionVisible("header")
-                width: parent.width
-                spacing: 18
-
-                GohuText {
-                    text: "◉  RADIO // NEWS FIRST"
-                    font.pixelSize: 23
-                    color: Colors.cyan
-                }
-
-                GohuText {
-                    text: controller.errorText !== ""
-                          ? controller.errorText
-                          : controller.busy ? "CONTROLLER WORKING"
-                          : controller.playbackState.toUpperCase()
-                    font.pixelSize: 12
-                    color: controller.errorText !== "" ? Colors.orange
-                           : controller.ownsPlayback ? Colors.green : Colors.white
-                }
-            }
-
-            StationSectionDivider {
-            visible: stationRadio.sectionVisible("source")
-                width: parent.width
-                title: "SHARED HI-FI // RADIO BROWSER // MPD"
-            }
-
-            QuietText {
-            visible: stationRadio.sectionVisible("source")
-                width: parent.width
-                font.pixelSize: 11
-                text: "SAME RADIO SERVICE AS HI-FI // DIRECTORY CLASSIFICATION IS NOT VERIFIED NEWS CONTENT"
-            }
-
+    // M1 // Only the directory/saved rows scroll. Original search actions
+    // and MPD/select/load/enter/play controls retain their same callbacks.
+    Column {
+        id: fixedSearch
+        objectName: "media-m1-radio-search-fixed"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.leftMargin: 8
+        anchors.rightMargin: 8
+        anchors.topMargin: 2
+        spacing: 3
+        visible: !stationRadio.compactOverview
+        height: visible ? implicitHeight : 0
             Row {
             visible: stationRadio.sectionVisible("search")
                 id: presetRow
+                objectName: "media-m1-radio-preset-rail"
+                height: 26
                 width: parent.width
                 spacing: 6
 
@@ -413,8 +380,8 @@ Rectangle {
                     delegate: ActionButton {
                         required property var modelData
                         required property int index
-                        width: Math.max(65, (presetRow.width - 5 * presetRow.spacing) / 6)
-                        height: 29
+                        width: Math.max(1, (presetRow.width - 5 * presetRow.spacing) / 6)
+                        height: 26
                         label: modelData.name
                         labelPixelSize: 10
                         selected: stationRadio.presetIndex === index
@@ -427,8 +394,9 @@ Rectangle {
             Row {
             visible: stationRadio.sectionVisible("search")
                 id: queryRow
+                objectName: "media-m1-radio-query-rail"
                 width: parent.width
-                height: 33
+                height: 30
                 spacing: 8
 
                 ActionButton {
@@ -441,7 +409,7 @@ Rectangle {
                 }
 
                 Rectangle {
-                    width: Math.max(150, queryRow.width - 82 - 92 - 2 * queryRow.spacing)
+                    width: Math.max(1, queryRow.width - 82 - 92 - 2 * queryRow.spacing)
                     height: queryRow.height
                     color: Colors.dark
                     border.width: 1
@@ -486,6 +454,64 @@ Rectangle {
                 width: parent.width
                 text: "NAME / TAG:NEWS / TAG:TALK / COUNTRY:US / LANGUAGE:ENGLISH"
                 font.pixelSize: 10
+            }
+
+
+    }
+
+    Flickable {
+        id: radioScroll
+        objectName: "media-m1-radio-directory-scroll"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: fixedSearch.bottom
+        anchors.topMargin: fixedSearch.visible ? 3 : 0
+        anchors.bottom: fixedTransport.top
+        anchors.bottomMargin: fixedTransport.visible ? 3 : 0
+        clip: true
+        contentWidth: width
+        contentHeight: content.implicitHeight + 12
+        boundsBehavior: Flickable.StopAtBounds
+        Column {
+            id: content
+            objectName: "media-m1-radio-results"
+            x: 8
+            y: 3
+            width: Math.max(0,radioScroll.width-16)
+            spacing: 6
+            Row {
+            visible: stationRadio.sectionVisible("header")
+                width: parent.width
+                spacing: 18
+
+                GohuText {
+                    text: "◉  RADIO // NEWS FIRST"
+                    font.pixelSize: 23
+                    color: Colors.cyan
+                }
+
+                GohuText {
+                    text: controller.errorText !== ""
+                          ? controller.errorText
+                          : controller.busy ? "CONTROLLER WORKING"
+                          : controller.playbackState.toUpperCase()
+                    font.pixelSize: 12
+                    color: controller.errorText !== "" ? Colors.orange
+                           : controller.ownsPlayback ? Colors.green : Colors.white
+                }
+            }
+
+            StationSectionDivider {
+            visible: stationRadio.sectionVisible("source")
+                width: parent.width
+                title: "SHARED HI-FI // RADIO BROWSER // MPD"
+            }
+
+            QuietText {
+            visible: stationRadio.sectionVisible("source")
+                width: parent.width
+                font.pixelSize: 11
+                text: "SAME RADIO SERVICE AS HI-FI // DIRECTORY CLASSIFICATION IS NOT VERIFIED NEWS CONTENT"
             }
 
             StationSectionDivider {
@@ -758,6 +784,22 @@ Rectangle {
                 }
             }
 
+
+        }
+    }
+
+    Column {
+        id: fixedTransport
+        objectName: "media-m1-radio-transport-fixed"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 8
+        anchors.rightMargin: 8
+        anchors.bottomMargin: 3
+        visible: !stationRadio.compactOverview
+        height: visible ? implicitHeight : 0
+        spacing: 2
             StationSectionDivider {
             visible: stationRadio.sectionVisible("transport")
                 width: parent.width
@@ -765,25 +807,28 @@ Rectangle {
             }
 
             Row {
+                id: transportRow
+                objectName: "media-m1-radio-transport-row"
+                height: 29
             visible: stationRadio.sectionVisible("transport")
                 width: parent.width
                 spacing: 8
 
                 ActionButton {
-                    width: 105
-                    height: 36
+                    width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
+                    height: 29
                     label: "SELECT"
-                    labelPixelSize: 12
+                    labelPixelSize: 9
                     available: stationRadio.canOperate
                                && !!stationRadio.highlightedItem
                     onClicked: stationRadio.selectHighlighted()
                 }
 
                 ActionButton {
-                    width: 100
-                    height: 36
+                    width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
+                    height: 29
                     label: "LOAD"
-                    labelPixelSize: 12
+                    labelPixelSize: 9
                     available: stationRadio.canOperate
                                && !!(stationRadio.selectedRef
                                      && stationRadio.selectedRef.source === "radio-browser")
@@ -791,48 +836,48 @@ Rectangle {
                 }
 
                 ActionButton {
-                    width: 100
-                    height: 36
+                    width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
+                    height: 29
                     label: "ENTER"
-                    labelPixelSize: 12
+                    labelPixelSize: 9
                     available: stationRadio.canOperate
                                && !!stationRadio.highlightedItem
                     onClicked: stationRadio.enterHighlighted()
                 }
 
                 ActionButton {
-                    width: 100
-                    height: 36
+                    width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
+                    height: 29
                     label: "PLAY"
-                    labelPixelSize: 12
+                    labelPixelSize: 9
                     available: stationRadio.canPlaySelected
                     onClicked: stationRadio.playbackAction("play")
                 }
 
                 ActionButton {
-                    width: 100
-                    height: 36
+                    width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
+                    height: 29
                     label: "PAUSE"
-                    labelPixelSize: 12
+                    labelPixelSize: 9
                     available: stationRadio.canTransport
                     onClicked: stationRadio.playbackAction("pause")
                 }
 
                 ActionButton {
-                    width: 100
-                    height: 36
+                    width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
+                    height: 29
                     label: "STOP"
-                    labelPixelSize: 12
+                    labelPixelSize: 9
                     available: stationRadio.canTransport
                     onClicked: stationRadio.playbackAction("stop")
                 }
 
                 ActionButton {
-                    width: 122
-                    height: 36
+                    width: Math.max(1,(transportRow.width-6*transportRow.spacing)/7)
+                    height: 29
                     label: stationRadio.highlightedFavorite
                            ? "UNFAVORITE" : "FAVORITE"
-                    labelPixelSize: 10
+                    labelPixelSize: 8
                     available: stationRadio.canOperate
                                && !!stationRadio.highlightedItem
                     selected: stationRadio.highlightedFavorite
@@ -846,7 +891,7 @@ Rectangle {
                 text: controller.errorText !== ""
                       ? controller.message : stationRadio.notice
                 color: controller.errorText !== "" ? Colors.orange : Colors.cyan
-                font.pixelSize: 12
+                font.pixelSize: 9
             }
 
             QuietText {
@@ -855,7 +900,7 @@ Rectangle {
                 text: "SELECTED // " + (stationRadio.selectedRef
                       ? String(stationRadio.selectedRef.id) : "--")
                 elide: Text.ElideMiddle
-                font.pixelSize: 11
+                font.pixelSize: 9
             }
 
             GohuText {
@@ -868,7 +913,7 @@ Rectangle {
                          : "--")
                 color: Colors.white
                 elide: Text.ElideRight
-                font.pixelSize: 12
+                font.pixelSize: 9
             }
 
             QuietText {
@@ -878,16 +923,15 @@ Rectangle {
                       + controller.playbackState.toUpperCase()
                       + (controller.ownsPlayback ? " // CONTROLLER OWNED"
                          : " // NO VERIFIED PLAYBACK OWNERSHIP")
-                font.pixelSize: 10
+                font.pixelSize: 9
             }
 
             QuietText {
             visible: stationRadio.sectionVisible("status")
                 width: parent.width
                 text: "MPRIS EXTERNAL PLAYERS REMAIN A SEPARATE HI-FI MODE // WEATHER DOES NOT CLAIM THEIR CONTROL"
-                font.pixelSize: 10
+                font.pixelSize: 9
             }
-        }
     }
 
     NeonScrollBar {

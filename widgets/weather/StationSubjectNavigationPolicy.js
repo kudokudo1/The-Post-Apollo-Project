@@ -124,7 +124,9 @@ var SUBJECTS = [
       {id:"saved",label:"FAVORITES AND RECENTS"},
       {id:"transport",label:"PLAYBACK"}]},
     {id:"creators",label:"CREATORS",children:[
-      {id:"saved",label:"SAVED CHANNELS"}, {id:"uploads",label:"RECENT UPLOADS"}]}
+      {id:"saved",label:"SAVED CHANNELS"}, {id:"uploads",label:"RECENT UPLOADS"}]},
+    {id:"services",label:"SERVICES",children:[
+      {id:"health",label:"MEDIA DIAGNOSTICS // DASHBOARD"}]}
   ]},
   {id:"magick",label:"MAGICK",sections:[
     {id:"overview",label:"OVERVIEW"},

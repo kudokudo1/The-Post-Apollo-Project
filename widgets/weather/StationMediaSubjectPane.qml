@@ -12,6 +12,7 @@ Rectangle {
     property string subjectRoute: ""
     property real runtimeNowMs: Date.now()
     signal newsMapRequested(var payload)
+    signal routeRequested(string path)
 
     readonly property string kind:
         MediaPanelPolicy.kindForRoute(subjectRoute)
@@ -48,14 +49,38 @@ Rectangle {
                ? mapped : Qt.rect(0, 0, 0, 0);
     }
 
+    // M1 // One fixed COSMOS/EARTH C44 title/tab/divider for every MEDIA
+    // screen. NEWS, RADIO and overview own only the content below it.
+    StationMediaHeader {
+        id: mediaHeader
+        objectName: "media-m1-global-fixed-header"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        subjectRoute: mediaPane.subjectRoute
+        onRouteRequested: function(path) {
+            mediaPane.routeRequested(path);
+        }
+    }
+
     Loader {
         id: mediaLoader
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: mediaHeader.bottom
+        anchors.bottom: parent.bottom
         active: mediaPane.visible && mediaPane.kind !== ""
         sourceComponent: mediaPane.kind === "overview"
                          ? overviewComponent
                          : mediaPane.kind === "radio"
-                           ? radioComponent : newsComponent
+                           ? radioComponent
+                           : mediaPane.kind === "services"
+                           ? servicesComponent : newsComponent
+    }
+
+    Component {
+        id: servicesComponent
+        StationMediaServicesPane { }
     }
 
     Component {
@@ -63,6 +88,7 @@ Rectangle {
         StationNewsHub {
             stationOpen: mediaPane.visible
             subjectRoute: mediaPane.subjectRoute
+            embeddedHeader: true
             runtimeNowMs: mediaPane.runtimeNowMs
             onNewsMapRequested: function(payload) {
                 mediaPane.newsMapRequested(payload);
@@ -122,6 +148,7 @@ Rectangle {
                     anchors.fill: parent
                     stationOpen: mediaPane.visible
                     subjectRoute: "media/news/reports"
+                    embeddedHeader: true
                     runtimeNowMs: mediaPane.runtimeNowMs
                     onNewsMapRequested: function(payload) {
                         mediaPane.newsMapRequested(payload);

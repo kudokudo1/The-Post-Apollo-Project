@@ -191,6 +191,7 @@ Rectangle {
                      && surface.subjectWorkspaceActive
             subjectRoute: surface.currentPath
             runtimeNowMs: surface.runtimeNowMs
+            onRouteRequested: function(path) { surface.routeRequested(path); }
             onNewsMapRequested: function(payload) {
                 surface.newsMapRequested(payload);
             }

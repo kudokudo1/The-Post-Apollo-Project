@@ -30,7 +30,11 @@ assert "TITLE EXACT, NOT VERIFIED SENDER" in h
 assert "NotificationsService.toggleFavorite(notificationEntry.targetKey" in h
 assert "NotificationsService.toggleDnd(notificationEntry.targetKey" in h
 assert "NotificationsService.snoozeApp(notificationEntry.targetKey" in h
-assert 'text: "DND / ZZ RULES  //  " + managerDndPolicies.count' in h
+assert 'id: managerRuleTabs' in h
+assert 'model: managerVisiblePolicies' in h
+assert '"DO NOT DISTURB // " + managerVisiblePolicies.count' in h
+assert '"SNOOZED // " + managerVisiblePolicies.count' in h
+assert 'visible: root.managerPolicyMode === "favorites"' in h
 assert 'label: dndRule.dnd ? "ALLOW" : "WAKE"' in h
 
 NODE = r"""

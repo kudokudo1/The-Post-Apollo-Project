@@ -48,6 +48,8 @@ function room(a) {
     const existingLabel = existingPatients.filter(r => v(r.patientId) === patientId
         && v(r.patientLabel))[0];
     const patientLabel = existingLabel ? v(existingLabel.patientLabel) : repository;
+    if (!validName(patientLabel))
+        blockers.push("Patient display label too long for this Room creation");
     return {ready: blockers.length === 0, blockers, id, name, repository,
         patientId, patientLabel,
         mutationAuthorized: false, createsSession: false, assignsDoctor: false,

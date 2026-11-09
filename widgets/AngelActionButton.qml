@@ -1,24 +1,32 @@
 import QtQuick
 import "../components"
 
-// ANGEL // ONE BACKGROUND COLOR.
-// The shared ActionButton normally uses state-dependent fills. Angel does not:
-// idle, hover, press, keyboard focus, selection and favorite all paint black.
-// State remains visible in text, border and glow, never in the background.
-// This is intentionally scoped to Angel rather than shared ActionButton.
+// ANGEL // EXPLICIT SELECTION COLOR ONLY.
+// Idle/hover/press/focus remain black; only a navigation or history action
+// explicitly opted into selection highlighting gets a yellow background.
+// Favorite membership and ERR status are not navigation selections.
+// Keep this local: the shared button's broad glows are unsafe for Angel rows.
 ActionButton {
     id: angelButton
 
     readonly property color fixedFillColor: Colors.black
+    readonly property color activeFillColor: Colors.yellow
+    // Only OPEN/SELECT navigation explicitly enables the selection wash.
+    property bool highlightWhenSelected: false
+
     idleFillColor: fixedFillColor
     hoverFillColor: fixedFillColor
     pressedFillColor: fixedFillColor
-    selectedFillColor: fixedFillColor
+    selectedFillColor: activeFillColor
     keyboardSelectedFillColor: fixedFillColor
 
-    // Final painted surface is independent of fillColor's state machine.
-    // Scrolling/reusing ListView delegates cannot restore a colored wash.
-    color: fixedFillColor
+    // Never use the shared hover/press/keyboard fill-state dispatcher.
+    // List scrolling cannot accidentally produce a colored background.
+    color: highlightWhenSelected && selected ? activeFillColor : fixedFillColor
+
+    selectedForegroundColor: Colors.magenta
+    selectedBorderColor: Colors.magenta
+    selectedContentGlowColor: Colors.magenta
 
     // RectangularShadow is a filled shadow shape, not an outline-only
     // stroke. On the history ListView its full-rectangle accent tint can

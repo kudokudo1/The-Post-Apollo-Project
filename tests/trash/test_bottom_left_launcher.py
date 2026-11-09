@@ -182,7 +182,8 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn("running: trashLauncher.menuOpen", timer)
         self.assertIn("!trashLauncher.busy", timer)
         self.assertIn('trashLauncher.confirmMode === ""', timer)
-        self.assertIn("!trashSearch.activeFocus", timer)
+        # A focused search field must NOT block live updates indefinitely.
+        self.assertNotIn("trashSearch.activeFocus", timer)
         self.assertIn("trashLauncher.refresh(false, true)", timer)
         self.assertNotIn('run("burn"', timer)
         self.assertNotIn('run("burn-all"', timer)
@@ -192,6 +193,29 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn("items = Array.isArray(payload.items) ? payload.items : [];", TRASH)
         self.assertIn("indexReady = true;", TRASH)
         self.assertIn('lastError ? "STALE"', TRASH)
+
+    def test_gio_trash_change_events_trigger_read_only_debounced_refresh(self):
+        monitor = section(TRASH, "        id: trashChangeMonitor",
+                          "    Process {\n        id: trashProcess")
+        self.assertIn('command: ["gio", "monitor", "--dir=trash:///"]', monitor)
+        self.assertIn("running: trashLauncher.menuOpen", monitor)
+        self.assertIn("stdout: SplitParser {", monitor)
+        self.assertIn("trashEventDebounce.restart()", monitor)
+        debounce = section(TRASH, "        id: trashEventDebounce",
+                           "    Process {\n        id: trashChangeMonitor")
+        self.assertIn("interval: 450", debounce)
+        self.assertIn("repeat: false", debounce)
+        self.assertIn('trashLauncher.confirmMode === ""', debounce)
+        self.assertIn("!trashLauncher.busy", debounce)
+        self.assertIn("trashLauncher.refresh(false, true)", debounce)
+        self.assertNotIn('trashLauncher.run("burn"', debounce)
+        self.assertNotIn('trashLauncher.run("burn-all"', debounce)
+        # Polling still runs if the optional event watcher is unavailable.
+        timer = section(TRASH, "        id: trashLiveTimer",
+                        "    Timer {\n        id: trashEventDebounce")
+        self.assertIn("interval: 15000", timer)
+        self.assertIn("running: trashLauncher.menuOpen", timer)
+        self.assertNotIn("trashSearch.activeFocus", timer)
 
     def test_finance_red_close_button_family_and_no_destructive_shortcut(self):
         self.assertIn('id: closeTrashButton', TRASH)

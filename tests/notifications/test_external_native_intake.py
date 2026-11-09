@@ -7,6 +7,7 @@ ROOT=Path(__file__).resolve().parents[2]
 SERVER=ROOT/"services/notifications/NotificationsService.qml"
 CONVERTER=ROOT/"services/notifications/NotificationsConverter.qml"
 SITES=ROOT/"services/notifications/BrowserSiteIdentity.js"
+SCOPE=ROOT/"services/notifications/NotificationScopePolicy.js"
 POPUP=ROOT/"modules/Notifications.qml"
 FACETS=ROOT/"services/notifications/NotificationFacets.js"
 HUB=ROOT/"widgets/notifications/NotificationsHubW.qml"
@@ -68,6 +69,7 @@ const facetSrc=fs.readFileSync(process.argv[3],'utf8')
  .replace(/^\s*\.pragma library\s*$/m,'');
 const siteSrc=fs.readFileSync(process.argv[4],'utf8')
  .replace(/^\s*\.pragma library\s*$/m,'');
+const scopeSrc=fs.readFileSync(process.argv[5],'utf8');
 function method(text,name){
  const at=text.indexOf('function '+name+'(');assert(at>=0,'missing '+name);
  const o=text.indexOf('{',at);let depth=0,end=-1;
@@ -79,9 +81,12 @@ function method(text,name){
 }
 const Sites={String,Array,Object};
 vm.runInNewContext(siteSrc,Sites);
+const Scope={String,Array,Number,Math,encodeURIComponent};
+vm.runInNewContext(scopeSrc,Scope);
 const C={
  String,NotificationUrgency:{Critical:2,Normal:1,Low:0},root:{},
- BrowserSiteIdentity:{fromNotification:Sites.fromNotification}
+ BrowserSiteIdentity:{fromNotification:Sites.fromNotification},
+ NotificationScopePolicy:{scopeFromHints:Scope.scopeFromHints}
 };
 vm.runInNewContext(['categoryFor','severityFor','convert']
  .map(n=>method(conv,n)).join('\n'),C);
@@ -198,5 +203,5 @@ assert.strictEqual(S.invokeExternalDefaultAction('event-1'),false);
 assert.strictEqual(invokeCount,3);
 console.log('Synthetic native metadata, classification, live-action routing: PASS');
 """
-subprocess.run(["node","-e",NODE,str(CONVERTER),str(SERVER),str(FACETS),str(SITES)],check=True)
+subprocess.run(["node","-e",NODE,str(CONVERTER),str(SERVER),str(FACETS),str(SITES),str(SCOPE)],check=True)
 print("External native/browser intake contracts: PASS")

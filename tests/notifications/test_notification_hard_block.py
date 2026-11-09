@@ -21,7 +21,8 @@ for needle in (
 ):
     assert needle in s, needle
 for needle in (
-    'label: "⃠"',
+    'label: "✞"',
+    'symbolFontFamily: "Noto Sans Symbols 2"',
     "NotificationsService.toggleBlocked(notificationEntry.targetKey",
     'label: "BLOCK"',
     'label: root.managerPolicyMode === "block"',
@@ -30,6 +31,22 @@ for needle in (
     'function selectInheritedBlockScope()',
 ):
     assert needle in h, needle
+
+# The selected BLOCK state uses the shared MiniButton's yellow fill,
+# orange border/text and orange text/frame glow. It must NOT inherit the
+# red-danger override used by CLEAR ALL and X.
+block_button = h.split("label: \"✞\"", 1)[1].split("onTriggered:", 1)[0]
+assert "active: notificationEntry.blocked" in block_button
+assert "activeColor: Colors.orange" in block_button
+assert "danger:" not in block_button
+mini = h.split("component MiniButton: Rectangle {", 1)[1].split(
+    "// ===== LOCAL VISUAL TYPE: FILTER BUTTON", 1
+)[0]
+assert 'property string symbolFontFamily: ""' in mini
+assert 'font.family: miniButton.symbolFontFamily !== ""' in mini
+assert "return Colors.yellow;" in mini
+assert "return Colors.orange;" in mini
+assert "miniButton.active ? Colors.orange : miniButton.stateColor" in mini
 
 NODE=r"""
 const fs=require('fs'),vm=require('vm'),assert=require('assert');

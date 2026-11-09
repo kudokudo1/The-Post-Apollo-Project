@@ -159,6 +159,37 @@ UI.inheritedPolicyKey='';
 assert.strictEqual(UI.selectInheritedPolicyScope(),false,
  'second click may now change the explicitly selected parent');
 S.setDnd(key(sA,'server'),'vesktop','Vesktop // SERVER guild-a',false);
+
+// Reproduce the Git history card in the operator's screenshot: a literal
+// TITLE is selected, while a previous APP-wide DND is still active.
+const gitNotice={
+ source:'GIT',sourceId:'git-journal',title:'DISPLAY UPDATED',
+ originalTitle:'GIT // OPERATION RECORDED COMPLETE',websiteHost:'',context:{}
+};
+const gitOptions=opt(gitNotice);
+const gitApp=key(gitNotice,'app');
+const gitTitle=key(gitNotice,'title');
+assert.notStrictEqual(gitTitle,gitApp);
+S.setDnd(gitApp,'git-journal','GIT',true);
+assert.strictEqual(S.shouldSuppressScoped(gitNotice),true);
+assert.strictEqual(S.inheritedPolicyOwnerKey(gitNotice,gitTitle),gitApp);
+UI.scopeOptions=gitOptions;
+UI.inheritedPolicyKey=gitApp;
+UI.targetScopeIndex=0;
+assert.strictEqual(UI.selectInheritedPolicyScope(),true);
+assert.strictEqual(UI.scopeOptions[UI.targetScopeIndex].kind,'app');
+UI.inheritedPolicyKey='';
+assert.strictEqual(UI.selectInheritedPolicyScope(),false);
+S.toggleDnd(gitApp,'git-journal','GIT');
+assert.strictEqual(S.shouldSuppressScoped(gitNotice),false,
+ 'explicit second click on parent can restore popup delivery');
+S.snoozeApp(gitApp,'git-journal','GIT');
+assert.strictEqual(S.inheritedPolicyOwnerKey(gitNotice,gitTitle),gitApp,
+ 'timed ZZ inherited from app must route to parent too');
+assert.strictEqual(S.shouldSuppressScoped(gitNotice),true);
+S.clearSnooze(gitApp);
+assert.strictEqual(S.shouldSuppressScoped(gitNotice),false);
+
 S.snoozeApp(key(dmA,'conversation'),'vesktop','Vesktop // DM alice');
 assert.strictEqual(S.shouldSuppressScoped(dmA),true);
 assert.strictEqual(S.shouldSuppressScoped(dmB),false);

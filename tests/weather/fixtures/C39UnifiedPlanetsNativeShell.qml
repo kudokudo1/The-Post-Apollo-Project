@@ -274,6 +274,7 @@ ShellRoot {
                     return root.fail("C41_SELECTED_PLANET_NOT_PRESERVED");
                 root.done=true;
                 console.log("C41_NATIVE_PASS // ALL_FIVE_SOURCE_DATED_AND_DETAILS");
+                console.log("C39_NATIVE_PASS // TWO_MODES_EMBEDDED_RING_FIXED_SKY_STRIP_FULL_DETAILS");
                 Qt.quit();
             }
         }

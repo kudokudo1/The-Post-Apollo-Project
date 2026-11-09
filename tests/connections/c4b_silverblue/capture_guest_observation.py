@@ -231,7 +231,7 @@ def main() -> int:
     ready_fd = os.open(args.ready, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                        os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
     with os.fdopen(ready_fd, "wb") as signal:
-        signal.write(b"READY\\n")
+        signal.write(b"READY\n")
         signal.flush()
         os.fsync(signal.fileno())
     line = capture(root, args.complete)

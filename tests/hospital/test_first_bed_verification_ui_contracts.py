@@ -46,7 +46,7 @@ check('verifiedForReview: blockers.length === 0' in policy
 check('room.bedPath' in policy and 'room.branch' in policy
       and 'Room has Session history' in policy
       and 'Room is already staffed' in policy
-      and 'claimed' not in policy,
+      and 'Select an unclaimed, non-live, clean Bed' in policy,
       "Refuse occupied Rooms, registered Beds, and historical Sessions")
 check('probeProcess.exec(["python3", "-c", inspect, selected]);' in probe
       and 'GIT_OPTIONAL_LOCKS' in probe

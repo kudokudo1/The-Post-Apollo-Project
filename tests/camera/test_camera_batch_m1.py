@@ -250,7 +250,7 @@ class CameraBatchM1Tests(unittest.TestCase):
         self.assertEqual(run.call_count, 0)
 
     def test_batch_always_review_first_and_never_direct_file_delete_in_qml(self):
-        qml = QML.read_text()
+        qml = QML.read_text() + (ROOT / "widgets/CameraCleanupView.qml").read_text()
         for snippet in ('property var batchPaths: []',
                         'function batchToggle(record)',
                         'function batchSelectLoaded(nameNeedle)',

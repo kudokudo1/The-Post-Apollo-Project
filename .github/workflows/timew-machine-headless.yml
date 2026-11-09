@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "services/time/MachineWindowMovePilot.py"
+      - "services/time/MachineMoveApply.py"
       - "services/time/MachineWindowResolver.py"
       - "services/time/MachineMoveJournal.py"
       - "services/time/MachineMoveApproval.py"
@@ -16,6 +17,7 @@ on:
       - main
     paths:
       - "services/time/MachineWindowMovePilot.py"
+      - "services/time/MachineMoveApply.py"
       - "services/time/MachineWindowResolver.py"
       - "services/time/MachineMoveJournal.py"
       - "services/time/MachineMoveApproval.py"

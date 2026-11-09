@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "StationSubjectHeaderGeometry.js" as HeaderGeometry
 
 // C8 // COSMOS MOON uses the established MAGICK compact phase instrument.
 // The original StationSky owns all USNO collectors and UTC/civil calculations.
@@ -15,7 +16,7 @@ Rectangle {
     property real runtimeNowMs: Date.now()
     signal routeRequested(string path)
     // Match COSMOS Overview/Modes: 6 px between stage boundary and content.
-    readonly property int contentInset: 6
+    readonly property int contentInset: HeaderGeometry.inset
     readonly property var sourceSkyHost: sourceSky
     readonly property var phaseInstrument: moonVisual
     readonly property var moonSource: sourceSky.moonObservation
@@ -92,10 +93,9 @@ Rectangle {
         anchors.top: parent.top
         anchors.leftMargin: moonPane.contentInset
         anchors.rightMargin: moonPane.contentInset
-        anchors.topMargin: moonPane.contentInset
-        // 13px remains readable at 10px font while preserving the compact
-        // Moon disk size below the new 5/2/3 divider spacing.
-        height: 13
+        anchors.topMargin: HeaderGeometry.inset
+        // Same title height as SUN, ASTRONOMY, EVENTS and SPACE.
+        height: HeaderGeometry.titleHeight
         spacing: 4
         GohuText {
             id: moonHeading
@@ -130,13 +130,13 @@ Rectangle {
         anchors.top: titleRail.bottom
         anchors.leftMargin: moonPane.contentInset
         anchors.rightMargin: moonPane.contentInset
-        anchors.topMargin: 2
-        height: 27
-        spacing: 4
+        anchors.topMargin: HeaderGeometry.titleToTabs
+        height: HeaderGeometry.tabHeight
+        spacing: HeaderGeometry.tabSpacing
         ActionButton {
             objectName: "cosmos-c18-moon-observation-tab"
-            width: Math.max(1,(moonModeRail.width-moonModeRail.spacing)/2)
-            height: 27
+            width: HeaderGeometry.buttonWidth(moonModeRail.width,2)
+            height: HeaderGeometry.tabHeight
             label: "OVERVIEW"
             labelPixelSize: 10
             contentPadding: 1
@@ -146,8 +146,8 @@ Rectangle {
         ActionButton {
             id: moonYearButton
             objectName: "cosmos-c11-open-moon-year"
-            width: Math.max(1,(moonModeRail.width-moonModeRail.spacing)/2)
-            height: 27
+            width: HeaderGeometry.buttonWidth(moonModeRail.width,2)
+            height: HeaderGeometry.tabHeight
             label: "LUNAR YEAR"
             labelPixelSize: 10
             contentPadding: 1
@@ -163,12 +163,12 @@ Rectangle {
         objectName: "cosmos-c23-moon-overview-divider"
         anchors.top: moonModeRail.bottom
         // Match SUN's five-pixel tab-to-rule breathing room.
-        anchors.topMargin: 5
+        anchors.topMargin: HeaderGeometry.tabsToRule
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: moonPane.contentInset
         anchors.rightMargin: moonPane.contentInset
-        height: 2
+        height: HeaderGeometry.ruleHeight
         color: Colors.cyan
     }
 
@@ -182,7 +182,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: moonHeaderDivider.bottom
         // Keep the first instrument off the cyan rule.
-        anchors.topMargin: 3
+        anchors.topMargin: HeaderGeometry.ruleToContent
         anchors.bottom: parent.bottom
         anchors.leftMargin: moonPane.contentInset
         anchors.rightMargin: moonPane.contentInset

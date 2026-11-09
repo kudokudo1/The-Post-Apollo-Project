@@ -143,8 +143,16 @@ class DirectGuestRelayReview(unittest.TestCase):
         # just before the unchanged controller's final 110-line log relay.
         self.assertLess(code.index("C4B_RUNNING_HOST_PROBE\n"),
                         code.index("stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN"))
-        self.assertLess(code.index("stage BOOTED_RUNTIME_ACCEPTED"),
+        self.assertLess(code.index('echo "C4B_PASS // SERVICE_STOP_RELEASES_DBUS_NAME"'),
                         code.index("C4B_SINGLE_UART_RELAY"))
+        # The exact previous failure: using the isolated venv interpreter
+        # after the same guest phase had already deleted that executable.
+        self.assertLess(code.index("C4B_SINGLE_UART_RELAY"),
+                        code.index("  rm -rf -- /opt/postapollo-c2o-venv"))
+        self.assertIn('timeout --signal=TERM --kill-after=1s 6s "$python" -I -B -', code)
+        self.assertIn('python=/opt/postapollo-c2o-venv/bin/python3', code)
+        self.assertLess(code.index("  rm -rf -- /opt/postapollo-c2o-venv"),
+                        code.index("stage BOOTED_RUNTIME_ACCEPTED"))
         self.assertLess(code.index("C4B_SINGLE_UART_RELAY"),
                         code.index('echo "C4B_PASS // RUNTIME_USERS_VENV_CLEANED_POLICY_RETAINED_FOR_ROLLBACK"'))
         for v in ("os.O_NOFOLLOW", "os.O_NONBLOCK",

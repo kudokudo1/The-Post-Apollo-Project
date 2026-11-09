@@ -258,6 +258,13 @@ PanelWindow {
     property bool listKeyboardSelectionActive: false
     property string managerSelectionSection: "dnd"
     property string managerPolicyMode: "dnd" // dnd | zz | favorites
+
+    function cycleManagerPolicyMode(direction) {
+        const modes = ["dnd", "zz", "favorites"];
+        const index = Math.max(0, modes.indexOf(managerPolicyMode));
+        const step = Number(direction) < 0 ? -1 : 1;
+        managerPolicyMode = modes[(index + step + modes.length) % modes.length];
+    }
     // Do not take mode keys from the search editor or destructive dialogs.
     readonly property bool standardKeysAvailable:
         menuOpen && keyboardActive && !searchInput.activeFocus
@@ -327,21 +334,13 @@ PanelWindow {
         sequence: "Left"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable && root.activeFilter === "manager"
-        onActivated: {
-            root.managerPolicyMode = "dnd";
-            root.managerSelectionSection = "dnd";
-            root.listKeyboardSelectionActive = false;
-        }
+        onActivated: root.cycleManagerPolicyMode(-1)
     }
     Shortcut {
         sequence: "Right"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable && root.activeFilter === "manager"
-        onActivated: {
-            root.managerPolicyMode = "favorites";
-            root.managerSelectionSection = "favorites";
-            root.listKeyboardSelectionActive = false;
-        }
+        onActivated: root.cycleManagerPolicyMode(1)
     }
     Shortcut {
         sequence: "Tab"
@@ -453,7 +452,7 @@ PanelWindow {
     onActiveFilterChanged: {
         listKeyboardSelectionActive = false;
         if (activeFilter === "manager")
-            managerSelectionSection = dndManagerList.count > 0 ? "dnd" : "favorites";
+            managerSelectionSection = managerPolicyMode === "favorites" ? "favorites" : "dnd";
         root.scheduleFilteredModelRebuild();
     }
 

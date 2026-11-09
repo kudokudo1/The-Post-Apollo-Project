@@ -2,7 +2,9 @@
 """C4d source-side adversarial tests. No VM or host system changes."""
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
 from unittest import mock
@@ -334,6 +336,67 @@ class C4dSerialCaptureTests(unittest.TestCase):
             with self.assertRaisesRegex(
                     C.Refused, "ORIGINAL_TWO_BOOT_LIFECYCLE_DID_NOT_PASS"):
                 C.capture(self.root, self.done, poll=0)
+
+    def test_24_no_observation_emits_safe_source_to_serial_diagnostic(self):
+        # In CI, a real signed guest may pass original C2v/C4b acceptance
+        # while its separate report transport is absent. Log fixed counters,
+        # never a forged/unsigned report or any guest-provided text.
+        self.serial.write_bytes(
+            b"C4B_CONTROLLER_GUEST_LOG_BEGIN\n" +
+            b"C4D_UART_DIAG // UART_RELAY_REFUSED\n" +
+            b"\n".join(C.REQUIRED_MARKERS) + b"\n")
+        self.done.write_text("PASS\n")
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            with self.assertRaisesRegex(
+                    C.Refused, "NO_REAL_GUEST_OBSERVATION_CAPTURED"):
+                C.capture(self.root, self.done, poll=0)
+        diag = stream.getvalue()
+        self.assertIn("C4D_CAPTURE_DIAG // serial_opened=1", diag)
+        self.assertIn("candidate_records=0", diag)
+        self.assertIn("controller_tail=1", diag)
+        self.assertIn("relay_status=1 relay_complete=0", diag)
+        self.assertIn("c3b_origin=1 c4b_runtime_origin=1", diag)
+        self.assertIn("c4c_signed_process=1 c2v_rollback=1", diag)
+        self.assertNotIn("UART_RELAY_REFUSED", diag)
+        self.assertNotIn("C4B_OBSERVED //", diag)
+
+    def test_25_valid_guest_record_logs_counts_but_not_the_payload(self):
+        self.payload(observation())
+        self.done.write_text("PASS\n")
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            result = C.capture(self.root, self.done, poll=0)
+        self.assertEqual(result, observation())
+        diag = stream.getvalue()
+        self.assertIn("C4D_CAPTURE_DIAG // serial_opened=1", diag)
+        self.assertIn("candidate_records=1", diag)
+        self.assertIn("c4c_signed_process=1 c2v_rollback=1", diag)
+        self.assertNotIn(observation().decode(), diag)
+        self.assertNotIn("a"*64, diag)
+
+    def test_26_partial_observation_is_not_promoted(self):
+        self.serial.write_bytes(
+            b"\n".join(C.REQUIRED_MARKERS) + b"\n" + C.PREFIX +
+            b'{"schema":"truncated"')
+        self.done.write_text("PASS\n")
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            with self.assertRaisesRegex(
+                    C.Refused, "NO_REAL_GUEST_OBSERVATION_CAPTURED"):
+                C.capture(self.root, self.done, poll=0)
+        self.assertIn("partial_prefix=1", stream.getvalue())
+        self.assertIn("candidate_records=0", stream.getvalue())
+
+    def test_27_no_guest_serial_source_remains_rejected(self):
+        self.done.write_text("PASS\n")
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            with self.assertRaisesRegex(
+                    C.Refused, "NO_REAL_GUEST_OBSERVATION_CAPTURED"):
+                C.capture(self.root, self.done, poll=0)
+        self.assertIn("serial_opened=0", stream.getvalue())
+        self.assertIn("candidate_records=0", stream.getvalue())
 
     def test_23_workflow_waits_for_ready_before_unchanged_c2v_boot(self):
         workflow = (Path(__file__).resolve().parents[2] /

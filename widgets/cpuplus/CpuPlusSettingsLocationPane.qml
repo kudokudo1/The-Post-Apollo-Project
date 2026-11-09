@@ -13,12 +13,29 @@ Item {
     // field is focused. Escape in a field only releases its text focus.
     readonly property bool editingText:
         homeLabelInput.activeFocus || homeLatitudeInput.activeFocus
-        || homeLongitudeInput.activeFocus || explorePanel.editingText
-        || placeSearchPanel.editingText
+        || homeLongitudeInput.activeFocus
     readonly property var savedHome:
         registry ? registry.homePlace : null
     readonly property bool canWrite:
         registry && registry.canSaveHome === true
+
+    // LOCATION // Search lives in the wide left column. Selecting HOME
+    // only copies a search result to these original right-side edit fields.
+    // The existing SAVE HOME action remains the sole Home writer.
+    function fillHomeCandidate(candidate) {
+        if (!candidate || typeof candidate!=="object")
+            return false;
+        homeLabelInput.text=String(candidate.label || "");
+        homeLatitudeInput.text=String(candidate.latitude);
+        homeLongitudeInput.text=String(candidate.longitude);
+        locationPane.feedback="SEARCH RESULT LOADED // REVIEW THEN SAVE HOME";
+        Qt.callLater(function() {
+            const y=homeLabelInput.mapToItem(body,0,0).y-45;
+            locationScroll.contentY=Math.max(0,Math.min(
+                Math.max(0,locationScroll.contentHeight-locationScroll.height),y));
+        });
+        return true;
+    }
 
     function readableError(code) {
         switch (String(code || "")) {
@@ -67,7 +84,7 @@ Item {
             spacing: 12
 
             GohuText {
-                text: "PLACES // LOCATION CONTEXT"
+                text: "HOME // DEFAULT PLACE EDITOR"
                 font.pixelSize: 12
                 color: Colors.cyan
             }
@@ -75,81 +92,6 @@ Item {
                 width: parent.width
                 text: "HOME // MANUAL // LOCAL STORAGE"
                 font.pixelSize: 9
-            }
-
-            CpuPlusPlaceSearchPanel {
-                id: placeSearchPanel
-                width: parent.width
-
-                onUseForHome: function(candidate) {
-                    homeLabelInput.text = candidate.label;
-                    homeLatitudeInput.text = String(candidate.latitude);
-                    homeLongitudeInput.text = String(candidate.longitude);
-                    locationPane.feedback =
-                        "SEARCH RESULT LOADED // REVIEW THEN SAVE HOME";
-                    Qt.callLater(function() {
-                        const y = homeLabelInput.mapToItem(body, 0, 0).y - 45;
-                        locationScroll.contentY = Math.max(0, Math.min(
-                            Math.max(0, locationScroll.contentHeight
-                                       - locationScroll.height), y
-                        ));
-                    });
-                }
-                onUseForExplore: function(candidate) {
-                    explorePanel.fillDestination(candidate);
-                    Qt.callLater(function() {
-                        const y = explorePanel.mapToItem(body, 0, 0).y - 20;
-                        locationScroll.contentY = Math.max(0, Math.min(
-                            Math.max(0, locationScroll.contentHeight
-                                       - locationScroll.height), y
-                        ));
-                    });
-                }
-            }
-
-            Rectangle {
-                id: savedCard
-                width: parent.width
-                height: 107
-                color: Colors.black
-                border.width: 1
-                border.color: Colors.orange
-
-                Column {
-                    anchors.fill: parent
-                    anchors.margins: 10
-                    spacing: 6
-                    GohuText {
-                        text: "⌂  SAVED HOME"
-                        font.pixelSize: 12
-                        color: Colors.orange
-                    }
-                    GohuText {
-                        width: parent.width
-                        elide: Text.ElideRight
-                        font.pixelSize: 11
-                        color: Colors.white
-                        text: locationPane.savedHome
-                              ? locationPane.savedHome.label
-                              : "NOT SET"
-                    }
-                    QuietText {
-                        width: parent.width
-                        font.pixelSize: 9
-                        text: locationPane.savedHome
-                              ? Number(locationPane.savedHome.latitude).toFixed(4)
-                                + "°, " + Number(locationPane.savedHome.longitude).toFixed(4) + "°"
-                              : "SET YOUR DEFAULT POINT BELOW"
-                    }
-                    QuietText {
-                        font.pixelSize: 9
-                        text: "STORE // " + (
-                            locationPane.registry
-                            ? String(locationPane.registry.storageState).toUpperCase()
-                            : "NOT CONNECTED"
-                        )
-                    }
-                }
             }
 
             GohuText {
@@ -326,54 +268,7 @@ Item {
                         : "ONLY SAVE HOME CHANGES THE DEFAULT PLACE")
             }
 
-            CpuPlusExploreLocationPanel {
-                id: explorePanel
-                width: parent.width
-                registry: locationPane.registry
-            }
 
-            CpuPlusSavedPlacesPanel {
-                id: savedPlacesPanel
-                width: parent.width
-                registry: locationPane.registry
-                durationKey: explorePanel.durationKey
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 96
-                color: Colors.black
-                border.width: 1
-                border.color: Colors.magenta
-
-                Column {
-                    anchors.fill: parent
-                    anchors.margins: 9
-                    spacing: 6
-                    GohuText {
-                        text: "SHARED CONTEXT // "
-                              + (locationPane.registry
-                                 ? locationPane.registry.contextKind : "UNKNOWN")
-                        font.pixelSize: 10
-                        color: Colors.magenta
-                    }
-                    GohuText {
-                        width: parent.width
-                        elide: Text.ElideRight
-                        font.pixelSize: 10
-                        color: Colors.white
-                        text: locationPane.registry && locationPane.registry.effectivePlace
-                              ? locationPane.registry.effectivePlace.label
-                              : "NO HOME CONFIGURED"
-                    }
-                    QuietText {
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        font.pixelSize: 9
-                        text: "CONTEXT READY // ROUTING TO WEATHER, SKY, GROUND AND MAP IS NOT WIRED. ALERT TARGETS REMAIN PINNED."
-                    }
-                }
-            }
         }
     }
 

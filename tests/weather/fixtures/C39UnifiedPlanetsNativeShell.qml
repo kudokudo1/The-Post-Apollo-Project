@@ -28,7 +28,14 @@ ShellRoot {
         id: weather
         property real latitude: 38.9
         property real longitude: -76.75
+        // The source-only SKY still instantiates read-only legacy bindings.
+        // Supply explicit benign values so the isolated test doesn't invent
+        // undefined weather/AQI observations.
         property var dailyForecast: []
+        property var hourlyForecast: []
+        property bool forecastReady: false
+        property bool aqiReady: false
+        property bool aqiLoading: false
         property int airQualityUtcOffsetMinutes: -300
         property bool ready: false
         property bool loading: false

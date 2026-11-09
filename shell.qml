@@ -20,6 +20,7 @@ import qs.services.time
 import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy
 import "services/favorites/FavoritesAppSelectionPolicy.js" as AppFavoriteSelection
 import "services/favorites/FavoritesSystemSelectionPolicy.js" as SystemFavoriteSelection
+import "services/favorites/FavoritesSystemWatchSelectionPolicy.js" as SystemWatchSelection
 import "services/favorites/FavoritesThermalSelectionPolicy.js" as ThermalFavoriteSelection
 import qs.services.notifications
 
@@ -262,6 +263,18 @@ PanelWindow {
         if(!appControlWindow.selectSavedSystemMetric(metric))
             return false;
         shellRoot.requestControlKeyboard("appcontrol","favorites-system-metric");
+        return true;
+    }
+
+    // U7b-J: a short opaque token selects an existing SYSTEM row/watch box.
+    // Device targets, commands, URLs, original keys and saved box identities
+    // never cross this shell boundary.
+    function openApolloSavedSystemWatch(token) {
+        if(!SystemWatchSelection.validToken(token))
+            return false;
+        if(!appControlWindow.selectSavedSystemWatch(token))
+            return false;
+        shellRoot.requestControlKeyboard("appcontrol","favorites-system-watch");
         return true;
     }
 
@@ -1190,6 +1203,10 @@ PanelWindow {
                 onFavoriteSystemSelectionRequested: function(metric) {
                     // No sensor/device path or control action crosses shell.
                     if(shellRoot.openApolloSavedSystemMetric(metric))
+                        cpuPlusWindow.close();
+                }
+                onFavoriteSystemWatchSelectionRequested: function(token) {
+                    if(shellRoot.openApolloSavedSystemWatch(token))
                         cpuPlusWindow.close();
                 }
                 onFavoriteThermalSelectionRequested: function(token) {

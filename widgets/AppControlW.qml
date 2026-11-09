@@ -11,6 +11,7 @@ import "../services/remote"
 import qs.services.favorites
 import "../services/favorites/FavoritesAppSelectionPolicy.js" as AppFavoriteSelection
 import "../services/favorites/FavoritesSystemSelectionPolicy.js" as SystemFavoriteSelection
+import "../services/favorites/FavoritesThermalSelectionPolicy.js" as ThermalFavoriteSelection
 import "appcontrol"
 import "thermal"
 import QtQuick.Effects
@@ -8654,6 +8655,58 @@ PanelWindow {
                 return;
             const now=SystemFavoriteSelection.selectedIndex(
                 metric,[...systemResults.values]);
+            if(now<0) return;
+            selectedResultIndex=now;
+            resultList.positionViewAtIndex(now,ListView.Contain);
+        });
+        return true;
+    }
+
+    // U7b-E // Selection-only view of an existing saved temperature/fan
+    // reading. No fan unlock, PWM write, subprocess or sensor controls.
+    function selectSavedThermal(token) {
+        const original=ThermalFavoriteSelection.resolve(
+            token,favoriteStore.favoriteKeys,thermalRows,fanRows);
+        if(!original.ok) return false;
+
+        if(!menuOpen) menuOpen=true;
+        if(!menuOpen) return false;
+        switchMode(thermalModeIndex,false);
+        thermalController.setThermalViewMode(
+            original.kind==="fan"
+            ? thermalController.thermalViewFans
+            : thermalController.thermalViewThermal);
+        searchInput.text="";
+
+        // Revalidate after mode setup, since telemetry can change between
+        // the CPU++ click and the owner-local UI selection.
+        const current=ThermalFavoriteSelection.resolve(
+            token,favoriteStore.favoriteKeys,thermalRows,fanRows);
+        if(!current.ok || current.sourceId!==original.sourceId
+                || current.kind!==original.kind)
+            return false;
+        const index=ThermalFavoriteSelection.selectedIndex(
+            token,current.sourceId,[...thermalResults.values],current.kind);
+        if(index<0) return false;
+
+        selectedResultIndex=index;
+        hoveredResultIndex=-1;
+        detailFocused=false;
+        resetDetailActionSelection();
+        Qt.callLater(function() {
+            if(!menuOpen || selectedModeIndex!==thermalModeIndex
+                    || selectedResultIndex!==index
+                    || thermalController.thermalViewMode!==(
+                        original.kind==="fan" ? thermalController.thermalViewFans
+                                              : thermalController.thermalViewThermal))
+                return;
+            const verified=ThermalFavoriteSelection.resolve(
+                token,favoriteStore.favoriteKeys,thermalRows,fanRows);
+            if(!verified.ok || verified.kind!==original.kind
+                    || verified.sourceId!==original.sourceId)
+                return;
+            const now=ThermalFavoriteSelection.selectedIndex(
+                token,verified.sourceId,[...thermalResults.values],verified.kind);
             if(now<0) return;
             selectedResultIndex=now;
             resultList.positionViewAtIndex(now,ListView.Contain);

@@ -41,9 +41,9 @@ PanelWindow {
     property var trashPreview: null
     property var selectedTrashPreview: null
     property string lastTrashReceipt: ""
-    // Camera Cleanup selection surfaces share ONE queue. Queue contents
-    // are not automatically deleted; explicit preview and confirmation
-    // are the only authority to move the selected files into GIO Trash.
+    // Camera Cleanup modes share ONE queue. One explicit user click on
+    // MOVE N TO TRASH invokes validation + recoverable GIO Trash in the
+    // backend. Selecting media alone NEVER triggers deletion.
     property string cleanupTechnique: "batch"
     property bool cleanupQueueOpen: false
     // A filter/search rescan preserves marks, but switching the allowed
@@ -61,8 +61,8 @@ PanelWindow {
     property string batchReceipt: ""
     property int swipeIndex: 0
     property var swipeHistory: []
-    // Hunt is a presentation over the same review queue. Only the existing
-    // confirmBatchTrash() can authorize a physical move to recoverable Trash.
+    // Hunt is a presentation over the same queue. A deliberately clicked
+    // MOVE N TO TRASH button is the only direct bulk move authority.
     property var huntTargets: []
     property var huntHistory: []
     property var huntSparedPaths: []
@@ -1180,6 +1180,29 @@ PanelWindow {
         return true;
     }
 
+    function trashQueuedNow() {
+        if (busy || !batchMode || batchPaths.length === 0)
+            return false;
+        // Scope must match the latest Cleanup scan. We retain the
+        // backend's Gallery membership and file-signature checks too.
+        if (cleanupCustomFolder !== cleanupLoadedFolder
+                || cleanupCustomFolder !== galleryRequestedFolder
+                || galleryRequestedView !== "cleanup") {
+            feedback = "TRASH // SCAN CURRENT CLEANUP FOLDER FIRST";
+            return false;
+        }
+        // This is the single explicit DELETE click: in one subprocess
+        // the backend validates, creates/consumes its one-use plan and
+        // sends eligible unchanged files into recoverable system Trash.
+        batchPreview = null;
+        batchReviewKey = "";
+        batchReceipt = "";
+        return run("trashBatchNow", [
+            "trash-batch-now", JSON.stringify(batchPaths),
+            "MOVE_TO_TRASH", "--folder", cleanupCustomFolder
+        ]);
+    }
+
     function previewBatchTrash() {
         if (busy || !batchMode || batchPaths.length === 0)
             return false;
@@ -1357,7 +1380,10 @@ PanelWindow {
                 feedback = "ZOOM // CLIENT NOT INSTALLED // SEE SETUP OPTIONS";
                 return;
             }
-            feedback = "CAMERA // " + String(payload && payload.error || "ACTION_FAILED");
+            feedback = action === "trashBatchNow"
+                       ? "TRASH // NOT MOVED // "
+                         + String(payload && payload.error || "ACTION_FAILED")
+                       : "CAMERA // " + String(payload && payload.error || "ACTION_FAILED");
             if (action === "capture")
                 menuOpen = true;
             return;
@@ -1512,7 +1538,7 @@ PanelWindow {
                 feedback = "BATCH // REVIEW " + payload.count
                            + " FILES // NO FILES MOVED";
             }
-        } else if (action === "trashBatch") {
+        } else if (action === "trashBatch" || action === "trashBatchNow") {
             batchReceipt = "TRASH // MOVED " + payload.moved
                            + " // SKIPPED " + payload.skipped
                            + " // FAILED " + payload.failed;
@@ -1524,7 +1550,9 @@ PanelWindow {
                          ? payload.unmovedPaths.slice() : [];
             batchReviewKey = "";
             batchPreview = null;
-            cleanupQueueOpen = true;
+            // Successful empty queue goes away immediately. Only unresolved
+            // skipped/failed items stay visible for another action.
+            cleanupQueueOpen = batchPaths.length > 0;
             swipeIndex = 0;
             swipeHistory = [];
             huntHistory = [];
@@ -3150,83 +3178,40 @@ PanelWindow {
                     Row {
                         id: cleanupQueueActions
                         width: parent.width
-                        height: 33
-                        spacing: 6
+                        height: 38
+                        spacing: 8
                         visible: camera.cleanupTechnique !== "desktop"
                         ActionButton {
-                            width: (parent.width - 12) * 0.46
-                            height: 32
-                            label: "REVIEW FOR TRASH // " + camera.batchPaths.length
-                            labelPixelSize: 9
-                            accentColor: Colors.yellow
+                            width: (parent.width - 8) * 0.68
+                            height: 37
+                            label: "MOVE " + camera.batchPaths.length + " TO TRASH"
+                            labelPixelSize: 12
+                            accentColor: Colors.red
+                            destructive: true
                             available: !camera.busy && camera.batchPaths.length > 0
-                            onLeftClicked: camera.previewBatchTrash()
+                            onLeftClicked: camera.trashQueuedNow()
                         }
                         ActionButton {
-                            width: (parent.width - 12) * 0.28
-                            height: 32
+                            width: (parent.width - 8) * 0.32
+                            height: 37
                             label: "CLEAR MARKS"
-                            labelPixelSize: 9
+                            labelPixelSize: 10
                             accentColor: Colors.cyan
                             available: !camera.busy && camera.batchPaths.length > 0
                             onLeftClicked: camera.batchClear()
                         }
-                        GohuText {
-                            width: (parent.width - 12) * 0.26
-                            height: 32
-                            verticalAlignment: Text.AlignVCenter
-                            font.pixelSize: 9
-                            color: camera.batchPreview ? Colors.yellow : Colors.cyan
-                            text: camera.batchPreview ? "READY // CONFIRM"
-                                  : "GIO TRASH // REVERSIBLE"
-                        }
                     }
                     GohuText {
                         width: parent.width
-                        height: camera.batchPreview ? 33 : 20
+                        height: 19
                         visible: camera.cleanupTechnique !== "desktop"
-                        wrapMode: Text.WrapAnywhere
                         font.pixelSize: 9
-                        color: camera.batchPreview ? Colors.yellow : Colors.cyan
-                        text: camera.batchPreview
-                              ? "PREVIEW // " + camera.batchPreview.count
-                                + " FILES // " + camera.batchPreview.bytes
-                                + " BYTES // " + camera.batchPreview.sample.join(" · ")
-                              : camera.batchReceipt
-                                ? camera.batchReceipt
-                                : camera.batchPaths.length + " FILES MARKED // "
-                                  + "REVIEW FOR TRASH TO AUTHORIZE MOVE"
-                    }
-                    Row {
-                        width: parent.width
-                        height: 32
-                        visible: camera.cleanupTechnique !== "desktop"
-                                 && camera.batchPreview !== null
-                        spacing: 7
-                        ActionButton {
-                            width: (parent.width - 7) * 0.40
-                            height: 31
-                            label: "CANCEL REVIEW"
-                            labelPixelSize: 9
-                            accentColor: Colors.cyan
-                            onLeftClicked: {
-                                camera.batchPreview = null;
-                                camera.batchReviewKey = "";
-                            }
-                        }
-                        ActionButton {
-                            width: (parent.width - 7) * 0.60
-                            height: 31
-                            label: camera.batchPreview
-                                   ? "MOVE " + camera.batchPreview.count + " TO TRASH"
-                                   : "MOVE TO TRASH"
-                            labelPixelSize: 10
-                            accentColor: Colors.red
-                            destructive: true
-                            available: !camera.busy && camera.batchPreview !== null
-                                       && !!camera.batchPreview.planId
-                            onLeftClicked: camera.confirmBatchTrash()
-                        }
+                        color: camera.batchReceipt ? Colors.yellow : Colors.cyan
+                        elide: Text.ElideRight
+                        text: camera.batchReceipt
+                              ? camera.batchReceipt
+                              : "ONE CLICK // RECOVERABLE SYSTEM TRASH // "
+                                + camera.batchPaths.length + " MARKED"
                     }
 
                     Row {
@@ -3325,8 +3310,7 @@ PanelWindow {
                         width: parent.width
                         height: camera.cleanupTechnique === "desktop"
                                 ? Math.max(170, cleanupPage.height - 135)
-                                : Math.max(145, cleanupPage.height
-                                           - (camera.batchPreview ? 266 : 236))
+                                : Math.max(145, cleanupPage.height - 216)
 
                         Rectangle {
                             id: cleanupQueueView
@@ -3369,7 +3353,7 @@ PanelWindow {
                                     height: 18
                                     font.pixelSize: 9
                                     color: Colors.yellow
-                                    text: "REMOVE HERE // REVIEW FOR TRASH ABOVE // NOTHING DELETED AUTOMATICALLY"
+                                    text: "REMOVE TO UNMARK // MOVE N TO TRASH ABOVE // RECOVERABLE"
                                     elide: Text.ElideRight
                                 }
                                 Item {

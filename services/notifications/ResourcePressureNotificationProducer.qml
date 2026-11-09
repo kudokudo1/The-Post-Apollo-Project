@@ -56,6 +56,10 @@ Scope {
                 "eventType": "resource-pressure-" + event,
                 "origin": "apollo",
                 "domain": "system",
+                // Durable typed policy identity. Preserve "metric" for
+                // existing CPU++ consumers and older history records.
+                "resourceId": kind,
+                "resourceLabel": label,
                 "metric": kind,
                 "observedAtUtc": new Date(observedMs).toISOString(),
                 "sampling": "existing active monitoring only"

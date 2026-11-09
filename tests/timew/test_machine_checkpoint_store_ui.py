@@ -29,7 +29,7 @@ for term in (
     'label: "OPEN SAVED METADATA"',
     'label: "REFRESH STORED"',
     'read_only === true',
-    'NO SCREENSHOTS OR RESTORATION ACTIVE',
+    'NO SCREENSHOTS OR AUTOMATIC RESTORATION',
     'MARKERS ARE TIMESTAMPS ONLY // LOST ON RESTART',
 ):
     assert term in qml, f"missing guarded MACHINE storage UI: {term}"

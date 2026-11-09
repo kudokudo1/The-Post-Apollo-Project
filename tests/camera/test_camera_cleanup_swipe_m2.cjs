@@ -1410,7 +1410,7 @@ test("Refreshing Cleanup search/filter preserves queue, changing folder clears i
 test("Cleanup queue receipt preserves skipped/failed paths, not just a success count", () => {
     // Source contract verifies successful backend receipt does not
     // erase files that GIO could not move.
-    const start=qml.indexOf('        } else if (action === "trashBatch") {');
+    const start=qml.indexOf('        } else if (action === "trashBatch" || action === "trashBatchNow") {');
     const end=qml.indexOf('        } else if (action === "previewSelected") {',start);
     assert.ok(start>0&&end>start);
     const code=qml.slice(start,end);

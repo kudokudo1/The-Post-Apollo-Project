@@ -95,6 +95,9 @@ function trashHarness(overrides={}) {
         confirmMode:"",
         cameraCleanupController:camera,
         status:"",
+        archiveRefreshCalls:0,
+        refreshArchive(){ctx.archiveRefreshCalls++;return true;},
+        Qt:{callLater(fn){fn();}},
         ...overrides
     };
     vm.createContext(ctx);
@@ -197,6 +200,7 @@ test("Trash changes mode IN PLACE and does not hand off to Camera window",()=>{
     assert.deepEqual(Array.from(ctx.cameraCleanupController.calls),["batch","swipe"]);
     assert.equal(vm.runInContext('setMode("archive")',ctx),true);
     assert.deepEqual(Array.from(ctx.cameraCleanupController.calls),["batch","swipe","suspend"]);
+    assert.equal(ctx.archiveRefreshCalls,1);
     assert.equal(ctx.menuOpen,true);
 });
 

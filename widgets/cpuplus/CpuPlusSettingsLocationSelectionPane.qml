@@ -1,22 +1,51 @@
 import QtQuick
 import "../../components"
 
-// CPU++ LOCATION // Middle SELECT bay. Saved Home, active point and
-// bookmarks stay together as selectable data. The existing SavedPlacesPanel
-// remains the ONLY saved-place control surface and uses PlaceRegistry.
+// CPU++ LOCATION // Middle bay: permanently pinned FIND PLACE search,
+// scrollable results inside the search, then independently scrollable
+// saved Home and bookmarks. All original writers remain in PlaceRegistry.
 Item {
     id: locationSelection
     property var registry: null
     property string durationKey: "2H"
+    signal homeCandidateRequested(var candidate)
+    signal exploreCandidateRequested(var candidate)
+    readonly property bool editingText: placeSearchPanel.editingText
 
     readonly property var savedHome:
         registry ? registry.homePlace : null
     readonly property var currentPlace:
         registry ? registry.effectivePlace : null
 
+    // Top search controls never scroll away. The component itself scrolls
+    // only its match list; bookmarks scroll separately below the search.
+    CpuPlusPlaceSearchPanel {
+        id: placeSearchPanel
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.leftMargin: 5
+        anchors.rightMargin: 10
+        anchors.topMargin: 5
+        compactPinned: true
+        resultsViewportLimit: Math.max(50,Math.min(108,
+            locationSelection.height*0.22))
+        height: implicitHeight
+        onUseForHome: function(candidate) {
+            locationSelection.homeCandidateRequested(candidate);
+        }
+        onUseForExplore: function(candidate) {
+            locationSelection.exploreCandidateRequested(candidate);
+        }
+    }
+
     Flickable {
         id: selectedPlacesScroll
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: placeSearchPanel.bottom
+        anchors.topMargin: 8
+        anchors.bottom: parent.bottom
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
@@ -76,40 +105,6 @@ Item {
                         text: "STORE // "+(locationSelection.registry
                                ? String(locationSelection.registry.storageState).toUpperCase()
                                : "NOT CONNECTED")
-                    }
-                }
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 76
-                color: Colors.black
-                border.width: 1
-                border.color: Colors.magenta
-                Column {
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    spacing: 6
-                    GohuText {
-                        text: "⌖  CURRENT // ACTIVE"
-                        font.pixelSize: 10
-                        color: Colors.magenta
-                    }
-                    GohuText {
-                        width: parent.width
-                        font.pixelSize: 10
-                        elide: Text.ElideRight
-                        color: Colors.white
-                        text: locationSelection.currentPlace
-                              ? locationSelection.currentPlace.label
-                              : "HOME NOT YET CONFIGURED"
-                    }
-                    QuietText {
-                        width: parent.width
-                        font.pixelSize: 9
-                        text: locationSelection.registry
-                              ? "CONTEXT // "+String(locationSelection.registry.contextKind || "UNKNOWN")
-                              : "CONTEXT // UNAVAILABLE"
                     }
                 }
             }

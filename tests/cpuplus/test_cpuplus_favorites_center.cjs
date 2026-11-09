@@ -1693,15 +1693,24 @@ test("U8b category icons take verified module colors; Notifications and Time rem
   const main=pane.slice(pane.indexOf("id: categoryFilterFlow"),
                         pane.indexOf("id: menuFilterPrev"));
   assert.match(main,/modelData==="WEATHER" \? Colors\.yellow/);
-  assert.match(main,/modelData==="HOSPITAL" \? Colors\.magenta/);
+  assert.match(main,/modelData==="HOSPITAL"/);
+  assert.match(main,/hospitalModule \? Colors\.magenta/);
   assert.match(main,/modelData==="NOTIFS" \|\| modelData==="CLOCK"/);
   assert.match(main,/whiteModule \? Colors\.white : Colors\.cyan/);
+  assert.match(main,/hoverAccent:\s*whiteModule \? Colors\.white/);
   assert.match(main,/accentColor: moduleAccent/);
   for(const state of [
-    "hoverForegroundColor","pressedForegroundColor",
+    "hoverForegroundColor","hoverBorderColor",
+    "hoverContentGlowColor","hoverSoftGlowColor"
+  ]) assert.match(main,new RegExp(state+": hoverAccent"));
+  for(const state of [
     "selectedForegroundColor","selectedFillColor","selectedBorderColor",
-    "selectedContentGlowColor","selectedSoftGlowColor"
+    "selectedContentGlowColor","selectedSoftGlowColor",
+    "keyboardSelectedBorderColor","keyboardSelectedContentGlowColor",
+    "keyboardSelectedSoftGlowColor"
   ]) assert.match(main,new RegExp(state+":\\s*whiteModule \\? Colors\\."));
+  assert.match(main,/whiteModule \|\| hospitalModule/);
+  assert.match(main,/pressedFillColor:\s*whiteModule \|\| hospitalModule/);
   assert.match(main,/selectedFillColor:\s*whiteModule \? Colors\.dark : Colors\.yellow/);
   assert.match(main,/selectedBorderWidth: 2/);
   assert.match(read("modules/Weather.qml"),/openFillColor: Colors\.yellow/);

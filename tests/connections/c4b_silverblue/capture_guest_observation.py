@@ -126,6 +126,11 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
     """Scan live UART while the owning C2v runner is still executing."""
     fd = None
     source = None
+    # C2v deletes its temporary QEMU directory on successful return, before
+    # the parent workflow can write the separate PASS/FAIL completion marker.
+    # Keep reading the already-open inode after unlink, without following a
+    # replacement pathname. The original C2v PASS remains mandatory.
+    source_unlinked_at = None
     offset = 0
     pending = b""
     total = 0
@@ -147,16 +152,9 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
                         reject("GUEST_SERIAL_FD_NOT_REGULAR")
                     source = (info.st_dev, info.st_ino)
             if fd is not None:
-                # Detect replacement instead of silently switching serial sources.
-                try:
-                    current = os.stat(find_serial(root), follow_symlinks=False)
-                except (OSError, TypeError):
-                    if not completed.exists():
-                        reject("GUEST_SERIAL_SOURCE_DISAPPEARED")
-                    current = None
-                if current is not None and (
-                        current.st_dev, current.st_ino) != source:
-                    reject("GUEST_SERIAL_REPLACED")
+                # Drain the original open inode BEFORE checking its pathname.
+                # C2v's cleanup unlinks the file immediately on full success.
+                # An open descriptor preserves already-written UART bytes.
                 os.lseek(fd, offset, os.SEEK_SET)
                 while True:
                     chunk = os.read(fd, 65536)
@@ -184,6 +182,33 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
                             observed = extracted
                         elif observed != extracted:
                             reject("CONFLICTING_GUEST_OBSERVATIONS")
+                # Never switch to a new guest serial file. C2v normally
+                # removes the original at the END of the successful two-boot
+                # lifecycle. That unlink is not a security failure if the
+                # original descriptor has been drained and the independently
+                # reported C2v command later returns PASS. Reappearance or
+                # inode substitution remains an unconditional refusal.
+                current_path = find_serial(root)
+                if current_path is None:
+                    if source_unlinked_at is None:
+                        source_unlinked_at = time.monotonic()
+                else:
+                    if source_unlinked_at is not None:
+                        reject("GUEST_SERIAL_REAPPEARED_AFTER_REMOVAL")
+                    try:
+                        current = os.stat(current_path, follow_symlinks=False)
+                    except FileNotFoundError:
+                        if source_unlinked_at is None:
+                            source_unlinked_at = time.monotonic()
+                    else:
+                        if (current.st_dev, current.st_ino) != source:
+                            reject("GUEST_SERIAL_REPLACED")
+                # No indefinite acceptance of disappearing input: bounded
+                # grace covers C2v's cleanup-to-parent-exit handoff only.
+                if (source_unlinked_at is not None and
+                        not completed.exists() and
+                        time.monotonic() - source_unlinked_at > 30):
+                    reject("GUEST_SERIAL_MISSING_BEFORE_C2V_RESULT")
             if completed.exists():
                 if completed.read_text(encoding="ascii").strip() != "PASS":
                     reject("ORIGINAL_TWO_BOOT_LIFECYCLE_DID_NOT_PASS")

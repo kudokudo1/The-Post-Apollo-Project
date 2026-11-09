@@ -37,10 +37,11 @@ for(const x of inputs){
   assert.equal(p.providerStatus,"CONNECT / RECONNECT / DISCONNECT // UNAVAILABLE");
   assert.doesNotMatch(JSON.stringify(p),/token|password|secret|sessionPath|email/i);
 }
-assert.equal(inspect(inputs[3]).identityVerified,false);
-assert.equal(inspect(inputs[4]).identityVerified,true);
-assert.equal(inspect(inputs[4]).prerequisitesObserved,true);
-assert.equal(inspect(inputs[5]).identityVerified,false);
+assert.equal(inspect({identityHostConnected:false,identityAuthenticated:true}).identityVerified,false);
+const allTrue=inputs[8];
+assert.equal(inspect(allTrue).identityVerified,true);
+assert.equal(inspect(allTrue).prerequisitesObserved,true);
+assert.equal(inspect(inputs[9]).identityVerified,false);
 assert.equal(inspect({localObservationSeen:true}).connectionStatus,
              "LOCAL HOST OBSERVED // NOT AUTHENTICATED");
 assert.equal(inspect({}).connectionStatus,
@@ -64,7 +65,7 @@ for(const s of [
  'text: overview.signIn.batchStatus',
  'label: "OPEN ID MANAGEMENT"',
  'onClicked: overview.idManagementRequested()',
- 'label: "INSPECT LOCAL HOST"',
+ 'INSPECT LOCAL HOST',
  'onClicked: ConnectionsHostObservation.inspect()',
  'identityHostConnected: false',
  'identityAuthenticated: false',

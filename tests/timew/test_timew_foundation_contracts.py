@@ -780,8 +780,8 @@ for prop in ('label: "×"', "labelPixelSize: 22", "destructive: true",
     assert prop in close, prop
 
 # Both TOOLS clocks are session-local elapsed counters. Desktop alarms,
-# system notifications, Sway restoration and persistence remain unimplemented.
-assert "NO SCREENSHOTS OR RESTORATION ACTIVE" in window
+# system notifications and *automatic* Sway restoration remain unimplemented.
+assert "NO SCREENSHOTS OR AUTOMATIC RESTORATION" in window
 assert "STOPWATCH + TIMERS // NOT CONNECTED" not in window
 assert "COUNTDOWN TIMERS // NEXT DEVELOPMENT STAGE" not in window
 assert "NO AUDIO OR DESKTOP NOTIFICATION // INITIAL SLICE" in window

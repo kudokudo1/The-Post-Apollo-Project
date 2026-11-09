@@ -6369,6 +6369,7 @@ PanelWindow {
                     active: root.menuOpen && root.workforceRosterVisible
                         && root.workforceManagerExpanded
                     doctorService: doctorService
+                    providerService: providerService
                     rooms: responsibilityService.durableRooms
                     sessions: responsibilityService.durableSessions
                     roomsLoaded: responsibilityService.roomsLoaded
@@ -6382,6 +6383,18 @@ PanelWindow {
                             responsibilityService.refreshDurableGraph();
                         if (!doctorService.refreshing)
                             doctorService.refresh();
+                    }
+                    // Route only to the existing nested Room inspector; this
+                    // is navigation, not a staffing or Session mutation.
+                    onOpenRoomRequested: function(roomId) {
+                        const row = root.workforceRosterRows.filter(function(r) {
+                            return String((r || {}).roomId || "") === String(roomId || "");
+                        })[0] || null;
+                        if (row)
+                            root.openRosterSession(row, "connections");
+                        else
+                            inlineWorkforceManager.outcome =
+                                "OPEN ROOM HOLD // ROOM IS NOT IN VERIFIED ROSTER";
                     }
                 }
 

@@ -12,9 +12,12 @@ function plan(row) {
             || row.key.length===0)
         return fail();
     const owner=row.owner,category=row.category,menu=row.menu;
-    if(owner==="appcontrol" && category==="APP CTRL"
-            && ["APPS","FILES","RUN","WINDOWS","KILL","THERMAL","SYSTEM","OTHER"]
-                .indexOf(menu)>=0)
+    if(owner==="appcontrol"
+            && ((category==="APP CTRL"
+                 && ["APPS","FILES","RUN","WINDOWS","KILL","THERMAL","SYSTEM","OTHER"]
+                     .indexOf(menu)>=0)
+                || (category==="CPU++"
+                    && ["KILL","THERMAL","SYSTEM"].indexOf(menu)>=0)))
         return {ok:true,owner:"appcontrol",
                 view:menu==="OTHER"?"FAVORITES":menu};
     if(owner==="weather-home" && category==="WEATHER"

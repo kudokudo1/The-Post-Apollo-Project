@@ -19,6 +19,9 @@ install -d -m 700 "$work/home" "$work/run" "$work/data" "$work/cache" \
   "$work/config-home" "$work/config/widgets"
 cp -a "$repo/components" "$work/config/components"
 cp -a "$repo/widgets/weather" "$work/config/widgets/weather"
+# StationSubjectNavigator compiles MAGICK date selectors even while EARTH is active.
+# Copy only that existing helper dependency, not a second Task process or writer.
+cp -a "$repo/widgets/tasks" "$work/config/widgets/tasks"
 cp -a "$repo/services" "$work/config/services"
 cp "$repo/tests/weather/fixtures/M28AMediaEarthMentions.qml" "$work/config/shell.qml"
 # Only the temporary test tree substitutes fake, network-free providers.

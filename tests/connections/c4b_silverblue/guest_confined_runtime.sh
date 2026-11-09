@@ -60,6 +60,23 @@ client_check() {
     fail "CLIENT_INVOCATION_FAILED"
   [[ "$result" == "$3" ]] || fail "CLIENT_RESPONSE_MISMATCH"
 }
+# Read-only prerequisite for a genuine later rpm-ostree rollback --reboot.
+# The booted system bus must still own login1 and answer ListInhibitors.
+# This neither restarts logind/broker nor overrides reboot inhibitors.
+check_logind_bus_health() {
+  local checkpoint="$1"
+  timeout --signal=TERM --kill-after=2s 8s \
+    busctl --system --timeout=5s call \
+      org.freedesktop.DBus /org/freedesktop/DBus \
+      org.freedesktop.DBus GetNameOwner s org.freedesktop.login1 \
+      >/dev/null || fail "LOGIND_DBUS_OWNER_UNAVAILABLE_$checkpoint"
+  timeout --signal=TERM --kill-after=2s 8s \
+    busctl --system --timeout=5s call \
+      org.freedesktop.login1 /org/freedesktop/login1 \
+      org.freedesktop.login1.Manager ListInhibitors \
+      >/dev/null || fail "LOGIND_INHIBITOR_QUERY_UNRESPONSIVE_$checkpoint"
+  echo "C4B_PASS // LOGIND_DBUS_RESPONSIVE_$checkpoint"
+}
 if [[ "$phase" == booted ]]; then
   [[ "$(cat /var/lib/c2v-transaction-stage)" == layer_pending ]] ||
     fail "WRONG_BOOT_PHASE"
@@ -125,12 +142,26 @@ if [[ "$phase" == booted ]]; then
   [[ "$(systemctl is-enabled "$unit" 2>&1 || true)" == static ]] ||
     fail "SIGNED_SERVICE_MUST_BE_STATIC"
   check_released
-  stage DBUS_POLICY_RELOAD_BEGIN
-  timeout --signal=TERM --kill-after=5s 45s systemctl restart dbus-broker.service ||
-    fail "GUEST_ONLY_DBUS_POLICY_RELOAD_FAILED"
+  # The C3d-signed D-Bus policy was composed into immutable /usr BEFORE the
+  # real Silverblue boot. The system bus loaded it at boot. Restarting the
+  # broker here risks losing login1 ownership before the OS rollback; instead
+  # validate signed package ownership and test the live deny-only policy.
+  stage DBUS_BOOT_COMPOSED_POLICY_CHECK_BEGIN
+  dbus_policy=/usr/share/dbus-1/system.d/org.postapollo.ConnectionsStatus1.conf
+  [[ -f "$dbus_policy" && ! -L "$dbus_policy" ]] ||
+    fail "SIGNED_BOOT_COMPOSED_DBUS_POLICY_MISSING"
+  [[ "$(rpm -qf --qf '%{NAME}\n' "$dbus_policy" 2>/dev/null || true)" == \
+     postapollo-connections-c3d-ci-status ]] ||
+    fail "DBUS_POLICY_NOT_OWNED_BY_SIGNED_C3D_RPM"
+  [[ "$(stat -c '%u:%g:%a' "$dbus_policy")" == 0:0:644 ]] ||
+    fail "SIGNED_DBUS_POLICY_FILE_UNSAFE"
+  [[ "$(systemctl is-active dbus-broker.service)" == active ]] ||
+    fail "BOOTED_DBUS_BROKER_NOT_ACTIVE"
+  check_logind_bus_health BEFORE_C4B_DENIALS
   client_check c4b-reader claim OWN_REFUSED
   client_check c4b-outsider claim OWN_REFUSED
   echo "C4B_PASS // UNAUTHORIZED_DBUS_OWNERSHIP_REFUSED"
+  echo "C4B_PASS // BOOT_COMPOSED_DBUS_POLICY_EFFECTIVE_WITHOUT_BROKER_RESTART"
 
   stage EXPLICIT_SIGNED_FAKE_SERVICE_START_BEGIN
   timeout --signal=TERM --kill-after=5s 75s systemctl start "$unit" ||
@@ -263,6 +294,7 @@ C4B_C3B_DIR_DIAG
     fail "COMPOSED_POLICY_VANISHED_PREMATURELY"
   check_accounts_absent
   check_released
+  check_logind_bus_health AFTER_C4B_RUNTIME_CLEANUP
   stage BOOTED_RUNTIME_ACCEPTED
   echo complete > "$donefile"
   echo "C4B_PASS // RUNTIME_USERS_VENV_CLEANED_POLICY_RETAINED_FOR_ROLLBACK"

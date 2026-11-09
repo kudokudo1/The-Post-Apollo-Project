@@ -87,6 +87,55 @@ class DirectGuestRelayReview(unittest.TestCase):
     def test_04_no_write_to_nonserial_file(self):
         self.assertEqual(self.relay(report()+b"\n", regular_target=True), b"")
 
+    def _writer_function(self, fake_os, fake_select, fake_time):
+        # Execute the ACTUAL embedded relay function, not a rewritten model.
+        marker = "def write_all_serial(fd, payload):\n"
+        self.assertEqual(self.source.count(marker), 1)
+        code = marker + self.source.split(marker, 1)[1].split(
+            "\ntry:\n    payload = selected_line", 1)[0]
+        env = {"os": fake_os, "select": fake_select, "time": fake_time}
+        exec(compile(code, str(GUEST), "exec"), env)
+        return env["write_all_serial"]
+
+    def test_06_partial_uart_write_and_eagain_eventually_sends_exact_bytes(self):
+        from types import SimpleNamespace
+        target = report() + b"\n"
+        output, calls = bytearray(), [0]
+
+        def short_writer(_fd, portion):
+            calls[0] += 1
+            if calls[0] in (2, 4):
+                raise BlockingIOError("simulated UART EAGAIN")
+            n = min(13, len(portion))
+            output.extend(portion[:n])
+            return n
+
+        writer = self._writer_function(
+            SimpleNamespace(write=short_writer),
+            SimpleNamespace(select=lambda r, w, e, t: ([], w, [])),
+            SimpleNamespace(monotonic=lambda: 1.0))
+        self.assertEqual(writer(9, target), len(target))
+        self.assertEqual(bytes(output), target)
+        self.assertGreater(calls[0], 5)
+
+    def test_07_unwritable_serial_refuses_and_does_not_issue_complete_receipt(self):
+        from types import SimpleNamespace
+        writer = self._writer_function(
+            SimpleNamespace(write=lambda _fd, _b: 1),
+            SimpleNamespace(select=lambda r, w, e, t: ([], [], [])),
+            SimpleNamespace(monotonic=lambda: 1.0))
+        with self.assertRaisesRegex(ValueError, "UART_WRITE_TIMEOUT"):
+            writer(9, report() + b"\n")
+
+    def test_08_zero_byte_serial_write_fails_closed(self):
+        from types import SimpleNamespace
+        writer = self._writer_function(
+            SimpleNamespace(write=lambda _fd, _b: 0),
+            SimpleNamespace(select=lambda r, w, e, t: ([], w, [])),
+            SimpleNamespace(monotonic=lambda: 1.0))
+        with self.assertRaisesRegex(ValueError, "UART_WRITE_ZERO"):
+            writer(9, report() + b"\n")
+
     def test_05_guest_source_placement_and_deny_only(self):
         code = GUEST.read_text()
         self.assertLess(code.index("C4B_RUNNING_HOST_PROBE\n"),

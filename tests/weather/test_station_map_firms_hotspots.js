@@ -94,7 +94,7 @@ assert.match(ui, /label: "FETCH HOTSPOTS"/);
 assert.match(ui, /available: firmsService\.configured[\s\S]*?firmsAreaReady[\s\S]*?!firmsService\.loading/);
 assert.match(ui, /ONE DAY \/\/ MAX 60° × 40° VIEW \/\/ NO AUTO-FETCH/);
 assert.match(ui, /KEY NEVER SHOWN OR PASSED IN PROCESS ARGV/);
-assert.match(ui, /model: firmsService\.ready \? firmsService\.hotspots : \[\]/);
+assert.match(ui, /model: firmsService\.ready[\s\S]*?stationDiscovery\.earthLayerSelected\("firms"\)\s*\? firmsService\.hotspots : \[\]/);
 assert.match(ui, /title: "HOTSPOT INSPECTOR \/\/ NASA FIRMS"/);
 assert.match(ui, /SATELLITE HOTSPOT, NOT FIRE PERIMETER/);
 assert.match(ui, /selectedMapHotspot = modelData/);

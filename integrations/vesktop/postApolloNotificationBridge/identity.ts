@@ -26,7 +26,8 @@ function label(value: unknown): string {
 // Event and channel originate in the authorized client dispatcher/store.
 // These objects are not trusted just because the renderer passed them.
 export function scopedDiscordEvent(event: any, channel: any, selfId: unknown,
-                                    allowed: Set<string>): Record<string, string> | null {
+                                    allowed: Set<string>,
+                                    allowedServers: Set<string>): Record<string, string> | null {
     const msg = event?.message;
     const accountId = discordSnowflake(selfId);
     const senderId = discordSnowflake(msg?.author?.id);
@@ -34,9 +35,12 @@ export function scopedDiscordEvent(event: any, channel: any, selfId: unknown,
     const channelId = discordSnowflake(event?.channelId ?? event?.channel_id ?? msg?.channel_id);
     if (!accountId || !senderId || !messageId || !channelId
             || senderId === accountId || event?.optimistic || msg?.state === "SENDING"
-            || !allowed.has(channelId) || discordSnowflake(channel?.id) !== channelId)
+            || discordSnowflake(channel?.id) !== channelId)
         return null;
     const guildId = discordSnowflake(channel?.guild_id ?? event?.guildId ?? msg?.guild_id);
+    if (!allowed.has(channelId)
+            && !(guildId && allowedServers.has(guildId)))
+        return null;
     const groupDm = !guildId && channel?.type === 3;
     const direct = !guildId && channel?.type === 1;
     // Unknown channel kinds never imply group/DM (or generate new popups).

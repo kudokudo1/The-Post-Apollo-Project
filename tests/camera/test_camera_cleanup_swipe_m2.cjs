@@ -111,8 +111,16 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.doesNotMatch(gallery, /label: "BATCH ON"/);
     assert.doesNotMatch(gallery, /onLeftClicked: camera\.batchToggle\(modelData\)/);
     assert.match(cleanup, /label: "SELECT LOADED"/);
-    assert.match(cleanup, /label: "MOVE " \+ camera\.batchPaths\.length \+ " TO TRASH"/);
-    assert.match(cleanup, /onLeftClicked: camera\.trashQueuedNow\(\)/);
+    const toolbar = cleanup.slice(cleanup.indexOf("id: cleanupQueueActions"),
+                                  cleanup.indexOf("id: cleanupWorkArea"));
+    const queue = cleanup.slice(cleanup.indexOf("id: cleanupQueueView"),
+                                cleanup.indexOf("id: cleanupBatchView"));
+    assert.match(toolbar, /label: camera\.cleanupQueueOpen/);
+    assert.match(toolbar, /onLeftClicked: camera\.cleanupToggleQueue\(\)/);
+    assert.doesNotMatch(toolbar, /onLeftClicked: camera\.trashQueuedNow\(\)/);
+    assert.match(queue, /label: "MOVE " \+ camera\.batchPaths\.length \+ " TO TRASH"/);
+    assert.match(queue, /onLeftClicked: camera\.trashQueuedNow\(\)/);
+    assert.match(queue, /available: !camera\.busy && camera\.batchPaths\.length > 0/);
     assert.doesNotMatch(cleanup, /label: "REVIEW FOR TRASH/);
     assert.doesNotMatch(cleanup, /label: "CANCEL REVIEW"/);
     assert.match(cleanup, /label: "CLEAR MARKS"/);
@@ -1437,7 +1445,7 @@ test("One click from any Cleanup selection mode executes a single direct Trash c
         ]);
         assert.equal(state.batchPreview,null);
         assert.equal(state.batchReviewKey,"");
-        // The UI doesn't need to open the queue or request a plan.
+        // The backend requires no extra preview; the UI exposes this action inside View Queue.
         assert.equal(state.cleanupQueueOpen,false);
         assert.equal(state.called.some(c=>c.action==="previewBatch"),false);
         assert.equal(state.called.some(c=>c.action==="trashBatch"),false);

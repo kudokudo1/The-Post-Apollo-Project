@@ -100,6 +100,8 @@ function trashHarness(overrides={}) {
         Qt:{callLater(fn){fn();}},
         ...overrides
     };
+    // QML root id is available by name inside Qt.callLater callbacks.
+    ctx.trashLauncher = ctx;
     vm.createContext(ctx);
     vm.runInContext(trashMethods,ctx);
     return ctx;

@@ -8,6 +8,10 @@ Item {
     signal useForHome(var candidate)
     signal useForExplore(var candidate)
     readonly property bool editingText: queryInput.activeFocus
+    // The pinned middle-bay search keeps the input and button visible
+    // even as the search result list grows independently beneath.
+    property bool compactPinned: false
+    property int resultsViewportLimit: 108
     implicitHeight: searchContent.implicitHeight
 
     function search() {
@@ -40,7 +44,7 @@ Item {
     Column {
         id: searchContent
         width: parent.width
-        spacing: 9
+        spacing: searchPanel.compactPinned ? 5 : 9
 
         GohuText {
             width: parent.width
@@ -54,11 +58,12 @@ Item {
             wrapMode: Text.WordWrap
             font.pixelSize: 9
             text: "CITY, REGION, OR POSTAL CODE // NO STREET ADDRESS SEARCH"
+            visible: !searchPanel.compactPinned
         }
 
         Rectangle {
             width: parent.width
-            height: 36
+            height: searchPanel.compactPinned ? 31 : 36
             color: Colors.black
             border.width: 1
             border.color: queryInput.activeFocus ? Colors.magenta : Colors.cyan
@@ -86,7 +91,7 @@ Item {
         Rectangle {
             id: runSearchButton
             width: parent.width
-            height: 35
+            height: searchPanel.compactPinned ? 29 : 35
             readonly property bool hovered: runSearchMouse.containsMouse
             readonly property bool pressed: runSearchMouse.pressed
             color: pressed ? Colors.magenta
@@ -117,100 +122,130 @@ Item {
             text: searchPanel.statusText()
         }
 
-        Repeater {
-            model: searchService.rows
-
-            delegate: Rectangle {
-                id: resultCard
-                required property var modelData
-                width: searchContent.width
-                height: 112
-                color: Colors.black
-                border.width: 1
-                border.color: Colors.cyan
-
+        Item {
+            id: matchesViewport
+            width: parent.width
+            height: searchService.rows.length === 0 ? 0
+                : searchPanel.compactPinned
+                  ? Math.min(searchPanel.resultsViewportLimit,
+                      matchesBody.implicitHeight)
+                  : matchesBody.implicitHeight
+            visible: height > 0
+            Flickable {
+                id: matchesScroll
+                anchors.fill: parent
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                contentWidth: width
+                contentHeight: matchesBody.implicitHeight
                 Column {
-                    anchors.fill: parent
-                    anchors.margins: 7
+                    id: matchesBody
+                    width: matchesScroll.width
                     spacing: 5
-
-                    GohuText {
-                        width: parent.width
-                        textFormat: Text.PlainText
-                        text: resultCard.modelData.label
-                        color: Colors.white
-                        font.pixelSize: 10
-                        elide: Text.ElideRight
-                    }
-
-                    QuietText {
-                        width: parent.width
-                        textFormat: Text.PlainText
-                        text: Number(resultCard.modelData.latitude).toFixed(4)
-                              + "°, "
-                              + Number(resultCard.modelData.longitude).toFixed(4)
-                              + "°"
-                              + (resultCard.modelData.timezone
-                                 ? " // " + resultCard.modelData.timezone : "")
-                        color: Colors.cyan
-                        font.pixelSize: 9
-                        elide: Text.ElideRight
-                    }
-
-                    Row {
-                        width: parent.width
-                        height: 31
-                        spacing: 6
-
-                        Rectangle {
-                            id: useHomeButton
-                            width: (parent.width - 6) / 2
-                            height: 30
-                            color: homeMouse.pressed ? Colors.magenta
-                                   : homeMouse.containsMouse
-                                   ? Colors.yellow : Colors.dark
-                            border.width: 1
-                            border.color: Colors.orange
-
+                Repeater {
+                    model: searchService.rows
+        
+                    delegate: Rectangle {
+                        id: resultCard
+                        required property var modelData
+                        width: Math.max(0,matchesBody.width-(searchPanel.compactPinned ? 10 : 0))
+                        height: 112
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.cyan
+        
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 7
+                            spacing: 5
+        
                             GohuText {
-                                anchors.centerIn: parent
-                                text: "USE FOR HOME"
+                                width: parent.width
+                                textFormat: Text.PlainText
+                                text: resultCard.modelData.label
+                                color: Colors.white
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+        
+                            QuietText {
+                                width: parent.width
+                                textFormat: Text.PlainText
+                                text: Number(resultCard.modelData.latitude).toFixed(4)
+                                      + "°, "
+                                      + Number(resultCard.modelData.longitude).toFixed(4)
+                                      + "°"
+                                      + (resultCard.modelData.timezone
+                                         ? " // " + resultCard.modelData.timezone : "")
+                                color: Colors.cyan
                                 font.pixelSize: 9
-                                color: homeMouse.pressed ? Colors.black : Colors.orange
+                                elide: Text.ElideRight
                             }
-                            MouseArea {
-                                id: homeMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onClicked: searchPanel.useForHome(resultCard.modelData)
-                            }
-                        }
-
-                        Rectangle {
-                            id: useExploreButton
-                            width: (parent.width - 6) / 2
-                            height: 30
-                            color: exploreMouse.pressed ? Colors.magenta
-                                   : exploreMouse.containsMouse
-                                   ? Colors.yellow : Colors.dark
-                            border.width: 1
-                            border.color: Colors.cyan
-
-                            GohuText {
-                                anchors.centerIn: parent
-                                text: "USE FOR EXPLORE"
-                                font.pixelSize: 9
-                                color: exploreMouse.pressed ? Colors.black : Colors.cyan
-                            }
-                            MouseArea {
-                                id: exploreMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onClicked: searchPanel.useForExplore(resultCard.modelData)
+        
+                            Row {
+                                width: parent.width
+                                height: 31
+                                spacing: 6
+        
+                                Rectangle {
+                                    id: useHomeButton
+                                    width: (parent.width - 6) / 2
+                                    height: 30
+                                    color: homeMouse.pressed ? Colors.magenta
+                                           : homeMouse.containsMouse
+                                           ? Colors.yellow : Colors.dark
+                                    border.width: 1
+                                    border.color: Colors.orange
+        
+                                    GohuText {
+                                        anchors.centerIn: parent
+                                        text: "USE FOR HOME"
+                                        font.pixelSize: 9
+                                        color: homeMouse.pressed ? Colors.black : Colors.orange
+                                    }
+                                    MouseArea {
+                                        id: homeMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        onClicked: searchPanel.useForHome(resultCard.modelData)
+                                    }
+                                }
+        
+                                Rectangle {
+                                    id: useExploreButton
+                                    width: (parent.width - 6) / 2
+                                    height: 30
+                                    color: exploreMouse.pressed ? Colors.magenta
+                                           : exploreMouse.containsMouse
+                                           ? Colors.yellow : Colors.dark
+                                    border.width: 1
+                                    border.color: Colors.cyan
+        
+                                    GohuText {
+                                        anchors.centerIn: parent
+                                        text: "USE FOR EXPLORE"
+                                        font.pixelSize: 9
+                                        color: exploreMouse.pressed ? Colors.black : Colors.cyan
+                                    }
+                                    MouseArea {
+                                        id: exploreMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        onClicked: searchPanel.useForExplore(resultCard.modelData)
+                                    }
+                                }
                             }
                         }
                     }
                 }
+                }
+            }
+            NeonScrollBar {
+                flickable: matchesScroll
+                visible: searchPanel.compactPinned && scrollable
+                x: parent.width-width
+                y: 0
+                height: parent.height
             }
         }
 
@@ -221,6 +256,7 @@ Item {
             text: "LOCATION DATA // GEONAMES VIA OPEN-METEO. "
                   + "EXPLICIT ONLINE SEARCH // NON-COMMERCIAL API. "
                   + "RESULTS ARE PREVIEWS UNTIL YOU SAVE HOME OR EXPLORE."
+            visible: !searchPanel.compactPinned
         }
     }
 }

@@ -17,8 +17,9 @@ check('HospitalWorkforceManagerView {' in host
       and 'providerService: providerService' in host
       and 'root.workforceManagerExpanded' in host,
       "Provider directory wired to existing inline Surgery manager")
-check('onOpenRoomRequested: function(roomId)' in host
-      and 'root.openRosterSession(row, "connections")' in host
+check('onOpenRoomRequested: function(roomId, selection)' in host
+      and 'root.openRosterSession(row,' in host
+      and 'valid ? "attachPreview" : "connections"' in host
       and 'root.workforceRosterRows.filter(' in host,
       "Open Room must reuse existing nested worker inspector")
 check('import "../services/hospital/HospitalWorkforceStaffingPolicy.js" as StaffingPolicy'

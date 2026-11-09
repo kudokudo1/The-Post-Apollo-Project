@@ -48,9 +48,14 @@ function retirement(a) {
         blockers.push("Worker is already released");
     if (rows(source.rooms).some(r => v(r.doctorId) === id))
         blockers.push("Worker still owns a Room. Recover or release staffing first");
-    if (rows(source.sessions).some(s => v(s.doctorId) === id
-            && !v(s.endedAt) && ["COMPLETE","FAILED","ENDED"].indexOf(roleCode(s.status)) < 0))
-        blockers.push("Worker still has a nonterminal Session");
+    if (rows(source.sessions).some(function(s) {
+        if (v(s.doctorId) !== id) return false;
+        const pid = Number(s.activePid || 0);
+        return !v(s.endedAt)
+            || ["COMPLETE","FAILED","ENDED"].indexOf(roleCode(s.status)) < 0
+            || !Number.isFinite(pid) || pid !== 0;
+    }))
+        blockers.push("Worker has unreleased Session or recorded active process");
     return {ready: blockers.length === 0, blockers, id,
         mutationAuthorized: false, deletesHistory: false};
 }

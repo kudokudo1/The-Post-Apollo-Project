@@ -188,4 +188,9 @@ test("source wiring uses live owner resolver for all thermal paths and retains o
   assert.match(app,/function selectSavedApplication\(desktopId\)/);
   assert.match(app,/function selectSavedSystemMetric\(metric\)/);
   assert.match(app,/favoriteNavigationNoticeBar/);
+  const native=read("tests/cpuplus/fixtures/CpuPlusFavoritesNative.qml");
+  const runner=read("scripts/favorites/verify_cpuplus_hub_fedora_u4.sh");
+  assert.match(native,/property list<string> favoriteKeys:/);
+  assert.match(native,/U7G_PASS \/\/ QML_TYPED_LIST_AND_EXACT_LIVE_SENSOR/);
+  assert.match(runner,/U7G_PASS \/\/ QML_TYPED_LIST_AND_EXACT_LIVE_SENSOR/);
 });

@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""CI-ONLY installed entrypoint for the REAL IdentityCommandGateway.
+
+It uses the actual installed gateway, signed-receipt implementation and
+kernel Unix listener. ALL human consent, peer authority, and seat decisions
+are DENIED. It cannot launch OAuth, open a browser or perform provider actions.
+Do not install this fixture outside disposable GitHub-hosted CI.
+"""
+from __future__ import annotations
+import os
+from pathlib import Path
+import signal
+import sys
+import threading
+
+if (os.environ.get("GITHUB_ACTIONS") != "true" or
+        os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted" or
+        os.environ.get("POST_APOLLO_ID_INSTALL_CI_ONLY") != "1"):
+    raise SystemExit(79)
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).parent))
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from desktop_command_gateway_v0 import IdentityCommandGateway
+from signed_command_receipt_v0 import ReceiptIssuer
+
+stop = threading.Event()
+
+
+def _shutdown(_signum, _frame):
+    stop.set()
+
+
+def _no_login_host():
+    raise RuntimeError("Disposable installed fixture explicitly forbids login")
+
+
+def main() -> None:
+    runtime = Path(os.environ["POST_APOLLO_ID_CI_RUNTIME"])
+    signing_file = Path(os.environ["POST_APOLLO_ID_CI_SIGNING_KEY"])
+    if (not runtime.is_absolute() or not signing_file.is_absolute()
+            or runtime.parent != signing_file.parent
+            or runtime.stat().st_uid != os.geteuid()
+            or (runtime.stat().st_mode & 0o777) != 0o700
+            or signing_file.stat().st_uid != os.geteuid()
+            or (signing_file.stat().st_mode & 0o777) != 0o600):
+        raise SystemExit(78)
+    raw = signing_file.read_bytes()
+    if len(raw) != 32:
+        raise SystemExit(78)
+    issuer = ReceiptIssuer(Ed25519PrivateKey.from_private_bytes(raw))
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+    gateway = IdentityCommandGateway(
+        runtime_directory=runtime,
+        host_factory=_no_login_host,
+        # These are intentionally, unconditionally DENY-only, even on
+        # a valid same-UID UNIX client. Only a C5 owner can change consent
+        # semantics in a separately reviewed production host.
+        verified_peer=lambda _peer: False,
+        active_seat=lambda: False,
+        approved_intent=lambda _peer, _action: False,
+        secure_receipt_issuer=issuer,
+    )
+    try:
+        gateway.start()
+        stop.wait(30)  # Bound CI lifetime even if cleanup is interrupted.
+    finally:
+        gateway.close()
+
+
+if __name__ == "__main__":
+    main()

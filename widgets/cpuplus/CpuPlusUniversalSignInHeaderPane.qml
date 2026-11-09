@@ -4,6 +4,7 @@ import qs.services.connections
 import "../../services/connections/ConnectionsUnifiedSignInPolicy.js" as SignInPolicy
 import "../../services/connections/ConnectionsIdentityJourneyPolicy.js" as JourneyPolicy
 import "../../services/connections/ConnectionsSignInFlowContract.js" as FlowContract
+import "../../services/connections/ConnectionsSignInHostBoundary.js" as HostBoundary
 import "../messanger"
 
 // CPU++ Connections' reserved UPPER-LEFT identity slot: physically above
@@ -17,6 +18,7 @@ Item {
     property bool flowExpanded: false
     // V3 has no trusted command/status adapter. Offline projection only.
     readonly property var signInFlow: FlowContract.offline()
+    readonly property var hostBridge: HostBoundary.offline()
 
     // Hide or switch away from CPU++ -> Connections: revoke this view.
     // Existing Identity Center reader also cancels stale in-flight display.
@@ -64,20 +66,21 @@ Item {
             width: parent.width
             text: "UNIVERSAL SIGN-IN // CONTROL"
             color: Colors.magenta
-            font.pixelSize: 12
+            font.pixelSize: 13
             wrapMode: Text.WordWrap
         }
         GohuText {
             width: parent.width
             text: upperSignIn.signIn.identityStatus
             color: upperSignIn.signIn.identityVerified ? Colors.green : Colors.orange
-            font.pixelSize: 10
+            font.pixelSize: 12
             wrapMode: Text.WordWrap
         }
         QuietText {
             width: parent.width
-            text: upperSignIn.signIn.identityNote
-            font.pixelSize: 9
+            text: upperSignIn.hostBridge.heading
+            color: Colors.orange
+            font.pixelSize: 11
             wrapMode: Text.WordWrap
         }
         Row {
@@ -86,18 +89,18 @@ Item {
 
             ActionButton {
                 width: (parent.width - parent.spacing) / 2
-                height: 30
+                height: 34
                 label: "OPEN ID MANAGEMENT"
-                labelPixelSize: 9
+                labelPixelSize: 10
                 accentColor: Colors.cyan
                 onClicked: upperSignIn.idManagementRequested()
             }
             ActionButton {
                 width: (parent.width - parent.spacing) / 2
-                height: 30
+                height: 34
                 label: ConnectionsHostObservation.checking
                        ? "CHECKING HOST..." : "INSPECT LOCAL HOST"
-                labelPixelSize: 9
+                labelPixelSize: 10
                 accentColor: Colors.cyan
                 available: !ConnectionsHostObservation.checking
                 onClicked: ConnectionsHostObservation.inspect()
@@ -111,7 +114,7 @@ Item {
             height: 30
             label: upperSignIn.statusExpanded
                    ? "HIDE SIGN-IN STATUS" : "VIEW SIGN-IN STATUS"
-            labelPixelSize: 9
+            labelPixelSize: 11
             accentColor: Colors.magenta
             selected: upperSignIn.statusExpanded
             interactive: upperSignIn.panelActive
@@ -121,7 +124,7 @@ Item {
             id: journeyViewport
             width: parent.width
             visible: upperSignIn.statusExpanded
-            height: visible ? Math.min(journeyBody.implicitHeight + 4, 184) : 0
+            height: visible ? Math.min(journeyBody.implicitHeight + 4, 204) : 0
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             contentWidth: width
@@ -130,26 +133,47 @@ Item {
             Column {
                 id: journeyBody
                 width: journeyViewport.width
-                spacing: 6
+                spacing: 9
 
                 GohuText {
                     width: parent.width
                     text: "IDENTITY CENTER // READ-ONLY DISPLAY"
                     color: Colors.cyan
-                    font.pixelSize: 10
+                    font.pixelSize: 12
                     wrapMode: Text.WordWrap
                 }
                 GohuText {
                     width: parent.width
                     text: upperSignIn.journey.displayStatus
                     color: Colors.orange
-                    font.pixelSize: 9
+                    font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
                 QuietText {
                     width: parent.width
                     text: upperSignIn.journey.displayGuidance
-                    font.pixelSize: 9
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: upperSignIn.signIn.identityNote
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "TRUST BOUNDARIES // ALL LOCKED"
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: upperSignIn.hostBridge.hostStatus
+                          + "\n" + upperSignIn.hostBridge.commandStatus
+                          + "\n" + upperSignIn.hostBridge.consentStatus
+                    font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
                 QuietText {
@@ -158,20 +182,20 @@ Item {
                           + "\n" + upperSignIn.journey.signInStep
                           + "\n" + upperSignIn.journey.identityStep
                           + "\n" + upperSignIn.journey.providerStep
-                    font.pixelSize: 9
+                    font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
                 GohuText {
                     width: parent.width
                     text: upperSignIn.signInFlow.label
                     color: Colors.orange
-                    font.pixelSize: 9
+                    font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
                 QuietText {
                     width: parent.width
                     text: upperSignIn.signInFlow.requestLabel
-                    font.pixelSize: 9
+                    font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
                 ActionButton {
@@ -179,7 +203,7 @@ Item {
                     height: 30
                     label: upperSignIn.flowExpanded
                            ? "HIDE REQUEST FLOW" : "VIEW REQUEST FLOW"
-                    labelPixelSize: 9
+                    labelPixelSize: 11
                     accentColor: Colors.magenta
                     selected: upperSignIn.flowExpanded
                     interactive: upperSignIn.panelActive
@@ -195,7 +219,7 @@ Item {
                             required property var modelData
                             width: journeyBody.width
                             text: modelData
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             wrapMode: Text.WordWrap
                         }
                     }
@@ -203,7 +227,7 @@ Item {
                         width: parent.width
                         text: upperSignIn.signInFlow.explanation
                         color: Colors.orange
-                        font.pixelSize: 9
+                        font.pixelSize: 11
                         wrapMode: Text.WordWrap
                     }
                 }
@@ -211,7 +235,7 @@ Item {
                     width: Math.min(parent.width, 188)
                     height: 30
                     label: upperSignIn.journey.signInButtonLabel
-                    labelPixelSize: 9
+                    labelPixelSize: 11
                     accentColor: Colors.orange
                     available: upperSignIn.journey.canBeginSignIn
                     // No onClicked: the protected host has NO approved
@@ -224,7 +248,7 @@ Item {
                         width: (parent.width - parent.spacing) / 2
                         height: 30
                         label: "CANCEL // UNAVAILABLE"
-                        labelPixelSize: 9
+                        labelPixelSize: 10
                         accentColor: Colors.orange
                         available: upperSignIn.signInFlow.canCancel
                         // No onClicked: host-originated request receipt absent.
@@ -233,7 +257,7 @@ Item {
                         width: (parent.width - parent.spacing) / 2
                         height: 30
                         label: "RETRY // UNAVAILABLE"
-                        labelPixelSize: 9
+                        labelPixelSize: 10
                         accentColor: Colors.orange
                         available: upperSignIn.signInFlow.canRetry
                         // No onClicked: host must issue a new request ID.
@@ -243,41 +267,47 @@ Item {
                     width: Math.min(parent.width, 188)
                     height: 30
                     label: "REFRESH CONTEXT VIEW"
-                    labelPixelSize: 9
+                    labelPixelSize: 11
                     accentColor: Colors.cyan
                     interactive: upperSignIn.panelActive
                     onClicked: contextReader.refresh()
+                }
+                GohuText {
+                    width: parent.width
+                    text: "CONNECTIONS // READ-ONLY"
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: upperSignIn.signIn.connectionStatus
+                    color: Colors.orange
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: upperSignIn.signIn.providerStatus
+                    color: Colors.orange
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: upperSignIn.signIn.batchStatus
+                    color: Colors.orange
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
                 }
                 QuietText {
                     width: parent.width
                     text: "NO LOGIN, AUTHORIZATION OR PROVIDER ACCESS FROM THIS VIEW."
                     color: Colors.orange
-                    font.pixelSize: 9
+                    font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
             }
-        }
-
-        GohuText {
-            width: parent.width
-            text: upperSignIn.signIn.connectionStatus
-            color: Colors.orange
-            font.pixelSize: 10
-            wrapMode: Text.WordWrap
-        }
-        QuietText {
-            width: parent.width
-            text: upperSignIn.signIn.providerStatus
-            color: Colors.orange
-            font.pixelSize: 9
-            wrapMode: Text.WordWrap
-        }
-        QuietText {
-            width: parent.width
-            text: upperSignIn.signIn.batchStatus
-            color: Colors.orange
-            font.pixelSize: 9
-            wrapMode: Text.WordWrap
         }
     }
 }

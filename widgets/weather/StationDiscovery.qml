@@ -50,6 +50,70 @@ Rectangle {
     property bool earthPinnedMap: false
     property bool earthServicesOnly: false
     property string earthFocusedLayer: "all"
+    // E3 // Single fixed MAP control deck. These controls operate on the
+    // original renderer and manual provider actions; no second map/source.
+    property string pinnedSourceMode: "mrms"
+    function mapToolActive(key) {
+        if (key === "borders") return mapShowCountryBorders;
+        if (key === "states") return mapShowAdmin1;
+        if (key === "places") return mapShowPlaces;
+        if (key === "quakes") return mapShowEarthquakes;
+        if (key === "gdacs") return mapShowGdacs;
+        return false;
+    }
+    function toggleMapTool(key) {
+        if (key === "borders") mapShowCountryBorders = !mapShowCountryBorders;
+        else if (key === "states") mapShowAdmin1 = !mapShowAdmin1;
+        else if (key === "places") mapShowPlaces = !mapShowPlaces;
+        else if (key === "quakes") mapShowEarthquakes = !mapShowEarthquakes;
+        else if (key === "gdacs") mapShowGdacs = !mapShowGdacs;
+        else if (key === "reset") resetMapView();
+    }
+    function pinnedLoadAvailable() {
+        if (pinnedSourceMode === "mrms")
+            return radarAreaReady && !mrmsRadarService.loading;
+        if (pinnedSourceMode === "rainviewer")
+            return radarHistoryMinutes <= 120 && !rainViewerRadarService.loading;
+        if (pinnedSourceMode === "smoke")
+            return !hmsSmokeService.loading;
+        if (pinnedSourceMode === "firms")
+            return firmsService.configured && firmsAreaReady
+                && !firmsService.loading;
+        return false;
+    }
+    function pinnedClearAvailable() {
+        if (pinnedSourceMode === "mrms")
+            return radarImageUrl !== "" || radarSnapshotBounds !== null;
+        if (pinnedSourceMode === "rainviewer")
+            return rainViewerRadarService.ready || rainViewerRadarService.strips.length > 0;
+        if (pinnedSourceMode === "smoke") return hmsSmokeService.ready;
+        return false; // FIRMS previously had no clear action.
+    }
+    function pinnedLoadSource() {
+        if (!pinnedLoadAvailable()) return;
+        if (pinnedSourceMode === "mrms") loadRadarSnapshot();
+        else if (pinnedSourceMode === "rainviewer") loadRainViewerFallback();
+        else if (pinnedSourceMode === "smoke") loadSmokePolygons();
+        else if (pinnedSourceMode === "firms") fetchVisibleHotspots();
+    }
+    function pinnedClearSource() {
+        if (!pinnedClearAvailable()) return;
+        if (pinnedSourceMode === "mrms") clearRadarSnapshot();
+        else if (pinnedSourceMode === "rainviewer") clearRainViewerFallback();
+        else if (pinnedSourceMode === "smoke") clearSmokePolygons();
+    }
+    function nextPinnedRadarHistory() {
+        if (pinnedSourceMode !== "mrms" && pinnedSourceMode !== "rainviewer")
+            return;
+        const choices = radarHistoryOptions.filter(function(option) {
+            return pinnedSourceMode !== "rainviewer" || option.minutes <= 120;
+        });
+        if (choices.length === 0) return;
+        let at = choices.findIndex(function(option) {
+            return option.minutes === radarHistoryMinutes;
+        });
+        selectRadarHistory(choices[(at + 1) % choices.length].minutes);
+    }
     function earthLayerSelected(layer) {
         return !earthPinnedMap || earthFocusedLayer === "all"
             || earthFocusedLayer === layer;
@@ -1330,9 +1394,12 @@ Rectangle {
     WeatherServices.StationDiscoveryService {
         id: source
         domain: stationDiscovery.domain
-        mapCategory: stationDiscovery.mapCategoryForFilter(
-            stationDiscovery.mapFilter
-        )
+        // The pinned ALL/EONET source buttons replace the old EONET
+        // category filter. Never let an unseen legacy category restrict it.
+        mapCategory: stationDiscovery.earthPinnedMap
+            ? "" : stationDiscovery.mapCategoryForFilter(
+                stationDiscovery.mapFilter
+            )
         active: stationDiscovery.stationOpen && stationDiscovery.visible
                 && !stationDiscovery.weatherMapOnly
                 && (!stationDiscovery.earthMapOnly
@@ -1540,12 +1607,118 @@ Rectangle {
         z: 1
     }
 
+    // E3 // Stable control deck directly under the live map. The first row
+    // handles presentation; the second selects one existing manual source
+    // and invokes its existing LOAD/CLEAR/history actions.
+    Column {
+        id: pinnedMapControls
+        objectName: "earth-e3-pinned-map-controls"
+        visible: pinnedMapHost.visible
+        anchors.top: pinnedMapHost.bottom
+        anchors.topMargin: visible ? 3 : 0
+        anchors.left: pinnedMapHost.left
+        anchors.right: pinnedMapHost.right
+        height: visible ? 47 : 0
+        spacing: 2
+        Row {
+            id: pinnedAppearance
+            objectName: "earth-e3-pinned-appearance"
+            width: parent.width
+            height: 23
+            spacing: 3
+            Repeater {
+                model: ["borders","states","places","quakes","gdacs","reset"]
+                delegate: ActionButton {
+                    required property string modelData
+                    objectName: "earth-e3-map-" + modelData
+                    width: Math.max(1,(pinnedAppearance.width
+                        - 5*pinnedAppearance.spacing)/6)
+                    height: 23
+                    contentPadding: 1
+                    labelPixelSize: 8
+                    label: modelData.toUpperCase()
+                        + (modelData === "reset" ? "" :
+                            (stationDiscovery.mapToolActive(modelData) ? " ON" : " OFF"))
+                    selected: stationDiscovery.mapToolActive(modelData)
+                    available: modelData !== "reset"
+                        || stationDiscovery.mapZoom > 1.001
+                        || Math.abs(stationDiscovery.mapCenterLon) > 0.001
+                        || Math.abs(stationDiscovery.mapCenterLat) > 0.001
+                    accentColor: Colors.cyan
+                    onClicked: stationDiscovery.toggleMapTool(modelData)
+                }
+            }
+        }
+        Row {
+            id: pinnedManual
+            objectName: "earth-e3-pinned-manual"
+            width: parent.width
+            height: 22
+            spacing: 3
+            Repeater {
+                model: [{key:"mrms",label:"MRMS"},
+                        {key:"rainviewer",label:"RV"},
+                        {key:"smoke",label:"HMS"},
+                        {key:"firms",label:"FIRES"}]
+                delegate: ActionButton {
+                    required property var modelData
+                    objectName: "earth-e3-source-" + modelData.key
+                    width: Math.max(1,(pinnedManual.width
+                        - 6*pinnedManual.spacing)/7)
+                    height: 22
+                    contentPadding: 1
+                    labelPixelSize: 9
+                    label: modelData.label
+                    selected: stationDiscovery.pinnedSourceMode === modelData.key
+                    accentColor: Colors.magenta
+                    onClicked: stationDiscovery.pinnedSourceMode = modelData.key
+                }
+            }
+            ActionButton {
+                objectName: "earth-e3-radar-history"
+                width: Math.max(1,(pinnedManual.width
+                    - 6*pinnedManual.spacing)/7)
+                height: 22
+                contentPadding: 1
+                labelPixelSize: 8
+                label: "H " + stationDiscovery.radarHistoryLabel(
+                    stationDiscovery.radarHistoryMinutes)
+                available: stationDiscovery.pinnedSourceMode === "mrms"
+                    || stationDiscovery.pinnedSourceMode === "rainviewer"
+                onClicked: stationDiscovery.nextPinnedRadarHistory()
+            }
+            ActionButton {
+                objectName: "earth-e3-manual-load"
+                width: Math.max(1,(pinnedManual.width
+                    - 6*pinnedManual.spacing)/7)
+                height: 22
+                contentPadding: 1
+                labelPixelSize: 9
+                label: "LOAD"
+                available: stationDiscovery.pinnedLoadAvailable()
+                accentColor: Colors.orange
+                onClicked: stationDiscovery.pinnedLoadSource()
+            }
+            ActionButton {
+                objectName: "earth-e3-manual-clear"
+                width: Math.max(1,(pinnedManual.width
+                    - 6*pinnedManual.spacing)/7)
+                height: 22
+                contentPadding: 1
+                labelPixelSize: 9
+                label: "CLEAR"
+                available: stationDiscovery.pinnedClearAvailable()
+                onClicked: stationDiscovery.pinnedClearSource()
+            }
+        }
+    }
+
     Flickable {
         id: discoveryScroll
         objectName: "earth-e2-event-scroll"
-        anchors.top: pinnedMapHost.visible
-            ? pinnedMapHost.bottom : parent.top
-        anchors.topMargin: pinnedMapHost.visible ? 4 : 0
+        anchors.top: pinnedMapControls.visible
+            ? pinnedMapControls.bottom : parent.top
+        anchors.topMargin: pinnedMapControls.visible ? 4 : 0
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -1589,24 +1762,28 @@ Rectangle {
             }
 
             StationRuntimeRack {
-                // Preserve CLASSIC NEWS/RADIO runtime rack and add native
-                // WEATHER map; never suppress the original news scroll area.
-                visible: !stationDiscovery.weatherMapOnly
-                         || stationDiscovery.domain === "map"
+                objectName: "earth-e3-legacy-runtime-rack"
+                // The pinned EARTH page no longer repeats SERVICES runtime.
+                visible: !stationDiscovery.earthPinnedMap
+                    && (!stationDiscovery.weatherMapOnly
+                        || stationDiscovery.domain === "map")
                 width: parent.width
                 rows: stationDiscovery.runtimeRows
             }
 
             StationSectionDivider {
-                visible: !stationDiscovery.weatherMapOnly
-                         || stationDiscovery.domain === "map"
+                visible: !stationDiscovery.earthPinnedMap
+                    && (!stationDiscovery.weatherMapOnly
+                        || stationDiscovery.domain === "map")
                 width: parent.width
                 title: "SOURCE RACK // WHAT IS CONNECTED"
             }
 
             Column {
-                visible: !stationDiscovery.weatherMapOnly
-                         || stationDiscovery.domain === "map"
+                objectName: "earth-e3-legacy-source-rack"
+                visible: !stationDiscovery.earthPinnedMap
+                    && (!stationDiscovery.weatherMapOnly
+                        || stationDiscovery.domain === "map")
                 width: parent.width
                 spacing: 5
 
@@ -1645,6 +1822,7 @@ Rectangle {
 
             StationSectionDivider {
                 visible: !stationDiscovery.weatherMapOnly
+                    && !stationDiscovery.earthPinnedMap
                 width: parent.width
                 title: stationDiscovery.providerTitle
             }
@@ -1653,8 +1831,10 @@ Rectangle {
                 id: mapFilterRail
                 width: parent.width
                 height: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly
+                        && !stationDiscovery.earthPinnedMap
                         && stationDiscovery.earthLayerEnabled("eonet") ? 34 : 0
                 visible: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly
+                         && !stationDiscovery.earthPinnedMap
                          && stationDiscovery.earthLayerEnabled("eonet")
                 spacing: 8
 
@@ -1704,6 +1884,7 @@ Rectangle {
 
                 StationSectionDivider {
                     visible: stationDiscovery.earthMapOnly
+                        && !stationDiscovery.earthPinnedMap
                     width: parent.width
                     title: EarthPanelPolicy.routeLabel(
                         stationDiscovery.earthMapRoute)
@@ -1721,7 +1902,9 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly) && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
+                    visible: !stationDiscovery.earthPinnedMap
+                    && (!stationDiscovery.weatherMapOnly)
+                    && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     title: "SPATIAL PLOT // GDACS + USGS QUAKES + EONET + FIRMS + NEWS"
                 }
@@ -1744,6 +1927,7 @@ Rectangle {
                 }
 
                 Row {
+                    visible: !stationDiscovery.earthPinnedMap
                     width: parent.width
                     height: 30
                     spacing: 8
@@ -1801,7 +1985,8 @@ Rectangle {
                 }
 
                 Row {
-                    visible: (!stationDiscovery.weatherMapOnly)
+                    visible: !stationDiscovery.earthPinnedMap
+                             && (!stationDiscovery.weatherMapOnly)
                              && stationDiscovery.earthLayerEnabled("quakes")
                     width: parent.width
                     height: 30
@@ -1842,7 +2027,8 @@ Rectangle {
                 }
 
                 Row {
-                    visible: (!stationDiscovery.weatherMapOnly)
+                    visible: !stationDiscovery.earthPinnedMap
+                             && (!stationDiscovery.weatherMapOnly)
                              && stationDiscovery.earthLayerEnabled("gdacs")
                     width: parent.width
                     height: 30
@@ -1883,6 +2069,7 @@ Rectangle {
                 }
 
                 Row {
+                    visible: !stationDiscovery.earthPinnedMap
                     width: parent.width
                     height: 28
                     spacing: 10
@@ -1960,7 +2147,8 @@ Rectangle {
                 }
 
                 Row {
-                    visible: (!stationDiscovery.weatherMapOnly)
+                    visible: !stationDiscovery.earthPinnedMap
+                             && (!stationDiscovery.weatherMapOnly)
                              && stationDiscovery.earthLayerEnabled("firms")
                     width: parent.width
                     height: 32
@@ -2022,7 +2210,8 @@ Rectangle {
                 }
 
                 Row {
-                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar") || stationDiscovery.weatherLayerEnabled("radar-fallback"))
+                    visible: !stationDiscovery.earthPinnedMap
+                             && (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar") || stationDiscovery.weatherLayerEnabled("radar-fallback"))
                              && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     height: 30
@@ -2063,7 +2252,8 @@ Rectangle {
                 }
 
                 Row {
-                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
+                    visible: !stationDiscovery.earthPinnedMap
+                             && (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
                              && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     height: 32
@@ -2158,7 +2348,8 @@ Rectangle {
                 }
 
                 Row {
-                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
+                    visible: !stationDiscovery.earthPinnedMap
+                             && (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
                              && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     height: 32
@@ -2298,7 +2489,8 @@ Rectangle {
                 }
 
                 Row {
-                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
+                    visible: !stationDiscovery.earthPinnedMap
+                             && (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
                              && stationDiscovery.earthLayerEnabled("smoke")
                     width: parent.width
                     height: 32

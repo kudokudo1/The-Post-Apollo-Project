@@ -5,6 +5,8 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 cpu = (root / "widgets/CpuPlusW.qml").read_text(encoding="utf-8")
 location = (root / "widgets/cpuplus/CpuPlusSettingsLocationPane.qml").read_text(encoding="utf-8")
+overview = (root / "widgets/cpuplus/CpuPlusSettingsLocationOverviewPane.qml").read_text(encoding="utf-8")
+selector = (root / "widgets/cpuplus/CpuPlusSettingsLocationSelectionPane.qml").read_text(encoding="utf-8")
 explore = (root / "widgets/cpuplus/CpuPlusExploreLocationPanel.qml").read_text(encoding="utf-8")
 saved = (root / "widgets/cpuplus/CpuPlusSavedPlacesPanel.qml").read_text(encoding="utf-8")
 
@@ -26,7 +28,8 @@ for token in (
     "function selectSettingsSubMode(key)",
     "settingsSubModes.some(",
     "settingsSubMode = next;",
-    "id: settingsCategorySummary",
+    "id: settingsLocationOverviewPane",
+    "id: settingsLocationSelectionPane",
     "cpuPlusWindow.settingsSubModes",
     "cpuPlusWindow.settingsSubMode === String(modelData.key)",
     "cpuPlusWindow.selectSettingsSubMode(modelData.key)",
@@ -36,18 +39,35 @@ for token in (
 ):
     assert token in cpu, token
 
+# One original persistent Home writer in the right actuator bay.
 for token in (
-    "SAVED HOME", "SHARED CONTEXT",
-    "NOT SET", "NOT WIRED", "SAVE HOME",
-    "HOME SAVED // PERSISTENT", "PLACE STORAGE NOT READY",
-    "registry.saveHome(", "registry.canSaveHome", "registry.homePlace",
-    "CpuPlusExploreLocationPanel {", "id: explorePanel",
-    "explorePanel.editingText", "registry.effectivePlace",
-    "registry.contextKind",
-    "CpuPlusSavedPlacesPanel {", "id: savedPlacesPanel",
-    "durationKey: explorePanel.durationKey",
+    "SAVE HOME", "HOME SAVED // PERSISTENT",
+    "PLACE STORAGE NOT READY", "registry.saveHome(",
+    "registry.canSaveHome", "registry.homePlace",
+    "function fillHomeCandidate(candidate)",
+    "readonly property bool editingText:",
 ):
     assert token in location, token
+
+# The existing search and Explore controls live in the WIDE left bay.
+for token in (
+    "SHARED CONTEXT", "NOT YET WIRED",
+    "CpuPlusPlaceSearchPanel {", "id: placeSearchPanel",
+    "CpuPlusExploreLocationPanel {", "id: explorePanel",
+    "placeSearchPanel.editingText", "explorePanel.editingText",
+    "registry.effectivePlace", "registry.contextKind",
+    "property alias durationKey: explorePanel.durationKey",
+):
+    assert token in overview, token
+
+# Saved Home/current point/bookmarks are a single middle selector.
+for token in (
+    "SAVED HOME", "NOT SET", "CURRENT // ACTIVE",
+    "CpuPlusSavedPlacesPanel {", "id: savedPlacesPanel",
+    "registry: locationSelection.registry",
+    "durationKey: locationSelection.durationKey",
+):
+    assert token in selector, token
 
 for token in (
     "EXPLORE LOCATION", "NOT ACTIVE", "EXPIRED // HOME",
@@ -78,6 +98,8 @@ for forbidden in ("Process {", "FileView {", "JsonAdapter {",
     assert forbidden not in location, forbidden
     assert forbidden not in explore, forbidden
     assert forbidden not in saved, forbidden
+    assert forbidden not in overview, forbidden
+    assert forbidden not in selector, forbidden
 
 assert explore.count("Keys.onEscapePressed:") == 3
 assert "readonly property bool editingText:" in explore
@@ -87,7 +109,9 @@ assert "LOCATION ROUTING" not in explore
 
 assert "import qs.services.location" in cpu
 assert "registry: PlaceRegistry" in cpu
-assert '!(selectedModeIndex === 6 && settingsLocationPane.editingText)' in cpu
+assert 'settingsLocationPane.editingText' in cpu
+assert 'settingsLocationOverviewPane.editingText' in cpu
+assert 'settingsSubMode === "LOCATION"' in cpu
 assert "readonly property bool editingText:" in location
 assert location.count("Keys.onEscapePressed:") == 3
 assert "awaitingSave = true" in location
@@ -145,14 +169,23 @@ search_policy = (root / "services/location/PlaceSearchPolicy.js").read_text(enco
 for token in (
     "CpuPlusPlaceSearchPanel {", "id: placeSearchPanel",
     "onUseForHome:", "onUseForExplore:",
-    "homeLabelInput.text = candidate.label",
-    "homeLatitudeInput.text = String(candidate.latitude)",
-    "homeLongitudeInput.text = String(candidate.longitude)",
     "explorePanel.fillDestination(candidate)",
     "placeSearchPanel.editingText",
+    "locationOverview.homeCandidateRequested(candidate)",
+):
+    assert token in overview, token
+for token in (
+    "homeLabelInput.text=String(candidate.label",
+    "homeLatitudeInput.text=String(candidate.latitude)",
+    "homeLongitudeInput.text=String(candidate.longitude)",
     "REVIEW THEN SAVE HOME",
 ):
     assert token in location, token
+assert "settingsLocationPane.fillHomeCandidate(candidate)" in cpu
+assert "durationKey: settingsLocationOverviewPane.durationKey" in cpu
+assert location.count("registry.saveHome(") == 1
+assert "registry.saveHome(" not in overview
+assert "registry.saveHome(" not in selector
 for token in (
     "function fillDestination(candidate)", "exploreNameInput.text =",
     "exploreLatitudeInput.text =", "exploreLongitudeInput.text =",

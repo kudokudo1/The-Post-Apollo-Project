@@ -34,6 +34,27 @@ ShellRoot {
         }
         return null;
     }
+    function findAll(item,name) {
+        if (!item) return [];
+        let result=item.objectName===name ? [item] : [];
+        const children=item.children || [];
+        for(let i=0;i<children.length;i++)
+            result=result.concat(findAll(children[i],name));
+        return result;
+    }
+    function buttons(item,index) {
+        if (index===0) return findAll(item,"cosmos-c44-mode-button");
+        if (index===1) return [
+            find(item,"cosmos-c18-moon-observation-tab"),
+            find(item,"cosmos-c11-open-moon-year")
+        ];
+        if (index===2) return [
+            find(item,"cosmos-c11-back-to-moon"),
+            find(item,"cosmos-c17-moon-wheel-tab")
+        ];
+        if (index===3) return findAll(item,"cosmos-c44-space-button");
+        return findAll(item,"cosmos-c44-overview-button");
+    }
     function fail(what){
         if(done)return;
         done=true;
@@ -193,6 +214,25 @@ ShellRoot {
                      b.x,b.y,tabs.width,tabs.height,
                      d.x,d.y,rule.width,rule.height,
                      f.x,f.y,body.width,body.height].join(","));
+            // Check each actual clickable button, not just the row
+            // container. This catches asymmetric padding and leftover
+            // old hardcoded widths in individual panels.
+            const buttons=root.buttons(panel,root.caseIndex);
+            const count=root.caseIndex===4 ? 3 : 2;
+            const expected=(508-(count-1)*4)/count;
+            if(buttons.length!==count)
+                return root.fail("WRONG_TOP_BUTTON_COUNT");
+            for(let i=0;i<count;i++){
+                const button=buttons[i];
+                if(!button)return root.fail("MISSING_TOP_BUTTON_"+i);
+                const loc=button.mapToItem(panel,0,0);
+                if(!root.closeTo(loc.x,6+i*(expected+4))
+                    ||!root.closeTo(loc.y,28)
+                    ||!root.closeTo(button.width,expected)
+                    ||!root.closeTo(button.height,27))
+                    return root.fail("UNEQUAL_TOP_BUTTON_"+i+": "+
+                        [loc.x,loc.y,button.width,button.height].join(","));
+            }
             root.verified++;
             if(root.verified===root.cases.length){
                 root.done=true;

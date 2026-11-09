@@ -49,6 +49,20 @@ PanelWindow {
     property string status: "READY // OPEN TO SCAN SYSTEM TRASH"
     property string receipt: ""
     property bool lastError: false
+    property bool indexReady: false
+
+    // Visible "LIVE" means that GIO returned a successful full Trash index.
+    // Merely opening the menu or starting a request never claims freshness.
+    readonly property string liveLabel:
+        !menuOpen ? "OFF"
+        : busy ? (pendingAction === "index" || pendingAction === "index-live"
+                  ? "SYNC" : "BUSY")
+        : lastError ? "STALE"
+        : indexReady ? "LIVE" : "WAIT"
+    readonly property color liveColor:
+        liveLabel === "LIVE" ? Colors.omnitrix
+        : liveLabel === "STALE" ? Colors.red
+        : Colors.orange
 
     property string confirmMode: "" // "" | "item" | "all"
     property string confirmUri: ""
@@ -83,23 +97,28 @@ PanelWindow {
         }
     }
 
-    function run(action, args) {
+    function run(action, args, passive) {
         if (busy) return false;
         busy = true;
         pendingAction = action;
-        lastError = false;
-        status = "TRASH // " + action.toUpperCase() + " REQUESTED";
+        if (passive !== true) {
+            lastError = false;
+            status = "TRASH // " + action.toUpperCase() + " REQUESTED";
+        }
         trashProcess.exec(["python3", "-I", "-B",
                            Quickshell.shellPath("scripts/trash/trash_cli.py")]
                           .concat(args));
         return true;
     }
 
-    function refresh(clearReceipt) {
+    function refresh(clearReceipt, passive) {
         if (busy) return false;
         if (clearReceipt === true)
             receipt = "";
-        return run("index", ["index", String(page)]);
+        // Passive polling never triggers destructive operations or overwrites
+        // the user's most recent status while the inventory is unchanged.
+        return run(passive === true ? "index-live" : "index",
+                   ["index", String(page)], passive === true);
     }
 
     function consume(raw) {
@@ -122,13 +141,21 @@ PanelWindow {
             // implies items were restored or permanently deleted.
             return;
         }
-        if (action === "index") {
-            items = Array.isArray(payload.items) ? payload.items : [];
+        if (action === "index" || action === "index-live") {
+            const nextRevision = String(payload.revision || "");
+            const changed = !indexReady || nextRevision !== revision;
+            // Keep delegates, cursor and scroll position intact when a live
+            // poll reports exactly the same complete inventory.
+            if (action === "index" || changed)
+                items = Array.isArray(payload.items) ? payload.items : [];
             total = Number(payload.total) || 0;
             page = Number(payload.page) || 0;
             pageSize = Number(payload.pageSize) || 80;
-            revision = String(payload.revision || "");
-            status = receipt || ("TRASH // " + total + " ITEMS");
+            revision = nextRevision;
+            indexReady = true;
+            lastError = false;
+            if (action === "index" || changed)
+                status = receipt || ("TRASH // " + total + " ITEMS");
         } else {
             receipt = action === "restore"
                     ? "RESTORED // " + String(payload.name || "")
@@ -184,6 +211,23 @@ PanelWindow {
 
         function toggle() {
             trashLauncher.toggle();
+        }
+    }
+
+    // One immediate refresh is performed in toggle(). Then refresh only
+    // while visible, every 15s, and never during an armed Burn or text edit.
+    // Unchanged snapshots do not rebuild ListView delegates.
+    Timer {
+        id: trashLiveTimer
+        interval: 15000
+        repeat: true
+        triggeredOnStart: false
+        running: trashLauncher.menuOpen
+        onTriggered: {
+            if (trashLauncher.menuOpen && !trashLauncher.busy
+                    && trashLauncher.confirmMode === ""
+                    && !trashSearch.activeFocus)
+                trashLauncher.refresh(false, true);
         }
     }
 
@@ -316,7 +360,7 @@ PanelWindow {
         width: trashLauncher.frameWidth
         height: trashLauncher.frameHeight
         z: 1
-        radius: 5
+        radius: 0
         fillColor: Colors.black
         fillOpacity: 0.95
         borderWidth: 1
@@ -352,7 +396,7 @@ PanelWindow {
                 spacing: 6
 
                 GohuText {
-                    width: parent.width - 112
+                    width: parent.width - 184
                     height: parent.height
                     text: "TRASH // INDEX // " + trashLauncher.chassisSize.toUpperCase()
                     color: Colors.magenta
@@ -382,6 +426,25 @@ PanelWindow {
                     accentColor: Colors.magenta
                     available: trashLauncher.chassisSize !== "full"
                     onLeftClicked: trashLauncher.stepChassis(1)
+                }
+
+                // This indicator is a real GIO index heartbeat, not a
+                // decorative "online" claim. STALE is shown after failures.
+                Rectangle {
+                    id: trashLiveIndicator
+                    width: 68
+                    height: 27
+                    color: Colors.dark
+                    radius: 0
+                    border.width: 1
+                    border.color: trashLauncher.liveColor
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "● " + trashLauncher.liveLabel
+                        color: trashLauncher.liveColor
+                        font.pixelSize: 10
+                    }
                 }
 
                 // Finance red-close treatment, using the shared ActionButton
@@ -455,7 +518,7 @@ PanelWindow {
                     color: Colors.dark
                     border.color: Colors.cyan
                     border.width: 1
-                    radius: 2
+                    radius: 0
                 }
             }
 
@@ -482,7 +545,7 @@ PanelWindow {
                         color: Colors.dark
                         border.width: 1
                         border.color: Colors.green
-                        radius: 3
+                        radius: 0
 
                         Column {
                             x: 6

@@ -1,6 +1,6 @@
 .pragma library
 
-// Camera Cleanup Hunt M3d. Visual movement + bounded progression only.
+// Camera Cleanup Hunt M3e. Visual animal pursuit + bounded progression only.
 // It never reads a filesystem path, executes a command, or marks Trash.
 var PROFILES = ["bird", "frog", "deer", "ox", "fox"];
 
@@ -53,6 +53,30 @@ function reflect(position, velocity) {
     return {position: clamp(x, 0, 1), velocity: v};
 }
 
+function shieldingPrey(ox, targets) {
+    // Frog is the shield's preferred companion; if absent, the ox
+    // chooses the nearest other smaller animal. Pure read-only lookup.
+    if (!Array.isArray(targets) || targets.length === 0)
+        return null;
+    var choice = null;
+    var best = Infinity;
+    for (var i = 0; i < targets.length; i++) {
+        var other = targets[i];
+        if (!other || other.profile === "ox" || other.path === ox.path)
+            continue;
+        var dx = other.xNorm - ox.xNorm;
+        var dy = other.yNorm - ox.yNorm;
+        var distance2 = dx * dx + dy * dy;
+        var frogBonus = other.profile === "frog" ? 0 : 10;
+        var rank = frogBonus + distance2;
+        if (rank < best) {
+            choice = other;
+            best = rank;
+        }
+    }
+    return choice;
+}
+
 function createTarget(record, profile, random) {
     if (PROFILES.indexOf(profile) < 0)
         throw new Error("INVALID_HUNT_PROFILE");
@@ -103,7 +127,9 @@ function createTarget(record, profile, random) {
         // gets a brief rest; it never stays asleep permanently.
         target.fatigueAt = 215 + Math.floor(430 * randomUnit(random));
     } else if (profile === "ox") {
-        target.sizeScale = 1.72;
+        // Heavy targets vary in size rather than always spawning identical.
+        // Ox remains larger than the deer, bird, fox or frog.
+        target.sizeScale = 1.5 + 0.75 * randomUnit(random);
         target.vx = randomDirection(random) * pickSpeed(0.0025, 0.0020, random);
         target.vy = randomDirection(random) * pickSpeed(0.0018, 0.0015, random);
         target.state = "trudge";
@@ -116,7 +142,7 @@ function createTarget(record, profile, random) {
     return target;
 }
 
-function advanceTarget(current, pointer, speedTier) {
+function advanceTarget(current, pointer, speedTier, herd) {
     // Immutable snapshot: existing shot/undo history is not mutated by
     // subsequent clock ticks. Scale position deltas, not stored velocities,
     // to avoid compounding speed every 100ms.
@@ -217,6 +243,30 @@ function advanceTarget(current, pointer, speedTier) {
                 t.vy = 0;
                 t.state = "run";
                 t.stateTicks = 18 + (t.age % 20);
+            }
+        }
+    } else if (t.profile === "ox") {
+        // The slower, oversized ox drifts toward smaller targets to
+        // occlude them. It favors Frog, but never teleports, and stays
+        // slower than Fox/Deer/Bird even at higher difficulty tiers.
+        var prey = shieldingPrey(t, herd);
+        if (prey) {
+            var pX = clamp(prey.xNorm + (prey.vx || 0) * 2, 0, 1);
+            var pY = clamp(prey.yNorm, 0, 1);
+            var seekX = pX - t.xNorm;
+            var seekY = pY - t.yNorm;
+            var distance = Math.sqrt(seekX * seekX + seekY * seekY);
+            if (distance > 0.04) {
+                var nudge = prey.profile === "frog" ? 0.00058 : 0.00038;
+                t.vx = clamp(t.vx * 0.985 + nudge * seekX / distance,
+                             -0.0075, 0.0075);
+                t.vy = clamp(t.vy * 0.985 + nudge * seekY / distance,
+                             -0.0060, 0.0060);
+                t.state = "shield";
+            } else {
+                t.vx *= 0.88;
+                t.vy *= 0.88;
+                t.state = "cover";
             }
         }
     } else if (t.profile === "fox") {

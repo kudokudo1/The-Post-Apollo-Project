@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -86,6 +87,7 @@ PanelWindow {
     property bool huntAutoPending: false
     property bool huntSettingsOpen: false
     property bool huntScoped: false
+    property bool huntHitFlash: false
     readonly property real huntScopeScale: huntScoped ? 1.85 : 1
     readonly property real huntScopeSwayX: huntScoped ? 2.2 * Math.sin(huntTick * 0.19) : 0
     readonly property real huntScopeSwayY: huntScoped ? 1.8 * Math.cos(huntTick * 0.23) : 0
@@ -458,6 +460,7 @@ PanelWindow {
             huntLastEvent = "READY // NEW ROUND";
             huntAutoPending = false;
             huntScoped = false;
+            huntHitFlash = false;
             huntSettingsOpen = false;
             huntRoundSpeed = 1.0;
             huntRoundSpawnCount = huntSpawnCount;
@@ -713,6 +716,26 @@ PanelWindow {
         return true;
     }
 
+    // Front-to-back hierarchy is deliberate: Ox shields small targets,
+    // Bird and Deer are middle depth, Fox stays above Frog.
+    function huntTargetDepth(profile) {
+        if (profile === "ox") return 50;
+        if (profile === "bird") return 35;
+        if (profile === "deer") return 30;
+        if (profile === "fox") return 10;
+        if (profile === "frog") return 5;
+        return 20;
+    }
+
+    function huntTargetColor(profile) {
+        if (profile === "frog") return Colors.omnitrix;
+        if (profile === "fox") return Colors.orange;
+        if (profile === "deer") return Colors.yellow;
+        if (profile === "bird") return Colors.cyan;
+        if (profile === "ox") return Colors.magenta;
+        return Colors.white;
+    }
+
     // Duck Hunt-style Cleanup game. Targets come only from the already-loaded
     // safe gallery inventory. Hits mark paths; no game code calls GIO/Trash.
     function huntStartRound() {
@@ -773,6 +796,7 @@ PanelWindow {
         huntHistory = [];
         huntAutoPending = false;
         huntScoped = false;
+        huntHitFlash = false;
         huntRoundSpeed = HuntMotion.speedForRound(
             huntSpeedGainPercent, huntSpeedEvery, nextRound);
         huntRoundSpawnCount = targets.length;
@@ -807,7 +831,7 @@ PanelWindow {
         const nextTargets = [];
         for (let i = 0; i < huntTargets.length; i++)
             nextTargets.push(HuntMotion.advanceTarget(
-                huntTargets[i], pointer, huntRoundSpeed));
+                huntTargets[i], pointer, huntRoundSpeed, huntTargets));
         huntTargets = nextTargets;
         huntTick++;
         huntSecondsLeft = Math.max(0, 25 - Math.floor(huntTick / 10));
@@ -820,6 +844,7 @@ PanelWindow {
             huntRoundComplete = true;
             huntAutoPending = huntAutoRounds;
             huntScoped = false;
+            huntHitFlash = false;
             huntCombo = 0;
             huntLastEvent = "TIME UP // UNHIT FILES STAY UNTOUCHED";
             feedback = huntLastEvent;
@@ -881,6 +906,10 @@ PanelWindow {
             huntHits += 1;
             huntCombo += 1;
             huntScore += 100 + Math.min(huntCombo - 1, 5) * 25;
+            // A soft red wash is visual hit confirmation only.
+            // The actual selected file is still recoverably trashed only
+            // after a completely separate review and confirmation.
+            huntHitFlash = true;
             batchPreview = null;
             batchReviewKey = "";
             swipeHistory = [];
@@ -907,6 +936,7 @@ PanelWindow {
         huntHistory = history;
         huntAutoPending = false;
         huntScoped = false;
+        huntHitFlash = false;
         huntTargets = last.targets.slice();
         batchPaths = last.paths.slice();
         huntShots = last.shots;
@@ -1263,6 +1293,7 @@ PanelWindow {
             huntTargets = [];
             huntPaused = true;
             huntScoped = false;
+            huntHitFlash = false;
             huntAutoPending = false;
             Qt.callLater(function() { camera.loadGallery(false, "cleanup"); });
         } else if (action === "previewSelected") {
@@ -2850,6 +2881,7 @@ PanelWindow {
                                             && modelData.id !== "hunt") {
                                         camera.huntPaused = true;
                                         camera.huntScoped = false;
+                                        camera.huntHitFlash = false;
                                         camera.huntAutoPending = false;
                                         camera.huntSettingsOpen = false;
                                     }
@@ -3407,6 +3439,13 @@ PanelWindow {
                                 onTriggered: camera.huntAutoStartNext()
                             }
                             Timer {
+                                id: huntHitFlashTimer
+                                interval: 190
+                                repeat: false
+                                running: camera.huntHitFlash
+                                onTriggered: camera.huntHitFlash = false
+                            }
+                            Timer {
                                 id: huntClock
                                 interval: 100
                                 repeat: true
@@ -3526,7 +3565,9 @@ PanelWindow {
                                         enabled: !camera.huntPaused && !camera.busy
                                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                                         hoverEnabled: true
-                                        cursorShape: Qt.CrossCursor
+                                        // The arena renders its own bright crosshair.
+                                        cursorShape: camera.huntPaused
+                                                     ? Qt.ArrowCursor : Qt.BlankCursor
                                         onPositionChanged: function(mouse) {
                                             camera.huntSetPointer(mouse.x, mouse.y,
                                                                   huntArena.width,
@@ -3563,6 +3604,9 @@ PanelWindow {
                                         delegate: Item {
                                             id: huntTargetItem
                                             property var target: camera.huntTargets[index]
+                                            property bool hovered: false
+                                            readonly property color targetTint:
+                                                camera.huntTargetColor(target.profile)
                                             // Dense rounds preserve usable hitboxes.
                                             // Ox is larger and always above the other
                                             // thumbnail actors if targets overlap.
@@ -3587,7 +3631,7 @@ PanelWindow {
                                                 * target.yNorm
                                             width: unscopedWidth * camera.huntScopeScale
                                             height: unscopedHeight * camera.huntScopeScale
-                                            z: target.profile === "ox" ? 40 : 2
+                                            z: camera.huntTargetDepth(target.profile)
                                             // The magnified *hitbox* follows the actual
                                             // magnified thumbnail, not the old world rect.
                                             x: (unscopedX - huntArena.width * camera.huntMouseX)
@@ -3611,11 +3655,23 @@ PanelWindow {
                                                 }
                                             }
 
+                                            RectangularShadow {
+                                                anchors.fill: huntTargetPlate
+                                                z: -1
+                                                spread: huntTargetItem.hovered ? 10 : 5
+                                                color: huntTargetItem.targetTint
+                                                opacity: huntTargetItem.hovered ? 0.70 : 0.25
+                                                visible: !camera.huntPaused
+                                                Behavior on opacity {
+                                                    NumberAnimation { duration: 125 }
+                                                }
+                                            }
                                             Rectangle {
+                                                id: huntTargetPlate
                                                 anchors.fill: parent
                                                 radius: 5
-                                                border.width: 2
-                                                border.color: Colors.magenta
+                                                border.width: huntTargetItem.hovered ? 3 : 2
+                                                border.color: huntTargetItem.targetTint
                                                 color: Colors.black
                                                 clip: true
                                                 Image {
@@ -3636,14 +3692,14 @@ PanelWindow {
                                                     anchors.centerIn: parent
                                                     visible: huntTargetItem.target.mediaType.indexOf("video") >= 0
                                                     font.pixelSize: 12
-                                                    color: Colors.cyan
+                                                    color: huntTargetItem.targetTint
                                                     text: "VIDEO"
                                                 }
                                                 GohuText {
                                                     x: 3
                                                     y: 2
                                                     font.pixelSize: 9
-                                                    color: Colors.yellow
+                                                    color: huntTargetItem.targetTint
                                                     text: huntTargetItem.target.profile.toUpperCase()
                                                 }
                                                 GohuText {
@@ -3662,7 +3718,10 @@ PanelWindow {
                                                     enabled: !camera.huntPaused && !camera.busy
                                                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                                                     hoverEnabled: true
-                                                    cursorShape: Qt.CrossCursor
+                                                    cursorShape: camera.huntPaused
+                                                                 ? Qt.ArrowCursor : Qt.BlankCursor
+                                                    onEntered: huntTargetItem.hovered = true
+                                                    onExited: huntTargetItem.hovered = false
                                                     onPositionChanged: function(mouse) {
                                                         const position = mapToItem(
                                                             huntArena, mouse.x, mouse.y);
@@ -3693,6 +3752,60 @@ PanelWindow {
                                                     }
                                                 }
                                             }
+                                        }
+                                    }
+                                    // Non-interactive hit wash. Only a validated target
+                                    // click triggers it; a miss or right-click does not.
+                                    Rectangle {
+                                        id: huntHitWash
+                                        anchors.fill: parent
+                                        z: 70
+                                        color: Colors.red
+                                        opacity: camera.huntHitFlash ? 0.13 : 0.0
+                                        visible: opacity > 0
+                                        Behavior on opacity {
+                                            NumberAnimation { duration: 160 }
+                                        }
+                                    }
+                                    Item {
+                                        id: huntNormalCrosshair
+                                        width: 32
+                                        height: 32
+                                        z: 80
+                                        visible: camera.huntMouseActive
+                                                 && !camera.huntPaused
+                                                 && !camera.huntScoped
+                                                 && !camera.huntSettingsOpen
+                                        x: huntArena.width * camera.huntMouseX - width / 2
+                                        y: huntArena.height * camera.huntMouseY - height / 2
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 25
+                                            height: 25
+                                            radius: 13
+                                            color: "transparent"
+                                            border.width: 1
+                                            border.color: Colors.cyan
+                                            opacity: 0.75
+                                        }
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 1
+                                            height: 32
+                                            color: Colors.white
+                                        }
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 32
+                                            height: 1
+                                            color: Colors.white
+                                        }
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 5
+                                            height: 5
+                                            radius: 3
+                                            color: Colors.magenta
                                         }
                                     }
                                     Item {

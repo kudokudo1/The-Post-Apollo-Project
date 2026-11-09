@@ -63,6 +63,12 @@ function createState() {
         huntAutoPending:false,
         huntSettingsOpen:false,
         huntScoped:false,
+        huntHitFlash:false,
+        Colors:{
+            omnitrix:"#00F782",orange:"#ED981A",
+            yellow:"#F2BE4E",cyan:"#55CFCA",
+            magenta:"#C74EC7",white:"#DCF3FA"
+        },
         huntMouseX:0.5,
         huntMouseY:0.5,
         huntMouseActive:false,
@@ -117,7 +123,6 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /camera\.huntSetPointer\(/);
     assert.match(cleanup, /camera\.huntFire\(/);
     assert.match(cleanup, /onTriggered: camera\.huntAdvance\(\)/);
-    assert.match(cleanup, /cursorShape: Qt\.CrossCursor/);
     assert.match(cleanup, /label: "UNDO SHOT"/);
     assert.match(cleanup, /label: "NEW ROUND"/);
     assert.match(cleanup, /id: huntAutoNextTimer/);
@@ -138,7 +143,16 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /label: "SPAWN -"/);
     assert.match(cleanup, /label: "SPAWN \+"/);
     assert.match(cleanup, /TARGETS \/\//);
-    assert.match(cleanup, /z: target.profile === "ox" \? 40 : 2/);
+    assert.match(cleanup, /z: camera\.huntTargetDepth\(target\.profile\)/);
+    assert.match(cleanup, /readonly property color targetTint/);
+    assert.match(cleanup, /RectangularShadow \{/);
+    assert.match(cleanup, /id: huntTargetPlate/);
+    assert.match(cleanup, /id: huntNormalCrosshair/);
+    assert.match(cleanup, /cursorShape: camera\.huntPaused/);
+    assert.match(cleanup, /Qt\.BlankCursor/);
+    assert.match(cleanup, /id: huntHitWash/);
+    assert.match(cleanup, /huntHitFlash \? 0\.13 : 0\.0/);
+    assert.match(cleanup, /id: huntHitFlashTimer/);
     assert.match(cleanup, /readonly property real crowdScale/);
     assert.match(qml, /readonly property bool batchMode: activeView === "cleanup"/);
     assert.match(qml, /camera\.loadGallery\(false, "cleanup"\)/);
@@ -768,5 +782,87 @@ test("Auto-next is scheduled on timeout, not triggered by a miss or normal pause
     assert.equal(s.huntAutoPending,true);
     assert.equal(s.huntAutoStartNext(),true);
     assert.equal(s.huntRound,2);
+    assert.equal(s.called.length,0);
+});
+
+
+test("Hunt profile depth makes frog below fox and ox above all others", () => {
+    const s=createState();
+    const sorted=["frog","fox","deer","bird","ox"]
+        .map(name=>({name,z:s.huntTargetDepth(name)}));
+    for(let i=1;i<sorted.length;i++)
+        assert.ok(sorted[i].z>sorted[i-1].z,
+                  sorted[i-1].name+" must remain behind "+sorted[i].name);
+    assert.deepEqual(sorted.map(x=>x.z),[5,10,30,35,50]);
+});
+
+test("Hunt animal colors use existing palette including Omnitrix", () => {
+    const s=createState();
+    assert.equal(s.huntTargetColor("frog"),"#00F782");
+    assert.equal(s.huntTargetColor("fox"),"#ED981A");
+    assert.equal(s.huntTargetColor("deer"),"#F2BE4E");
+    assert.equal(s.huntTargetColor("bird"),"#55CFCA");
+    assert.equal(s.huntTargetColor("ox"),"#C74EC7");
+    assert.equal(s.huntTargetColor("other"),"#DCF3FA");
+});
+
+test("Ox size varies across spawns while staying bigger than other animals", () => {
+    const tinyOx=motion.createTarget({path:"/tmp/oxA.png"},"ox",()=>0.05);
+    const largeOx=motion.createTarget({path:"/tmp/oxB.png"},"ox",()=>0.95);
+    assert.ok(tinyOx.sizeScale>=1.5);
+    assert.ok(largeOx.sizeScale>tinyOx.sizeScale+0.5);
+    assert.ok(largeOx.sizeScale<=2.25);
+    const frog=motion.createTarget({path:"/tmp/frog.png"},"frog",()=>0.95);
+    assert.ok(tinyOx.sizeScale>frog.sizeScale*2);
+});
+
+test("Ox chooses frog to shield before fox even if fox is nearer", () => {
+    const ox=motion.createTarget({path:"/tmp/ox.png"},"ox",()=>0.5);
+    ox.xNorm=0.18; ox.yNorm=0.22; ox.vx=0; ox.vy=0;
+    const frog={path:"/tmp/frog.png",profile:"frog",xNorm:0.85,yNorm:0.87,vx:0};
+    const fox={path:"/tmp/fox.png",profile:"fox",xNorm:0.20,yNorm:0.10,vx:0};
+    assert.equal(motion.shieldingPrey(ox,[ox,fox,frog]).path,frog.path);
+    const withFrog=motion.advanceTarget(ox,{active:false},1,[ox,fox,frog]);
+    const withoutFrog=motion.advanceTarget(ox,{active:false},1,[ox,fox]);
+    assert.ok(withFrog.vy>0,"frog is below ox; shield should drift toward it");
+    assert.ok(withoutFrog.vy<0,"without frog, ox tracks nearby fox above");
+    assert.equal(withFrog.state,"shield");
+    assert.equal(ox.vx,0,"immutable movement leaves source intact");
+});
+
+test("Ox slowly closes on frog without teleport or exceeding heavy velocity caps", () => {
+    let ox=motion.createTarget({path:"/tmp/ox.png"},"ox",()=>0.5);
+    ox.xNorm=0.12; ox.yNorm=0.12; ox.vx=0; ox.vy=0;
+    const frog={path:"/tmp/frog.png",profile:"frog",xNorm:0.73,yNorm:0.77,vx:0};
+    const initial=Math.hypot(ox.xNorm-frog.xNorm,ox.yNorm-frog.yNorm);
+    let previous=ox;
+    for(let i=0;i<90;i++) {
+        ox=motion.advanceTarget(ox,{active:false},1,[previous,frog]);
+        assert.ok(ox.xNorm>=0&&ox.xNorm<=1);
+        assert.ok(ox.yNorm>=0&&ox.yNorm<=1);
+        assert.ok(Math.abs(ox.vx)<=0.007501);
+        assert.ok(Math.abs(ox.vy)<=0.006001);
+        assert.ok(Math.hypot(ox.xNorm-previous.xNorm,ox.yNorm-previous.yNorm)<0.012);
+        previous=ox;
+    }
+    assert.ok(Math.hypot(ox.xNorm-frog.xNorm,ox.yNorm-frog.yNorm)<initial*0.7);
+});
+
+test("Hunt hit triggers brief red wash; misses and selection alone do not", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    assert.equal(s.huntHitFlash,false);
+    s.huntStartRound();
+    assert.equal(s.huntHitFlash,false);
+    s.huntFire("");
+    assert.equal(s.huntHitFlash,false);
+    const path=s.huntTargets[0].path;
+    s.huntFire(path);
+    assert.equal(s.huntHitFlash,true);
+    assert.equal(s.batchPaths.length,1);
+    assert.equal(s.called.length,0);
+    s.huntUndo();
+    assert.equal(s.huntHitFlash,false);
+    assert.equal(s.batchPaths.length,0);
     assert.equal(s.called.length,0);
 });

@@ -1,0 +1,76 @@
+name: Weather COSMOS C44 aligned header geometry
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationSubjectHeaderGeometry.js'
+      - 'widgets/weather/StationCosmosModesPane.qml'
+      - 'widgets/weather/StationCosmosMoonCompactPane.qml'
+      - 'widgets/weather/StationCosmosAnnualWheelPane.qml'
+      - 'widgets/weather/StationCosmosSpaceWeatherHubPane.qml'
+      - 'widgets/weather/StationCosmosOverviewPane.qml'
+      - 'tests/weather/test_cosmos_c44_header_alignment.js'
+      - 'tests/weather/fixtures/C44CosmosHeadersNativeShell.qml'
+      - '.github/workflows/weather-cosmos-c44-header-alignment.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check shared header geometry and original COSMOS behavior
+        run: |
+          node --test \
+            tests/weather/test_cosmos_c44_header_alignment.js \
+            tests/weather/test_cosmos_c42_space_runtime_dashboard.js \
+            tests/weather/test_cosmos_c39_unified_planets.js \
+            tests/weather/test_cosmos_c8_moon_compact.js \
+            tests/weather/test_cosmos_c11_annual_wheels.js
+  native-alignment:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:unstable
+    timeout-minutes: 15
+    steps:
+      - name: Install disposable Quickshell and Qt
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git quickshell qt6-qpa-plugins \
+            qml6-module-qtquick-effects qml6-module-qt5compat-graphicaleffects \
+            coreutils findutils
+      - uses: actions/checkout@v4
+      - name: Prove identical header and divider pixels across all COSMOS landings
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(pwd)"
+          work="$(mktemp -d /tmp/cosmos-c44.XXXXXXXX)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -m 700 "$work/home" "$work/runtime" "$work/cache" "$work/config"
+          mkdir -p "$work/config/widgets"
+          cp -a "$root/components" "$work/config/components"
+          cp -a "$root/widgets/weather" "$work/config/widgets/weather"
+          cp -a "$root/services" "$work/config/services"
+          for fixture in C44CosmosHeadersNativeShell; do
+            cp "$root/tests/weather/fixtures/${fixture}.qml" "$work/config/shell.qml"
+            rc=0
+            timeout --signal=TERM --kill-after=3s 35s \
+              env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
+              XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
+              QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+              quickshell --no-color -p "$work/config/shell.qml" \
+              > "$work/native.log" 2>&1 || rc=$?
+            cat "$work/native.log"
+            test "$rc" -eq 0
+            grep -F "C44_NATIVE_PASS // ALL_FIVE_COSMOS_FRAMES_6_18_27_2_65" "$work/native.log"
+            if grep -E 'C44_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+              exit 1
+            fi
+          done

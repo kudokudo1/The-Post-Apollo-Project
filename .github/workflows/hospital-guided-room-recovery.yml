@@ -7,6 +7,10 @@ on:
       - "widgets/HospitalRoomContinuityView.qml"
       - "widgets/HospitalRoomSuccessorView.qml"
       - "services/hospital/HospitalRoomSuccessorPreviewPolicy.js"
+      - "services/hospital/HospitalDoctorSuccessionCapabilityPolicy.js"
+      - "services/hospital/HospitalDoctorSuccessionCapabilityService.qml"
+      - "tests/hospital/test_doctor_succession_capability_policy.js"
+      - "tests/hospital/test_doctor_succession_capability_ui_contracts.py"
       - "tests/hospital/test_room_successor_preview_policy.js"
       - "tests/hospital/test_room_successor_ui_contracts.py"
       - ".github/workflows/hospital-guided-room-recovery.yml"
@@ -18,6 +22,10 @@ on:
       - "widgets/HospitalRoomContinuityView.qml"
       - "widgets/HospitalRoomSuccessorView.qml"
       - "services/hospital/HospitalRoomSuccessorPreviewPolicy.js"
+      - "services/hospital/HospitalDoctorSuccessionCapabilityPolicy.js"
+      - "services/hospital/HospitalDoctorSuccessionCapabilityService.qml"
+      - "tests/hospital/test_doctor_succession_capability_policy.js"
+      - "tests/hospital/test_doctor_succession_capability_ui_contracts.py"
       - "tests/hospital/test_room_successor_preview_policy.js"
       - "tests/hospital/test_room_successor_ui_contracts.py"
       - ".github/workflows/hospital-guided-room-recovery.yml"
@@ -35,9 +43,12 @@ jobs:
         run: |
           node --check services/hospital/HospitalRoomSuccessorPreviewPolicy.js
           node tests/hospital/test_room_successor_preview_policy.js
+          node --check services/hospital/HospitalDoctorSuccessionCapabilityPolicy.js
+          node tests/hospital/test_doctor_succession_capability_policy.js
       - name: Scoped Room UI, no writes and existing worker gates
         run: |
           python3 tests/hospital/test_room_successor_ui_contracts.py
+          python3 tests/hospital/test_doctor_succession_capability_ui_contracts.py
           node tests/hospital/test_room_continuity_policy.js
           python3 tests/hospital/test_room_continuity_ui_contracts.py
           python3 tests/hospital/test_registered_worker_routes.py

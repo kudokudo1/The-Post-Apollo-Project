@@ -47,13 +47,17 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         power_margins = section(POWER, "    margins {", "    implicitWidth:")
         trash_button = section(TRASH, "        DockButton {", "            onLeftClicked:")
         power_button = section(POWER, "        DockButton {", "            onHoverEntered:")
-        for key in ("implicitWidth", "implicitHeight"):
-            self.assertEqual(number(TRASH, key), number(POWER, key))
-        for key in ("width", "height", "y"):
+        # Widget panel can grow independently of the 50x50 dock button.
+        self.assertGreater(number(TRASH, "implicitWidth"),
+                           number(POWER, "implicitWidth"))
+        self.assertGreater(number(TRASH, "implicitHeight"),
+                           number(POWER, "implicitHeight"))
+        for key in ("width", "height"):
             self.assertEqual(number(trash_button, key), number(power_button, key))
         self.assertEqual(number(trash_button, "width"), 50)
         self.assertEqual(number(trash_button, "height"), 50)
-
+        self.assertIn("y: trashArea.height - 60", trash_button)
+        self.assertIn("height: 540", TRASH)
         left_gap = number(trash_margins, "left") + number(trash_button, "x")
         right_gap = (number(power_margins, "right")
                      + number(POWER, "implicitWidth")
@@ -62,10 +66,8 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertEqual(left_gap, right_gap)
         self.assertEqual(left_gap, 25)
 
-        trash_bottom = (number(trash_margins, "bottom")
-                        + number(TRASH, "implicitHeight")
-                        - number(trash_button, "y")
-                        - number(trash_button, "height"))
+        # Bottom position follows the larger panel height; never shift dock.
+        trash_bottom = number(trash_margins, "bottom") + 60 - 50
         power_bottom = (number(power_margins, "bottom")
                         + number(POWER, "implicitHeight")
                         - number(power_button, "y")
@@ -148,11 +150,21 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn("trashLauncher.menuOpen = false", TRASH)
         self.assertIn('label: "X"', TRASH)
         self.assertIn('text: "TRASH // INDEX"', TRASH)
-        self.assertIn("NO FILE ACTIONS IN THIS PREVIEW.", TRASH)
-        self.assertNotRegex(
-            TRASH, r"(?i)\bprocess\s*\{|\bgio\b|unlink\s*\("
-            r"|\brm\s+-|\bsystemctl\b|\bshutil\b"
-        )
+        self.assertIn('text: "TRASH // INDEX"', TRASH)
+        self.assertIn('Quickshell.shellPath("scripts/trash/trash_cli.py")', TRASH)
+        self.assertIn('stdout: StdioCollector {', TRASH)
+        self.assertIn("function consume(raw)", TRASH)
+        self.assertIn("function refresh()", TRASH)
+        self.assertIn("function restoreItem(item)", TRASH)
+        self.assertIn("function armBurn(item)", TRASH)
+        self.assertIn("function armBurnAll()", TRASH)
+        self.assertIn("function confirmBurn()", TRASH)
+        self.assertIn('label: "BURN ALL"', TRASH)
+        self.assertIn('label: "CONFIRM BURN"', TRASH)
+        self.assertIn("run(\"burn\", [\"burn\", confirmUri, confirmOriginal,", TRASH)
+        self.assertIn('run("burn-all", ["burn-all", confirmRevision,', TRASH)
+        self.assertNotIn('onLeftClicked: trashLauncher.run("burn"', TRASH)
+        self.assertNotIn('onLeftClicked: trashLauncher.run("burn-all"', TRASH)
 
 
 if __name__ == "__main__":

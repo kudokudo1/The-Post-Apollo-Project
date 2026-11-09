@@ -71,6 +71,16 @@ Item {
         return tags.length ? tags[0].toLowerCase() : "other";
     }
 
+    function visiblePattern(digits) {
+        // In a specific pattern filter, show that filter's color even when
+        // the number overlaps several classifications (e.g. ADD and MUL).
+        // ALL, FAV and ERR fall back to the normal primary pattern.
+        const patterns = ["repeat", "mirror", "sequence", "add", "subtract",
+                          "multiply", "divide", "other"];
+        return patterns.indexOf(activeFilter) >= 0
+            ? activeFilter : primaryPattern(digits);
+    }
+
     function wash(tint, alpha) {
         return Qt.rgba(tint.r, tint.g, tint.b, alpha);
     }
@@ -440,7 +450,7 @@ Item {
                     readonly property bool isFavoriteNumber:
                         FavoritesDefaultStore.isFavorite(numberKey)
                     readonly property string pattern:
-                        pane.primaryPattern(modelData.digits)
+                        pane.visiblePattern(modelData.digits)
                     readonly property color entryInk:
                         isMarkedErr ? Colors.red
                         : isFavoriteNumber ? Colors.magenta

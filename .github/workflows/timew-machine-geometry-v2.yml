@@ -1,0 +1,30 @@
+name: TimeW MACHINE v2 geometry contract (synthetic)
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineGeometryV2.py"
+      - "tests/timew/test_machine_geometry_v2.py"
+      - "docs/timew-machine-m2-geometry-capture-plan.md"
+      - ".github/workflows/timew-machine-geometry-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  geometry-proposal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate exact window geometry and tiling hierarchy with fictional Sway frames
+        run: python3 -B -I tests/timew/test_machine_geometry_v2.py
+      - name: Preserve original checkpoint schema/storage fixtures
+        run: |
+          python3 -B -I tests/timew/test_machine_checkpoint_model.py
+          python3 -B -I tests/timew/test_machine_checkpoint_store.py
+      - name: Preserve existing v2 identity proposal and duplicate-window inventory
+        run: |
+          python3 -B -I tests/timew/test_machine_session_identity_v2.py
+          python3 -B -I tests/timew/test_machine_window_multiplicity.py

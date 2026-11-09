@@ -11,7 +11,7 @@ on:
       - 'docs/cpuplus-universal-signin-visual-v1.md'
       - '.github/workflows/cpuplus-universal-signin-visual-v1.yml'
   push:
-    branches: [main]
+    branches: [main, 'feat/cpuplus-signin-*']
     paths:
       - 'services/connections/ConnectionsUnifiedSignInPolicy.js'
       - 'widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml'

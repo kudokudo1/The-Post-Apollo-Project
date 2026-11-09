@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -107,7 +108,8 @@ int main(int argc, char **argv) {
     int result = 3;
     int has_socket = 0;
 
-    if (argc != 9 || geteuid() != 0 || getuid() != 0 ||
+    if (argc != 9 || strcmp(argv[2], "--read-only") != 0 ||
+            geteuid() != 0 || getuid() != 0 ||
             !decimal(argv[3], INT_MAX, &pid) ||
             !decimal(argv[4], INT_MAX, &uid) ||
             !decimal(argv[5], INT_MAX, &gid) ||

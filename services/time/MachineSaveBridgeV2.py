@@ -20,6 +20,12 @@ import re
 import subprocess
 import sys
 import uuid
+from pathlib import Path
+
+# TimeW launches this CLI with Python -I. Isolated mode deliberately excludes
+# the script's own directory from sys.path, so sibling imports must be
+# explicitly bound to this trusted, resolved service directory first.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from MachineCaptureSaveV2 import (
     CaptureError, stable_geometry, geometry_digest, capture_and_save)

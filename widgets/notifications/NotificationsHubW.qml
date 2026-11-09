@@ -17,8 +17,9 @@ PanelWindow {
         String(Quickshell.env("POST_APOLLO_UI_LAG_PROBE") || "").trim() === "1"
     property double bgLastRebuildReportMs: 0
 
-    // Opt-in freeze isolation. Keep the durable notification service and
-    // popups live; only defer THIS closed window's filtered history ListModel.
+    // Closed-window rebuild suppression is the safe default. Keep the
+    // durable notification service and popups live, and defer only this
+    // history projection. Set the environment override to 0 to diagnose.
     readonly property bool hiddenHistoryRebuildPauseEnabled:
         String(Quickshell.env("POST_APOLLO_NOTIFICATIONS_HIDDEN_REBUILD_PAUSED") || "").trim() !== "0"
     property bool hiddenHistoryRebuildDeferred: false
@@ -1075,6 +1076,7 @@ PanelWindow {
             return;
         const traceStartMs = bgLagProbeEnabled ? Date.now() : 0;
         const total = NotificationsService.notifications.count;
+        const start = filterScanIndex;
         const end = Math.min(total, filterScanIndex + 64);
         const rows = filterScanRows;
         for (let i = filterScanIndex; i < end; i++) {
@@ -1111,7 +1113,7 @@ PanelWindow {
         }
         filterScanIndex = end;
         if (traceStartMs)
-            reportBgRebuild(traceStartMs, end - (end >= 64 ? end - 64 : 0));
+            reportBgRebuild(traceStartMs, end - start);
         if (end < total) {
             filteredScanTimer.start();
             return;

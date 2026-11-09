@@ -17,6 +17,9 @@ assert 'import "NotificationScopePolicy.js" as NotificationScopePolicy' in c
 assert 'const scope = NotificationScopePolicy.scopeFromHints(notification.hints || {});' in c
 assert '"context": { "notificationScope": scope }' in c
 assert "property var pendingPolicyDeliveryIds: []" in s
+assert "property var pendingPolicyIntakeEntries: []" in s
+assert "function shouldBlockNotification(entry)" in s
+assert "function setBlocked(appKey, sourceId, source, enabled)" in s
 assert 'const suppressed = !policyReady' in s
 assert 'root.reconcilePendingPolicyDeliveries();' in s
 assert "function inheritedSuppressionFor(entry, selectedKey)" in s
@@ -219,9 +222,11 @@ S.favoritesReady=true;
 // load, admit only nonexpired events which are not suppressed.
 const Q={String,Number,Math,Array,Date:Clock,
  notifications:new Model(), activeNotifications:new Model(),
- pendingPolicyDeliveryIds:[], policyReady:false, policyStatus:'loading',
+ pendingPolicyDeliveryIds:[], pendingPolicyIntakeEntries:[],
+ policyReady:false, policyStatus:'loading',
  normalize:e=>e,timeoutFor:()=>5000,pruneHistory(){},
  shouldSuppress:()=>false,shouldSuppressScoped:e=>e.source==='Muted App',
+ shouldBlockNotification:()=>false,
  markNotificationsChanged(){},scheduleHistorySave(){},
  indexOfNotification(model,id){return model.rows.findIndex(x=>x.id===id);},
  replaceModelEntry(model,i,e){model.rows[i]={...e};},
@@ -231,16 +236,20 @@ vm.runInNewContext(['appendNotification','reconcilePendingPolicyDeliveries']
  .map(n=>extract(source,n)).join('\n'),Q);
 Q.appendNotification({id:'pending-visible',source:'Allowed App',sourceId:'allowed'});
 Q.appendNotification({id:'pending-muted',source:'Muted App',sourceId:'muted'});
-assert.strictEqual(Q.notifications.count,2);
+assert.strictEqual(Q.notifications.count,0,
+ 'startup intake must not write to history before BLOCK policies are loaded');
+assert.strictEqual(Q.pendingPolicyIntakeEntries.length,2);
 assert.strictEqual(Q.activeNotifications.count,0);
 Q.policyReady=true;Q.policyStatus='ready';
 Q.reconcilePendingPolicyDeliveries();
+assert.strictEqual(Q.notifications.count,2);
 assert.deepStrictEqual(Q.activeNotifications.rows.map(x=>x.id),['pending-visible']);
 Q.policyReady=false;Q.policyStatus='loading';
 Q.appendNotification({id:'corrupt-policy',source:'Allowed App',sourceId:'allowed'});
 Q.policyReady=true;Q.policyStatus='parse-error';
 Q.reconcilePendingPolicyDeliveries();
 assert.strictEqual(Q.activeNotifications.count,0,'bad policy must hide existing and queued popups');
+assert.strictEqual(Q.notifications.count,2,'bad policy cannot write new queued entries');
 
 // A native sender may close its event before the policy file is ready.
 // That event must not be resurrected when policy loading completes.
@@ -249,9 +258,9 @@ Q.externalActionsRevision=0;
 vm.runInNewContext(extract(source,'releaseExternalNotification'),Q);
 Q.policyReady=false;Q.policyStatus='loading';
 Q.appendNotification({id:'closed-startup',source:'Allowed App',sourceId:'allowed'});
-assert(Q.pendingPolicyDeliveryIds.includes('closed-startup'));
+assert(Q.pendingPolicyIntakeEntries.some(e=>e.id==='closed-startup'));
 Q.releaseExternalNotification('closed-startup');
-assert(!Q.pendingPolicyDeliveryIds.includes('closed-startup'));
+assert(!Q.pendingPolicyIntakeEntries.some(e=>e.id==='closed-startup'));
 Q.policyReady=true;Q.policyStatus='ready';
 Q.reconcilePendingPolicyDeliveries();
 assert(!Q.activeNotifications.rows.some(e=>e.id==='closed-startup'));

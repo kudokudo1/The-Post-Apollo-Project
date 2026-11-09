@@ -146,16 +146,17 @@ def validate_geometry(document):
         if (not isinstance(children, list) or len(children) > 512
                 or not isinstance(floaters, list) or len(floaters) > 512):
             raise GeometryStoreError("INVALID GEOMETRY CHILDREN")
+        node_rect = _rect(value["rect"])
         key = value["window_key"]
         if key is not None:
             key = _id(key)
             if key in tree_windows:
                 raise GeometryStoreError("DUPLICATE TREE WINDOW KEY")
-            tree_windows[key] = (workspace, output, floating)
+            tree_windows[key] = (workspace, output, floating, node_rect)
         return {
             "layout": _layout(value["layout"]),
             "percent": _ratio(value["percent"]),
-            "rect": _rect(value["rect"]),
+            "rect": node_rect,
             "window_key": key,
             "children": [node(x, workspace=workspace, output=output,
                               floating=floating, depth=depth + 1)
@@ -203,7 +204,8 @@ def validate_geometry(document):
         if (ws not in workspace_outputs or workspace_outputs[ws] != output
                 or type(floating) is not bool):
             raise GeometryStoreError("INCONSISTENT GEOMETRY WINDOW")
-        if tree_windows.get(key) != (ws, output, floating):
+        window_rect = _rect(window["rect"])
+        if tree_windows.get(key) != (ws, output, floating, window_rect):
             raise GeometryStoreError("WINDOW DOES NOT MATCH TILING TREE")
         fullscreen = window["fullscreen_mode"]
         if type(fullscreen) is not int or not 0 <= fullscreen <= 2:
@@ -211,7 +213,7 @@ def validate_geometry(document):
         clean_windows.append({
             "window_key": key, "app_id": _text(window["app_id"]),
             "workspace": ws, "output": output, "floating": floating,
-            "rect": _rect(window["rect"]),
+            "rect": window_rect,
             "window_rect": _rect(window["window_rect"], optional=True),
             "deco_rect": _rect(window["deco_rect"], optional=True),
             "geometry": _rect(window["geometry"], optional=True),

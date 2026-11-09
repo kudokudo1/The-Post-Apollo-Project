@@ -11,6 +11,7 @@ import "../services/remote"
 import qs.services.favorites
 import "../services/favorites/FavoritesAppSelectionPolicy.js" as AppFavoriteSelection
 import "../services/favorites/FavoritesSystemSelectionPolicy.js" as SystemFavoriteSelection
+import "../services/favorites/FavoritesSystemWatchSelectionPolicy.js" as SystemWatchSelection
 import "../services/favorites/FavoritesThermalSelectionPolicy.js" as ThermalFavoriteSelection
 import "appcontrol"
 import "thermal"
@@ -42,6 +43,9 @@ PanelWindow {
     // saved item is explained inside the already-open destination.
     property var pendingFavoriteSelection: null
     property string favoriteNavigationNotice: ""
+    // Exact read-only SYSTEM watch-box focus; no saved key or device action.
+    property string savedSystemWatchSourceId: ""
+    property string savedSystemWatchBoxId: ""
     // Owner-owned typed action surface for Hub RUNNING. No service clones.
     property alias hubProcessActionGate: appControlHubGate
     property bool relationshipFocusModeActive: false
@@ -8607,6 +8611,8 @@ PanelWindow {
     function clearFavoriteNavigation() {
         pendingFavoriteSelection=null;
         favoriteNavigationNotice="";
+        savedSystemWatchSourceId="";
+        savedSystemWatchBoxId="";
     }
     function deferFavoriteSelection(kind,value,mode,notice) {
         pendingFavoriteSelection={kind:kind,value:value,mode:mode};
@@ -8634,7 +8640,7 @@ PanelWindow {
     function tryResumeFavoriteSelection() {
         const p=pendingFavoriteSelection;
         if(!p || !menuOpen || selectedModeIndex!==p.mode) return false;
-        let index=-1;
+        let index=-1,watchSelection=null;
         if(p.kind==="app") {
             const installed=[...DesktopEntries.applications.values];
             if(!AppFavoriteSelection.ownerAllows(
@@ -8650,6 +8656,13 @@ PanelWindow {
             index=SystemFavoriteSelection.selectedIndex(
                 p.value,[...systemResults.values]);
             if(index<0) return false;
+        } else if(p.kind==="system-watch") {
+            const current=SystemWatchSelection.resolveVisible(p.value,systemRows);
+            if(!current.ok) return false;
+            index=SystemWatchSelection.selectedIndex(
+                current.sourceId,[...systemResults.values]);
+            if(index<0) return false;
+            watchSelection=current;
         } else if(p.kind==="thermal") {
             const current=ThermalFavoriteSelection.resolveVisible(
                 p.value,thermalRows,fanRows);
@@ -8665,6 +8678,10 @@ PanelWindow {
 
         // Refuse stale/colliding items. Never execute any selected result.
         clearFavoriteNavigation();
+        if(watchSelection) {
+            savedSystemWatchSourceId=watchSelection.sourceId;
+            savedSystemWatchBoxId=watchSelection.boxId;
+        }
         selectedResultIndex=index;
         hoveredResultIndex=-1;
         detailFocused=false;
@@ -8748,6 +8765,51 @@ PanelWindow {
                 return;
             const now=SystemFavoriteSelection.selectedIndex(
                 metric,[...systemResults.values]);
+            if(now<0) return;
+            selectedResultIndex=now;
+            resultList.positionViewAtIndex(now,ListView.Contain);
+        });
+        return true;
+    }
+
+    // U7b-J // Exact read-only saved SYSTEM row/watch-box navigation.
+    // Open locally FIRST, then resolve the opaque token against true live
+    // _systemRecord identities. Selecting a metric box is not activating it.
+    function selectSavedSystemWatch(token) {
+        if(!SystemWatchSelection.validToken(token)) return false;
+        if(!menuOpen) menuOpen=true;
+        switchMode(systemModeIndex,false);
+        searchInput.text="";
+        savedSystemWatchSourceId="";
+        savedSystemWatchBoxId="";
+        const current=SystemWatchSelection.resolveVisible(token,systemRows);
+        if(!current.ok)
+            return deferFavoriteSelection("system-watch",token,systemModeIndex,
+                current.reason==="AMBIGUOUS_LIVE_ID"
+                ? "SAVED SYSTEM ID AMBIGUOUS // SYSTEM IS OPEN"
+                : "SAVED SYSTEM READING NOT FOUND // SYSTEM IS OPEN");
+        const index=SystemWatchSelection.selectedIndex(
+            current.sourceId,[...systemResults.values]);
+        if(index<0)
+            return deferFavoriteSelection("system-watch",token,systemModeIndex,
+                "SAVED SYSTEM READING NOT VISIBLE // SYSTEM IS OPEN");
+        clearFavoriteNavigation();
+        savedSystemWatchSourceId=current.sourceId;
+        savedSystemWatchBoxId=current.boxId;
+        selectedResultIndex=index;
+        hoveredResultIndex=-1;
+        detailFocused=false;
+        resetDetailActionSelection();
+        Qt.callLater(function() {
+            if(!menuOpen || selectedModeIndex!==systemModeIndex
+                    || savedSystemWatchSourceId!==current.sourceId
+                    || savedSystemWatchBoxId!==current.boxId)
+                return;
+            const verified=SystemWatchSelection.resolveVisible(token,systemRows);
+            if(!verified.ok || verified.sourceId!==current.sourceId
+                    || verified.boxId!==current.boxId) return;
+            const now=SystemWatchSelection.selectedIndex(
+                verified.sourceId,[...systemResults.values]);
             if(now<0) return;
             selectedResultIndex=now;
             resultList.positionViewAtIndex(now,ListView.Contain);

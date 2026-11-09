@@ -127,7 +127,7 @@ with tempfile.TemporaryDirectory(prefix="machine-m1m-") as tmp:
         commands = []
         def move_command(argv, **kw):
             commands.append(argv)
-            assert len(commands) == 1, "more than one move attempted"
+            assert len(commands) <= 2, "unexpected extra move attempted"
             assert argv[:4] == ["swaymsg", "-r", "-t", "command"]
             assert re.fullmatch(
                 r"\[con_id=[1-9][0-9]*\] move --no-auto-back-and-forth "

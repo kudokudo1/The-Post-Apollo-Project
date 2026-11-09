@@ -93,7 +93,7 @@ test("the real CPU++ mode order is exactly the requested suffix",()=>{
   const names=[...segment.matchAll(/name: "([^"]+)"/g)].map(x=>x[1]);
   assert.deepEqual(names,["OVERVIEW","PROCESS","THERMAL","SYSTEM",
                           "FAVORITES","ID MANAGEMENT","SETTINGS"]);
-  assert.match(src,/selectedModeIndex === 4 && favoritesDetailsPane\.editingText/);
+  assert.match(src,/selectedModeIndex === 4[\s\S]*?favoritesDetailsPane\.editingText[\s\S]*?favoritesSelectorPane\.editingText/);
   assert.match(src,/selectedModeIndex === 6 && settingsSubMode === "LOCATION"[\s\S]*?settingsLocationPane\.editingText[\s\S]*?settingsLocationOverviewPane\.editingText/);
   assert.match(src,/cpuPlusWindow\.selectMode\(index\)/);
   assert.match(src,/selectedModeIndex === 2 \|\| selectedModeIndex === 3/);

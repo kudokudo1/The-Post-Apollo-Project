@@ -32,6 +32,12 @@ function createState() {
         activeView:"cleanup",
         cleanupTechnique:"batch",
         cleanupCustomFolder:"/tmp/CameraReview",
+        cleanupLoadedFolder:"/tmp/CameraReview",
+        cleanupQueueOpen:false,
+        cleanupSearchQuery:"",
+        cleanupMediaFilter:"all",
+        galleryRequestedFolder:"/tmp/CameraReview",
+        galleryRequestedView:"cleanup",
         galleryFiles:files.slice(),
         batchPaths:[],
         batchPreview:null,
@@ -105,8 +111,19 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.doesNotMatch(gallery, /label: "BATCH ON"/);
     assert.doesNotMatch(gallery, /onLeftClicked: camera\.batchToggle\(modelData\)/);
     assert.match(cleanup, /label: "SELECT LOADED"/);
-    assert.match(cleanup, /label: "REVIEW QUEUE/);
-    assert.match(cleanup, /label: "CONFIRM TRASH"/);
+    assert.match(cleanup, /label: "REVIEW FOR TRASH/);
+    assert.match(cleanup, /label: camera\.batchPreview/);
+    assert.match(cleanup, /" TO TRASH"/);
+    assert.match(cleanup, /label: "CLEAR MARKS"/);
+    assert.match(cleanup, /label: "BATCH SCROLL"/);
+    assert.match(cleanup, /label: "BATCH GRID"/);
+    assert.match(cleanup, /id: cleanupGridView/);
+    assert.match(cleanup, /id: cleanupGridList/);
+    assert.match(cleanup, /GridView \{/);
+    assert.match(cleanup, /onClicked: camera\.batchToggle\(modelData\)/);
+    assert.match(cleanup, /id: cleanupQueueView/);
+    assert.match(cleanup, /id: cleanupQueuedList/);
+    assert.match(cleanup, /onLeftClicked: camera\.batchRemovePath\(modelData\)/);
     assert.match(cleanup, /id: cleanupSwipeView/);
     assert.match(cleanup, /id: swipeVisualCard/);
     assert.match(cleanup, /rotation: swipeDeck\.dragX \/ 24/);
@@ -1302,4 +1319,103 @@ test("Laser impact feedback follows bolt arrival, while shots stay immediate", (
     assert.equal(s.huntUndo(),true);
     assert.equal(s.batchPaths.length,0);
     assert.equal(s.huntShotEffect,null);
+});
+
+
+test("Queue can be inspected and cleared from Grid, Swipe or Hunt without deleting", () => {
+    const s=createState();
+    s.batchToggle(files[0]);
+    for(const mode of ["grid","swipe","hunt"]) {
+        s.cleanupTechnique=mode;
+        assert.equal(s.cleanupToggleQueue(),true);
+        assert.equal(s.cleanupQueueOpen,true);
+        assert.equal(s.cleanupToggleQueue(),true);
+        assert.equal(s.cleanupQueueOpen,false);
+        assert.deepEqual(Array.from(s.batchPaths),["/tmp/Alpha.png"]);
+    }
+    s.cleanupTechnique="grid";
+    assert.equal(s.batchRemovePath("/tmp/not-queued"),false);
+    assert.equal(s.batchRemovePath("/tmp/Alpha.png"),true);
+    assert.equal(s.batchPaths.length,0);
+    assert.equal(s.called.length,0);
+    s.batchToggle(files[1]);
+    assert.equal(s.batchClear(),true);
+    assert.equal(s.batchPaths.length,0);
+    assert.match(s.feedback,/NO FILES MOVED/);
+    assert.equal(s.called.length,0);
+});
+
+test("Queue supports Grid review and explicit backend Trash confirmation", () => {
+    const s=createState();
+    s.cleanupTechnique="grid";
+    s.batchToggle(files[0]);
+    s.batchToggle(files[2]);
+    assert.equal(s.previewBatchTrash(),true);
+    assert.equal(s.cleanupQueueOpen,true);
+    assert.equal(s.called.length,1);
+    assert.equal(s.called[0].action,"previewBatch");
+    assert.deepEqual(Array.from(s.called[0].args),[
+        "preview-batch",
+        JSON.stringify(["/tmp/Alpha.png","/tmp/Charlie.webp"]),
+        "--folder","/tmp/CameraReview"
+    ]);
+    assert.equal(s.called.some(c=>c.action==="trashBatch"),false);
+    s.batchPreview={planId:"synthetic-plan",count:2};
+    assert.equal(s.confirmBatchTrash(),true);
+    assert.equal(s.called.length,2);
+    assert.equal(s.called[1].action,"trashBatch");
+    assert.deepEqual(Array.from(s.called[1].args),[
+        "trash-batch","synthetic-plan","MOVE_TO_TRASH"
+    ]);
+});
+
+test("Review refuses stale Cleanup folder or Gallery scan", () => {
+    const s=createState();
+    s.batchToggle(files[0]);
+    s.galleryRequestedFolder="/tmp/AnotherScope";
+    assert.equal(s.previewBatchTrash(),false);
+    assert.equal(s.called.length,0);
+    assert.match(s.feedback,/SCAN CLEANUP FOLDER/);
+    s.galleryRequestedFolder="/tmp/CameraReview";
+    s.galleryRequestedView="gallery";
+    assert.equal(s.previewBatchTrash(),false);
+    assert.equal(s.called.length,0);
+    s.galleryRequestedView="cleanup";
+    assert.equal(s.previewBatchTrash(),true);
+});
+
+test("Refreshing Cleanup search/filter preserves queue, changing folder clears it", () => {
+    const s=createState();
+    const begin=qml.indexOf("    function loadGallery(append, targetView) {");
+    const end=qml.indexOf("    function selectImage(record) {",begin);
+    assert.ok(begin>0 && end>begin);
+    vm.runInContext(qml.slice(begin,end),s);
+    s.batchPaths=["/tmp/Alpha.png","/tmp/Bravo.mp4"];
+    s.cleanupQueueOpen=true;
+    s.cleanupSearchQuery="Alpha";
+    s.cleanupMediaFilter="screenshots";
+    assert.equal(s.loadGallery(false,"cleanup"),true);
+    assert.deepEqual(Array.from(s.batchPaths),
+                     ["/tmp/Alpha.png","/tmp/Bravo.mp4"]);
+    assert.equal(s.cleanupQueueOpen,true);
+    s.cleanupCustomFolder="/tmp/NewScopedFolder";
+    assert.equal(s.loadGallery(false,"cleanup"),true);
+    assert.equal(s.cleanupQueueOpen,false);
+    assert.equal(s.batchPaths.length,0);
+    assert.equal(s.batchReviewKey,"");
+    assert.equal(s.called.some(c=>c.action==="trashBatch"),false);
+});
+
+test("Cleanup queue receipt preserves skipped/failed paths, not just a success count", () => {
+    // Source contract verifies successful backend receipt does not
+    // erase files that GIO could not move.
+    const start=qml.indexOf('        } else if (action === "trashBatch") {');
+    const end=qml.indexOf('        } else if (action === "previewSelected") {',start);
+    assert.ok(start>0&&end>start);
+    const code=qml.slice(start,end);
+    assert.match(code,/Array\.isArray\(payload\.unmovedPaths\)/);
+    assert.match(code,/payload\.unmovedPaths\.slice\(\)/);
+    assert.match(code,/SKIPPED/);
+    assert.match(code,/FAILED/);
+    assert.match(code,/camera\.loadGallery\(false, "cleanup"\)/);
 });

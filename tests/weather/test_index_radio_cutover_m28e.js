@@ -68,10 +68,10 @@ test("native RADIO retains original search, presets, paging, favorites, recents 
     "stationRadio.playbackAction(\"pause\")",
     "stationRadio.playbackAction(\"stop\")"
   ])assert.ok(radio.includes(call),call);
-  assert.match(radio,/onRecallRequested: function\\(item\\) \\{ stationRadio\\.recallSaved\\(item\\); \\}/);
-  assert.match(saved,/onClicked: strips\\.recallRequested\\(modelData\\)/);
-  assert.match(saved,/onClicked: strips\\.removeRequested\\(modelData\\)/);
-  assert.match(radio,/MediaServices\\.HeadlessMediaController\\s*\\{/);
+  assert.ok(radio.includes("onRecallRequested: function(item) { stationRadio.recallSaved(item); }"));
+  assert.ok(saved.includes("onClicked: strips.recallRequested(modelData)"));
+  assert.ok(saved.includes("onClicked: strips.removeRequested(modelData)"));
+  assert.ok(radio.includes("MediaServices.HeadlessMediaController {"));
   assert.match(radio,/radioClient: "weather-radio"/);
   assert.match(radio,/weather-radio-memory\.json/);
   assert.match(radio,/NO AUTOPLAY/);

@@ -394,7 +394,7 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
   assert.equal(cosmos.visibleFor("sky","cosmos/moon/position","moon-position"),true);
   assert.equal(cosmos.needsSource("cosmos/moon/position","celnav"),true);
   assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix","celestial-fix"),true);
-  assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix","planet-clock"),false);
+  assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix","planet-clock"),true); // C39 dates remain in PLANETS
   assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/planet-clock","planet-clock"),true);
   for (const section of ["moon","meteor","eclipses","iss"]) {
     assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix",section),false);
@@ -430,7 +430,7 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
 test("C5 subject modes are distinct real routes and direct fixed-rail actions", () => {
   const families = {
     sun:["OBSERVATION","ACTIVITY","YEAR"],
-    astronomy:["CLOCK","PLANETS","STARS"],
+    astronomy:["PLANETS","STARS"],
     events:["METEORS","ECLIPSES","ISS"]
   };
   for (const [family,labels] of Object.entries(families)) {

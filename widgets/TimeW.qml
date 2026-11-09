@@ -1084,6 +1084,12 @@ PanelWindow {
     property string machineApplySubmittedText: ""
     property var machineApplyResult: null
     property string machineApplyStatus: "NOT APPLIED"
+    // One visible recovery action; detailed recovery machinery stays optional.
+    property bool machineAdvancedOpen: false
+    property bool machineAutoRestoreBusy: false
+    property string machineAutoRestoreKey: ""
+    property var machineAutoRestoreResult: null
+    property string machineAutoRestoreStatus: "READY TO RESTORE"
     readonly property bool machineReviewReadyForConfirmation:
         machineMoveReviewResult
         && machineMoveReviewResult.kind === "machine-m1o-action-review"
@@ -1162,6 +1168,22 @@ PanelWindow {
         machineApplyOneProcess.exec(["python3", "-B", "-I",
             Quickshell.shellPath("services/time/MachineMoveApply.py"),
             "apply-one"]);
+    }
+
+    function machineRestoreSelectedCheckpoint() {
+        if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
+                || !machineSavedItem || machineStoreBusy
+                || machineAutoRestoreBusy || machineApplyBusy)
+            return;
+        // A checkpoint selection and this click are the full operator flow.
+        // The backend loads the persisted snapshot and rechecks each move.
+        machineAutoRestoreKey = machineSavedItem.id;
+        machineAutoRestoreResult = null;
+        machineAutoRestoreStatus = "RESTORING DESKTOP // CHECKING WINDOWS";
+        machineAutoRestoreBusy = true;
+        machineAutoRestoreProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineRestoreCheckpoint.py"),
+            "restore", machineAutoRestoreKey]);
     }
 
     function machineInvalidateMoveReview() {
@@ -1777,6 +1799,43 @@ PanelWindow {
                 timew.machineApplyStatus =
                     "MOVE REFUSED OR INTERRUPTED // CHECK INTERRUPTS";
             }
+        }
+    }
+
+    // No automatic relaunch at startup or on menu open. The only entry
+    // point is a separate RESTORE click on a saved checkpoint.
+    Process {
+        id: machineAutoRestoreProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const data = JSON.parse(this.text);
+                    if (data.kind !== "machine-one-click-restore-result"
+                            || data.checkpoint_id !== timew.machineAutoRestoreKey
+                            || !data.counts || !Array.isArray(data.items)
+                            || data.no_automatic_retry !== true) {
+                        timew.machineAutoRestoreStatus = "RESTORE RESULT UNAVAILABLE";
+                        return;
+                    }
+                    timew.machineAutoRestoreResult = data;
+                    const c = data.counts;
+                    const actions = c.moved + c.opened + c.in_place;
+                    const attention = c.skipped + c.pending;
+                    timew.machineAutoRestoreStatus =
+                        (attention ? "PARTIAL RESTORE" : "RESTORE COMPLETE")
+                        + " // " + actions + " READY // " + attention
+                        + " NEED ATTENTION";
+                } catch (error) {
+                    timew.machineAutoRestoreStatus = "RESTORE RESULT UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.machineAutoRestoreBusy = false;
+            if (exitCode !== 0 && !timew.machineAutoRestoreResult)
+                timew.machineAutoRestoreStatus =
+                    "RESTORE COULD NOT COMPLETE // OPEN DETAILS";
         }
     }
 
@@ -4935,6 +4994,66 @@ PanelWindow {
                         }
                         Row {
                             width: parent.width
+                            height: 42
+                            spacing: 8
+                            ActionButton {
+                                width: parent.width
+                                height: parent.height
+                                label: "RESTORE DESKTOP"
+                                labelPixelSize: 13
+                                accentColor: Colors.orange
+                                available: !!timew.machineSavedItem
+                                           && !timew.machineAutoRestoreBusy
+                                           && !timew.machineStoreBusy
+                                           && !timew.machineApplyBusy
+                                onLeftClicked: timew.machineRestoreSelectedCheckpoint()
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineAutoRestoreStatus
+                            color: timew.machineAutoRestoreResult
+                                   && timew.machineAutoRestoreResult.status === "complete"
+                                   ? Colors.cyan : Colors.orange
+                            font.pixelSize: 11
+                            wrapMode: Text.Wrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: !!timew.machineAutoRestoreResult
+                                     && timew.machineAutoRestoreResult.counts.skipped
+                                        + timew.machineAutoRestoreResult.counts.pending > 0
+                            text: timew.machineAutoRestoreResult
+                                  ? timew.machineAutoRestoreResult.items.filter(function(x) {
+                                        return x.outcome === "skipped"
+                                            || x.outcome === "pending";
+                                    }).slice(0, 3).map(function(x) {
+                                        return x.app_id + " // " + x.reason;
+                                    }).join("\n")
+                                  : ""
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+                        Row {
+                            width: parent.width
+                            height: 29
+                            ActionButton {
+                                width: parent.width
+                                height: parent.height
+                                label: timew.machineAdvancedOpen ? "HIDE DETAILS" : "DETAILS"
+                                labelPixelSize: 10
+                                accentColor: timew.semanticColor
+                                onLeftClicked: timew.machineAdvancedOpen =
+                                    !timew.machineAdvancedOpen
+                            }
+                        }
+                        Column {
+                            width: parent.width
+                            spacing: 14
+                            visible: timew.machineAdvancedOpen
+                        Row {
+                            width: parent.width
                             height: 35
                             spacing: 7
                             ActionButton {
@@ -5433,6 +5552,7 @@ PanelWindow {
                             text: "NO SCREENSHOTS OR AUTOMATIC RESTORATION"
                             color: Colors.orange
                             font.pixelSize: 11
+                        }
                         }
                             }
                         }

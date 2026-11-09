@@ -16,7 +16,7 @@ DOCK = (ROOT / "components" / "DockButton.qml").read_text(encoding="utf-8")
 
 
 def number(source, name):
-    match = re.search(r"\\b" + re.escape(name) + r"\\s*:\\s*(\\d+)", source)
+    match = re.search(r"\b" + re.escape(name) + r"\s*:\s*(\d+)", source)
     if match is None:
         raise AssertionError(f"Missing numeric QML property {name}")
     return int(match.group(1))
@@ -108,8 +108,8 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
             "wideGlowHoverOpacity", "wideGlowPressedOpacity"
         ):
             self.assertEqual(
-                re.search(r"\\b" + field + r":\\s*([0-9.]+)", trash_button).group(1),
-                re.search(r"\\b" + field + r":\\s*([0-9.]+)", power_button).group(1),
+                re.search(r"\b" + field + r":\s*([0-9.]+)", trash_button).group(1),
+                re.search(r"\b" + field + r":\s*([0-9.]+)", power_button).group(1),
                 field
             )
 
@@ -129,8 +129,8 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('text: "TRASH // INDEX"', TRASH)
         self.assertIn("NO FILE ACTIONS IN THIS PREVIEW.", TRASH)
         self.assertNotRegex(
-            TRASH, r"(?i)\\bprocess\\s*\\{|\\bgio\\b|unlink\\s*\\("
-            r"|\\brm\\s+-|\\bsystemctl\\b|\\bshutil\\b"
+            TRASH, r"(?i)\bprocess\s*\{|\bgio\b|unlink\s*\("
+            r"|\brm\s+-|\bsystemctl\b|\bshutil\b"
         )
 
 

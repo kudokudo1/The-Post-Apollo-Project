@@ -47,7 +47,11 @@ if operation == "forward":
                "print(s.recv(4096).decode()); s.close()")
     child = subprocess.run([sys.executable, "-c", program, str(sock.fileno())],
                            pass_fds=(sock.fileno(),), stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE, text=True, timeout=6, check=True)
+                           stderr=subprocess.PIPE, text=True, timeout=6, check=False)
+    if child.returncode:
+        print(json.dumps({"forward_exit": child.returncode,
+                          "forward_stderr": child.stderr[-1600:]}), flush=True)
+        sys.exit(0)
     raw = child.stdout.strip()
 else:
     data = b'WITNESS-FLOOR-READ-V1'

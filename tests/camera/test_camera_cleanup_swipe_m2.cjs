@@ -41,6 +41,7 @@ function createState() {
         swipeHistory:[],
         huntTargets:[],
         huntHistory:[],
+        huntSparedPaths:[],
         huntRound:0,
         huntTick:0,
         huntSecondsLeft:25,
@@ -64,10 +65,13 @@ function createState() {
         huntSettingsOpen:false,
         huntScoped:false,
         huntHitFlash:false,
+        huntShotEffect:null,
+        huntShotSerial:0,
+        huntLaserCycle:0,
         Colors:{
             omnitrix:"#00F782",orange:"#ED981A",
             yellow:"#F2BE4E",cyan:"#55CFCA",
-            magenta:"#C74EC7",white:"#DCF3FA"
+            magenta:"#C74EC7",red:"#D16041",white:"#DCF3FA"
         },
         huntMouseX:0.5,
         huntMouseY:0.5,
@@ -151,7 +155,17 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /cursorShape: camera\.huntPaused/);
     assert.match(cleanup, /Qt\.BlankCursor/);
     assert.match(cleanup, /id: huntHitWash/);
-    assert.match(cleanup, /huntHitFlash \? 0\.13 : 0\.0/);
+    assert.match(cleanup, /huntHitFlash \? 0\.045 : 0\.0/);
+    assert.match(cleanup, /id: huntHitAnimalEcho/);
+    assert.match(cleanup, /id: huntLaserLayer/);
+    assert.match(cleanup, /id: huntLaserFlight/);
+    assert.match(cleanup, /function onHuntShotSerialChanged/);
+    assert.match(cleanup, /opacity: huntTargetItem\.hovered \? 0\.18 : 0\.10/);
+    assert.match(cleanup, /opacity: 0\.055/);
+    assert.match(cleanup, /huntTargetItem\.mediaTint/);
+    assert.match(cleanup, /camera\.huntMediaLabel\(/);
+    assert.match(cleanup, /huntTargetItem\.target\.protected/);
+    assert.match(cleanup, /huntKeepProtected\(/);
     assert.match(cleanup, /id: huntHitFlashTimer/);
     assert.match(cleanup, /readonly property real crowdScale/);
     assert.match(qml, /readonly property bool batchMode: activeView === "cleanup"/);
@@ -848,7 +862,7 @@ test("Ox slowly closes on frog without teleport or exceeding heavy velocity caps
     assert.ok(Math.hypot(ox.xNorm-frog.xNorm,ox.yNorm-frog.yNorm)<initial*0.7);
 });
 
-test("Hunt hit triggers brief red wash; misses and selection alone do not", () => {
+test("Hunt hit triggers animal impact echo; misses and selection alone do not flash arena", () => {
     const s=createState();
     s.cleanupTechnique="hunt";
     assert.equal(s.huntHitFlash,false);
@@ -864,5 +878,162 @@ test("Hunt hit triggers brief red wash; misses and selection alone do not", () =
     s.huntUndo();
     assert.equal(s.huntHitFlash,false);
     assert.equal(s.batchPaths.length,0);
+    assert.equal(s.called.length,0);
+});
+
+
+test("Hunt classifies media by backend type and screenshot flags, not guessing names", () => {
+    assert.equal(motion.mediaKind({mediaType:"screenshot"}),"screenshot");
+    assert.equal(motion.mediaKind({mediaType:"other-image",screenshotLikely:true}),"screenshot");
+    assert.equal(motion.mediaKind({mediaType:"other-image",name:"family.jpg"}),"photo");
+    assert.equal(motion.mediaKind({mediaType:"webcam-photo"}),"photo");
+    assert.equal(motion.mediaKind({mediaType:"webcam-video"}),"webcam-video");
+    assert.equal(motion.mediaKind({mediaType:"other-video"}),"video");
+    assert.equal(motion.mediaKind({mediaType:"screen-video"}),"screen-video");
+    assert.equal(motion.protectedHuntMedia({mediaType:"screen-video"}),true);
+    assert.equal(motion.protectedHuntMedia({mediaType:"other-video",name:"screen_hello.mp4"}),false);
+    const screen=motion.createTarget({
+        path:"/tmp/screen.mp4",name:"screen.mp4",mediaType:"screen-video"
+    },"bird",()=>0.5);
+    assert.equal(screen.mediaKind,"screen-video");
+    assert.equal(screen.protected,true);
+});
+
+test("Hunt media wash colors follow the content, not the animal", () => {
+    const s=createState();
+    assert.equal(s.huntMediaTint("photo"),"#55CFCA");
+    assert.equal(s.huntMediaTint("screenshot"),"#ED981A");
+    assert.equal(s.huntMediaTint("video"),"#D16041");
+    assert.equal(s.huntMediaTint("webcam-video"),"#C74EC7");
+    assert.equal(s.huntMediaTint("screen-video"),"#F2BE4E");
+    assert.equal(s.huntMediaLabel("screen-video"),"SCREEN RECORDING · SAFE");
+    assert.equal(s.huntMediaLabel("webcam-video"),"WEBCAM VIDEO");
+    assert.equal(s.huntMediaLabel("photo"),"PHOTO");
+    assert.equal(s.huntTargetColor("frog"),"#00F782");
+    assert.equal(s.huntTargetColor("fox"),"#ED981A");
+});
+
+test("Cyan/orange/magenta laser rotates on shots and only hits tint the arena", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.huntStartRound();
+    assert.equal(s.huntFire("",0.1,0.3),true);
+    assert.equal(s.huntShotEffect.color,"#55CFCA");
+    assert.equal(s.huntShotEffect.hit,false);
+    assert.equal(s.huntHitFlash,false);
+    assert.equal(s.huntShotEffect.aimX,0.1);
+    const first=s.huntTargets[0];
+    assert.equal(s.huntFire(first.path,0.66,0.4,0.5,0.3,0.2,0.15),true);
+    assert.equal(s.huntShotEffect.color,"#ED981A");
+    assert.equal(s.huntShotEffect.hit,true);
+    assert.equal(s.huntShotEffect.path,first.path);
+    assert.equal(s.huntHitFlash,true);
+    assert.equal(s.huntShotEffect.rectW,0.2);
+    assert.equal(s.huntShotEffect.rectH,0.15);
+    assert.equal(s.huntFire("",0.9,0.1),true);
+    assert.equal(s.huntShotEffect.color,"#C74EC7");
+    assert.equal(s.huntShotEffect.hit,false);
+    assert.equal(s.huntHitFlash,false);
+    assert.equal(s.huntFire("",0.5,0.5),true);
+    assert.equal(s.huntShotEffect.color,"#55CFCA");
+    assert.equal(s.huntLaserCycle,4);
+    assert.equal(s.huntShotSerial,4);
+    assert.equal(s.called.length,0);
+});
+
+test("Screen recordings remain visible but safe and cannot be fired into Hunt Trash", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=[
+        {path:"/tmp/screen_a.mp4",name:"screen_a.mp4",
+         mediaType:"screen-video"},
+        {path:"/tmp/sc.png",name:"sc.png",
+         mediaType:"screenshot",screenshotLikely:true}
+    ];
+    assert.equal(s.huntStartRound(),true);
+    const protectedTarget=s.huntTargets.find(x=>x.mediaType==="screen-video");
+    assert.ok(protectedTarget);
+    assert.equal(protectedTarget.protected,true);
+    assert.equal(s.huntFire(protectedTarget.path),false);
+    assert.equal(s.batchPaths.length,0);
+    assert.equal(s.huntShotSerial,0);
+    assert.equal(s.huntKeepProtected(protectedTarget.path),true);
+    assert.equal(s.batchPaths.length,0);
+    assert.deepEqual(Array.from(s.huntSparedPaths),[protectedTarget.path]);
+    assert.equal(s.huntShots,0);
+    assert.equal(s.huntHits,0);
+    assert.equal(s.huntTargets.length,1);
+    assert.equal(s.huntUndo(),true);
+    assert.equal(s.huntTargets.length,2);
+    assert.equal(s.huntSparedPaths.length,0);
+    assert.equal(s.batchPaths.length,0);
+    assert.equal(s.huntKeepProtected(protectedTarget.path),true);
+    const screenshot=s.huntTargets.find(x=>x.mediaType==="screenshot");
+    assert.equal(s.huntFire(screenshot.path),true);
+    assert.deepEqual(Array.from(s.batchPaths),[screenshot.path]);
+    assert.equal(s.huntShots,1);
+    assert.equal(s.called.length,0);
+});
+
+test("Shot effects do not mutate file records, and Undo clears laser and hit cue", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.huntStartRound();
+    const before=s.huntTargets[0];
+    assert.equal(s.huntFire(before.path,2,-4,-1,3,2,1),true);
+    assert.ok(s.huntHitFlash);
+    assert.equal(s.huntShotEffect.aimX,1);
+    assert.equal(s.huntShotEffect.aimY,0);
+    assert.equal(s.huntShotEffect.rectX,0);
+    assert.equal(s.huntShotEffect.rectY,1);
+    assert.equal(s.huntShotEffect.rectW,1);
+    assert.equal(s.huntShotEffect.rectH,1);
+    assert.equal(before.path,s.huntShotEffect.path);
+    assert.equal(s.huntUndo(),true);
+    assert.equal(s.huntHitFlash,false);
+    assert.equal(s.huntShotEffect,null);
+    assert.equal(s.batchPaths.length,0);
+    assert.equal(s.called.length,0);
+});
+
+
+test("Spared screen recordings do not respawn in later rounds", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=[
+        {path:"/tmp/preserved-screen.mp4",name:"screen_001.mp4",
+         mediaType:"screen-video"},
+        {path:"/tmp/photo.png",name:"photo.png",mediaType:"other-image"},
+        {path:"/tmp/again.jpg",name:"again.jpg",mediaType:"other-image"}
+    ];
+    assert.equal(s.huntStartRound(),true);
+    const safe=s.huntTargets.find(t=>t.protected);
+    assert.equal(s.huntKeepProtected(safe.path),true);
+    assert.equal(s.huntTargets.some(t=>t.path===safe.path),false);
+    // Complete round without deleting screen media.
+    while(s.huntTargets.length)
+        s.huntFire(s.huntTargets[0].path);
+    assert.equal(s.huntAutoStartNext(),false);
+    assert.equal(s.huntTargets.length,0);
+    assert.equal(s.huntSparedPaths.includes(safe.path),true);
+    assert.equal(s.batchPaths.includes(safe.path),false);
+    assert.equal(s.called.length,0);
+});
+
+test("Time-out spares protected videos without queuing them for Trash", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=[
+        {path:"/tmp/safe-screen.mp4",name:"safe-screen.mp4",
+         mediaType:"screen-video"}
+    ];
+    assert.equal(s.huntStartRound(),true);
+    for(let i=0;i<250;i++)
+        s.huntAdvance();
+    assert.equal(s.huntRoundComplete,true);
+    assert.deepEqual(Array.from(s.huntSparedPaths),["/tmp/safe-screen.mp4"]);
+    assert.equal(s.batchPaths.length,0);
+    assert.equal(s.huntAutoStartNext(),false);
+    assert.equal(s.huntAutoPending,false);
     assert.equal(s.called.length,0);
 });

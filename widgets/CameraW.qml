@@ -62,6 +62,7 @@ PanelWindow {
     // confirmBatchTrash() can authorize a physical move to recoverable Trash.
     property var huntTargets: []
     property var huntHistory: []
+    property var huntSparedPaths: []
     property int huntRound: 0
     property int huntTick: 0
     property int huntSecondsLeft: 25
@@ -88,6 +89,10 @@ PanelWindow {
     property bool huntSettingsOpen: false
     property bool huntScoped: false
     property bool huntHitFlash: false
+    // Laser shot VFX is gameplay-only. No filesystem action is bound to it.
+    property var huntShotEffect: null
+    property int huntShotSerial: 0
+    property int huntLaserCycle: 0
     readonly property real huntScopeScale: huntScoped ? 1.85 : 1
     readonly property real huntScopeSwayX: huntScoped ? 2.2 * Math.sin(huntTick * 0.19) : 0
     readonly property real huntScopeSwayY: huntScoped ? 1.8 * Math.cos(huntTick * 0.23) : 0
@@ -447,6 +452,7 @@ PanelWindow {
             // Never fire a selection for an earlier folder or filter.
             huntTargets = [];
             huntHistory = [];
+            huntSparedPaths = [];
             huntPaused = true;
             huntRoundComplete = false;
             huntRound = 0;
@@ -461,6 +467,7 @@ PanelWindow {
             huntAutoPending = false;
             huntScoped = false;
             huntHitFlash = false;
+            huntShotEffect = null;
             huntSettingsOpen = false;
             huntRoundSpeed = 1.0;
             huntRoundSpawnCount = huntSpawnCount;
@@ -736,6 +743,68 @@ PanelWindow {
         return Colors.white;
     }
 
+    function huntMediaTint(kind) {
+        if (kind === "screenshot") return Colors.orange;
+        if (kind === "screen-video") return Colors.yellow;
+        if (kind === "webcam-video") return Colors.magenta;
+        if (kind === "video") return Colors.red;
+        return Colors.cyan;
+    }
+
+    function huntMediaLabel(kind) {
+        if (kind === "screenshot") return "SCREENSHOT";
+        if (kind === "screen-video") return "SCREEN RECORDING · SAFE";
+        if (kind === "webcam-video") return "WEBCAM VIDEO";
+        if (kind === "video") return "VIDEO";
+        return "PHOTO";
+    }
+
+    function huntLaserColor(index) {
+        // Cyan → Orange → Magenta → Cyan, regardless of target animal.
+        const sequence = [Colors.cyan, Colors.orange, Colors.magenta];
+        return sequence[Math.abs(Math.floor(index)) % sequence.length];
+    }
+
+    function huntKeepProtected(path) {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || huntPaused || huntRoundComplete || !path)
+            return false;
+        const index = huntTargets.findIndex(function(item) {
+            return item.path === path
+                   && HuntMotion.protectedHuntMedia(item);
+        });
+        if (index < 0) return false;
+        const history = huntHistory.slice();
+        history.push({
+            targets: huntTargets.slice(), paths: batchPaths.slice(),
+            spared: huntSparedPaths.slice(),
+            shots: huntShots, hits: huntHits, misses: huntMisses,
+            score: huntScore, combo: huntCombo,
+            paused: huntPaused, complete: huntRoundComplete
+        });
+        if (history.length > 30) history.shift();
+        huntHistory = history;
+        const next = huntTargets.slice();
+        next.splice(index, 1);
+        huntTargets = next;
+        if (huntSparedPaths.indexOf(path) < 0) {
+            const spared = huntSparedPaths.slice();
+            spared.push(path);
+            huntSparedPaths = spared;
+        }
+        huntHitFlash = false;
+        huntShotEffect = null;
+        huntLastEvent = "SAFE // SCREEN RECORDING KEPT // NOT QUEUED";
+        feedback = "HUNT // " + huntLastEvent;
+        if (next.length === 0) {
+            huntRoundComplete = true;
+            huntPaused = true;
+            huntScoped = false;
+            huntAutoPending = huntAutoRounds;
+        }
+        return true;
+    }
+
     // Duck Hunt-style Cleanup game. Targets come only from the already-loaded
     // safe gallery inventory. Hits mark paths; no game code calls GIO/Trash.
     function huntStartRound() {
@@ -752,7 +821,8 @@ PanelWindow {
         for (let i = 0; i < galleryFiles.length; i++) {
             const item = galleryFiles[i];
             if (!item || typeof item.path !== "string" || !item.path
-                    || seen[item.path] || batchContains(item.path))
+                    || seen[item.path] || batchContains(item.path)
+                    || huntSparedPaths.indexOf(item.path) >= 0)
                 continue;
             seen[item.path] = true;
             eligible.push(item);
@@ -797,6 +867,7 @@ PanelWindow {
         huntAutoPending = false;
         huntScoped = false;
         huntHitFlash = false;
+        huntShotEffect = null;
         huntRoundSpeed = HuntMotion.speedForRound(
             huntSpeedGainPercent, huntSpeedEvery, nextRound);
         huntRoundSpawnCount = targets.length;
@@ -836,8 +907,17 @@ PanelWindow {
         huntTick++;
         huntSecondsLeft = Math.max(0, 25 - Math.floor(huntTick / 10));
         if (huntTick >= 250) {
-            // Timeouts never queue anything. Unshot files stay eligible for
-            // a later round and are never silently marked for deletion.
+            // A timed-out safe screen recording is spared for later rounds,
+            // so auto-next cannot loop on the same unshootable target.
+            const spared = huntSparedPaths.slice();
+            for (let i = 0; i < huntTargets.length; i++) {
+                const item = huntTargets[i];
+                if (HuntMotion.protectedHuntMedia(item)
+                        && spared.indexOf(item.path) < 0)
+                    spared.push(item.path);
+            }
+            huntSparedPaths = spared;
+            // Unhit regular files remain eligible; nothing enters Trash.
             huntTargets = [];
             huntHistory = [];
             huntPaused = true;
@@ -845,6 +925,7 @@ PanelWindow {
             huntAutoPending = huntAutoRounds;
             huntScoped = false;
             huntHitFlash = false;
+            huntShotEffect = null;
             huntCombo = 0;
             huntLastEvent = "TIME UP // UNHIT FILES STAY UNTOUCHED";
             feedback = huntLastEvent;
@@ -862,7 +943,7 @@ PanelWindow {
         return true;
     }
 
-    function huntFire(path) {
+    function huntFire(path, aimX, aimY, boxX, boxY, boxW, boxH) {
         if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
                 || huntPaused || huntRoundComplete || huntTargets.length === 0)
             return false;
@@ -873,6 +954,9 @@ PanelWindow {
                 hitIndex = i;
         if (targetPath && hitIndex < 0)
             return false; // forged/stale hit cannot add an arbitrary path
+        if (hitIndex >= 0
+                && HuntMotion.protectedHuntMedia(huntTargets[hitIndex]))
+            return false; // screen recordings cannot be queued by Hunt
         if (hitIndex >= 0 && !batchContains(targetPath)
                 && batchPaths.length >= 500) {
             feedback = "HUNT // QUEUE FULL // REVIEW OR CLEAR";
@@ -882,6 +966,7 @@ PanelWindow {
         const history = huntHistory.slice();
         history.push({
             targets: huntTargets.slice(), paths: batchPaths.slice(),
+            spared: huntSparedPaths.slice(),
             shots: huntShots, hits: huntHits, misses: huntMisses,
             score: huntScore, combo: huntCombo,
             paused: huntPaused, complete: huntRoundComplete
@@ -889,6 +974,33 @@ PanelWindow {
         if (history.length > 30)
             history.shift();
         huntHistory = history;
+        // The laser cycles on every actual shot, including a miss.
+        // Only validated hits trigger an animal flash and arena tint.
+        const hitRecord = hitIndex >= 0 ? huntTargets[hitIndex] : null;
+        const clamp01 = function(value, fallback) {
+            return Number.isFinite(Number(value))
+                   ? Math.max(0, Math.min(1, Number(value)))
+                   : fallback;
+        };
+        const hit = hitRecord !== null;
+        const shotColor = huntLaserColor(huntLaserCycle);
+        huntLaserCycle++;
+        huntShotEffect = {
+            hit: hit,
+            color: shotColor,
+            aimX: clamp01(aimX, hit ? hitRecord.xNorm : 0.5),
+            aimY: clamp01(aimY, hit ? hitRecord.yNorm : 0.5),
+            rectX: clamp01(boxX, hit ? hitRecord.xNorm : 0.4),
+            rectY: clamp01(boxY, hit ? hitRecord.yNorm : 0.4),
+            rectW: clamp01(boxW, 0.16),
+            rectH: clamp01(boxH, 0.18),
+            path: hit ? hitRecord.path : "",
+            mediaKind: hit ? hitRecord.mediaKind : "",
+            profile: hit ? hitRecord.profile : "",
+            mediaType: hit ? hitRecord.mediaType : ""
+        };
+        huntShotSerial++;
+        huntHitFlash = false;
         huntShots += 1;
         if (hitIndex < 0) {
             huntMisses += 1;
@@ -906,9 +1018,8 @@ PanelWindow {
             huntHits += 1;
             huntCombo += 1;
             huntScore += 100 + Math.min(huntCombo - 1, 5) * 25;
-            // A soft red wash is visual hit confirmation only.
-            // The actual selected file is still recoverably trashed only
-            // after a completely separate review and confirmation.
+            // The removed animal gets its own red hit echo. The rest of
+            // the arena flashes only 4.5% of the laser's current color.
             huntHitFlash = true;
             batchPreview = null;
             batchReviewKey = "";
@@ -937,8 +1048,11 @@ PanelWindow {
         huntAutoPending = false;
         huntScoped = false;
         huntHitFlash = false;
+        huntShotEffect = null;
         huntTargets = last.targets.slice();
         batchPaths = last.paths.slice();
+        huntSparedPaths = last.spared ? last.spared.slice()
+                                    : huntSparedPaths;
         huntShots = last.shots;
         huntHits = last.hits;
         huntMisses = last.misses;
@@ -1294,6 +1408,7 @@ PanelWindow {
             huntPaused = true;
             huntScoped = false;
             huntHitFlash = false;
+            huntShotEffect = null;
             huntAutoPending = false;
             Qt.callLater(function() { camera.loadGallery(false, "cleanup"); });
         } else if (action === "previewSelected") {
@@ -2882,6 +2997,7 @@ PanelWindow {
                                         camera.huntPaused = true;
                                         camera.huntScoped = false;
                                         camera.huntHitFlash = false;
+                                        camera.huntShotEffect = null;
                                         camera.huntAutoPending = false;
                                         camera.huntSettingsOpen = false;
                                     }
@@ -3440,10 +3556,22 @@ PanelWindow {
                             }
                             Timer {
                                 id: huntHitFlashTimer
-                                interval: 190
+                                interval: 220
                                 repeat: false
-                                running: camera.huntHitFlash
-                                onTriggered: camera.huntHitFlash = false
+                                running: camera.huntShotEffect !== null
+                                onTriggered: {
+                                    camera.huntHitFlash = false;
+                                    camera.huntShotEffect = null;
+                                }
+                            }
+                            Connections {
+                                target: camera
+                                function onHuntShotSerialChanged() {
+                                    // Restart the one-shot projectile even for
+                                    // quick successive hits and misses.
+                                    huntLaserFlight.restart();
+                                    huntHitFlashTimer.restart();
+                                }
                             }
                             Timer {
                                 id: huntClock
@@ -3593,7 +3721,9 @@ PanelWindow {
                                         onCanceled: camera.huntSetScoped(false)
                                         onClicked: function(mouse) {
                                             if (mouse.button === Qt.LeftButton)
-                                                camera.huntFire("");
+                                                camera.huntFire(
+                                                    "", mouse.x / huntArena.width,
+                                                    mouse.y / huntArena.height);
                                         }
                                     }
                                     Repeater {
@@ -3607,6 +3737,8 @@ PanelWindow {
                                             property bool hovered: false
                                             readonly property color targetTint:
                                                 camera.huntTargetColor(target.profile)
+                                            readonly property color mediaTint:
+                                                camera.huntMediaTint(target.mediaKind)
                                             // Dense rounds preserve usable hitboxes.
                                             // Ox is larger and always above the other
                                             // thumbnail actors if targets overlap.
@@ -3658,19 +3790,21 @@ PanelWindow {
                                             RectangularShadow {
                                                 anchors.fill: huntTargetPlate
                                                 z: -1
-                                                spread: huntTargetItem.hovered ? 10 : 5
+                                                // Keep hover feedback understated;
+                                                // the hit itself owns the strong cue.
+                                                spread: huntTargetItem.hovered ? 5 : 3
                                                 color: huntTargetItem.targetTint
-                                                opacity: huntTargetItem.hovered ? 0.70 : 0.25
+                                                opacity: huntTargetItem.hovered ? 0.18 : 0.10
                                                 visible: !camera.huntPaused
                                                 Behavior on opacity {
-                                                    NumberAnimation { duration: 125 }
+                                                    NumberAnimation { duration: 170 }
                                                 }
                                             }
                                             Rectangle {
                                                 id: huntTargetPlate
                                                 anchors.fill: parent
                                                 radius: 5
-                                                border.width: huntTargetItem.hovered ? 3 : 2
+                                                border.width: 2
                                                 border.color: huntTargetItem.targetTint
                                                 color: Colors.black
                                                 clip: true
@@ -3688,6 +3822,17 @@ PanelWindow {
                                                     asynchronous: true
                                                     cache: false
                                                 }
+                                                Rectangle {
+                                                    // 5.5% content tint, independent of
+                                                    // the much stronger animal border.
+                                                    x: 4
+                                                    y: 3
+                                                    width: parent.width - 8
+                                                    height: parent.height - 21
+                                                    z: 2
+                                                    color: huntTargetItem.mediaTint
+                                                    opacity: 0.055
+                                                }
                                                 GohuText {
                                                     anchors.centerIn: parent
                                                     visible: huntTargetItem.target.mediaType.indexOf("video") >= 0
@@ -3698,9 +3843,22 @@ PanelWindow {
                                                 GohuText {
                                                     x: 3
                                                     y: 2
+                                                    z: 3
                                                     font.pixelSize: 9
                                                     color: huntTargetItem.targetTint
                                                     text: huntTargetItem.target.profile.toUpperCase()
+                                                }
+                                                GohuText {
+                                                    x: parent.width * 0.41
+                                                    y: 2
+                                                    z: 3
+                                                    width: parent.width * 0.57
+                                                    horizontalAlignment: Text.AlignRight
+                                                    elide: Text.ElideRight
+                                                    font.pixelSize: 8
+                                                    color: huntTargetItem.mediaTint
+                                                    text: camera.huntMediaLabel(
+                                                        huntTargetItem.target.mediaKind)
                                                 }
                                                 GohuText {
                                                     anchors.bottom: parent.bottom
@@ -3746,25 +3904,149 @@ PanelWindow {
                                                     }
                                                     onCanceled: camera.huntSetScoped(false)
                                                     onClicked: function(mouse) {
-                                                        if (mouse.button === Qt.LeftButton)
-                                                            camera.huntFire(
+                                                        if (mouse.button !== Qt.LeftButton)
+                                                            return;
+                                                        if (huntTargetItem.target.protected) {
+                                                            // User's screen-recording SAFE rule.
+                                                            camera.huntKeepProtected(
                                                                 huntTargetItem.target.path);
+                                                            return;
+                                                        }
+                                                        camera.huntFire(
+                                                            huntTargetItem.target.path,
+                                                            (huntTargetItem.x + huntTargetItem.width / 2)
+                                                              / huntArena.width,
+                                                            (huntTargetItem.y + huntTargetItem.height / 2)
+                                                              / huntArena.height,
+                                                            huntTargetItem.x / huntArena.width,
+                                                            huntTargetItem.y / huntArena.height,
+                                                            huntTargetItem.width / huntArena.width,
+                                                            huntTargetItem.height / huntArena.height);
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                    // Non-interactive hit wash. Only a validated target
-                                    // click triggers it; a miss or right-click does not.
+                                    // Hit feedback is intentionally restrained. Animal
+                                    // echoes flash red; the WORLD gets only 4.5% of
+                                    // the current laser color, never a full-screen blast.
                                     Rectangle {
                                         id: huntHitWash
                                         anchors.fill: parent
                                         z: 70
-                                        color: Colors.red
-                                        opacity: camera.huntHitFlash ? 0.13 : 0.0
+                                        color: camera.huntShotEffect
+                                               ? camera.huntShotEffect.color : Colors.cyan
+                                        opacity: camera.huntHitFlash ? 0.045 : 0.0
                                         visible: opacity > 0
                                         Behavior on opacity {
-                                            NumberAnimation { duration: 160 }
+                                            NumberAnimation { duration: 100 }
+                                        }
+                                    }
+                                    Item {
+                                        id: huntLaserLayer
+                                        anchors.fill: parent
+                                        z: 74
+                                        visible: camera.huntShotEffect !== null
+                                        property real progress: 0.0
+                                        readonly property var shot: camera.huntShotEffect
+                                            || ({aimX: 0.5, aimY: 0.5, color: Colors.cyan})
+                                        readonly property real muzzleX: width * 0.5
+                                        readonly property real muzzleY: height * 0.97
+                                        readonly property real impactX: width * shot.aimX
+                                        readonly property real impactY: height * shot.aimY
+                                        readonly property real dx: impactX - muzzleX
+                                        readonly property real dy: impactY - muzzleY
+                                        readonly property real length: Math.sqrt(dx * dx + dy * dy)
+                                        readonly property real angle: Math.atan2(dy, dx) * 180 / Math.PI
+                                        NumberAnimation {
+                                            id: huntLaserFlight
+                                            target: huntLaserLayer
+                                            property: "progress"
+                                            from: 0
+                                            to: 1
+                                            duration: 145
+                                            easing.type: Easing.OutCubic
+                                        }
+                                        Rectangle {
+                                            x: huntLaserLayer.muzzleX
+                                            y: huntLaserLayer.muzzleY - height / 2
+                                            width: huntLaserLayer.length * huntLaserLayer.progress
+                                            height: 5
+                                            radius: 2
+                                            rotation: huntLaserLayer.angle
+                                            transformOrigin: Item.Left
+                                            color: huntLaserLayer.shot.color
+                                            opacity: 0.17
+                                        }
+                                        Rectangle {
+                                            x: huntLaserLayer.muzzleX
+                                            y: huntLaserLayer.muzzleY - height / 2
+                                            width: huntLaserLayer.length * huntLaserLayer.progress
+                                            height: 2
+                                            radius: 1
+                                            rotation: huntLaserLayer.angle
+                                            transformOrigin: Item.Left
+                                            color: huntLaserLayer.shot.color
+                                            opacity: 0.82
+                                        }
+                                        Rectangle {
+                                            x: huntLaserLayer.muzzleX
+                                               + huntLaserLayer.dx * huntLaserLayer.progress
+                                               - width / 2
+                                            y: huntLaserLayer.muzzleY
+                                               + huntLaserLayer.dy * huntLaserLayer.progress
+                                               - height / 2
+                                            width: 8
+                                            height: 8
+                                            radius: 4
+                                            color: huntLaserLayer.shot.color
+                                            opacity: 0.85
+                                        }
+                                    }
+                                    // The original target disappears from the playable
+                                    // list immediately, so a short-lived echo at its
+                                    // actual drawn bounds shows the RED impact on it.
+                                    Item {
+                                        id: huntHitAnimalEcho
+                                        z: 77
+                                        visible: camera.huntShotEffect
+                                                 && camera.huntShotEffect.hit
+                                        readonly property var shot: camera.huntShotEffect
+                                            || ({rectX: 0, rectY: 0, rectW: 0, rectH: 0,
+                                                 path: "", mediaType: ""})
+                                        x: shot.rectX * huntArena.width
+                                        y: shot.rectY * huntArena.height
+                                        width: shot.rectW * huntArena.width
+                                        height: shot.rectH * huntArena.height
+                                        clip: true
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            radius: 5
+                                            color: Colors.black
+                                            border.color: Colors.red
+                                            border.width: 2
+                                            Image {
+                                                anchors.fill: parent
+                                                anchors.margins: 3
+                                                source: huntHitAnimalEcho.shot.mediaType.indexOf("video") >= 0
+                                                        ? ""
+                                                        : camera.fileUrl(huntHitAnimalEcho.shot.path)
+                                                fillMode: Image.PreserveAspectFit
+                                                asynchronous: true
+                                                cache: false
+                                            }
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                radius: 4
+                                                color: Colors.red
+                                                opacity: 0.40
+                                            }
+                                            GohuText {
+                                                anchors.centerIn: parent
+                                                text: "HIT"
+                                                font.pixelSize: 12
+                                                color: Colors.white
+                                            }
                                         }
                                     }
                                     Item {

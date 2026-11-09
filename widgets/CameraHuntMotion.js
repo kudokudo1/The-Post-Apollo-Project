@@ -77,6 +77,24 @@ function shieldingPrey(ox, targets) {
     return choice;
 }
 
+// Explicit gallery classifications, not filename heuristics, decide the
+// very light media wash. The backend owns recognition of screen recordings.
+function mediaKind(record) {
+    var kind = String(record && record.mediaType || "");
+    if (kind === "screen-video") return "screen-video";
+    if (kind === "webcam-video") return "webcam-video";
+    if (kind === "other-video") return "video";
+    if (kind === "screenshot" || (record && record.screenshotLikely === true))
+        return "screenshot";
+    return "photo";
+}
+
+function protectedHuntMedia(record) {
+    // Operator policy: recognized screen recordings are safe in HUNT.
+    // Do not apply this rule to Batch or Swipe without their own approval.
+    return mediaKind(record) === "screen-video";
+}
+
 function createTarget(record, profile, random) {
     if (PROFILES.indexOf(profile) < 0)
         throw new Error("INVALID_HUNT_PROFILE");
@@ -84,6 +102,9 @@ function createTarget(record, profile, random) {
     var target = {
         path: record.path, name: String(record.name || ""),
         mediaType: String(record.mediaType || ""),
+        screenshotLikely: record.screenshotLikely === true,
+        mediaKind: mediaKind(record),
+        protected: protectedHuntMedia(record),
         profile: profile,
         // Position is normalized against the usable arena area AFTER
         // the actual target width/height are reserved.

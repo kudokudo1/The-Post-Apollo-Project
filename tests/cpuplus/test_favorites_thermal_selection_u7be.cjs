@@ -53,7 +53,7 @@ test("rejects wrong family, forged encoding, commands, paths, and monitor/watch 
     {...x,key:Resource.identityKey("appcontrol","item","run:kitty:top")},
     {...x,key:Resource.identityKey("appcontrol","item","task|1234")},
     {...x,key:Resource.identityKey("appcontrol","monitor-watch",save(hot))},
-    {...x,key:key(hot).replace("thermal%257C","thermal%7C")},
+    {...x,key:key(hot).replace("thermal%7C","thermal%257C")},
     {...x,key:"fav1:local:appcontrol:item:%E0%A4%A"},
     {...x,key:"fav1:local:appcontrol:item:"}
   ]) {

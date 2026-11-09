@@ -12,7 +12,10 @@ const PER_MINUTE = 12;
 
 export async function emit(_event: IpcMainInvokeEvent,
                            raw: unknown): Promise<{ status: string }> {
-    const args = notificationArgs(raw);
+    // Preserve the calling package's existing desktop policy namespace.
+    const desktopEntry = process.env.FLATPAK_ID === "dev.vencord.Vesktop"
+        ? "dev.vencord.Vesktop" : "vesktop";
+    const args = notificationArgs(raw, desktopEntry);
     if (!args) return { status: "INVALID" };
     const messageId = (raw as { messageId: string }).messageId;
     const now = Date.now();

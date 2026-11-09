@@ -82,6 +82,22 @@ function segmentRank(rank,max) {
 function chart(type,caption,values) {
     return {type:type,caption:caption,values:values};
 }
+// Genuine short-range AQI series from Open-Meteo's existing hourly forecast.
+// A single observation is not a time-series and must not be drawn as one.
+function forecastBars(weather) {
+    var rows=weather && Array.isArray(weather.airQualityForecast)
+        ?weather.airQualityForecast:[];
+    var observations=[];
+    for(var i=0;i<rows.length && observations.length<6;i++) {
+        var n=finiteNumber(rows[i] ? rows[i].aqi : null);
+        if(n!==null && n>=0) observations.push(n);
+    }
+    if(observations.length<2) return [];
+    var max=0;
+    for(var j=0;j<observations.length;j++)
+        max=Math.max(max,observations[j]);
+    return observations.map(function(value){return relative(value,max);});
+}
 function microcharts(index,river,weather,nws,seismic,heat,fireProducts) {
     var t=topic(index);
     if(t.id==="water") {
@@ -130,9 +146,12 @@ function microcharts(index,river,weather,nws,seismic,heat,fireProducts) {
             pollenBars.push(value===null || value<0 ? null
                 : relative(value,pollenMax));
         }
+        var nextAqi=ready ? forecastBars(weather) : [];
         return [
-            chart("marks","AQI BAND",aqi===null || aqi<0?[]
-                  :countMarks(bandCount,6)),
+            nextAqi.length>1
+                ? chart("bars","AQI / 6H",nextAqi)
+                : chart("marks","AQI BAND",aqi===null || aqi<0?[]
+                      :countMarks(bandCount,6)),
             chart("meter","VS PM PEAK",pm25===null || pm25<0?[]
                   :[relative(pm25,maximum)]),
             chart("meter","VS PM PEAK",pm10===null || pm10<0?[]

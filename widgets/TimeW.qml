@@ -1239,7 +1239,8 @@ PanelWindow {
     }
 
     function machineStoreRequest(action, data, id) {
-        if (!menuOpen || selectedMode !== "machine" || machineStoreBusy)
+        if (!menuOpen || selectedMode !== "machine" || machineStoreBusy
+                || machineAutoRestoreBusy)
             return;
         if (action !== "save" && action !== "list" && action !== "load")
             return;
@@ -1286,6 +1287,10 @@ PanelWindow {
         machineStoreRequest("load", null, machineSavedItem.id);
     }
     function machineStepSavedCheckpoint(delta) {
+        if (machineAutoRestoreBusy)
+            return;
+        machineAutoRestoreResult = null;
+        machineAutoRestoreStatus = "READY TO RESTORE";
         const n = machineSavedCheckpoints.length;
         if (n > 0)
             machineSavedIndex = (machineSavedIndex + delta + n) % n;

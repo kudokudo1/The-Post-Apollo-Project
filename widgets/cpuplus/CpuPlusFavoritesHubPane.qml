@@ -6,6 +6,7 @@ import "../../services/favorites/FavoritesOwnerNavigationPolicy.js" as OwnerNavi
 import "../../services/favorites/FavoritesExactNavigationPolicy.js" as ExactNavigation
 import "../../services/favorites/FavoritesAppSelectionPolicy.js" as AppSelection
 import "../../services/favorites/FavoritesSystemSelectionPolicy.js" as SystemSelection
+import "../../services/favorites/FavoritesThermalSelectionPolicy.js" as ThermalSelection
 
 // CPU++ Favorites++ manager. Three instances share one selection/snapshot.
 // No new FileView, owner process, or action authority is created here.
@@ -47,6 +48,10 @@ Item {
     signal appSelectionRequested(string desktopId)
     // U7b-D: fixed SYSTEM metric only, not a device ID or control action.
     signal systemSelectionRequested(string metric)
+    // Opaque selection token; AppControl alone resolves the saved hardware ID.
+    signal thermalSelectionRequested(string token)
+    readonly property var thermalSelection:
+        ThermalSelection.plan(pane.selectedResource)
     readonly property var systemSelection:
         SystemSelection.plan(pane.selectedResource)
     readonly property var appSelection:
@@ -762,7 +767,8 @@ Item {
                 height: 30
                 label: pane.selectedResource && pane.selectedResource.readOnly
                     ? (pane.exactNavigation.ok || pane.appSelection.ok
-                       || pane.systemSelection.ok ? "OPEN ITEM" : "NO ACTION")
+                       || pane.systemSelection.ok || pane.thermalSelection.ok
+                       ? "OPEN ITEM" : "NO ACTION")
                     : pane.selectedResource
                       && pane.selectedResource.category==="CLOCK"
                       && pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
@@ -776,7 +782,7 @@ Item {
                 available: pane.selectedResource !== null &&
                     (pane.selectedResource.readOnly
                       ? (pane.exactNavigation.ok || pane.appSelection.ok
-                         || pane.systemSelection.ok)
+                         || pane.systemSelection.ok || pane.thermalSelection.ok)
                       : pane.selectedResource.category==="CLOCK"
                         ? pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
                           && !pane.timeOwner.zoneCatalogLoading
@@ -792,6 +798,8 @@ Item {
                             pane.appSelectionRequested(pane.appSelection.desktopId);
                         else if(pane.systemSelection.ok)
                             pane.systemSelectionRequested(pane.systemSelection.metric);
+                        else if(pane.thermalSelection.ok)
+                            pane.thermalSelectionRequested(pane.thermalSelection.token);
                         return;
                     }
                     if(pane.selectedResource.category==="CLOCK")

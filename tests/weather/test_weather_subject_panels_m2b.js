@@ -208,7 +208,7 @@ test("WEATHER map does not fetch or plot non-weather events", () => {
   assert.match(discovery,/!weatherMapOnly && mapShowEarthquakes/);
   assert.match(discovery,/!weatherMapOnly && mapShowGdacs/);
   assert.match(discovery,/&& !stationDiscovery\.weatherMapOnly/);
-  assert.match(discovery,/model: firmsService\.ready \? firmsService\.hotspots : \[\]/);
+  assert.match(discovery,/model: firmsService\.ready[\s\S]*?stationDiscovery\.earthLayerSelected\("firms"\)/);
   assert.match(discovery,/visible: !stationDiscovery\.weatherMapOnly/);
   // Full source-row lists are now partitioned by DOMAIN:
   // WEATHER map has none; EARTH's original map renderer keeps full source

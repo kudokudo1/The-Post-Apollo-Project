@@ -16,6 +16,8 @@ Rectangle {
     property string section: "LIVE"
     // Empty route keeps the original CLASSIC NEWS hub unchanged.
     property string subjectRoute: ""
+    // MEDIA M1: native SUBJECTS already has a fixed COSMOS C44 title.
+    property bool embeddedHeader: false
     // M28-T: the native NEWS // ALL route restores the exact CLASSIC
     // six-tab channel controls and the same GDELT report inspector.
     readonly property bool usesOriginalChannelTabs:
@@ -267,8 +269,10 @@ Rectangle {
             spacing: 10
 
             Row {
+                objectName: "media-m1-legacy-news-title"
+                visible: !stationNewsHub.embeddedHeader
                 width: parent.width
-                height: 25
+                height: visible ? 25 : 0
                 spacing: 12
                 GohuText {
                     text: (stationNewsHub.usesOriginalChannelTabs ? "NEWS // " : "MEDIA // ")

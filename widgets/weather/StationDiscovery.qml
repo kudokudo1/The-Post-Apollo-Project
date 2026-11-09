@@ -2381,8 +2381,22 @@ Rectangle {
                 Rectangle {
                     id: mapPlot
                     objectName: "earth-e2-single-map-plot"
-                    parent: stationDiscovery.earthPinnedMap
-                        ? pinnedMapHost : mapCanvasSection
+                    // E2 repair: the original map is first positioned by
+                    // mapCanvasSection's Column. A direct parent binding can
+                    // carry that old Column y-coordinate into pinnedMapHost,
+                    // where clip:true makes the entire map disappear. Use a
+                    // reversible ParentChange to reset its local origin.
+                    parent: mapCanvasSection
+                    states: State {
+                        name: "pinned"
+                        when: stationDiscovery.earthPinnedMap
+                        ParentChange {
+                            target: mapPlot
+                            parent: pinnedMapHost
+                            x: 0
+                            y: 0
+                        }
+                    }
                     width: parent.width
                     height: stationDiscovery.earthPinnedMap
                         ? pinnedMapHost.height : 270

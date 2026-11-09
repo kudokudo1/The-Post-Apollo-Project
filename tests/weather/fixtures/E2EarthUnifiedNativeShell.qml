@@ -12,6 +12,8 @@ ShellRoot {
     property int ticks: 0
     property real pinnedY: -1
     property int initialMapCount: -1
+    // Start on the original scrolling map route, as the real EARTH overview does.
+    property bool pinned: false
     function find(item,name) {
         if(!item)return null;
         if(item.objectName===name)return item;
@@ -54,8 +56,9 @@ ShellRoot {
             domain: "map"
             stationOpen: false
             earthMapOnly: true
-            earthMapRoute: "earth/maps/events"
-            earthPinnedMap: true
+            earthMapRoute: root.pinned
+                ? "earth/maps/events" : "earth/overview"
+            earthPinnedMap: root.pinned
         }
     }
     Component {
@@ -90,6 +93,18 @@ ShellRoot {
                 const scroll=find(map,"earth-e2-event-scroll");
                 const filters=find(map,"earth-e2-pinned-filters");
                 if(!host || !canvas || !scroll || !filters)return;
+                if(!root.pinned) {
+                    // The original map gets a Column-assigned y-offset before
+                    // selecting the pinned MAP tab. This transition was absent
+                    // from E2's original native witness.
+                    if(canvas.parent===host || canvas.y<=0)return;
+                    root.pinned=true;
+                    return;
+                }
+                if(!canvas.visible
+                    || Math.abs(canvas.mapToItem(host,0,0).x)>0.15
+                    || Math.abs(canvas.mapToItem(host,0,0).y)>0.15)
+                    return root.fail("PINNED_MAP_RETAINED_OLD_SCROLL_OFFSET");
                 if(!host.visible || !filters.visible
                     || canvas.parent!==host
                     || !scroll.visible || canvas.height<=100

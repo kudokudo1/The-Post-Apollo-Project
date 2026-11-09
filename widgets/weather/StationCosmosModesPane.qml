@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "StationCosmosModePolicy.js" as Modes
 import "StationCosmosPlanetEventPolicy.js" as ClockPolicy
+import "StationSubjectHeaderGeometry.js" as HeaderGeometry
 
 // Fixed subject rail + one focused instrument. No whole-page scrolling.
 // The IAU shower catalogue alone scrolls inside a bounded middle panel.
@@ -257,8 +258,8 @@ Rectangle {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.margins: 6
-        height: 18
+        anchors.margins: HeaderGeometry.inset
+        height: HeaderGeometry.titleHeight
         text: "COSMOS // "+cosmosModePane.family.toUpperCase()
         color: Colors.magenta
         font.pixelSize: 12
@@ -269,20 +270,19 @@ Rectangle {
         anchors.top: titleText.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: 6
-        anchors.rightMargin: 6
-        anchors.topMargin: 4
-        height: 27
-        spacing: 4
+        anchors.leftMargin: HeaderGeometry.inset
+        anchors.rightMargin: HeaderGeometry.inset
+        anchors.topMargin: HeaderGeometry.titleToTabs
+        height: HeaderGeometry.tabHeight
+        spacing: HeaderGeometry.tabSpacing
         Repeater {
             id: modeRepeater
             model: cosmosModePane.modes || []
             delegate: ActionButton {
                 required property var modelData
-                width: Math.max(1,(modeRail.width
-                    -(cosmosModePane.modeCount-1)*modeRail.spacing)
-                    /Math.max(1,cosmosModePane.modeCount))
-                height: 27
+                width: HeaderGeometry.buttonWidth(modeRail.width,
+                    cosmosModePane.modeCount)
+                height: HeaderGeometry.tabHeight
                 label: modelData.label
                 labelPixelSize: cosmosModePane.modeCount>5 ? 9 : 10
                 contentPadding: 1
@@ -295,12 +295,12 @@ Rectangle {
     Rectangle {
         id: dividerLine
         anchors.top: modeRail.bottom
-        anchors.topMargin: 5
+        anchors.topMargin: HeaderGeometry.tabsToRule
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: 6
-        anchors.rightMargin: 6
-        height: 2
+        anchors.leftMargin: HeaderGeometry.inset
+        anchors.rightMargin: HeaderGeometry.inset
+        height: HeaderGeometry.ruleHeight
         color: Colors.cyan
     }
     Item {
@@ -309,7 +309,10 @@ Rectangle {
         anchors.bottom: footer.top
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.margins: 6
+        anchors.leftMargin: HeaderGeometry.inset
+        anchors.rightMargin: HeaderGeometry.inset
+        anchors.bottomMargin: HeaderGeometry.inset
+        anchors.topMargin: HeaderGeometry.ruleToContent
         clip: true
         Loader {
             id: instrumentLoader

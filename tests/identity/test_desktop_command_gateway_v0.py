@@ -46,6 +46,7 @@ class GatewayIntegrationTests(unittest.TestCase):
         self.verifier_calls = []
         self.consent_calls = []
         self.seat = True
+        self.time = NOW
         self.peer_allowed = False
         self.consent_allowed = False
         self.secret = "CI-PRIVATE-FAKE-TOKEN"
@@ -65,7 +66,7 @@ class GatewayIntegrationTests(unittest.TestCase):
             browser_open=lambda url: self.urls.append(url),
             exchange_and_verify=self._exchange,
             api_get=self._get,
-            clock=lambda: NOW,
+            clock=lambda: self.time,
             session_is_active=lambda: self.seat,
         )
         self.hosts.append(host)
@@ -395,8 +396,9 @@ class GatewayIntegrationTests(unittest.TestCase):
         rid = self._begin()["requestId"]
         self._check_rejected(self._status("MISMATCHED_REQUEST_ID_1234"))
         self._check_rejected(self._cancel("MISMATCHED_REQUEST_ID_1234"))
-        self._check_rejected(self._status(rid[:-1] + "X"))
-        self._check_rejected(self._cancel(rid[:-1] + "X"))
+        wrong_id = rid[:-1] + ("A" if rid[-1] != "A" else "B")
+        self._check_rejected(self._status(wrong_id))
+        self._check_rejected(self._cancel(wrong_id))
         self._check_rejected(self._status(None))
         self._check_rejected(self._cancel(None))
         for action in ("STATUS", "CANCEL"):
@@ -454,6 +456,21 @@ class GatewayIntegrationTests(unittest.TestCase):
         self.assertEqual(self._status(rid)["state"], "FAILED")
         self._check_rejected(self._cancel(rid))
         self._check_rejected(self._begin())
+
+    def test_host_status_expires_local_session_without_token_disclosure(self):
+        self.peer_allowed = self.consent_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        status, _ = self._callback()
+        self.assertEqual(status, 200)
+        self.assertEqual(self._status(rid)["state"], "AUTHENTICATED")
+        self.time = NOW + 181
+        self.assertEqual(self._status(rid)["state"], "FAILED")
+        self._check_rejected(self._cancel(rid))
+        self.assertEqual(read_private_display(
+            self.hosts[0].display_socket_path,
+            clock=lambda: self.time)["organizations"], [])
+        self.assertNotIn(self.secret, json.dumps(self._status(rid)))
 
     def test_host_lost_is_never_reported_as_authenticated(self):
         self.peer_allowed = self.consent_allowed = True

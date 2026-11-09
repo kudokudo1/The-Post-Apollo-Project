@@ -48,7 +48,7 @@ require_regex(
 
 require(HUB, 'filterId: "manager"', "hub must expose a MANAGER mode")
 require(HUB, 'label: "MANAGER"', "manager control must be visibly labeled")
-require(HUB, 'text: "DND / ZZ RULES  //  " + managerDndPolicies.count', "manager must show scoped DND and ZZ rules")
+require(HUB, 'id: managerRuleTabs', "manager must expose independent DND, ZZ, and Favorites views")
 require(HUB, 'label: dndRule.dnd ? "ALLOW" : "WAKE"', "manager must clear DND or wake ZZ")
 for preset in ("1H", "6H", "12H", "1D", "3D", "7D"):
     require(HUB, f'label: "{preset}"', f"manager must expose {preset} snooze preset")
@@ -62,7 +62,7 @@ require(SERVICE, 'const child = policyFor(childKey);', "exact website policy")
 require(SERVICE, 'websiteKey(entry.sourceId, entry.source, entry.websiteHost) === key', "website DND must immediately suppress only matching active site popups")
 require(HUB, '"websiteHost": String(entry.websiteHost || "")', "website hostname reaches card controls")
 require(HUB, 'onNotificationIdChanged: {', "recycled card must reset per-event state")
-require(HUB, 'targetWholeApp = false;', "recycled card resets SITE/APP scope")
+require(HUB, 'targetScopeIndex = 0;', "recycled card resets exact scope selector")
 require(HUB, 'emailDeckOpen = false;', "recycled card resets email action deck")
 require(HUB, 'notificationEntry.targetWholeApp ? "APP"', "visible SITE/APP selector")
 require(HUB, 'NotificationsService.toggleDnd(notificationEntry.targetKey,', "DND must follow selected scope")
@@ -177,7 +177,7 @@ require(HUB, "model: NotificationsService.favoriteSources", "Manager must displa
 require(HUB, 'text: "FAVORITES  //  " + NotificationsService.favoriteSources.count', "Manager must display Favorites section")
 require(HUB, 'label: "UNFAV"', "Manager must allow removing a favorite")
 require(HUB, "NotificationsService.setFavorite(favoriteRule.appKey, favoriteRule.sourceId, favoriteRule.source, false)", "UNFAV must remove just favorite status")
-require(HUB, 'text: "DND / ZZ RULES  //  " + managerDndPolicies.count', "DND and ZZ manager must remain available")
+require(HUB, '"DO NOT DISTURB // " + managerVisiblePolicies.count', "DND and ZZ manager must remain available")
 require(HUB, 'label: dndRule.dnd ? "ALLOW" : "WAKE"', "ALLOW and WAKE controls must remain intact")
 
 # The user's existing keyboard-owner protocol must remain authoritative.

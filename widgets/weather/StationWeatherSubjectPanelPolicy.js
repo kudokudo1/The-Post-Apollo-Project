@@ -14,13 +14,13 @@ var ROUTES = {
   "earth/ground/full": {page:"ground",sections:[
     "header","runtime","alerts","lightning","heat-fire","air-pm",
     "air-gases","pollen","air-forecast","seismic","source"]},
-  "earth/water/rivers": {page:"ground",sections:["header","rivers"]},
-  "earth/water/rivers/gauges": {page:"ground",sections:["header","rivers"]},
-  "earth/water/rivers/nearby": {page:"ground",sections:["header","rivers"]},
-  "earth/water/rivers/flood": {page:"ground",sections:["header","rivers"]},
-  "earth/water/rivers/hydrograph": {page:"ground",sections:["header","rivers"]},
-  "earth/water/marine": {page:"ground",sections:["header","marine"]},
-  "earth/water/coast": {page:"ground",sections:["header","coast"]},
+  "earth/water/rivers": {page:"ground",sections:["rivers"]},
+  "earth/water/rivers/gauges": {page:"ground",sections:["rivers"]},
+  "earth/water/rivers/nearby": {page:"ground",sections:["rivers"]},
+  "earth/water/rivers/flood": {page:"ground",sections:["rivers"]},
+  "earth/water/rivers/hydrograph": {page:"ground",sections:["rivers"]},
+  "earth/water/marine": {page:"ground",sections:["marine"]},
+  "earth/water/coast": {page:"ground",sections:["coast"]},
   // NOW + AIR aggregates original terrestrial readings in one scrollable
   // StationSky view; detailed ground air/gas/pollen pages stay independent.
   "weather/conditions/current": {page:"sky", sections:["header","runtime","current","atmosphere"]},

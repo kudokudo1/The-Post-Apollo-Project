@@ -943,6 +943,10 @@ PanelWindow {
     }
 
     function machineRequestNotesRead() {
+        if (machineNotesDirty) {
+            machineNotesStatus = "UNSAVED NOTES // SAVE OR CANCEL FIRST";
+            return;
+        }
         if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
                 || !machineSavedItem || machineSaveBridgeBusy
                 || machineStoreBusy || machineAutoRestoreBusy)
@@ -5770,7 +5774,12 @@ PanelWindow {
                                 label: "BACK TO CAPTURE"
                                 labelPixelSize: 10
                                 accentColor: timew.semanticColor
-                                onLeftClicked: timew.machineStoredViewOpen = false
+                                available: !timew.machineNotesDirty
+                                           && !timew.machineSaveBridgeBusy
+                                onLeftClicked: {
+                                    timew.machineNotesDiscard();
+                                    timew.machineStoredViewOpen = false;
+                                }
                             }
                             ActionButton {
                                 width: (parent.width - 8) / 2
@@ -5779,6 +5788,8 @@ PanelWindow {
                                 labelPixelSize: 10
                                 accentColor: timew.semanticColor
                                 available: !timew.machineStoreBusy
+                                           && !timew.machineSaveBridgeBusy
+                                           && !timew.machineNotesDirty
                                 onLeftClicked: timew.machineListCheckpoints()
                             }
                         }
@@ -5792,6 +5803,9 @@ PanelWindow {
                                 label: "<"
                                 accentColor: timew.semanticColor
                                 available: timew.machineSavedCheckpoints.length > 1
+                                           && !timew.machineNotesDirty
+                                           && !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
                                 onLeftClicked: timew.machineStepSavedCheckpoint(-1)
                             }
                             GohuText {
@@ -5811,13 +5825,15 @@ PanelWindow {
                                 label: ">"
                                 accentColor: timew.semanticColor
                                 available: timew.machineSavedCheckpoints.length > 1
+                                           && !timew.machineNotesDirty
+                                           && !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
                                 onLeftClicked: timew.machineStepSavedCheckpoint(1)
                             }
                         }
                         GohuText {
                             width: parent.width
-                            text: timew.machineSavedItem ? timew.machineSavedItem.label
-                                                          : "NO SAVED RECORD SELECTED"
+                            text: timew.machineNotesNameForItem(timew.machineSavedItem)
                             color: Colors.orange
                             font.pixelSize: 12
                             elide: Text.ElideRight
@@ -5842,6 +5858,153 @@ PanelWindow {
                             font.pixelSize: 11
                             elide: Text.ElideRight
                         }
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 8
+                            ActionButton {
+                                width: parent.width
+                                height: parent.height
+                                label: timew.machineNotesEditorOpen
+                                       ? "NOTES // REFRESH SELECTED" : "NOTES // RENAME"
+                                labelPixelSize: 10
+                                accentColor: Colors.magenta
+                                available: !!timew.machineSavedItem
+                                           && !timew.machineNotesDirty
+                                           && !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
+                                           && !timew.machineAutoRestoreBusy
+                                onLeftClicked: timew.machineRequestNotesRead()
+                            }
+                        }
+                        Column {
+                            id: machineStoredNotesEditor
+                            visible: timew.machineNotesEditorOpen
+                            width: parent.width
+                            spacing: 7
+
+                            GohuText {
+                                width: parent.width
+                                text: "CHECKPOINT NOTES // OPTIONAL PERSONAL METADATA"
+                                color: Colors.magenta
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: timew.machineNotesStatus
+                                color: timew.machineNotesStatus.startsWith("NOTES SAVED")
+                                       ? Colors.cyan : Colors.orange
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                            GohuText {
+                                visible: !!timew.machineNotesLoaded
+                                width: parent.width
+                                text: timew.machineNotesLoaded
+                                      ? "ORIGINAL // " + timew.machineNotesLoaded.original_label
+                                        + " // REV " + timew.machineNotesLoaded.revision
+                                      : ""
+                                color: Colors.white
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                            TextField {
+                                id: machineNotesNameInput
+                                visible: !!timew.machineNotesLoaded
+                                width: parent.width
+                                height: 34
+                                maximumLength: 48
+                                text: timew.machineNotesDraftName
+                                placeholderText: "CHECKPOINT NAME"
+                                color: Colors.magenta
+                                placeholderTextColor: Colors.cyan
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 11
+                                leftPadding: 7
+                                rightPadding: 7
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: machineNotesNameInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                }
+                                onTextEdited: timew.machineNotesDraftName = text
+                            }
+                            TextArea {
+                                id: machineNotesTextInput
+                                visible: !!timew.machineNotesLoaded
+                                width: parent.width
+                                height: 114
+                                text: timew.machineNotesDraftText
+                                textFormat: TextEdit.PlainText
+                                wrapMode: TextEdit.Wrap
+                                placeholderText: "OPTIONAL NOTES // 1024 CHARACTERS"
+                                color: Colors.white
+                                placeholderTextColor: Colors.cyan
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 11
+                                leftPadding: 7
+                                rightPadding: 7
+                                topPadding: 7
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: machineNotesTextInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                }
+                                onTextChanged: timew.machineNotesDraftText = text
+                            }
+                            GohuText {
+                                visible: !!timew.machineNotesLoaded
+                                width: parent.width
+                                text: timew.machineNotesDraftText.length + " / 1024 // "
+                                      + (timew.machineNotesDirty
+                                         ? "UNSAVED CHANGES" : "NO UNSAVED CHANGES")
+                                color: timew.machineNotesInputValid
+                                       ? Colors.cyan : Colors.orange
+                                font.pixelSize: 10
+                            }
+                            Row {
+                                width: parent.width
+                                height: 32
+                                spacing: 6
+                                ActionButton {
+                                    width: (parent.width - 6) / 2
+                                    height: parent.height
+                                    label: "SAVE NOTES"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.orange
+                                    available: !!timew.machineNotesLoaded
+                                               && timew.machineNotesDirty
+                                               && timew.machineNotesInputValid
+                                               && !timew.machineSaveBridgeBusy
+                                               && !timew.machineStoreBusy
+                                    onLeftClicked: timew.machineSaveNotes()
+                                }
+                                ActionButton {
+                                    width: (parent.width - 6) / 2
+                                    height: parent.height
+                                    label: "CANCEL // CLOSE"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.magenta
+                                    available: !timew.machineSaveBridgeBusy
+                                    onLeftClicked: timew.machineNotesDiscard()
+                                }
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: "ONLY NAME + NOTE CHANGE // ORIGINAL CAPTURE AND GEOMETRY STAY UNTOUCHED"
+                                color: Colors.orange
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                        }
+
                         Row {
                             width: parent.width
                             height: 34

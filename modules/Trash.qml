@@ -1177,8 +1177,9 @@ PanelWindow {
                                 color: Colors.yellow
                                 font.pixelSize: 12
                                 verticalAlignment: Text.AlignVCenter
-                                text: "ARCHIVE // RECORD INVENTORY // "
-                                      + trashLauncher.archiveRows.length
+                                text: "ARCHIVE // INVENTORY // "
+                                      + (trashLauncher.archiveRows.length
+                                         + trashLauncher.researchRows.length)
                             }
                             ActionButton {
                                 width: 92
@@ -1200,6 +1201,7 @@ PanelWindow {
                                    ? Colors.red : Colors.cyan
                             elide: Text.ElideRight
                             text: trashLauncher.archiveState + " // "
+                                + trashLauncher.researchState + " // "
                                 + trashLauncher.archiveSources.map(function(v) {
                                     return v.id + ":" + v.state;
                                 }).join(" // ")
@@ -1212,7 +1214,7 @@ PanelWindow {
                             color: Colors.white
                             font.pixelSize: 10
                             placeholderTextColor: Colors.cyan
-                            placeholderText: "SEARCH ARCHIVED EVENTS // DOSSIERS // SCRAPES"
+                            placeholderText: "FIND RECORDS // SAVED COPIES // BIN"
                             text: trashLauncher.archiveSearchText
                             onTextChanged: trashLauncher.archiveSearchText = text
                             background: Rectangle {
@@ -1234,11 +1236,13 @@ PanelWindow {
                                     {id:"all", label:"ALL"},
                                     {id:"events", label:"EVENTS"},
                                     {id:"dossiers", label:"DOSSIERS"},
-                                    {id:"scrapes", label:"SCRAPES"}
+                                    {id:"scrapes", label:"SCRAPES"},
+                                    {id:"copies", label:"COPIES"},
+                                    {id:"bin", label:"BIN"}
                                 ]
                                 ActionButton {
                                     required property var modelData
-                                    width: (archiveFilterRow.width - 12) / 4
+                                    width: (archiveFilterRow.width - 20) / 6
                                     height: 26
                                     label: modelData.label
                                     labelPixelSize: 9
@@ -1266,15 +1270,17 @@ PanelWindow {
                                 delegate: Rectangle {
                                     required property var modelData
                                     width: archiveEntriesList.width
-                                    height: 77
+                                    height: 86
                                     color: Colors.dark
                                     radius: 0
                                     border.width: 1
-                                    border.color: Colors.cyan
+                                    border.color: modelData.state === "trashed"
+                                                  ? Colors.orange : Colors.cyan
 
                                     Column {
                                         anchors.fill: parent
                                         anchors.margins: 6
+                                        anchors.rightMargin: 126
                                         spacing: 3
 
                                         GohuText {
@@ -1293,6 +1299,9 @@ PanelWindow {
                                             elide: Text.ElideRight
                                             text: String(modelData.source)
                                                   + " // " + String(modelData.kind)
+                                                  + (modelData.state
+                                                     ? " // " + String(modelData.state).toUpperCase()
+                                                     : "")
                                         }
                                         GohuText {
                                             width: parent.width
@@ -1302,6 +1311,53 @@ PanelWindow {
                                             elide: Text.ElideRight
                                             text: String(modelData.recordedAt)
                                                   + " // " + String(modelData.details)
+                                        }
+                                    }
+
+                                    Column {
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 5
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 109
+                                        spacing: 4
+
+                                        ActionButton {
+                                            width: parent.width
+                                            height: 30
+                                            visible: modelData.kind === "WEB SCRAPE"
+                                                     || modelData.kind === "SAVED RESEARCH"
+                                            label: modelData.kind === "WEB SCRAPE"
+                                                   ? "SAVE COPY"
+                                                   : modelData.state === "trashed"
+                                                   ? "RESTORE" : "TRASH COPY"
+                                            labelPixelSize: 9
+                                            accentColor: modelData.state === "trashed"
+                                                         ? Colors.green : Colors.cyan
+                                            available: !trashLauncher.researchBusy
+                                                       && !trashLauncher.archiveBusy
+                                                       && trashLauncher.researchBurnId === ""
+                                            onLeftClicked: {
+                                                if (modelData.kind === "WEB SCRAPE")
+                                                    trashLauncher.saveDemoCopy(modelData);
+                                                else if (modelData.state === "trashed")
+                                                    trashLauncher.restoreResearchCopy(modelData);
+                                                else
+                                                    trashLauncher.trashResearchCopy(modelData);
+                                            }
+                                        }
+
+                                        ActionButton {
+                                            width: parent.width
+                                            height: 29
+                                            visible: modelData.kind === "SAVED RESEARCH"
+                                                     && modelData.state === "trashed"
+                                            label: "BURN COPY"
+                                            labelPixelSize: 9
+                                            accentColor: Colors.red
+                                            destructive: true
+                                            available: !trashLauncher.researchBusy
+                                                       && trashLauncher.researchBurnId === ""
+                                            onLeftClicked: trashLauncher.armResearchBurn(modelData)
                                         }
                                     }
                                 }
@@ -1319,10 +1375,12 @@ PanelWindow {
                             GohuText {
                                 anchors.centerIn: parent
                                 visible: !trashLauncher.archiveBusy
+                                         && !trashLauncher.researchBusy
                                          && trashLauncher.archiveFilteredRows.length === 0
                                 color: Colors.cyan
                                 font.pixelSize: 11
                                 text: trashLauncher.archiveRows.length === 0
+                                         && trashLauncher.researchRows.length === 0
                                       ? "NO ARCHIVED RECORDS FOUND"
                                       : "NO MATCHES // TRY ANOTHER FILTER"
                             }
@@ -1334,43 +1392,117 @@ PanelWindow {
                             color: Colors.yellow
                             font.pixelSize: 9
                             wrapMode: Text.WordWrap
-                            text: "SOURCE OWNED // READ-ONLY DISCOVERY. NO RECORD TRASH, RESTORE OR BURN ENABLED."
+                            text: "SOURCES READ-ONLY // SAVE COPY ENABLED FOR DEMO SCRAPES ONLY. BURN AFFECTS TRASH++ COPIES, NEVER ORIGINALS."
                         }
                     }
                 }
 
-                Column {
+                Item {
+                    id: researchBurnReview
                     anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 12
                     visible: trashLauncher.activeMode === "burn"
 
-                    GohuText {
-                        width: parent.width
-                        height: 28
-                        font.pixelSize: 14
-                        color: Colors.yellow
-                        text: "BURN // VERIFIED DELETION ONLY"
-                    }
-                    Rectangle {
-                        width: parent.width
-                        height: 2
-                        color: Colors.cyan
-                    }
-                    GohuText {
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        font.pixelSize: 11
-                        color: Colors.cyan
-                        text: "Only SYSTEM TRASH currently supports Burn. Archive records, Hospital reports, Finance and source-owned data have no universal Burn permission."
-                    }
-                    ActionButton {
-                        width: 156
-                        height: 30
-                        label: "VIEW SYSTEM TRASH"
-                        labelPixelSize: 10
-                        accentColor: Colors.green
-                        onLeftClicked: trashLauncher.setMode("trash")
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 9
+
+                        GohuText {
+                            width: parent.width
+                            height: 28
+                            font.pixelSize: 13
+                            color: Colors.yellow
+                            text: "BURN // SAVED COPY BIN // "
+                                  + trashLauncher.researchBinRows.length
+                        }
+                        GohuText {
+                            width: parent.width
+                            height: 43
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                            color: Colors.cyan
+                            text: "Only SYSTEM TRASH currently supports Burn. This separate section also permits explicit Burn of trashed, Trash++-owned DEMO RESEARCH COPIES. Originals, Hospital and Finance records are excluded."
+                        }
+
+                        Item {
+                            width: parent.width
+                            height: Math.max(100, researchBurnReview.height - 145)
+
+                            ListView {
+                                id: researchBurnList
+                                width: parent.width - 14
+                                height: parent.height
+                                clip: true
+                                spacing: 6
+                                boundsBehavior: Flickable.StopAtBounds
+                                model: trashLauncher.researchBinRows
+
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: researchBurnList.width
+                                    height: 64
+                                    color: Colors.dark
+                                    radius: 0
+                                    border.width: 1
+                                    border.color: Colors.orange
+
+                                    GohuText {
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 7
+                                        anchors.right: burnCopyButton.left
+                                        anchors.rightMargin: 8
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        font.pixelSize: 10
+                                        color: Colors.white
+                                        elide: Text.ElideRight
+                                        text: String(modelData.title)
+                                              + " // " + String(modelData.recordedAt)
+                                    }
+
+                                    ActionButton {
+                                        id: burnCopyButton
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 6
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 105
+                                        height: 33
+                                        label: "BURN COPY"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.red
+                                        destructive: true
+                                        available: !trashLauncher.researchBusy
+                                                   && trashLauncher.researchBurnId === ""
+                                        onLeftClicked: trashLauncher.armResearchBurn(modelData)
+                                    }
+                                }
+                            }
+
+                            NeonScrollBar {
+                                flickable: researchBurnList
+                                x: parent.width - width - 1
+                                height: parent.height
+                                geometryMode: "viewport"
+                                handleStyle: "star"
+                                visible: scrollable
+                            }
+
+                            GohuText {
+                                anchors.centerIn: parent
+                                visible: trashLauncher.researchBinRows.length === 0
+                                color: Colors.cyan
+                                font.pixelSize: 11
+                                text: "NO MANAGED COPIES PENDING PURGE"
+                            }
+                        }
+
+                        ActionButton {
+                            width: 172
+                            height: 30
+                            label: "VIEW SYSTEM TRASH"
+                            labelPixelSize: 10
+                            accentColor: Colors.green
+                            onLeftClicked: trashLauncher.setMode("trash")
+                        }
                     }
                 }
             }

@@ -280,7 +280,7 @@ class DirectGuestRelayReview(unittest.TestCase):
             'print("C4B_OBSERVED // " + json.dumps(observe(),'), 1)
         self.assertEqual(guest.count("C4B_RUNNING_HOST_PROBE"), 2)
         self.assertIn("GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1",guest)
-                self.assertIn("C4D_PRODUCER_CAPTURE_UNSAFE_AT_CLEANUP",guest)
+        self.assertIn("C4D_PRODUCER_CAPTURE_UNSAFE_AT_CLEANUP",guest)
 
     def test_11_bounded_full_instrument_log_read_and_existing_c2v_tail(self):
         code = GUEST.read_text()

@@ -369,6 +369,7 @@ Rectangle {
             Row {
             visible: stationRadio.sectionVisible("search")
                 id: presetRow
+                objectName: "media-m1-radio-preset-rail"
                 height: 26
                 width: parent.width
                 spacing: 6
@@ -393,6 +394,7 @@ Rectangle {
             Row {
             visible: stationRadio.sectionVisible("search")
                 id: queryRow
+                objectName: "media-m1-radio-query-rail"
                 width: parent.width
                 height: 30
                 spacing: 8
@@ -806,6 +808,7 @@ Rectangle {
 
             Row {
                 id: transportRow
+                objectName: "media-m1-radio-transport-row"
                 height: 29
             visible: stationRadio.sectionVisible("transport")
                 width: parent.width

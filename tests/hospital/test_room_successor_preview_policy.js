@@ -106,7 +106,8 @@ function transferFor(changes) {
     const source = {...base,...(changes || {})};
     return ctx.successionContract({
         plan:ctx.preview(source), snapshot:source.snapshot,
-        sessions:source.sessions, sessionsLoaded:source.sessionsLoaded
+        sessions:source.sessions, sessionsLoaded:source.sessionsLoaded,
+        previousSessionId:source.previousSessionId
     });
 }
 function transferHeld(changes, phrase) {
@@ -142,6 +143,17 @@ transferHeld({sessions:[{...released,providerId:"other"}]}, "Doctor/Provider dif
 transferHeld({sessions:[{...released,workingDirectory:"/tmp/other"}]}, "Session Bed differs");
 transferHeld({sessions:[released,{...released,id:"older"}]},
     "Multiple historical Room Sessions");
+const selected = transferFor({
+    sessions:[released,{...released,id:"older"}],previousSessionId:"older"
+});
+assert.equal(selected.readyForAuthorityCheck,true);
+assert.equal(selected.pinnedRequest.previousSessionId,"older");
+assert.equal(selected.mutationAuthorized,false);
+assert.match(selected.status,/LATEST ORDER/);
+transferHeld({sessions:[released,{...released,id:"older"}],
+    previousSessionId:"unknown"}, "Selected predecessor Session");
+transferHeld({sessions:[released],previousSessionId:"unknown"},
+    "Selected predecessor Session");
 transferHeld({sessions:[released],sessionsLoaded:false},
     "Session registry not verified");
 transferHeld({sessions:[released],doctorId:"doctor-old"},

@@ -25,3 +25,9 @@ li strong { color: #dcf3fa; }
 li span { color: #55cfca; }
 .limits { border-top: 1px solid #c74ec7; padding-top: 10px; margin-top: 12px; font-size: 10px; color: #f2be4e; }
 .limits p { margin: 0 0 6px; }
+
+.local-link { border-top: 1px solid #c74ec7; margin-top: 14px; padding-top: 10px; }
+.local-link h2 { font-size: 12px; color: #c74ec7; margin: 0 0 8px; }
+.local-link p { font-size: 10px; line-height: 1.5; }
+.local-link button { margin-top: 6px; font-size: 10px; padding: 8px; }
+#local-status { font-size: 10px; color: #55cfca; }

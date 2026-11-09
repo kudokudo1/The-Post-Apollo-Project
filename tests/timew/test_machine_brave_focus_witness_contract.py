@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """No accidental Brave host activation or window-moving authority."""
 import ast
+import json
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[2]
@@ -52,9 +53,12 @@ assert "MachineBraveFocusWitness" not in qml
 assert "MachineBraveHostPairingReview" not in qml
 assert "MachineBraveFocusWitness" not in restore
 assert "MachineBraveFocusWitness" not in legacy
-assert "nativeMessaging" not in pilot
-assert '"permissions": []' in pilot
+pilot_manifest = json.loads(pilot)
+assert pilot_manifest["permissions"] == []
+assert pilot_manifest["host_permissions"] == []
+assert pilot_manifest["optional_permissions"] == ["nativeMessaging"]
+assert pilot_manifest["incognito"] == "not_allowed"
 assert "SCHEMA_VERSION = 1" in legacy
 assert qml.count("Process {") == 15
 
-print("MACHINE Brave focus // no live connection, no move and no identity grant PASS")
+print("MACHINE Brave focus // no host binding, move or identity grant PASS")

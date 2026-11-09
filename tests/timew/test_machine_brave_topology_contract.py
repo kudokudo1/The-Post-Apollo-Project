@@ -19,14 +19,15 @@ assert manifest["manifest_version"] == 3
 assert manifest["incognito"] == "not_allowed"
 assert manifest["permissions"] == []
 assert manifest["host_permissions"] == []
+assert manifest["optional_permissions"] == ["nativeMessaging"]
 assert manifest["action"]["default_popup"] == "popup.html"
 assert set(manifest) == {
     "manifest_version", "name", "version", "description",
     "minimum_chrome_version", "incognito", "permissions",
-    "host_permissions", "action",
+    "optional_permissions", "host_permissions", "action",
 }
 for forbidden in (
-    "nativeMessaging", "tabs", "history", "cookies", "storage",
+    "tabs", "history", "cookies", "storage",
     "scripting", "debugger", "activeTab", "background", "content_scripts",
     "externally_connectable", "webRequest", "<all_urls>",
 ):
@@ -74,4 +75,4 @@ assert qml.count("Process {") == 15
 roots = re.findall(r"^    (?:readonly )?property\s+\w+\s+(\w+)\s*[:=]",
                    qml, flags=re.MULTILINE)
 assert roots and len(roots) == len(set(roots))
-print("MACHINE Brave // zero permissions, no private data or live host control PASS")
+print("MACHINE Brave // zero required permissions, explicit optional host only PASS")

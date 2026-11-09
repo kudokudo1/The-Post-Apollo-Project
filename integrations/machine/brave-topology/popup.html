@@ -19,6 +19,16 @@
     <p id="status" role="status" aria-live="polite">READY</p>
     <div id="counts" aria-label="Browser window and tab totals"></div>
     <ol id="window-list" aria-label="Temporary browser windows"></ol>
+    <section class="local-link" aria-label="Optional local host connection">
+      <h2>LOCAL HOST // OPT-IN</h2>
+      <p>Browser window counts work without this permission. A local host
+      connection only tests whether messages can pass. It does not identify
+      a Brave window or enable session recovery.</p>
+      <button type="button" id="allow-local">ALLOW LOCAL CONNECTION</button>
+      <button type="button" id="test-local">TEST CONNECTION ONCE</button>
+      <button type="button" id="revoke-local">REVOKE LOCAL PERMISSION</button>
+      <p id="local-status" role="status" aria-live="polite">LOCAL HOST // NOT CONTACTED</p>
+    </section>
     <section class="limits" aria-label="Recovery limitations">
       <p>Window numbers last only for this browser run. They are not Sway window IDs.</p>
       <p>No private windows, page addresses, titles, profiles or tab contents are read or saved.</p>
@@ -26,5 +36,6 @@
     </section>
   </main>
   <script type="module" src="popup.mjs"></script>
+  <script type="module" src="native-probe-ui.mjs"></script>
 </body>
 </html>

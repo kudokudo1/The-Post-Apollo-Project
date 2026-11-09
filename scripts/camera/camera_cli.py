@@ -743,6 +743,7 @@ def trash_batch(token, confirmation):
         moved = 0
         skipped = 0
         failed = 0
+        first_error = ""
         unmoved_paths = []
         for target, signature in targets:
             try:
@@ -758,6 +759,13 @@ def trash_batch(token, confirmation):
                 if proc.returncode:
                     failed += 1
                     unmoved_paths.append(str(target))
+                    if not first_error:
+                        detail = proc.stderr
+                        if isinstance(detail, bytes):
+                            detail = detail.decode("utf-8", errors="replace")
+                        first_error = (detail.strip().splitlines()[0][:140]
+                                       if isinstance(detail, str) and detail.strip()
+                                       else "GIO_TRASH_FAILED")
                 else:
                     moved += 1
             except FileNotFoundError:
@@ -766,9 +774,10 @@ def trash_batch(token, confirmation):
             except (OSError, subprocess.SubprocessError):
                 failed += 1
                 unmoved_paths.append(str(target))
+                first_error = first_error or "GIO_TRASH_EXECUTION_FAILED"
         return {"ok": True, "kind": "trash-batch", "moved": moved,
                 "skipped": skipped, "failed": failed,
-                "unmovedPaths": unmoved_paths,
+                "unmovedPaths": unmoved_paths, "trashError": first_error,
                 "recoverable": True, "destination": "Freedesktop Trash"}
     finally:
         try:

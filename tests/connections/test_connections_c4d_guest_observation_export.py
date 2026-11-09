@@ -269,7 +269,7 @@ class C4dSerialCaptureTests(unittest.TestCase):
             return original_find(root)
         def parent_result():
             time.sleep(.03)
-            self.done.write_text("PASS\\n")
+            self.done.write_text("PASS\n")
         parent = threading.Thread(target=parent_result)
         parent.start()
         self.addCleanup(parent.join)
@@ -280,7 +280,7 @@ class C4dSerialCaptureTests(unittest.TestCase):
         self.assertGreaterEqual(calls, 2)
 
     def test_20_unlink_without_rollback_marker_still_refuses(self):
-        self.serial.write_bytes(observation() + b"\\n")
+        self.serial.write_bytes(observation() + b"\n")
         original_find = C.find_serial
         calls = 0
         def vanish_after_drain(root):
@@ -291,7 +291,7 @@ class C4dSerialCaptureTests(unittest.TestCase):
                 self.boot.rmdir()
                 return None
             return original_find(root)
-        self.done.write_text("PASS\\n")
+        self.done.write_text("PASS\n")
         with mock.patch.object(C, "find_serial", side_effect=vanish_after_drain):
             with self.assertRaisesRegex(
                     C.Refused, "REAL_GUEST_SECURITY_OR_ROLLBACK_MARKERS_MISSING"):
@@ -310,7 +310,7 @@ class C4dSerialCaptureTests(unittest.TestCase):
                 return None
             if calls == 3:
                 self.boot.mkdir(mode=0o700)
-                self.serial.write_bytes(observation() + b"\\n")
+                self.serial.write_bytes(observation() + b"\n")
             return original_find(root)
         with mock.patch.object(C, "find_serial", side_effect=replace_after_unlink):
             with self.assertRaisesRegex(
@@ -329,7 +329,7 @@ class C4dSerialCaptureTests(unittest.TestCase):
                 self.boot.rmdir()
                 return None
             return original_find(root)
-        self.done.write_text("FAIL\\n")
+        self.done.write_text("FAIL\n")
         with mock.patch.object(C, "find_serial", side_effect=vanished):
             with self.assertRaisesRegex(
                     C.Refused, "ORIGINAL_TWO_BOOT_LIFECYCLE_DID_NOT_PASS"):

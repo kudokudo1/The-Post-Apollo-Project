@@ -1,0 +1,62 @@
+name: Connections C3e-N installed origin and witness compatibility (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eNOriginWitnessHandoff.py"
+      - "tests/connections/test_connections_c3en_origin_witness_handoff.py"
+      - ".github/workflows/connections-c3en-origin-witness-handoff.yml"
+      - "docs/connections-c3en-origin-witness-handoff.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  origin-and-witness-handoff:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Syntax and prior canonical signed origin tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eNOriginWitnessHandoff.py \
+            tests/connections/test_connections_c3en_origin_witness_handoff.py
+          python3 -B tests/connections/test_connections_c3b_origin.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          test "$(id -u)" != "0"
+          sudo -n id -u | grep -qx 0
+      - name: Two independent OS boundaries and adversarial handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n python3 -B tests/connections/test_connections_c3en_origin_witness_handoff.py
+          echo "C3EN_PASS // C3B_CANONICAL_OPT_AND_C3EL_REAL_WITNESS_COMPATIBLE_CI_ONLY"
+      - name: Preserve real kernel origin and signed release regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n python3 -B tests/connections/test_connections_c3el_host_status_observation.py
+          sudo -n python3 -B tests/connections/test_connections_c3ek_protected_witness.py
+          python3 -B tests/connections/test_connections_c3ej_witness_peer.py
+          python3 -B tests/connections/test_connections_c3ei_supervised_supersession.py
+          echo "C3EN_PASS // PRIOR_REAL_LINUX_WITNESS_AND_SIGNED_INTENT_STILL_DENY"
+      - name: Explicit no production promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'not cryptographically bound' docs/connections-c3en-origin-witness-handoff.md
+          grep -Fq 'productionAuthority": False' tests/connections/c3e_release_trust/C3eNOriginWitnessHandoff.py
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('services/connections')
+          assert 'readonly property bool credentialActionsEnabled: false' in (s/'ConnectionsBroker.qml').read_text()
+          assert 'readonly property bool hostAuthenticated: false' in (s/'ConnectionsRequestStatus.qml').read_text()
+          print('C3EN_LIMITATION // TEST_FIXTURE_COMPATIBILITY_NOT_TRUSTED_ATTESTATION')
+          PY

@@ -181,6 +181,13 @@ Column {
 
     Connections {
         target: root.doctorService
+        function onSavingChanged() {
+            if (root.doctorService && !root.doctorService.saving
+                    && root.doctorService.lastError && root.pendingKind) {
+                root.outcome = "PX WORKER REFUSED // " + root.doctorService.lastError;
+                root.pendingKind = "";
+            }
+        }
         function onDoctorSaved(doctor) {
             root.outcome = "PX SAVED // " + String(doctor.name || doctor.id)
                 + " // " + root.pendingKind
@@ -306,6 +313,14 @@ Column {
             wrapMode: Text.WrapAnywhere
         }
         ManagerConfirmRow { kind: "CREATE_WORKER" }
+        GohuText {
+            width: parent.width
+            visible: !!root.doctorService && !!root.doctorService.lastError
+            text: root.doctorService ? root.doctorService.lastError : ""
+            font.pixelSize: 9
+            color: Colors.red
+            wrapMode: Text.Wrap
+        }
         Rectangle {width:parent.width; height:2; color:Colors.magenta}
         GohuText {
             width: parent.width
@@ -498,6 +513,7 @@ Column {
     }
 
     component ManagerConfirmRow: Row {
+        id: confirmRow
         property string kind: ""
         property bool caution: false
         width: root.width
@@ -506,24 +522,25 @@ Column {
             width: (parent.width - 6) / 2
             height: 30
             label: "REVIEW"
-            accent: caution ? Colors.orange : Colors.cyan
+            accent: confirmRow.caution ? Colors.orange : Colors.cyan
             contentGlowEnabled: false
             enabledAction: !root.registryBusy
-            onTriggered: root.review(kind)
+            onTriggered: root.review(confirmRow.kind)
         }
         HospitalActionButton {
             width: (parent.width - 6) / 2
             height: 30
-            label: caution ? "CONFIRM RELEASE" : "CONFIRM SAVE"
-            accent: caution ? Colors.red : Colors.green
-            destructive: caution
+            label: confirmRow.caution ? "CONFIRM RELEASE" : "CONFIRM SAVE"
+            accent: confirmRow.caution ? Colors.red : Colors.green
+            destructive: confirmRow.caution
             contentGlowEnabled: false
-            enabledAction: root.armedKind === kind && root.armedKey !== ""
-            onTriggered: root.confirm(kind)
+            enabledAction: root.armedKind === confirmRow.kind && root.armedKey !== ""
+            onTriggered: root.confirm(confirmRow.kind)
         }
     }
 
     component ManagerPageRow: Row {
+        id: pageRow
         property int currentPage: 0
         property int count: 0
         signal previous()
@@ -537,14 +554,14 @@ Column {
             label: "PREV"
             compactIcon: "<"
             contentGlowEnabled: false
-            enabledAction: currentPage > 0
-            onTriggered: previous()
+            enabledAction: pageRow.currentPage > 0
+            onTriggered: pageRow.previous()
         }
         GohuText {
             width: parent.width - 148
             height: parent.height
-            text: "PAGE " + (currentPage + 1)
-                + " // " + count + " RECORDS"
+            text: "PAGE " + (pageRow.currentPage + 1)
+                + " // " + pageRow.count + " RECORDS"
             color: Colors.blue
             font.pixelSize: 9
             horizontalAlignment: Text.AlignHCenter
@@ -556,19 +573,20 @@ Column {
             label: "NEXT"
             compactIcon: ">"
             contentGlowEnabled: false
-            enabledAction: (currentPage + 1) * root.pageSize < count
-            onTriggered: next()
+            enabledAction: (pageRow.currentPage + 1) * root.pageSize < pageRow.count
+            onTriggered: pageRow.next()
         }
     }
 
     component ManagerField: Column {
+        id: managerField
         property string caption: ""
         property alias value: input.text
         width: root.width
         spacing: 3
         height: 43
         GohuText {
-            text: caption
+            text: managerField.caption
             color: Colors.blue
             font.pixelSize: 9
             height: 12
@@ -597,13 +615,14 @@ Column {
     }
 
     component ManagerArea: Column {
+        id: managerArea
         property string caption: ""
         property alias value: edit.text
         width: root.width
         spacing: 3
         height: 94
         GohuText {
-            text: caption
+            text: managerArea.caption
             color: Colors.blue
             font.pixelSize: 9
             height: 12

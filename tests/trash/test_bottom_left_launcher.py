@@ -154,7 +154,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('Quickshell.shellPath("scripts/trash/trash_cli.py")', TRASH)
         self.assertIn('stdout: StdioCollector {', TRASH)
         self.assertIn("function consume(raw)", TRASH)
-        self.assertIn("function refresh()", TRASH)
+        self.assertIn("function refresh(clearReceipt)", TRASH)
         self.assertIn("function restoreItem(item)", TRASH)
         self.assertIn("function armBurn(item)", TRASH)
         self.assertIn("function armBurnAll()", TRASH)

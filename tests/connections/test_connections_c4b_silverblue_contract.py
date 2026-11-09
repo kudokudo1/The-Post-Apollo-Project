@@ -377,7 +377,7 @@ class C4bContracts(unittest.TestCase):
             '"/proc/{pid}/cmdline"', '"/proc/{pid}/attr/current"',
             '"/proc/{pid}/status"', '"NoNewPrivs:"',
             '"--checksig", "-v", rpm',
-            '"[%{FILENAMES}\t%{FILEDIGESTS}\n]"',
+            r'"[%{FILENAMES}\t%{FILEDIGESTS}\n]"',
             '"--read-only"', 'os.O_NOFOLLOW',
             'signedGuestOriginAuthenticated=False',
             'evidenceCryptographicallyAttested=False',

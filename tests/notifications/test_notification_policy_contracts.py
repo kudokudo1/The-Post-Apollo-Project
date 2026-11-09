@@ -49,7 +49,9 @@ require_regex(
 require(HUB, 'filterId: "manager"', "hub must expose a MANAGER mode")
 require(HUB, 'label: "MANAGER"', "manager control must be visibly labeled")
 require(HUB, 'id: managerRuleTabs', "manager must expose independent DND, ZZ, and Favorites views")
-require(HUB, 'label: dndRule.dnd ? "ALLOW" : "WAKE"', "manager must clear DND or wake ZZ")
+require(HUB, 'label: root.managerPolicyMode === "block"', "manager must expose BLOCK action")
+require(HUB, '"UNBLOCK" : root.managerPolicyMode === "dnd"', "manager must let operator undo blocked rules")
+require(HUB, "NotificationsService.setBlocked(dndRule.appKey", "UNBLOCK must call persisted service")
 for preset in ("1H", "6H", "12H", "1D", "3D", "7D"):
     require(HUB, f'label: "{preset}"', f"manager must expose {preset} snooze preset")
 require(HUB, "NotificationsService.snoozeApp(", "ZZ button must call backend snooze policy")
@@ -181,7 +183,7 @@ require(HUB, 'text: "FAVORITES  //  " + NotificationsService.favoriteSources.cou
 require(HUB, 'label: "UNFAV"', "Manager must allow removing a favorite")
 require(HUB, "NotificationsService.setFavorite(favoriteRule.appKey, favoriteRule.sourceId, favoriteRule.source, false)", "UNFAV must remove just favorite status")
 require(HUB, '"DO NOT DISTURB // " + managerVisiblePolicies.count', "DND and ZZ manager must remain available")
-require(HUB, 'label: dndRule.dnd ? "ALLOW" : "WAKE"', "ALLOW and WAKE controls must remain intact")
+require(HUB, '"UNBLOCK" : root.managerPolicyMode === "dnd"', "DND, ZZ and BLOCK controls must remain available")
 
 # The user's existing keyboard-owner protocol must remain authoritative.
 require(HUB, 'sequence: "Escape"', "Esc close shortcut")

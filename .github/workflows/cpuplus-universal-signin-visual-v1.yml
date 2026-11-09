@@ -7,6 +7,7 @@ on:
       - 'services/connections/ConnectionsIdentityJourneyPolicy.js'
       - 'services/connections/ConnectionsSignInFlowContract.js'
       - 'services/connections/ConnectionsSignInHostBoundary.js'
+      - 'services/connections/ConnectionsSignInIntentProposal.js'
       - 'widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml'
       - 'widgets/cpuplus/CpuPlusUniversalSignInHeaderPane.qml'
       - 'widgets/CpuPlusW.qml'
@@ -14,10 +15,12 @@ on:
       - 'tests/cpuplus/test_cpuplus_universal_signin_journey_v2.cjs'
       - 'tests/cpuplus/test_cpuplus_universal_signin_flow_v3.cjs'
       - 'tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs'
+      - 'tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs'
       - 'docs/cpuplus-universal-signin-visual-v1.md'
       - 'docs/cpuplus-universal-signin-journey-v2.md'
       - 'docs/cpuplus-universal-signin-flow-v3.md'
       - 'docs/cpuplus-universal-signin-host-boundary-v4.md'
+      - 'docs/cpuplus-universal-signin-intent-v5.md'
       - '.github/workflows/cpuplus-universal-signin-visual-v1.yml'
   push:
     branches: [main, 'feat/cpuplus-signin-*', 'feat/cpuplus-universal-signin-*']
@@ -26,6 +29,7 @@ on:
       - 'services/connections/ConnectionsIdentityJourneyPolicy.js'
       - 'services/connections/ConnectionsSignInFlowContract.js'
       - 'services/connections/ConnectionsSignInHostBoundary.js'
+      - 'services/connections/ConnectionsSignInIntentProposal.js'
       - 'widgets/cpuplus/CpuPlusSettingsConnectionsOverviewPane.qml'
       - 'widgets/cpuplus/CpuPlusUniversalSignInHeaderPane.qml'
       - 'widgets/CpuPlusW.qml'
@@ -33,6 +37,7 @@ on:
       - 'tests/cpuplus/test_cpuplus_universal_signin_journey_v2.cjs'
       - 'tests/cpuplus/test_cpuplus_universal_signin_flow_v3.cjs'
       - 'tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs'
+      - 'tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs'
       - '.github/workflows/cpuplus-universal-signin-visual-v1.yml'
 permissions:
   contents: read
@@ -53,6 +58,8 @@ jobs:
         run: node tests/cpuplus/test_cpuplus_universal_signin_flow_v3.cjs
       - name: Universal Sign-In V4 guarded host boundary and compact readable controls
         run: node tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs
+      - name: Universal Sign-In V5 proposed command envelope (review-only)
+        run: node tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs
       - name: Existing CPU++ Connections, deny-only and account editor behavior
         run: |
           node tests/cpuplus/test_cpuplus_connections_c1.js

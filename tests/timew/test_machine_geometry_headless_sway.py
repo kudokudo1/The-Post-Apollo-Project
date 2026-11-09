@@ -370,7 +370,7 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
                 "label": "CI ACTUAL CLI SAVE",
                 "review": None,
                 "selection": None,
-            }).encode() + b"\\n"
+            }).encode() + b"\n"
             cli_save = subprocess.run(
                 ["python3", "-B", "-I", bridge_cli, "save"],
                 input=cli_request, env=bridge_env,

@@ -9,6 +9,7 @@ import "../services/system"
 import "../services/files"
 import "../services/remote"
 import qs.services.favorites
+import "../services/favorites/FavoritesAppSelectionPolicy.js" as AppFavoriteSelection
 import "appcontrol"
 import "thermal"
 import QtQuick.Effects
@@ -8578,6 +8579,50 @@ PanelWindow {
             return String(entry.id);
 
         return String(entry.name || "");
+    }
+
+    // U7b-C // Select an exact saved DesktopEntry in the existing APPS list.
+    // This function performs NO desktop launch, shell command, process action,
+    // favorite write or action-trigger click. Never select by display name.
+    function selectSavedApplication(desktopId) {
+        const installed=[...DesktopEntries.applications.values];
+        if (!AppFavoriteSelection.ownerAllows(
+                desktopId,favoriteStore.favoriteKeys,installed))
+            return false;
+        // Only after resolving the original owner inventory do we change UI.
+        // NORMAL shows native and Flatpak installed apps, not hidden commands.
+        if (!menuOpen) menuOpen=true;
+        if (!menuOpen) return false;
+        appSourceMode=appSourceNative;
+        switchMode(appsModeIndex,false);
+        searchInput.text="";
+        const index=AppFavoriteSelection.selectedIndex(
+            desktopId,[...filteredApps.values]);
+        if (index<0 || !AppFavoriteSelection.ownerAllows(
+                desktopId,favoriteStore.favoriteKeys,
+                [...DesktopEntries.applications.values]))
+            return false;
+        rememberedAppKey=desktopId;
+        selectedResultIndex=index;
+        hoveredResultIndex=-1;
+        detailFocused=false;
+        resetDetailActionSelection();
+        // Model delegates may settle one event turn later. Keep the exact
+        // target only if the saved membership still exists at that moment.
+        Qt.callLater(function() {
+            if (!menuOpen || selectedModeIndex!==appsModeIndex
+                    || rememberedAppKey!==desktopId
+                    || !AppFavoriteSelection.ownerAllows(
+                        desktopId,favoriteStore.favoriteKeys,
+                        [...DesktopEntries.applications.values]))
+                return;
+            const now=AppFavoriteSelection.selectedIndex(
+                desktopId,[...filteredApps.values]);
+            if(now<0) return;
+            selectedResultIndex=now;
+            resultList.positionViewAtIndex(now,ListView.Contain);
+        });
+        return true;
     }
 
     function rememberCurrentAppSelection() {

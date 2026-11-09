@@ -7,6 +7,9 @@ on:
       - "services/favorites/FavoritesResourcePolicy.js"
       - "services/weather/WeatherHomeFavoritesPolicy.js"
       - "tests/cpuplus/test_favorites_exact_navigation_u7b.cjs"
+      - "services/favorites/FavoritesAppSelectionPolicy.js"
+      - "tests/cpuplus/test_favorites_app_selection_u7bc.cjs"
+      - "widgets/AppControlW.qml"
       - "widgets/cpuplus/CpuPlusFavoritesHubPane.qml"
       - "widgets/CpuPlusW.qml"
       - "widgets/weather/WeatherStationW.qml"
@@ -20,6 +23,9 @@ on:
       - "services/favorites/FavoritesResourcePolicy.js"
       - "services/weather/WeatherHomeFavoritesPolicy.js"
       - "tests/cpuplus/test_favorites_exact_navigation_u7b.cjs"
+      - "services/favorites/FavoritesAppSelectionPolicy.js"
+      - "tests/cpuplus/test_favorites_app_selection_u7bc.cjs"
+      - "widgets/AppControlW.qml"
       - "widgets/cpuplus/CpuPlusFavoritesHubPane.qml"
       - "widgets/CpuPlusW.qml"
       - "widgets/weather/WeatherStationW.qml"
@@ -38,4 +44,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Strict Weather HOME route and original-owner revocation checks
-        run: node --test tests/cpuplus/test_favorites_exact_navigation_u7b.cjs
+        run: |
+          node --test tests/cpuplus/test_favorites_exact_navigation_u7b.cjs
+          node --test tests/cpuplus/test_favorites_app_selection_u7bc.cjs

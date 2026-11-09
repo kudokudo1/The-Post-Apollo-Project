@@ -4,6 +4,7 @@ import "../../services/favorites/FavoritesDossierIndexPolicy.js" as Dossier
 import "../../services/favorites/FavoritesCollectionsViewPolicy.js" as CollectionView
 import "../../services/favorites/FavoritesOwnerNavigationPolicy.js" as OwnerNavigation
 import "../../services/favorites/FavoritesExactNavigationPolicy.js" as ExactNavigation
+import "../../services/favorites/FavoritesAppSelectionPolicy.js" as AppSelection
 
 // CPU++ Favorites++ manager. Three instances share one selection/snapshot.
 // No new FileView, owner process, or action authority is created here.
@@ -41,6 +42,10 @@ Item {
     signal ownerNavigationRequested(string owner, string view)
     // Fixed, non-sensitive exact route only; Weather rechecks its own store.
     signal exactNavigationRequested(string owner, string route)
+    // U7b-C: one vetted DesktopEntry id, never AppControl actions.
+    signal appSelectionRequested(string desktopId)
+    readonly property var appSelection:
+        AppSelection.plan(pane.selectedResource)
     readonly property var ownerNavigation:
         OwnerNavigation.plan(pane.selectedResource)
     readonly property var exactNavigation:
@@ -751,7 +756,8 @@ Item {
                 width: Math.max(0,parent.width-remove.width-parent.spacing)
                 height: 30
                 label: pane.selectedResource && pane.selectedResource.readOnly
-                    ? (pane.exactNavigation.ok ? "OPEN ITEM" : "NO ACTION")
+                    ? (pane.exactNavigation.ok || pane.appSelection.ok
+                       ? "OPEN ITEM" : "NO ACTION")
                     : pane.selectedResource
                       && pane.selectedResource.category==="CLOCK"
                       && pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
@@ -764,7 +770,7 @@ Item {
                 accentColor: Colors.cyan
                 available: pane.selectedResource !== null &&
                     (pane.selectedResource.readOnly
-                      ? pane.exactNavigation.ok
+                      ? (pane.exactNavigation.ok || pane.appSelection.ok)
                       : pane.selectedResource.category==="CLOCK"
                         ? pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
                           && !pane.timeOwner.zoneCatalogLoading
@@ -776,6 +782,8 @@ Item {
                         const target=pane.exactNavigation;
                         if(target.ok)
                             pane.exactNavigationRequested(target.owner,target.route);
+                        else if(pane.appSelection.ok)
+                            pane.appSelectionRequested(pane.appSelection.desktopId);
                         return;
                     }
                     if(pane.selectedResource.category==="CLOCK")

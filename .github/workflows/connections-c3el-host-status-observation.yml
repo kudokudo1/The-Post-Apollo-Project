@@ -1,0 +1,70 @@
+name: Connections C3e-L kernel-verified host observation (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eLHostStatusObservation.py"
+      - "tests/connections/test_connections_c3el_host_status_observation.py"
+      - ".github/workflows/connections-c3el-host-status-observation.yml"
+      - "docs/connections-c3el-host-status-observation.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  distinct-uid-client-host-observation:
+    # Ephemeral Ubuntu-only demonstration, not a workstation installation.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Syntax, existing denial, and disposable test preconditions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eLHostStatusObservation.py \
+            tests/connections/test_connections_c3el_host_status_observation.py
+          test "$(id -u)" != "0"
+          sudo -n id -u | grep -qx 0
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("tests/connections/c3e_release_trust/C3eLHostStatusObservation.py").read_text()
+          assert "SO_PEERCRED" in a and "process_start" in a and "socket_origin" in a
+          assert '"hostAuthenticated": False' in a
+          assert '"credentialActionsEnabled": False' in a
+          assert '"canApprove": False' in a
+          p=Path("services/connections")
+          assert "readonly property bool credentialActionsEnabled: false" in (p/"ConnectionsBroker.qml").read_text()
+          assert "readonly property bool hostAuthenticated: false" in (p/"ConnectionsRequestStatus.qml").read_text()
+          print("C3EL_PASS // DENY_ONLY_PRODUCTION_AND_TEST_CLIENT_PINNING")
+          PY
+      - name: Real nonroot client validates root-owned witness host identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n python3 -B tests/connections/test_connections_c3el_host_status_observation.py
+          echo "C3EL_PASS // REVERSE_KERNEL_HOST_BINDING_AND_READ_ONLY_STATUS"
+      - name: Retain predecessor protected witness and signed recovery regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n python3 -B tests/connections/test_connections_c3ek_protected_witness.py
+          python3 -B tests/connections/test_connections_c3ej_witness_peer.py
+          python3 -B tests/connections/test_connections_c3ei_supervised_supersession.py
+          python3 -B tests/connections/test_connections_c3eh_operator_recovery_gate.py
+          python3 -B tests/connections/test_connections_c3eg_split_commit_recovery.py
+          python3 -B tests/connections/test_connections_c3ef_rollback_witness.py
+          echo "C3EL_PASS // PRIOR_DAC_SIGNED_INTENT_AND_CRASH_GATES"
+      - name: Enforce no production-service or credential claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'not production authentication' docs/connections-c3el-host-status-observation.md
+          grep -Fq 'does not authenticate a signed installed executable' docs/connections-c3el-host-status-observation.md
+          echo "C3EL_LIMITATION // TEST_SUPERVISOR_PINS_NOT_LIVE_SIGNED_HOST"

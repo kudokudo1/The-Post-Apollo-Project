@@ -44,7 +44,7 @@ The `/proc/PID/cmdline` field comes from **mutable process memory**; a process c
 
 Thus, this is **not cryptographic attestation**, not independent executable integrity or an authenticated cross-boundary origin. C3e-O's pinned hash must come from a separately trusted signed artifact validation, and even a matching script file cannot become an authorization token. A guest-produced log or JSON string remains untrusted outside that guest without separately enrolled, challenge-bound signing and replay protection. The proof does not establish SELinux confinement, C4b two-reboot cleanup, a real signed deployed host, human consent, C5 authorization, or provider credentials.
 
-All output grant fields are FALSE, including `installedGuestMeasured` unless the real restricted C4b guest path is explicitly used; even then `evidenceCryptographicallyAttested:false`, `hostAuthenticated:false`, `canApprove:false`, `credentialActionsEnabled:false`, `productionAuthority:false`.
+All output grant fields are FALSE. `installedGuestMeasured:false` remains false **even if** the real C4b guest path is selected: the path is a candidate observation, not proof of a signed, confined installed guest. The separate `observedPathIsC4bGuestCandidate` field only identifies that path selection; `evidenceCryptographicallyAttested:false`, `hostAuthenticated:false`, `canApprove:false`, `credentialActionsEnabled:false`, and `productionAuthority:false` remain false.
 
 ## CHECKLIST
 

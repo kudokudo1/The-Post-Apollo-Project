@@ -3325,11 +3325,111 @@ PanelWindow {
                                 : Math.max(145, cleanupPage.height
                                            - (camera.batchPreview ? 266 : 236))
 
+                        Rectangle {
+                            id: cleanupQueueView
+                            anchors.fill: parent
+                            z: 250
+                            visible: camera.cleanupQueueOpen
+                                     && camera.cleanupTechnique !== "desktop"
+                            color: Colors.black
+                            radius: 5
+                            border.width: 1
+                            border.color: Colors.magenta
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 7
+                                spacing: 5
+                                Row {
+                                    width: parent.width
+                                    height: 29
+                                    spacing: 6
+                                    GohuText {
+                                        width: parent.width - 117
+                                        height: 28
+                                        verticalAlignment: Text.AlignVCenter
+                                        font.pixelSize: 11
+                                        color: Colors.magenta
+                                        text: "QUEUED FILES // " + camera.batchPaths.length
+                                              + "/500"
+                                    }
+                                    ActionButton {
+                                        width: 111
+                                        height: 28
+                                        label: "BACK TO MODE"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.cyan
+                                        onLeftClicked: camera.cleanupToggleQueue()
+                                    }
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    height: 18
+                                    font.pixelSize: 9
+                                    color: Colors.yellow
+                                    text: "REMOVE HERE // REVIEW FOR TRASH ABOVE // NOTHING DELETED AUTOMATICALLY"
+                                    elide: Text.ElideRight
+                                }
+                                Item {
+                                    width: parent.width
+                                    height: Math.max(60, cleanupWorkArea.height - 66)
+                                    ListView {
+                                        id: cleanupQueuedList
+                                        anchors.fill: parent
+                                        anchors.rightMargin: 11
+                                        clip: true
+                                        boundsBehavior: Flickable.StopAtBounds
+                                        spacing: 3
+                                        model: camera.batchPaths
+                                        delegate: Row {
+                                            width: cleanupQueuedList.width
+                                            height: 33
+                                            spacing: 5
+                                            GohuText {
+                                                width: parent.width - 89
+                                                height: 32
+                                                font.pixelSize: 9
+                                                verticalAlignment: Text.AlignVCenter
+                                                elide: Text.ElideMiddle
+                                                color: Colors.white
+                                                text: String(modelData).split("/").pop()
+                                                      + " // " + String(modelData)
+                                            }
+                                            ActionButton {
+                                                width: 84
+                                                height: 31
+                                                label: "REMOVE"
+                                                labelPixelSize: 9
+                                                accentColor: Colors.yellow
+                                                available: !camera.busy
+                                                onLeftClicked: camera.batchRemovePath(modelData)
+                                            }
+                                        }
+                                    }
+                                    NeonScrollBar {
+                                        flickable: cleanupQueuedList
+                                        x: parent.width - width - 1
+                                        height: parent.height
+                                        geometryMode: "viewport"
+                                        handleStyle: "star"
+                                        visible: scrollable
+                                    }
+                                    GohuText {
+                                        anchors.centerIn: parent
+                                        visible: camera.batchPaths.length === 0
+                                        font.pixelSize: 11
+                                        color: Colors.cyan
+                                        text: "QUEUE EMPTY // SELECT MEDIA IN ANY MODE"
+                                    }
+                                }
+                            }
+                        }
+
                         Row {
                             id: cleanupBatchView
                             anchors.fill: parent
                             spacing: 9
                             visible: camera.cleanupTechnique === "batch"
+                                     && !camera.cleanupQueueOpen
 
                             Column {
                                 width: Math.floor(parent.width * 0.53)
@@ -3516,10 +3616,163 @@ PanelWindow {
                         }
 
                         Column {
+                            id: cleanupGridView
+                            anchors.fill: parent
+                            spacing: 5
+                            visible: camera.cleanupTechnique === "grid"
+                                     && !camera.cleanupQueueOpen
+                            Row {
+                                width: parent.width
+                                height: 26
+                                spacing: 7
+                                GohuText {
+                                    width: parent.width * 0.55
+                                    height: 25
+                                    verticalAlignment: Text.AlignVCenter
+                                    font.pixelSize: 10
+                                    color: Colors.cyan
+                                    text: "BATCH GRID // " + camera.galleryFiles.length
+                                          + " LOADED // " + camera.batchPaths.length
+                                          + " SELECTED"
+                                }
+                                ActionButton {
+                                    width: parent.width * 0.45 - 7
+                                    height: 25
+                                    label: "SELECT LOADED"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.yellow
+                                    available: !camera.busy
+                                               && camera.galleryFiles.length > 0
+                                    onLeftClicked: camera.batchSelectLoaded("")
+                                }
+                            }
+                            Item {
+                                width: parent.width
+                                height: Math.max(65, cleanupWorkArea.height - 61)
+                                GridView {
+                                    id: cleanupGridList
+                                    anchors.fill: parent
+                                    anchors.rightMargin: 12
+                                    clip: true
+                                    boundsBehavior: Flickable.StopAtBounds
+                                    model: camera.galleryFiles
+                                    cellWidth: width / Math.max(1, Math.floor(width / 140))
+                                    cellHeight: 132
+                                    cacheBuffer: 240
+                                    delegate: Item {
+                                        id: cleanupGridTile
+                                        width: cleanupGridList.cellWidth
+                                        height: cleanupGridList.cellHeight
+                                        readonly property bool queued:
+                                            camera.batchContains(modelData.path)
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            anchors.margins: 3
+                                            radius: 5
+                                            color: Colors.black
+                                            border.width: cleanupGridTile.queued ? 3 : 1
+                                            border.color: cleanupGridTile.queued
+                                                          ? Colors.magenta : Colors.cyan
+                                            Image {
+                                                x: 4
+                                                y: 4
+                                                width: parent.width - 8
+                                                height: parent.height - 28
+                                                source: modelData.mediaType
+                                                        && modelData.mediaType.indexOf("video") >= 0
+                                                        ? "" : camera.fileUrl(modelData.path)
+                                                fillMode: Image.PreserveAspectFit
+                                                sourceSize.width: 220
+                                                sourceSize.height: 160
+                                                asynchronous: true
+                                                cache: false
+                                            }
+                                            GohuText {
+                                                anchors.centerIn: parent
+                                                visible: modelData.mediaType
+                                                         && modelData.mediaType.indexOf("video") >= 0
+                                                font.pixelSize: 11
+                                                color: Colors.yellow
+                                                text: "VIDEO"
+                                            }
+                                            Rectangle {
+                                                x: parent.width - 66
+                                                y: 3
+                                                width: 63
+                                                height: 17
+                                                color: cleanupGridTile.queued
+                                                       ? Colors.magenta : Colors.black
+                                                border.color: Colors.cyan
+                                                border.width: 1
+                                                GohuText {
+                                                    anchors.centerIn: parent
+                                                    font.pixelSize: 9
+                                                    color: cleanupGridTile.queued
+                                                           ? Colors.black : Colors.cyan
+                                                    text: cleanupGridTile.queued
+                                                          ? "QUEUED" : "+ SELECT"
+                                                }
+                                            }
+                                            GohuText {
+                                                x: 5
+                                                anchors.bottom: parent.bottom
+                                                width: parent.width - 10
+                                                height: 20
+                                                font.pixelSize: 9
+                                                color: Colors.white
+                                                elide: Text.ElideMiddle
+                                                text: modelData.name
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                enabled: !camera.busy
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: camera.batchToggle(modelData)
+                                            }
+                                        }
+                                    }
+                                }
+                                NeonScrollBar {
+                                    flickable: cleanupGridList
+                                    x: parent.width - width - 1
+                                    height: parent.height
+                                    geometryMode: "viewport"
+                                    handleStyle: "star"
+                                    visible: scrollable
+                                }
+                            }
+                            Row {
+                                width: parent.width
+                                height: 28
+                                spacing: 6
+                                GohuText {
+                                    width: parent.width - 132
+                                    height: 27
+                                    verticalAlignment: Text.AlignVCenter
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                    text: camera.galleryFiles.length + "/"
+                                          + camera.galleryTotal
+                                          + " VISIBLE // CLICK ANY THUMBNAIL"
+                                }
+                                ActionButton {
+                                    width: 126
+                                    height: 27
+                                    label: "LOAD 120 MORE"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.cyan
+                                    available: !camera.busy && camera.galleryHasMore
+                                    onLeftClicked: camera.loadGallery(true, "cleanup")
+                                }
+                            }
+                        }
+
+                        Column {
                             id: cleanupSwipeView
                             anchors.fill: parent
                             spacing: 6
                             visible: camera.cleanupTechnique === "swipe"
+                                     && !camera.cleanupQueueOpen
 
                             GohuText {
                                 width: parent.width
@@ -3740,6 +3993,7 @@ PanelWindow {
                             id: cleanupHuntView
                             anchors.fill: parent
                             visible: camera.cleanupTechnique === "hunt"
+                                     && !camera.cleanupQueueOpen
                             focus: visible && camera.activeView === "cleanup"
 
                             Keys.onPressed: function(event) {
@@ -4797,8 +5051,6 @@ PanelWindow {
                                 }
                             }
                         }
-                    }
-
                     }
                 }
 

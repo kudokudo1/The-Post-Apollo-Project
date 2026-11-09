@@ -1552,6 +1552,10 @@ test("U8a bottom subfilters are scoped to the main category and are view-only",(
   assert.match(pane,/row\.menu===pane\.menuFilter/);
   assert.match(pane,/id: subfilterScroll/);
   assert.match(pane,/id: subfilterButtons/);
+  assert.match(pane,/id: menuFilterPrev/);
+  assert.match(pane,/id: menuFilterNext/);
+  assert.match(pane,/subfilterScroll\.contentX-140/);
+  assert.match(pane,/subfilterScroll\.contentX\+140/);
   assert.match(pane,/onLeftClicked: pane\.menuFilter=modelData/);
   assert.match(cpu,/favoritesSelectorPane\.menuFilter = "ALL"/);
   assert.match(cpu,/favoritesSelectorPane\.menuFilter="ALL"/);

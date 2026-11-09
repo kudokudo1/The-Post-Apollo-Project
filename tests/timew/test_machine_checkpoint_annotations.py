@@ -179,7 +179,7 @@ try:
         }
         write = subprocess.run(
             ["python3", "-B", "-I", str(cli), "update"],
-            input=(json.dumps(request) + "\\n").encode("utf-8"),
+            input=(json.dumps(request) + "\n").encode("utf-8"),
             capture_output=True, timeout=8)
         assert write.returncode == 0, write.stderr
         assert b"Private checkpoint annotation" not in write.stderr
@@ -190,7 +190,7 @@ try:
 
         stale = subprocess.run(
             ["python3", "-B", "-I", str(cli), "update"],
-            input=(json.dumps(request) + "\\n").encode("utf-8"),
+            input=(json.dumps(request) + "\n").encode("utf-8"),
             capture_output=True, timeout=8)
         assert stale.returncode == 1
         assert json.loads(stale.stdout) == {

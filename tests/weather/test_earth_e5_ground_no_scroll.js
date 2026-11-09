@@ -13,7 +13,8 @@ test("E5 keeps only two EARTH GROUND routes non-scrolling, not CLASSIC or WEATHE
     assert.match(ground,/compactEarthEnvironment: subjectRoute === "earth\/ground\/environment"/);
     assert.match(ground,/compactEarthGround: compactEarthAir \|\| compactEarthEnvironment/);
     assert.match(ground,/interactive: !ground\.compactEarthGround/);
-    assert.match(ground,/visible: !ground\.compactEarthGround && scrollable/);
+    assert.match(ground,/visible: scrollable/);
+    assert.match(ground,/target: groundScrollBar[\s\S]*?property: "visible"[\s\S]*?when: ground\.compactEarthGround/);
     assert.match(ground,/requiredContentHeight:/);
     assert.match(ground,/contentHeight: Math\.max\(height, groundContent\.y \+ groundContent\.implicitHeight \+ 12\)/);
     assert.match(ground,/onSubjectRouteChanged: \{/);

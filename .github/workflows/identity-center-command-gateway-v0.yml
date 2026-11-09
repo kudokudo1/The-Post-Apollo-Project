@@ -1,0 +1,43 @@
+name: Identity Center experimental native BEGIN command gateway v0
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/desktop_command_gateway_v0.py'
+      - 'tests/identity/test_desktop_command_gateway_v0.py'
+      - '.github/workflows/identity-center-command-gateway-v0.yml'
+      - 'docs/identity-center-command-gateway-v0.md'
+  push:
+    branches: [main, 'feat/identity-protected-command-*']
+    paths:
+      - 'services/identity/desktop_command_gateway_v0.py'
+      - 'tests/identity/test_desktop_command_gateway_v0.py'
+      - '.github/workflows/identity-center-command-gateway-v0.yml'
+      - 'docs/identity-center-command-gateway-v0.md'
+
+permissions:
+  contents: read
+
+jobs:
+  guarded-begin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile actual host command and gateway test
+        run: python3 -m py_compile services/identity/desktop_command_gateway_v0.py tests/identity/test_desktop_command_gateway_v0.py
+      - name: Real AF_UNIX BEGIN, peer gate, one-use host, negative commands
+        run: python3 -m unittest discover -s tests/identity -p 'test_desktop_command_gateway_v0.py' -v
+      - name: Existing native Identity host lifecycle, callback, and private display
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_host_lifecycle_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_session_host_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_private_context_ipc_v0.py' -v
+      - name: CPU++ actual host seam and fixed-deny UI
+        run: |
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_identity_host_seam_v6.py' -v
+          node tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs
+          node tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs

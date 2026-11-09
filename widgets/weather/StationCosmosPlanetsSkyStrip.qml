@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "StationCosmosDetailPolicy.js" as Details
 import "StationCosmosPlanetDayWheelPolicy.js" as DayWheel
+import "StationCosmosPlanetSummaryPolicy.js" as Summary
 
 // C39 // One compact, source-backed current USNO celestial observation.
 // The 12-field C6 inspector stays available through DETAILS, not squeezed
@@ -14,6 +15,9 @@ Rectangle {
     border.width: 1
     border.color: Colors.cyan
     property var celestialSource: null
+    property var datedRows: []
+    property string civilDate: ""
+    property bool datedSourceReady: false
     property string selectedPlanet: "ALL"
     signal planetPicked(string name)
     signal detailsRequested(int index)
@@ -23,6 +27,10 @@ Rectangle {
     readonly property var records: Details.records("planets",snapshot,null,null,false)
     readonly property int recordCount: records.length
     readonly property int selectablePlanetCount: DayWheel.PLANETS.length
+    readonly property var reading: Summary.selection(
+        selectedPlanet,records,datedRows,civilDate,
+        !!celestialSource && celestialSource.ready,
+        datedSourceReady,snapshot ? snapshot.time : "")
     readonly property int currentIndex: {
         if (!recordCount) return -1;
         if (selectedPlanet === "ALL") return 0;
@@ -34,15 +42,9 @@ Rectangle {
     }
     readonly property var currentRecord: currentIndex >= 0
         ? records[currentIndex] : null
-    readonly property string selectedName: currentRecord
-        ? String(currentRecord.name || "--")
-        : selectedPlanet !== "ALL" ? selectedPlanet : "--"
-    readonly property string sourceNote: !celestialSource ? "SOURCE UNAVAILABLE"
-        : !celestialSource.configured ? "LOCATION UNAVAILABLE"
-        : celestialSource.loading ? "SOURCE RECEIVING"
-        : celestialSource.failed ? "SOURCE FAILED"
-        : !celestialSource.ready ? "WAITING"
-        : currentRecord ? "CURRENT FIX" : "NOT IN USNO SAMPLE"
+    readonly property string selectedName: reading.planet
+    readonly property string sourceNote: reading.sourceNote
+    readonly property bool detailAvailable: reading.detailAvailable
     readonly property string utcSample: snapshot
         ? String(snapshot.time || "--") + "Z" : "--"
     function stepPlanet(delta) {
@@ -72,7 +74,8 @@ Rectangle {
             spacing: 1
             QuietText {
                 width: parent.width;height: 10
-                text: "SKY NOW // USNO"
+                text: strip.reading.mode === "current"
+                    ? "SKY NOW // USNO" : "CIVIL DAY // USNO"
                 color: Colors.cyan
                 font.pixelSize: 8
                 elide: Text.ElideRight
@@ -99,13 +102,14 @@ Rectangle {
             width: line.unit*0.13;height: line.height;spacing: 1
             QuietText {
                 width: parent.width;height: 10
-                text: "ALT // HC";color: Colors.cyan
+                text: strip.reading.labels[0];color: Colors.cyan
                 font.pixelSize: 8;elide: Text.ElideRight
             }
             GohuText {
                 width: parent.width;height: 17
                 text: strip.currentRecord
-                    ? Details.degrees(strip.currentRecord.altitude) : "--"
+                    ? Details.degrees(strip.currentRecord.altitude)
+                    : strip.reading.values[0]
                 color: Colors.white;font.pixelSize: 11;elide: Text.ElideRight
             }
         }
@@ -113,13 +117,14 @@ Rectangle {
             width: line.unit*0.13;height: line.height;spacing: 1
             QuietText {
                 width: parent.width;height: 10
-                text: "AZ // ZN";color: Colors.cyan
+                text: strip.reading.labels[1];color: Colors.cyan
                 font.pixelSize: 8;elide: Text.ElideRight
             }
             GohuText {
                 width: parent.width;height: 17
                 text: strip.currentRecord
-                    ? Details.degrees(strip.currentRecord.azimuth) : "--"
+                    ? Details.degrees(strip.currentRecord.azimuth)
+                    : strip.reading.values[1]
                 color: Colors.white;font.pixelSize: 11;elide: Text.ElideRight
             }
         }
@@ -127,13 +132,14 @@ Rectangle {
             width: line.unit*0.10;height: line.height;spacing: 1
             QuietText {
                 width: parent.width;height: 10
-                text: "DIR";color: Colors.cyan
+                text: strip.reading.labels[2];color: Colors.cyan
                 font.pixelSize: 8;elide: Text.ElideRight
             }
             GohuText {
                 width: parent.width;height: 17
                 text: strip.currentRecord
-                    ? Details.text(strip.currentRecord.direction) : "--"
+                    ? Details.text(strip.currentRecord.direction)
+                    : strip.reading.values[2]
                 color: Colors.white;font.pixelSize: 10;elide: Text.ElideRight
             }
         }
@@ -147,7 +153,7 @@ Rectangle {
             }
             QuietText {
                 width: parent.width;height: 17
-                text: strip.currentRecord ? strip.utcSample : "--"
+                text: strip.reading.stamp
                 color: Colors.white;font.pixelSize: 9;elide: Text.ElideRight
             }
         }
@@ -159,7 +165,7 @@ Rectangle {
             labelPixelSize: 8
             contentPadding: 0
             accentColor: Colors.magenta
-            available: strip.currentIndex>=0
+            available: strip.detailAvailable
             onClicked: strip.detailsRequested(strip.currentIndex)
         }
     }

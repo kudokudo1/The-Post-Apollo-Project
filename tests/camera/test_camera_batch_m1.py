@@ -136,6 +136,65 @@ class CameraBatchM1Tests(unittest.TestCase):
         self.assertEqual(camera.trash_batch(plan["planId"], "MOVE_TO_TRASH")["error"],
                          "PLAN_NOT_FOUND")
 
+    def test_one_click_moves_only_explicit_selection_to_recoverable_trash(self):
+        # No user-facing PREVIEW click is needed. Backend still creates and
+        # consumes its one-use, signature-verified plan internally.
+        run = self.mock_trash()
+        paths = json.dumps([str(self.a), str(self.v)])
+        result = camera.trash_batch_now(paths, "MOVE_TO_TRASH")
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["kind"], "trash-batch-now")
+        self.assertEqual((result["moved"], result["skipped"], result["failed"]),
+                         (2, 0, 0))
+        self.assertEqual(result["unmovedPaths"], [])
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual([call.args[0][-1] for call in run.call_args_list],
+                         [str(self.a), str(self.v)])
+        self.assertFalse(list(self.planroot.glob("*.json")))
+        self.assertFalse(list(self.planroot.glob("*.claimed")))
+
+    def test_one_click_rejects_missing_explicit_trash_command(self):
+        run = self.mock_trash()
+        raw = json.dumps([str(self.a)])
+        result = camera.trash_batch_now(raw, "NOT_AUTHORIZED")
+        self.assertEqual(result["error"], "CONFIRMATION_REQUIRED")
+        self.assertEqual(run.call_count, 0)
+        self.assertTrue(self.a.exists())
+        self.assertFalse(self.planroot.exists())
+
+    def test_one_click_rejects_file_outside_current_scan(self):
+        run = self.mock_trash()
+        foreign = self.home / "Documents" / "secret.png"
+        foreign.parent.mkdir()
+        foreign.write_bytes(b"safe")
+        result = camera.trash_batch_now(json.dumps([str(foreign)]),
+                                         "MOVE_TO_TRASH")
+        self.assertEqual(result["error"], "NOT_IN_GALLERY")
+        self.assertEqual(run.call_count, 0)
+        self.assertTrue(foreign.exists())
+        self.assertTrue(self.a.exists())
+
+    def test_one_click_preserves_skipped_or_failed_paths(self):
+        # A changed file is skipped instead of silently included.
+        with patch.object(camera, "preview_batch_trash",
+                          wraps=camera.preview_batch_trash) as preview, \
+                patch.object(camera, "trash_batch",
+                             wraps=camera.trash_batch) as trash:
+            # A mock GIO failure for only the second selected file.
+            with patch.object(camera.shutil, "which", return_value="/usr/bin/gio"), \
+                    patch.object(camera.subprocess, "run",
+                                 side_effect=[Mock(returncode=0),
+                                              Mock(returncode=1)]):
+                result = camera.trash_batch_now(
+                    json.dumps([str(self.a), str(self.b)]),
+                    "MOVE_TO_TRASH")
+            self.assertEqual(preview.call_count, 1)
+            self.assertEqual(trash.call_count, 1)
+        self.assertTrue(result["ok"])
+        self.assertEqual((result["moved"], result["skipped"], result["failed"]),
+                         (1, 0, 1))
+        self.assertEqual(result["unmovedPaths"], [str(self.b)])
+
     def test_expired_plan_cannot_move_anything(self):
         plan = self.preview()
         file = self.planroot / (plan["planId"] + ".json")
@@ -158,7 +217,8 @@ class CameraBatchM1Tests(unittest.TestCase):
                         '"trash-batch"',
                         'galleryFiles.length',
                         'label: "SELECT LOADED"',
-                        'label: "CONFIRM TRASH"'):
+                        'label: "MOVE " + camera.batchPaths.length + " TO TRASH"',
+                        'onLeftClicked: camera.trashQueuedNow()'):
             self.assertIn(snippet, qml)
         self.assertIn('batchReviewKey !== JSON.stringify(batchPaths)', qml)
         self.assertIn('batchPreview = null;', qml)

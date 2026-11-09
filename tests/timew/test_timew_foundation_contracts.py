@@ -275,7 +275,7 @@ assert 'enabled: timew.navigationKeysAvailable' in window
 assert 'WORLD // SELECT A SEARCH RESULT' in window
 assert '"ZONE DIRECTORY UNAVAILABLE"' in window
 # CLOCK WORLD search + CONVERT date/time + MATH date/time/duration fields.
-assert window.count('onTextEdited:') == 18  # Includes MACHINE checkpoint name and STORED rename input
+assert window.count('onTextEdited:') == 19  # Includes separate durable MARK name field  # Includes MACHINE checkpoint name and STORED rename input
 # No dynamic command composition or arbitrary typed TZ values.
 assert 'command: ["date", "+%z"]' in window
 assert 'worldLookup.exec({' in window

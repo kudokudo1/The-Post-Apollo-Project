@@ -54,10 +54,6 @@ Rectangle {
             ? "SOURCE INACTIVE // VIEW-SCOPED"
             : "NO CURRENT PROVIDER REPORT // " + RuntimePolicy.rowStateLabel(current);
     }
-    readonly property string serviceOwnerNote: {
-        const spec = currentRuntime ? RuntimePolicy.sourceSpec(currentRuntime.id) : null;
-        return spec ? String(spec.note || spec.owner || "") : "";
-    }
     function metricText(ready, value, digits, suffix) {
         return displayValue(ready, value, digits, suffix);
     }
@@ -182,19 +178,17 @@ Rectangle {
             Repeater {
                 model: [
                     {label:"DASHBOARD",kind:"dashboard"},
-                    {label:"SERVICES",kind:"services"},
                     {label:"DIRECTORY",kind:"directory"}
                 ]
                 delegate: ActionButton {
                     required property var modelData
-                    width: Math.max(1,(viewRail.width-2*viewRail.spacing)/3)
+                    width: Math.max(1,(viewRail.width-viewRail.spacing)/2)
                     height: 21
                     label: modelData.label
                     labelPixelSize: 9
                     contentPadding: 0
                     selected: spaceHub.viewMode === modelData.kind
-                    accentColor: modelData.kind === "services"
-                        ? Colors.magenta : Colors.cyan
+                    accentColor: Colors.cyan
                     onClicked: spaceHub.viewMode = modelData.kind
                 }
             }
@@ -372,7 +366,7 @@ Rectangle {
             objectName: "cosmos-c42-selected-service-report"
             visible: spaceHub.viewMode !== "directory"
             width: parent.width
-            height: visible ? (spaceHub.viewMode === "services" ? 55 : 38) : 0
+            height: visible ? 38 : 0
             color: Colors.dark
             border.width: 1
             border.color: Colors.magenta
@@ -397,15 +391,6 @@ Rectangle {
                     text: spaceHub.serviceBrief
                     color: Colors.white
                     font.pixelSize: 9
-                    elide: Text.ElideRight
-                }
-                QuietText {
-                    visible: spaceHub.viewMode === "services"
-                    width: parent.width
-                    height: visible ? 15 : 0
-                    text: "SOURCE NOTES // " + spaceHub.serviceOwnerNote
-                    font.pixelSize: 8
-                    color: Colors.cyan
                     elide: Text.ElideRight
                 }
             }

@@ -11,6 +11,7 @@ const read = name => fs.readFileSync(path.join(root, name), "utf8");
 const sourceTree = read("widgets/weather/StationSubjectNavigationPolicy.js");
 const preview = read("widgets/weather/StationSubjectNavigationPreviewPolicy.js");
 const weatherPolicy = read("widgets/weather/StationWeatherSubjectPanelPolicy.js");
+const earthPolicy = read("widgets/weather/StationEarthSubjectPanelPolicy.js");
 const pane = read("widgets/weather/StationWeatherSubjectPane.qml");
 const home = read("widgets/weather/StationHome.qml");
 const ground = read("widgets/weather/StationGround.qml");
@@ -19,9 +20,11 @@ const discovery = read("widgets/weather/StationDiscovery.qml");
 const navigator = read("widgets/weather/StationSubjectNavigator.qml");
 const context = vm.createContext({});
 const weather = vm.createContext({});
+const earth = vm.createContext({});
 vm.runInContext(sourceTree.replace(/^\.pragma library\s*$/m, ""), context);
 vm.runInContext(preview.replace(/^\.pragma library\s*$/m, ""), context);
 vm.runInContext(weatherPolicy.replace(/^\.pragma library\s*$/m, ""), weather);
+vm.runInContext(earthPolicy.replace(/^\.pragma library\s*$/m, ""), earth);
 const plain = x => JSON.parse(JSON.stringify(x));
 
 // Exact original source-control IDs and the *existing* filtered section which
@@ -36,12 +39,12 @@ const reviewed = [
   ["ground-official-alerts", "weather/hazards/alerts", "ground", "alerts"],
   ["ground-coastal-relationship", "weather/history/relationships/coastal", "ground", "coastal-rel"],
   ["ground-marine-relationships", "weather/history/relationships/marine", "ground", "marine-rel"],
-  ["ground-river-nwps", "weather/water/rivers/gauges", "ground", "rivers"],
-  ["ground-river-nearby", "weather/water/rivers/nearby", "ground", "rivers"],
-  ["ground-river-flood-context", "weather/water/rivers/flood", "ground", "rivers"],
-  ["ground-river-stageflow", "weather/water/rivers/hydrograph", "ground", "rivers"],
-  ["ground-marine-ndbc", "weather/water/marine", "ground", "marine"],
-  ["ground-coast-coops", "weather/water/coast", "ground", "coast"],
+  ["ground-river-nwps", "earth/water/rivers/gauges", "ground", "rivers"],
+  ["ground-river-nearby", "earth/water/rivers/nearby", "ground", "rivers"],
+  ["ground-river-flood-context", "earth/water/rivers/flood", "ground", "rivers"],
+  ["ground-river-stageflow", "earth/water/rivers/hydrograph", "ground", "rivers"],
+  ["ground-marine-ndbc", "earth/water/marine", "ground", "marine"],
+  ["ground-coast-coops", "earth/water/coast", "ground", "coast"],
   ["ground-lightning-nowcoast", "weather/hazards/lightning", "ground", "lightning"],
   ["ground-heat-fire-weather", "weather/hazards/heat-fire", "ground", "heat-fire"],
   ["ground-air-particulates", "weather/conditions/air", "ground", "air-pm"],
@@ -54,9 +57,9 @@ const reviewed = [
   ["sky-hourly-forecast", "weather/forecasts/hourly", "sky", "hourly"],
   ["sky-hour-inspector", "weather/forecasts/hourly", "sky", "hourly"],
   ["sky-daily-forecast", "weather/forecasts/daily", "sky", "daily"],
-  ["map-mrms-radar", "weather/maps/radar", "map", "radar"],
-  ["map-rainviewer", "weather/maps/radar-fallback", "map", "rainviewer"],
-  ["map-hms-smoke", "weather/maps/smoke", "map", "smoke"]
+  ["map-mrms-radar", "earth/maps/events", "map", "radar"],
+  ["map-rainviewer", "earth/maps/events", "map", "rainviewer"],
+  ["map-hms-smoke", "earth/maps/events", "map", "smoke"]
 ];
 
 test("M28-F tags only exact source-backed WEATHER controls, no whole-page shortcut assumption", () => {
@@ -68,9 +71,22 @@ test("M28-F tags only exact source-backed WEATHER controls, no whole-page shortc
   for (const [id, route, kind, section] of reviewed) {
     assert.equal(context.PANELS[id], route, id + " actual destination");
     const target = context.findRoute(route);
-    assert.ok(target && !target.group && target.subject === "weather", id + " must point to leaf");
-    assert.equal(weather.kindForRoute(route), kind, id + " page owner");
-    assert.equal(weather.visibleFor(kind, route, section), true, id + " source section");
+    assert.ok(target && !target.group
+      && target.subject === route.split("/")[0], id + " must point to live leaf");
+    if (kind === "map") {
+      assert.equal(earth.kindForRoute(route),kind,id+" EARTH map owner");
+      assert.equal(earth.isPinnedMap(route),true,id+" pinned map");
+      // The radar and smoke modes share the original map, not a second
+      // weather-only StationDiscovery process.
+      const markers={radar:"mrmsRadarService",rainviewer:"rainViewerRadarService",
+        smoke:"hmsSmokeService"};
+      assert.ok(discovery.includes(markers[section]),id+" real overlay");
+      assert.match(discovery,/earthPinnedMap/);
+    } else {
+      assert.equal(weather.kindForRoute(route),kind,id+" original Ground section");
+      assert.equal(weather.visibleFor(kind,route,section),true,
+        id+" original source section retained");
+    }
   }
 });
 

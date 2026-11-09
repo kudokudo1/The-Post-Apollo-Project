@@ -23,13 +23,14 @@ vm.runInContext(navSrc.replace(/^\.pragma library\s*$/m,""),nav);
 vm.runInContext(policySrc.replace(/^\.pragma library\s*$/m,""),policy);
 const asArray = x => JSON.parse(JSON.stringify(x));
 
-test("17 original MEDIA destinations plus two exact CLASSIC full-page routes are canonical", () => {
+test("17 original MEDIA destinations, two CLASSIC full pages, and read-only SERVICES are canonical", () => {
   assert.equal(policy.FORMAT,"post-apollo.weather.media-panels.d1.v1");
   const rows=Object.keys(policy.ROUTES);
-  assert.equal(rows.length,19);
-  assert.equal(new Set(rows).size,19);
-  assert.equal(rows.filter(x=>x!=="media/news/full" && x!=="media/radio/full").length,17);
-  const kinds={overview:0,news:0,catalog:0,radio:0};
+  assert.equal(rows.length,20);
+  assert.equal(new Set(rows).size,20);
+  assert.equal(rows.filter(x=>x!=="media/news/full" && x!=="media/radio/full"
+    && x!=="media/services/health").length,17);
+  const kinds={overview:0,news:0,catalog:0,radio:0,services:0};
   for(const route of rows) {
     const found=nav.findRoute(route);
     assert.ok(found,route);
@@ -38,7 +39,7 @@ test("17 original MEDIA destinations plus two exact CLASSIC full-page routes are
     assert.ok(kind in kinds,route+" "+kind);
     kinds[kind]++;
   }
-  assert.deepEqual(kinds,{overview:1,news:7,catalog:7,radio:4});
+  assert.deepEqual(kinds,{overview:1,news:7,catalog:7,radio:4,services:1});
   for(const p of ["media","media/news","media/radio","media/watch","media/creators",
                     "weather/overview","cosmos/overview","earth/overview","magick/astrology/charts"])
     assert.equal(policy.kindForRoute(p),"",p);

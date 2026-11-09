@@ -116,7 +116,8 @@ ShellRoot {
             const oldDivider=find(summary,"earth-e7-overview-divider");
             const host=find(map,"earth-e2-pinned-map-host");
             const plot=find(map,"earth-e2-single-map-plot");
-            if(!title||!rail||!divider||!water||!pollen||!environment
+            if(!title||!rail||!divider
+                ||(root.phase<4 && (!water||!pollen||!environment))
                 ||!summaryCards||!arrows||!oldRail||!oldDivider
                 ||!host||!plot) {
                 if(root.ticks>8) {

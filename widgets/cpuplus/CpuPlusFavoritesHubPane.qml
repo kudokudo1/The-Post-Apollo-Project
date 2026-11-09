@@ -110,7 +110,10 @@ Item {
     }
     onFilterModeChanged: {
         menuFilter="ALL";
-        if(pane.area==="selector") Qt.callLater(pane.revealSelectedInSelector);
+        if(pane.area==="selector") {
+            subfilterScroll.contentX=0;
+            Qt.callLater(pane.revealSelectedInSelector);
+        }
     }
     onSelectedCollectionIdChanged: {
         if(pane.filterMode==="GROUP") menuFilter="ALL";
@@ -678,32 +681,62 @@ Item {
         }
         // Secondary source/menu filters remain pinned below the scrollable
         // list. Only canonical dossier menu names are offered here.
-        Flickable {
-            id: subfilterScroll
+        Row {
             width: parent.width
             height: 35
-            clip: true
-            interactive: contentWidth>width
-            boundsBehavior: Flickable.StopAtBounds
-            contentWidth: subfilterButtons.implicitWidth
-            contentHeight: height
-            Row {
-                id: subfilterButtons
-                height: 31
-                spacing: 4
-                Repeater {
-                    model: pane.menuOptions
-                    ActionButton {
-                        required property string modelData
-                        width: Math.max(54,Math.min(110,modelData.length*8+22))
-                        height: 29
-                        label: modelData
-                        labelPixelSize: 9
-                        selected: pane.menuFilter===modelData
-                        accentColor: selected ? Colors.magenta : Colors.cyan
-                        onLeftClicked: pane.menuFilter=modelData
+            spacing: 3
+            ActionButton {
+                id: menuFilterPrev
+                width: 22
+                height: 29
+                label: "‹"
+                labelPixelSize: 15
+                accentColor: Colors.cyan
+                available: subfilterScroll.contentX>0
+                onLeftClicked: subfilterScroll.contentX=Math.max(
+                    0,subfilterScroll.contentX-140)
+            }
+            Flickable {
+                id: subfilterScroll
+                width: Math.max(0,parent.width-menuFilterPrev.width
+                    -menuFilterNext.width-parent.spacing*2)
+                height: 35
+                clip: true
+                interactive: contentWidth>width
+                boundsBehavior: Flickable.StopAtBounds
+                contentWidth: subfilterButtons.implicitWidth
+                contentHeight: height
+                Row {
+                    id: subfilterButtons
+                    height: 31
+                    spacing: 4
+                    Repeater {
+                        model: pane.menuOptions
+                        ActionButton {
+                            required property string modelData
+                            width: Math.max(54,Math.min(110,modelData.length*8+22))
+                            height: 29
+                            label: modelData
+                            labelPixelSize: 9
+                            selected: pane.menuFilter===modelData
+                            accentColor: selected ? Colors.magenta : Colors.cyan
+                            onLeftClicked: pane.menuFilter=modelData
+                        }
                     }
                 }
+            }
+            ActionButton {
+                id: menuFilterNext
+                width: 22
+                height: 29
+                label: "›"
+                labelPixelSize: 15
+                accentColor: Colors.cyan
+                available: subfilterScroll.contentX <
+                    subfilterScroll.contentWidth-subfilterScroll.width-1
+                onLeftClicked: subfilterScroll.contentX=Math.min(
+                    Math.max(0,subfilterScroll.contentWidth-subfilterScroll.width),
+                    subfilterScroll.contentX+140)
             }
         }
     }

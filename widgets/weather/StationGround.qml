@@ -3052,8 +3052,21 @@ Rectangle {
             Rectangle {
                 id: airQualityInstrument
                 width: 248
-                height: ground.compactEarthAir ? 106 : 166
+                height: 166
                 color: Colors.dark
+                // Keep the original full-size instrument canonical.
+                states: State {
+                    name: "earth-e5-compact-aqi"
+                    when: ground.compactEarthAir
+                    PropertyChanges {
+                        target: airQualityInstrument
+                        height: 106
+                    }
+                    PropertyChanges {
+                        target: aqiReadingText
+                        font.pixelSize: 50
+                    }
+                }
                 border.width: 1
                 border.color: Colors.cyan
 
@@ -3085,7 +3098,7 @@ Rectangle {
                     anchors.top: parent.top
                     anchors.topMargin: ground.compactEarthAir ? 19 : 29
                     text: ground.aqiReady ? String(weatherService.aqi) : "--"
-                    font.pixelSize: ground.compactEarthAir ? 50 : 68
+                    font.pixelSize: 68
                     color: ground.aqiColor
                 }
 

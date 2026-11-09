@@ -545,21 +545,53 @@ Item {
         anchors.fill: parent
         spacing: 7
 
-        // Ten compact categories occupy four rows in the middle bay.
+        // U8b // Compact icon-only source filters. Module accent identities
+        // stay visible; text names remain in accessibility metadata.
         Flow {
+            id: categoryFilterFlow
             width: parent.width
-            height: 121
             spacing: 4
+            readonly property int columns:
+                Math.max(1,Math.floor((width+spacing)/(38+spacing)))
+            height: Math.ceil(11/columns)*(30+spacing)-spacing
             Repeater {
                 model: ["ALL","GROUP","CPU++","APP CTRL","WEATHER","NOTIFS","RADIO","HOSPITAL","CLOCK","PLACES","NEW"]
                 ActionButton {
                     required property string modelData
-                    width: Math.max(1,(selector.width-8)/3)
-                    height: 27
-                    label: Dossier.mainIcon(modelData)+" "+modelData
-                    labelPixelSize: 9
+                    readonly property bool whiteModule:
+                        modelData==="NOTIFS" || modelData==="CLOCK"
+                    readonly property color moduleAccent:
+                        modelData==="WEATHER" ? Colors.yellow
+                        : modelData==="HOSPITAL" ? Colors.magenta
+                        : whiteModule ? Colors.white : Colors.cyan
+
+                    width: 38
+                    height: 30
+                    contentPadding: 2
+                    label: Dossier.mainIcon(modelData)
+                    labelPixelSize: 18
+                    Accessible.role: Accessible.Button
+                    Accessible.name: modelData+" favorites filter"
                     selected: pane.filterMode===modelData
-                    accentColor: selected ? Colors.magenta : Colors.cyan
+                    accentColor: moduleAccent
+                    // White Notifications/Time icons must stay white even
+                    // while hovered, selected or keyboard-selected.
+                    hoverForegroundColor:
+                        whiteModule ? Colors.white : Colors.orange
+                    pressedForegroundColor:
+                        whiteModule ? Colors.white : Colors.black
+                    selectedForegroundColor:
+                        whiteModule ? Colors.white : Colors.magenta
+                    keyboardSelectedForegroundColor: selectedForegroundColor
+                    selectedFillColor:
+                        whiteModule ? Colors.dark : Colors.yellow
+                    selectedBorderColor:
+                        whiteModule ? Colors.white : Colors.magenta
+                    selectedContentGlowColor:
+                        whiteModule ? Colors.white : Colors.magenta
+                    selectedSoftGlowColor:
+                        whiteModule ? Colors.white : Colors.magenta
+                    selectedBorderWidth: 2
                     onLeftClicked: pane.filterMode=modelData
                 }
             }
@@ -587,7 +619,7 @@ Item {
         Flickable {
             id: listScroll
             width: parent.width
-            height: Math.max(0,selector.height-242)
+            height: Math.max(0,selector.height-categoryFilterFlow.height-121)
             clip: true
             contentWidth: width
             contentHeight: listRows.implicitHeight

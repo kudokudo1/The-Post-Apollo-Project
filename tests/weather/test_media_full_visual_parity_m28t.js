@@ -139,5 +139,5 @@ test("native MEDIA uses same original NEWS/RADIO components and preserves safe-m
                     "XMLHttpRequest","swaymsg","curl ","writeAdapter()"])
       assert.equal(src.includes(x),false,"unexpected source owner in navigation metadata: "+x);
   }
-  assert.match(mapTest,/EARTH bottom MAP/,"M28-S full MAP regression carried forward in this milestone");
+  assert.match(mapTest,/EARTH has one MAP \/ EVENTS main tab/,"M28-S full MAP remains accessible via INDEX while the unified EARTH map owns the visible tab");
 });

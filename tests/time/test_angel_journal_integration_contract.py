@@ -149,7 +149,7 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn("pane.visiblePattern(modelData.digits)", entries)
         self.assertIn("readonly property color ink: pane.filterInk(modelData.key)", filters)
         self.assertIn("idleBorderColor: edge", filters)
-        self.assertIn("selectedFillColor: pane.wash(ink, 0.24)", filters)
+        self.assertIn("selected: pane.activeFilter === modelData.key", filters)
 
         self.assertIn("readonly property bool isMarkedErr:", entries)
         self.assertIn("modelData.errMarked === true", entries)
@@ -159,41 +159,33 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn("pane.filterEdge(pattern)", entries)
         self.assertIn("accentColor: observationEntry.entryInk", entries)
         self.assertIn("idleBorderColor: observationEntry.entryEdge", entries)
-        self.assertIn("idleFillColor: observationEntry.isFavoriteNumber", entries)
-        self.assertIn("selectedFillColor: pane.wash(observationEntry.entryEdge, 0.24)", entries)
+        self.assertIn("selected: pane.selectedId === modelData.id", entries)
         self.assertNotIn("matchesFilter(", entries)
         self.assertNotIn("activeFilter ===", entries)
 
-    def test_angel_buttons_do_not_fill_on_idle_hover_or_press(self):
+    def test_angel_buttons_use_one_black_fill_across_all_states(self):
         local_button = (ROOT / "widgets/AngelActionButton.qml").read_text(
             encoding="utf-8")
         meaning = (ROOT / "widgets/AngelMeaningPane.qml").read_text(
             encoding="utf-8")
         self.assertIn("ActionButton {", local_button)
-        self.assertIn("idleFillColor: Colors.black", local_button)
-        self.assertIn(
-            "hoverFillColor: selected ? selectedFillColor : idleFillColor",
-            local_button)
-        self.assertIn(
-            "pressedFillColor: selected ? selectedFillColor : idleFillColor",
-            local_button)
-        self.assertIn(
-            "keyboardSelectedFillColor: selected ? selectedFillColor : idleFillColor",
-            local_button)
-        self.assertIn(
-            "color: angelButton.withOpacity(", local_button)
-        self.assertIn(
-            "? angelButton.selectedFillColor : angelButton.idleFillColor",
-            local_button)
-        self.assertIn(
-            "hoverForegroundColor: selected ? selectedForegroundColor : idleForegroundColor",
-            local_button)
+        self.assertIn("readonly property color fixedFillColor: Colors.black",
+                      local_button)
+        for state in ("idle", "hover", "pressed", "selected",
+                      "keyboardSelected"):
+            self.assertIn(state + "FillColor: fixedFillColor", local_button)
+        self.assertIn("color: fixedFillColor", local_button)
+        # No child may override the single fill, including favorite / ERR.
+        for content in (PANE, meaning):
+            self.assertNotIn("FillColor:", content)
+            self.assertNotIn("pane.wash(", content)
         self.assertEqual(PANE.count("AngelActionButton {"), 13)
         self.assertEqual(meaning.count("AngelActionButton {"), 2)
         self.assertIn("x: 0", PANE.split("id: favoriteObservation", 1)[1]
                       .split("id: noteObservation", 1)[0])
         self.assertIn("x: favoriteObservation.width + 4", PANE)
-        self.assertIn("x: observationSelect.x + observationSelect.width + 4", PANE)
+        self.assertIn("x: observationSelect.x + observationSelect.width + 4",
+                      PANE)
 
     def test_counter_words_and_slashes_are_white(self):
         header = PANE.split('text: "HISTORY //"', 1)[1].split(

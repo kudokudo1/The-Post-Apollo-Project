@@ -1,29 +1,24 @@
 import QtQuick
 import "../components"
 
-// ANGEL-local outline-first action. Standard ActionButton paints a new color
-// on hover/press, which turns an otherwise neutral entire rail into filled
-// controls while pointer events move across them. Keep the idle surface when
-// unselected; selected states may retain their intentional color wash.
+// ANGEL // ONE BACKGROUND COLOR.
+// The shared ActionButton normally uses state-dependent fills. Angel does not:
+// idle, hover, press, keyboard focus, selection and favorite all paint black.
+// State remains visible in text, border and glow, never in the background.
+// This is intentionally scoped to Angel rather than shared ActionButton.
 ActionButton {
     id: angelButton
 
-    idleFillColor: Colors.black
-    hoverFillColor: selected ? selectedFillColor : idleFillColor
-    pressedFillColor: selected ? selectedFillColor : idleFillColor
-    // The shared ActionButton has a separate keyboard-selection branch that
-    // previously fell back to selectedFillColor even when selected was false.
-    keyboardSelectedFillColor: selected ? selectedFillColor : idleFillColor
+    readonly property color fixedFillColor: Colors.black
+    idleFillColor: fixedFillColor
+    hoverFillColor: fixedFillColor
+    pressedFillColor: fixedFillColor
+    selectedFillColor: fixedFillColor
+    keyboardSelectedFillColor: fixedFillColor
 
-    // Paint from semantic selection only. Hover, press and keyboard focus
-    // cannot wash unrelated entries, even if a state remains set during
-    // ListView delegate reuse or pointer transitions. A favorite observation
-    // can still provide its magenta-tinted idleFillColor.
-    color: angelButton.withOpacity(
-        angelButton.selected
-            ? angelButton.selectedFillColor : angelButton.idleFillColor,
-        angelButton.available ? 1.0 : angelButton.unavailableFillOpacity
-    )
+    // Final painted surface is independent of fillColor's state machine.
+    // Scrolling/reusing ListView delegates cannot restore a colored wash.
+    color: fixedFillColor
 
     hoverForegroundColor: selected ? selectedForegroundColor : idleForegroundColor
     pressedForegroundColor: selected ? selectedForegroundColor : idleForegroundColor

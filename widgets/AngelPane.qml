@@ -82,10 +82,6 @@ Item {
             ? activeFilter : primaryPattern(digits);
     }
 
-    function wash(tint, alpha) {
-        return Qt.rgba(tint.r, tint.g, tint.b, alpha);
-    }
-
     function showMeaning() {
         const chosen = pane.selectedObservation !== null
             ? pane.selectedObservation.digits
@@ -170,7 +166,6 @@ Item {
             trackLabelGlowLocally: true
             accentColor: Colors.white
             selected: pane.activeView === "journal"
-            selectedFillColor: Colors.yellow
             selectedForegroundColor: Colors.magenta
             selectedBorderColor: Colors.magenta
             onLeftClicked: pane.activeView = "journal"
@@ -184,7 +179,6 @@ Item {
             trackLabelGlowLocally: true
             accentColor: Colors.white
             selected: pane.activeView === "meaning"
-            selectedFillColor: Colors.yellow
             selectedForegroundColor: Colors.magenta
             selectedBorderColor: Colors.magenta
             onLeftClicked: pane.showMeaning()
@@ -407,7 +401,6 @@ Item {
                     idleContentGlowColor: edge
                     idleSoftGlowColor: edge
                     selected: pane.activeFilter === modelData.key
-                    selectedFillColor: pane.wash(ink, 0.24)
                     selectedForegroundColor: ink
                     selectedBorderColor: edge
                     selectedContentGlowColor: edge
@@ -477,17 +470,13 @@ Item {
                         labelHorizontalAlignment: Text.AlignLeft
                         contentPadding: 5
                         trackLabelGlowLocally: true
-                        // Saved favorites keep their magenta wash; all other
-                        // idle, hovered and pressed history rows remain dark.
+                        // Every row stays black. Favorites and selection
+                        // are distinguished by magenta/colorful ink and glow.
                         accentColor: observationEntry.entryInk
                         idleBorderColor: observationEntry.entryEdge
                         idleContentGlowColor: observationEntry.entryEdge
                         idleSoftGlowColor: observationEntry.entryEdge
-                        idleFillColor: observationEntry.isFavoriteNumber
-                                       ? pane.wash(Colors.magenta, 0.16)
-                                       : Colors.black
                         selected: pane.selectedId === modelData.id
-                        selectedFillColor: pane.wash(observationEntry.entryEdge, 0.24)
                         selectedForegroundColor: observationEntry.entryInk
                         selectedBorderColor: observationEntry.entryEdge
                         selectedContentGlowColor: observationEntry.entryEdge
@@ -508,7 +497,6 @@ Item {
                         accentColor: observationEntry.isFavoriteNumber
                                      ? Colors.magenta : Colors.white
                         selected: observationEntry.isFavoriteNumber
-                        selectedFillColor: pane.wash(Colors.magenta, 0.28)
                         selectedForegroundColor: Colors.magenta
                         selectedBorderColor: Colors.magenta
                         available: FavoritesDefaultStore.canEdit
@@ -525,7 +513,6 @@ Item {
                         contentPadding: 2
                         accentColor: modelData.note ? Colors.orange : Colors.cyan
                         selected: pane.editingNoteId === modelData.id
-                        selectedFillColor: pane.wash(Colors.cyan, 0.23)
                         selectedForegroundColor: modelData.note ? Colors.orange : Colors.cyan
                         available: AngelObservationsStore.writable
                         onLeftClicked: pane.editObservationNote(modelData)
@@ -665,7 +652,6 @@ Item {
                 destructive: true
                 selected: pane.selectedObservation !== null
                           && pane.selectedObservation.errMarked === true
-                selectedFillColor: Colors.red
                 selectedForegroundColor: Colors.white
                 selectedBorderColor: Colors.red
                 available: pane.selectedObservation !== null

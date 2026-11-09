@@ -5064,6 +5064,75 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
+                            text: "MARK // NAME A RESTORE CHECKPOINT"
+                            color: Colors.magenta
+                            font.pixelSize: 11
+                        }
+                        Row {
+                            id: machinePersistentMarkRow
+                            width: parent.width
+                            height: 35
+                            spacing: 7
+                            TextField {
+                                id: machinePersistentMarkInput
+                                width: Math.max(0, parent.width
+                                        - machinePersistentMarkButton.width
+                                        - machinePersistentMarkRow.spacing)
+                                height: parent.height
+                                maximumLength: 40
+                                text: timew.machinePersistentMarkDraft
+                                placeholderText: "NAME MOMENT // OPTIONAL"
+                                color: Colors.magenta
+                                placeholderTextColor: Colors.cyan
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 11
+                                leftPadding: 8
+                                rightPadding: 8
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: machinePersistentMarkInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                }
+                                onTextEdited: timew.machinePersistentMarkDraft = text
+                                onAccepted: timew.machineRequestPersistentMark()
+                            }
+                            ActionButton {
+                                id: machinePersistentMarkButton
+                                width: 108
+                                height: parent.height
+                                label: timew.machineSaveBridgeBusy
+                                       && timew.machineSaveBridgeOrigin === "mark"
+                                       ? "MARKING..." : "MARK NOW"
+                                labelPixelSize: 11
+                                accentColor: Colors.orange
+                                available: !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
+                                           && !timew.machineCaptureBusy
+                                           && !timew.machineAutoRestoreBusy
+                                onLeftClicked: timew.machineRequestPersistentMark()
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machinePersistentMarkStatus
+                            color: timew.machinePersistentMarkStatus.startsWith("MARK SAVED")
+                                   ? Colors.cyan : Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "MARK SAVES GEOMETRY IN STORED // BRAVE TABS + EXACT RESTORE NOT YET VERIFIED"
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+
+                        GohuText {
+                            width: parent.width
                             text: timew.machineSaveBridgeStatus
                             color: timew.machineSaveBridgeStatus.startsWith("SAVED")
                                    ? Colors.cyan : Colors.orange
@@ -5635,8 +5704,8 @@ PanelWindow {
                                 id: machineMarkButton
                                 width: 75
                                 height: parent.height
-                                label: "MARK"
-                                labelPixelSize: 11
+                                label: "TIME ONLY"
+                                labelPixelSize: 9
                                 accentColor: timew.semanticColor
                                 available: timew.machineMarkers.length
                                            < MachineTimelinePolicy.MAX_MARKERS

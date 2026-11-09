@@ -135,6 +135,42 @@ def get_annotation(checkpoint_id):
         conn.close()
 
 
+
+def list_annotation_names():
+    """Read only names for the exact visible legacy checkpoint list.
+
+    Never return private notes during ordinary list browsing. Do not
+    create the optional table or mutate SQLite when it does not exist.
+    """
+    conn = legacy.connect(writable=False)
+    if conn is None:
+        return {"status": "listed", "read_only": True, "items": []}
+    try:
+        if not _annotation_table_exists(conn):
+            return {"status": "listed", "read_only": True, "items": []}
+        rows = conn.execute(
+            f"SELECT a.checkpoint_id, a.display_name, a.revision "
+            f"FROM {TABLE} AS a INNER JOIN checkpoints AS c "
+            "ON c.id=a.checkpoint_id "
+            "WHERE a.checkpoint_id IN "
+            "(SELECT id FROM checkpoints ORDER BY saved_at_utc DESC, id DESC "
+            "LIMIT ?) ORDER BY c.saved_at_utc DESC, c.id DESC",
+            (legacy.MAX_LIST,)).fetchall()
+        items = []
+        for row in rows:
+            revision = row["revision"]
+            if type(revision) is not int or not 1 <= revision <= MAX_REVISION:
+                raise AnnotationError("INVALID STORED ANNOTATION")
+            items.append({
+                "checkpoint_id": _canonical_id(row["checkpoint_id"]),
+                "display_name": _display_name(row["display_name"]),
+                "revision": revision,
+            })
+        return {"status": "listed", "read_only": True, "items": items}
+    finally:
+        conn.close()
+
+
 def set_annotation(checkpoint_id, *, display_name, note, expected_revision,
                    stage_hook=None):
     """Update only the metadata sidecar with stale-editor protection.

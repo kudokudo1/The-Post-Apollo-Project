@@ -35,6 +35,9 @@ from MachineSwayRead import PreviewError
 from MachineGeometryV2 import GeometryError
 from MachineGeometryStoreV2 import GeometryStoreError, load_geometry
 from MachineCheckpointStore import StoreError, load as load_legacy
+from MachineCheckpointAnnotations import (
+    AnnotationError, get_annotation, set_annotation, list_annotation_names)
+from MachineCheckpointNotesCLI import _input as _decode_notes_input
 
 MAX_REQUEST_BYTES = 65536
 MAX_RESPONSE_BYTES = 262144
@@ -237,8 +240,8 @@ def _decode_request():
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    if argv not in (["inspect"], ["save"]) and not (
-            len(argv) == 2 and argv[0] == "verify"):
+    if argv not in (["inspect"], ["save"], ["notes-list"], ["notes-update"]) and not (
+            len(argv) == 2 and argv[0] in ("verify", "notes-read")):
         print(json.dumps({"status": "error", "reason": "INVALID ACTION"}))
         return 1
     try:
@@ -246,6 +249,16 @@ def main(argv=None):
             result = inspect()
         elif len(argv) == 2 and argv[0] == "verify":
             result = inspect_checkpoint(argv[1])
+        elif argv == ["notes-list"]:
+            result = list_annotation_names()
+        elif len(argv) == 2 and argv[0] == "notes-read":
+            result = get_annotation(argv[1])
+        elif argv == ["notes-update"]:
+            request = _decode_notes_input()
+            result = set_annotation(
+                request["checkpoint_id"],
+                display_name=request["display_name"], note=request["note"],
+                expected_revision=request["expected_revision"])
         else:
             result = save_request(_decode_request())
         raw = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
@@ -253,6 +266,12 @@ def main(argv=None):
             raise BridgeError("RESPONSE TOO LARGE")
         print(raw)
         return 0
+    except AnnotationError as exc:
+        # Notes are private; output only known status categories.
+        reason = ("CHECKPOINT NOTES STALE" if str(exc) == "STALE CHECKPOINT ANNOTATION"
+                  else "ANNOTATION REJECTED")
+        print(json.dumps({"status": "error", "reason": reason}))
+        return 1
     except (BridgeError, CaptureError, SelectionError) as exc:
         # These exceptions contain only bounded app-authored status values.
         print(json.dumps({"status": "error", "reason": str(exc)}))

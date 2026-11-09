@@ -840,6 +840,23 @@ PanelWindow {
     property string machineGeometryVerifyId: ""
     property string machineGeometryVerifyStatus: "NOT VERIFIED // READ-ONLY CHECK AVAILABLE"
     property var machineGeometryVerifyResult: null
+    // STORED name overlays are read-only; private notes load only on EDIT.
+    property var machineNotesNameOverlay: ({})
+    property bool machineNotesEditorOpen: false
+    property var machineNotesLoaded: null
+    property string machineNotesCheckpointId: ""
+    property string machineNotesDraftName: ""
+    property string machineNotesDraftText: ""
+    property string machineNotesStatus: "NOTES // SELECT A STORED CHECKPOINT"
+    readonly property bool machineNotesDirty: machineNotesEditorOpen
+        && machineNotesLoaded !== null
+        && (machineNotesDraftName !== machineNotesLoaded.display_name
+            || machineNotesDraftText !== machineNotesLoaded.note)
+    readonly property bool machineNotesInputValid:
+        machineNotesDraftName.trim().length > 0
+        && machineNotesDraftName.trim().length <= 48
+        && machineNotesDraftText.length <= 1024
+        && machineNotesDraftName.indexOf("\\n") < 0
     property string machineCheckpointDraft: ""
     property bool machineCustomOpen: false
     property bool machineSaveAdvancedOpen: false
@@ -893,6 +910,147 @@ PanelWindow {
         machineSaveBridgeProcess.exec(["python3", "-B", "-I",
             Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"),
             "verify", machineGeometryVerifyId]);
+    }
+
+    function machineNotesNameForItem(item) {
+        if (!item)
+            return "NO SAVED RECORD SELECTED";
+        const entry = machineNotesNameOverlay[item.id];
+        return entry && typeof entry.display_name === "string"
+            ? entry.display_name : item.label;
+    }
+
+    function machineNotesDiscard() {
+        machineNotesEditorOpen = false;
+        machineNotesLoaded = null;
+        machineNotesCheckpointId = "";
+        machineNotesDraftName = "";
+        machineNotesDraftText = "";
+        machineNotesStatus = "NOTES // CLOSED";
+    }
+
+    function machineRequestNotesList() {
+        if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
+                || machineSaveBridgeBusy || machineStoreBusy
+                || machineAutoRestoreBusy)
+            return;
+        machineSaveBridgeBusy = true;
+        machineSaveBridgeAction = "notes-list";
+        machineSaveBridgePayload = "";
+        machineSaveBridgeProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"),
+            "notes-list"]);
+    }
+
+    function machineRequestNotesRead() {
+        if (machineNotesDirty) {
+            machineNotesStatus = "UNSAVED NOTES // SAVE OR CANCEL FIRST";
+            return;
+        }
+        if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
+                || !machineSavedItem || machineSaveBridgeBusy
+                || machineStoreBusy || machineAutoRestoreBusy)
+            return;
+        machineNotesEditorOpen = true;
+        machineNotesCheckpointId = machineSavedItem.id;
+        machineNotesLoaded = null;
+        machineNotesDraftName = "";
+        machineNotesDraftText = "";
+        machineNotesStatus = "NOTES // LOADING SELECTED CHECKPOINT";
+        machineSaveBridgeBusy = true;
+        machineSaveBridgeAction = "notes-read";
+        machineSaveBridgePayload = "";
+        machineSaveBridgeProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"),
+            "notes-read", machineNotesCheckpointId]);
+    }
+
+    function machineSaveNotes() {
+        if (!machineNotesEditorOpen || !machineNotesLoaded || !machineSavedItem
+                || machineNotesLoaded.checkpoint_id !== machineSavedItem.id
+                || machineNotesCheckpointId !== machineSavedItem.id
+                || !machineNotesDirty || !machineNotesInputValid
+                || machineSaveBridgeBusy || machineStoreBusy
+                || machineAutoRestoreBusy)
+            return;
+        machineSaveBridgeBusy = true;
+        machineSaveBridgeAction = "notes-update";
+        machineSaveBridgePayload = JSON.stringify({
+            checkpoint_id: machineNotesCheckpointId,
+            display_name: machineNotesDraftName.trim(),
+            note: machineNotesDraftText,
+            expected_revision: machineNotesLoaded.revision
+        });
+        machineNotesStatus = "SAVING NOTES // ORIGINAL CAPTURE UNCHANGED";
+        machineSaveBridgeProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"),
+            "notes-update"]);
+    }
+
+    function machineAcceptNotesResponse(data) {
+        if (machineSaveBridgeAction === "notes-list") {
+            if (data.status !== "listed" || data.read_only !== true
+                    || !Array.isArray(data.items) || data.items.length > 30)
+                return;
+            const shown = {};
+            for (let i = 0; i < machineSavedCheckpoints.length; i++)
+                shown[machineSavedCheckpoints[i].id] = true;
+            const overlay = {};
+            for (let i = 0; i < data.items.length; i++) {
+                const row = data.items[i];
+                if (shown[row.checkpoint_id] && typeof row.display_name === "string")
+                    overlay[row.checkpoint_id] = {
+                        display_name: row.display_name,
+                        revision: row.revision
+                    };
+            }
+            machineNotesNameOverlay = overlay;
+            return;
+        }
+        if (!machineNotesEditorOpen || !machineSavedItem
+                || machineNotesCheckpointId !== machineSavedItem.id)
+            return;
+        if (data.status === "error") {
+            if (data.reason === "CHECKPOINT NOTES STALE") {
+                machineNotesLoaded = null;
+                machineNotesStatus = "NOTES STALE // REFRESH BEFORE EDITING";
+            } else {
+                machineNotesStatus = "NOTES REJECTED // CHECK INPUT OR STORE";
+            }
+            return;
+        }
+        const reading = machineSaveBridgeAction === "notes-read";
+        const updating = machineSaveBridgeAction === "notes-update";
+        if ((!reading && !updating)
+                || data.checkpoint_id !== machineNotesCheckpointId
+                || data.capture_modified !== false
+                || typeof data.display_name !== "string"
+                || typeof data.note !== "string"
+                || typeof data.revision !== "number"
+                || (reading && (data.status !== "loaded" || data.read_only !== true))
+                || (updating && (data.status !== "updated" || data.read_only !== false
+                    || !machineNotesLoaded || data.revision !== machineNotesLoaded.revision + 1))) {
+            machineNotesStatus = "INVALID NOTES RESPONSE";
+            return;
+        }
+        machineNotesLoaded = {
+            checkpoint_id: data.checkpoint_id,
+            display_name: data.display_name,
+            note: data.note,
+            revision: data.revision,
+            original_label: data.original_label
+        };
+        machineNotesDraftName = data.display_name;
+        machineNotesDraftText = data.note;
+        const next = Object.assign({}, machineNotesNameOverlay);
+        next[data.checkpoint_id] = {
+            display_name: data.display_name,
+            revision: data.revision
+        };
+        machineNotesNameOverlay = next;
+        machineNotesStatus = reading
+            ? "NOTES LOADED // ORIGINAL CAPTURE UNCHANGED"
+            : "NOTES SAVED // REVISION " + data.revision;
     }
 
     function machineSaveLabel() {
@@ -985,6 +1143,12 @@ PanelWindow {
     function machineAcceptSaveBridge(data) {
         if (!data || typeof data.status !== "string") {
             machineSaveBridgeStatus = "INVALID SAVE RESPONSE";
+            return;
+        }
+        if (machineSaveBridgeAction === "notes-list"
+                || machineSaveBridgeAction === "notes-read"
+                || machineSaveBridgeAction === "notes-update") {
+            machineAcceptNotesResponse(data);
             return;
         }
         if (machineSaveBridgeAction === "verify") {
@@ -1524,6 +1688,12 @@ PanelWindow {
         machineListCheckpoints();
     }
     function machineListCheckpoints() {
+        if (machineNotesDirty) {
+            machineNotesStatus = "UNSAVED NOTES // SAVE OR CANCEL FIRST";
+            return;
+        }
+        machineNotesDiscard();
+        machineNotesNameOverlay = ({});
         machineGeometryVerifyId = "";
         machineGeometryVerifyResult = null;
         machineGeometryVerifyStatus = "NOT VERIFIED // READ-ONLY CHECK AVAILABLE";
@@ -1539,8 +1709,13 @@ PanelWindow {
         machineStoreRequest("load", null, machineSavedItem.id);
     }
     function machineStepSavedCheckpoint(delta) {
-        if (machineAutoRestoreBusy)
+        if (machineAutoRestoreBusy || machineSaveBridgeBusy || machineStoreBusy)
             return;
+        if (machineNotesDirty) {
+            machineNotesStatus = "UNSAVED NOTES // SAVE OR CANCEL FIRST";
+            return;
+        }
+        machineNotesDiscard();
         machineGeometryVerifyId = "";
         machineGeometryVerifyResult = null;
         machineGeometryVerifyStatus = "NOT VERIFIED // READ-ONLY CHECK AVAILABLE";
@@ -1760,7 +1935,9 @@ PanelWindow {
         running: false
         stdinEnabled: true
         onStarted: {
-            if (timew.machineSaveBridgeAction === "save" && timew.machineSaveBridgePayload)
+            if ((timew.machineSaveBridgeAction === "save"
+                    || timew.machineSaveBridgeAction === "notes-update")
+                    && timew.machineSaveBridgePayload)
                 machineSaveBridgeProcess.write(
                     timew.machineSaveBridgePayload + String.fromCharCode(10));
             timew.machineSaveBridgePayload = "";
@@ -1770,13 +1947,27 @@ PanelWindow {
                 try {
                     timew.machineAcceptSaveBridge(JSON.parse(this.text));
                 } catch (error) {
-                    timew.machineSaveBridgeStatus = "INVALID SAVE RESPONSE";
+                    if (timew.machineSaveBridgeAction.startsWith("notes-"))
+                        timew.machineNotesStatus = "INVALID NOTES RESPONSE";
+                    else
+                        timew.machineSaveBridgeStatus = "INVALID SAVE RESPONSE";
                 }
             }
         }
         onExited: function(exitCode, exitStatus) {
             timew.machineSaveBridgeBusy = false;
             timew.machineSaveBridgePayload = "";
+            if (timew.machineSaveBridgeAction.startsWith("notes-")) {
+                if (exitCode !== 0 && timew.machineSaveBridgeAction === "notes-update"
+                        && !timew.machineNotesStatus.startsWith("NOTES STALE"))
+                    timew.machineNotesStatus =
+                        "NOTES UPDATE UNCERTAIN // REFRESH BEFORE RETRY";
+                else if (exitCode !== 0 && timew.machineSaveBridgeAction === "notes-read"
+                         && timew.machineNotesEditorOpen
+                         && !timew.machineNotesLoaded)
+                    timew.machineNotesStatus = "NOTES READ UNAVAILABLE";
+                return;
+            }
             if (exitCode !== 0 && timew.machineSaveBridgeAction === "verify") {
                 if (timew.machineSavedItem
                         && timew.machineGeometryVerifyId === timew.machineSavedItem.id)
@@ -1853,6 +2044,11 @@ PanelWindow {
         onExited: function(exitCode, exitStatus) {
             timew.machineStoreBusy = false;
             timew.machineStorePayload = "";
+            if (timew.machineStoreAction === "list"
+                    && exitCode === 0 && timew.machineStoreResponse
+                    && timew.machineStoreResponse.status === "listed"
+                    && timew.machineSavedCheckpoints.length > 0)
+                timew.machineRequestNotesList();
             if (exitCode !== 0)
                 timew.machineStoreStatus = timew.machineStoreResponse
                     && timew.machineStoreResponse.status === "error"
@@ -5578,7 +5774,12 @@ PanelWindow {
                                 label: "BACK TO CAPTURE"
                                 labelPixelSize: 10
                                 accentColor: timew.semanticColor
-                                onLeftClicked: timew.machineStoredViewOpen = false
+                                available: !timew.machineNotesDirty
+                                           && !timew.machineSaveBridgeBusy
+                                onLeftClicked: {
+                                    timew.machineNotesDiscard();
+                                    timew.machineStoredViewOpen = false;
+                                }
                             }
                             ActionButton {
                                 width: (parent.width - 8) / 2
@@ -5587,6 +5788,8 @@ PanelWindow {
                                 labelPixelSize: 10
                                 accentColor: timew.semanticColor
                                 available: !timew.machineStoreBusy
+                                           && !timew.machineSaveBridgeBusy
+                                           && !timew.machineNotesDirty
                                 onLeftClicked: timew.machineListCheckpoints()
                             }
                         }
@@ -5600,6 +5803,9 @@ PanelWindow {
                                 label: "<"
                                 accentColor: timew.semanticColor
                                 available: timew.machineSavedCheckpoints.length > 1
+                                           && !timew.machineNotesDirty
+                                           && !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
                                 onLeftClicked: timew.machineStepSavedCheckpoint(-1)
                             }
                             GohuText {
@@ -5619,13 +5825,15 @@ PanelWindow {
                                 label: ">"
                                 accentColor: timew.semanticColor
                                 available: timew.machineSavedCheckpoints.length > 1
+                                           && !timew.machineNotesDirty
+                                           && !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
                                 onLeftClicked: timew.machineStepSavedCheckpoint(1)
                             }
                         }
                         GohuText {
                             width: parent.width
-                            text: timew.machineSavedItem ? timew.machineSavedItem.label
-                                                          : "NO SAVED RECORD SELECTED"
+                            text: timew.machineNotesNameForItem(timew.machineSavedItem)
                             color: Colors.orange
                             font.pixelSize: 12
                             elide: Text.ElideRight
@@ -5650,6 +5858,153 @@ PanelWindow {
                             font.pixelSize: 11
                             elide: Text.ElideRight
                         }
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 8
+                            ActionButton {
+                                width: parent.width
+                                height: parent.height
+                                label: timew.machineNotesEditorOpen
+                                       ? "NOTES // REFRESH SELECTED" : "NOTES // RENAME"
+                                labelPixelSize: 10
+                                accentColor: Colors.magenta
+                                available: !!timew.machineSavedItem
+                                           && !timew.machineNotesDirty
+                                           && !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
+                                           && !timew.machineAutoRestoreBusy
+                                onLeftClicked: timew.machineRequestNotesRead()
+                            }
+                        }
+                        Column {
+                            id: machineStoredNotesEditor
+                            visible: timew.machineNotesEditorOpen
+                            width: parent.width
+                            spacing: 7
+
+                            GohuText {
+                                width: parent.width
+                                text: "CHECKPOINT NOTES // OPTIONAL PERSONAL METADATA"
+                                color: Colors.magenta
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: timew.machineNotesStatus
+                                color: timew.machineNotesStatus.startsWith("NOTES SAVED")
+                                       ? Colors.cyan : Colors.orange
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                            GohuText {
+                                visible: !!timew.machineNotesLoaded
+                                width: parent.width
+                                text: timew.machineNotesLoaded
+                                      ? "ORIGINAL // " + timew.machineNotesLoaded.original_label
+                                        + " // REV " + timew.machineNotesLoaded.revision
+                                      : ""
+                                color: Colors.white
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                            TextField {
+                                id: machineNotesNameInput
+                                visible: !!timew.machineNotesLoaded
+                                width: parent.width
+                                height: 34
+                                maximumLength: 48
+                                text: timew.machineNotesDraftName
+                                placeholderText: "CHECKPOINT NAME"
+                                color: Colors.magenta
+                                placeholderTextColor: Colors.cyan
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 11
+                                leftPadding: 7
+                                rightPadding: 7
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: machineNotesNameInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                }
+                                onTextEdited: timew.machineNotesDraftName = text
+                            }
+                            TextArea {
+                                id: machineNotesTextInput
+                                visible: !!timew.machineNotesLoaded
+                                width: parent.width
+                                height: 114
+                                text: timew.machineNotesDraftText
+                                textFormat: TextEdit.PlainText
+                                wrapMode: TextEdit.Wrap
+                                placeholderText: "OPTIONAL NOTES // 1024 CHARACTERS"
+                                color: Colors.white
+                                placeholderTextColor: Colors.cyan
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 11
+                                leftPadding: 7
+                                rightPadding: 7
+                                topPadding: 7
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: machineNotesTextInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                }
+                                onTextChanged: timew.machineNotesDraftText = text
+                            }
+                            GohuText {
+                                visible: !!timew.machineNotesLoaded
+                                width: parent.width
+                                text: timew.machineNotesDraftText.length + " / 1024 // "
+                                      + (timew.machineNotesDirty
+                                         ? "UNSAVED CHANGES" : "NO UNSAVED CHANGES")
+                                color: timew.machineNotesInputValid
+                                       ? Colors.cyan : Colors.orange
+                                font.pixelSize: 10
+                            }
+                            Row {
+                                width: parent.width
+                                height: 32
+                                spacing: 6
+                                ActionButton {
+                                    width: (parent.width - 6) / 2
+                                    height: parent.height
+                                    label: "SAVE NOTES"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.orange
+                                    available: !!timew.machineNotesLoaded
+                                               && timew.machineNotesDirty
+                                               && timew.machineNotesInputValid
+                                               && !timew.machineSaveBridgeBusy
+                                               && !timew.machineStoreBusy
+                                    onLeftClicked: timew.machineSaveNotes()
+                                }
+                                ActionButton {
+                                    width: (parent.width - 6) / 2
+                                    height: parent.height
+                                    label: "CANCEL // CLOSE"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.magenta
+                                    available: !timew.machineSaveBridgeBusy
+                                    onLeftClicked: timew.machineNotesDiscard()
+                                }
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: "ONLY NAME + NOTE CHANGE // ORIGINAL CAPTURE AND GEOMETRY STAY UNTOUCHED"
+                                color: Colors.orange
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                        }
+
                         Row {
                             width: parent.width
                             height: 34

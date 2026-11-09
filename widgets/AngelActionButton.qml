@@ -20,6 +20,14 @@ ActionButton {
     // Scrolling/reusing ListView delegates cannot restore a colored wash.
     color: fixedFillColor
 
+    // RectangularShadow is a filled shadow shape, not an outline-only
+    // stroke. On the history ListView its full-rectangle accent tint can
+    // become visible during scrolling/compositing despite a black Rectangle.
+    // Keep the text/glow identity but remove these broad-area shadow layers.
+    softGlowEnabled: false
+    wideGlowEnabled: false
+    contentGlowEnabled: true
+
     hoverForegroundColor: selected ? selectedForegroundColor : idleForegroundColor
     pressedForegroundColor: selected ? selectedForegroundColor : idleForegroundColor
     hoverBorderColor: selected ? selectedBorderColor : idleBorderColor

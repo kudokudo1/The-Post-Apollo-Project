@@ -181,6 +181,9 @@ class IdentityCommandGateway:
         self._host: DesktopHostLifecycle | None = None
         self._request_id: str | None = None
         self._owner_peer: KernelPeer | None = None
+        # Keep all prior IDs spent for the lifetime of the gateway.
+        # Even an unexpected random collision may NEVER revive a stale ID.
+        self._issued_ids: set[str] = set()
         self._begun_once = False
         self._started_once = False
 
@@ -282,9 +285,10 @@ class IdentityCommandGateway:
                     or self._verify_peer(peer) is not True):
                 raise RuntimeError("Seat or caller lost during new login")
             new_id = secrets.token_urlsafe(32)
-            if (new_id == previous_id
+            if (new_id == previous_id or new_id in self._issued_ids
                     or _REQUEST_ID.fullmatch(new_id) is None):
                 raise RuntimeError("Fresh host request ID unavailable")
+            self._issued_ids.add(new_id)
             self._host = host
             self._request_id = new_id
             self._owner_peer = peer

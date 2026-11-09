@@ -1,0 +1,66 @@
+name: Connections C3e-U actual C4c guest report schema importer (diagnostic only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eUObservedGuestImport.py"
+      - "tests/connections/test_connections_c3eu_c4c_observed_guest_import.py"
+      - ".github/workflows/connections-c3eu-c4c-observed-guest-import.yml"
+      - "docs/connections-c3eu-c4c-observed-guest-import.md"
+      - "tests/connections/c4b_silverblue/guest_confined_runtime.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c4c-source-shape-and-guarded-observation-import:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile DOC consumer and read-only policy source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eUObservedGuestImport.py \
+            tests/connections/test_connections_c3eu_c4c_observed_guest_import.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("tests/connections/c3e_release_trust/C3eUObservedGuestImport.py").read_text()
+          assert "C4B_OBSERVED // " in s
+          assert '"signedGuestOriginAuthenticated": False' in s
+          assert '"evidenceCryptographicallyAttested": False' in s
+          assert '"hostAuthenticated": False' in s
+          assert '"credentialActionsEnabled": False' in s
+          q=Path("services/connections")
+          assert "readonly property bool credentialActionsEnabled: false" in (q/"ConnectionsBroker.qml").read_text()
+          assert "readonly property bool hostAuthenticated: false" in (q/"ConnectionsRequestStatus.qml").read_text()
+          print("C3EU_PASS // NO_UNTRUSTED_GUEST_TO_PRODUCTION_PROMOTION")
+          PY
+      - name: Exact merged C4c embedded source schema and adversarial CLI import
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3eu_c4c_observed_guest_import.py
+          echo "C3EU_PASS // C4C_REAL_SOURCE_SCHEMA_AND_INDEPENDENT_PIN_REFUSALS"
+      - name: Preserve real C4b guest source/deny-only and signed receipt tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c4b_silverblue_contract.py
+          python3 -B tests/connections/test_connections_c3eq_signed_guest_evidence.py
+          python3 -B tests/connections/test_connections_c3b_origin.py
+          echo "C3EU_PASS // C4B_Q_AND_C3B_REGRESSIONS_PRESERVED"
+      - name: Refuse remote-attestation claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'not authenticated C4c guest evidence' docs/connections-c3eu-c4c-observed-guest-import.md
+          grep -Fq 'actual real guest UART JSON is not exported' docs/connections-c3eu-c4c-observed-guest-import.md
+          echo "C3EU_LIMITATION // INPUT_FIXTURE_COMPATIBLE_NOT_ATTESTED_OR_ARTIFACT_RECEIVED"

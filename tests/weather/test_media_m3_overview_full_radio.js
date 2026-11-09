@@ -69,7 +69,10 @@ test("M3 NEWS remains first in OVERVIEW and its fixed contextual filters act on 
     assert.match(media,/onNewsSectionRequested: function\(section\)/);
     assert.match(media,/loadedNews\.selectSection\(section\)/);
     assert.match(media,/if \(kind==="news" && subjectRoute!=="media\/news\/full"\)/);
-    assert.match(media,/subjectRoute: "media\/news\/full"\s*section: "REPORTS"/);
+    assert.ok(media.includes('subjectRoute: "media/news/reports"'));
+    assert.ok(media.includes("overviewChannelFilters: true"));
+    assert.ok(media.includes('section: "REPORTS"'));
+    assert.ok(news.includes("property bool overviewChannelFilters: false"));
     assert.match(news,/function selectSection\(nextSection\)/);
     assert.match(news,/stationNewsHub\.closeViewer\(\)/);
     assert.match(media,/const bay = overviewNewsHub\.playerViewportRect/);

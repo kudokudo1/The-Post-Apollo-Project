@@ -1,4 +1,4 @@
-name: Identity Center experimental native BEGIN STATUS CANCEL command gateway
+name: Identity Center experimental native BEGIN STATUS CANCEL RECOVER gateway
 
 on:
   pull_request:
@@ -10,6 +10,7 @@ on:
       - '.github/workflows/identity-center-command-gateway-v0.yml'
       - 'docs/identity-center-command-gateway-v0.md'
       - 'docs/identity-center-command-gateway-cancel-status-v1.md'
+      - 'docs/identity-center-command-gateway-fresh-recover-v2.md'
   push:
     branches: [main, 'feat/identity-protected-command-*', 'feat/identity-command-*']
     paths:
@@ -20,6 +21,7 @@ on:
       - '.github/workflows/identity-center-command-gateway-v0.yml'
       - 'docs/identity-center-command-gateway-v0.md'
       - 'docs/identity-center-command-gateway-cancel-status-v1.md'
+      - 'docs/identity-center-command-gateway-fresh-recover-v2.md'
 
 permissions:
   contents: read
@@ -35,7 +37,7 @@ jobs:
           python-version: '3.12'
       - name: Compile actual host command and gateway test
         run: python3 -m py_compile services/identity/desktop_command_gateway_v0.py tests/identity/test_desktop_command_gateway_v0.py
-      - name: Real AF_UNIX BEGIN STATUS CANCEL, owner-locked callback, expiry and forgery denial
+      - name: Real AF_UNIX BEGIN STATUS CANCEL RECOVER, fresh-host and adversarial denial
         run: python3 -m unittest discover -s tests/identity -p 'test_desktop_command_gateway_v0.py' -v
       - name: Existing native Identity host lifecycle, callback, and private display
         run: |

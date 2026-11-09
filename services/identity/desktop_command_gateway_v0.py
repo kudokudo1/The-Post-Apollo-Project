@@ -13,7 +13,7 @@ SECURITY / PRODUCTION HOLD:
     cannot set any approval fields in the command JSON.
   - This module does NOT itself implement C3e/C4b witness binding, C5 real
     human consent, enrollment, or a production identity-provider config.
-  - CANCEL/RECOVER and UI clients are intentionally NOT wired or supported.
+  - RECOVER is explicit and request-bound; UI clients remain unwired.
   - No host-owned method or private display socket has been repurposed.
 
 The service is a bounded integration building block requiring independent
@@ -102,7 +102,7 @@ def _parse_command(raw: bytes) -> tuple[str, str | None] | None:
     action, request_id = command["action"], command["requestId"]
     if action == "BEGIN" and request_id is None:
         return ("BEGIN", None)
-    if (action in ("CANCEL", "STATUS")
+    if (action in ("CANCEL", "STATUS", "RECOVER")
             and type(request_id) is str
             and _REQUEST_ID.fullmatch(request_id) is not None):
         return (action, request_id)
@@ -145,9 +145,10 @@ class IdentityCommandGateway:
     one-use operation for THIS peer. A positive callback fixture in CI is not
     a production authorization implementation.
 
-    BEGIN, request-scoped CANCEL and read-only STATUS are supported behind
-    separate host-supplied admissions. RECOVER remains unavailable; the
-    host's unconditional logout() is never a command cancellation.
+    BEGIN, request-scoped CANCEL, read-only STATUS and fresh RECOVER are
+    supported behind separate host-supplied admissions. RECOVER closes a
+    failed/cancelled host and creates a new one-use lifecycle. General
+    logout() is never a command cancellation.
     """
 
     def __init__(
@@ -180,6 +181,10 @@ class IdentityCommandGateway:
         self._host: DesktopHostLifecycle | None = None
         self._request_id: str | None = None
         self._owner_peer: KernelPeer | None = None
+        # Keep all prior IDs spent for the lifetime of the gateway.
+        # Even an unexpected random collision may NEVER revive a stale ID.
+        self._issued_ids: set[str] = set()
+        self._begun_once = False
         self._started_once = False
 
     @property
@@ -259,35 +264,81 @@ class IdentityCommandGateway:
         except Exception:
             return False
 
+    def _new_attempt(self, peer: KernelPeer, previous_id: str | None) -> bytes:
+        """Host-owned fresh login state, under the gateway lock.
+
+        The previous attempt, if any, was already closed and invalidated.
+        Failure cannot silently create another BEGIN or reuse old state.
+        """
+        host: DesktopHostLifecycle | None = None
+        try:
+            host = self._factory()
+            if not isinstance(host, DesktopHostLifecycle):
+                raise ValueError("Wrong host lifecycle owner")
+            host.start()
+            if host.begin_login() != {"status": "LOGIN_PENDING"}:
+                raise RuntimeError("Host refused new login attempt")
+            # Recheck seat/caller after browser side effects. One-shot C5
+            # operator approval is intentionally not consumed a second time.
+            if (self._closing.is_set()
+                    or self._active_seat() is not True
+                    or self._verify_peer(peer) is not True):
+                raise RuntimeError("Seat or caller lost during new login")
+            new_id = secrets.token_urlsafe(32)
+            if (new_id == previous_id or new_id in self._issued_ids
+                    or _REQUEST_ID.fullmatch(new_id) is None):
+                raise RuntimeError("Fresh host request ID unavailable")
+            self._issued_ids.add(new_id)
+            self._host = host
+            self._request_id = new_id
+            self._owner_peer = peer
+            return _receipt("REQUESTED", new_id)
+        except Exception:
+            if host is not None:
+                try:
+                    host.close()
+                except Exception:
+                    pass
+            return _receipt("UNAVAILABLE")
+
     def _begin(self, peer: KernelPeer) -> bytes:
         with self._lock:
-            if self._host is not None or not self._admitted(peer, "BEGIN"):
+            if (self._host is not None or self._begun_once
+                    or not self._admitted(peer, "BEGIN")):
                 return _receipt("UNAVAILABLE")
-            host: DesktopHostLifecycle | None = None
-            try:
-                host = self._factory()
-                if not isinstance(host, DesktopHostLifecycle):
-                    raise ValueError("Wrong host lifecycle owner")
-                host.start()
-                if host.begin_login() != {"status": "LOGIN_PENDING"}:
-                    raise RuntimeError("Real host refused BEGIN")
-                # Seat/host may be revoked while browser dispatch is pending.
-                if (self._closing.is_set()
-                        or self._active_seat() is not True
-                        or self._verify_peer(peer) is not True):
-                    raise RuntimeError("Lost trusted seat or caller during BEGIN")
-                request_id = secrets.token_urlsafe(32)
-                self._host = host
-                self._request_id = request_id
-                self._owner_peer = peer
-                return _receipt("REQUESTED", request_id)
-            except Exception:
-                if host is not None:
-                    try:
-                        host.close()
-                    except Exception:
-                        pass
+            # Deny second BEGIN even if host creation/browser launch fails.
+            self._begun_once = True
+            return self._new_attempt(peer, None)
+
+    def _recover(self, peer: KernelPeer, prior_id: str, phase: str) -> bytes:
+        """Consume terminal request, revoke old host and start NEW login.
+
+        Never replace pending or authenticated attempts. Host/seat loss is
+        not recoverable on this socket; re-enrollment must be independent.
+        """
+        if phase not in ("CANCELLED", "FAILED"):
+            return _receipt("UNAVAILABLE")
+        old_host = self._host
+        if old_host is None:
+            return _receipt("UNAVAILABLE")
+        # Invalidate the old receipt before cleanup and new browser action.
+        self._host = None
+        self._request_id = None
+        self._owner_peer = None
+        try:
+            old_host.close()
+        except Exception:
+            # Unverified cleanup can never become a new login.
+            return _receipt("UNAVAILABLE")
+        if self._closing.is_set():
+            return _receipt("UNAVAILABLE")
+        try:
+            if (self._active_seat() is not True
+                    or self._verify_peer(peer) is not True):
                 return _receipt("UNAVAILABLE")
+        except Exception:
+            return _receipt("UNAVAILABLE")
+        return self._new_attempt(peer, prior_id)
 
     def _dispatch(self, peer: KernelPeer, raw: bytes) -> bytes:
         parsed = _parse_command(raw)
@@ -315,6 +366,8 @@ class IdentityCommandGateway:
                 result = self._host.cancel_pending_login()
                 if result == {"status": "CANCELLED"}:
                     return _receipt("CANCELLED", request_id)
+            if action == "RECOVER":
+                return self._recover(peer, request_id, phase)
             return _receipt("UNAVAILABLE")
 
     class _Handler(socketserver.BaseRequestHandler):

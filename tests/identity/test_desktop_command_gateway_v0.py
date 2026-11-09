@@ -10,16 +10,19 @@ import http.client
 import json
 import os
 from pathlib import Path
+import secrets
 import socket
 import stat
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "services" / "identity"))
 
+import desktop_command_gateway_v0 as gateway_module
 from desktop_command_gateway_v0 import (
     COMMAND_SOCKET, COMMAND_SCHEMA, RECEIPT_SCHEMA,
     IdentityCommandGateway, KernelPeer,
@@ -49,6 +52,7 @@ class GatewayIntegrationTests(unittest.TestCase):
         self.time = NOW
         self.peer_allowed = False
         self.consent_allowed = False
+        self.recover_allowed = False
         self.secret = "CI-PRIVATE-FAKE-TOKEN"
         self.gateway = self._gateway()
         self.addCleanup(self.gateway.close)
@@ -113,7 +117,9 @@ class GatewayIntegrationTests(unittest.TestCase):
 
     def _approve(self, peer, action):
         self.consent_calls.append((peer, action))
-        return self.consent_allowed and action in ("BEGIN", "STATUS", "CANCEL")
+        return (self.consent_allowed
+                and (action in ("BEGIN", "STATUS", "CANCEL")
+                     or (action == "RECOVER" and self.recover_allowed)))
 
     def _gateway(self):
         return IdentityCommandGateway(
@@ -160,6 +166,13 @@ class GatewayIntegrationTests(unittest.TestCase):
         return self._request({
             "schema": COMMAND_SCHEMA,
             "action": "CANCEL",
+            "requestId": request_id,
+        })
+
+    def _recover(self, request_id):
+        return self._request({
+            "schema": COMMAND_SCHEMA,
+            "action": "RECOVER",
             "requestId": request_id,
         })
 
@@ -505,6 +518,177 @@ class GatewayIntegrationTests(unittest.TestCase):
         self.hosts[0].session_event("session-end")
         self.assertEqual(self._status(rid)["state"], "HOST_LOST")
         self._check_rejected(self._cancel(rid))
+        self._check_rejected(self._begin())
+
+    def test_recover_cancelled_request_issues_new_host_id_and_valid_callback(self):
+        self.peer_allowed = self.consent_allowed = self.recover_allowed = True
+        self.gateway.start()
+        original = self._begin()["requestId"]
+        old_host = self.hosts[0]
+        self.assertEqual(self._status(original)["state"], "PENDING")
+        self._check_rejected(self._recover(original))
+        self.assertEqual(self._cancel(original)["state"], "CANCELLED")
+        self.assertEqual(self._status(original)["state"], "CANCELLED")
+        recovered = self._recover(original)
+        self.assertEqual(recovered["state"], "REQUESTED")
+        newer = recovered["requestId"]
+        self.assertNotEqual(original, newer)
+        self.assertEqual(self.factory_calls, 2)
+        self.assertIsNot(self.hosts[0], self.hosts[1])
+        self.assertFalse(old_host.started)
+        self.assertEqual(old_host.begin_login(), {"status": "UNAVAILABLE"})
+        self._check_rejected(self._status(original))
+        self._check_rejected(self._cancel(original))
+        self._check_rejected(self._recover(original))
+        self._check_rejected(self._begin())
+        self.assertEqual(self._status(newer)["state"], "PENDING")
+        self.assertEqual(self._cancel(newer)["state"], "CANCELLED")
+        self._check_rejected(self._recover(original))
+        third = self._recover(newer)
+        self.assertEqual(third["state"], "REQUESTED")
+        self.assertNotIn(third["requestId"], [original, newer])
+        self.assertEqual(self.factory_calls, 3)
+        result, reply = self._callback()
+        self.assertEqual(result, 200)
+        self.assertNotIn(self.secret.encode(), reply)
+        self.assertEqual(self._status(third["requestId"])["state"],
+                         "AUTHENTICATED")
+        self._check_rejected(self._recover(third["requestId"]))
+        self.assertEqual(read_private_display(
+            self.hosts[-1].display_socket_path, clock=lambda: NOW)["status"],
+            "READY")
+
+    def test_recover_failed_callback_requires_fresh_approval(self):
+        self.peer_allowed = self.consent_allowed = True
+        self.gateway.start()
+        original = self._begin()["requestId"]
+        redirect = urlsplit(self.hosts[0].redirect_uri)
+        conn = http.client.HTTPConnection("127.0.0.1", redirect.port, timeout=2)
+        conn.request("GET", "/callback?code=ci-one-use-code&state=forged&iss="
+                     + ISSUER,
+                     headers={"Host": f"127.0.0.1:{redirect.port}"})
+        self.assertEqual(conn.getresponse().status, 400)
+        conn.close()
+        self.assertEqual(self._status(original)["state"], "FAILED")
+        self._check_rejected(self._recover(original))
+        self.assertEqual(self.factory_calls, 1)
+        self.recover_allowed = True
+        recovered = self._recover(original)
+        self.assertEqual(recovered["state"], "REQUESTED")
+        self.assertNotEqual(recovered["requestId"], original)
+        self.assertEqual(self.factory_calls, 2)
+        self._check_rejected(self._status(original))
+        self.assertEqual(self._status(recovered["requestId"])["state"], "PENDING")
+        self.assertEqual(self._callback()[0], 200)
+        self.assertEqual(self._status(recovered["requestId"])["state"],
+                         "AUTHENTICATED")
+
+    def test_recover_never_replaces_pending_or_authenticated_login(self):
+        self.peer_allowed = self.consent_allowed = self.recover_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        self._check_rejected(self._recover(rid))
+        self.assertEqual(self.factory_calls, 1)
+        self.assertEqual(self._callback()[0], 200)
+        self._check_rejected(self._recover(rid))
+        self.assertEqual(self.factory_calls, 1)
+        self.assertEqual(self._status(rid)["state"], "AUTHENTICATED")
+        self.assertEqual(read_private_display(
+            self.hosts[0].display_socket_path, clock=lambda: NOW)["status"],
+            "READY")
+
+    def test_recover_rejects_wrong_peer_id_and_revoked_approval(self):
+        self.peer_allowed = self.consent_allowed = self.recover_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        self.assertEqual(self._cancel(rid)["state"], "CANCELLED")
+        self._check_rejected(self._recover(None))
+        self._check_rejected(self._recover("BAD_REQUEST_ID_1234567890"))
+        self._check_rejected(self._request({
+            "schema": COMMAND_SCHEMA, "action": "RECOVER",
+            "requestId": rid, "operatorConsentVerified": True,
+        }))
+        self._check_rejected(self._request({
+            "schema": COMMAND_SCHEMA, "action": "RECOVER",
+            "requestId": rid, "token": self.secret,
+        }))
+        self.recover_allowed = False
+        self._check_rejected(self._recover(rid))
+        self.recover_allowed = True
+        self.peer_allowed = False
+        self._check_rejected(self._recover(rid))
+        self.peer_allowed = True
+        old_peer = self.gateway._owner_peer
+        self.gateway._owner_peer = KernelPeer(
+            pid=old_peer.pid + 1, uid=old_peer.uid, gid=old_peer.gid)
+        self._check_rejected(self._recover(rid))
+        self.gateway._owner_peer = old_peer
+        self.assertEqual(self._status(rid)["state"], "CANCELLED")
+        new = self._recover(rid)
+        self.assertEqual(new["state"], "REQUESTED")
+        self._check_rejected(self._recover(rid))
+        self.assertEqual(self.factory_calls, 2)
+
+    def test_recovery_launch_failure_consumes_request_no_implicit_begin(self):
+        self.peer_allowed = self.consent_allowed = self.recover_allowed = True
+        self.gateway.start()
+        old_id = self._begin()["requestId"]
+        self.assertEqual(self._cancel(old_id)["state"], "CANCELLED")
+        def fail_to_construct():
+            raise RuntimeError("Disposable host factory failure")
+        self.gateway._factory = fail_to_construct
+        self._check_rejected(self._recover(old_id))
+        self._check_rejected(self._status(old_id))
+        self._check_rejected(self._recover(old_id))
+        self._check_rejected(self._begin())
+        self.assertFalse(self.hosts[0].started)
+        self.assertFalse((self.dir / "identity-display-v0.sock").exists())
+
+    def test_recovery_rejects_random_id_collision_with_any_older_request(self):
+        self.peer_allowed = self.consent_allowed = self.recover_allowed = True
+        self.gateway.start()
+        first = self._begin()["requestId"]
+        self.assertEqual(self._cancel(first)["state"], "CANCELLED")
+        second = self._recover(first)["requestId"]
+        self.assertNotEqual(first, second)
+        self.assertEqual(self._cancel(second)["state"], "CANCELLED")
+        self.assertEqual(self.factory_calls, 2)
+        original_token = secrets.token_urlsafe
+        calls = [0]
+
+        def collide_after_native_pkce(n):
+            # Native PKCE uses 64-byte verifier, then two 32-byte tokens
+            # (state + nonce), before the gateway mints a request ID.
+            if n == 32:
+                calls[0] += 1
+                if calls[0] == 3:
+                    return first  # Collision with NON-adjacent old request.
+            return original_token(n)
+
+        with patch.object(gateway_module.secrets, "token_urlsafe",
+                          side_effect=collide_after_native_pkce):
+            self._check_rejected(self._recover(second))
+        self.assertEqual(calls[0], 3, "Test exercised mint-time collision")
+        self.assertEqual(self.factory_calls, 3)
+        self.assertFalse(self.hosts[0].started)
+        self.assertFalse(self.hosts[1].started)
+        self.assertFalse(self.hosts[2].started)
+        self._check_rejected(self._status(first))
+        self._check_rejected(self._status(second))
+        self._check_rejected(self._recover(second))
+        self._check_rejected(self._begin())
+        self.assertFalse((self.dir / "identity-display-v0.sock").exists())
+
+    def test_host_loss_cannot_recover_by_restoring_seat(self):
+        self.peer_allowed = self.consent_allowed = self.recover_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        self.seat = False
+        self._check_rejected(self._recover(rid))
+        self.seat = True
+        self.assertEqual(self._status(rid)["state"], "HOST_LOST")
+        self._check_rejected(self._recover(rid))
+        self.assertEqual(self.factory_calls, 1)
         self._check_rejected(self._begin())
 
     def test_no_direct_qml_activation_and_existing_owner_guards(self):

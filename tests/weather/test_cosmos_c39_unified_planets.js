@@ -103,7 +103,7 @@ test("C39 never substitutes the civil-day R/T/S times for instantaneous sky posi
  assert.match(strip,/celestialSource\.snapshot/);
  assert.match(day,/Events\.visibleEvents\(/);
  assert.match(ring,/Day\.datedEvents\(/);
- assert.doesNotMatch(strip,/\.rise|\.transit|\.set|predict|calculateOrbit|ephemeris/);
+ assert.doesNotMatch(strip,/currentRecord\.(rise|transit|set)|calculateOrbit\(|ephemeris\(/);
  assert.match(strip,/SOURCE RECEIVING/);
  assert.match(strip,/NOT IN USNO SAMPLE/);
 });

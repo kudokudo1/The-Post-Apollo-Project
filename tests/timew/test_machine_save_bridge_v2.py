@@ -91,8 +91,8 @@ for private in ("PRIVATE BROWSER TITLE", "PRIVATE SERIAL", '"pid"', '"con_id"', 
     assert private not in visible, private
 
 
-def refuses(req, *, modified=None, message=None):
-    runner, calls = reader(frame, modified)
+def refuses(req, *, base=None, modified=None, message=None):
+    runner, calls = reader(frame if base is None else base, modified)
     try:
         save_request(req, read_runner=runner)
     except (BridgeError, CaptureError) as exc:
@@ -136,11 +136,11 @@ try:
         # invalidates the digest before a database can be created.
         shifted = copy.deepcopy(frame)
         shifted[2]["nodes"][0]["nodes"][0]["nodes"][0]["rect"]["x"] += 10
-        refuses(custom_request, modified=shifted, message="CUSTOM SELECTION STALE")
+        refuses(custom_request, base=shifted, message="CUSTOM SELECTION STALE")
         assert not legacy.db_path().exists()
         stale_id = copy.deepcopy(frame)
         stale_id[2]["nodes"][0]["nodes"][0]["nodes"][0]["id"] = 909
-        refuses(custom_request, modified=stale_id)
+        refuses(custom_request, base=stale_id, message="CUSTOM SELECTION STALE")
         assert not legacy.db_path().exists()
 
         runner, calls = reader(frame)

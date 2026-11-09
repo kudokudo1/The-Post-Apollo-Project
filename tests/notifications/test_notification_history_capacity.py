@@ -12,6 +12,11 @@ h = HUB.read_text(encoding="utf-8")
 # Capacity survives restart from the history file itself, avoiding async
 # preference-load ordering that could prune an existing high-capacity archive.
 assert "property int maxHistoryEntries: 300" in s
+assert "property bool historyCapacityLocked: false" in s
+assert "function toggleHistoryCapacityLock()" in s
+assert "if (!historyReady || historyCapacityLocked)" in s
+assert '"historyCapacityLocked": historyCapacityLocked' in s
+assert "historyCapacityLocked = document.historyCapacityLocked === true" in s
 assert "function normalizeHistoryCapacity(value)" in s
 assert "function setMaxHistoryEntries(value)" in s
 assert '"maxHistoryEntries": maxHistoryEntries' in s
@@ -25,6 +30,16 @@ assert "id: historyCapacityControls" in h
 assert "id: historyCapacitySlider" in h
 assert "function previewHistoryCapacity(pointerX, railWidth)" in h
 assert 'label: root.historyCapacityDirty ? "APPLY" : "SAVED"' in h
+assert "id: historyCapacityActions" in h
+assert "id: historyCapacityApplyButton" in h
+assert "id: historyCapacityLockButton" in h
+assert 'label: NotificationsService.historyCapacityLocked' in h
+assert '? "🔒︎" : "🗝"' in h
+assert "NotificationsService.toggleHistoryCapacityLock()" in h
+assert "enabled: NotificationsService.historyReady" in h
+assert "!NotificationsService.historyCapacityLocked" in h
+assert "UNSAVED // APPLY BEFORE LOCKING" in h
+assert "width: 43" in h and "width: 24" in h
 assert "NotificationsService.setMaxHistoryEntries(" in h
 assert "APPLY WILL DELETE OLDEST HISTORY" in h
 assert "property int controlBayHeight: 220" in h
@@ -67,13 +82,14 @@ const retained = asModel(Array.from({length: 1350}, (_, i) => ({id:String(i)})))
 const owner = {
   Math, Number, JSON, Date, Array, String, console,
   notifications: retained, maxHistoryEntries: 300, historyVersion: 1,
+  historyReady: true, historyCapacityLocked: false,
   historySnapshot: (entry) => entry,
   saves: 0, revisions: 0,
   scheduleHistorySave() { owner.saves++; },
   markNotificationsChanged() { owner.revisions++; }
 };
 vm.runInNewContext(['normalizeHistoryCapacity','setMaxHistoryEntries',
-  'pruneHistory','historyDocument','historyToJson']
+  'toggleHistoryCapacityLock', 'pruneHistory','historyDocument','historyToJson']
   .map(n => extract(service, n)).join('\n'), owner);
 assert.strictEqual(owner.normalizeHistoryCapacity(999), 1000);
 assert.strictEqual(owner.normalizeHistoryCapacity(90000), 5000);
@@ -81,15 +97,27 @@ assert.strictEqual(owner.normalizeHistoryCapacity(-1), 300);
 assert.strictEqual(owner.normalizeHistoryCapacity('broken'), 300);
 assert.strictEqual(owner.setMaxHistoryEntries(5000), true);
 assert.strictEqual(retained.count, 1350, 'raising limit never deletes');
+// Locked capacity rejects edits, including destructive reductions.
+assert.strictEqual(owner.toggleHistoryCapacityLock(), true);
+assert.strictEqual(owner.historyCapacityLocked, true);
+assert.strictEqual(owner.setMaxHistoryEntries(900), false);
+assert.strictEqual(retained.count, 1350, 'lock must never prune history');
 const snapshot = JSON.parse(owner.historyToJson());
 assert.strictEqual(snapshot.maxHistoryEntries, 5000);
+assert.strictEqual(snapshot.historyCapacityLocked, true);
 assert.strictEqual(snapshot.notifications.length, 1350);
+assert.strictEqual(owner.toggleHistoryCapacityLock(), true);
+assert.strictEqual(owner.historyCapacityLocked, false);
 assert.strictEqual(owner.setMaxHistoryEntries(900), true);
 assert.strictEqual(retained.count, 900, 'lowering prunes oldest in one batch');
 assert.strictEqual(retained.get(0).id, '450');
 assert.strictEqual(owner.setMaxHistoryEntries(900), false, 'no redundant save');
-assert.strictEqual(owner.saves, 2);
+assert.strictEqual(owner.saves, 4);
 assert.strictEqual(owner.revisions, 1);
+owner.historyReady = false;
+assert.strictEqual(owner.toggleHistoryCapacityLock(), false, 'cannot lock before load');
+assert.strictEqual(owner.setMaxHistoryEntries(5000), false, 'cannot edit before load');
+owner.historyReady = true;
 
 const history = asModel(Array.from({length: 1250}, (_, i) => ({
   id: String(i), source:'test', sourceId:'test', title:'synthetic',

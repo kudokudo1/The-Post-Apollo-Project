@@ -51,6 +51,7 @@ Singleton {
     // Durable retention preference. Default preserves the accepted 300-item
     // behavior; deliberate user changes may retain up to 5,000 records.
     property int maxHistoryEntries: 300
+    property bool historyCapacityLocked: false
     property int notificationsRevision: 0
 
     // Persistent source-wide notification policy.
@@ -713,6 +714,10 @@ Singleton {
     }
 
     function setMaxHistoryEntries(value) {
+        // Never overwrite a retained preference before history is loaded, and
+        // never prune stored records from a locked capacity control.
+        if (!historyReady || historyCapacityLocked)
+            return false;
         const next = normalizeHistoryCapacity(value);
         if (maxHistoryEntries === next)
             return false;
@@ -721,6 +726,14 @@ Singleton {
         pruneHistory();
         if (notifications.count !== oldCount)
             markNotificationsChanged();
+        scheduleHistorySave();
+        return true;
+    }
+
+    function toggleHistoryCapacityLock() {
+        if (!historyReady)
+            return false;
+        historyCapacityLocked = !historyCapacityLocked;
         scheduleHistorySave();
         return true;
     }
@@ -951,6 +964,7 @@ Singleton {
         return {
             "version": historyVersion,
             "maxHistoryEntries": maxHistoryEntries,
+            "historyCapacityLocked": historyCapacityLocked,
             "savedAt": Date.now(),
             "notifications": entries
         };
@@ -991,6 +1005,7 @@ Singleton {
         historyFile.setText(JSON.stringify({
             "version": historyVersion,
             "maxHistoryEntries": maxHistoryEntries,
+            "historyCapacityLocked": historyCapacityLocked,
             "savedAt": Date.now(),
             "notifications": []
         }, null, 4) + "\n");
@@ -1022,9 +1037,12 @@ Singleton {
         // Read the limit from the SAME durable file before pruning. An
         // independent async settings file could otherwise load too late and
         // silently delete records above the temporary 300-item default.
-        if (document && !Array.isArray(document)
-                && document.maxHistoryEntries !== undefined)
-            maxHistoryEntries = normalizeHistoryCapacity(document.maxHistoryEntries);
+        if (document && !Array.isArray(document)) {
+            if (document.maxHistoryEntries !== undefined)
+                maxHistoryEntries = normalizeHistoryCapacity(document.maxHistoryEntries);
+            // Legacy files without this setting default to unlocked.
+            historyCapacityLocked = document.historyCapacityLocked === true;
+        }
 
         // Allows an old raw-array history file too.
         const entries = Array.isArray(document) ? document : Array.isArray(document.notifications) ? document.notifications : [];

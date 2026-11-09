@@ -234,7 +234,8 @@ PanelWindow {
     }
 
     function previewHistoryCapacity(pointerX, railWidth) {
-        if (railWidth <= 0)
+        if (railWidth <= 0 || !NotificationsService.historyReady
+                || NotificationsService.historyCapacityLocked)
             return;
         const ratio = Math.max(0, Math.min(1, Number(pointerX) / railWidth));
         pendingHistoryCapacity =
@@ -2118,14 +2119,18 @@ PanelWindow {
                             x: historyCapacityRail.x + historyCapacityRail.width
                                 * root.historyCapacityRatio - width / 2
                             anchors.verticalCenter: parent.verticalCenter
-                            color: root.historyCapacityDirty ? Colors.yellow : Colors.white
+                            color: NotificationsService.historyCapacityLocked
+                                ? Colors.magenta
+                                : root.historyCapacityDirty ? Colors.yellow : Colors.white
                             border.width: 1
                             border.color: Colors.magenta
                         }
 
                         MouseArea {
                             anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
+                            enabled: NotificationsService.historyReady
+                                && !NotificationsService.historyCapacityLocked
+                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                             onPressed: function(mouse) {
                                 root.previewHistoryCapacity(
                                     mouse.x - historyCapacityRail.x,
@@ -2140,18 +2145,54 @@ PanelWindow {
                         }
                     }
 
-                    MiniButton {
+                    // SAVE/APPLY and LOCK share the original single 70px
+                    // control slot. The key means unlocked; the padlock
+                    // means edits are blocked. An unsaved preview must be
+                    // applied separately before locking to avoid pruning
+                    // history as a side effect of the lock.
+                    Row {
+                        id: historyCapacityActions
                         width: 70
                         height: 28
-                        label: root.historyCapacityDirty ? "APPLY" : "SAVED"
-                        labelPixelSize: 10
-                        active: root.historyCapacityDirty
-                        activeColor: Colors.magenta
-                        danger: root.pendingHistoryCapacity < NotificationsService.notifications.count
-                        onTriggered: {
-                            if (root.historyCapacityDirty)
-                                NotificationsService.setMaxHistoryEntries(
-                                    root.pendingHistoryCapacity);
+                        spacing: 3
+
+                        MiniButton {
+                            id: historyCapacityApplyButton
+                            width: 43
+                            height: 28
+                            label: root.historyCapacityDirty ? "APPLY" : "SAVED"
+                            labelPixelSize: 9
+                            active: root.historyCapacityDirty
+                            activeColor: Colors.magenta
+                            danger: root.pendingHistoryCapacity
+                                < NotificationsService.notifications.count
+                            enabled: root.historyCapacityDirty
+                                && NotificationsService.historyReady
+                                && !NotificationsService.historyCapacityLocked
+                            opacity: enabled ? 1 : 0.65
+                            onTriggered: {
+                                if (enabled)
+                                    NotificationsService.setMaxHistoryEntries(
+                                        root.pendingHistoryCapacity);
+                            }
+                        }
+
+                        MiniButton {
+                            id: historyCapacityLockButton
+                            width: 24
+                            height: 28
+                            label: NotificationsService.historyCapacityLocked
+                                ? "🔒︎" : "🗝"
+                            labelPixelSize: 15
+                            active: NotificationsService.historyCapacityLocked
+                            activeColor: Colors.magenta
+                            enabled: NotificationsService.historyReady
+                                && !root.historyCapacityDirty
+                            opacity: enabled ? 1 : 0.55
+                            onTriggered: {
+                                if (enabled)
+                                    NotificationsService.toggleHistoryCapacityLock();
+                            }
                         }
                     }
                 }
@@ -2169,8 +2210,12 @@ PanelWindow {
                     pixelSize: 10
                     text: root.pendingHistoryCapacity < NotificationsService.notifications.count
                         ? "WARNING // APPLY WILL DELETE OLDEST HISTORY ABOVE NEW LIMIT"
-                        : NotificationsService.notifications.count
-                          + " STORED // 300–5000 CAPACITY // 100-ITEM STEPS"
+                        : root.historyCapacityDirty
+                          ? "UNSAVED // APPLY BEFORE LOCKING"
+                          : NotificationsService.historyCapacityLocked
+                            ? "LOCKED // USE 🗝 TO ADJUST HISTORY LIMIT"
+                            : NotificationsService.notifications.count
+                              + " STORED // 300–5000 CAPACITY // 100-ITEM STEPS"
                     textColor: root.pendingHistoryCapacity < NotificationsService.notifications.count
                         ? Colors.orange : Colors.cyan
                     glowColor: textColor

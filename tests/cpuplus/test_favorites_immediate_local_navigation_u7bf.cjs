@@ -39,7 +39,7 @@ function ownerFixture() {
     Qt:{callLater(fn){callbacks.push(fn);}},
     resultList:{positionViewAtIndex(index,method){trace.push("position:"+index+":"+method);}},
     trace,
-    switchMode(index,preserve){trace.push("open-mode:"+index);this.selectedModeIndex=index;},
+    switchMode(index,preserve){trace.push("open-mode:"+index);scope.selectedModeIndex=index;},
     resetDetailActionSelection(){trace.push("reset-detail");}
   };
   scope.appControlWindow=scope;

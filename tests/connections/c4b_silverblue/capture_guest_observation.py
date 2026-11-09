@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+"""C4d CI-only capture of ONE bounded actual C4b guest UART observation.
+
+The unchanged C2v QEMU controller writes guest ttyS0 to a temporary serial log
+and removes the VM directory when the full two-reboot run ends. This separate
+C4b-owned reader follows that ephemeral file while the VM is live, retains a
+single allowlisted C4B_OBSERVED line, and exports it ONLY after the parent
+workflow independently confirms that the original full boot/rollback PASSED.
+
+This is diagnostic availability, NOT signed guest attestation or authorization.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import sys
+import time
+
+PREFIX = b"C4B_OBSERVED // "
+SCHEMA = "postapollo.connections.c4b-booted-signed-host-observation.v1"
+SHA = re.compile(r"[0-9a-f]{64}\Z")
+FIELDS = {
+    "schema", "signed_rpm_sha256", "signed_script_sha256",
+    "running_script_sha256", "interpreter_sha256",
+    "service_pid", "dbus_owner_pid", "process_start_ticks",
+    "service_uid", "service_gid", "systemd_unit", "selinux_enforcing",
+    "signedGuestOriginAuthenticated", "evidenceCryptographicallyAttested",
+    "hostAuthenticated", "canApprove", "credentialActionsEnabled",
+    "productionAuthority",
+}
+FALSE_FLAGS = {
+    "signedGuestOriginAuthenticated", "evidenceCryptographicallyAttested",
+    "hostAuthenticated", "canApprove", "credentialActionsEnabled",
+    "productionAuthority",
+}
+REQUIRED_MARKERS = (
+    b"C3B_PASS // OS_DBUS_PID_UID_SYSTEMD_SELINUX_ORIGIN_COHERENCE_TEST_ONLY",
+    b"C4B_PASS // EXACT_RUNTIME_ORIGIN_AND_DENY_ONLY_CLIENT_CALLS",
+    b"C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED",
+    b"C2V_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER",
+)
+MAX_LINE = 2048
+MAX_BYTES = 32 * 1024 * 1024
+
+
+class Refused(Exception):
+    pass
+
+
+def reject(reason: str):
+    raise Refused(reason)
+
+
+def unique_fields(pairs):
+    result = {}
+    for name, value in pairs:
+        if name in result:
+            reject("DUPLICATE_OBSERVATION_FIELD")
+        result[name] = value
+    return result
+
+
+def validate_observation(raw: bytes) -> bytes:
+    """Return exact observed UART bytes if narrow schema and deny flags hold."""
+    if not (raw.startswith(PREFIX) and len(raw) <= MAX_LINE):
+        reject("OBSERVATION_LINE_OVERSIZE_OR_MISSING")
+    try:
+        value = json.loads(raw[len(PREFIX):].decode("utf-8", "strict"),
+                           object_pairs_hook=unique_fields)
+    except (UnicodeError, ValueError, TypeError):
+        reject("OBSERVATION_JSON_INVALID")
+    if type(value) is not dict or set(value) != FIELDS:
+        reject("OBSERVATION_SCHEMA_FIELDS_REFUSED")
+    if value["schema"] != SCHEMA or value["systemd_unit"] != (
+            "postapollo-connections-status.service"):
+        reject("OBSERVATION_SCHEMA_OR_UNIT_REFUSED")
+    if any(type(value[k]) is not bool or value[k] for k in FALSE_FLAGS):
+        reject("OBSERVATION_CLAIMS_AUTHORITY")
+    if value["selinux_enforcing"] is not True:
+        reject("OBSERVATION_NOT_ENFORCING")
+    for name in ("signed_rpm_sha256", "signed_script_sha256",
+                 "running_script_sha256", "interpreter_sha256"):
+        if type(value[name]) is not str or SHA.fullmatch(value[name]) is None:
+            reject("OBSERVATION_HASH_REFUSED")
+    if value["signed_script_sha256"] != value["running_script_sha256"]:
+        reject("RUNNING_SCRIPT_SIGNED_HASH_MISMATCH")
+    for name in ("service_pid", "dbus_owner_pid", "service_uid", "service_gid"):
+        if type(value[name]) is not int or value[name] <= 0:
+            reject("OBSERVATION_PROCESS_IDENTITY_REFUSED")
+    if value["service_pid"] != value["dbus_owner_pid"]:
+        reject("OBSERVATION_DBUS_PROCESS_MISMATCH")
+    ticks = value["process_start_ticks"]
+    if type(ticks) is not str or not ticks.isascii() or (
+            not ticks.isdecimal()) or int(ticks) <= 0 or len(ticks) > 20:
+        reject("OBSERVATION_KERNEL_START_REFUSED")
+    return raw
+
+
+def find_serial(root: Path) -> Path | None:
+    candidates = list(root.glob("c2v-silverblue-*"))
+    if len(candidates) > 1:
+        reject("MULTIPLE_GUEST_BOOT_DIRECTORIES")
+    if not candidates:
+        return None
+    folder = candidates[0]
+    info = os.lstat(folder)
+    if (not stat.S_ISDIR(info.st_mode) or
+            info.st_uid != os.geteuid() or
+            stat.S_IMODE(info.st_mode) != 0o700):
+        reject("GUEST_BOOT_DIRECTORY_UNSAFE")
+    path = folder / "guest-serial.log"
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid():
+        reject("GUEST_SERIAL_SOURCE_UNSAFE")
+    return path
+
+
+def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
+    """Scan live UART while the owning C2v runner is still executing."""
+    fd = None
+    source = None
+    offset = 0
+    pending = b""
+    total = 0
+    observed = None
+    seen = {marker: False for marker in REQUIRED_MARKERS}
+    started = time.monotonic()
+    try:
+        while time.monotonic() - started < 3700:
+            if fd is None:
+                candidate = find_serial(root)
+                if candidate is not None:
+                    try:
+                        fd = os.open(candidate, os.O_RDONLY | os.O_NOFOLLOW |
+                                     os.O_CLOEXEC)
+                    except OSError:
+                        reject("GUEST_SERIAL_OPEN_REFUSED")
+                    info = os.fstat(fd)
+                    if not stat.S_ISREG(info.st_mode):
+                        reject("GUEST_SERIAL_FD_NOT_REGULAR")
+                    source = (info.st_dev, info.st_ino)
+            if fd is not None:
+                # Detect replacement instead of silently switching serial sources.
+                try:
+                    current = os.stat(find_serial(root), follow_symlinks=False)
+                except (OSError, TypeError):
+                    if not completed.exists():
+                        reject("GUEST_SERIAL_SOURCE_DISAPPEARED")
+                    current = None
+                if current is not None and (
+                        current.st_dev, current.st_ino) != source:
+                    reject("GUEST_SERIAL_REPLACED")
+                os.lseek(fd, offset, os.SEEK_SET)
+                while True:
+                    chunk = os.read(fd, 65536)
+                    if not chunk:
+                        break
+                    offset += len(chunk)
+                    total += len(chunk)
+                    if total > MAX_BYTES:
+                        reject("GUEST_SERIAL_BOUND_EXCEEDED")
+                    pending += chunk
+                    records = pending.split(b"\n")
+                    pending = records.pop()
+                    if len(pending) > 8192:
+                        reject("GUEST_SERIAL_LINE_OVERSIZE")
+                    for line in records:
+                        for marker in REQUIRED_MARKERS:
+                            if marker in line:
+                                seen[marker] = True
+                        index = line.find(PREFIX)
+                        if index == -1:
+                            continue
+                        extracted = line[index:].rstrip(b"\r")
+                        validate_observation(extracted)
+                        if observed is None:
+                            observed = extracted
+                        elif observed != extracted:
+                            reject("CONFLICTING_GUEST_OBSERVATIONS")
+            if completed.exists():
+                if completed.read_text(encoding="ascii").strip() != "PASS":
+                    reject("ORIGINAL_TWO_BOOT_LIFECYCLE_DID_NOT_PASS")
+                if observed is None:
+                    reject("NO_REAL_GUEST_OBSERVATION_CAPTURED")
+                if not all(seen.values()):
+                    reject("REAL_GUEST_SECURITY_OR_ROLLBACK_MARKERS_MISSING")
+                return observed
+            time.sleep(poll)
+        reject("GUEST_SERIAL_CAPTURE_TIMEOUT")
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--runner-temp", type=Path, required=True)
+    parser.add_argument("--complete", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        reject("CI_RUNNER_REQUIRED")
+    root = args.runner_temp
+    if not root.is_absolute() or root.is_symlink() or not root.is_dir():
+        reject("RUNNER_TEMP_NOT_ABSOLUTE_DIRECTORY")
+    if list(root.glob("c2v-silverblue-*")):
+        reject("STALE_C2V_BOOT_DIRECTORY_BEFORE_MONITOR")
+    if args.output.parent.is_symlink() or not args.output.parent.is_dir():
+        reject("OUTPUT_DIRECTORY_UNAVAILABLE")
+    out_stat = os.stat(args.output.parent)
+    if (out_stat.st_uid != os.geteuid() or
+            stat.S_IMODE(out_stat.st_mode) != 0o700):
+        reject("OUTPUT_DIRECTORY_NOT_PRIVATE")
+    if args.output.exists() or args.output.is_symlink():
+        reject("OUTPUT_ALREADY_EXISTS")
+    line = capture(root, args.complete)
+    fd = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                 os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(line + b"\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+    except BaseException:
+        args.output.unlink(missing_ok=True)
+        raise
+    print("C4D_PASS // ONE_BOUNDED_ACTUAL_GUEST_SERIAL_OBSERVATION_EXPORTED")
+    print("C4D_LIMITATION // UNSIGNED_GUEST_LOG_NOT_REMOTE_ATTESTATION")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (Refused, OSError, ValueError) as exc:
+        print("C4D_REFUSED // " + (
+            str(exc) if isinstance(exc, Refused) else type(exc).__name__),
+            file=sys.stderr)
+        sys.exit(2)

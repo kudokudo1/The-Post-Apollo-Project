@@ -71,6 +71,14 @@ ShellRoot {
                 focused.planetSource.active=false;
                 focused.planetSource.loadedKey=focused.planetSource.currentKey;
                 focused.planetSource.rows=[
+                    {name:"MERCURY",date:focused.civilDate,status:"NORMAL",
+                        rise:"07:05",riseAzimuth:89,
+                        transit:"12:05",transitAltitude:51,transitHemisphere:"S",
+                        set:"18:05",setAzimuth:271},
+                    {name:"VENUS",date:focused.civilDate,status:"NORMAL",
+                        rise:"07:15",riseAzimuth:95,
+                        transit:"12:15",transitAltitude:47,transitHemisphere:"S",
+                        set:"18:15",setAzimuth:270},
                     {name:"MARS",date:focused.civilDate,status:"NORMAL",
                         rise:"06:14",riseAzimuth:88,
                         transit:"12:43",transitAltitude:45,transitHemisphere:"S",
@@ -78,7 +86,11 @@ ShellRoot {
                     {name:"JUPITER",date:focused.civilDate,status:"NORMAL",
                         rise:"05:00",riseAzimuth:93,
                         transit:"11:30",transitAltitude:52,transitHemisphere:"N",
-                        set:"18:15",setAzimuth:265}
+                        set:"18:15",setAzimuth:265},
+                    {name:"SATURN",date:focused.civilDate,status:"NORMAL",
+                        rise:"04:00",riseAzimuth:80,
+                        transit:"09:00",transitAltitude:39,transitHemisphere:"N",
+                        set:"15:00",setAzimuth:282}
                 ];
                 focused.planetSource.ready=true;
                 focused.celnav.active=false;
@@ -99,7 +111,7 @@ ShellRoot {
                     || !timeline.compactInPlanets || !timeline.sourceReady
                     || strip.recordCount!==2
                     || strip.currentRecord.name!=="MARS"
-                    || timeline.rows.length!==5 || timeline.events.length!==6)
+                    || timeline.rows.length!==5 || timeline.events.length!==15)
                     return root.fail("PLANETS_DAY_EVENTS_AND_SKY_STRIP_NOT_RENDERED");
                 // ALL has no selected ring planet; C40 right-arrow starts
                 // at Mercury. Explicitly choose Mars to verify Mars → Jupiter.
@@ -159,8 +171,13 @@ ShellRoot {
                         || strip.selectedName!==entry[1]
                         || !!strip.currentRecord!==entry[2])
                         return root.fail("C40_ARROW_CYCLE_"+i+"_"+entry[1]);
-                    if(!entry[2] && strip.sourceNote!=="NOT IN USNO SAMPLE")
-                        return root.fail("C40_MISSING_SOURCE_NOT_DISCLOSED");
+                    if(!entry[2] &&
+                        (strip.reading.mode!=="dated"
+                         || strip.reading.values[0]==="--"
+                         || strip.reading.values[1]==="--"
+                         || strip.reading.values[2]==="--"
+                         || !strip.detailAvailable))
+                        return root.fail("C41_DATED_PLANET_DATA_MISSING_"+entry[1]);
                 }
                 // Restore full synthetic sample and previous source selection
                 // for the established C39 replay and 12-field detail checks.
@@ -204,7 +221,59 @@ ShellRoot {
                 if(!timeline || !strip || !strip.visible
                     || timeline.selectedPlanet!=="JUPITER")
                     return root.fail("RETURN_TO_PLANETS_LOST_SELECTION");
+
+                // C41 // User-reported regression: current CelNav has
+                // Saturn alone, but every other planet must still reveal
+                // real dated MRST R/T/S and open an inspectable details view.
+                focused.celnav.snapshot={
+                    date:focused.civilDate,time:"17:12",
+                    planets:[{name:"SATURN",altitude:13.5,
+                              azimuth:222,direction:"SW"}],
+                    stars:[],constellations:[]
+                };
+                focused.planetSelection="VENUS";
+                if(strip.currentIndex!==-1
+                    || strip.reading.mode!=="dated"
+                    || strip.reading.values[0]!=="07:15"
+                    || strip.reading.values[1]!=="12:15"
+                    || strip.reading.values[2]!=="18:15"
+                    || strip.sourceNote!=="USNO MRST // DAY"
+                    || !strip.detailAvailable)
+                    return root.fail("C41_VENUS_BACKED_DATA_NOT_SHOWN");
+                strip.detailsRequested(strip.currentIndex);
+                if(!focused.skyDetailsExpanded
+                    || focused.skyDetailsMode!=="dated")
+                    return root.fail("C41_DETAILS_FALLBACK_NOT_OPENED");
+                root.phase=5;
+                return;
+            }
+            if(root.phase===5) {
+                const pane=root.find(focused.instrumentItem,
+                    "cosmos-c41-dated-planet-details");
+                if(!pane) return; // nested loader mounts after selection
+                if(pane.resolvedName!=="VENUS"
+                    || pane.renderedFactCount!==12
+                    || pane.facts[2].value!=="07:15"
+                    || pane.facts[4].value!=="12:15"
+                    || pane.facts[7].value!=="18:15"
+                    || pane.facts[10].value!=="USNO MRST")
+                    return root.fail("C41_DATED_PLANET_FULL_DETAILS_MISSING");
+                focused.skyDetailsExpanded=false;
+                root.phase=6;
+                return;
+            }
+            if(root.phase===6) {
+                const strip=root.find(focused.instrumentItem,
+                    "cosmos-c39-fixed-sky-now");
+                const timeline=root.find(focused.instrumentItem,
+                    "cosmos-c38-planets-day-events");
+                if(!strip || !timeline) return;
+                if(strip.reading.planet!=="VENUS"
+                    || strip.reading.mode!=="dated"
+                    || timeline.selectedPlanet!=="VENUS")
+                    return root.fail("C41_SELECTED_PLANET_NOT_PRESERVED");
                 root.done=true;
+                console.log("C41_NATIVE_PASS // ALL_FIVE_SOURCE_DATED_AND_DETAILS");
                 console.log("C39_NATIVE_PASS // TWO_MODES_EMBEDDED_RING_FIXED_SKY_STRIP_FULL_DETAILS");
                 Qt.quit();
             }

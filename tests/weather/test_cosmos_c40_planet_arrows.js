@@ -46,8 +46,8 @@ test("C40 SKY NOW arrows use five-ring order, not the USNO snapshot subset",()=>
 test("C40 still declines to invent instantaneous sky positions for an unsampled planet",()=>{
  assert.match(strip,/readonly property var records: Details\.records\("planets",snapshot/);
  assert.match(strip,/readonly property var currentRecord: currentIndex >= 0/);
- assert.match(strip,/currentRecord \? "CURRENT FIX" : "NOT IN USNO SAMPLE"/);
- assert.match(strip,/available: strip\.currentIndex>=0/);
+ assert.match(strip,/readonly property string sourceNote: reading\.sourceNote/);
+ assert.match(strip,/available: strip\.detailAvailable/);
  assert.match(modes,/selectedPlanet: cosmosModePane\.planetSelection/);
  assert.match(modes,/cosmosModePane\.planetSelection = name/);
  const onlySaturn=[{name:"SATURN",altitude:13.5,azimuth:222,direction:"SW"}];

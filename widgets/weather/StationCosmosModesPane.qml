@@ -16,6 +16,7 @@ Rectangle {
     property string planetSelection: "ALL"
     property bool skyDetailsExpanded: false
     property int skyDetailsIndex: 0
+    property string skyDetailsMode: "current"
     property var weatherService: null
     property var spaceService: null
     property var liveHistoryStore: null
@@ -587,12 +588,18 @@ Rectangle {
                 height: 38
                 visible: !cosmosModePane.skyDetailsExpanded
                 celestialSource: cosmosModePane.celnav
+                datedRows: cosmosModePane.planetRows
+                civilDate: cosmosModePane.civilDate
+                datedSourceReady: !!cosmosModePane.planetSource
+                    && cosmosModePane.planetSource.ready
                 selectedPlanet: cosmosModePane.planetSelection
                 onPlanetPicked: function(name) {
                     cosmosModePane.planetSelection = name;
                 }
                 onDetailsRequested: function(index) {
-                    cosmosModePane.skyDetailsIndex = index;
+                    cosmosModePane.skyDetailsMode = index >= 0
+                        ? "current" : "dated";
+                    cosmosModePane.skyDetailsIndex = Math.max(0,index);
                     cosmosModePane.skyDetailsExpanded = true;
                 }
             }
@@ -613,7 +620,9 @@ Rectangle {
                     spacing: 4
                     GohuText {
                         width: Math.max(1,overlayHeader.width-105)
-                        text: "SKY NOW // FULL SOURCE RECORD"
+                        text: cosmosModePane.skyDetailsMode === "dated"
+                            ? "PLANET // FULL DATED USNO RECORD"
+                            : "SKY NOW // FULL SOURCE RECORD"
                         font.pixelSize: 10
                         color: Colors.magenta
                         elide: Text.ElideRight
@@ -637,9 +646,21 @@ Rectangle {
                     anchors.bottom: parent.bottom
                     anchors.topMargin: 3
                     active: detailOverlay.visible
-                    sourceComponent: planetsSkyComponent
+                    sourceComponent: cosmosModePane.skyDetailsMode === "dated"
+                        ? planetsDatedDetailsComponent : planetsSkyComponent
                 }
             }
+        }
+    }
+    Component {
+        id: planetsDatedDetailsComponent
+        StationCosmosPlanetDatedDetailsPane {
+            datedRows: cosmosModePane.planetRows
+            civilDate: cosmosModePane.civilDate
+            selectedPlanet: cosmosModePane.planetSelection
+            sourceReady: !!cosmosModePane.planetSource
+                && cosmosModePane.planetSource.ready
+            sourceStatus: cosmosModePane.sourceStatus
         }
     }
     Component {

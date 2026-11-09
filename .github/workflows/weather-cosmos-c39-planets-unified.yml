@@ -8,10 +8,13 @@ on:
       - 'widgets/weather/StationCosmosPlanetsDayPane.qml'
       - 'widgets/weather/StationCosmosPlanetClockFace.qml'
       - 'widgets/weather/StationCosmosPlanetsSkyStrip.qml'
+      - 'widgets/weather/StationCosmosPlanetSummaryPolicy.js'
+      - 'widgets/weather/StationCosmosPlanetDatedDetailsPane.qml'
       - 'widgets/weather/StationCosmosPlanetDayWheelPolicy.js'
       - 'tests/weather/test_cosmos_c38_planets_day.js'
       - 'tests/weather/test_cosmos_c39_unified_planets.js'
       - 'tests/weather/test_cosmos_c40_planet_arrows.js'
+      - 'tests/weather/test_cosmos_c41_planet_data_restore.js'
       - 'tests/weather/fixtures/C39UnifiedPlanetsNativeShell.qml'
       - 'tests/weather/fixtures/C5PopulatedNativeShell.qml'
       - '.github/workflows/weather-cosmos-c39-planets-unified.yml'
@@ -32,6 +35,7 @@ jobs:
           node --test \
             tests/weather/test_cosmos_c39_unified_planets.js \
             tests/weather/test_cosmos_c40_planet_arrows.js \
+            tests/weather/test_cosmos_c41_planet_data_restore.js \
             tests/weather/test_cosmos_c38_planets_day.js \
             tests/weather/test_cosmos_c5_empty_repair.js \
             tests/weather/test_cosmos_c6_details.js \
@@ -74,6 +78,7 @@ jobs:
           cat "$work/native.log"
           test "$rc" -eq 0
           grep -F "C39_NATIVE_PASS // TWO_MODES_EMBEDDED_RING_FIXED_SKY_STRIP_FULL_DETAILS" "$work/native.log"
-          if grep -E 'C39_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError' "$work/native.log"; then
+          grep -F "C41_NATIVE_PASS // ALL_FIVE_SOURCE_DATED_AND_DETAILS" "$work/native.log"
+          if grep -E 'C39_NATIVE_FAIL|C41_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError' "$work/native.log"; then
             exit 1
           fi

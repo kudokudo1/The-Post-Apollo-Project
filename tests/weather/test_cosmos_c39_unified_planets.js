@@ -77,8 +77,8 @@ test("C39 SKY NOW stays a single row beneath the stage, all 12 facts are inspect
  assert.match(strip,/Details\.degrees\(strip\.currentRecord\.altitude\)/);
  assert.match(strip,/Details\.degrees\(strip\.currentRecord\.azimuth\)/);
  assert.match(strip,/strip\.currentRecord\.direction/);
- assert.match(strip,/strip\.utcSample/);
- assert.match(strip,/NOT IN USNO SAMPLE/);
+ assert.match(strip,/strip\.reading\.stamp/);
+ assert.match(strip,/sourceNote: reading\.sourceNote/);
  assert.match(strip,/signal planetPicked\(string name\)/);
  assert.match(strip,/signal detailsRequested\(int index\)/);
  for(const name of ["cosmos-c39-sky-prev","cosmos-c39-sky-next","cosmos-c39-sky-details"])
@@ -105,5 +105,5 @@ test("C39 never substitutes the civil-day R/T/S times for instantaneous sky posi
  assert.match(ring,/Day\.datedEvents\(/);
  assert.doesNotMatch(strip,/currentRecord\.(rise|transit|set)|calculateOrbit\(|ephemeris\(/);
  assert.match(strip,/SOURCE RECEIVING/);
- assert.match(strip,/NOT IN USNO SAMPLE/);
+ assert.match(strip,/sourceNote: reading\.sourceNote/);
 });

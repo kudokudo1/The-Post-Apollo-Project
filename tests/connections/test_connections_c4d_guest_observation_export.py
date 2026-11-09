@@ -343,7 +343,7 @@ class C4dSerialCaptureTests(unittest.TestCase):
         # never a forged/unsigned report or any guest-provided text.
         self.serial.write_bytes(
             b"C4B_CONTROLLER_GUEST_LOG_BEGIN\n" +
-            b"C4D_UART_DIAG // UART_RELAY_REFUSED\n" +
+            b"C4D_UART_DIAG // GUEST_OBSERVATION_MISSING\n" +
             b"\n".join(C.REQUIRED_MARKERS) + b"\n")
         self.done.write_text("PASS\n")
         stream = io.StringIO()
@@ -356,10 +356,41 @@ class C4dSerialCaptureTests(unittest.TestCase):
         self.assertIn("candidate_records=0", diag)
         self.assertIn("controller_tail=1", diag)
         self.assertIn("relay_status=1 relay_complete=0", diag)
+        self.assertIn("relay_reason=GUEST_OBSERVATION_MISSING", diag)
         self.assertIn("c3b_origin=1 c4b_runtime_origin=1", diag)
         self.assertIn("c4c_signed_process=1 c2v_rollback=1", diag)
-        self.assertNotIn("UART_RELAY_REFUSED", diag)
+        self.assertNotIn("C4D_UART_DIAG //", diag)
         self.assertNotIn("C4B_OBSERVED //", diag)
+
+    def test_28_unrecognized_guest_error_cannot_be_echoed_into_host_log(self):
+        # A hostile guest cannot inject a made-up status into CI output.
+        self.serial.write_bytes(
+            b"C4D_UART_DIAG // credential=ATTACKER_TEXT\n" +
+            b"\n".join(C.REQUIRED_MARKERS) + b"\n")
+        self.done.write_text("PASS\n")
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            with self.assertRaisesRegex(
+                    C.Refused, "NO_REAL_GUEST_OBSERVATION_CAPTURED"):
+                C.capture(self.root, self.done, poll=0)
+        diag = stream.getvalue()
+        self.assertIn("relay_reason=UNKNOWN", diag)
+        self.assertNotIn("credential=ATTACKER_TEXT", diag)
+
+    def test_29_multiple_conflicting_diagnostic_codes_report_only_multiple(self):
+        self.serial.write_bytes(
+            b"C4D_UART_DIAG // GUEST_LOG_UNSAFE\n" +
+            b"C4D_UART_DIAG // GUEST_OBSERVATION_MISSING\n" +
+            b"\n".join(C.REQUIRED_MARKERS) + b"\n")
+        self.done.write_text("PASS\n")
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            with self.assertRaisesRegex(
+                    C.Refused, "NO_REAL_GUEST_OBSERVATION_CAPTURED"):
+                C.capture(self.root, self.done, poll=0)
+        diag = stream.getvalue()
+        self.assertIn("relay_reason=MULTIPLE", diag)
+        self.assertNotIn("GUEST_LOG_UNSAFE", diag)
 
     def test_25_valid_guest_record_logs_counts_but_not_the_payload(self):
         self.payload(observation())

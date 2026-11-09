@@ -3084,13 +3084,18 @@ PanelWindow {
                             color: Colors.white
                             text: "CLEANUP // FILE REVIEW"
                         }
-                        GohuText {
+                        ActionButton {
                             width: 170
-                            height: parent.height
-                            verticalAlignment: Text.AlignVCenter
-                            font.pixelSize: 10
-                            color: Colors.magenta
-                            text: "TRASH QUEUE // " + camera.batchPaths.length + "/500"
+                            height: 24
+                            label: camera.cleanupQueueOpen
+                                   ? "CLOSE QUEUE // " + camera.batchPaths.length
+                                   : "VIEW QUEUE // " + camera.batchPaths.length
+                            labelPixelSize: 9
+                            accentColor: Colors.magenta
+                            selected: camera.cleanupQueueOpen
+                            available: !camera.busy
+                                       && camera.cleanupTechnique !== "desktop"
+                            onLeftClicked: camera.cleanupToggleQueue()
                         }
                     }
 
@@ -3101,16 +3106,17 @@ PanelWindow {
                         spacing: 6
                         Repeater {
                             model: [
-                                {id: "batch", label: "BATCH"},
+                                {id: "batch", label: "BATCH SCROLL"},
+                                {id: "grid", label: "BATCH GRID"},
                                 {id: "swipe", label: "SWIPE"},
                                 {id: "hunt", label: "HUNT"},
                                 {id: "desktop", label: "DESKTOP"}
                             ]
                             ActionButton {
-                                width: (cleanupModeRow.width - 3 * cleanupModeRow.spacing) / 4
+                                width: (cleanupModeRow.width - 4 * cleanupModeRow.spacing) / 5
                                 height: 32
                                 label: modelData.label
-                                labelPixelSize: 10
+                                labelPixelSize: 9
                                 selected: camera.cleanupTechnique === modelData.id
                                 accentColor: modelData.id === "hunt"
                                              ? Colors.cyan : Colors.magenta
@@ -3127,6 +3133,7 @@ PanelWindow {
                                         camera.huntPauseMenuOpen = false;
                                     }
                                     camera.cleanupTechnique = modelData.id;
+                                    camera.cleanupQueueOpen = false;
                                     camera.huntMouseActive = false;
                                     camera.huntMouseMovingTicks = 0;
                                     camera.batchPreview = null;
@@ -3137,6 +3144,85 @@ PanelWindow {
                                         });
                                 }
                             }
+                        }
+                    }
+
+                    Row {
+                        id: cleanupQueueActions
+                        width: parent.width
+                        height: 33
+                        spacing: 6
+                        visible: camera.cleanupTechnique !== "desktop"
+                        ActionButton {
+                            width: (parent.width - 12) * 0.46
+                            height: 32
+                            label: "REVIEW FOR TRASH // " + camera.batchPaths.length
+                            labelPixelSize: 9
+                            accentColor: Colors.yellow
+                            available: !camera.busy && camera.batchPaths.length > 0
+                            onLeftClicked: camera.previewBatchTrash()
+                        }
+                        ActionButton {
+                            width: (parent.width - 12) * 0.28
+                            height: 32
+                            label: "CLEAR MARKS"
+                            labelPixelSize: 9
+                            accentColor: Colors.cyan
+                            available: !camera.busy && camera.batchPaths.length > 0
+                            onLeftClicked: camera.batchClear()
+                        }
+                        GohuText {
+                            width: (parent.width - 12) * 0.26
+                            height: 32
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 9
+                            color: camera.batchPreview ? Colors.yellow : Colors.cyan
+                            text: camera.batchPreview ? "READY // CONFIRM"
+                                  : "GIO TRASH // REVERSIBLE"
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        height: camera.batchPreview ? 33 : 20
+                        visible: camera.cleanupTechnique !== "desktop"
+                        wrapMode: Text.WrapAnywhere
+                        font.pixelSize: 9
+                        color: camera.batchPreview ? Colors.yellow : Colors.cyan
+                        text: camera.batchPreview
+                              ? "PREVIEW // " + camera.batchPreview.count
+                                + " FILES // " + camera.batchPreview.bytes
+                                + " BYTES // " + camera.batchPreview.sample.join(" · ")
+                              : camera.batchReceipt
+                                ? camera.batchReceipt
+                                : camera.batchPaths.length + " FILES MARKED // "
+                                  + "REVIEW FOR TRASH TO AUTHORIZE MOVE"
+                    }
+                    Row {
+                        width: parent.width
+                        height: 32
+                        visible: camera.cleanupTechnique !== "desktop"
+                                 && camera.batchPreview !== null
+                        spacing: 7
+                        ActionButton {
+                            width: (parent.width - 7) * 0.40
+                            height: 31
+                            label: "CANCEL REVIEW"
+                            labelPixelSize: 9
+                            accentColor: Colors.cyan
+                            onLeftClicked: {
+                                camera.batchPreview = null;
+                                camera.batchReviewKey = "";
+                            }
+                        }
+                        ActionButton {
+                            width: (parent.width - 7) * 0.60
+                            height: 31
+                            label: "MOVE " + camera.batchPreview.count + " TO TRASH"
+                            labelPixelSize: 10
+                            accentColor: Colors.red
+                            destructive: true
+                            available: !camera.busy
+                            onLeftClicked: camera.confirmBatchTrash()
                         }
                     }
 
@@ -3236,7 +3322,8 @@ PanelWindow {
                         width: parent.width
                         height: camera.cleanupTechnique === "desktop"
                                 ? Math.max(170, cleanupPage.height - 135)
-                                : Math.max(145, cleanupPage.height - 260)
+                                : Math.max(145, cleanupPage.height
+                                           - (camera.batchPreview ? 266 : 236))
 
                         Row {
                             id: cleanupBatchView
@@ -4712,72 +4799,6 @@ PanelWindow {
                         }
                     }
 
-                    Row {
-                        width: parent.width
-                        height: 34
-                        visible: camera.cleanupTechnique !== "desktop"
-                        spacing: 8
-                        ActionButton {
-                            width: (parent.width - 8) * 0.46
-                            height: 33
-                            label: "REVIEW QUEUE // " + camera.batchPaths.length
-                            labelPixelSize: 11
-                            accentColor: Colors.yellow
-                            available: !camera.busy && camera.batchPaths.length > 0
-                            onLeftClicked: camera.previewBatchTrash()
-                        }
-                        GohuText {
-                            width: (parent.width - 8) * 0.54
-                            height: 33
-                            verticalAlignment: Text.AlignVCenter
-                            font.pixelSize: 10
-                            color: camera.galleryScanTruncated ? Colors.red : Colors.cyan
-                            text: camera.galleryScanTruncated
-                                  ? "SCAN LIMIT // SELECT A FOLDER"
-                                  : camera.batchPreview
-                                    ? "READY TO CONFIRM // " + camera.batchPreview.count
-                                    : "NO FILES MOVED // TRASH IS REVERSIBLE"
-                        }
-                    }
-                    GohuText {
-                        width: parent.width
-                        height: 31
-                        visible: camera.cleanupTechnique !== "desktop"
-                        wrapMode: Text.WrapAnywhere
-                        font.pixelSize: 10
-                        color: camera.batchPreview ? Colors.yellow : Colors.cyan
-                        text: camera.batchPreview
-                              ? "REVIEW // " + camera.batchPreview.count + " FILES // "
-                                + camera.batchPreview.bytes + " BYTES // "
-                                + camera.batchPreview.sample.join(" · ")
-                              : camera.batchReceipt
-                                ? camera.batchReceipt
-                                : "SELECT OR SWIPE TO QUEUE // FINAL CONFIRMATION REQUIRED"
-                    }
-                    Row {
-                        width: parent.width
-                        height: 33
-                        visible: camera.cleanupTechnique !== "desktop"
-                                 && camera.batchPreview !== null
-                        spacing: 8
-                        ActionButton {
-                            width: (parent.width - 8) / 2
-                            height: 32
-                            label: "CANCEL"
-                            labelPixelSize: 10
-                            accentColor: Colors.cyan
-                            onLeftClicked: camera.batchPreview = null
-                        }
-                        ActionButton {
-                            width: (parent.width - 8) / 2
-                            height: 32
-                            label: "CONFIRM TRASH"
-                            labelPixelSize: 10
-                            accentColor: Colors.red
-                            destructive: true
-                            available: !camera.busy
-                            onLeftClicked: camera.confirmBatchTrash()
-                        }
                     }
                 }
 

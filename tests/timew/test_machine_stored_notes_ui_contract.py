@@ -52,7 +52,7 @@ assert 'MachineCheckpointAnnotations' not in legacy
 assert 'SCHEMA_VERSION = 1' in legacy
 assert 'id: machineSaveBridgeProcess' in qml
 assert qml.count('Process {') == 15, "No new Quickshell process is authorized"
-assert qml.count('onTextEdited:') == 18
+assert qml.count('onTextEdited:') == 19  # Includes durable MARK name field
 assert 'SAVE DESKTOP' in qml and 'VERIFY SAVED GEOMETRY' in qml
 assert 'RESTORE DESKTOP' in qml and 'machineAdvancedOpen' in qml
 assert 'MachineCheckpointNotesCLI.py' not in qml

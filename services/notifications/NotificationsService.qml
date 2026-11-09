@@ -249,9 +249,15 @@ Singleton {
     function inheritedSuppressionFor(entry, selectedKey) {
         const options = scopeOptionsFor(entry);
         const key = String(selectedKey || "");
+        const selected = options.find(function(option) { return option.key === key; });
+        if (!selected || selected.kind === "app")
+            return false;
+        const parents = selected.kind === "channel" ? ["app", "server"]
+            : selected.kind === "title" ? ["app", "website"]
+            : ["app"];
         const now = Date.now();
         for (let i = 0; i < options.length; i++) {
-            if (options[i].key === key)
+            if (parents.indexOf(options[i].kind) === -1)
                 continue;
             const p = policyFor(options[i].key);
             if (p.dnd === true || Number(p.snoozeUntil || 0) > now)

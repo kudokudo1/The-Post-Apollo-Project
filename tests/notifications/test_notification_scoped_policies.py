@@ -42,7 +42,9 @@ assert 'model: managerVisiblePolicies' in h
 assert '"DO NOT DISTURB // " + managerVisiblePolicies.count' in h
 assert '"SNOOZED // " + managerVisiblePolicies.count' in h
 assert 'visible: root.managerPolicyMode === "favorites"' in h
-assert 'label: dndRule.dnd ? "ALLOW" : "WAKE"' in h
+assert 'label: root.managerPolicyMode === "block"' in h
+assert '"UNBLOCK" : root.managerPolicyMode === "dnd"' in h
+assert "NotificationsService.setBlocked(dndRule.appKey" in h
 
 NODE = r"""
 const fs = require('fs'), vm = require('vm'), assert = require('assert');

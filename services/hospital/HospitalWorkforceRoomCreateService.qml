@@ -29,16 +29,20 @@ Scope {
         const id = String(v.id || "").trim();
         const repository = String(v.repository || "").trim();
         const name = String(v.name || "").trim();
+        const patientId = String(v.patientId || "").trim();
+        const patientLabel = String(v.patientLabel || "").trim();
         if (creating || bindProcess.running || nameProcess.running)
             return false;
         if (!/^room-[a-z0-9-]{8,90}$/.test(id)
                 || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)
-                || !name || name.length > 96
-                || /[\x00-\x1f\x7f]/.test(name)) {
+                || !name || name.length > 96 || !patientId
+                || !patientLabel || patientLabel.length > 96
+                || /[\x00-\x1f\x7f]/.test(name + patientLabel)) {
             lastError = "ROOM CREATE REFUSED // INVALID NEW ROOM ID, NAME OR REPOSITORY";
             return false;
         }
-        pending = {id: id, repository: repository, name: name};
+        pending = {id: id, repository: repository, name: name,
+            patientId: patientId, patientLabel: patientLabel};
         savedRoom = null;
         lastError = "";
         lastStatus = "CREATING UNSTAFFED ROOM // NO AGENT WILL LAUNCH";
@@ -46,7 +50,8 @@ Scope {
         bindProcess.exec(pxArgs([
             "hospital", "room-bind", id,
             "--repository", repository,
-            "--patient-id", repository,
+            "--patient-id", patientId,
+            "--patient-label", patientLabel,
             "--json"
         ]));
         return true;
@@ -70,6 +75,7 @@ Scope {
                 result = JSON.parse(bindProcess.resultText);
                 if (String(result.id || "") !== root.pending.id
                         || String(result.repository || "") !== root.pending.repository
+                        || String(result.patientId || "") !== root.pending.patientId
                         || String(result.doctorId || "")
                         || String(result.providerId || "")
                         || String(result.assignmentId || "")

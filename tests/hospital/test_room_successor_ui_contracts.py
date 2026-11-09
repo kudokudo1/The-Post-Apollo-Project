@@ -111,9 +111,11 @@ check('No PX transfer, Session mutation' in view
       and 'TRANSFER NOT AUTHORIZED' in view,
       "Claims remain accurate")
 check('function successionContract(a)' in policy
-      and 'latest insertion order must be verified by PX' in policy
+      and 'sameRoom.length > 1 && !selectedPreviousId' in policy
+      and 'select the exact predecessor for PX latest-order verification' in policy
+      and 'Selected predecessor Session is not in this Room registry' in policy
       and 'mutationAuthorized: false' in policy,
-      "Read-only exact predecessor contract must fail closed on ambiguous history")
+      "Read-only predecessor contract must require explicit selection and PX latest-order verification")
 check('readonly property var transfer: SuccessorPolicy.successionContract' in view
       and 'PREDECESSOR SESSION //' in view
       and 'SUCCESSION HOLD //' in view,

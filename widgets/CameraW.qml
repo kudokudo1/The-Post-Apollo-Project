@@ -3534,10 +3534,22 @@ PanelWindow {
                             }
                             Timer {
                                 id: huntHitFlashTimer
-                                interval: 190
+                                interval: 220
                                 repeat: false
-                                running: camera.huntHitFlash
-                                onTriggered: camera.huntHitFlash = false
+                                running: camera.huntShotEffect !== null
+                                onTriggered: {
+                                    camera.huntHitFlash = false;
+                                    camera.huntShotEffect = null;
+                                }
+                            }
+                            Connections {
+                                target: camera
+                                function onHuntShotSerialChanged() {
+                                    // Restart the one-shot projectile even for
+                                    // quick successive hits and misses.
+                                    huntLaserFlight.restart();
+                                    huntHitFlashTimer.restart();
+                                }
                             }
                             Timer {
                                 id: huntClock
@@ -3687,7 +3699,9 @@ PanelWindow {
                                         onCanceled: camera.huntSetScoped(false)
                                         onClicked: function(mouse) {
                                             if (mouse.button === Qt.LeftButton)
-                                                camera.huntFire("");
+                                                camera.huntFire(
+                                                    "", mouse.x / huntArena.width,
+                                                    mouse.y / huntArena.height);
                                         }
                                     }
                                     Repeater {
@@ -3701,6 +3715,8 @@ PanelWindow {
                                             property bool hovered: false
                                             readonly property color targetTint:
                                                 camera.huntTargetColor(target.profile)
+                                            readonly property color mediaTint:
+                                                camera.huntMediaTint(target.mediaKind)
                                             // Dense rounds preserve usable hitboxes.
                                             // Ox is larger and always above the other
                                             // thumbnail actors if targets overlap.
@@ -3752,19 +3768,21 @@ PanelWindow {
                                             RectangularShadow {
                                                 anchors.fill: huntTargetPlate
                                                 z: -1
-                                                spread: huntTargetItem.hovered ? 10 : 5
+                                                // Keep hover feedback understated;
+                                                // the hit itself owns the strong cue.
+                                                spread: huntTargetItem.hovered ? 5 : 3
                                                 color: huntTargetItem.targetTint
-                                                opacity: huntTargetItem.hovered ? 0.70 : 0.25
+                                                opacity: huntTargetItem.hovered ? 0.18 : 0.10
                                                 visible: !camera.huntPaused
                                                 Behavior on opacity {
-                                                    NumberAnimation { duration: 125 }
+                                                    NumberAnimation { duration: 170 }
                                                 }
                                             }
                                             Rectangle {
                                                 id: huntTargetPlate
                                                 anchors.fill: parent
                                                 radius: 5
-                                                border.width: huntTargetItem.hovered ? 3 : 2
+                                                border.width: 2
                                                 border.color: huntTargetItem.targetTint
                                                 color: Colors.black
                                                 clip: true
@@ -3782,6 +3800,17 @@ PanelWindow {
                                                     asynchronous: true
                                                     cache: false
                                                 }
+                                                Rectangle {
+                                                    // 5.5% content tint, independent of
+                                                    // the much stronger animal border.
+                                                    x: 4
+                                                    y: 3
+                                                    width: parent.width - 8
+                                                    height: parent.height - 21
+                                                    z: 2
+                                                    color: huntTargetItem.mediaTint
+                                                    opacity: 0.055
+                                                }
                                                 GohuText {
                                                     anchors.centerIn: parent
                                                     visible: huntTargetItem.target.mediaType.indexOf("video") >= 0
@@ -3792,9 +3821,22 @@ PanelWindow {
                                                 GohuText {
                                                     x: 3
                                                     y: 2
+                                                    z: 3
                                                     font.pixelSize: 9
                                                     color: huntTargetItem.targetTint
                                                     text: huntTargetItem.target.profile.toUpperCase()
+                                                }
+                                                GohuText {
+                                                    x: parent.width * 0.41
+                                                    y: 2
+                                                    z: 3
+                                                    width: parent.width * 0.57
+                                                    horizontalAlignment: Text.AlignRight
+                                                    elide: Text.ElideRight
+                                                    font.pixelSize: 8
+                                                    color: huntTargetItem.mediaTint
+                                                    text: camera.huntMediaLabel(
+                                                        huntTargetItem.target.mediaKind)
                                                 }
                                                 GohuText {
                                                     anchors.bottom: parent.bottom
@@ -3840,9 +3882,24 @@ PanelWindow {
                                                     }
                                                     onCanceled: camera.huntSetScoped(false)
                                                     onClicked: function(mouse) {
-                                                        if (mouse.button === Qt.LeftButton)
-                                                            camera.huntFire(
+                                                        if (mouse.button !== Qt.LeftButton)
+                                                            return;
+                                                        if (huntTargetItem.target.protected) {
+                                                            // User's screen-recording SAFE rule.
+                                                            camera.huntKeepProtected(
                                                                 huntTargetItem.target.path);
+                                                            return;
+                                                        }
+                                                        camera.huntFire(
+                                                            huntTargetItem.target.path,
+                                                            (huntTargetItem.x + huntTargetItem.width / 2)
+                                                              / huntArena.width,
+                                                            (huntTargetItem.y + huntTargetItem.height / 2)
+                                                              / huntArena.height,
+                                                            huntTargetItem.x / huntArena.width,
+                                                            huntTargetItem.y / huntArena.height,
+                                                            huntTargetItem.width / huntArena.width,
+                                                            huntTargetItem.height / huntArena.height);
                                                     }
                                                 }
                                             }

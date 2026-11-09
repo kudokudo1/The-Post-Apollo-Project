@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -86,6 +87,7 @@ PanelWindow {
     property bool huntAutoPending: false
     property bool huntSettingsOpen: false
     property bool huntScoped: false
+    property bool huntHitFlash: false
     readonly property real huntScopeScale: huntScoped ? 1.85 : 1
     readonly property real huntScopeSwayX: huntScoped ? 2.2 * Math.sin(huntTick * 0.19) : 0
     readonly property real huntScopeSwayY: huntScoped ? 1.8 * Math.cos(huntTick * 0.23) : 0
@@ -458,6 +460,7 @@ PanelWindow {
             huntLastEvent = "READY // NEW ROUND";
             huntAutoPending = false;
             huntScoped = false;
+            huntHitFlash = false;
             huntSettingsOpen = false;
             huntRoundSpeed = 1.0;
             huntRoundSpawnCount = huntSpawnCount;
@@ -713,6 +716,26 @@ PanelWindow {
         return true;
     }
 
+    // Front-to-back hierarchy is deliberate: Ox shields small targets,
+    // Bird and Deer are middle depth, Fox stays above Frog.
+    function huntTargetDepth(profile) {
+        if (profile === "ox") return 50;
+        if (profile === "bird") return 35;
+        if (profile === "deer") return 30;
+        if (profile === "fox") return 10;
+        if (profile === "frog") return 5;
+        return 20;
+    }
+
+    function huntTargetColor(profile) {
+        if (profile === "frog") return Colors.omnitrix;
+        if (profile === "fox") return Colors.orange;
+        if (profile === "deer") return Colors.yellow;
+        if (profile === "bird") return Colors.cyan;
+        if (profile === "ox") return Colors.magenta;
+        return Colors.white;
+    }
+
     // Duck Hunt-style Cleanup game. Targets come only from the already-loaded
     // safe gallery inventory. Hits mark paths; no game code calls GIO/Trash.
     function huntStartRound() {
@@ -773,6 +796,7 @@ PanelWindow {
         huntHistory = [];
         huntAutoPending = false;
         huntScoped = false;
+        huntHitFlash = false;
         huntRoundSpeed = HuntMotion.speedForRound(
             huntSpeedGainPercent, huntSpeedEvery, nextRound);
         huntRoundSpawnCount = targets.length;
@@ -807,7 +831,7 @@ PanelWindow {
         const nextTargets = [];
         for (let i = 0; i < huntTargets.length; i++)
             nextTargets.push(HuntMotion.advanceTarget(
-                huntTargets[i], pointer, huntRoundSpeed));
+                huntTargets[i], pointer, huntRoundSpeed, huntTargets));
         huntTargets = nextTargets;
         huntTick++;
         huntSecondsLeft = Math.max(0, 25 - Math.floor(huntTick / 10));
@@ -820,6 +844,7 @@ PanelWindow {
             huntRoundComplete = true;
             huntAutoPending = huntAutoRounds;
             huntScoped = false;
+            huntHitFlash = false;
             huntCombo = 0;
             huntLastEvent = "TIME UP // UNHIT FILES STAY UNTOUCHED";
             feedback = huntLastEvent;
@@ -881,6 +906,10 @@ PanelWindow {
             huntHits += 1;
             huntCombo += 1;
             huntScore += 100 + Math.min(huntCombo - 1, 5) * 25;
+            // A soft red wash is visual hit confirmation only.
+            // The actual selected file is still recoverably trashed only
+            // after a completely separate review and confirmation.
+            huntHitFlash = true;
             batchPreview = null;
             batchReviewKey = "";
             swipeHistory = [];
@@ -907,6 +936,7 @@ PanelWindow {
         huntHistory = history;
         huntAutoPending = false;
         huntScoped = false;
+        huntHitFlash = false;
         huntTargets = last.targets.slice();
         batchPaths = last.paths.slice();
         huntShots = last.shots;
@@ -1263,6 +1293,7 @@ PanelWindow {
             huntTargets = [];
             huntPaused = true;
             huntScoped = false;
+            huntHitFlash = false;
             huntAutoPending = false;
             Qt.callLater(function() { camera.loadGallery(false, "cleanup"); });
         } else if (action === "previewSelected") {
@@ -2850,6 +2881,7 @@ PanelWindow {
                                             && modelData.id !== "hunt") {
                                         camera.huntPaused = true;
                                         camera.huntScoped = false;
+                                        camera.huntHitFlash = false;
                                         camera.huntAutoPending = false;
                                         camera.huntSettingsOpen = false;
                                     }

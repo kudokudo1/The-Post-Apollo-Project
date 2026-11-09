@@ -17,6 +17,34 @@ PanelWindow {
     property string activeMode: "trash"
     readonly property var lifecycleModes: ["cleanup", "archive", "trash", "burn"]
 
+    // Shell wires this request to CameraW, the ONLY owner of gallery scans,
+    // selection history and the approved MOVE N TO TRASH backend.
+    signal cleanupRequested(string technique)
+    property int cameraCleanupQueueCount: 0
+    property bool cameraCleanupBusy: false
+
+    function requestCameraCleanup(technique) {
+        const requested = String(technique || "");
+        if (!menuOpen || busy || cameraCleanupBusy || confirmMode !== ""
+                || activeMode !== "cleanup"
+                || ["batch", "grid", "swipe", "hunt", "desktop", "queue"]
+                     .indexOf(requested) < 0)
+            return false;
+        cleanupRequested(requested);
+        return true;
+    }
+
+    function finishCleanupHandoff(accepted, technique) {
+        if (accepted !== true) {
+            status = "CLEANUP // CAMERA BUSY OR UNAVAILABLE";
+            return false;
+        }
+        status = "CLEANUP // OPENED CAMERA " + String(technique || "").toUpperCase();
+        clearConfirmation();
+        menuOpen = false;
+        return true;
+    }
+
     function setMode(nextMode) {
         const requested = String(nextMode || "");
         if (busy || confirmMode !== ""
@@ -831,13 +859,13 @@ PanelWindow {
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 13
+                    anchors.margins: 9
+                    spacing: 6
 
                     GohuText {
                         width: parent.width
-                        height: 30
-                        font.pixelSize: 15
+                        height: 23
+                        font.pixelSize: 14
                         color: Colors.yellow
                         text: trashLauncher.activeMode.toUpperCase()
                               + " // LIFECYCLE WORKSPACE"
@@ -851,7 +879,7 @@ PanelWindow {
 
                     GohuText {
                         width: parent.width
-                        wrapMode: Text.WordWrap
+                        height: 18
                         font.pixelSize: 11
                         color: Colors.white
                         text: trashLauncher.activeMode === "cleanup"
@@ -863,19 +891,66 @@ PanelWindow {
 
                     GohuText {
                         width: parent.width
+                        height: trashLauncher.activeMode === "cleanup" ? 31 : 70
                         wrapMode: Text.WordWrap
-                        font.pixelSize: 11
+                        font.pixelSize: 10
                         color: Colors.cyan
                         text: trashLauncher.activeMode === "cleanup"
-                              ? "Camera owns the existing Cleanup queue. Cross-widget routing is not connected yet. For now, use Camera // Cleanup."
+                              ? "Camera owns the existing Cleanup queue. Choose a mode to continue in Camera; only its validated file actions can move files to Trash."
                               : trashLauncher.activeMode === "archive"
                               ? "No record stores are connected to Universal Archive yet. Hospital, Company and Finance retain their own authorization and recovery."
                               : "Only SYSTEM TRASH currently supports Burn. This mode cannot delete Hospital reports, finance records or arbitrary files."
                     }
 
+                    Grid {
+                        id: cleanupLaunchGrid
+                        visible: trashLauncher.activeMode === "cleanup"
+                        width: parent.width
+                        columns: 2
+                        columnSpacing: 7
+                        rowSpacing: 5
+                        height: 3 * 29 + 2 * 5
+
+                        Repeater {
+                            model: [
+                                {id: "batch", label: "BATCH SCROLL"},
+                                {id: "grid", label: "BATCH GRID"},
+                                {id: "swipe", label: "SWIPE"},
+                                {id: "hunt", label: "HUNT"},
+                                {id: "desktop", label: "DESKTOP"},
+                                {id: "queue", label: "VIEW QUEUE"}
+                            ]
+                            ActionButton {
+                                required property var modelData
+                                width: (cleanupLaunchGrid.width - cleanupLaunchGrid.columnSpacing) / 2
+                                height: 29
+                                label: modelData.label
+                                labelPixelSize: 10
+                                accentColor: modelData.id === "hunt"
+                                             ? Colors.cyan
+                                             : modelData.id === "queue"
+                                             ? Colors.orange : Colors.magenta
+                                available: !trashLauncher.busy
+                                           && !trashLauncher.cameraCleanupBusy
+                                onLeftClicked: trashLauncher.requestCameraCleanup(modelData.id)
+                            }
+                        }
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        height: 17
+                        visible: trashLauncher.activeMode === "cleanup"
+                        font.pixelSize: 10
+                        color: Colors.magenta
+                        text: "SHARED CAMERA QUEUE // "
+                              + trashLauncher.cameraCleanupQueueCount
+                              + "/500 // NO AUTOMATIC DELETE"
+                    }
+
                     ActionButton {
                         width: 156
-                        height: 32
+                        height: 28
                         label: "VIEW SYSTEM TRASH"
                         labelPixelSize: 10
                         accentColor: Colors.green

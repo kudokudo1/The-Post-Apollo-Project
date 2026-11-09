@@ -1,0 +1,60 @@
+name: Company M31d isolated Fedora native MapLibre visual preview safety
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'experiments/company-vector-qt/preview_m31d.sh'
+      - 'tests/company/test_company_vector_preview_m31d.py'
+      - '.github/workflows/company-vector-preview-m31d.yml'
+      - 'docs/company-m31d-isolated-vector-visual-preview-20261108.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preview-source-and-readonly-control:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check isolated launcher's shell syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n experiments/company-vector-qt/preview_m31d.sh
+          bash -n experiments/company-vector-qt/fedora_lab_m14.sh
+      - name: Execute fake-Toolbox preview refusal and mode tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest discover -s tests/company -p 'test_company_vector_preview_m31d.py' -v
+      - name: Existing Fedora M14 test contracts unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/company/test_company_vector_fedora_m14.py
+      - name: Assert preview does not change Quickshell, production or SceneFX
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          from pathlib import Path
+          launch=Path('experiments/company-vector-qt/preview_m31d.sh').read_text()
+          company=Path('widgets/CompanyNetworkW.qml').read_text()
+          original=Path('experiments/company-vector-qt/main.qml').read_text()
+          assert 'vectorBridgeOptIn: false' in company
+          assert 'Online' not in launch or 'run-online' in launch
+          assert 'maplibre' in original
+          for forbidden in ('rpm-ostree', 'systemctl', 'git pull',
+                            'git reset', 'quickshell --restart',
+                            'sudo ', '.local/libexec', 'curl '):
+              assert forbidden not in launch, forbidden
+          assert 'company-preview-src' in launch
+          assert 'run-offline' in launch and 'run-online' in launch
+          print('COMPANY_M31D_BOUNDARY isolated_clone=1 '
+                'existing_MapLibre_app=1 production_OFF=1 PASS')
+          PY

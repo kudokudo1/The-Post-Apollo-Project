@@ -373,7 +373,7 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
   const tab = key => tabs.find(row => row.key === key);
   assert.equal(tab("sun").path, "cosmos/sun/position");
   assert.equal(tab("moon").path, "cosmos/moon/ephemeris");
-  assert.equal(tab("sky").path, "cosmos/planets-stars/planet-clock");
+  assert.equal(tab("sky").path, "cosmos/planets-stars/celestial-fix");
   assert.equal(tab("events").path, "cosmos/events/overview");
   assert.equal(workspace.selectedGroup("cosmos/planets-stars/planet-clock"),"sky");
   assert.equal(workspace.selectedGroup("cosmos/events/meteors"),"events");
@@ -394,7 +394,7 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
   assert.equal(cosmos.visibleFor("sky","cosmos/moon/position","moon-position"),true);
   assert.equal(cosmos.needsSource("cosmos/moon/position","celnav"),true);
   assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix","celestial-fix"),true);
-  assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix","planet-clock"),false);
+  assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix","planet-clock"),true); // C39 dates remain in PLANETS
   assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/planet-clock","planet-clock"),true);
   for (const section of ["moon","meteor","eclipses","iss"]) {
     assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix",section),false);
@@ -430,7 +430,7 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
 test("C5 subject modes are distinct real routes and direct fixed-rail actions", () => {
   const families = {
     sun:["OBSERVATION","ACTIVITY","YEAR"],
-    astronomy:["CLOCK","PLANETS","STARS"],
+    astronomy:["PLANETS","STARS"],
     events:["METEORS","ECLIPSES","ISS"]
   };
   for (const [family,labels] of Object.entries(families)) {
@@ -463,7 +463,7 @@ test("C5 subject modes are distinct real routes and direct fixed-rail actions", 
     assert.equal(cosmos.visibleFor("space","cosmos/sun/suvi",s),s==="suvi");
   assert.equal(workspace.GROUPS.cosmos.length,6);
   assert.equal(workspace.GROUPS.cosmos.find(x=>x.key==="sky").path,
-               "cosmos/planets-stars/planet-clock");
+               "cosmos/planets-stars/celestial-fix");
   assert.match(pane,/id: focusModesComponent/);
   assert.match(pane,/StationCosmosModesPane\s*\{/);
   assert.match(pane,/Modes\.family\(cosmosPane\.subjectRoute\) !== ""/);

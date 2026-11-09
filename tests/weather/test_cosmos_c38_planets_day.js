@@ -36,31 +36,37 @@ test("C38 retains five dated USNO event rows with precision and null gaps",()=>{
  assert.equal(policy.eventDetail(all[0]).includes("LOCAL"),true);
 });
 
-test("C38 PLANETS has two local views and a link to existing circular CLOCK",()=>{
- assert.match(modes,/property string planetSubmode: "sky"/);
+test("C39 PLANETS keeps DAY EVENTS and embedded DAY RING, with fixed SKY NOW below",()=>{
+ assert.match(modes,/property string planetSubmode: "day"/);
  assert.match(modes,/kind === "planets" \? planetsComposite/);
  assert.match(modes,/id: planetsComposite/);
- assert.match(modes,/objectName: "cosmos-c38-planets-inner-modes"/);
- assert.match(modes,/label: "SKY NOW"/);
+ assert.match(modes,/objectName: "cosmos-c39-planets-inner-modes"/);
  assert.match(modes,/label: "DAY EVENTS"/);
- assert.match(modes,/label: "DAY RING \/\/ CLOCK"/);
+ assert.match(modes,/label: "DAY RING"/);
+ assert.doesNotMatch(modes,/label: "DAY RING \/\/ CLOCK"/);
  assert.match(modes,/id: planetsSkyComponent\s*StationCosmosDetailPane/);
- assert.match(modes,/kind: "planets"/);
  assert.match(modes,/id: planetsTimelineComponent\s*StationCosmosPlanetsDayPane/);
+ assert.match(modes,/id: planetsRingComponent\s*StationCosmosPlanetClockFace/);
+ assert.match(modes,/StationCosmosPlanetsSkyStrip\s*\{/);
+ assert.match(modes,/anchors\.bottom: skyNowStrip\.top/);
+ assert.match(modes,/objectName: "cosmos-c39-sky-detail-overlay"/);
  assert.match(modes,/datedRows: cosmosModePane\.planetRows/);
  assert.match(modes,/civilDate: cosmosModePane\.civilDate/);
 });
 
-test("C38 activates one existing route-scoped USNO service only on DAY EVENTS",()=>{
- assert.match(modes,/cosmosModePane\.kind === "planets"\s*&& cosmosModePane\.planetSubmode === "day"\s*\? "cosmos\/planets-stars\/planet-clock"/);
- assert.match(modes,/kind === "planets" && planetSubmode === "day"/);
- assert.match(modes,/kind === "planets" && planetSubmode === "day"\)\s*\? planetSource/);
+test("C39 PLANETS activates both existing USNO sources in one source-only host",()=>{
+ assert.match(modes,/subjectRoute: Modes\.dataRoute\(cosmosModePane\.subjectRoute \|\| ""\)/);
+ assert.match(modes,/kind === "planet-clock" \|\| kind === "planets"/);
  assert.match(modes,/sourceOnly: true/);
  assert.match(sky,/id: planetRiseSetService/);
+ assert.match(sky,/id: celnavService/);
  assert.equal((sky.match(/WeatherServices\.UsnoPlanetRiseSetService\s*\{/g)||[]).length,1);
+ assert.equal((sky.match(/WeatherServices\.UsnoCelnavService\s*\{/g)||[]).length,1);
  assert.equal(source.needsSource("cosmos/planets-stars/planet-clock","planets"),true);
- assert.equal(source.needsSource("cosmos/planets-stars/celestial-fix","planets"),false);
+ assert.equal(source.needsSource("cosmos/planets-stars/celestial-fix","planets"),true);
  assert.equal(source.needsSource("cosmos/planets-stars/celestial-fix","celnav"),true);
+ for(const extra of ["iss","eclipses","meteor","moon"])
+   assert.equal(source.needsSource("cosmos/planets-stars/celestial-fix",extra),false);
  assert.doesNotMatch(day,/UsnoPlanetRiseSetService|StationSky\s*\{|XMLHttpRequest|Process\s*\{|new WebSocket/);
 });
 

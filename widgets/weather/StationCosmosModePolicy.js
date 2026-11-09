@@ -9,7 +9,6 @@ var MODES = {
         {label:"YEAR", route:"cosmos/sun/year", kind:"annual-solar"}
     ],
     astronomy: [
-        {label:"CLOCK", route:"cosmos/planets-stars/planet-clock", kind:"planet-clock"},
         {label:"PLANETS", route:"cosmos/planets-stars/celestial-fix", kind:"planets"},
         {label:"STARS", route:"cosmos/planets-stars/constellations", kind:"stars"}
     ],
@@ -44,6 +43,8 @@ function canonical(path) {
 
 function family(path) {
     var route = canonical(path);
+    // Preserve the older CLOCK deep link while retiring its main tab.
+    if (route === "cosmos/planets-stars/planet-clock") return "astronomy";
     if (Object.prototype.hasOwnProperty.call(LEGACY_SUN,route))
         return "sun";
     for (var key in MODES) {
@@ -62,6 +63,7 @@ function modesFor(path) {
 
 function kind(path) {
     var route = canonical(path);
+    if (route === "cosmos/planets-stars/planet-clock") return "planet-clock";
     if (Object.prototype.hasOwnProperty.call(LEGACY_SUN,route))
         return LEGACY_SUN[route];
     var modes = modesFor(route);

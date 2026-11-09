@@ -43,7 +43,9 @@ var ROUTES = {
   "cosmos/moon/position": {page:"sky",sky:["header","moon-position"]},
   // Native ASTRONOMY landing keeps the planet/constellation instruments;
   // the original comprehensive SKY page remains in INDEX unchanged.
-  "cosmos/planets-stars/celestial-fix": {page:"sky",sky:["celestial-fix"]},
+  // C39 // PLANETS shows current USNO SKY NOW alongside the dated R/T/S
+  // instrument; activate the two existing sole-owned services together.
+  "cosmos/planets-stars/celestial-fix": {page:"sky",sky:["celestial-fix","planet-clock"]},
   "cosmos/planets-stars/planet-clock": {page:"sky",sky:["header","planet-clock"]},
   "cosmos/planets-stars/constellations": {page:"sky",sky:["header","celestial-fix"]},
   // Native EVENTS landing groups the real ISS, eclipse and meteor instruments.

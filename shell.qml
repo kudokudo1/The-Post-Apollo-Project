@@ -1353,6 +1353,11 @@ PanelWindow {
         }
     }
 
+    // ===== BOTTOM UTILITIES =====================================
+    // Trash begins the bottom-left utility family; keep Power isolated on
+    // the bottom-right. Both are independent masked PanelWindows.
+    Trash {}
+
     // ===== POWER ================================================
 
     Power {}

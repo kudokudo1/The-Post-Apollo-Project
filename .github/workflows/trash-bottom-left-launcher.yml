@@ -1,0 +1,33 @@
+name: Trash Bottom-Left Launcher Contracts
+
+on:
+  pull_request:
+    paths:
+      - shell.qml
+      - modules/Trash.qml
+      - modules/Power.qml
+      - components/DockButton.qml
+      - tests/trash/test_bottom_left_launcher.py
+      - .github/workflows/trash-bottom-left-launcher.yml
+  push:
+    paths:
+      - shell.qml
+      - modules/Trash.qml
+      - modules/Power.qml
+      - components/DockButton.qml
+      - tests/trash/test_bottom_left_launcher.py
+      - .github/workflows/trash-bottom-left-launcher.yml
+
+permissions:
+  contents: read
+
+jobs:
+  bottom-left-launcher:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Verify Trash launcher, Power geometry, and no file operations
+        run: python3 -m unittest discover -s tests/trash -p 'test_*.py' -v

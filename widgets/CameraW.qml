@@ -88,6 +88,10 @@ PanelWindow {
     property bool huntSettingsOpen: false
     property bool huntScoped: false
     property bool huntHitFlash: false
+    // Laser shot VFX is gameplay-only. No filesystem action is bound to it.
+    property var huntShotEffect: null
+    property int huntShotSerial: 0
+    property int huntLaserCycle: 0
     readonly property real huntScopeScale: huntScoped ? 1.85 : 1
     readonly property real huntScopeSwayX: huntScoped ? 2.2 * Math.sin(huntTick * 0.19) : 0
     readonly property real huntScopeSwayY: huntScoped ? 1.8 * Math.cos(huntTick * 0.23) : 0
@@ -461,6 +465,7 @@ PanelWindow {
             huntAutoPending = false;
             huntScoped = false;
             huntHitFlash = false;
+            huntShotEffect = null;
             huntSettingsOpen = false;
             huntRoundSpeed = 1.0;
             huntRoundSpawnCount = huntSpawnCount;
@@ -736,6 +741,62 @@ PanelWindow {
         return Colors.white;
     }
 
+    function huntMediaTint(kind) {
+        if (kind === "screenshot") return Colors.orange;
+        if (kind === "screen-video") return Colors.yellow;
+        if (kind === "webcam-video") return Colors.magenta;
+        if (kind === "video") return Colors.red;
+        return Colors.cyan;
+    }
+
+    function huntMediaLabel(kind) {
+        if (kind === "screenshot") return "SCREENSHOT";
+        if (kind === "screen-video") return "SCREEN RECORDING · SAFE";
+        if (kind === "webcam-video") return "WEBCAM VIDEO";
+        if (kind === "video") return "VIDEO";
+        return "PHOTO";
+    }
+
+    function huntLaserColor(index) {
+        // Cyan → Orange → Magenta → Cyan, regardless of target animal.
+        const sequence = [Colors.cyan, Colors.orange, Colors.magenta];
+        return sequence[Math.abs(Math.floor(index)) % sequence.length];
+    }
+
+    function huntKeepProtected(path) {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || huntPaused || huntRoundComplete || !path)
+            return false;
+        const index = huntTargets.findIndex(function(item) {
+            return item.path === path
+                   && HuntMotion.protectedHuntMedia(item);
+        });
+        if (index < 0) return false;
+        const history = huntHistory.slice();
+        history.push({
+            targets: huntTargets.slice(), paths: batchPaths.slice(),
+            shots: huntShots, hits: huntHits, misses: huntMisses,
+            score: huntScore, combo: huntCombo,
+            paused: huntPaused, complete: huntRoundComplete
+        });
+        if (history.length > 30) history.shift();
+        huntHistory = history;
+        const next = huntTargets.slice();
+        next.splice(index, 1);
+        huntTargets = next;
+        huntHitFlash = false;
+        huntShotEffect = null;
+        huntLastEvent = "SAFE // SCREEN RECORDING KEPT // NOT QUEUED";
+        feedback = "HUNT // " + huntLastEvent;
+        if (next.length === 0) {
+            huntRoundComplete = true;
+            huntPaused = true;
+            huntScoped = false;
+            huntAutoPending = huntAutoRounds;
+        }
+        return true;
+    }
+
     // Duck Hunt-style Cleanup game. Targets come only from the already-loaded
     // safe gallery inventory. Hits mark paths; no game code calls GIO/Trash.
     function huntStartRound() {
@@ -797,6 +858,7 @@ PanelWindow {
         huntAutoPending = false;
         huntScoped = false;
         huntHitFlash = false;
+        huntShotEffect = null;
         huntRoundSpeed = HuntMotion.speedForRound(
             huntSpeedGainPercent, huntSpeedEvery, nextRound);
         huntRoundSpawnCount = targets.length;
@@ -845,6 +907,7 @@ PanelWindow {
             huntAutoPending = huntAutoRounds;
             huntScoped = false;
             huntHitFlash = false;
+            huntShotEffect = null;
             huntCombo = 0;
             huntLastEvent = "TIME UP // UNHIT FILES STAY UNTOUCHED";
             feedback = huntLastEvent;
@@ -862,7 +925,7 @@ PanelWindow {
         return true;
     }
 
-    function huntFire(path) {
+    function huntFire(path, aimX, aimY, boxX, boxY, boxW, boxH) {
         if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
                 || huntPaused || huntRoundComplete || huntTargets.length === 0)
             return false;
@@ -873,6 +936,9 @@ PanelWindow {
                 hitIndex = i;
         if (targetPath && hitIndex < 0)
             return false; // forged/stale hit cannot add an arbitrary path
+        if (hitIndex >= 0
+                && HuntMotion.protectedHuntMedia(huntTargets[hitIndex]))
+            return false; // screen recordings cannot be queued by Hunt
         if (hitIndex >= 0 && !batchContains(targetPath)
                 && batchPaths.length >= 500) {
             feedback = "HUNT // QUEUE FULL // REVIEW OR CLEAR";
@@ -889,6 +955,32 @@ PanelWindow {
         if (history.length > 30)
             history.shift();
         huntHistory = history;
+        // The laser cycles on every actual shot, including a miss.
+        // Only validated hits trigger an animal flash and arena tint.
+        const hitRecord = hitIndex >= 0 ? huntTargets[hitIndex] : null;
+        const clamp01 = function(value, fallback) {
+            return Number.isFinite(Number(value))
+                   ? Math.max(0, Math.min(1, Number(value)))
+                   : fallback;
+        };
+        const hit = hitRecord !== null;
+        const shotColor = huntLaserColor(huntLaserCycle);
+        huntLaserCycle++;
+        huntShotEffect = {
+            hit: hit,
+            color: shotColor,
+            aimX: clamp01(aimX, hit ? hitRecord.xNorm : 0.5),
+            aimY: clamp01(aimY, hit ? hitRecord.yNorm : 0.5),
+            rectX: clamp01(boxX, hit ? hitRecord.xNorm : 0.4),
+            rectY: clamp01(boxY, hit ? hitRecord.yNorm : 0.4),
+            rectW: clamp01(boxW, 0.16),
+            rectH: clamp01(boxH, 0.18),
+            path: hit ? hitRecord.path : "",
+            mediaKind: hit ? hitRecord.mediaKind : "",
+            profile: hit ? hitRecord.profile : "",
+            mediaType: hit ? hitRecord.mediaType : ""
+        };
+        huntShotSerial++;
         huntShots += 1;
         if (hitIndex < 0) {
             huntMisses += 1;
@@ -906,9 +998,8 @@ PanelWindow {
             huntHits += 1;
             huntCombo += 1;
             huntScore += 100 + Math.min(huntCombo - 1, 5) * 25;
-            // A soft red wash is visual hit confirmation only.
-            // The actual selected file is still recoverably trashed only
-            // after a completely separate review and confirmation.
+            // The removed animal gets its own red hit echo. The rest of
+            // the arena flashes only 4.5% of the laser's current color.
             huntHitFlash = true;
             batchPreview = null;
             batchReviewKey = "";
@@ -937,6 +1028,7 @@ PanelWindow {
         huntAutoPending = false;
         huntScoped = false;
         huntHitFlash = false;
+        huntShotEffect = null;
         huntTargets = last.targets.slice();
         batchPaths = last.paths.slice();
         huntShots = last.shots;
@@ -1294,6 +1386,7 @@ PanelWindow {
             huntPaused = true;
             huntScoped = false;
             huntHitFlash = false;
+            huntShotEffect = null;
             huntAutoPending = false;
             Qt.callLater(function() { camera.loadGallery(false, "cleanup"); });
         } else if (action === "previewSelected") {
@@ -2882,6 +2975,7 @@ PanelWindow {
                                         camera.huntPaused = true;
                                         camera.huntScoped = false;
                                         camera.huntHitFlash = false;
+                                        camera.huntShotEffect = null;
                                         camera.huntAutoPending = false;
                                         camera.huntSettingsOpen = false;
                                     }

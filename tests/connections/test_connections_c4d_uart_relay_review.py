@@ -182,6 +182,53 @@ class DirectGuestRelayReview(unittest.TestCase):
                 self.assertEqual(serial, b"")
                 self.assertNotIn(PREFIX, controller)
 
+    def test_12_missing_guest_observation_emits_fixed_not_generic_reason(self):
+        serial, diagnostic = self.relay(b"no signed observer record\n",
+                                        with_stdout=True)
+        self.assertEqual(serial, b"")
+        self.assertIn(b"C4D_UART_DIAG // GUEST_OBSERVATION_MISSING", diagnostic)
+        self.assertNotIn(b"no signed observer record", diagnostic)
+
+    def test_13_duplicate_observations_emit_fixed_reason_and_no_data(self):
+        serial, diagnostic = self.relay(
+            report() + b"\n" + report() + b"\n", with_stdout=True)
+        self.assertEqual(serial, b"")
+        self.assertIn(b"C4D_UART_DIAG // GUEST_OBSERVATION_DUPLICATE", diagnostic)
+        self.assertNotIn(PREFIX, diagnostic)
+
+    def test_14_bounded_guest_log_size_refuses_with_fixed_code(self):
+        serial, diagnostic = self.relay(
+            b"X" * (2 * 1024 * 1024 + 1), with_stdout=True)
+        self.assertEqual(serial, b"")
+        self.assertIn(b"C4D_UART_DIAG // GUEST_LOG_UNSAFE", diagnostic)
+        self.assertNotIn(PREFIX, diagnostic)
+
+    def test_15_relay_defines_only_codes_used_by_host_collector(self):
+        # Every source-defined outcome that the host may show must be a
+        # fixed label, not a dynamic exception/message or a guest-report byte.
+        from importlib.util import module_from_spec, spec_from_file_location
+        collector = ROOT / "tests/connections/c4b_silverblue/capture_guest_observation.py"
+        spec = spec_from_file_location("c4d_diag", collector)
+        self.assertIsNotNone(spec)
+        module = module_from_spec(spec)
+        spec.loader.exec_module(module)
+        for value in (
+            "GUEST_OBSERVATION_DUPLICATE_KEY", "GUEST_LOG_UNSAFE",
+            "GUEST_LOG_CHANGED", "GUEST_OBSERVATION_MISSING",
+            "GUEST_OBSERVATION_DUPLICATE", "GUEST_OBSERVATION_OVERSIZE",
+            "GUEST_OBSERVATION_JSON_INVALID", "GUEST_OBSERVATION_SCHEMA_INVALID",
+            "GUEST_OBSERVATION_DIGEST_INVALID",
+            "GUEST_OBSERVATION_PROCESS_INVALID",
+            "GUEST_OBSERVATION_DBUS_PID_MISMATCH",
+            "GUEST_OBSERVATION_START_INVALID", "UART_NOT_CHARACTER_DEVICE",
+            "UART_WRITE_TIMEOUT", "UART_WRITE_ZERO", "UART_WRITE_INCOMPLETE",
+            "LOG_PREP_REFUSED", "UART_OPEN_REFUSED", "UART_WRITE_REFUSED",
+        ):
+            self.assertIn(value.encode(), module.KNOWN_RELAY_REASONS)
+        self.assertIn('reason = phase + "_REFUSED"', self.source)
+        self.assertNotIn("type(exc).__name__", self.source)
+        self.assertNotIn("print(str(exc)", self.source)
+
     def test_11_bounded_full_instrument_log_read_and_existing_c2v_tail(self):
         code = GUEST.read_text()
         self.assertIn("log = os.read(fd, st.st_size + 1)", code)

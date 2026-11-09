@@ -1,0 +1,32 @@
+name: TimeW MACHINE M2 automatic checkpoint capture
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineCaptureSaveV2.py"
+      - "services/time/MachineGeometryStoreV2.py"
+      - "tests/timew/test_machine_capture_save_v2.py"
+      - "tests/timew/test_machine_capture_save_v2_contract.py"
+      - "tests/timew/test_machine_geometry_headless_sway.py"
+      - ".github/workflows/timew-machine-capture-save-v2.yml"
+      - "docs/timew-machine-m2-automatic-capture-save.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  save-coordinator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify dormant source boundaries
+        run: python3 -B -I tests/timew/test_machine_capture_save_v2_contract.py
+      - name: Test automatic capture, unstable-frame rejection and SQLite roundtrip
+        run: python3 -B -I tests/timew/test_machine_capture_save_v2.py
+      - name: Preserve v1 and geometry storage regressions
+        run: |
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_geometry_v2.py
+          python3 -B -I tests/timew/test_machine_checkpoint_store.py

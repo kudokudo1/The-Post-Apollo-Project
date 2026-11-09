@@ -55,7 +55,7 @@ check('doctorService.saveDoctor(p.id, p.name, p.role, "ACTIVE")' in view
       "Create and release use the existing PX Doctor writer")
 check('root.retirePlan.ready' in view
       and 'Worker still owns a Room' in policy
-      and 'Worker still has a nonterminal Session' in policy,
+      and 'Worker has unreleased Session or recorded active process' in policy,
       "Retirement cannot silently detach a Room or operating Session")
 check('roomCreate.create(p)' in view
       and 'root.selectedRoomId' in view

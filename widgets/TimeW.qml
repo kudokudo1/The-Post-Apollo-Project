@@ -4823,11 +4823,27 @@ PanelWindow {
                         }
                     }
 
-                    Column {
-                        id: machineStoredPane
+                    // STORED is taller than the fixed TimeW viewport.
+                    // Keep the complete recovery path scrollable and visible.
+                    Item {
+                        id: machineStoredViewport
                         visible: timew.selectedMode === "machine" && timew.machineStoredViewOpen
                         width: parent.width
-                        spacing: 14
+                        height: Math.max(0, parent.height - 88)
+
+                        Flickable {
+                            id: machineStoredScroll
+                            anchors.fill: parent
+                            anchors.rightMargin: 13
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+                            contentWidth: width
+                            contentHeight: machineStoredPane.height
+
+                            Column {
+                                id: machineStoredPane
+                                width: machineStoredScroll.width
+                                spacing: 14
 
                         GohuText {
                             width: parent.width
@@ -5417,6 +5433,25 @@ PanelWindow {
                             text: "NO SCREENSHOTS OR AUTOMATIC RESTORATION"
                             color: Colors.orange
                             font.pixelSize: 11
+                        }
+                            }
+                        }
+
+                        NeonScrollBar {
+                            id: machineStoredRail
+                            flickable: machineStoredScroll
+                            accountForContentOrigin: true
+                            geometryMode: "viewport"
+                            x: machineStoredViewport.width - width - 3
+                            y: 0
+                            height: machineStoredViewport.height
+                            handleStyle: "star"
+                            railColor: Colors.cyan
+                            handleColor: Colors.magenta
+                            handleBorderColor: Colors.magenta
+                            railGlowColor: Colors.white
+                            containGlow: true
+                            visible: scrollable
                         }
                     }
 

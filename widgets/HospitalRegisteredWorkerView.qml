@@ -16,6 +16,9 @@ Item {
     property string pinnedRoomId: ""
     property string pinnedSessionId: ""
     property string initialMode: "continuity"
+    // Optional review-only selection carried from Surgery MANAGE +.
+    // It cannot authorize or trigger a Session mutation.
+    property var initialAttachmentSelection: ({})
     property string viewMode: "continuity"
     property bool runtimeStatusVerified: false
     property string actionError: ""
@@ -232,6 +235,29 @@ Item {
             attachmentSessionId = "";
             attachmentOutcome = "";
             reload();
+            // The Room's existing attachment preview owns the real PX
+            // capability/authority gate. Preset choices only; never CONFIRM.
+            if (initialMode === "attachPreview") {
+                const prepared = initialAttachmentSelection || {};
+                const sameRoom = String(prepared.roomId || "")
+                    === root.pinnedRoomId && root.roomMatches;
+                const sameAssignment = String(prepared.assignmentId || "")
+                    === String((root.roomData || {}).assignmentId || "");
+                if (sameRoom && sameAssignment
+                        && !!String(prepared.doctorId || "")
+                        && !!String(prepared.providerId || "")
+                        && root.openAttachmentPreview()) {
+                    root.previewAssignmentId = String(prepared.assignmentId);
+                    root.previewDoctorId = String(prepared.doctorId);
+                    root.previewProviderId = String(prepared.providerId);
+                    root.attachmentOutcome =
+                        "SURGERY CHOICES PRESELECTED // PX MUST REVALIDATE // NOTHING ATTACHED";
+                } else {
+                    root.viewMode = "connections";
+                    root.actionError =
+                        "STAFFING HANDOFF REFUSED // ROOM OR ACTIVE ASSIGNMENT CHANGED";
+                }
+            }
         } else {
             attachmentArmKey = "";
             runtimeStatusVerified = false;

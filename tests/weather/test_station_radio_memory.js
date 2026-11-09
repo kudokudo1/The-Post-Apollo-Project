@@ -144,17 +144,17 @@ assert.match(ui, /onBrowseItemsChanged:/);
 assert.match(ui, /onLoadedMediaChanged:/);
 assert.match(ui, /id !== lastLoadRequestedId/);
 assert.match(ui, /RadioMemory\.touchRecent/);
-assert.match(ui, /StationRadioSavedStrips\\s*\\{/);
-assert.match(ui, /onRecallRequested: function\\(item\\)/);
-assert.match(ui, /onRemoveRequested: function\\(item\\)/);
-assert.match(squares, /model: strips\\.favoriteItems/);
-assert.match(squares, /model: strips\\.recentItems/);
-assert.match(squares, /FAVORITES \\/\\//);
-assert.match(squares, /RECENTS \\/\\//);
-assert.match(squares, /label: "X"/);
-assert.match(squares, /strips\\.recallRequested\\(modelData\\)/);
-assert.match(ui, /UNFAVORITE/);
-assert.match(squares, /NO STORED STREAM URL \\/\\/ NO AUTOPLAY/);
+assert.ok(ui.includes('StationRadioSavedStrips {'));
+assert.ok(ui.includes('onRecallRequested: function(item)'));
+assert.ok(ui.includes('onRemoveRequested: function(item)'));
+assert.ok(squares.includes('model: strips.favoriteItems'));
+assert.ok(squares.includes('model: strips.recentItems'));
+assert.ok(squares.includes('FAVORITES //'));
+assert.ok(squares.includes('RECENTS //'));
+assert.ok(squares.includes('label: "X"'));
+assert.ok(squares.includes('strips.recallRequested(modelData)'));
+assert.ok(ui.includes('UNFAVORITE'));
+assert.ok(squares.includes('NO STORED STREAM URL // NO AUTOPLAY'));
 
 // Recall must only re-enter the existing directory + select path. It may not
 // directly load/play a persisted ref or manufacture a direct stream URL.

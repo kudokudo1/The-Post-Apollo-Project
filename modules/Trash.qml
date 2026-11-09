@@ -25,6 +25,59 @@ PanelWindow {
     property int cameraCleanupQueueCount: 0
     property bool cameraCleanupBusy: false
 
+    // Universal record inventory v1. Read-only and source-owned. The index
+    // carries NO archive/trash/burn actions for Weather or demo web scrapes.
+    property var archiveRows: []
+    property var archiveSources: []
+    property bool archiveBusy: false
+    property string archiveState: "NOT_SCANNED"
+    property string archiveFilter: "all"
+    property string archiveSearchText: ""
+    readonly property var archiveFilteredRows: archiveRows.filter(function(row) {
+        const selected = archiveFilter;
+        if (selected === "events" && row.kind !== "EVENT HISTORY") return false;
+        if (selected === "dossiers" && row.kind !== "SAVED DOSSIER") return false;
+        if (selected === "scrapes" && row.kind !== "WEB SCRAPE") return false;
+        const q = archiveSearchText.trim().toLowerCase();
+        return !q || (String(row.title) + " " + String(row.source)
+                      + " " + String(row.details) + " " + String(row.id))
+                     .toLowerCase().indexOf(q) >= 0;
+    })
+
+    function refreshArchive() {
+        if (!menuOpen || activeMode !== "archive" || archiveBusy)
+            return false;
+        archiveBusy = true;
+        archiveState = "SCANNING";
+        archiveProcess.exec([
+            "python3", "-I", "-B",
+            Quickshell.shellPath("scripts/trash/record_index.py"),
+            "index", Quickshell.dataDir
+        ]);
+        return true;
+    }
+
+    function consumeArchive(raw) {
+        if (!archiveBusy)
+            return;
+        archiveBusy = false;
+        let reply = null;
+        try { reply = JSON.parse(String(raw || "").trim()); }
+        catch (error) {
+            archiveState = "STALE // INVALID INDEX RESPONSE";
+            return;
+        }
+        if (!reply || reply.ok !== true || reply.kind !== "record-index"
+                || reply.readOnly !== true
+                || !Array.isArray(reply.items) || !Array.isArray(reply.sources)) {
+            archiveState = "STALE // SOURCE INDEX UNAVAILABLE";
+            return;
+        }
+        archiveRows = reply.items;
+        archiveSources = reply.sources;
+        archiveState = "READY";
+    }
+
     function requestCameraCleanup(technique) {
         const requested = String(technique || "");
         if (!menuOpen || activeMode !== "cleanup" || confirmMode !== ""
@@ -58,6 +111,11 @@ PanelWindow {
                 && cameraCleanupController)
             cameraCleanupController.suspendHostedCleanup();
         activeMode = requested;
+        if (requested === "archive" && menuOpen)
+            Qt.callLater(function() {
+                if (trashLauncher.activeMode === "archive")
+                    trashLauncher.refreshArchive();
+            });
         return true;
     }
 
@@ -147,6 +205,8 @@ PanelWindow {
             if (activeMode === "cleanup" && cameraCleanupController)
                 cameraCleanupController.openCleanupFromTrash(
                     cameraCleanupController.cleanupTechnique);
+            if (activeMode === "archive")
+                Qt.callLater(function() { trashLauncher.refreshArchive(); });
         }
     }
 
@@ -319,6 +379,24 @@ PanelWindow {
                 if (trashLauncher.menuOpen && String(data || "").trim() !== "")
                     trashEventDebounce.restart();
             }
+        }
+    }
+
+    // Separate process, separate stdout and no shared destructive command
+    // channel. This process can only run the read-only record-index command.
+    Process {
+        id: archiveProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: trashLauncher.consumeArchive(this.text)
+        }
+        onExited: function(code, status) {
+            Qt.callLater(function() {
+                if (trashLauncher.archiveBusy) {
+                    trashLauncher.archiveBusy = false;
+                    trashLauncher.archiveState = "STALE // INDEX PROCESS FAILED";
+                }
+            });
         }
     }
 
@@ -908,20 +986,200 @@ PanelWindow {
                     }
                 }
 
+                Item {
+                    id: archiveRecordsView
+                    anchors.fill: parent
+                    visible: trashLauncher.activeMode === "archive"
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        spacing: 6
+
+                        Row {
+                            width: parent.width
+                            height: 28
+                            spacing: 8
+                            GohuText {
+                                width: parent.width - 100
+                                height: parent.height
+                                color: Colors.yellow
+                                font.pixelSize: 12
+                                verticalAlignment: Text.AlignVCenter
+                                text: "ARCHIVE // RECORD INVENTORY // "
+                                      + trashLauncher.archiveRows.length
+                            }
+                            ActionButton {
+                                width: 92
+                                height: 27
+                                label: trashLauncher.archiveBusy
+                                       ? "SCANNING" : "REFRESH"
+                                labelPixelSize: 10
+                                accentColor: Colors.green
+                                available: !trashLauncher.archiveBusy
+                                onLeftClicked: trashLauncher.refreshArchive()
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            height: 17
+                            font.pixelSize: 9
+                            color: trashLauncher.archiveState.indexOf("STALE") === 0
+                                   ? Colors.red : Colors.cyan
+                            elide: Text.ElideRight
+                            text: trashLauncher.archiveState + " // "
+                                + trashLauncher.archiveSources.map(function(v) {
+                                    return v.id + ":" + v.state;
+                                }).join(" // ")
+                        }
+
+                        TextField {
+                            id: archiveSearch
+                            width: parent.width
+                            height: 32
+                            color: Colors.white
+                            font.pixelSize: 10
+                            placeholderTextColor: Colors.cyan
+                            placeholderText: "SEARCH ARCHIVED EVENTS // DOSSIERS // SCRAPES"
+                            text: trashLauncher.archiveSearchText
+                            onTextChanged: trashLauncher.archiveSearchText = text
+                            background: Rectangle {
+                                color: Colors.dark
+                                border.width: 1
+                                border.color: Colors.cyan
+                                radius: 0
+                            }
+                        }
+
+                        Row {
+                            id: archiveFilterRow
+                            width: parent.width
+                            height: 27
+                            spacing: 4
+
+                            Repeater {
+                                model: [
+                                    {id:"all", label:"ALL"},
+                                    {id:"events", label:"EVENTS"},
+                                    {id:"dossiers", label:"DOSSIERS"},
+                                    {id:"scrapes", label:"SCRAPES"}
+                                ]
+                                ActionButton {
+                                    required property var modelData
+                                    width: (archiveFilterRow.width - 12) / 4
+                                    height: 26
+                                    label: modelData.label
+                                    labelPixelSize: 9
+                                    accentColor: modelData.id === "all"
+                                                 ? Colors.magenta : Colors.cyan
+                                    selected: trashLauncher.archiveFilter === modelData.id
+                                    onLeftClicked: trashLauncher.archiveFilter = modelData.id
+                                }
+                            }
+                        }
+
+                        Item {
+                            id: archiveEntriesBox
+                            width: parent.width
+                            height: Math.max(80, archiveRecordsView.height - 190)
+                            ListView {
+                                id: archiveEntriesList
+                                width: parent.width - 17
+                                height: parent.height
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+                                spacing: 5
+                                model: trashLauncher.archiveFilteredRows
+
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: archiveEntriesList.width
+                                    height: 77
+                                    color: Colors.dark
+                                    radius: 0
+                                    border.width: 1
+                                    border.color: Colors.cyan
+
+                                    Column {
+                                        anchors.fill: parent
+                                        anchors.margins: 6
+                                        spacing: 3
+
+                                        GohuText {
+                                            width: parent.width
+                                            height: 18
+                                            font.pixelSize: 11
+                                            color: Colors.white
+                                            elide: Text.ElideRight
+                                            text: String(modelData.title || "UNTITLED RECORD")
+                                        }
+                                        GohuText {
+                                            width: parent.width
+                                            height: 17
+                                            font.pixelSize: 9
+                                            color: Colors.magenta
+                                            elide: Text.ElideRight
+                                            text: String(modelData.source)
+                                                  + " // " + String(modelData.kind)
+                                        }
+                                        GohuText {
+                                            width: parent.width
+                                            height: 17
+                                            font.pixelSize: 9
+                                            color: Colors.cyan
+                                            elide: Text.ElideRight
+                                            text: String(modelData.recordedAt)
+                                                  + " // " + String(modelData.details)
+                                        }
+                                    }
+                                }
+                            }
+
+                            NeonScrollBar {
+                                flickable: archiveEntriesList
+                                x: parent.width - width - 1
+                                height: parent.height
+                                geometryMode: "viewport"
+                                handleStyle: "star"
+                                visible: scrollable
+                            }
+
+                            GohuText {
+                                anchors.centerIn: parent
+                                visible: !trashLauncher.archiveBusy
+                                         && trashLauncher.archiveFilteredRows.length === 0
+                                color: Colors.cyan
+                                font.pixelSize: 11
+                                text: trashLauncher.archiveRows.length === 0
+                                      ? "NO ARCHIVED RECORDS FOUND"
+                                      : "NO MATCHES // TRY ANOTHER FILTER"
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            height: 24
+                            color: Colors.yellow
+                            font.pixelSize: 9
+                            wrapMode: Text.WordWrap
+                            text: "SOURCE OWNED // READ-ONLY DISCOVERY. NO RECORD TRASH, RESTORE OR BURN ENABLED."
+                        }
+                    }
+                }
+
                 Column {
                     anchors.fill: parent
                     anchors.margins: 12
                     spacing: 12
-                    visible: trashLauncher.activeMode === "archive"
-                             || trashLauncher.activeMode === "burn"
+                    visible: trashLauncher.activeMode === "burn"
 
                     GohuText {
                         width: parent.width
                         height: 28
                         font.pixelSize: 14
                         color: Colors.yellow
-                        text: trashLauncher.activeMode.toUpperCase()
-                              + " // LIFECYCLE WORKSPACE"
+                        text: "BURN // VERIFIED DELETION ONLY"
                     }
                     Rectangle {
                         width: parent.width
@@ -932,19 +1190,8 @@ PanelWindow {
                         width: parent.width
                         wrapMode: Text.WordWrap
                         font.pixelSize: 11
-                        color: Colors.white
-                        text: trashLauncher.activeMode === "archive"
-                              ? "ARCHIVE // RETAIN AND RETRIEVE"
-                              : "BURN // VERIFIED DELETION ONLY"
-                    }
-                    GohuText {
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        font.pixelSize: 11
                         color: Colors.cyan
-                        text: trashLauncher.activeMode === "archive"
-                              ? "No record stores are connected to Universal Archive yet. Hospital, Company and Finance retain their own authorization and recovery."
-                              : "Only SYSTEM TRASH currently supports Burn. This mode cannot delete Hospital reports, finance records or arbitrary files."
+                        text: "Only SYSTEM TRASH currently supports Burn. Archive records, Hospital reports, Finance and source-owned data have no universal Burn permission."
                     }
                     ActionButton {
                         width: 156

@@ -171,6 +171,9 @@ Rectangle {
             subjectRoute: surface.currentPath
             newsMentionOverlay: surface.newsMentionOverlay
             onNewsMapClearRequested: surface.newsMapClearRequested()
+            onRouteRequested: function(path) {surface.routeRequested(path);}
+            nwsAlertSource: surface.nwsAlertSource
+            liveHistoryStore: surface.liveHistoryStore
             seismicSource: surface.seismicSource
             lightningSource: surface.lightningSource
             riverSource: surface.riverSource

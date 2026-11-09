@@ -19,7 +19,7 @@ test("C43 SPACE end-page has exactly DASHBOARD and DIRECTORY, with original rout
  for(const mode of ["dashboard","directory"])
      assert.ok(hub.includes('kind:"'+mode+'"'),"missing "+mode);
  assert.doesNotMatch(hub,/kind:"services"|label:"SERVICES"|viewMode === "services"/);
- assert.match(hub,/Math\.max\(1,\(viewRail\.width-viewRail\.spacing\)\/2\)/);
+ assert.match(hub,/HeaderGeometry\.buttonWidth\(viewRail\.width,2\)/);
  assert.equal((hub.match(/route:"cosmos\/space-weather\//g)||[]).length,7);
  assert.match(hub,/route:"cosmos\/sun\/activity"/);
  assert.match(hub,/routeRequested\(modelData.route\)/);

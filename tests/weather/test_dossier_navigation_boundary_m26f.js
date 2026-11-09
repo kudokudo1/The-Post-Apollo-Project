@@ -20,10 +20,10 @@ test("only the single SUBJECTS navigator hosts original map views",()=>{
 });
 test("EARTH retains a route-scoped single original StationDiscovery loader",()=>{
   assert.match(earth,/Loader\s*\{\s*id:\s*earthLoader/);
-  assert.match(earth,/active:\s*earthPane.visible\s*&&\s*earthPane.kind\s*===\s*"map"/);
+  assert.match(earth,/active:\s*earthPane.visible\s*&&\s*earthPane.kind\s*!==\s*""/);
   assert.match(earth,/sourceComponent:\s*earthMapComponent/);
   assert.match(earth,/id:\s*earthMapComponent[\s\S]*?StationDiscovery\s*\{/);
-  assert.match(earth,/earthMapRoute:\s*earthPane.subjectRoute/);
+  assert.match(earth,/earthMapRoute:\s*earthPane.kind === "services"/);
   assert.match(discovery,/property var selectedMapGdacsEvent:\s*null/);
   assert.match(discovery,/property var selectedMapEarthquake:\s*null/);
 });

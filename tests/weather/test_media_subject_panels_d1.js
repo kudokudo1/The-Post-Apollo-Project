@@ -177,7 +177,7 @@ test("CLASSIC MEDIA behavior and NEWS-to-MAP handoff remain available", () => {
   assert.ok(!station.includes("weatherContentLoader"));
   assert.match(browser,/function showNewsMentionsOnEarth\(payload\)/);
   assert.match(browser,/newsMentionOverlay = incoming/);
-  assert.match(browser,/chooseRoute\("earth\/maps\/overview"\)/);
+  assert.match(browser,/chooseRoute\("earth\/maps\/events"\)/);
   assert.ok(!station.includes("switchToClassic"));
   assert.ok(!station.includes("openLegacyFromSubject"));
   assert.match(station,/StationTerminal\s*\{/);

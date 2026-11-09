@@ -21,7 +21,11 @@ vm.runInContext(policySource.replace(/^\.pragma library\s*$/m,""),earth);
 
 test("original ten EARTH routes plus one full original MAP are canonical descendants", () => {
   assert.equal(earth.FORMAT,"post-apollo.weather.earth-panels.e1.v1");
-  const routes = Object.keys(earth.ROUTES);
+  // Historical E1 scope remains intact; E2 adds separate focused screens.
+  const routes = Object.keys(earth.ROUTES).filter(route=>
+    route!=="earth/maps/events" && !route.startsWith("earth/water/")
+      && !route.startsWith("earth/ground/")
+      && !route.startsWith("earth/services/"));
   assert.equal(routes.length,11);
   assert.equal(routes.filter(route=>!earth.isFullMap(route)).length,10);
   assert.equal(earth.isFullMap("earth/maps/full"),true);
@@ -98,7 +102,7 @@ test("seismic, EONET and GDACS use existing fetchers and only poll on admitted r
       "FIRMS/HMS must remain manual");
 });
 
-test("EARTH map excludes unrelated weather radar and MEDIA news", () => {
+test("EARTH keeps old source-scoped views and permits radar only on new pinned consolidated map", () => {
   assert.match(discovery,/property bool earthMapOnly: false/);
   assert.match(discovery,/function earthLayerEnabled\(layer\)/);
   assert.match(discovery,/weatherMapOnly \? \[\] : MapProjection\.plottable\(source/);
@@ -109,8 +113,8 @@ test("EARTH map excludes unrelated weather radar and MEDIA news", () => {
   assert.match(discovery,/earthLayerEnabled\("gdacs"\)/);
   assert.match(discovery,/earthLayerEnabled\("firms"\)/);
   assert.match(discovery,/earthLayerEnabled\("smoke"\)/);
-  assert.match(discovery,/!stationDiscovery\.earthMapOnly\s*&& stationDiscovery\.weatherLayerEnabled\("radar"\)/);
-  assert.match(discovery,/&& !stationDiscovery\.earthMapOnly\s*\? rainViewerRadarService\.strips/);
+  assert.match(discovery,/stationDiscovery\.earthPinnedMap/);
+  assert.match(discovery,/stationDiscovery\.earthMapOnly \|\| stationDiscovery\.earthPinnedMap/);
   assert.match(discovery,/!stationDiscovery\.earthMapOnly/);
   assert.match(discovery,/model: stationDiscovery.newsGroupVisible\("list"\)\s*&& source.ready\s*\? stationDiscovery.visibleRows : \[\]/);
   assert.match(discovery,/mapCompanionEonetRows/);
@@ -148,8 +152,9 @@ test("EARTH investigations reuse selected original context with dossier and arch
 test("one EARTH map instance persists event selection and zoom while navigating routes", () => {
   assert.match(earthPane,/Loader\s*\{/);
   assert.match(earthPane,/sourceComponent: earthMapComponent/);
-  assert.match(earthPane,/earthMapRoute: earthPane\.subjectRoute/);
+  assert.match(earthPane,/earthMapRoute: earthPane\.kind === "services"/);
   assert.match(earthPane,/stationOpen: earthPane\.visible/);
+  assert.match(earthPane,/earthPinnedMap: EarthPanelPolicy\.isPinnedMap\(earthPane\.subjectRoute\)/);
   assert.equal((earthPane.match(/StationDiscovery\s*\{/g)||[]).length,1);
   for(const bind of [
     "seismicSource: earthPane.seismicSource",

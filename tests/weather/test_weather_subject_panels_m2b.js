@@ -24,7 +24,8 @@ vm.runInContext(policySource.replace(/^\.pragma library\s*$/m, ""), env);
 const plain = x => JSON.parse(JSON.stringify(x));
 
 test("M2b preserves its original 30 routes plus M28-Q full GROUND visual destination", () => {
-  const routes = Object.keys(env.ROUTES);
+  // Original 31 WEATHER deep routes remain as compatibility destinations.
+  const routes = Object.keys(env.ROUTES).filter(x=>x.startsWith("weather/"));
   assert.equal(routes.length,31);
   assert.equal(new Set(routes).size,31);
   assert.equal(routes.filter(x=>x!=="weather/ground/full").length,30,
@@ -160,7 +161,8 @@ test("M29-A river deep routes focus their own existing data blocks", () => {
     ground.indexOf('// The four deep RIVERS routes'),
     ground.indexOf('Column {\n            visible: ground.sectionVisible("rivers")')
   );
-  assert.equal((riverButtons.match(/path:"weather\/water\/rivers/g)||[]).length,5);
+  assert.equal((riverButtons.match(/path:parent\.riverBase/g)||[]).length,5);
+   assert.match(riverButtons,/earth\/water\/rivers/);
   assert.match(riverButtons,/onTriggered: ground\.routeRequested\(modelData\.path\)/);
   assert.match(ground,/onSubjectRouteChanged:[\s\S]*?groundScroll\.contentY = 0/);
   assert.match(pane,/onRouteRequested: function\(path\) \{ weatherPane\.routeRequested\(path\); \}/);
@@ -206,13 +208,13 @@ test("WEATHER map does not fetch or plot non-weather events", () => {
   assert.match(discovery,/!weatherMapOnly && mapShowEarthquakes/);
   assert.match(discovery,/!weatherMapOnly && mapShowGdacs/);
   assert.match(discovery,/&& !stationDiscovery\.weatherMapOnly/);
-  assert.match(discovery,/model: firmsService\.ready \? firmsService\.hotspots : \[\]/);
+  assert.match(discovery,/model: firmsService\.ready[\s\S]*?stationDiscovery\.earthLayerSelected\("firms"\)/);
   assert.match(discovery,/visible: !stationDiscovery\.weatherMapOnly/);
   // Full source-row lists are now partitioned by DOMAIN:
   // WEATHER map has none; EARTH's original map renderer keeps full source
   // controls via its migrated route without a duplicate CLASSIC loader.
-  assert.match(discovery,/model: stationDiscovery.domain === "map"\s*&& !stationDiscovery.earthMapOnly && source.ready\s*\? stationDiscovery.visibleRows : \[\]/);
-  assert.match(discovery,/model: stationDiscovery.domain === "map"\s*&& stationDiscovery.earthMapOnly\s*&& stationDiscovery.earthLayerEnabled\("eonet"\)\s*&& source.ready\s*\? stationDiscovery.mapCompanionEonetRows : \[\]/);
+  assert.match(discovery,/model: stationDiscovery.domain === "map"\s*&& !stationDiscovery\.earthMapOnly && source.ready\s*\? stationDiscovery\.visibleRows : \[\]/);
+  assert.match(discovery,/model: stationDiscovery.domain === "map"\s*&& stationDiscovery.earthMapOnly\s*&& stationDiscovery.earthLayerEnabled\("eonet"\)\s*&& stationDiscovery.earthLayerSelected\("eonet"\)\s*&& source.ready\s*\? stationDiscovery.mapCompanionEonetRows : \[\]/);
   assert.match(discovery,/weatherLayerEnabled\("smoke"\)/);
   assert.match(discovery,/weatherLayerEnabled\("radar"\)/);
   assert.match(discovery,/weatherLayerEnabled\("radar-fallback"\)/);

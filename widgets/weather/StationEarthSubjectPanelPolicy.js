@@ -12,13 +12,20 @@ var ROUTES = {
   "earth/events/gdacs": {layers:["gdacs"]},
   "earth/fires/hotspots": {layers:["firms","smoke"]},
   "earth/maps/overview": {layers:["quakes","eonet","gdacs","firms","smoke"]},
+  // E2: one unified, pinned event map. The old deep routes remain valid.
+  "earth/maps/events": {layers:["quakes","eonet","gdacs","firms","smoke"],pinned:true},
   // M28-S restores the complete original CLASSIC MAP presentation (radar,
   // smoke, weather context, geodata, map companion, native event inspectors)
   // in one existing StationDiscovery instance. No collector is copied.
   "earth/maps/full": {layers:["quakes","eonet","gdacs","firms","smoke"],full:true},
   "earth/investigations/context": {layers:["quakes","eonet","gdacs","firms","smoke"]},
   "earth/investigations/dossiers": {layers:["quakes","eonet","gdacs","firms","smoke"]},
-  "earth/investigations/archive": {layers:["quakes","eonet","gdacs","firms","smoke"]}
+  "earth/investigations/archive": {layers:["quakes","eonet","gdacs","firms","smoke"]},
+  "earth/water/rivers": {page:"ground"},
+  "earth/water/marine": {page:"ground"},
+  "earth/water/coast": {page:"ground"},
+  "earth/ground/full": {page:"ground"},
+  "earth/services/health": {page:"services"}
 };
 
 function routeInfo(path) {
@@ -28,7 +35,12 @@ function routeInfo(path) {
 }
 
 function kindForRoute(path) {
-  return routeInfo(path) ? "map" : "";
+  var info=routeInfo(path);
+  return info ? (info.page || "map") : "";
+}
+function isPinnedMap(path) {
+  var info=routeInfo(path);
+  return !!info && info.pinned === true;
 }
 function isFullMap(path) {
   var info=routeInfo(path);
@@ -46,13 +58,20 @@ function showsLayer(path, layer) {
 function needsSource(path, source) {
   if (path === "") return true;
   if (!routeInfo(path)) return false;
-  if (source === "seismic") return showsLayer(path,"quakes");
+  if (source === "seismic")
+    return showsLayer(path,"quakes") || path === "earth/ground/full"
+      || path === "earth/services/health";
   if (source === "eonet") return showsLayer(path,"eonet");
   if (source === "gdacs") return showsLayer(path,"gdacs");
   // Original CLASSIC MAP also gives flood/lightning event context from the
   // same root sources. They remain active only for this exact full route.
-  if (source === "lightning" || source === "river")
-    return isFullMap(path);
+  if (source === "lightning")
+    return isFullMap(path) || isPinnedMap(path)
+      || path === "earth/ground/full" || path === "earth/services/health";
+  if (source === "river")
+    return isFullMap(path) || isPinnedMap(path)
+      || path === "earth/ground/full" || path === "earth/services/health"
+      || path === "earth/water/rivers";
   // FIRMS and NOAA HMS remain explicitly manually requested.
   return false;
 }
@@ -72,10 +91,16 @@ function routeLabel(path) {
     "earth/events/gdacs":"NATURAL EVENTS // GDACS",
     "earth/fires/hotspots":"FIRES // FIRMS + HMS SMOKE",
     "earth/maps/overview":"EARTH // EVENT MAP",
+    "earth/maps/events":"EARTH // ONE LIVE EVENT MAP",
     "earth/maps/full":"MAP // ALL ORIGINAL INSTRUMENTS",
     "earth/investigations/context":"INVESTIGATIONS // EVENT CONTEXT",
     "earth/investigations/dossiers":"INVESTIGATIONS // DOSSIERS",
-    "earth/investigations/archive":"INVESTIGATIONS // EVENT ARCHIVE"
+    "earth/investigations/archive":"INVESTIGATIONS // EVENT ARCHIVE",
+    "earth/water/rivers":"EARTH // RIVERS + FLOOD",
+    "earth/water/marine":"EARTH // MARINE",
+    "earth/water/coast":"EARTH // COAST",
+    "earth/ground/full":"EARTH // GROUND",
+    "earth/services/health":"EARTH // SOURCE DIAGNOSTICS"
   };
   return routeInfo(path) ? data[path] : "";
 }

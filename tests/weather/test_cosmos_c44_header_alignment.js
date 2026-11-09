@@ -78,11 +78,14 @@ test("C44 SPACE has the same centered two-button tab frame, no SERVICES mode rei
  assert.match(s,/anchors\.margins: HeaderGeometry\.inset/);
  assert.match(s,/objectName: "cosmos-c44-space-title"/);
  assert.match(s,/id: headerSpacer/);
- assert.match(s,/height: HeaderGeometry\.columnHeaderGap\(\)/);
+ assert.match(s,/height: HeaderGeometry\.titleToTabs/);
  assert.match(s,/objectName: "cosmos-c42-space-view-modes"/);
  assert.match(s,/width: HeaderGeometry\.buttonWidth\(viewRail\.width,2\)/);
  assert.match(s,/objectName: "cosmos-c44-space-divider"/);
- assert.match(s,/height: HeaderGeometry\.columnRuleSlotHeight\(\)/);
+ assert.match(s,/height: HeaderGeometry\.tabsToRule \+ HeaderGeometry\.ruleHeight/);
+ assert.match(s,/id: headerContentGap/);
+ assert.match(s,/id: bodyContent/);
+ assert.match(s,/height: HeaderGeometry\.ruleToContent/);
  assert.match(s,/objectName: "cosmos-c42-space-metrics"/);
  assert.doesNotMatch(s,/kind:"services"|label:"SERVICES"/);
  assert.match(s,/kind:"dashboard"/);
@@ -98,7 +101,9 @@ test("C44 OVERVIEW promotes three small shortcuts into full-width nav and retain
  assert.match(s,/width: HeaderGeometry\.buttonWidth\(overviewModeRail\.width,3\)/);
  assert.match(s,/height: HeaderGeometry\.tabHeight/);
  assert.match(s,/objectName: "cosmos-c44-overview-divider"/);
- assert.match(s,/height: HeaderGeometry\.columnRuleSlotHeight\(\)/);
+ assert.match(s,/height: HeaderGeometry\.tabsToRule \+ HeaderGeometry\.ruleHeight/);
+ assert.match(s,/id: headerContentGap/);
+ assert.match(s,/id: overviewContent/);
  assert.match(s,/objectName: "cosmos-c44-overview-stage"/);
  for(const path of ["cosmos/sun/position","cosmos/moon/ephemeris",
         "cosmos/space-weather/overview","cosmos/space-weather/full"])

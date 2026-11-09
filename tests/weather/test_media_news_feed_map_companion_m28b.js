@@ -85,7 +85,7 @@ test("EARTH MAPS is compact, EONET source route retains full event list",()=>{
   assert.match(qml,/import "StationMapCompanionPolicy.js" as MapCompanion/);
   assert.match(qml,/earthMapRoute === "earth\/events\/eonet"\s*\? visibleRows/);
   assert.match(qml,/MapCompanion\.previewEonet\(\s*mapPointRows, selectedMapEvent, mapVisibleBounds, 4/);
-  assert.match(qml,/model: stationDiscovery.domain === "map"\s*&& stationDiscovery.earthMapOnly\s*&& stationDiscovery.earthLayerEnabled\("eonet"\)\s*&& source.ready\s*\? stationDiscovery.mapCompanionEonetRows/);
+  assert.match(qml,/model: stationDiscovery.domain === "map"\s*&& stationDiscovery.earthMapOnly\s*&& stationDiscovery.earthLayerEnabled\("eonet"\)\s*&& stationDiscovery.earthLayerSelected\("eonet"\)\s*&& source.ready\s*\? stationDiscovery.mapCompanionEonetRows/);
   assert.match(qml,/EARTH MAP CONTEXT \/\/ EONET EVENTS IN VIEW/);
   assert.match(qml,/NASA EONET \/\/ FULL EVENT LIST/);
   assert.ok(!qml.includes('model: stationDiscovery.earthLayerEnabled("eonet")\n                            && source.ready'),"avoid hidden event delegates under MEDIA NEWS");
@@ -104,7 +104,7 @@ test("EARTH MAPS is compact, EONET source route retains full event list",()=>{
 
 test("EARTH news companion is the selected MEDIA article's known places, not another feed",()=>{
   assert.match(nav,/function showNewsMentionsOnEarth\(payload\)/);
-  assert.match(nav,/chooseRoute\("earth\/maps\/overview"\)/);
+  assert.match(nav,/chooseRoute\("earth\/maps\/events"\)/);
   assert.match(earthPane,/newsMentionOverlay: earthPane\.newsMentionOverlay/);
   assert.match(qml,/MAP COMPANION \/\/ ARTICLE MENTIONED PLACES/);
   assert.match(qml,/model: stationDiscovery.mapNewsMentionRows\.slice\(0, 5\)/);

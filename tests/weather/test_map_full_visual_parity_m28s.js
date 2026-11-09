@@ -22,8 +22,12 @@ const earth=load(earthPolicy),nav=load(navigation),tabs=load(workspace);
 const FULL="earth/maps/full";
 
 test("M28-S full MAP is one native EARTH route, original 10 routes remain",()=>{
-  assert.equal(Object.keys(earth.ROUTES).length,11);
-  assert.equal(Object.keys(earth.ROUTES).filter(route=>!earth.isFullMap(route)).length,10);
+  const original=Object.keys(earth.ROUTES).filter(route=>
+    route!=="earth/maps/events" && !route.startsWith("earth/water/")
+      && !route.startsWith("earth/ground/")
+      && !route.startsWith("earth/services/"));
+  assert.equal(original.length,11);
+  assert.equal(original.filter(route=>!earth.isFullMap(route)).length,10);
   assert.equal(earth.kindForRoute(FULL),"map");
   assert.equal(earth.isFullMap(FULL),true);
   for(const path of ["earth/maps/overview","earth/overview","earth/geology/earthquakes",
@@ -40,22 +44,21 @@ test("M28-S full MAP is one native EARTH route, original 10 routes remain",()=>{
   assert.equal(earth.routeLabel(FULL),"MAP // ALL ORIGINAL INSTRUMENTS");
   assert.equal(nav.findRoute("earth/maps").group,true);
   assert.equal(Object.keys(nav.PANELS).length,103,"historical source-control ledger unchanged");
-  assert.equal(nav.PANELS["map-spatial-canvas"],"earth/maps/overview");
-  assert.equal(nav.LEGACY_MODES.map,"earth/maps/overview");
+  assert.equal(nav.PANELS["map-spatial-canvas"],"earth/maps/events");
+  assert.equal(nav.LEGACY_MODES.map,"earth/maps/events");
 });
 
-test("EARTH bottom MAP // ALL is a real clickable native mode, original seven retained",()=>{
+test("EARTH has one MAP / EVENTS main tab while historic MAP FULL remains accessible in INDEX",()=>{
   const modes=JSON.parse(JSON.stringify(tabs.tabsFor(FULL)));
-  assert.equal(modes.length,8);
-  const full=modes.find(row=>row.key==="map");
-  assert.deepEqual(full,{label:"MAP // ALL",path:FULL,key:"map"});
+  assert.equal(modes.length,5);
+  const map=modes.find(row=>row.key==="map");
+  assert.deepEqual(map,{label:"MAP / EVENTS",path:"earth/maps/events",key:"map"});
   assert.equal(tabs.familyFor(FULL),"earth");
   assert.equal(tabs.selectedGroup(FULL),"map");
   assert.equal(new Set(modes.map(x=>x.path)).size,modes.length);
-  assert.deepEqual(modes.filter(x=>x.key!=="map").map(x=>x.path),
-    ["earth/overview","earth/geography/basemap","earth/geology/earthquakes",
-     "earth/events/eonet","earth/fires/hotspots","earth/maps/overview",
-     "earth/investigations/context"]);
+  assert.deepEqual(modes.map(x=>x.path),[
+    "earth/overview","earth/maps/events","earth/water/rivers",
+    "earth/ground/full","earth/services/health"]);
   assert.match(surface,/model: surface\.activeTabs/);
   assert.match(surface,/onTriggered: surface\.routeRequested\(modelData\.path\)/);
 });
@@ -64,7 +67,7 @@ test("exact MAP full route uses same original StationDiscovery with both map fil
   assert.equal((pane.match(/StationDiscovery\s*\{/g)||[]).length,1);
   assert.match(pane,/sourceComponent: earthMapComponent/);
   assert.match(pane,/earthMapOnly: !EarthPanelPolicy\.isFullMap\(earthPane\.subjectRoute\)/);
-  assert.match(pane,/earthMapRoute: earthPane\.subjectRoute/);
+  assert.match(pane,/earthMapRoute: earthPane\.kind === "services"/);
   assert.match(pane,/stationOpen: earthPane\.visible/);
   assert.match(pane,/domain: "map"/);
   for(const binding of ["seismicSource","lightningSource","riverSource","weatherService",

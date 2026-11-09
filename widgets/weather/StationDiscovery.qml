@@ -44,6 +44,16 @@ Rectangle {
     // Never clear selected event or geographic viewport during EARTH routing.
     property bool earthMapOnly: false
     property string earthMapRoute: ""
+    // E2 // One actual mapPlot item moves to the fixed header viewport.
+    // The underlying collectors, selected events and map coordinates remain
+    // owned by this StationDiscovery instance.
+    property bool earthPinnedMap: false
+    property bool earthServicesOnly: false
+    property string earthFocusedLayer: "all"
+    function earthLayerSelected(layer) {
+        return !earthPinnedMap || earthFocusedLayer === "all"
+            || earthFocusedLayer === layer;
+    }
     function earthLayerEnabled(layer) {
         return !earthMapOnly
             || EarthPanelPolicy.showsLayer(earthMapRoute,layer);
@@ -347,7 +357,8 @@ Rectangle {
     readonly property var mapPointRows:
         weatherMapOnly ? [] : MapProjection.plottable(source ? source.rows : [])
             .filter(function() {
-                return stationDiscovery.earthLayerEnabled("eonet");
+                return stationDiscovery.earthLayerEnabled("eonet")
+                    && stationDiscovery.earthLayerSelected("eonet");
             })
     // MEDIA owns article extraction. Both CLASSIC (during migration) and
     // EARTH may plot the explicitly handed-off mentioned locations. These
@@ -361,6 +372,7 @@ Rectangle {
     readonly property var mapEarthquakeRows:
         !weatherMapOnly && mapShowEarthquakes
         && earthLayerEnabled("quakes")
+        && earthLayerSelected("quakes")
         && seismicSource
         && seismicSource.ready
         ? MapProjection.plottable(seismicSource.events)
@@ -368,6 +380,7 @@ Rectangle {
     readonly property var mapGdacsRows:
         !weatherMapOnly && mapShowGdacs && gdacsService.ready
         && earthLayerEnabled("gdacs")
+        && earthLayerSelected("gdacs")
         ? MapProjection.plottable(gdacsService.events)
         : []
     readonly property var gdacsSummary:
@@ -385,7 +398,8 @@ Rectangle {
     // A small spatial companion, not a duplicated MEDIA news feed.
     // EARTH → EVENTS → EONET keeps the complete original event list.
     readonly property var mapCompanionEonetRows:
-        !earthMapOnly || earthMapRoute === "earth/events/eonet"
+        !earthMapOnly || earthPinnedMap
+            || earthMapRoute === "earth/events/eonet"
         ? visibleRows
         : MapCompanion.previewEonet(
               mapPointRows, selectedMapEvent, mapVisibleBounds, 4
@@ -825,6 +839,26 @@ Rectangle {
         mapFilter = id;
         resetMapView();
         discoveryScroll.contentY = 0;
+    }
+
+    function inspectPinnedEvent(kind,row) {
+        if (!earthPinnedMap || !row) return false;
+        selectedMapEarthquake = null;
+        selectedMapGdacsEvent = null;
+        selectedMapHotspot = null;
+        selectedMapEvent = null;
+        selectedMapNewsMention = null;
+        if (kind === "quakes") selectedMapEarthquake = row;
+        else if (kind === "gdacs") selectedMapGdacsEvent = row;
+        else if (kind === "firms") selectedMapHotspot = row;
+        else if (kind === "eonet") selectedMapEvent = row;
+        else return false;
+        // The viewport does not scroll away and the selected event uses
+        // the original inspector and dossier identity.
+        if (isFinite(Number(row.latitude))
+            && isFinite(Number(row.longitude)))
+            applyMapView(MapProjection.fitRows([row],1.35));
+        return true;
     }
 
     function closeMapInspector() {
@@ -1330,7 +1364,8 @@ Rectangle {
         id: mrmsRadarService
         active: stationDiscovery.domain === "map"
                 && stationDiscovery.stationOpen
-                && !stationDiscovery.earthMapOnly
+                && (!stationDiscovery.earthMapOnly
+                    || stationDiscovery.earthPinnedMap)
         onFrameReady: {
             if (!stationDiscovery.pendingRainViewerDisplay)
                 stationDiscovery.radarDisplaySource = "noaa";
@@ -1449,10 +1484,72 @@ Rectangle {
                 }
     }
 
+    // The only map viewport remains on-screen while the original event,
+    // radar, inspection and source content scrolls beneath it.
+    Row {
+        id: pinnedEarthFilters
+        objectName: "earth-e2-pinned-filters"
+        visible: stationDiscovery.earthPinnedMap
+            && !stationDiscovery.earthServicesOnly
+            && !stationDiscovery.viewerOpen
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: 20
+        anchors.rightMargin: 20
+        anchors.topMargin: visible ? 6 : 0
+        height: visible ? 27 : 0
+        spacing: 4
+        Repeater {
+            model: [
+                {key:"all",label:"ALL"},
+                {key:"quakes",label:"QUAKES"},
+                {key:"eonet",label:"EONET"},
+                {key:"gdacs",label:"GDACS"},
+                {key:"firms",label:"FIRES"}
+            ]
+            delegate: ActionButton {
+                required property var modelData
+                objectName: "earth-e2-filter-" + modelData.key
+                width: Math.max(1,(pinnedEarthFilters.width
+                    -4*pinnedEarthFilters.spacing)/5)
+                height: 27
+                contentPadding: 1
+                labelPixelSize: 9
+                label: modelData.label
+                selected: stationDiscovery.earthFocusedLayer
+                    === modelData.key
+                accentColor: Colors.cyan
+                onClicked: stationDiscovery.earthFocusedLayer = modelData.key
+            }
+        }
+    }
+    Item {
+        id: pinnedMapHost
+        objectName: "earth-e2-pinned-map-host"
+        visible: pinnedEarthFilters.visible
+        anchors.top: pinnedEarthFilters.bottom
+        anchors.topMargin: visible ? 3 : 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: 20
+        anchors.rightMargin: 20
+        height: visible ? Math.min(270,
+            Math.max(120,stationDiscovery.height*0.43)) : 0
+        clip: true
+        z: 1
+    }
+
     Flickable {
         id: discoveryScroll
-        anchors.fill: parent
-        visible: !stationDiscovery.viewerOpen
+        objectName: "earth-e2-event-scroll"
+        anchors.top: pinnedMapHost.visible
+            ? pinnedMapHost.bottom : parent.top
+        anchors.topMargin: pinnedMapHost.visible ? 4 : 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        visible: !stationDiscovery.viewerOpen && !stationDiscovery.earthServicesOnly
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
@@ -1624,7 +1721,7 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly) && !stationDiscovery.earthMapOnly
+                    visible: (!stationDiscovery.weatherMapOnly) && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     title: "SPATIAL PLOT // GDACS + USGS QUAKES + EONET + FIRMS + NEWS"
                 }
@@ -1919,14 +2016,14 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar")) && !stationDiscovery.earthMapOnly
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar")) && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     title: "RADAR // NOAA/NWS MRMS BASE REFLECTIVITY + 4H HISTORY"
                 }
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar") || stationDiscovery.weatherLayerEnabled("radar-fallback"))
-                             && !stationDiscovery.earthMapOnly
+                             && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     height: 30
                     spacing: 7
@@ -1967,7 +2064,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
-                             && !stationDiscovery.earthMapOnly
+                             && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -2047,7 +2144,7 @@ Rectangle {
 
                 QuietText {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
-                             && !stationDiscovery.earthMapOnly
+                             && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     text: "NOAA / NWS / MRMS // OFFICIAL BASE REFLECTIVITY // 4H MOVING HISTORY // COVERAGE IS NOT GLOBAL"
                     font.pixelSize: 9
@@ -2055,14 +2152,14 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback")) && !stationDiscovery.earthMapOnly
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback")) && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     title: "RADAR FALLBACK // RAINVIEWER PAST RADAR"
                 }
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
-                             && !stationDiscovery.earthMapOnly
+                             && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -2139,7 +2236,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
-                             && !stationDiscovery.earthMapOnly
+                             && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -2187,7 +2284,7 @@ Rectangle {
 
                 QuietText {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
-                             && !stationDiscovery.earthMapOnly
+                             && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                     width: parent.width
                     text: "RAINVIEWER API // SOURCE CREDIT REQUIRED // GLOBAL COVERAGE VARIES // PUBLIC FALLBACK HAS PAST RADAR ONLY"
                     font.pixelSize: 9
@@ -2283,8 +2380,12 @@ Rectangle {
 
                 Rectangle {
                     id: mapPlot
+                    objectName: "earth-e2-single-map-plot"
+                    parent: stationDiscovery.earthPinnedMap
+                        ? pinnedMapHost : mapCanvasSection
                     width: parent.width
-                    height: 270
+                    height: stationDiscovery.earthPinnedMap
+                        ? pinnedMapHost.height : 270
                     clip: true
                     color: Colors.black
                     border.width: 1
@@ -2593,7 +2694,7 @@ Rectangle {
                         height: northWest.valid && southEast.valid
                                 ? Math.max(0, southEast.y - northWest.y) : 0
                         visible: stationDiscovery.radarDisplaySource === "noaa"
-                                 && !stationDiscovery.earthMapOnly
+                                 && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                                  && stationDiscovery.weatherLayerEnabled("radar")
                                  && source !== ""
                                  && northWest.valid && southEast.valid
@@ -2605,7 +2706,7 @@ Rectangle {
                                === "rainviewer"
                                && rainViewerRadarService.ready
                                && stationDiscovery.weatherLayerEnabled("radar-fallback")
-                               && !stationDiscovery.earthMapOnly
+                               && (!stationDiscovery.earthMapOnly || stationDiscovery.earthPinnedMap)
                                ? rainViewerRadarService.strips : []
 
                         delegate: Image {
@@ -3175,7 +3276,9 @@ Rectangle {
                     }
 
                     Repeater {
-                        model: firmsService.ready ? firmsService.hotspots : []
+                        model: firmsService.ready
+                            && stationDiscovery.earthLayerSelected("firms")
+                            ? firmsService.hotspots : []
                         visible: !stationDiscovery.weatherMapOnly
                                  && stationDiscovery.earthLayerEnabled("firms")
 
@@ -3328,9 +3431,97 @@ Rectangle {
                     }
                 }
 
+                // E2 // Actual event rows from the same plotted source arrays,
+                // never a copied event pool. The map above stays pinned.
+                StationSectionDivider {
+                    width: parent.width
+                    visible: stationDiscovery.earthPinnedMap
+                        && stationDiscovery.earthLayerSelected("quakes")
+                    title: "USGS // EARTHQUAKES // "
+                        + stationDiscovery.mapEarthquakeRows.length
+                }
+                Repeater {
+                    model: stationDiscovery.earthPinnedMap
+                        && stationDiscovery.earthLayerSelected("quakes")
+                        ? stationDiscovery.mapEarthquakeRows : []
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: content.width
+                        height: 27
+                        labelPixelSize: 10
+                        contentPadding: 2
+                        accentColor: Colors.orange
+                        selected: stationDiscovery.selectedMapEarthquake
+                            === modelData
+                        label: "M" + modelData.magnitude + " // "
+                            + (modelData.place || modelData.title
+                               || modelData.coordinates || "USGS EVENT")
+                        onClicked: stationDiscovery.inspectPinnedEvent(
+                            "quakes",modelData)
+                    }
+                }
+
+                StationSectionDivider {
+                    width: parent.width
+                    visible: stationDiscovery.earthPinnedMap
+                        && stationDiscovery.earthLayerSelected("gdacs")
+                    title: "GDACS // DISASTER ALERTS // "
+                        + stationDiscovery.mapGdacsRows.length
+                }
+                Repeater {
+                    model: stationDiscovery.earthPinnedMap
+                        && stationDiscovery.earthLayerSelected("gdacs")
+                        ? stationDiscovery.mapGdacsRows : []
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: content.width
+                        height: 27
+                        labelPixelSize: 10
+                        contentPadding: 2
+                        accentColor: Colors.yellow
+                        selected: stationDiscovery.selectedMapGdacsEvent
+                            === modelData
+                        label: (modelData.name || "GDACS EVENT") + " // "
+                            + (modelData.alertLevel || "--")
+                        onClicked: stationDiscovery.inspectPinnedEvent(
+                            "gdacs",modelData)
+                    }
+                }
+
+                StationSectionDivider {
+                    width: parent.width
+                    visible: stationDiscovery.earthPinnedMap
+                        && stationDiscovery.earthLayerSelected("firms")
+                    title: "NASA FIRMS // HOTSPOTS // "
+                        + (firmsService.ready
+                            ? firmsService.hotspots.length : 0)
+                        + " // MANUAL FETCH ABOVE"
+                }
+                Repeater {
+                    model: stationDiscovery.earthPinnedMap
+                        && stationDiscovery.earthLayerSelected("firms")
+                        && firmsService.ready
+                        ? firmsService.hotspots : []
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: content.width
+                        height: 27
+                        labelPixelSize: 10
+                        contentPadding: 2
+                        accentColor: Colors.orange
+                        selected: stationDiscovery.selectedMapHotspot
+                            === modelData
+                        label: (modelData.acquiredUtc || "FIRMS HOTSPOT")
+                            + " // " + (modelData.coordinates || "--")
+                        onClicked: stationDiscovery.inspectPinnedEvent(
+                            "firms",modelData)
+                    }
+                }
+
                 StationSectionDivider {
                     width: parent.width
                     visible: stationDiscovery.earthLayerEnabled("eonet")
+                        && stationDiscovery.earthLayerSelected("eonet")
                     title: stationDiscovery.earthMapRoute === "earth/events/eonet"
                         ? "NASA EONET // FULL EVENT LIST"
                         : "EARTH MAP CONTEXT // EONET EVENTS IN VIEW"
@@ -3338,6 +3529,7 @@ Rectangle {
                 QuietText {
                     width: parent.width
                     visible: stationDiscovery.earthLayerEnabled("eonet")
+                        && stationDiscovery.earthLayerSelected("eonet")
                     text: stationDiscovery.earthMapRoute === "earth/events/eonet"
                         ? "ALL SOURCE EVENTS // SELECT TO INSPECT"
                         : "SHOWING " + stationDiscovery.mapCompanionEonetRows.length
@@ -3348,6 +3540,7 @@ Rectangle {
                 QuietText {
                     width: parent.width
                     visible: stationDiscovery.earthLayerEnabled("eonet")
+                             && stationDiscovery.earthLayerSelected("eonet")
                              && !source.ready
                     text: source.failed ? source.errorText
                           : source.retryWaitSeconds > 0
@@ -3361,6 +3554,7 @@ Rectangle {
                     model: stationDiscovery.domain === "map"
                             && stationDiscovery.earthMapOnly
                             && stationDiscovery.earthLayerEnabled("eonet")
+                            && stationDiscovery.earthLayerSelected("eonet")
                             && source.ready
                         ? stationDiscovery.mapCompanionEonetRows : []
                     delegate: discoveryRecordCard

@@ -21,7 +21,7 @@ install -d -m 700 "$work/home" "$work/run" "$work/data" "$work/cache" \
   "$work/config-home" "$work/config/widgets" "$work/config/services"
 cp -a "$repo/components" "$work/config/components"
 cp -a "$repo/widgets/weather" "$work/config/widgets/weather"
-cp -a "$repo/services/weather" "$work/config/services/weather"
+cp -a "$repo/services/." "$work/config/services/"
 cp "$repo/tests/weather/fixtures/M26FEarthRouteContinuity.qml" \
    "$work/config/shell.qml"
 # Replace ONLY the test tree's provider services: never poll live feeds.

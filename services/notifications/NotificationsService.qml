@@ -37,6 +37,9 @@ Singleton {
     // New deliveries are held only while the policy file loads. Historical
     // records are still stored and the native popup service stays mounted.
     property var pendingPolicyDeliveryIds: []
+    // While policy storage loads, keep a small memory-only intake queue.
+    // Unlike DND, BLOCK must decide BEFORE any entry touches history.
+    property var pendingPolicyIntakeEntries: []
     // Independent from DND/snooze: starring a source never suppresses it.
     property ListModel favoriteSources: ListModel {}
 
@@ -205,7 +208,8 @@ Singleton {
                 "source": "",
                 "sourceId": "",
                 "dnd": false,
-                "snoozeUntil": 0
+                "snoozeUntil": 0,
+                "blocked": false
             };
         }
 
@@ -216,8 +220,42 @@ Singleton {
             "source": String(policy.source || ""),
             "sourceId": String(policy.sourceId || ""),
             "dnd": policy.dnd === true,
-            "snoozeUntil": Number(policy.snoozeUntil || 0)
+            "snoozeUntil": Number(policy.snoozeUntil || 0),
+            "blocked": policy.blocked === true
         };
+    }
+
+    function isBlocked(appKey) {
+        return policyFor(appKey).blocked === true;
+    }
+
+    // BLOCK is stronger than DND/ZZ: no new history entry or popup.
+    // Evaluate APP, WEBSITE, and every structured/exact scope in one place.
+    function shouldBlockNotification(entry) {
+        const options = scopeOptionsFor(entry);
+        for (let i = 0; i < options.length; i++) {
+            if (isBlocked(options[i].key))
+                return true;
+        }
+        return false;
+    }
+
+    function inheritedBlockOwnerKey(entry, selectedKey) {
+        const options = scopeOptionsFor(entry);
+        const key = String(selectedKey || "");
+        const selected = options.find(function(option) { return option.key === key; });
+        if (!selected || selected.kind === "app" || isBlocked(key))
+            return "";
+        const parents = selected.kind === "channel" ? ["server", "app"]
+            : selected.kind === "title" ? ["website", "app"]
+            : ["app"];
+        for (let k = 0; k < parents.length; k++) {
+            for (let i = 0; i < options.length; i++) {
+                if (options[i].kind === parents[k] && isBlocked(options[i].key))
+                    return options[i].key;
+            }
+        }
+        return "";
     }
 
     function isDnd(appKey) {
@@ -290,7 +328,8 @@ Singleton {
                 "source": String(source || ""),
                 "sourceId": String(sourceId || ""),
                 "dnd": false,
-                "snoozeUntil": 0
+                "snoozeUntil": 0,
+                "blocked": false
             });
 
             return sourcePolicies.count - 1;
@@ -333,11 +372,17 @@ Singleton {
         pendingPolicyDeliveryIds = [];
         if (!policyReady || policyStatus === "parse-error"
                 || policyStatus === "load-error") {
-            // A file reload may fail after popups were already admitted.
-            // Fail closed for the live popup surface; retain history.
+            // Unknown/corrupt policy must never admit queued history or popups.
+            pendingPolicyIntakeEntries = [];
             activeNotifications.clear();
             return;
         }
+        // Flush only after verified policy load so a saved BLOCK cannot
+        // leak into history during startup. Queue is bounded to 32 entries.
+        const intake = pendingPolicyIntakeEntries;
+        pendingPolicyIntakeEntries = [];
+        for (let i = 0; i < intake.length; i++)
+            appendNotification(intake[i]);
         for (let i = activeNotifications.count - 1; i >= 0; i--) {
             const active = activeNotifications.get(i);
             if (shouldSuppress(active.sourceId, active.source, active.websiteHost)
@@ -365,8 +410,32 @@ Singleton {
 
         const policy = sourcePolicies.get(index);
 
-        if (policy.dnd !== true && Number(policy.snoozeUntil || 0) <= Date.now())
+        if (policy.blocked !== true && policy.dnd !== true
+                && Number(policy.snoozeUntil || 0) <= Date.now())
             sourcePolicies.remove(index);
+    }
+
+    function setBlocked(appKey, sourceId, source, enabled) {
+        if (!policyReady || policyStatus === "parse-error"
+                || policyStatus === "load-error")
+            return false;
+        const key = String(appKey || sourceKey(sourceId, source)).trim().toLowerCase();
+        if (key === "")
+            return false;
+        if (isBlocked(key) === (enabled === true))
+            return false;
+        const index = ensurePolicy(key, sourceId, source);
+        sourcePolicies.setProperty(index, "blocked", enabled === true);
+        if (enabled === true)
+            suppressActiveForKey(key);
+        else
+            compactPolicy(index);
+        markPoliciesChanged();
+        return true;
+    }
+
+    function toggleBlocked(appKey, sourceId, source) {
+        return setBlocked(appKey, sourceId, source, !isBlocked(appKey));
     }
 
     function setDnd(appKey, sourceId, source, enabled) {
@@ -539,6 +608,10 @@ Singleton {
         if (pendingPolicyDeliveryIds.length > 0)
             pendingPolicyDeliveryIds = pendingPolicyDeliveryIds.filter(function(pendingId) {
                 return pendingId !== id;
+            });
+        if (pendingPolicyIntakeEntries.length > 0)
+            pendingPolicyIntakeEntries = pendingPolicyIntakeEntries.filter(function(entry) {
+                return String(entry.id || "") !== id;
             });
         if (!Object.prototype.hasOwnProperty.call(liveExternalNotifications, id))
             return;
@@ -869,6 +942,23 @@ Singleton {
     function appendNotification(notification) {
         const entry = normalize(notification);
 
+        // Policy-load gate runs BEFORE the first history mutation.
+        // Do not discard ordinary startup events: hold at most 32 in memory.
+        // A corrupt/unreadable policy fails closed, not into saved history.
+        if (!policyReady) {
+            const pending = pendingPolicyIntakeEntries.slice();
+            pending.push(entry);
+            pendingPolicyIntakeEntries = pending.slice(-32);
+            return false;
+        }
+        if (policyStatus === "parse-error" || policyStatus === "load-error"
+                || shouldBlockNotification(entry)) {
+            const blockedActive = indexOfNotification(activeNotifications, entry.id);
+            if (blockedActive !== -1)
+                activeNotifications.remove(blockedActive);
+            return false;
+        }
+
         const historyIndex = indexOfNotification(notifications, entry.id);
 
         const activeIndex = indexOfNotification(activeNotifications, entry.id);
@@ -950,6 +1040,18 @@ Singleton {
     }
 
     function updateNotification(notificationId, changes) {
+        // A blocked event must not write future updates to saved history.
+        const priorIndex = indexOfNotification(notifications, notificationId);
+        if (priorIndex !== -1) {
+            const candidate = Object.assign({}, notifications.get(priorIndex), changes || {});
+            if (!policyReady || policyStatus === "parse-error"
+                    || policyStatus === "load-error" || shouldBlockNotification(candidate)) {
+                const activeIndex = indexOfNotification(activeNotifications, notificationId);
+                if (activeIndex !== -1)
+                    activeNotifications.remove(activeIndex);
+                return false;
+            }
+        }
         const historyUpdated = updateModelNotification(notifications, notificationId, changes);
 
         const activeUpdated = updateModelNotification(activeNotifications, notificationId, changes);
@@ -1401,7 +1503,8 @@ Singleton {
                 "source": String(policy.source || ""),
                 "sourceId": String(policy.sourceId || ""),
                 "dnd": policy.dnd === true,
-                "snoozeUntil": Number(policy.snoozeUntil || 0)
+                "snoozeUntil": Number(policy.snoozeUntil || 0),
+                "blocked": policy.blocked === true
             });
         }
 
@@ -1460,9 +1563,10 @@ Singleton {
             const incoming = policies[i] || {};
             const key = String(incoming.appKey || sourceKey(incoming.sourceId, incoming.source)).trim().toLowerCase();
             const dnd = incoming.dnd === true;
+            const blocked = incoming.blocked === true;
             const snoozeUntil = Number(incoming.snoozeUntil || 0);
 
-            if (!dnd && snoozeUntil <= now) {
+            if (!blocked && !dnd && snoozeUntil <= now) {
                 pruned = true;
                 continue;
             }
@@ -1472,7 +1576,8 @@ Singleton {
                 "source": String(incoming.source || ""),
                 "sourceId": String(incoming.sourceId || ""),
                 "dnd": dnd,
-                "snoozeUntil": dnd ? 0 : snoozeUntil
+                "snoozeUntil": dnd ? 0 : snoozeUntil,
+                "blocked": blocked
             });
         }
 

@@ -8,7 +8,7 @@ function token(value) {
 
 function stableId(value) {
     const s = token(value);
-    return s.length > 0 && s.length <= 160 && /^[a-zA-Z0-9_.:@\/-]+$/.test(s)
+    return s.length > 0 && s.length <= 160 && /^[a-zA-Z0-9_.:@/+~-]+$/.test(s)
         ? s : "";
 }
 
@@ -19,13 +19,39 @@ function label(value, fallback) {
 
 // Only specifically named metadata is treated as sender/channel identity.
 // These are defined by a producer, never extracted from title/body guesses.
+// Nonempty only for explicit producer-declared types. Never infer from a
+// title, displayed contact name, or a notification message body.
+function conversationKind(value) {
+    const kind = token(value).toLowerCase();
+    return /^(direct|group|thread|channel)$/.test(kind) ? kind : "";
+}
+
+// IDs are separated by lengths, not a delimiter alone: provider/account
+// names and native IDs can legally contain '/' or ':'.
+function scopedIdentity(accountId, value) {
+    const account = stableId(accountId);
+    const id = stableId(value);
+    if (!id)
+        return "";
+    return account ? account.length + ":" + account + ":" + id : id;
+}
+
 function scopeFromHints(hints) {
     const h = hints || {};
     const fields = [
         ["senderId", "x-post-apollo-sender-id"],
         ["senderName", "x-post-apollo-sender-name"],
+        ["contactId", "x-post-apollo-contact-id"],
+        ["contactName", "x-post-apollo-contact-name"],
+        ["accountId", "x-post-apollo-account-id"],
+        ["accountName", "x-post-apollo-account-name"],
+        ["conversationType", "x-post-apollo-conversation-type"],
         ["conversationId", "x-post-apollo-conversation-id"],
         ["conversationName", "x-post-apollo-conversation-name"],
+        ["groupId", "x-post-apollo-group-id"],
+        ["groupName", "x-post-apollo-group-name"],
+        ["threadId", "x-post-apollo-thread-id"],
+        ["threadName", "x-post-apollo-thread-name"],
         ["serverId", "x-post-apollo-server-id"],
         ["serverName", "x-post-apollo-server-name"],
         ["channelId", "x-post-apollo-channel-id"],
@@ -35,7 +61,9 @@ function scopeFromHints(hints) {
     for (let i = 0; i < fields.length; i++) {
         const [name, hintName] = fields[i];
         const value = h[hintName];
-        const normalized = name.endsWith("Id") ? stableId(value) : token(value).slice(0, 120);
+        const normalized = name.endsWith("Id") ? stableId(value)
+            : name === "conversationType" ? conversationKind(value)
+            : token(value).slice(0, 120);
         if (normalized)
             out[name] = normalized;
     }
@@ -45,7 +73,7 @@ function scopeFromHints(hints) {
 function scopeKey(appKey, kind, scopeId) {
     const app = token(appKey).toLowerCase();
     const value = token(scopeId);
-    if (!app || !value || !/^(sender|conversation|server|channel|resource|resourceEvent|event|title)$/.test(kind))
+    if (!app || !value || !/^(account|sender|conversation|group|thread|server|channel|resource|resourceEvent|event|title)$/.test(kind))
         return "";
     // Existing policy stores lowercase keys. Encode UTF-16 code units in
     // fixed-width hexadecimal so case-sensitive sender IDs and literal
@@ -63,10 +91,18 @@ function scopeOptionsFor(entry, appKey, websiteKey) {
     const ctx = e.context || {};
     const raw = ctx.notificationScope || {};
     const s = {
-        senderId: stableId(raw.senderId),
-        senderName: token(raw.senderName),
+        accountId: stableId(raw.accountId),
+        accountName: token(raw.accountName),
+        senderId: stableId(raw.senderId || raw.contactId),
+        senderName: token(raw.senderName || raw.contactName),
+        isContact: !raw.senderId && !!stableId(raw.contactId),
+        conversationType: conversationKind(raw.conversationType),
         conversationId: stableId(raw.conversationId),
         conversationName: token(raw.conversationName),
+        groupId: stableId(raw.groupId),
+        groupName: token(raw.groupName),
+        threadId: stableId(raw.threadId),
+        threadName: token(raw.threadName),
         serverId: stableId(raw.serverId),
         serverName: token(raw.serverName),
         channelId: stableId(raw.channelId),
@@ -91,18 +127,41 @@ function scopeOptionsFor(entry, appKey, websiteKey) {
         });
     }
 
-    // A channel is scoped to its containing server, where known.
-    if (s.conversationId)
-        add("conversation", s.conversationId, "DM // " + label(s.conversationName, s.conversationId), true);
+    // Group, thread and direct conversation identities are different rule
+    // kinds. A group mute never becomes a sender mute or an app-wide mute.
+    // Legacy untyped conversationId keeps the original key, but is displayed
+    // as CHAT rather than making a false DM claim.
+    const groupId = s.groupId || (s.conversationType === "group" ? s.conversationId : "");
+    const threadId = s.threadId || (s.conversationType === "thread" ? s.conversationId : "");
+    const groupName = s.groupName || s.conversationName;
+    const threadName = s.threadName || s.conversationName;
+    if (groupId)
+        add("group", scopedIdentity(s.accountId, groupId),
+            "GROUP // " + label(groupName, groupId), true);
+    if (threadId)
+        add("thread", scopedIdentity(s.accountId, threadId),
+            "THREAD // " + label(threadName, threadId), true);
+    if (s.conversationId && !groupId && !threadId
+            && s.conversationType !== "channel")
+        add("conversation", scopedIdentity(s.accountId, s.conversationId),
+            (s.conversationType === "direct" ? "DM // " : "CHAT // ")
+                + label(s.conversationName, s.conversationId), true);
     if (s.channelId)
-        // Length-prefix the server component. A server ID containing '/'
-        // must never collide with a different server/channel pair.
-        add("channel", s.serverId.length + ":" + s.serverId + ":" + s.channelId,
+        // Length-prefix server and account components separately to avoid
+        // collision even if the native IDs contain '/' or ':'.
+        add("channel", scopedIdentity(s.accountId,
+            s.serverId.length + ":" + s.serverId + ":" + s.channelId),
             "CHANNEL // " + label(s.channelName, s.channelId), true);
     if (s.serverId)
-        add("server", s.serverId, "SERVER // " + label(s.serverName, s.serverId), true);
+        add("server", scopedIdentity(s.accountId, s.serverId),
+            "SERVER // " + label(s.serverName, s.serverId), true);
     if (s.senderId)
-        add("sender", s.senderId, "SENDER // " + label(s.senderName, s.senderId), true);
+        add("sender", scopedIdentity(s.accountId, s.senderId),
+            (s.isContact ? "CONTACT // " : "SENDER // ")
+                + label(s.senderName, s.senderId), true);
+    if (s.accountId)
+        add("account", s.accountId, "ACCOUNT // "
+            + label(s.accountName, s.accountId), true);
 
     // A producer-declared resource identity is stable within its APP.
     // Old CPU++ pressure history stored only "metric"; accept it exclusively

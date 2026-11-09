@@ -1672,6 +1672,36 @@ PanelWindow {
         Component.onCompleted: restart()
     }
 
+    // One explicit v2 SAVE or read-only CUSTOMIZE inspection process.
+    // Request payload goes through stdin, not argv or a side file.
+    Process {
+        id: machineSaveBridgeProcess
+        running: false
+        stdinEnabled: true
+        onStarted: {
+            if (timew.machineSaveBridgeAction === "save" && timew.machineSaveBridgePayload)
+                machineSaveBridgeProcess.write(
+                    timew.machineSaveBridgePayload + String.fromCharCode(10));
+            timew.machineSaveBridgePayload = "";
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    timew.machineAcceptSaveBridge(JSON.parse(this.text));
+                } catch (error) {
+                    timew.machineSaveBridgeStatus = "INVALID SAVE RESPONSE";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.machineSaveBridgeBusy = false;
+            timew.machineSaveBridgePayload = "";
+            if (exitCode !== 0
+                    && !timew.machineSaveBridgeStatus.startsWith("SAVE BLOCKED"))
+                timew.machineSaveBridgeStatus = "SAVE OR CAPTURE UNAVAILABLE";
+        }
+    }
+
     // Explicit, read-only IPC capture; its JSON is already allowlisted by the
     // Python adapter. No checkpoint saving, restoration or persistent storage.
     Process {

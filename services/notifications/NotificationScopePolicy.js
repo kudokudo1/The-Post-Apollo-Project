@@ -78,7 +78,7 @@ function scopeOptionsFor(entry, appKey, websiteKey) {
         return [];
     const options = [];
     const seen = {};
-    function add(kind, id, text, verified, key) {
+    function add(kind, id, text, structured, key) {
         const ruleKey = key || scopeKey(app, kind, id);
         if (!ruleKey || seen[ruleKey])
             return;
@@ -87,7 +87,7 @@ function scopeOptionsFor(entry, appKey, websiteKey) {
             kind: kind,
             key: ruleKey,
             label: label(text, kind.toUpperCase()),
-            verified: verified === true
+            structured: structured === true
         });
     }
 
@@ -138,7 +138,7 @@ function scopeOptionsFor(entry, appKey, websiteKey) {
             && ambiguousTitles.indexOf(genericTitle) === -1)
         add("title", title, "TITLE EXACT // " + title, false);
 
-    // For sources without verified child identity, put the exact-title option
+    // For sources without structured child identity, put the exact-title option
     // before APP so a card star/DND defaults to the narrower observable text.
     if (!site && options.length > 0 && options[0].kind === "app") {
         const titleIndex = options.findIndex(x => x.kind === "title");

@@ -87,6 +87,7 @@ PanelWindow {
     property bool huntAutoRounds: true
     property bool huntAutoPending: false
     property bool huntSettingsOpen: false
+    property bool huntPauseMenuOpen: false
     property bool huntScoped: false
     property bool huntHitFlash: false
     // Laser shot VFX is gameplay-only. No filesystem action is bound to it.
@@ -469,6 +470,7 @@ PanelWindow {
             huntHitFlash = false;
             huntShotEffect = null;
             huntSettingsOpen = false;
+            huntPauseMenuOpen = false;
             huntRoundSpeed = 1.0;
             huntRoundSpawnCount = huntSpawnCount;
             huntMouseActive = false;
@@ -669,21 +671,83 @@ PanelWindow {
         return true;
     }
 
+    // The only route to Settings is through the Pause overlay.
     function huntToggleSettings() {
-        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt")
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || !huntPauseMenuOpen)
             return false;
         huntSettingsOpen = !huntSettingsOpen;
-        if (huntSettingsOpen) {
-            huntPaused = true;
-            huntScoped = false;
-        }
+        huntPaused = true;
+        huntScoped = false;
         return true;
+    }
+
+    function huntResetDefaults() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || !huntPauseMenuOpen || !huntSettingsOpen)
+            return false;
+        // Restore options, NOT existing queued file selections, score
+        // or live target movement. New difficulty applies next round.
+        huntSpawnCount = 3;
+        huntTargetsPerTier = 1;
+        huntTargetsEvery = 5;
+        huntSpeedGainPercent = 10;
+        huntSpeedEvery = 5;
+        huntAutoRounds = true;
+        huntLastEvent = "SETTINGS // DEFAULTS RESTORED // NEXT ROUND";
+        feedback = "HUNT // DEFAULT SETTINGS RESTORED";
+        return true;
+    }
+
+    function huntRestartGame() {
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
+                || !huntPauseMenuOpen)
+            return false;
+        // Keep the independent review queue. Restart only gameplay.
+        // Resetting the file selection silently would discard the
+        // operator's review decisions from earlier rounds or Batch/Swipe.
+        huntTargets = [];
+        huntHistory = [];
+        huntSparedPaths = [];
+        huntRound = 0;
+        huntTick = 0;
+        huntSecondsLeft = 25;
+        huntShots = 0;
+        huntHits = 0;
+        huntMisses = 0;
+        huntCombo = 0;
+        huntScore = 0;
+        huntRoundSpeed = 1.0;
+        huntRoundSpawnCount = huntSpawnCount;
+        huntRoundComplete = false;
+        huntAutoPending = false;
+        huntScoped = false;
+        huntHitFlash = false;
+        huntShotEffect = null;
+        huntLaserCycle = 0;
+        huntSettingsOpen = false;
+        huntPauseMenuOpen = false;
+        huntPaused = true;
+        batchPreview = null;
+        batchReviewKey = "";
+        huntLastEvent = "GAME RESTARTED // ROUND 1";
+        feedback = "HUNT // GAME RESTART // TRASH QUEUE PRESERVED ("
+                   + batchPaths.length + ")";
+        const started = huntStartRound();
+        if (!started) {
+            // Remain on the Pause menu if there is no eligible media.
+            huntPauseMenuOpen = true;
+            huntPaused = true;
+            feedback = "HUNT // RESTARTED // LOAD ELIGIBLE MEDIA // QUEUE PRESERVED";
+        }
+        return started;
     }
 
     function huntSetScoped(enabled) {
         if (activeView !== "cleanup" || cleanupTechnique !== "hunt"
                 || busy || huntPaused || huntRoundComplete
-                || huntTargets.length === 0 || huntSettingsOpen) {
+                || huntTargets.length === 0 || huntSettingsOpen
+                || huntPauseMenuOpen) {
             huntScoped = false;
             return false;
         }
@@ -693,7 +757,8 @@ PanelWindow {
 
     function huntAutoStartNext() {
         if (!huntAutoPending || !huntAutoRounds || busy
-                || huntSettingsOpen || activeView !== "cleanup"
+                || huntSettingsOpen || huntPauseMenuOpen
+                || activeView !== "cleanup"
                 || cleanupTechnique !== "hunt" || !huntRoundComplete)
             return false;
         // One shot only. A depleted library or full queue must NOT start
@@ -866,6 +931,8 @@ PanelWindow {
         huntHistory = [];
         huntAutoPending = false;
         huntScoped = false;
+        huntPauseMenuOpen = false;
+        huntSettingsOpen = false;
         huntHitFlash = false;
         huntShotEffect = null;
         huntRoundSpeed = HuntMotion.speedForRound(
@@ -934,12 +1001,23 @@ PanelWindow {
     }
 
     function huntTogglePause() {
-        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt"
-                || huntRoundComplete || huntTargets.length === 0)
+        if (busy || activeView !== "cleanup" || cleanupTechnique !== "hunt")
             return false;
-        huntPaused = !huntPaused;
-        if (huntPaused) huntScoped = false;
-        huntLastEvent = huntPaused ? "PAUSED // NO SHOTS" : "RESUMED // HUNT";
+        if (huntPauseMenuOpen) {
+            // Resume existing round if it has active targets; if a round
+            // ended, return to the board and allow the normal auto-next.
+            huntPauseMenuOpen = false;
+            huntSettingsOpen = false;
+            huntPaused = huntRoundComplete || huntTargets.length === 0;
+            huntLastEvent = huntPaused ? "ROUND COMPLETE // READY"
+                                      : "RESUMED // HUNT";
+        } else {
+            huntPauseMenuOpen = true;
+            huntSettingsOpen = false;
+            huntPaused = true;
+            huntScoped = false;
+            huntLastEvent = "PAUSED // MENU OPEN";
+        }
         return true;
     }
 
@@ -3000,6 +3078,7 @@ PanelWindow {
                                         camera.huntShotEffect = null;
                                         camera.huntAutoPending = false;
                                         camera.huntSettingsOpen = false;
+                                        camera.huntPauseMenuOpen = false;
                                     }
                                     camera.cleanupTechnique = modelData.id;
                                     camera.huntMouseActive = false;
@@ -3531,6 +3610,12 @@ PanelWindow {
                             focus: visible && camera.activeView === "cleanup"
 
                             Keys.onPressed: function(event) {
+                                // While paused, only P closes the menu.
+                                // N/Z cannot mutate play under an overlay.
+                                if (camera.huntPauseMenuOpen && event.key !== Qt.Key_P) {
+                                    event.accepted = true;
+                                    return;
+                                }
                                 if (event.key === Qt.Key_N) {
                                     camera.huntStartRound();
                                     event.accepted = true;
@@ -3549,6 +3634,7 @@ PanelWindow {
                                 running: camera.menuOpen && camera.huntAutoRounds
                                          && camera.huntAutoPending
                                          && !camera.huntSettingsOpen
+                                         && !camera.huntPauseMenuOpen
                                          && camera.activeView === "cleanup"
                                          && camera.cleanupTechnique === "hunt"
                                          && !camera.busy
@@ -3627,7 +3713,7 @@ PanelWindow {
                                     height: 27
                                     spacing: 6
                                     ActionButton {
-                                        width: (parent.width - 18) * 0.22
+                                        width: (parent.width - 12) * 0.29
                                         height: 26
                                         label: "SPAWN -"
                                         labelPixelSize: 10
@@ -3637,7 +3723,7 @@ PanelWindow {
                                                            camera.huntSpawnCount - 1)
                                     }
                                     GohuText {
-                                        width: (parent.width - 18) * 0.34
+                                        width: (parent.width - 12) * 0.42
                                         height: 26
                                         verticalAlignment: Text.AlignVCenter
                                         horizontalAlignment: Text.AlignHCenter
@@ -3647,7 +3733,7 @@ PanelWindow {
                                               + " / 10"
                                     }
                                     ActionButton {
-                                        width: (parent.width - 18) * 0.22
+                                        width: (parent.width - 12) * 0.29
                                         height: 26
                                         label: "SPAWN +"
                                         labelPixelSize: 10
@@ -3655,15 +3741,6 @@ PanelWindow {
                                         available: !camera.busy && camera.huntSpawnCount < 10
                                         onLeftClicked: camera.huntSetSpawnCount(
                                                            camera.huntSpawnCount + 1)
-                                    }
-                                    ActionButton {
-                                        width: (parent.width - 18) * 0.22
-                                        height: 26
-                                        label: "SETTINGS"
-                                        labelPixelSize: 9
-                                        accentColor: Colors.yellow
-                                        selected: camera.huntSettingsOpen
-                                        onLeftClicked: camera.huntToggleSettings()
                                     }
                                 }
 
@@ -3912,12 +3989,18 @@ PanelWindow {
                                                                 huntTargetItem.target.path);
                                                             return;
                                                         }
+                                                        // The exact click position, NOT
+                                                        // the target's rectangle center,
+                                                        // determines laser trajectory.
+                                                        const impact = mapToItem(
+                                                            huntArena, mouse.x, mouse.y);
+                                                        camera.huntSetPointer(
+                                                            impact.x, impact.y,
+                                                            huntArena.width, huntArena.height);
                                                         camera.huntFire(
                                                             huntTargetItem.target.path,
-                                                            (huntTargetItem.x + huntTargetItem.width / 2)
-                                                              / huntArena.width,
-                                                            (huntTargetItem.y + huntTargetItem.height / 2)
-                                                              / huntArena.height,
+                                                            impact.x / huntArena.width,
+                                                            impact.y / huntArena.height,
                                                             huntTargetItem.x / huntArena.width,
                                                             huntTargetItem.y / huntArena.height,
                                                             huntTargetItem.width / huntArena.width,
@@ -3950,8 +4033,14 @@ PanelWindow {
                                         property real progress: 0.0
                                         readonly property var shot: camera.huntShotEffect
                                             || ({aimX: 0.5, aimY: 0.5, color: Colors.cyan})
-                                        readonly property real muzzleX: width * 0.5
-                                        readonly property real muzzleY: height * 0.97
+                                        // The cursor IS the aim point. The muzzle is
+                                        // attached to that aim and begins below the
+                                        // visible arena, like a hand-held waist gun,
+                                        // not a fixed weapon on the game board.
+                                        readonly property var entryPoint:
+                                            HuntMotion.laserEntryPoint(shot.aimX)
+                                        readonly property real muzzleX: width * entryPoint.x
+                                        readonly property real muzzleY: height * entryPoint.y
                                         readonly property real impactX: width * shot.aimX
                                         readonly property real impactY: height * shot.aimY
                                         readonly property real dx: impactX - muzzleX
@@ -4173,12 +4262,10 @@ PanelWindow {
                                     ActionButton {
                                         width: (parent.width - 18) / 4
                                         height: 29
-                                        label: camera.huntPaused ? "RESUME" : "PAUSE"
+                                        label: camera.huntPauseMenuOpen ? "RESUME" : "PAUSE"
                                         labelPixelSize: 10
                                         accentColor: Colors.cyan
                                         available: !camera.busy
-                                            && !camera.huntRoundComplete
-                                            && camera.huntTargets.length > 0
                                         onLeftClicked: camera.huntTogglePause()
                                     }
                                     ActionButton {
@@ -4218,14 +4305,74 @@ PanelWindow {
                                 id: huntSettingsOverlay
                                 anchors.fill: parent
                                 z: 200
-                                visible: camera.huntSettingsOpen
+                                visible: camera.huntPauseMenuOpen
                                 color: Colors.black
                                 border.width: 1
                                 border.color: Colors.magenta
                                 radius: 5
 
+                                Column {
+                                    id: huntPauseContents
+                                    anchors.fill: parent
+                                    anchors.margins: 10
+                                    spacing: 10
+                                    visible: !camera.huntSettingsOpen
+                                    GohuText {
+                                        width: parent.width
+                                        height: 26
+                                        font.pixelSize: 15
+                                        color: Colors.magenta
+                                        text: "HUNT // PAUSED"
+                                    }
+                                    GohuText {
+                                        width: parent.width
+                                        height: 46
+                                        wrapMode: Text.WordWrap
+                                        font.pixelSize: 10
+                                        color: Colors.cyan
+                                        text: "ROUND " + camera.huntRound
+                                              + " // SCORE " + camera.huntScore
+                                              + " // " + camera.batchPaths.length
+                                              + " FILES IN REVIEW QUEUE"
+                                    }
+                                    ActionButton {
+                                        width: parent.width
+                                        height: 36
+                                        label: camera.huntTargets.length === 0
+                                               ? "RETURN TO ARENA" : "RESUME HUNT"
+                                        labelPixelSize: 11
+                                        accentColor: Colors.cyan
+                                        onLeftClicked: camera.huntTogglePause()
+                                    }
+                                    ActionButton {
+                                        width: parent.width
+                                        height: 36
+                                        label: "SETTINGS"
+                                        labelPixelSize: 11
+                                        accentColor: Colors.yellow
+                                        onLeftClicked: camera.huntToggleSettings()
+                                    }
+                                    ActionButton {
+                                        width: parent.width
+                                        height: 36
+                                        label: "RESTART GAME // ROUND 1"
+                                        labelPixelSize: 10
+                                        accentColor: Colors.magenta
+                                        onLeftClicked: camera.huntRestartGame()
+                                    }
+                                    GohuText {
+                                        width: parent.width
+                                        height: 40
+                                        wrapMode: Text.WordWrap
+                                        font.pixelSize: 10
+                                        color: Colors.yellow
+                                        text: "RESTART RESETS ROUNDS AND SCORE. YOUR TRASH REVIEW QUEUE IS PRESERVED."
+                                    }
+                                }
+
                                 Flickable {
                                     id: huntSettingsScroll
+                                    visible: camera.huntSettingsOpen
                                     anchors.fill: parent
                                     anchors.margins: 8
                                     clip: true
@@ -4262,6 +4409,14 @@ PanelWindow {
                                             accentColor: Colors.yellow
                                             onLeftClicked: camera.huntSetAutoRounds(
                                                                !camera.huntAutoRounds)
+                                        }
+                                        ActionButton {
+                                            width: parent.width
+                                            height: 32
+                                            label: "RESET DEFAULTS // SETTINGS"
+                                            labelPixelSize: 10
+                                            accentColor: Colors.orange
+                                            onLeftClicked: camera.huntResetDefaults()
                                         }
                                         Repeater {
                                             model: [
@@ -4345,7 +4500,7 @@ PanelWindow {
                                         ActionButton {
                                             width: parent.width
                                             height: 34
-                                            label: "CLOSE SETTINGS"
+                                            label: "BACK TO PAUSE"
                                             labelPixelSize: 11
                                             accentColor: Colors.magenta
                                             onLeftClicked: camera.huntToggleSettings()
@@ -4356,7 +4511,7 @@ PanelWindow {
                                             wrapMode: Text.WordWrap
                                             font.pixelSize: 9
                                             color: Colors.yellow
-                                            text: "CHANGES APPLY TO NEXT ROUND. OPENING SETTINGS PAUSES THE CURRENT ROUND."
+                                            text: "DEFAULTS: 3 TARGETS, +1 EVERY 5, +10% SPEED EVERY 5. CHANGES APPLY NEXT ROUND."
                                         }
                                     }
                                 }

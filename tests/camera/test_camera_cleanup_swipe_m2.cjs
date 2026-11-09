@@ -63,6 +63,7 @@ function createState() {
         huntAutoRounds:true,
         huntAutoPending:false,
         huntSettingsOpen:false,
+        huntPauseMenuOpen:false,
         huntScoped:false,
         huntHitFlash:false,
         huntShotEffect:null,
@@ -139,7 +140,14 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /camera\.huntScopeScale/);
     assert.match(cleanup, /unscopedWidth \* camera\.huntScopeScale/);
     assert.match(cleanup, /id: huntSettingsOverlay/);
-    assert.match(cleanup, /label: "CLOSE SETTINGS"/);
+    assert.match(cleanup, /label: "BACK TO PAUSE"/);
+    assert.match(cleanup, /id: huntPauseContents/);
+    assert.match(cleanup, /visible: camera\.huntPauseMenuOpen/);
+    assert.match(cleanup, /label: "SETTINGS"/);
+    assert.match(cleanup, /label: "RESET DEFAULTS \/\/ SETTINGS"/);
+    assert.match(cleanup, /label: "RESTART GAME \/\/ ROUND 1"/);
+    assert.doesNotMatch(cleanup.slice(cleanup.indexOf("id: huntSpawnRow"),
+                        cleanup.indexOf("id: huntArena")), /label: "SETTINGS"/);
     assert.match(cleanup, /AUTO NEXT ROUND/);
     assert.match(cleanup, /ADD EVERY N ROUNDS/);
     assert.match(cleanup, /SPEED GAIN \/ TIER/);
@@ -159,6 +167,11 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(cleanup, /id: huntHitAnimalEcho/);
     assert.match(cleanup, /id: huntLaserLayer/);
     assert.match(cleanup, /id: huntLaserFlight/);
+    assert.match(cleanup, /HuntMotion\.laserEntryPoint\(shot\.aimX\)/);
+    assert.match(cleanup, /impact\.x \/ huntArena\.width/);
+    assert.match(cleanup, /impact\.y \/ huntArena\.height/);
+    assert.doesNotMatch(cleanup, /readonly property real muzzleX: width \* 0\.5/);
+    assert.doesNotMatch(cleanup, /readonly property real muzzleY: height \* 0\.97/);
     assert.match(cleanup, /function onHuntShotSerialChanged/);
     assert.match(cleanup, /opacity: huntTargetItem\.hovered \? 0\.18 : 0\.10/);
     assert.match(cleanup, /opacity: 0\.055/);
@@ -766,14 +779,19 @@ test("Auto-round setting and opening settings safely halt active gameplay", () =
     s.huntStartRound();
     assert.equal(s.huntSetScoped(true),true);
     assert.equal(s.huntScoped,true);
-    assert.equal(s.huntToggleSettings(),true);
-    assert.equal(s.huntSettingsOpen,true);
+    assert.equal(s.huntToggleSettings(),false); // Settings requires Pause menu
+    assert.equal(s.huntTogglePause(),true);
+    assert.equal(s.huntPauseMenuOpen,true);
+    assert.equal(s.huntSettingsOpen,false);
     assert.equal(s.huntScoped,false);
     assert.equal(s.huntPaused,true);
+    assert.equal(s.huntToggleSettings(),true);
+    assert.equal(s.huntSettingsOpen,true);
     assert.equal(s.huntSetScoped(true),false);
     assert.equal(s.huntToggleSettings(),true);
     assert.equal(s.huntSettingsOpen,false);
     assert.equal(s.huntTogglePause(),true);
+    assert.equal(s.huntPauseMenuOpen,false);
     assert.equal(s.huntSetScoped(true),true);
     assert.equal(s.huntSetScoped(false),true);
     assert.equal(s.huntScoped,false);
@@ -1035,5 +1053,154 @@ test("Time-out spares protected videos without queuing them for Trash", () => {
     assert.equal(s.batchPaths.length,0);
     assert.equal(s.huntAutoStartNext(),false);
     assert.equal(s.huntAutoPending,false);
+    assert.equal(s.called.length,0);
+});
+
+
+test("Laser launches from below visible arena following cursor aim, not fixed deck", () => {
+    const a=motion.laserEntryPoint(0.1);
+    const mid=motion.laserEntryPoint(0.5);
+    const b=motion.laserEntryPoint(0.9);
+    assert.ok(a.y>1 && mid.y>1 && b.y>1,"muzzle is below visible world");
+    assert.ok(a.x>=0 && a.x<=1 && b.x>=0 && b.x<=1);
+    assert.ok(a.x<mid.x && mid.x<b.x,"origin follows cursor side to side");
+    assert.ok(Math.abs(a.x-0.5)>0.2,"not fixed center of deck");
+    assert.ok(Math.abs(b.x-0.5)>0.2,"not fixed center of deck");
+    assert.ok(Math.abs(a.x-0.1)<0.11,"slight handheld muzzle offset");
+    assert.ok(Math.abs(b.x-0.9)<0.11,"slight handheld muzzle offset");
+    assert.equal(motion.laserEntryPoint(500).y,1.14);
+    assert.equal(motion.laserEntryPoint(-200).y,1.14);
+});
+
+test("Pause menu alone hosts Settings; auto-rounds wait while the menu is open", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    assert.equal(s.huntToggleSettings(),false);
+    assert.equal(s.huntTogglePause(),true); // even without a live round
+    assert.equal(s.huntPauseMenuOpen,true);
+    assert.equal(s.huntSettingsOpen,false);
+    assert.equal(s.huntToggleSettings(),true);
+    assert.equal(s.huntSettingsOpen,true);
+    assert.equal(s.huntSetProgression("speedGain",35),true);
+    assert.equal(s.huntResetDefaults(),true);
+    assert.equal(s.huntSpeedGainPercent,10);
+    assert.equal(s.huntToggleSettings(),true);
+    assert.equal(s.huntPauseMenuOpen,true);
+    assert.equal(s.huntSettingsOpen,false);
+    assert.equal(s.huntTogglePause(),true);
+    assert.equal(s.huntPauseMenuOpen,false);
+    assert.equal(s.called.length,0);
+});
+
+test("Reset Defaults restores every Hunt option without resetting round, score or queue", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=Array.from({length:9},(_,i)=>({
+        path:"/tmp/default"+i+".png",name:"default"+i+".png",mediaType:"image"
+    }));
+    s.huntSpawnCount=9;
+    s.huntTargetsPerTier=4;
+    s.huntTargetsEvery=2;
+    s.huntSpeedGainPercent=45;
+    s.huntSpeedEvery=3;
+    s.huntAutoRounds=false;
+    s.huntRound=7;
+    s.huntScore=1200;
+    s.batchPaths=["/tmp/to-review.jpg"];
+    assert.equal(s.huntResetDefaults(),false);
+    assert.equal(s.huntTogglePause(),true);
+    assert.equal(s.huntResetDefaults(),false); // not yet in Settings
+    assert.equal(s.huntToggleSettings(),true);
+    assert.equal(s.huntResetDefaults(),true);
+    assert.equal(s.huntSpawnCount,3);
+    assert.equal(s.huntTargetsPerTier,1);
+    assert.equal(s.huntTargetsEvery,5);
+    assert.equal(s.huntSpeedGainPercent,10);
+    assert.equal(s.huntSpeedEvery,5);
+    assert.equal(s.huntAutoRounds,true);
+    assert.equal(s.huntRound,7);
+    assert.equal(s.huntScore,1200);
+    assert.deepEqual(Array.from(s.batchPaths),["/tmp/to-review.jpg"]);
+    assert.equal(s.called.length,0);
+});
+
+test("Restart Game begins Round 1 and resets progression statistics, not queued files", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=Array.from({length:12},(_,i)=>({
+        path:"/tmp/restart"+i+".png",name:"restart"+i+".png",mediaType:"image"
+    }));
+    s.huntSpawnCount=4;
+    s.huntTargetsPerTier=2;
+    s.huntTargetsEvery=2;
+    s.huntSpeedGainPercent=35;
+    s.huntSpeedEvery=2;
+    s.batchPaths=["/tmp/restart0.png"];
+    s.batchPreview={planId:"previous"};
+    s.batchReviewKey=JSON.stringify(s.batchPaths);
+    s.huntRound=15;
+    s.huntScore=2500;
+    s.huntHits=10;
+    s.huntShots=14;
+    s.huntMisses=4;
+    s.huntSparedPaths=["/tmp/restart2.png"];
+    s.huntAutoPending=true;
+    assert.equal(s.huntRestartGame(),false); // requires Pause
+    assert.equal(s.huntTogglePause(),true);
+    assert.equal(s.huntRestartGame(),true);
+    assert.equal(s.huntRound,1);
+    assert.equal(s.huntTargets.length,4);
+    assert.ok(s.huntTargets.every(t=>t.path!=="/tmp/restart0.png"));
+    assert.equal(s.huntRoundSpeed,1);
+    assert.equal(s.huntScore,0);
+    assert.equal(s.huntHits,0);
+    assert.equal(s.huntShots,0);
+    assert.equal(s.huntMisses,0);
+    assert.equal(s.huntLaserCycle,0);
+    assert.equal(s.huntAutoPending,false);
+    assert.equal(s.huntPauseMenuOpen,false);
+    assert.equal(s.huntSettingsOpen,false);
+    assert.equal(s.huntPaused,false);
+    assert.equal(s.huntTargetsPerTier,2); // Restart !== reset settings
+    assert.equal(s.huntAutoRounds,true);
+    assert.equal(s.batchPreview,null); // old plan is invalidated
+    assert.equal(s.batchReviewKey,"");
+    assert.deepEqual(Array.from(s.batchPaths),["/tmp/restart0.png"]);
+    assert.equal(s.huntSparedPaths.length,0);
+    assert.equal(s.called.length,0);
+});
+
+test("Restart remains paused with no eligible files, preserving reviewed queue", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=[{path:"/tmp/only.png",name:"only.png",mediaType:"image"}];
+    s.batchPaths=["/tmp/only.png"];
+    s.huntRound=19;
+    assert.equal(s.huntTogglePause(),true);
+    assert.equal(s.huntRestartGame(),false);
+    assert.equal(s.huntRound,0);
+    assert.equal(s.huntPaused,true);
+    assert.equal(s.huntPauseMenuOpen,true);
+    assert.equal(s.huntAutoPending,false);
+    assert.deepEqual(Array.from(s.batchPaths),["/tmp/only.png"]);
+    assert.equal(s.called.length,0);
+});
+
+test("Pause menu blocks auto-next until explicitly closed", () => {
+    const s=createState();
+    s.cleanupTechnique="hunt";
+    s.galleryFiles=Array.from({length:20},(_,i)=>({
+        path:"/tmp/auto"+i+".jpg",name:"auto"+i+".jpg",mediaType:"image"
+    }));
+    s.huntStartRound();
+    while(s.huntTargets.length)s.huntFire(s.huntTargets[0].path);
+    assert.equal(s.huntAutoPending,true);
+    assert.equal(s.huntTogglePause(),true);
+    assert.equal(s.huntPauseMenuOpen,true);
+    assert.equal(s.huntAutoStartNext(),false);
+    assert.equal(s.huntAutoPending,true);
+    assert.equal(s.huntTogglePause(),true);
+    assert.equal(s.huntAutoStartNext(),true);
+    assert.equal(s.huntRound,2);
     assert.equal(s.called.length,0);
 });

@@ -27,10 +27,7 @@ var GROUPS = {
         {label:"OVERVIEW",path:"weather/overview",key:"overview"},
         {label:"NOW + AIR",path:"weather/conditions/current",key:"conditions"},
         {label:"FORECAST",path:"weather/forecasts/hourly",key:"forecasts"},
-        {label:"WATER",path:"weather/water/rivers",key:"water"},
-        {label:"GROUND",path:"weather/ground/full",key:"ground"},
         {label:"HAZARDS",path:"weather/hazards/alerts",key:"hazards"},
-        {label:"MAPS",path:"weather/maps",key:"maps"},
         {label:"HISTORY",path:"weather/history/historical-forecast",key:"history"}
     ],
     cosmos:[
@@ -44,13 +41,10 @@ var GROUPS = {
     ],
     earth:[
         {label:"OVERVIEW",path:"earth/overview",key:"overview"},
-        {label:"GEOGRAPHY",path:"earth/geography/basemap",key:"geography"},
-        {label:"GEOLOGY",path:"earth/geology/earthquakes",key:"geology"},
-        {label:"EVENTS",path:"earth/events/eonet",key:"events"},
-        {label:"FIRES",path:"earth/fires/hotspots",key:"fires"},
-        {label:"MAPS",path:"earth/maps/overview",key:"maps"},
-        {label:"MAP // ALL",path:"earth/maps/full",key:"map"},
-        {label:"DOSSIERS",path:"earth/investigations/context",key:"investigations"}
+        {label:"MAP / EVENTS",path:"earth/maps/events",key:"map"},
+        {label:"WATER",path:"earth/water/rivers",key:"water"},
+        {label:"GROUND",path:"earth/ground/full",key:"ground"},
+        {label:"SERVICES",path:"earth/services/health",key:"services"}
     ],
     media:[
         {label:"OVERVIEW",path:"media/overview",key:"overview"},
@@ -107,8 +101,10 @@ function selectedGroup(path) {
             if(groups[j].path===path) return groups[j].key;
     }
     var group=tokens[1]||"overview";
-    // The full original MAP is a distinct bottom tab inside EARTH / MAPS.
-    if(family==="earth" && path==="earth/maps/full") return "map";
+    // All original map / event / geography / investigation deep links
+    // belong to the one consolidated MAP / EVENTS tab.
+    if(family==="earth" && ["maps","geography","geology",
+      "events","fires","investigations"].indexOf(group)>=0) return "map";
     // Keep the PLANETS+STARS deep INDEX subtree associated with the full
     // SKY bottom swap, while its detailed route stays available in INDEX.
     if(family==="cosmos" && group==="planets-stars") return "sky";

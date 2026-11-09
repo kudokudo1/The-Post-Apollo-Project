@@ -422,10 +422,6 @@ class GatewayIntegrationTests(unittest.TestCase):
         self._check_rejected(self._status(rid))
         self._check_rejected(self._cancel(rid))
         self.consent_allowed = True
-        self.seat = False
-        self._check_rejected(self._status(rid))
-        self._check_rejected(self._cancel(rid))
-        self.seat = True
         original_peer = self.gateway._owner_peer
         self.gateway._owner_peer = KernelPeer(
             pid=original_peer.pid + 1, uid=original_peer.uid,
@@ -456,6 +452,35 @@ class GatewayIntegrationTests(unittest.TestCase):
         self.assertEqual(self._status(rid)["state"], "FAILED")
         self._check_rejected(self._cancel(rid))
         self._check_rejected(self._begin())
+
+    def test_seat_loss_is_permanent_even_when_test_seat_recovers(self):
+        self.peer_allowed = self.consent_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        self.assertEqual(self._status(rid)["state"], "PENDING")
+        self.seat = False
+        self._check_rejected(self._status(rid))
+        self.seat = True
+        self.assertEqual(self._status(rid)["state"], "HOST_LOST")
+        self._check_rejected(self._cancel(rid))
+        self.assertEqual(self.hosts[0].begin_login(), {"status": "UNAVAILABLE"})
+        self.assertFalse(self.hosts[0].started)
+        self.assertFalse((self.dir / "identity-display-v0.sock").exists())
+        self._check_rejected(self._begin())
+
+    def test_post_callback_seat_loss_revokes_active_token_and_display(self):
+        self.peer_allowed = self.consent_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        status, _ = self._callback()
+        self.assertEqual(status, 200)
+        self.assertEqual(self._status(rid)["state"], "AUTHENTICATED")
+        self.seat = False
+        self._check_rejected(self._cancel(rid))
+        self.seat = True
+        self.assertEqual(self._status(rid)["state"], "HOST_LOST")
+        self.assertFalse(self.hosts[0].started)
+        self.assertFalse((self.dir / "identity-display-v0.sock").exists())
 
     def test_host_status_expires_local_session_without_token_disclosure(self):
         self.peer_allowed = self.consent_allowed = True

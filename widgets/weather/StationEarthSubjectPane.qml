@@ -13,6 +13,9 @@ Rectangle {
     // MEDIA-sourced article location context, not an EARTH source collector.
     property var newsMentionOverlay: null
     signal newsMapClearRequested()
+    signal routeRequested(string path)
+    property var nwsAlertSource: null
+    property var liveHistoryStore: null
     property var seismicSource: null
     property var lightningSource: null
     property var riverSource: null
@@ -25,26 +28,57 @@ Rectangle {
     readonly property string kind:
         EarthPanelPolicy.kindForRoute(subjectRoute)
     readonly property var runtimeRows:
-        earthLoader.item && Array.isArray(earthLoader.item.runtimeRows)
+        earthPane.kind === "ground" && earthGroundLoader.item
+            && Array.isArray(earthGroundLoader.item.runtimeRows)
+        ? earthGroundLoader.item.runtimeRows
+        : earthLoader.item && Array.isArray(earthLoader.item.runtimeRows)
         ? earthLoader.item.runtimeRows : []
 
+    // One map is kept mounted across EARTH tab switches to preserve
+    // pan/zoom, manual source status and the selected event.
     Loader {
         id: earthLoader
+        objectName: "earth-e2-one-persistent-map-owner"
         anchors.fill: parent
-        active: earthPane.visible && earthPane.kind === "map"
+        active: earthPane.visible && earthPane.kind !== ""
         sourceComponent: earthMapComponent
+    }
+
+    Loader {
+        id: earthGroundLoader
+        objectName: "earth-e2-water-ground-router"
+        anchors.fill: parent
+        active: earthPane.visible && earthPane.kind === "ground"
+        sourceComponent: earthPane.subjectRoute.indexOf("earth/water/") === 0
+            ? earthWaterComponent : earthGroundComponent
+    }
+
+    StationEarthServicesPane {
+        id: diagnostics
+        objectName: "earth-e2-final-diagnostics"
+        anchors.fill: parent
+        visible: earthPane.kind === "services"
+        runtimeRows: earthLoader.item ? earthLoader.item.runtimeRows : []
+        sourceRows: earthLoader.item ? earthLoader.item.plannedSources : []
     }
 
     Component {
         id: earthMapComponent
 
         StationDiscovery {
+            visible: earthPane.kind === "map"
+                || earthPane.kind === "services"
             stationOpen: earthPane.visible
+                && (earthPane.kind === "map"
+                    || earthPane.kind === "services")
             domain: "map"
             // Only the exact full MAP route drops EARTH's layer filters.
             // All other EARTH routes keep their original source-scoped view.
             earthMapOnly: !EarthPanelPolicy.isFullMap(earthPane.subjectRoute)
-            earthMapRoute: earthPane.subjectRoute
+            earthMapRoute: earthPane.kind === "services"
+                ? "earth/maps/events" : earthPane.subjectRoute
+            earthPinnedMap: EarthPanelPolicy.isPinnedMap(earthPane.subjectRoute)
+            earthServicesOnly: earthPane.kind === "services"
             newsMentionOverlay: earthPane.newsMentionOverlay
             onNewsMapClearRequested: earthPane.newsMapClearRequested()
 
@@ -56,6 +90,38 @@ Rectangle {
             eventArchiveStore: earthPane.eventArchiveStore
             dossierArchiveStore: earthPane.dossierArchiveStore
             runtimeNowMs: earthPane.runtimeNowMs
+        }
+    }
+
+    Component {
+        id: earthWaterComponent
+        StationEarthWaterPane {
+            subjectRoute: earthPane.subjectRoute
+            weatherService: earthPane.weatherService
+            nwsAlertSource: earthPane.nwsAlertSource
+            seismicSource: earthPane.seismicSource
+            lightningSource: earthPane.lightningSource
+            riverSource: earthPane.riverSource
+            persistentCacheStore: earthPane.persistentCacheStore
+            liveHistoryStore: earthPane.liveHistoryStore
+            runtimeNowMs: earthPane.runtimeNowMs
+            onRouteRequested: function(path) { earthPane.routeRequested(path); }
+        }
+    }
+
+    Component {
+        id: earthGroundComponent
+        StationGround {
+            subjectRoute: earthPane.subjectRoute
+            weatherService: earthPane.weatherService
+            nwsAlertSource: earthPane.nwsAlertSource
+            seismicSource: earthPane.seismicSource
+            lightningSource: earthPane.lightningSource
+            riverSource: earthPane.riverSource
+            persistentCacheStore: earthPane.persistentCacheStore
+            liveHistoryStore: earthPane.liveHistoryStore
+            runtimeNowMs: earthPane.runtimeNowMs
+            onRouteRequested: function(path) { earthPane.routeRequested(path); }
         }
     }
 }

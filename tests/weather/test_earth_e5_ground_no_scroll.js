@@ -22,8 +22,8 @@ test("E5 keeps only two EARTH GROUND routes non-scrolling, not CLASSIC or WEATHE
 });
 test("E5 adjusts existing cards without changing the data meaning or source ownership",()=>{
     for(const token of [
-        "compactEarthAir ? 106 : 166",
-        "compactEarthAir ? 50 : 68",
+        'name: "earth-e5-compact-aqi"',
+        "font.pixelSize: 50",
         "compactEarthAir ? 18 : 22",
         "compactEarthEnvironment ? 82 : 112",
         "compactEarthEnvironment ? 78 : 112",

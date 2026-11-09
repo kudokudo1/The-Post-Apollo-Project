@@ -167,7 +167,7 @@ test("no premature MAP or MAGICK activation and no new persistence writer", () =
 test("route header reveals correct scope without claiming live provider success", () => {
   assert.match(ground,/visible: ground\.subjectRoute === ""/);
   assert.match(ground,/text: "⌁  GROUND"/);
-  assert.match(ground,/text: "⌁  WEATHER"/);
+  assert.match(ground, /\? "⌁  EARTH" : "⌁  WEATHER"/);
   assert.match(sky,/visible: sky\.subjectRoute === ""/);
   assert.match(sky,/text: "☁  SKY"/);
   assert.match(sky,/text: "☁  WEATHER"/);

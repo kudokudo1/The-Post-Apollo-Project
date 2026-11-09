@@ -38,7 +38,7 @@ class DirectGuestRelayReview(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(prefix="c4d-review-")
         self.addCleanup(self.tmp.cleanup)
         guest = GUEST.read_text()
-        needle = "<<'C4B_SINGLE_UART_RELAY'\n"
+        needle = "<<'C4B_SINGLE_UART_RELAY' || true\n"
         self.assertEqual(guest.count(needle), 1)
         self.source = guest.split(needle, 1)[1].split(
             "\nC4B_SINGLE_UART_RELAY\n", 1)[0]

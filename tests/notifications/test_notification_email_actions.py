@@ -32,7 +32,8 @@ for token in (
 ):
     assert token in hub,token
 
-assert 'NotificationsService.toggleFavorite(notificationEntry.appKey' in hub
+# Notification Favorites now select a scope independently of mailbox STAR.
+assert 'NotificationsService.toggleFavorite(notificationEntry.targetKey' in hub
 assert 'NotificationsService.snoozeApp(notificationEntry.targetKey' in hub
 assert '"kind": "star", "label": "MAIL STAR"' in hub
 assert '"kind": "snooze", "label": "SNOOZE"' in hub

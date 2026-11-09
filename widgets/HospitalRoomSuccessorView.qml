@@ -1,5 +1,6 @@
 import QtQuick
 import qs.components
+import "../services/hospital"
 import "../services/hospital/HospitalRoomSuccessorPreviewPolicy.js" as SuccessorPolicy
 
 // Guided Doctor succession, PREVIEW ONLY.
@@ -69,6 +70,11 @@ Item {
     signal returnRequested()
     signal refreshRequested()
 
+    HospitalDoctorSuccessionCapabilityService {
+        id: pxSuccessionCapability
+        enabled: root.active
+    }
+
     onRoomIdChanged: {
         successorDoctorId = "";
         successorProviderId = "";
@@ -132,7 +138,10 @@ Item {
                     label: "REFRESH"
                     compactIcon: "↻"
                     accent: Colors.cyan
-                    onTriggered: root.refreshRequested()
+                    onTriggered: {
+                        pxSuccessionCapability.refresh();
+                        root.refreshRequested();
+                    }
                 }
                 HospitalActionButton {
                     width: 88
@@ -451,6 +460,21 @@ Item {
                 text: "ATOMIC SUCCESSION // " + root.transfer.status
                 font.pixelSize: 10
                 color: root.transfer.readyForAuthorityCheck ? Colors.cyan : Colors.orange
+                wrapMode: Text.Wrap
+            }
+            GohuText {
+                width: parent.width
+                text: "LOCAL PX COMMAND // " + pxSuccessionCapability.reason
+                font.pixelSize: 9
+                color: pxSuccessionCapability.supported ? Colors.cyan : Colors.orange
+                wrapMode: Text.Wrap
+            }
+            GohuText {
+                width: parent.width
+                visible: pxSuccessionCapability.checked && !pxSuccessionCapability.supported
+                text: pxSuccessionCapability.detail
+                font.pixelSize: 9
+                color: Colors.blue
                 wrapMode: Text.Wrap
             }
             GohuText {

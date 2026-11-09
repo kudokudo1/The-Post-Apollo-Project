@@ -2123,3 +2123,94 @@ test("U9c middle search is live, source-only and suppresses CPU++ hotkeys when f
   for(const unsafe of ['"key"','"resourceId"','"command"','"url"'])
     assert.equal(policy.includes(unsafe),false,unsafe);
 });
+
+
+test("U9d fuzzy search tolerates spelling and transposition errors but keeps digits exact",()=>{
+  const Search={};
+  load("services/favorites/FavoritesSearchPolicy.js",Search);
+  const sensor={key:"secret-raw-identity-00001",resourceId:"private-calibration",
+    category:"CPU++",menu:"THERMAL",label:"Sensor 13",
+    item:"Sensor 13",favoriteType:"METRIC WATCH",
+    kind:"monitor-watch",sourceName:"APP CONTROL"};
+  for(const q of [
+    "theraml sensor","snesor thermal","sensro thermal",
+    "threm sensro","therml sensor","sensor theraml",
+    "wathc sensor", "THERMAL 1", "threm sensr 13"
+  ]) {
+    assert.equal(Search.matches(sensor,q),true,"misspelling: "+q);
+  }
+  for(const q of [
+    "sensor 12","sensor 99","thermal 2","secret-raw-identity",
+    "private-calibration", "wholly unrelated","sensor 14"
+  ]) {
+    assert.equal(Search.matches(sensor,q),false,"must not match: "+q);
+  }
+  for(const q of ["1","13","senso","thermal","thermal sensor"])
+    assert.equal(Search.matches(sensor,q),true,"original substring: "+q);
+  assert.equal(Search.typoBudget("1"),0);
+  assert.equal(Search.typoBudget("13"),0);
+  assert.equal(Search.typoBudget("MD"),0);
+  assert.equal(Search.typoBudget("usa"),0);
+  assert.equal(Search.typoBudget("sens"),1);
+  assert.equal(Search.typoBudget("thermal"),2);
+  assert.equal(Search.typoBudget("sensor13"),0);
+  assert.equal(Search.withinEdits("sensro","sensor",1),true);
+  assert.equal(Search.withinEdits("sensor","screen",1),false);
+  assert.equal(Search.withinEdits("zzzzzzzz","thermal",2),false);
+});
+
+test("U9d fuzzy place and AppControl queries preserve aliases and safe display boundaries",()=>{
+  const Search={};
+  load("services/favorites/FavoritesSearchPolicy.js",Search);
+  const place={category:"PLACES",menu:"PLACES",
+    label:"Baltimore, Maryland, United States",key:"HIDDENSECRET42",
+    provider:"places"};
+  const short={category:"PLACES",menu:"PLACES",
+    label:"Baltimore, MD, USA",key:"PRIVATE_ID_4",provider:"places"};
+  for(const row of [place,short]) {
+    for(const q of ["Baltimroe MD USA","Marland United Stats",
+                    "maryalnd usa","USA balti", "md state",
+                    "USA MD", "United States Maryland"])
+      assert.equal(Search.matches(row,q),true,JSON.stringify([row.label,q]));
+    for(const q of ["secret42","PRIVATE_ID","Virginia"])
+      assert.equal(Search.matches(row,q),false,q);
+  }
+  const app={category:"APP CTRL",menu:"APPS",
+    label:"Proton Mail",item:"Proton Mail",owner:"appcontrol",
+    key:"HIDDENSECRET"}
+  for(const q of ["app ctrl", "app control", "ctrl app",
+                  "appconrtol mail", "protn mail", "mial proton"])
+    assert.equal(Search.matches(app,q),true,q);
+  assert.equal(Search.matches(app,"hiddensecret"),false);
+});
+
+test("U9d Favorites search input centers magenta text and orange caret, with red-on-black clear X",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const section=pane.slice(pane.indexOf("id: favoritesSearchBar"),
+    pane.indexOf('text: pane.filterMode==="GROUP"',pane.indexOf("id: favoritesSearchBar")));
+  const input=section.slice(section.indexOf("TextInput {"),
+    section.indexOf("ActionButton {"));
+  const clear=section.slice(section.indexOf("id: favoritesSearchClear"));
+  assert.match(section,/anchors\.horizontalCenter: favoritesSearchInput\.horizontalCenter/);
+  assert.match(section,/horizontalAlignment: Text\.AlignHCenter/);
+  assert.match(input,/horizontalAlignment: TextInput\.AlignHCenter/);
+  assert.match(input,/color: Colors\.magenta/);
+  assert.match(input,/cursorDelegate: Rectangle \{/);
+  assert.match(input,/height: favoritesSearchInput\.font\.pixelSize\+4/);
+  assert.match(input,/color: Colors\.orange/);
+  assert.match(clear,/label: "×"/);
+  assert.match(clear,/accentColor: Colors\.red/);
+  assert.match(clear,/destructive: true/);
+  for(const state of ["idle","hover","pressed","selected","keyboardSelected"]) {
+    assert.match(clear,new RegExp(state+"FillColor: Colors\\.black"));
+    assert.match(clear,new RegExp(state+"ForegroundColor: Colors\\.red"));
+    assert.match(clear,new RegExp(state+"BorderColor: Colors\\.red"));
+    assert.match(clear,new RegExp(state+"ContentGlowColor: Colors\\.red"));
+    assert.match(clear,new RegExp(state+"SoftGlowColor: Colors\\.red"));
+  }
+  assert.match(clear,/onLeftClicked: favoritesSearchInput\.text=""/);
+  // This remains a local display search; no new owner capability or process.
+  for(const unsafe of ["Process {","execDetached(","saveHome(",
+                       "deleteCollection(","openUrl(","resourceId"])
+    assert.equal(section.includes(unsafe),false,unsafe);
+});

@@ -47,8 +47,15 @@ function scopeKey(appKey, kind, scopeId) {
     const value = token(scopeId);
     if (!app || !value || !/^(sender|conversation|server|channel|event|title)$/.test(kind))
         return "";
-    return "scope:" + kind + ":" + encodeURIComponent(app) + "::"
-        + encodeURIComponent(value);
+    // Existing policy stores lowercase keys. Encode UTF-16 code units in
+    // fixed-width hexadecimal so case-sensitive sender IDs and literal
+    // titles do not collapse into the same policy key.
+    let encoded = "";
+    for (let i = 0; i < value.length; i++) {
+        const part = value.charCodeAt(i).toString(16);
+        encoded += ("0000" + part).slice(-4);
+    }
+    return "scope:" + kind + ":" + encodeURIComponent(app) + "::" + encoded;
 }
 
 function scopeOptionsFor(entry, appKey, websiteKey) {

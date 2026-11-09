@@ -1,0 +1,34 @@
+name: TimeW MACHINE persistent checkpoint annotations
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineCheckpointAnnotations.py"
+      - "services/time/MachineCheckpointNotesCLI.py"
+      - "services/time/MachineCheckpointStore.py"
+      - "services/time/MachineGeometryStoreV2.py"
+      - "tests/timew/test_machine_checkpoint_annotations.py"
+      - "tests/timew/test_machine_checkpoint_annotations_contract.py"
+      - "docs/timew-machine-checkpoint-annotations.md"
+      - ".github/workflows/timew-machine-annotations.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  annotations:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure annotation owner stays outside current Quickshell runtime
+        run: python3 -B -I tests/timew/test_machine_checkpoint_annotations_contract.py
+      - name: Exercise temporary SQLite names notes revisions and rollback
+        run: python3 -B -I tests/timew/test_machine_checkpoint_annotations.py
+      - name: Preserve legacy and exact geometry checkpoint compatibility
+        run: |
+          python3 -B -I tests/timew/test_machine_checkpoint_store.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_stored_geometry_verify.py
+          python3 -B -I tests/timew/test_machine_save_bridge_v2.py

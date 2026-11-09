@@ -100,6 +100,16 @@ class C2vRollbackEvidenceContract(unittest.TestCase):
         self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_OSTREE_BEGIN", src)
         self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_RPM_OSTREE_BEGIN", src)
         self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_JOURNAL_BEGIN", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_UNIT_BEGIN", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_INHIBITORS_BEGIN", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_INHIBITORS_RC //", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_BUS_BEGIN", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_BUS_RC //", src)
+        self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_JOURNAL_BEGIN", src)
+        self.assertIn("loginctl list-inhibitors --no-pager", src)
+        self.assertIn("org.freedesktop.login1.Manager ListInhibitors", src)
+        self.assertIn("systemd-logind.service dbus-broker.service", src)
+        self.assertIn("7s", src)
         self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_COMMAND_OUTPUT_BEGIN", src)
         self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_EXIT //", src)
         self.assertIn("C2V_DIAG_ROLLBACK_OBSERVER_STARTED // non-authoritative", src)
@@ -147,6 +157,10 @@ class C2vRollbackEvidenceContract(unittest.TestCase):
             "curl ",
             "wget ",
             "shutdown -",
+            "systemctl restart",
+            "systemctl mask",
+            "systemctl stop",
+            "systemctl disable",
         ):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, observer)

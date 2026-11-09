@@ -5162,9 +5162,14 @@ Rectangle {
     }
 
     NeonScrollBar {
+        objectName: "earth-e7-overview-hide-event-scrollbar"
         flickable: discoveryScroll
         handleStyle: "star"
         geometryHost: stationDiscovery
-        visible: !stationDiscovery.viewerOpen && scrollable
+        // E7: E6 OVERVIEW hides the event Flickable itself. Hide its
+        // independently controlled scrollbar there, too; MAP / EVENTS
+        // retains its original scrollable event list and visible indicator.
+        visible: !stationDiscovery.earthOverviewMode
+            && !stationDiscovery.viewerOpen && scrollable
     }
 }

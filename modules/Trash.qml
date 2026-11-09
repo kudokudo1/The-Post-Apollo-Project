@@ -214,9 +214,10 @@ PanelWindow {
         }
     }
 
-    // One immediate refresh is performed in toggle(). Then refresh only
-    // while visible, every 15s, and never during an armed Burn or text edit.
-    // Unchanged snapshots do not rebuild ListView delegates.
+    // The search field may retain activeFocus even when the operator is not
+    // typing. Never let that suppress every live refresh. Updating the list
+    // does not clear the filter's text, focus, or insertion position.
+    // This timer is a fallback if the GIO watcher cannot deliver an event.
     Timer {
         id: trashLiveTimer
         interval: 15000
@@ -225,9 +226,34 @@ PanelWindow {
         running: trashLauncher.menuOpen
         onTriggered: {
             if (trashLauncher.menuOpen && !trashLauncher.busy
-                    && trashLauncher.confirmMode === ""
-                    && !trashSearch.activeFocus)
+                    && trashLauncher.confirmMode === "")
                 trashLauncher.refresh(false, true);
+        }
+    }
+
+    // GIO's virtual trash:/// directory can be monitored across mounts.
+    // Debounce bursts of create/remove signals into ONE read-only index
+    // request; there is no filesystem write or Burn action on an event.
+    Timer {
+        id: trashEventDebounce
+        interval: 450
+        repeat: false
+        onTriggered: {
+            if (trashLauncher.menuOpen && !trashLauncher.busy
+                    && trashLauncher.confirmMode === "")
+                trashLauncher.refresh(false, true);
+        }
+    }
+
+    Process {
+        id: trashChangeMonitor
+        command: ["gio", "monitor", "--dir=trash:///"]
+        running: trashLauncher.menuOpen
+        stdout: SplitParser {
+            onRead: function(data) {
+                if (trashLauncher.menuOpen && String(data || "").trim() !== "")
+                    trashEventDebounce.restart();
+            }
         }
     }
 

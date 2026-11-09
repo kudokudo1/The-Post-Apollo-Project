@@ -308,6 +308,29 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             assert sum(w["floating"] for w in geometry_saved["geometry"]["windows"]) == 1
             assert all(w["rect"]["width"] > 100 for w in geometry_saved["geometry"]["windows"])
             assert legacy.db_path().parent.is_relative_to(root)
+
+            # Optional scope must use the same capture coordinator and
+            # private SQLite writer, without a second capture-preview path.
+            scoped = capture_and_save(
+                label="CI FIRST MONITOR ONLY",
+                selection={"outputs": [first]},
+                read_runner=lambda command, **options: run_ipc(command))
+            assert scoped["status"] == "saved", scoped
+            assert scoped["checkpoint"]["counts"] == {
+                "outputs": 1, "workspaces": 1, "windows": 2,
+            }, scoped["checkpoint"]["counts"]
+            selected = load_geometry(scoped["checkpoint"]["id"])
+            assert selected["status"] == "loaded"
+            assert [row["connector"] for row in
+                    selected["geometry"]["outputs"]] == [first]
+            assert [row["name"] for row in
+                    selected["geometry"]["workspaces"]] == ["1"]
+            assert all(row["app_id"] == APP
+                       for row in selected["geometry"]["windows"])
+            assert len({row["window_key"] for row in
+                        selected["geometry"]["windows"]}) == 2
+            assert legacy.load(cid)["checkpoint"]["counts"]["windows"] == 3
+            print("MACHINE M2 CUSTOM SAVE // REAL HEADLESS SWAY SQLITE PASS")
             print("MACHINE M2 AUTOMATIC SAVE // REAL HEADLESS SWAY SQLITE PASS")
         finally:
             if previous_xdg is None:

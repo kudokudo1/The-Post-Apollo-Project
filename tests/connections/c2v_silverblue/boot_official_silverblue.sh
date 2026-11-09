@@ -207,6 +207,8 @@ pid="$!"
 result=""
 last_serial_bytes=0
 last_c4b_serial_bytes=0
+last_main_progress_bytes=0
+last_guest_byte_progress_iteration=0
 guest_phase=AWAITING_FIRST_BOOT
 # Phase reporting is observational. Silence never counts as an OS failure:
 # the actual QEMU guest may be in a legitimate offline RPM compose or reboot.
@@ -233,9 +235,19 @@ for i in $(seq 1 700); do
       esac
     fi
     echo "C2V_HOST_PHASE // iteration=$i guest_phase=$guest_phase"
+    if [[ -r "$tmp/guest-serial.log" ]]; then
+      current_main_progress_bytes="$(wc -c < "$tmp/guest-serial.log")"
+      if [[ "$current_main_progress_bytes" != "$last_main_progress_bytes" ]]; then
+        last_guest_byte_progress_iteration="$i"
+        last_main_progress_bytes="$current_main_progress_bytes"
+      fi
+    fi
     if [[ "$c4b_requested" == 1 && -r "$tmp/c4b-diagnostic-serial.log" ]]; then
       current_c4b_bytes="$(wc -c < "$tmp/c4b-diagnostic-serial.log")"
       echo "C4B_HOST_OBSERVER_BYTES // iteration=$i current=$current_c4b_bytes previous=$last_c4b_serial_bytes"
+      if [[ "$current_c4b_bytes" != "$last_c4b_serial_bytes" ]]; then
+        last_guest_byte_progress_iteration="$i"
+      fi
       last_c4b_serial_bytes="$current_c4b_bytes"
       last_c4b_marker="$(
         grep -a -E 'C2V_DIAG_ROLLBACK_OBSERVER_(TICK|INHIBITORS_RC|LOGIND_BUS_RC|EXIT)|C4B_DIAG_CONTROLLER_FATAL' \
@@ -244,6 +256,12 @@ for i in $(seq 1 700); do
       if [[ -n "$last_c4b_marker" ]]; then
         echo "C4B_HOST_RECENT_OBSERVER_MARKER // $last_c4b_marker"
       fi
+    fi
+    # Six minutes of unchanged *both* serial files earns a warning, not a
+    # synthetic failure. RPM composition or a real reboot can be silent.
+    # A terminal OS error or the existing 700-cycle deadline remains fatal.
+    if (( i - last_guest_byte_progress_iteration >= 180 && i % 30 == 0 )); then
+      echo "C2V_HOST_STALL_WARNING // no_serial_growth_for_at_least_360s guest_phase=$guest_phase diagnostic_only"
     fi
   fi
   if (( i % 20 == 0 )); then

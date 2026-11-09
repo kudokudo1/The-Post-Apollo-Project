@@ -831,6 +831,180 @@ PanelWindow {
     readonly property string machineUtcNow:
         MachineTimelinePolicy.utcStamp(localClock.date.getTime())
 
+    // MACHINE v2: SAVE captures and persists without a preview prerequisite.
+    // CUSTOMIZE is a separate explicit, capture-bound inspection transaction.
+    property bool machineSaveBridgeBusy: false
+    property string machineSaveBridgeAction: ""
+    property string machineSaveBridgePayload: ""
+    property string machineSaveBridgeStatus: "READY // SAVE DESKTOP"
+    property string machineCheckpointDraft: ""
+    property bool machineCustomOpen: false
+    property bool machineAdvancedOpen: false
+    property var machineCustomReview: null
+    property var machineCustomExcluded: ({})
+    property string machineCustomInspectKind: "windows"
+    property int machineCustomInspectIndex: 0
+    readonly property var machineCustomItems: machineCustomReview
+        ? (machineCustomReview[machineCustomInspectKind] || []) : []
+    readonly property var machineCustomItem:
+        machineCustomInspectIndex >= 0 && machineCustomInspectIndex < machineCustomItems.length
+        ? machineCustomItems[machineCustomInspectIndex] : null
+    readonly property var machineCustomPolicyPreview: machineCustomReview
+        ? ({
+            preview_only: true, kind: "sway-layout-metadata-preview",
+            outputs: machineCustomReview.outputs,
+            workspaces: machineCustomReview.workspaces,
+            windows: machineCustomReview.windows
+        }) : null
+    readonly property var machineCustomValidation:
+        MachineSelectionPolicy.validate(machineCustomPolicyPreview, machineCustomExcluded)
+
+    function machineBeginSaveBridge(action, request) {
+        if (!menuOpen || selectedMode !== "machine"
+                || machineSaveBridgeBusy || machineStoreBusy
+                || machineCaptureBusy || machineAutoRestoreBusy)
+            return;
+        if (action !== "inspect" && action !== "save")
+            return;
+        machineSaveBridgeBusy = true;
+        machineSaveBridgeAction = action;
+        machineSaveBridgePayload = action === "save" ? JSON.stringify(request) : "";
+        machineSaveBridgeStatus = action === "inspect"
+                                ? "CUSTOMIZE // READING DESKTOP"
+                                : "SAVING DESKTOP // VERIFYING LAYOUT";
+        machineSaveBridgeProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"), action]);
+    }
+
+    function machineSaveLabel() {
+        const name = machineCheckpointDraft.trim();
+        return name.length ? name : "DESKTOP CHECKPOINT";
+    }
+
+    function machineRequestFullSave() {
+        machineBeginSaveBridge("save", {
+            label: machineSaveLabel(), review: null, selection: null
+        });
+    }
+
+    function machineRequestCustomInspect() {
+        if (machineSaveBridgeBusy)
+            return;
+        machineCustomReview = null;
+        machineCustomExcluded = ({});
+        machineCustomInspectIndex = 0;
+        machineBeginSaveBridge("inspect", null);
+    }
+
+    function machineToggleCustomize() {
+        if (machineSaveBridgeBusy)
+            return;
+        machineCustomOpen = !machineCustomOpen;
+        if (machineCustomOpen && !machineCustomReview)
+            machineRequestCustomInspect();
+    }
+
+    function machineStepCustomInspect(delta) {
+        const n = machineCustomItems.length;
+        if (n > 0)
+            machineCustomInspectIndex = (machineCustomInspectIndex + delta + n) % n;
+    }
+
+    function machineChooseCustomKind(kind) {
+        if (kind !== "outputs" && kind !== "workspaces" && kind !== "windows")
+            return;
+        machineCustomInspectKind = kind;
+        machineCustomInspectIndex = 0;
+    }
+
+    function machineCustomIncluded(kind, index) {
+        return machineCustomExcluded[kind + ":" + index] !== true;
+    }
+
+    function machineToggleCustomItem() {
+        if (!machineCustomReview || !machineCustomItem || machineSaveBridgeBusy)
+            return;
+        const key = machineCustomInspectKind + ":" + machineCustomInspectIndex;
+        const next = Object.assign({}, machineCustomExcluded);
+        if (next[key] === true)
+            delete next[key];
+        else
+            next[key] = true;
+        machineCustomExcluded = next;
+        machineSaveBridgeStatus = "CUSTOMIZE // UNSAVED SELECTION";
+    }
+
+    function machineCustomLocateIssue() {
+        if (!machineCustomValidation.issues.length)
+            return;
+        const first = machineCustomValidation.issues[0];
+        machineCustomInspectKind = first.kind;
+        machineCustomInspectIndex = first.index;
+    }
+
+    function machineRequestCustomSave() {
+        if (!machineCustomReview || machineSaveBridgeBusy
+                || machineCustomValidation.status !== "ready")
+            return;
+        const review = machineCustomReview;
+        const selected = {
+            outputs: review.outputs.filter(function(_, i) {
+                return timew.machineCustomIncluded("outputs", i);
+            }).map(function(x) { return x.connector; }),
+            workspaces: review.workspaces.filter(function(_, i) {
+                return timew.machineCustomIncluded("workspaces", i);
+            }).map(function(x) { return x.name; }),
+            windows: review.windows.filter(function(_, i) {
+                return timew.machineCustomIncluded("windows", i);
+            }).map(function(x) { return x.window_key; })
+        };
+        machineBeginSaveBridge("save", {
+            label: machineSaveLabel(), review: review.review, selection: selected
+        });
+    }
+
+    function machineAcceptSaveBridge(data) {
+        if (!data || typeof data.status !== "string") {
+            machineSaveBridgeStatus = "INVALID SAVE RESPONSE";
+            return;
+        }
+        if (data.status === "error") {
+            machineSaveBridgeStatus = "SAVE BLOCKED // " + String(data.reason || "UNKNOWN");
+            return;
+        }
+        if (machineSaveBridgeAction === "inspect" && data.status === "ready"
+                && data.kind === "machine-save-review-v2" && data.read_only === true
+                && data.review && typeof data.review.digest === "string"
+                && Array.isArray(data.outputs) && Array.isArray(data.workspaces)
+                && Array.isArray(data.windows)) {
+            machineCustomReview = data;
+            machineCustomInspectKind = "windows";
+            machineCustomInspectIndex = 0;
+            machineSaveBridgeStatus = "CUSTOMIZE // CHOOSE WHAT TO SAVE";
+            return;
+        }
+        if (machineSaveBridgeAction === "save" && data.status === "saved"
+                && data.geometry_available === true && data.checkpoint
+                && typeof data.checkpoint.id === "string") {
+            machineSavedCheckpoints = [data.checkpoint].concat(
+                machineSavedCheckpoints.filter(function(x) {
+                    return x.id !== data.checkpoint.id;
+                })).slice(0, 30);
+            machineSavedIndex = 0;
+            machineOpenedCheckpoint = null;
+            machineRestorePlan = null;
+            machineLayoutComparison = null;
+            machineInvalidateResolver();
+            machineCustomReview = null;
+            machineCustomExcluded = ({});
+            machineCustomOpen = false;
+            machineStoreStatus = "SAVED // GEOMETRY CHECKPOINT";
+            machineSaveBridgeStatus = "SAVED // DESKTOP GEOMETRY STORED";
+            return;
+        }
+        machineSaveBridgeStatus = "UNEXPECTED SAVE RESPONSE";
+    }
+
     // Capture requires a deliberate click, never menu-open or background polling.
     property bool machineCaptureBusy: false
     property var machineCapturePreview: null
@@ -1240,7 +1414,7 @@ PanelWindow {
 
     function machineStoreRequest(action, data, id) {
         if (!menuOpen || selectedMode !== "machine" || machineStoreBusy
-                || machineAutoRestoreBusy)
+                || machineSaveBridgeBusy || machineAutoRestoreBusy)
             return;
         if (action !== "save" && action !== "list" && action !== "load")
             return;
@@ -1496,6 +1670,36 @@ PanelWindow {
     ElapsedTimer {
         id: machineLifetimeAnchor
         Component.onCompleted: restart()
+    }
+
+    // One explicit v2 SAVE or read-only CUSTOMIZE inspection process.
+    // Request payload goes through stdin, not argv or a side file.
+    Process {
+        id: machineSaveBridgeProcess
+        running: false
+        stdinEnabled: true
+        onStarted: {
+            if (timew.machineSaveBridgeAction === "save" && timew.machineSaveBridgePayload)
+                machineSaveBridgeProcess.write(
+                    timew.machineSaveBridgePayload + String.fromCharCode(10));
+            timew.machineSaveBridgePayload = "";
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    timew.machineAcceptSaveBridge(JSON.parse(this.text));
+                } catch (error) {
+                    timew.machineSaveBridgeStatus = "INVALID SAVE RESPONSE";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.machineSaveBridgeBusy = false;
+            timew.machineSaveBridgePayload = "";
+            if (exitCode !== 0
+                    && !timew.machineSaveBridgeStatus.startsWith("SAVE BLOCKED"))
+                timew.machineSaveBridgeStatus = "SAVE OR CAPTURE UNAVAILABLE";
+        }
     }
 
     // Explicit, read-only IPC capture; its JSON is already allowlisted by the
@@ -4425,17 +4629,355 @@ PanelWindow {
                         }
                     }
 
-                    Column {
-                        id: machinePane
+                    // SAVE is the primary task. CUSTOMIZE and legacy diagnostics
+                    // scroll inside this viewport instead of being cut off.
+                    Item {
+                        id: machineCaptureViewport
                         visible: timew.selectedMode === "machine" && !timew.machineStoredViewOpen
                         width: parent.width
-                        spacing: 9
+                        height: Math.max(0, parent.height - 88)
+
+                        Flickable {
+                            id: machineCaptureScroll
+                            anchors.fill: parent
+                            anchors.rightMargin: 13
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+                            contentWidth: width
+                            contentHeight: machinePane.height
+
+                            Column {
+                                id: machinePane
+                                width: machineCaptureScroll.width
+                                spacing: 9
 
                         GohuText {
                             width: parent.width
-                            text: "MACHINE // SESSION TIMELINE"
-                            color: timew.semanticColor
+                            text: "MACHINE // SAVE DESKTOP"
+                            color: Colors.white
                             font.pixelSize: 14
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: "LOCAL CLOCK // " + timew.clockReadoutText
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                        }
+
+                        TextField {
+                            id: machineSaveNameInput
+                            width: parent.width
+                            height: 35
+                            maximumLength: 48
+                            text: timew.machineCheckpointDraft
+                            placeholderText: "DESKTOP CHECKPOINT // OPTIONAL NAME"
+                            color: Colors.magenta
+                            placeholderTextColor: Colors.cyan
+                            selectionColor: Colors.magenta
+                            selectedTextColor: Colors.black
+                            font.family: "GohuFont 11 Nerd Font Mono"
+                            font.pixelSize: 11
+                            leftPadding: 8
+                            rightPadding: 8
+                            background: Rectangle {
+                                color: Colors.black
+                                border.width: 1
+                                border.color: machineSaveNameInput.activeFocus
+                                              ? Colors.magenta : Colors.cyan
+                            }
+                            onTextEdited: timew.machineCheckpointDraft = text
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 37
+                            spacing: 7
+                            ActionButton {
+                                width: (parent.width - 7) / 2
+                                height: parent.height
+                                label: timew.machineSaveBridgeBusy
+                                       && timew.machineSaveBridgeAction === "save"
+                                       ? "SAVING..." : "SAVE DESKTOP"
+                                labelPixelSize: 11
+                                accentColor: Colors.orange
+                                available: !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
+                                           && !timew.machineCaptureBusy
+                                           && !timew.machineAutoRestoreBusy
+                                onLeftClicked: timew.machineRequestFullSave()
+                            }
+                            ActionButton {
+                                width: (parent.width - 7) / 2
+                                height: parent.height
+                                label: "STORED"
+                                labelPixelSize: 11
+                                accentColor: Colors.white
+                                available: !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
+                                onLeftClicked: timew.machineShowSavedCheckpoints()
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineSaveBridgeStatus
+                            color: timew.machineSaveBridgeStatus.startsWith("SAVED")
+                                   ? Colors.cyan : Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "GEOMETRY SAVE // BROWSER TABS + EXACT RESTORE STILL IN DEVELOPMENT"
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 7
+                            ActionButton {
+                                width: (parent.width - 7) / 2
+                                height: parent.height
+                                label: timew.machineCustomOpen
+                                       ? "CUSTOMIZE // CLOSE" : "CUSTOMIZE"
+                                labelPixelSize: 10
+                                accentColor: timew.machineCustomOpen
+                                             ? Colors.magenta : Colors.white
+                                available: !timew.machineSaveBridgeBusy
+                                onLeftClicked: timew.machineToggleCustomize()
+                            }
+                            ActionButton {
+                                width: (parent.width - 7) / 2
+                                height: parent.height
+                                label: timew.machineAdvancedOpen
+                                       ? "ADVANCED // CLOSE" : "ADVANCED"
+                                labelPixelSize: 10
+                                accentColor: timew.machineAdvancedOpen
+                                             ? Colors.magenta : Colors.white
+                                available: !timew.machineSaveBridgeBusy
+                                onLeftClicked: timew.machineAdvancedOpen =
+                                               !timew.machineAdvancedOpen
+                            }
+                        }
+
+                        Column {
+                            id: machineCustomControls
+                            visible: timew.machineCustomOpen
+                            width: parent.width
+                            spacing: 8
+
+                            GohuText {
+                                width: parent.width
+                                text: "CUSTOM SAVE // THIS DESKTOP CAPTURE"
+                                color: Colors.magenta
+                                font.pixelSize: 11
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: "CHOOSE ITEMS // ORIGINAL WINDOW POSITIONS RETAINED"
+                                color: Colors.cyan
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                            Row {
+                                width: parent.width
+                                height: 30
+                                spacing: 6
+                                ActionButton {
+                                    width: 125
+                                    height: parent.height
+                                    label: "REFRESH CAPTURE"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.cyan
+                                    available: !timew.machineSaveBridgeBusy
+                                    onLeftClicked: timew.machineRequestCustomInspect()
+                                }
+                                GohuText {
+                                    width: parent.width - 131
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: !timew.machineCustomReview ? "NO CURRENT CAPTURE"
+                                          : "MON " + timew.machineCustomReview.outputs.length
+                                            + " // WS " + timew.machineCustomReview.workspaces.length
+                                            + " // WINDOWS " + timew.machineCustomReview.windows.length
+                                    color: Colors.white
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+                            }
+                            Row {
+                                visible: !!timew.machineCustomReview
+                                width: parent.width
+                                height: 28
+                                spacing: 5
+                                Repeater {
+                                    model: [
+                                        {name: "MONITORS", kind: "outputs"},
+                                        {name: "WORKSPACES", kind: "workspaces"},
+                                        {name: "WINDOWS", kind: "windows"}
+                                    ]
+                                    delegate: ActionButton {
+                                        width: (machineCustomControls.width - 10) / 3
+                                        height: 28
+                                        label: modelData.name
+                                        labelPixelSize: 9
+                                        accentColor: timew.machineCustomInspectKind === modelData.kind
+                                                     ? Colors.magenta : Colors.white
+                                        onLeftClicked: timew.machineChooseCustomKind(modelData.kind)
+                                    }
+                                }
+                            }
+                            Row {
+                                visible: !!timew.machineCustomReview
+                                width: parent.width
+                                height: 30
+                                spacing: 6
+                                ActionButton {
+                                    width: 42
+                                    height: parent.height
+                                    label: "<"
+                                    accentColor: Colors.orange
+                                    available: timew.machineCustomItems.length > 1
+                                    onLeftClicked: timew.machineStepCustomInspect(-1)
+                                }
+                                GohuText {
+                                    width: Math.max(0, parent.width - 96)
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: timew.machineCustomItems.length
+                                          ? (timew.machineCustomInspectIndex + 1)
+                                            + " / " + timew.machineCustomItems.length
+                                          : "0 / 0"
+                                    horizontalAlignment: Text.AlignHCenter
+                                    color: Colors.cyan
+                                    font.pixelSize: 12
+                                }
+                                ActionButton {
+                                    width: 42
+                                    height: parent.height
+                                    label: ">"
+                                    accentColor: Colors.orange
+                                    available: timew.machineCustomItems.length > 1
+                                    onLeftClicked: timew.machineStepCustomInspect(1)
+                                }
+                            }
+                            GohuText {
+                                visible: !!timew.machineCustomReview
+                                width: parent.width
+                                text: !timew.machineCustomItem ? "NO ITEMS"
+                                      : timew.machineCustomInspectKind === "outputs"
+                                      ? timew.machineCustomItem.connector + " // "
+                                        + timew.machineCustomItem.rect.width + "x"
+                                        + timew.machineCustomItem.rect.height
+                                      : timew.machineCustomInspectKind === "workspaces"
+                                      ? timew.machineCustomItem.name + " // "
+                                        + timew.machineCustomItem.output
+                                      : timew.machineCustomItem.app_id
+                                        + " // WORKSPACE " + timew.machineCustomItem.workspace
+                                        + " // " + timew.machineCustomItem.output
+                                        + " // " + timew.machineCustomItem.rect.x
+                                        + "," + timew.machineCustomItem.rect.y
+                                        + " // " + timew.machineCustomItem.rect.width
+                                        + "x" + timew.machineCustomItem.rect.height
+                                        + (timew.machineCustomItem.floating
+                                           ? " // FLOATING" : " // TILED")
+                                color: Colors.white
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                            Row {
+                                visible: !!timew.machineCustomReview
+                                width: parent.width
+                                height: 31
+                                spacing: 7
+                                ActionButton {
+                                    width: 145
+                                    height: parent.height
+                                    label: timew.machineCustomIncluded(
+                                           timew.machineCustomInspectKind,
+                                           timew.machineCustomInspectIndex)
+                                           ? "EXCLUDE ITEM" : "INCLUDE ITEM"
+                                    labelPixelSize: 10
+                                    accentColor: Colors.magenta
+                                    available: !!timew.machineCustomItem
+                                    onLeftClicked: timew.machineToggleCustomItem()
+                                }
+                                GohuText {
+                                    width: parent.width - 152
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "INCLUDED // "
+                                          + timew.machineCustomValidation.included[
+                                            timew.machineCustomInspectKind]
+                                          + " / " + timew.machineCustomItems.length
+                                    color: Colors.cyan
+                                    font.pixelSize: 10
+                                }
+                            }
+                            Row {
+                                visible: !!timew.machineCustomReview
+                                width: parent.width
+                                height: 28
+                                spacing: 6
+                                GohuText {
+                                    width: parent.width - 100
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: timew.machineCustomValidation.status === "ready"
+                                          ? "SELECTION READY"
+                                          : timew.machineCustomValidation.issues.length
+                                            ? timew.machineCustomValidation.issues[0].label
+                                            : "INVALID SELECTION"
+                                    color: timew.machineCustomValidation.status === "ready"
+                                           ? Colors.cyan : Colors.orange
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+                                ActionButton {
+                                    width: 94
+                                    height: parent.height
+                                    label: "LOCATE ISSUE"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.orange
+                                    available: timew.machineCustomValidation.issues.length > 0
+                                    onLeftClicked: timew.machineCustomLocateIssue()
+                                }
+                            }
+                            ActionButton {
+                                visible: !!timew.machineCustomReview
+                                width: parent.width
+                                height: 37
+                                label: "SAVE SELECTED DESKTOP"
+                                labelPixelSize: 11
+                                accentColor: Colors.orange
+                                available: !timew.machineSaveBridgeBusy
+                                           && timew.machineCustomValidation.status === "ready"
+                                onLeftClicked: timew.machineRequestCustomSave()
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: "WINDOW TITLES + TABS ARE NOT YET CAPTURED // "
+                                      + "INDIVIDUAL WINDOWS IDENTIFIED BY MONITOR + GEOMETRY"
+                                color: Colors.orange
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                        }
+
+                        // Keep all original manual time markers, previews,
+                        // selection diagnostics and legacy V1 save accessible.
+                        // None is a prerequisite for SAVE DESKTOP.
+                        Column {
+                            id: machineLegacyControls
+                            visible: timew.machineAdvancedOpen
+                            width: parent.width
+                            spacing: 9
+
+                        GohuText {
+                            width: parent.width
+                            text: "ADVANCED // LEGACY CAPTURE AND TIMELINE"
+                            color: Colors.magenta
+                            font.pixelSize: 11
                         }
 
                         GohuText {
@@ -4455,7 +4997,7 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
-                            text: "UTC // " + timew.machineUtcNow
+                            text: "LOCAL // " + timew.clockReadoutText
                             color: Colors.white
                             font.pixelSize: 11
                             elide: Text.ElideRight
@@ -4677,7 +5219,7 @@ PanelWindow {
                             ActionButton {
                                 width: (parent.width - 12) / 2
                                 height: parent.height
-                                label: "SAVE CHECKPOINT"
+                                label: "SAVE V1 METADATA"
                                 labelPixelSize: 10
                                 accentColor: timew.semanticColor
                                 available: !timew.machineStoreBusy && !timew.machineCaptureBusy
@@ -4704,7 +5246,7 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
-                            text: "MANUAL TIME MARKERS // MEMORY ONLY"
+                            text: "LEGACY MARKERS // MEMORY ONLY // NOT RESTORABLE"
                             color: Colors.white
                             font.pixelSize: 12
                         }
@@ -4885,7 +5427,26 @@ PanelWindow {
                             font.pixelSize: 10
                             wrapMode: Text.Wrap
                         }
-                    }
+                        } // machineLegacyControls
+                            } // machinePane
+                        } // machineCaptureScroll
+
+                        NeonScrollBar {
+                            id: machineCaptureRail
+                            flickable: machineCaptureScroll
+                            accountForContentOrigin: true
+                            geometryMode: "viewport"
+                            x: machineCaptureViewport.width - width - 3
+                            y: 0
+                            height: machineCaptureViewport.height
+                            handleStyle: "star"
+                            railColor: Colors.cyan
+                            handleColor: Colors.magenta
+                            handleBorderColor: Colors.magenta
+                            containGlow: true
+                            visible: scrollable
+                        }
+                    } // machineCaptureViewport
 
                     // STORED is taller than the fixed TimeW viewport.
                     // Keep the complete recovery path scrollable and visible.

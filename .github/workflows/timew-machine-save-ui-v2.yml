@@ -1,0 +1,33 @@
+name: TimeW MACHINE one-click SAVE interface and selection binding
+
+on:
+  pull_request:
+    paths:
+      - "widgets/TimeW.qml"
+      - "services/time/MachineSaveBridgeV2.py"
+      - "services/time/MachineCaptureSaveV2.py"
+      - "tests/timew/test_machine_save_bridge_v2.py"
+      - "tests/timew/test_machine_save_ui_contract.py"
+      - "docs/timew-machine-save-ui-v2.md"
+      - ".github/workflows/timew-machine-save-ui-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  one-click-save:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check primary SAVE UI and dormant advanced controls
+        run: python3 -B -I tests/timew/test_machine_save_ui_contract.py
+      - name: Verify inspected window-key binding and stale geometry refusal
+        run: python3 -B -I tests/timew/test_machine_save_bridge_v2.py
+      - name: Preserve previous v1/v2 capture, selection and storage tests
+        run: |
+          python3 -B -I tests/timew/test_machine_capture_selection_v2.py
+          python3 -B -I tests/timew/test_machine_capture_save_v2.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_checkpoint_store.py

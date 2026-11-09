@@ -14,6 +14,8 @@ application-session capture or an executable restore plan.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import json
 import subprocess
 import sys
 import uuid
@@ -114,7 +116,42 @@ def _legacy_from_geometry(geometry, *, label, captured_at):
     })
 
 
+def stable_geometry(*, read_runner=subprocess.run,
+                    key_factory=lambda: str(uuid.uuid4()), namespace=None):
+    """Return a bounded, double-observed geometry projection, without writes.
+
+    A review namespace produces reproducible per-capture window UUIDs from
+    ephemeral compositor IDs. This is not long-term window identification.
+    """
+    first = _frame(read_runner)
+    keys = _window_keys(first[2], first[1], key_factory=key_factory)
+    if namespace is not None:
+        if not isinstance(namespace, str):
+            raise CaptureError("INVALID REVIEW NAMESPACE")
+        try:
+            parsed = uuid.UUID(namespace)
+        except (ValueError, AttributeError) as exc:
+            raise CaptureError("INVALID REVIEW NAMESPACE") from exc
+        if parsed.version != 4 or str(parsed) != namespace:
+            raise CaptureError("INVALID REVIEW NAMESPACE")
+        keys = {con_id: str(uuid.uuid5(parsed, str(con_id)))
+                for con_id in keys}
+    geometry = project_geometry(*first, window_keys=keys)
+    again = project_geometry(*_frame(read_runner), window_keys=keys)
+    if again != geometry:
+        raise CaptureError("DESKTOP CHANGED WHILE SAVING; TRY AGAIN")
+    return geometry
+
+
+def geometry_digest(geometry):
+    """Digest only strict projected geometry; not a permission or signature."""
+    value = json.dumps(geometry, sort_keys=True, separators=(",", ":"),
+                       ensure_ascii=False, allow_nan=False).encode("utf-8")
+    return hashlib.sha256(value).hexdigest()
+
+
 def capture_and_save(*, label="DESKTOP CHECKPOINT", selection=None,
+                     review_binding=None,
                      read_runner=subprocess.run,
                      store_adapter=save_pair,
                      key_factory=lambda: str(uuid.uuid4()),
@@ -130,16 +167,23 @@ def capture_and_save(*, label="DESKTOP CHECKPOINT", selection=None,
         raise CaptureError("INVALID CHECKPOINT NAME")
 
     try:
-        first = _frame(read_runner)
-        keys = _window_keys(first[2], first[1], key_factory=key_factory)
-        geometry = project_geometry(*first, window_keys=keys)
-        # Detect intervening changes in both saved content AND transient
-        # window identities. Do not silently pair a replacement window by
-        # matching only its app_id and rectangle.
-        second = _frame(read_runner)
-        again = project_geometry(*second, window_keys=keys)
-        if again != geometry:
-            raise CaptureError("DESKTOP CHANGED WHILE SAVING; TRY AGAIN")
+        if review_binding is not None:
+            if (not isinstance(review_binding, dict)
+                    or set(review_binding) != {"namespace", "digest"}
+                    or not isinstance(review_binding["digest"], str)
+                    or len(review_binding["digest"]) != 64
+                    or any(c not in "0123456789abcdef"
+                           for c in review_binding["digest"])):
+                raise CaptureError("INVALID CUSTOM REVIEW")
+            namespace = review_binding["namespace"]
+        else:
+            namespace = None
+        geometry = stable_geometry(
+            read_runner=read_runner, key_factory=key_factory,
+            namespace=namespace)
+        if (review_binding is not None
+                and geometry_digest(geometry) != review_binding["digest"]):
+            raise CaptureError("CUSTOM SELECTION STALE; REFRESH CUSTOMIZE")
         # Optional custom scope prunes the same verified geometry tree.
         # The ordinary SAVE path leaves selection None and includes all.
         geometry = select_geometry(geometry, selection)

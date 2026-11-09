@@ -161,7 +161,7 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 14  # M1r single-window + one-click checkpoint restore processes
+assert window.count("Process {") == 15  # M1r single-window + one-click checkpoint restore processes
 assert "worldLookup.running" in window
 assert 'onLeftClicked:' in window
 assert 'timew.chooseWorldZone(modelData.id)' in window
@@ -275,7 +275,7 @@ assert 'enabled: timew.navigationKeysAvailable' in window
 assert 'WORLD // SELECT A SEARCH RESULT' in window
 assert '"ZONE DIRECTORY UNAVAILABLE"' in window
 # CLOCK WORLD search + CONVERT date/time + MATH date/time/duration fields.
-assert window.count('onTextEdited:') == 16  # M1p adds one typed recovery confirmation input
+assert window.count('onTextEdited:') == 17  # Includes the optional MACHINE checkpoint name input
 # No dynamic command composition or arbitrary typed TZ values.
 assert 'command: ["date", "+%z"]' in window
 assert 'worldLookup.exec({' in window
@@ -723,9 +723,10 @@ assert 'MachineTimelinePolicy.appendMarker(machineMarkers, marker)' in window
 assert 'MachineTimelinePolicy.removeMarker(machineMarkers, id)' in window
 assert 'machineMarkerNextId += 1' in window
 assert 'id: machinePane' in window
-assert 'MACHINE // SESSION TIMELINE' in window
+assert 'MACHINE // SAVE DESKTOP' in window
+assert 'ADVANCED // LEGACY CAPTURE AND TIMELINE' in window
 assert 'WINDOW INSTANCE // ELAPSED' in window
-assert 'MANUAL TIME MARKERS // MEMORY ONLY' in window
+assert 'LEGACY MARKERS // MEMORY ONLY // NOT RESTORABLE' in window
 assert 'id: machineMarkerInput' in window
 assert 'maximumLength: MachineTimelinePolicy.MAX_NAME_LENGTH' in window
 assert 'machineMarkerInput.activeFocus' in window
@@ -756,8 +757,10 @@ assert 'function utcStamp(nowMs)' in machine_policy
 assert window.count("SystemClock {") == 1
 assert window.count("ElapsedTimer {") == 3
 assert window.count("\n    Timer {") == 3
-# MACHINE now has one read-only Sway capture Process and one guarded SQLite store Process.
-assert window.count("Process {") == 14  # M1r single-window + one-click checkpoint restore processes
+# MACHINE retains legacy preview/store Processes plus one explicit v2 SAVE bridge Process.
+assert window.count("Process {") == 15  # M1r single-window + one-click checkpoint restore processes
+assert "id: machineSaveBridgeProcess" in window
+assert 'Quickshell.shellPath("services/time/MachineSaveBridgeV2.py")' in window
 assert "id: machineCaptureProcess" in window
 assert "id: machineStoreProcess" in window
 assert "id: machineResolverProcess" in window

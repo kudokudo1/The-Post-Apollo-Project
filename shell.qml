@@ -757,12 +757,25 @@ PanelWindow {
                 id: cameraDock
                 anchors.fill: parent
                 menuOpen: cameraWindow.menuOpen
-                onToggleRequested: cameraWindow.toggle()
+                onToggleRequested: {
+                    // Camera's dock now owns Capture/Gallery/Zoom only.
+                    // If Trash is hosting Cleanup, close that host before
+                    // switching to Camera's separate capture viewport.
+                    if (trashWindow.menuOpen
+                            && trashWindow.activeMode === "cleanup")
+                        trashWindow.menuOpen = false;
+                    cameraWindow.toggle();
+                }
             }
 
             CameraW {
                 id: cameraWindow
                 screen: shellRoot.screen
+                // The full Cleanup view and focus are in Trash++, not
+                // behind Camera's now three-mode window.
+                hostedCleanupActive: trashWindow.menuOpen
+                                     && trashWindow.activeMode === "cleanup"
+                hostedCleanupSurface: trashWindow.cleanupContentView
                 // Expanded Camera stays centered near its dock button;
                 // fullscreen uses Finance's exact full-screen left margin.
                 dockCenterX: shellRoot.margins.left + leftModules.x
@@ -1378,14 +1391,12 @@ PanelWindow {
     // the bottom-right. Both are independent masked PanelWindows.
     Trash {
         id: trashWindow
+        // Trash owns the visible Cleanup page. Camera remains sole owner of
+        // the gallery, shared queue and validated file operations, with no
+        // redirect, duplicate panel or duplicate deletion engine.
+        cameraCleanupController: cameraWindow
         cameraCleanupQueueCount: cameraWindow.batchPaths.length
         cameraCleanupBusy: cameraWindow.busy
-        onCleanupRequested: function(technique) {
-            // Camera remains sole owner of the gallery, Swipe/Hunt state,
-            // selection queue, validation and recoverable GIO Trash actions.
-            const accepted = cameraWindow.openCleanupFromTrash(technique);
-            trashWindow.finishCleanupHandoff(accepted, technique);
-        }
     }
 
     // ===== POWER ================================================

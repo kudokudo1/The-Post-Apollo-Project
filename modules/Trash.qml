@@ -4,6 +4,7 @@ import QtQuick.Controls
 import Quickshell.Io
 import Quickshell.Wayland
 import "../components"
+import "../widgets"
 
 // TRASH // Bottom-left utility backed by the user's existing GIO Trash.
 // The 50x50 dock button retains Power's exact edge clearances; the panel is
@@ -17,31 +18,27 @@ PanelWindow {
     property string activeMode: "trash"
     readonly property var lifecycleModes: ["cleanup", "archive", "trash", "burn"]
 
-    // Shell wires this request to CameraW, the ONLY owner of gallery scans,
-    // selection history and the approved MOVE N TO TRASH backend.
-    signal cleanupRequested(string technique)
+    // The Cleanup UI itself now lives here; CameraW supplies only its
+    // established scan, queue, preview and recoverable file operation logic.
+    property var cameraCleanupController: null
+    readonly property var cleanupContentView: cleanupViewLoader.item
     property int cameraCleanupQueueCount: 0
     property bool cameraCleanupBusy: false
 
     function requestCameraCleanup(technique) {
         const requested = String(technique || "");
-        if (!menuOpen || busy || cameraCleanupBusy || confirmMode !== ""
-                || activeMode !== "cleanup"
+        if (!menuOpen || activeMode !== "cleanup" || confirmMode !== ""
+                || cameraCleanupBusy || !cameraCleanupController
                 || ["batch", "grid", "swipe", "hunt", "desktop", "queue"]
-                     .indexOf(requested) < 0)
+                    .indexOf(requested) < 0)
             return false;
-        cleanupRequested(requested);
-        return true;
-    }
-
-    function finishCleanupHandoff(accepted, technique) {
-        if (accepted !== true) {
-            status = "CLEANUP // CAMERA BUSY OR UNAVAILABLE";
+        const accepted = cameraCleanupController.openCleanupFromTrash(requested);
+        if (!accepted) {
+            status = "CLEANUP // CAMERA SCAN BUSY OR UNAVAILABLE";
             return false;
         }
-        status = "CLEANUP // OPENED CAMERA " + String(technique || "").toUpperCase();
-        clearConfirmation();
-        menuOpen = false;
+        status = "CLEANUP // " + requested.toUpperCase()
+                 + " // SHARED CAMERA QUEUE";
         return true;
     }
 
@@ -50,6 +47,16 @@ PanelWindow {
         if (busy || confirmMode !== ""
                 || lifecycleModes.indexOf(requested) < 0)
             return false;
+        if (requested === "cleanup" && activeMode !== "cleanup") {
+            if (!cameraCleanupController || cameraCleanupBusy
+                    || !cameraCleanupController.openCleanupFromTrash("batch")) {
+                status = "CLEANUP // CAMERA SCAN BUSY OR UNAVAILABLE";
+                return false;
+            }
+        }
+        if (activeMode === "cleanup" && requested !== "cleanup"
+                && cameraCleanupController)
+            cameraCleanupController.suspendHostedCleanup();
         activeMode = requested;
         return true;
     }
@@ -134,10 +141,18 @@ PanelWindow {
         menuOpen = !menuOpen;
         clearConfirmation();
         if (menuOpen) {
-            // Open is visual/pointer-only. Do not steal keyboard ownership
-            // from the currently focused desktop application.
+            // Opening keeps the existing one-shot Trash inventory refresh.
+            // Cleanup is hosted here; never open a separate Camera panel.
             refresh(true);
+            if (activeMode === "cleanup" && cameraCleanupController)
+                cameraCleanupController.openCleanupFromTrash(
+                    cameraCleanupController.cleanupTechnique);
         }
+    }
+
+    onMenuOpenChanged: {
+        if (!menuOpen && cameraCleanupController)
+            cameraCleanupController.suspendHostedCleanup();
     }
 
     function run(action, args, passive) {
@@ -854,103 +869,86 @@ PanelWindow {
             Item {
                 id: lifecyclePreparation
                 width: parent.width
-                height: Math.max(145, trashMenu.height - 175)
+                height: Math.max(145, trashMenu.height - 136)
                 visible: trashLauncher.activeMode !== "trash"
+
+                // The original Camera Batch/Swipe/Hunt/Desktop/Queue page is
+                // physically rendered in this Trash++ surface. There is no
+                // redirect to the Camera window and no cloned queue.
+                Flickable {
+                    id: cleanupPageViewport
+                    anchors.fill: parent
+                    visible: trashLauncher.activeMode === "cleanup"
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    contentWidth: width
+                    contentHeight: Math.max(height, 525)
+                    interactive: trashLauncher.cameraCleanupController
+                                 && trashLauncher.cameraCleanupController.cleanupTechnique
+                                    !== "swipe"
+                                 && trashLauncher.cameraCleanupController.cleanupTechnique
+                                    !== "hunt"
+
+                    Item {
+                        width: cleanupPageViewport.width
+                        height: cleanupPageViewport.contentHeight
+
+                        Loader {
+                            id: cleanupViewLoader
+                            anchors.fill: parent
+                            active: trashLauncher.menuOpen
+                                    && trashLauncher.activeMode === "cleanup"
+                                    && trashLauncher.cameraCleanupController !== null
+                            sourceComponent: Component {
+                                CameraCleanupView {
+                                    camera: trashLauncher.cameraCleanupController
+                                }
+                            }
+                        }
+                    }
+                }
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 9
-                    spacing: 6
+                    anchors.margins: 12
+                    spacing: 12
+                    visible: trashLauncher.activeMode === "archive"
+                             || trashLauncher.activeMode === "burn"
 
                     GohuText {
                         width: parent.width
-                        height: 23
+                        height: 28
                         font.pixelSize: 14
                         color: Colors.yellow
                         text: trashLauncher.activeMode.toUpperCase()
                               + " // LIFECYCLE WORKSPACE"
                     }
-
                     Rectangle {
                         width: parent.width
                         height: 2
                         color: Colors.cyan
                     }
-
                     GohuText {
                         width: parent.width
-                        height: 18
+                        wrapMode: Text.WordWrap
                         font.pixelSize: 11
                         color: Colors.white
-                        text: trashLauncher.activeMode === "cleanup"
-                              ? "CAMERA // BATCH // SWIPE // HUNT"
-                              : trashLauncher.activeMode === "archive"
+                        text: trashLauncher.activeMode === "archive"
                               ? "ARCHIVE // RETAIN AND RETRIEVE"
                               : "BURN // VERIFIED DELETION ONLY"
                     }
-
                     GohuText {
                         width: parent.width
-                        height: trashLauncher.activeMode === "cleanup" ? 31 : 70
                         wrapMode: Text.WordWrap
-                        font.pixelSize: 10
+                        font.pixelSize: 11
                         color: Colors.cyan
-                        text: trashLauncher.activeMode === "cleanup"
-                              ? "Camera owns the existing Cleanup queue. Choose a mode to continue in Camera; only its validated file actions can move files to Trash."
-                              : trashLauncher.activeMode === "archive"
+                        text: trashLauncher.activeMode === "archive"
                               ? "No record stores are connected to Universal Archive yet. Hospital, Company and Finance retain their own authorization and recovery."
                               : "Only SYSTEM TRASH currently supports Burn. This mode cannot delete Hospital reports, finance records or arbitrary files."
                     }
-
-                    Grid {
-                        id: cleanupLaunchGrid
-                        visible: trashLauncher.activeMode === "cleanup"
-                        width: parent.width
-                        columns: 2
-                        columnSpacing: 7
-                        rowSpacing: 5
-                        height: 3 * 29 + 2 * 5
-
-                        Repeater {
-                            model: [
-                                {id: "batch", label: "BATCH SCROLL"},
-                                {id: "grid", label: "BATCH GRID"},
-                                {id: "swipe", label: "SWIPE"},
-                                {id: "hunt", label: "HUNT"},
-                                {id: "desktop", label: "DESKTOP"},
-                                {id: "queue", label: "VIEW QUEUE"}
-                            ]
-                            ActionButton {
-                                required property var modelData
-                                width: (cleanupLaunchGrid.width - cleanupLaunchGrid.columnSpacing) / 2
-                                height: 29
-                                label: modelData.label
-                                labelPixelSize: 10
-                                accentColor: modelData.id === "hunt"
-                                             ? Colors.cyan
-                                             : modelData.id === "queue"
-                                             ? Colors.orange : Colors.magenta
-                                available: !trashLauncher.busy
-                                           && !trashLauncher.cameraCleanupBusy
-                                onLeftClicked: trashLauncher.requestCameraCleanup(modelData.id)
-                            }
-                        }
-                    }
-
-                    GohuText {
-                        width: parent.width
-                        height: 17
-                        visible: trashLauncher.activeMode === "cleanup"
-                        font.pixelSize: 10
-                        color: Colors.magenta
-                        text: "SHARED CAMERA QUEUE // "
-                              + trashLauncher.cameraCleanupQueueCount
-                              + "/500 // NO AUTOMATIC DELETE"
-                    }
-
                     ActionButton {
                         width: 156
-                        height: 28
+                        height: 30
                         label: "VIEW SYSTEM TRASH"
                         labelPixelSize: 10
                         accentColor: Colors.green

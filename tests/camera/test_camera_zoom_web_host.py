@@ -53,10 +53,12 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertNotIn('WebEngineView',QML)
 
     def test_zoom_browser_gets_full_real_content_area_not_legacy_footer(self):
-        # Keep the existing Camera header and all four main tabs.
-        for label in ('"CAPTURE"', '"GALLERY"', '"ZOOM"', '"CLEANUP"',
+        # Camera now retains Capture/Gallery/Zoom only. Cleanup's visual
+        # page moved into the Trash++ window without moving Zoom.
+        for label in ('"CAPTURE"', '"GALLERY"', '"ZOOM"',
                       'label: "↓ DOWNLOAD"'):
             self.assertIn(label, QML)
+        self.assertNotIn('{id: "cleanup", label: "CLEANUP"}', QML)
         # The old fixed slot top/bottom cut short the Zoom web viewport.
         self.assertNotIn('readonly property int zoomBayTop: 131', QML)
         self.assertNotIn('readonly property int zoomBayHeight: Math.max(0, frameHeight - 169)', QML)
@@ -88,7 +90,7 @@ class ZoomWebHostTests(unittest.TestCase):
     def test_zoom_browser_owns_scroll_and_the_footer_cannot_cover_buttons(self):
         self.assertIn('visible: camera.activeView !== "zoom"', QML)
         self.assertIn('height: frame.height - 169', QML)
-        self.assertIn('Zoom is hosted by the sibling zoomViewport instead.', QML)
+        self.assertIn('Cleanup now renders in Trash++; Zoom uses its native bay.', QML)
         self.assertNotIn('height: camera.activeView === "zoom" && camera.zoomWebDocked', QML)
         self.assertIn('visible: camera.activeView !== "zoom"', QML)
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebVisualHeld', QML)
@@ -370,7 +372,8 @@ class ZoomWebHostTests(unittest.TestCase):
                       QML[page_start:page_start + 350])
         self.assertIn('id: capturePage', QML[page_start:])
         self.assertIn('id: galleryPage', QML[page_start:])
-        self.assertIn('id: cleanupPage', QML[page_start:])
+        self.assertNotIn('id: cleanupPage', QML[page_start:])
+        self.assertIn('CameraCleanupView {', (ROOT / 'modules/Trash.qml').read_text())
         self.assertNotIn('id: zoomPage', QML[page_start:])
 
     def test_zoom_host_follows_viewport_and_cutout_stays_below_mode_buttons(self):

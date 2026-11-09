@@ -6,6 +6,7 @@ on:
       - shell.qml
       - modules/Trash.qml
       - widgets/CameraW.qml
+      - widgets/CameraCleanupView.qml
       - modules/Power.qml
       - components/DockButton.qml
       - tests/trash/**
@@ -16,6 +17,7 @@ on:
       - shell.qml
       - modules/Trash.qml
       - widgets/CameraW.qml
+      - widgets/CameraCleanupView.qml
       - modules/Power.qml
       - components/DockButton.qml
       - tests/trash/**

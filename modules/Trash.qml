@@ -1082,7 +1082,7 @@ PanelWindow {
                         Item {
                             id: archiveEntriesBox
                             width: parent.width
-                            height: Math.max(80, archiveRecordsView.height - 155)
+                            height: Math.max(80, archiveRecordsView.height - 190)
                             ListView {
                                 id: archiveEntriesList
                                 width: parent.width - 17

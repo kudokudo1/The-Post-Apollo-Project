@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""M1p invariant: a typed review never becomes a live action or durable grant."""
+"""M1p VALIDATE ONLY stays read-only; M1r has a separate clicked action."""
 from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 qml = (root / "widgets/TimeW.qml").read_text()
@@ -19,7 +19,7 @@ for snippet in (
     '"confirm-preview"',
     "id: machineConfirmPreviewProcess",
     'label: "VALIDATE ONLY"',
-    'TYPE EXACT PHRASE // DRY RUN ONLY',
+    'TYPE EXACT PHRASE // VALIDATE OR RESTORE',
     'PHRASE VALIDATED // NO APPROVAL OR MOVE',
     'result.kind === "machine-m1p-confirmation-dry-run"',
     "result.approval_issued === false",
@@ -27,7 +27,7 @@ for snippet in (
     "result.read_only === true",
     "result.confirmation_persisted === false",
     "result.requires_new_approval_to_execute === true",
-    'NO SCREENSHOTS OR RESTORATION ACTIVE',
+    'NO SCREENSHOTS OR AUTOMATIC RESTORATION',
 ):
     assert snippet in qml, snippet
 for snippet in (
@@ -53,5 +53,5 @@ for forbidden in (
 for forbidden in ("MachineWindowMovePilot.py", "MachineMoveApproval.py",
                   "machineExecuteMove(", "onLeftClicked: timew.apply"):
     assert forbidden not in qml, forbidden
-assert qml.count("Process {") == 12
+assert qml.count("Process {") == 13
 print("MACHINE M1P: NO-APPLY CONFIRMATION UI CONTRACT PASS")

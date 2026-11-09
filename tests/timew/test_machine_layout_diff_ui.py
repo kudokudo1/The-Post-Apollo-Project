@@ -25,7 +25,7 @@ for term in (
     'onLeftClicked: timew.machineStepLayoutDifference(1)',
     "OPEN SAVED METADATA",
     "SAVE CHECKPOINT",
-    "NO SCREENSHOTS OR RESTORATION ACTIVE"
+    "NO SCREENSHOTS OR AUTOMATIC RESTORATION"
 ):
     assert term in qml, term
 for term in (

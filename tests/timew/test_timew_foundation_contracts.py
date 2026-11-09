@@ -161,7 +161,7 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 12
+assert window.count("Process {") == 13  # M1r separate explicit one-window Process
 assert "worldLookup.running" in window
 assert 'onLeftClicked:' in window
 assert 'timew.chooseWorldZone(modelData.id)' in window
@@ -743,7 +743,7 @@ assert 'handleStyle: "star"' in window
 assert 'handleColor: Colors.magenta' in window
 assert 'timew.removeMachineMarker(modelData.id)' in window
 assert 'MARKERS ARE TIMESTAMPS ONLY // LOST ON RESTART' in window
-assert 'NO SCREENSHOTS OR RESTORATION ACTIVE' in window
+assert 'NO SCREENSHOTS OR AUTOMATIC RESTORATION' in window
 assert 'MACHINE // LOCAL CHECKPOINTS' in window
 assert 'var MAX_MARKERS = 24;' in machine_policy
 assert 'var MAX_NAME_LENGTH = 48;' in machine_policy
@@ -757,7 +757,7 @@ assert window.count("SystemClock {") == 1
 assert window.count("ElapsedTimer {") == 3
 assert window.count("\n    Timer {") == 3
 # MACHINE now has one read-only Sway capture Process and one guarded SQLite store Process.
-assert window.count("Process {") == 12
+assert window.count("Process {") == 13  # M1r separate explicit one-window Process
 assert "id: machineCaptureProcess" in window
 assert "id: machineStoreProcess" in window
 assert "id: machineResolverProcess" in window
@@ -780,8 +780,8 @@ for prop in ('label: "×"', "labelPixelSize: 22", "destructive: true",
     assert prop in close, prop
 
 # Both TOOLS clocks are session-local elapsed counters. Desktop alarms,
-# system notifications, Sway restoration and persistence remain unimplemented.
-assert "NO SCREENSHOTS OR RESTORATION ACTIVE" in window
+# system notifications and *automatic* Sway restoration remain unimplemented.
+assert "NO SCREENSHOTS OR AUTOMATIC RESTORATION" in window
 assert "STOPWATCH + TIMERS // NOT CONNECTED" not in window
 assert "COUNTDOWN TIMERS // NEXT DEVELOPMENT STAGE" not in window
 assert "NO AUDIO OR DESKTOP NOTIFICATION // INITIAL SLICE" in window

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""M1k guard: isolated injected test pilot only, no production apply path."""
+"""M1k guard: injected pilot remains isolated behind M1q adapter."""
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[2]
@@ -44,6 +44,6 @@ for forbidden in (
     "onLeftClicked: timew.executeMove"
 ):
     assert forbidden not in qml, forbidden
-assert "NO SCREENSHOTS OR RESTORATION ACTIVE" in qml
+assert "NO SCREENSHOTS OR AUTOMATIC RESTORATION" in qml
 assert 'label: "RESOLVE LIVE"' in qml
-print("TIMEW MACHINE M1K: ISOLATED PILOT CONTRACT PASS / NO LIVE WIRING")
+print("TIMEW MACHINE M1K: ISOLATED PILOT CONTRACT PASS / NO DIRECT QML PILOT WIRING")

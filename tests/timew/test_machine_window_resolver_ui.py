@@ -20,7 +20,7 @@ for piece in (
     'data.read_only === true && data.executable === false',
     'timew.machineResolverCheckpointId === timew.machineSavedItem.id',
     'label: "RESTORE PREVIEW"',
-    "NO SCREENSHOTS OR RESTORATION ACTIVE",
+    "NO SCREENSHOTS OR AUTOMATIC RESTORATION",
     'PLAN ONLY // NO ACTIONS OR RESTARTS',
 ):
     assert piece in qml, piece
@@ -43,5 +43,5 @@ for prohibited in (
     assert prohibited not in resolver, prohibited
 assert 'function applySavedCheckpoint(' not in qml
 assert 'function machineApplyRecovery(' not in qml
-assert qml.count("Process {") == 12
+assert qml.count("Process {") == 13  # M1r manual one-window bridge
 print("TIMEW MACHINE M1J UI CONTRACT: PASS / EPHEMERAL / READ ONLY")

@@ -246,6 +246,24 @@ class DesktopSessionHost:
         """Only sanitized display snapshot escapes; no token/subject/code."""
         return self._display.refresh()
 
+    def has_active_session(self) -> bool:
+        """Host-only token liveness, with no credential or identity disclosure.
+
+        A verified callback is not indefinitely equivalent to an active
+        session. Clock rollback, missing expiry and token expiration clear
+        host secrets and deny the status without an API or client call.
+        """
+        try:
+            now = self._now()
+            if (self._access_token is not None
+                    and self._expires_at is not None
+                    and now < self._expires_at):
+                return True
+        except Exception:
+            pass
+        self._clear()
+        return False
+
     def snapshot(self) -> dict[str, object]:
         try:
             now = self._now()

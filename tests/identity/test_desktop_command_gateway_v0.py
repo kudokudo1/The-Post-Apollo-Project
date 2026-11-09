@@ -46,6 +46,7 @@ class GatewayIntegrationTests(unittest.TestCase):
         self.verifier_calls = []
         self.consent_calls = []
         self.seat = True
+        self.time = NOW
         self.peer_allowed = False
         self.consent_allowed = False
         self.secret = "CI-PRIVATE-FAKE-TOKEN"
@@ -65,7 +66,7 @@ class GatewayIntegrationTests(unittest.TestCase):
             browser_open=lambda url: self.urls.append(url),
             exchange_and_verify=self._exchange,
             api_get=self._get,
-            clock=lambda: NOW,
+            clock=lambda: self.time,
             session_is_active=lambda: self.seat,
         )
         self.hosts.append(host)
@@ -112,7 +113,7 @@ class GatewayIntegrationTests(unittest.TestCase):
 
     def _approve(self, peer, action):
         self.consent_calls.append((peer, action))
-        return self.consent_allowed and action == "BEGIN"
+        return self.consent_allowed and action in ("BEGIN", "STATUS", "CANCEL")
 
     def _gateway(self):
         return IdentityCommandGateway(
@@ -146,6 +147,20 @@ class GatewayIntegrationTests(unittest.TestCase):
             "schema": COMMAND_SCHEMA,
             "action": "BEGIN",
             "requestId": None,
+        })
+
+    def _status(self, request_id):
+        return self._request({
+            "schema": COMMAND_SCHEMA,
+            "action": "STATUS",
+            "requestId": request_id,
+        })
+
+    def _cancel(self, request_id):
+        return self._request({
+            "schema": COMMAND_SCHEMA,
+            "action": "CANCEL",
+            "requestId": request_id,
         })
 
     def _check_rejected(self, result):
@@ -324,6 +339,173 @@ class GatewayIntegrationTests(unittest.TestCase):
         self.assertFalse((self.dir / "identity-display-v0.sock").exists())
         with self.assertRaises(RuntimeError):
             self.gateway.start()
+
+    def test_pending_status_cancel_late_callback_and_terminal_replay(self):
+        self.peer_allowed = self.consent_allowed = True
+        self.gateway.start()
+        self._check_rejected(self._status("HOST_REQUEST_ID_123456"))
+        receipt = self._begin()
+        rid = receipt["requestId"]
+        self.assertEqual(self._status(rid), {
+            "schema": RECEIPT_SCHEMA, "state": "PENDING", "requestId": rid,
+        })
+        self.assertEqual(self.hosts[0].command_phase(), "PENDING")
+        self.assertEqual(self._cancel(rid), {
+            "schema": RECEIPT_SCHEMA, "state": "CANCELLED", "requestId": rid,
+        })
+        self.assertEqual(self._status(rid)["state"], "CANCELLED")
+        self._check_rejected(self._cancel(rid))
+        self._check_rejected(self._begin())
+        status, body = self._callback()
+        self.assertEqual(status, 400, "Late OAuth callback after CANCEL must fail")
+        self.assertNotIn(self.secret.encode(), body)
+        self.assertEqual(self._status(rid)["state"], "CANCELLED")
+        display = read_private_display(
+            self.hosts[0].display_socket_path, clock=lambda: NOW)
+        self.assertNotEqual(display["status"], "READY")
+        self.assertEqual(display["organizations"], [])
+        self.assertEqual(self.hosts[0].begin_login(), {"status": "UNAVAILABLE"})
+        self.assertIn("CANCEL", [action for _, action in self.consent_calls])
+        self.assertIn("STATUS", [action for _, action in self.consent_calls])
+
+    def test_verified_callback_is_not_cancelled_by_late_request(self):
+        self.peer_allowed = self.consent_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        self.assertEqual(self._status(rid)["state"], "PENDING")
+        status, body = self._callback()
+        self.assertEqual(status, 200)
+        self.assertNotIn(self.secret.encode(), body)
+        self.assertEqual(self._status(rid), {
+            "schema": RECEIPT_SCHEMA,
+            "state": "AUTHENTICATED", "requestId": rid,
+        })
+        self.assertEqual(self.hosts[0].command_phase(), "AUTHENTICATED")
+        self._check_rejected(self._cancel(rid))
+        self.assertEqual(self._status(rid)["state"], "AUTHENTICATED")
+        self.assertEqual(read_private_display(
+            self.hosts[0].display_socket_path,
+            clock=lambda: NOW)["status"], "READY")
+        self._check_rejected(self._request({
+            "schema": COMMAND_SCHEMA, "action": "RECOVER", "requestId": rid,
+        }))
+
+    def test_request_id_peer_and_admission_are_rechecked_per_command(self):
+        self.peer_allowed = self.consent_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        self._check_rejected(self._status("MISMATCHED_REQUEST_ID_1234"))
+        self._check_rejected(self._cancel("MISMATCHED_REQUEST_ID_1234"))
+        wrong_id = rid[:-1] + ("A" if rid[-1] != "A" else "B")
+        self._check_rejected(self._status(wrong_id))
+        self._check_rejected(self._cancel(wrong_id))
+        self._check_rejected(self._status(None))
+        self._check_rejected(self._cancel(None))
+        for action in ("STATUS", "CANCEL"):
+            self._check_rejected(self._request({
+                "schema": COMMAND_SCHEMA,
+                "action": action,
+                "requestId": rid,
+                "signed": True,
+            }))
+            self._check_rejected(self._request({
+                "schema": COMMAND_SCHEMA,
+                "action": action,
+                "requestId": rid,
+                "token": self.secret,
+            }))
+        self.peer_allowed = False
+        self._check_rejected(self._status(rid))
+        self._check_rejected(self._cancel(rid))
+        self.peer_allowed = True
+        self.consent_allowed = False
+        self._check_rejected(self._status(rid))
+        self._check_rejected(self._cancel(rid))
+        self.consent_allowed = True
+        original_peer = self.gateway._owner_peer
+        self.gateway._owner_peer = KernelPeer(
+            pid=original_peer.pid + 1, uid=original_peer.uid,
+            gid=original_peer.gid)
+        self._check_rejected(self._status(rid))
+        self._check_rejected(self._cancel(rid))
+        self.gateway._owner_peer = original_peer
+        self.assertEqual(self._status(rid)["state"], "PENDING")
+        self.assertEqual(self._cancel(rid)["state"], "CANCELLED")
+
+    def test_invalid_callback_reports_failed_and_denies_cancel(self):
+        self.peer_allowed = self.consent_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        self.assertEqual(self._status(rid)["state"], "PENDING")
+        auth = urlsplit(self.urls[0])
+        redirect = urlsplit(self.hosts[0].redirect_uri)
+        conn = http.client.HTTPConnection("127.0.0.1", redirect.port, timeout=2)
+        conn.request(
+            "GET", redirect.path + "?" + urlencode({
+                "code": "ci-one-use-code", "state": "forged", "iss": ISSUER,
+            }),
+            headers={"Host": f"127.0.0.1:{redirect.port}"})
+        response = conn.getresponse()
+        self.assertEqual(response.status, 400)
+        response.read()
+        conn.close()
+        self.assertEqual(self._status(rid)["state"], "FAILED")
+        self._check_rejected(self._cancel(rid))
+        self._check_rejected(self._begin())
+
+    def test_seat_loss_is_permanent_even_when_test_seat_recovers(self):
+        self.peer_allowed = self.consent_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        self.assertEqual(self._status(rid)["state"], "PENDING")
+        self.seat = False
+        self._check_rejected(self._status(rid))
+        self.seat = True
+        self.assertEqual(self._status(rid)["state"], "HOST_LOST")
+        self._check_rejected(self._cancel(rid))
+        self.assertEqual(self.hosts[0].begin_login(), {"status": "UNAVAILABLE"})
+        self.assertFalse(self.hosts[0].started)
+        self.assertFalse((self.dir / "identity-display-v0.sock").exists())
+        self._check_rejected(self._begin())
+
+    def test_post_callback_seat_loss_revokes_active_token_and_display(self):
+        self.peer_allowed = self.consent_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        status, _ = self._callback()
+        self.assertEqual(status, 200)
+        self.assertEqual(self._status(rid)["state"], "AUTHENTICATED")
+        self.seat = False
+        self._check_rejected(self._cancel(rid))
+        self.seat = True
+        self.assertEqual(self._status(rid)["state"], "HOST_LOST")
+        self.assertFalse(self.hosts[0].started)
+        self.assertFalse((self.dir / "identity-display-v0.sock").exists())
+
+    def test_host_status_expires_local_session_without_token_disclosure(self):
+        self.peer_allowed = self.consent_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        status, _ = self._callback()
+        self.assertEqual(status, 200)
+        self.assertEqual(self._status(rid)["state"], "AUTHENTICATED")
+        self.time = NOW + 181
+        self.assertEqual(self._status(rid)["state"], "FAILED")
+        self._check_rejected(self._cancel(rid))
+        self.assertEqual(read_private_display(
+            self.hosts[0].display_socket_path,
+            clock=lambda: self.time)["organizations"], [])
+        self.assertNotIn(self.secret, json.dumps(self._status(rid)))
+
+    def test_host_lost_is_never_reported_as_authenticated(self):
+        self.peer_allowed = self.consent_allowed = True
+        self.gateway.start()
+        rid = self._begin()["requestId"]
+        self.assertEqual(self._status(rid)["state"], "PENDING")
+        self.hosts[0].session_event("session-end")
+        self.assertEqual(self._status(rid)["state"], "HOST_LOST")
+        self._check_rejected(self._cancel(rid))
+        self._check_rejected(self._begin())
 
     def test_no_direct_qml_activation_and_existing_owner_guards(self):
         cpu = (ROOT / "widgets/cpuplus/CpuPlusUniversalSignInHeaderPane.qml").read_text()

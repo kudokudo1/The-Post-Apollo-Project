@@ -25,6 +25,7 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import socket
 import socketserver
@@ -40,6 +41,7 @@ RECEIPT_SCHEMA = "post-apollo.identity.command-receipt.experimental-v0"
 COMMAND_SOCKET = "identity-command-v0.sock"
 _MAX_REQUEST = 1024
 _MAX_RECEIPT = 256
+_REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{16,96}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,30 +84,43 @@ def _unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
     return parsed
 
 
-def _valid_begin(raw: bytes) -> bool:
+def _parse_command(raw: bytes) -> tuple[str, str | None] | None:
+    """Exact one-frame command grammar; client cannot supply trust claims."""
     if not 0 < len(raw) <= _MAX_REQUEST or not raw.endswith(b"\n"):
-        return False
+        return None
     if raw.count(b"\n") != 1:
-        return False
+        return None
     try:
         command = json.loads(raw[:-1].decode("utf-8", errors="strict"),
                              object_pairs_hook=_unique_pairs)
     except (UnicodeError, ValueError, TypeError):
-        return False
-    return (type(command) is dict
-            and set(command) == {"schema", "action", "requestId"}
-            and command["schema"] == COMMAND_SCHEMA
-            and command["action"] == "BEGIN"
-            and command["requestId"] is None)
+        return None
+    if (type(command) is not dict
+            or set(command) != {"schema", "action", "requestId"}
+            or command["schema"] != COMMAND_SCHEMA):
+        return None
+    action, request_id = command["action"], command["requestId"]
+    if action == "BEGIN" and request_id is None:
+        return ("BEGIN", None)
+    if (action in ("CANCEL", "STATUS")
+            and type(request_id) is str
+            and _REQUEST_ID.fullmatch(request_id) is not None):
+        return (action, request_id)
+    return None
 
 
 def _receipt(state: str, request_id: str | None = None) -> bytes:
-    # No issuer, redirect, authorization URL, subject, token, API error or
-    # display membership leaves the host command boundary.
-    if state not in ("REQUESTED", "UNAVAILABLE"):
+    # A receipt is *only* an experimental phase report, NOT an authenticated
+    # identity, a signature, an authorization grant or provider consent.
+    # No issuer, redirect, URL, token, subject, API error or membership data.
+    if state not in ("REQUESTED", "PENDING", "AUTHENTICATED",
+                     "CANCELLED", "FAILED", "HOST_LOST", "UNAVAILABLE"):
         raise ValueError("Unknown command receipt state")
-    if state != "REQUESTED":
+    if state == "UNAVAILABLE":
         request_id = None
+    elif (type(request_id) is not str
+          or _REQUEST_ID.fullmatch(request_id) is None):
+        raise ValueError("Required host-issued request identifier missing")
     payload = json.dumps(
         {"schema": RECEIPT_SCHEMA, "state": state, "requestId": request_id},
         ensure_ascii=True, allow_nan=False, separators=(",", ":"),
@@ -113,7 +128,6 @@ def _receipt(state: str, request_id: str | None = None) -> bytes:
     if len(payload) > _MAX_RECEIPT:
         raise ValueError("Command receipt too large")
     return payload
-
 
 class _Server(socketserver.ThreadingUnixStreamServer):
     allow_reuse_address = False
@@ -131,8 +145,9 @@ class IdentityCommandGateway:
     one-use operation for THIS peer. A positive callback fixture in CI is not
     a production authorization implementation.
 
-    Only BEGIN is supported. CANCEL and RECOVER return UNAVAILABLE; the
-    existing host's logout() is never repurposed as request cancellation.
+    BEGIN, request-scoped CANCEL and read-only STATUS are supported behind
+    separate host-supplied admissions. RECOVER remains unavailable; the
+    host's unconditional logout() is never a command cancellation.
     """
 
     def __init__(
@@ -164,6 +179,7 @@ class IdentityCommandGateway:
         self._socket_inode: int | None = None
         self._host: DesktopHostLifecycle | None = None
         self._request_id: str | None = None
+        self._owner_peer: KernelPeer | None = None
         self._started_once = False
 
     @property
@@ -217,23 +233,35 @@ class IdentityCommandGateway:
             pass
         self._socket_inode = None
 
-    def _admitted(self, peer: KernelPeer) -> bool:
-        # This is an independent host-owned callback decision, not a client
-        # JSON boolean or a property set by QML.
+    def _admitted(self, peer: KernelPeer, action: str) -> bool:
+        # Kernel SO_PEERCRED and separately approved, host-owned callbacks
+        # are required on *every* operation. A request ID alone is NEVER a
+        # bearer capability or evidence of matching process provenance.
         if self._closing.is_set() or peer.uid != os.geteuid():
             return False
         try:
-            return (self._active_seat() is True
-                    and self._verify_peer(peer) is True
-                    and self._approve(peer, "BEGIN") is True)
+            seat_ok = self._active_seat() is True
+        except Exception:
+            seat_ok = False
+        if not seat_ok:
+            # Once an active host observes seat loss, its pending code or
+            # verified local credential is revoked permanently. A future
+            # true seat probe must NOT resurrect the previous login.
+            if self._host is not None:
+                try:
+                    self._host.session_event("session-end")
+                except Exception:
+                    return False
+            return False
+        try:
+            return (self._verify_peer(peer) is True
+                    and self._approve(peer, action) is True)
         except Exception:
             return False
 
-    def _begin(self, peer: KernelPeer, raw: bytes) -> bytes:
-        if not _valid_begin(raw):
-            return _receipt("UNAVAILABLE")
+    def _begin(self, peer: KernelPeer) -> bytes:
         with self._lock:
-            if self._host is not None or not self._admitted(peer):
+            if self._host is not None or not self._admitted(peer, "BEGIN"):
                 return _receipt("UNAVAILABLE")
             host: DesktopHostLifecycle | None = None
             try:
@@ -244,11 +272,14 @@ class IdentityCommandGateway:
                 if host.begin_login() != {"status": "LOGIN_PENDING"}:
                     raise RuntimeError("Real host refused BEGIN")
                 # Seat/host may be revoked while browser dispatch is pending.
-                if self._closing.is_set() or self._active_seat() is not True:
-                    raise RuntimeError("Lost trusted seat during BEGIN")
+                if (self._closing.is_set()
+                        or self._active_seat() is not True
+                        or self._verify_peer(peer) is not True):
+                    raise RuntimeError("Lost trusted seat or caller during BEGIN")
                 request_id = secrets.token_urlsafe(32)
                 self._host = host
                 self._request_id = request_id
+                self._owner_peer = peer
                 return _receipt("REQUESTED", request_id)
             except Exception:
                 if host is not None:
@@ -257,6 +288,34 @@ class IdentityCommandGateway:
                     except Exception:
                         pass
                 return _receipt("UNAVAILABLE")
+
+    def _dispatch(self, peer: KernelPeer, raw: bytes) -> bytes:
+        parsed = _parse_command(raw)
+        if parsed is None:
+            return _receipt("UNAVAILABLE")
+        action, request_id = parsed
+        if action == "BEGIN":
+            return self._begin(peer)
+        with self._lock:
+            if (self._host is None or self._request_id is None
+                    or self._owner_peer != peer
+                    or request_id is None
+                    or not secrets.compare_digest(request_id, self._request_id)
+                    or not self._admitted(peer, action)):
+                return _receipt("UNAVAILABLE")
+            # The live host, NOT a client flag or private SNAPSHOT socket,
+            # owns callback completion, session validity and terminal phase.
+            phase = self._host.command_phase()
+            if action == "STATUS":
+                if phase not in ("PENDING", "AUTHENTICATED", "CANCELLED",
+                                 "FAILED", "HOST_LOST"):
+                    return _receipt("UNAVAILABLE")
+                return _receipt(phase, request_id)
+            if action == "CANCEL" and phase == "PENDING":
+                result = self._host.cancel_pending_login()
+                if result == {"status": "CANCELLED"}:
+                    return _receipt("CANCELLED", request_id)
+            return _receipt("UNAVAILABLE")
 
     class _Handler(socketserver.BaseRequestHandler):
         def handle(self) -> None:
@@ -275,7 +334,7 @@ class IdentityCommandGateway:
                     if not data:
                         break
                     raw.extend(data)
-                response = self.server.owner._begin(peer, bytes(raw))
+                response = self.server.owner._dispatch(peer, bytes(raw))
                 conn.sendall(response)
             except (OSError, TimeoutError, ValueError):
                 # No raw diagnostic/URL/secret is echoed to a client.
@@ -288,6 +347,7 @@ class IdentityCommandGateway:
             host, server, thread = self._host, self._server, self._thread
             self._host = None
             self._request_id = None
+            self._owner_peer = None
             self._server = None
             self._thread = None
         # The host revokes token/pending callback before we release the gate.

@@ -1,19 +1,25 @@
-name: Identity Center experimental native BEGIN command gateway v0
+name: Identity Center experimental native BEGIN STATUS CANCEL command gateway
 
 on:
   pull_request:
     paths:
       - 'services/identity/desktop_command_gateway_v0.py'
+      - 'services/identity/desktop_host_lifecycle_v0.py'
+      - 'services/identity/desktop_session_host_v0.py'
       - 'tests/identity/test_desktop_command_gateway_v0.py'
       - '.github/workflows/identity-center-command-gateway-v0.yml'
       - 'docs/identity-center-command-gateway-v0.md'
+      - 'docs/identity-center-command-gateway-cancel-status-v1.md'
   push:
-    branches: [main, 'feat/identity-protected-command-*']
+    branches: [main, 'feat/identity-protected-command-*', 'feat/identity-command-*']
     paths:
       - 'services/identity/desktop_command_gateway_v0.py'
+      - 'services/identity/desktop_host_lifecycle_v0.py'
+      - 'services/identity/desktop_session_host_v0.py'
       - 'tests/identity/test_desktop_command_gateway_v0.py'
       - '.github/workflows/identity-center-command-gateway-v0.yml'
       - 'docs/identity-center-command-gateway-v0.md'
+      - 'docs/identity-center-command-gateway-cancel-status-v1.md'
 
 permissions:
   contents: read
@@ -29,7 +35,7 @@ jobs:
           python-version: '3.12'
       - name: Compile actual host command and gateway test
         run: python3 -m py_compile services/identity/desktop_command_gateway_v0.py tests/identity/test_desktop_command_gateway_v0.py
-      - name: Real AF_UNIX BEGIN, peer gate, one-use host, negative commands
+      - name: Real AF_UNIX BEGIN STATUS CANCEL, owner-locked callback, expiry and forgery denial
         run: python3 -m unittest discover -s tests/identity -p 'test_desktop_command_gateway_v0.py' -v
       - name: Existing native Identity host lifecycle, callback, and private display
         run: |

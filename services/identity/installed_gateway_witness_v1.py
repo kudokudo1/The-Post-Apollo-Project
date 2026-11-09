@@ -244,7 +244,14 @@ class InstalledGatewayWitness:
             receipt_key_matches=True)
 
     def consistent(self, peer):
+        """Supplemental consistency check; NEVER an authentication grant."""
         try:
-            return self.inspect(peer).production_authority is False
+            evidence = self.inspect(peer)
+            return (evidence.package_matches is True
+                    and evidence.module_bytes_match is True
+                    and evidence.supervisor_matches is True
+                    and evidence.receipt_key_matches is True
+                    and evidence.production_authority is False
+                    and evidence.can_begin_sign_in is False)
         except (WitnessRefused, ValueError, OSError, KeyError):
             return False

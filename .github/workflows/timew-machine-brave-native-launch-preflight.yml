@@ -1,0 +1,29 @@
+name: TimeW MACHINE native Brave disposable launch preflight
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineBraveTrialLaunchPlan.py"
+      - "tests/timew/test_machine_brave_trial_launch_plan.py"
+      - "docs/timew-machine-brave-native-launch-preflight.md"
+      - ".github/workflows/timew-machine-brave-native-launch-preflight.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readonly-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preview native Brave launch without executing and reject unsafe paths
+        run: python3 -B -I tests/timew/test_machine_brave_trial_launch_plan.py
+      - name: Preserve disposable profile and partial write protections
+        run: python3 -B -I tests/timew/test_machine_brave_disposable_trial.py
+      - name: Preserve native-message no-restore boundaries
+        run: |
+          python3 -B -I tests/timew/test_machine_brave_native_probe_contract.py
+          python3 -B -I tests/timew/test_machine_brave_native_probe.py
+          python3 -B -I tests/timew/test_machine_brave_focus_sequence_review.py

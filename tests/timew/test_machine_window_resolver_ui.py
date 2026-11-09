@@ -43,5 +43,6 @@ for prohibited in (
     assert prohibited not in resolver, prohibited
 assert 'function applySavedCheckpoint(' not in qml
 assert 'function machineApplyRecovery(' not in qml
-assert qml.count("Process {") == 14  # M1r and one-click checkpoint restore
+assert qml.count("Process {") == 15  # Explicit v2 SAVE bridge plus existing M1r/restore
+assert "id: machineSaveBridgeProcess" in qml
 print("TIMEW MACHINE M1J UI CONTRACT: PASS / EPHEMERAL / READ ONLY")

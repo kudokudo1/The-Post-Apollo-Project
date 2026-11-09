@@ -70,7 +70,9 @@ function needsSource(path, source) {
     return isFullMap(path) || isPinnedMap(path)
       || path === "earth/services/health";
   if (source === "river")
-    return isFullMap(path) || isPinnedMap(path)
+    // E6 // Shared NWPS is used by the OVERVIEW water summary; no new reader.
+    return path === "earth/overview"
+      || isFullMap(path) || isPinnedMap(path)
       || path === "earth/ground/full" || path === "earth/services/health"
       || path === "earth/water/rivers";
   // FIRMS and NOAA HMS remain explicitly manually requested.

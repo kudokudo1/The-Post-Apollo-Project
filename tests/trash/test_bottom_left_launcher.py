@@ -291,6 +291,8 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('sourceObservedAt', TRASH)
         self.assertIn('label: "BURN COPY"', TRASH)
         self.assertIn('label: "TRASH COPY"', TRASH) if 'label: "TRASH COPY"' in TRASH else self.assertIn('? "RESTORE" : "TRASH COPY"', TRASH)
+        self.assertIn('label: "COPY BIN " + trashLauncher.researchBinRows.length', TRASH)
+        self.assertIn('trashLauncher.archiveFilter = "bin";', TRASH)
         self.assertIn('id: researchBurnReview', TRASH)
         self.assertIn('id: researchBurnList', TRASH)
         self.assertIn('model: trashLauncher.researchBinRows', TRASH)

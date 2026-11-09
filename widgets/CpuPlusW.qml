@@ -25,6 +25,8 @@ PanelWindow {
     signal favoriteExactNavigationRequested(string owner,string route)
     // APPS selection only; no commands/actions or arbitrary favorite keys.
     signal favoriteAppSelectionRequested(string desktopId)
+    // U7b-D: one fixed core SYSTEM metric token, not a monitor action.
+    signal favoriteSystemSelectionRequested(string metric)
     property var telegramConnectionObservation: null
     property var appControlWindow
     required property var systemTelemetry
@@ -2803,6 +2805,9 @@ PanelWindow {
             }
             onAppSelectionRequested: function(desktopId) {
                 cpuPlusWindow.favoriteAppSelectionRequested(desktopId);
+            }
+            onSystemSelectionRequested: function(metric) {
+                cpuPlusWindow.favoriteSystemSelectionRequested(metric);
             }
             anchors.left: parent.left
             anchors.right: parent.right

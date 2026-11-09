@@ -10,6 +10,7 @@ import "../services/files"
 import "../services/remote"
 import qs.services.favorites
 import "../services/favorites/FavoritesAppSelectionPolicy.js" as AppFavoriteSelection
+import "../services/favorites/FavoritesSystemSelectionPolicy.js" as SystemFavoriteSelection
 import "appcontrol"
 import "thermal"
 import QtQuick.Effects
@@ -8618,6 +8619,41 @@ PanelWindow {
                 return;
             const now=AppFavoriteSelection.selectedIndex(
                 desktopId,[...filteredApps.values]);
+            if(now<0) return;
+            selectedResultIndex=now;
+            resultList.positionViewAtIndex(now,ListView.Contain);
+        });
+        return true;
+    }
+
+    // U7b-D // Only select a saved core SYSTEM telemetry display row.
+    // No reboot/network controls, sensor commands, file paths or PID actions.
+    function selectSavedSystemMetric(metric) {
+        const snapshot=Array.isArray(systemRows) ? systemRows.slice() : [];
+        if(!SystemFavoriteSelection.ownerAllows(
+                metric,favoriteStore.favoriteKeys,snapshot))
+            return false;
+        // AppControl owns this mode and its one live SystemTelemetry reader.
+        if(!menuOpen) menuOpen=true;
+        if(!menuOpen) return false;
+        switchMode(systemModeIndex,false);
+        searchInput.text="";
+        const index=SystemFavoriteSelection.selectedIndex(
+            metric,[...systemResults.values]);
+        if(index<0 || !SystemFavoriteSelection.ownerAllows(
+                metric,favoriteStore.favoriteKeys,systemRows))
+            return false;
+        selectedResultIndex=index;
+        hoveredResultIndex=-1;
+        detailFocused=false;
+        resetDetailActionSelection();
+        Qt.callLater(function() {
+            if(!menuOpen || selectedModeIndex!==systemModeIndex
+                    || !SystemFavoriteSelection.ownerAllows(
+                        metric,favoriteStore.favoriteKeys,systemRows))
+                return;
+            const now=SystemFavoriteSelection.selectedIndex(
+                metric,[...systemResults.values]);
             if(now<0) return;
             selectedResultIndex=now;
             resultList.positionViewAtIndex(now,ListView.Contain);

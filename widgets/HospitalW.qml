@@ -138,6 +138,8 @@ PanelWindow {
     property string rosterFocusedRoomId: ""
     property string rosterFocusedSessionId: ""
     property string rosterFocusedMode: "continuity"
+    // One-shot navigation preference, never authorization for attachment.
+    property var rosterFocusedStaffingSelection: ({})
     readonly property var rosterFocusedRoomData: {
         const rooms = root.workforceRosterRows || [];
         for (let i = 0; i < rooms.length; ++i) {
@@ -365,9 +367,12 @@ PanelWindow {
         root.intercomMenuOpen = false;
         root.rosterFocusedRoomId = id;
         root.rosterFocusedSessionId = String(current.sessionId || "");
+        if (modeValue !== "attachPreview")
+            root.rosterFocusedStaffingSelection = ({});
         root.rosterFocusedMode = modeValue === "connections" ? "connections"
             : modeValue === "quick" ? "quick"
-            : modeValue === "chat" ? "chat" : "continuity";
+            : modeValue === "chat" ? "chat"
+            : modeValue === "attachPreview" ? "attachPreview" : "continuity";
         root.operationsSurface = "registeredWorker";
         return true;
     }
@@ -6369,6 +6374,7 @@ PanelWindow {
                     active: root.menuOpen && root.workforceRosterVisible
                         && root.workforceManagerExpanded
                     doctorService: doctorService
+                    providerService: providerService
                     rooms: responsibilityService.durableRooms
                     sessions: responsibilityService.durableSessions
                     roomsLoaded: responsibilityService.roomsLoaded
@@ -6382,6 +6388,29 @@ PanelWindow {
                             responsibilityService.refreshDurableGraph();
                         if (!doctorService.refreshing)
                             doctorService.refresh();
+                    }
+                    // Route only to the existing nested Room inspector; this
+                    // is navigation, not a staffing or Session mutation.
+                    onOpenRoomRequested: function(roomId, selection) {
+                        const row = root.workforceRosterRows.filter(function(r) {
+                            return String((r || {}).roomId || "") === String(roomId || "");
+                        })[0] || null;
+                        const proposed = selection || {};
+                        const valid = !!row && String(proposed.roomId || "")
+                            === String(roomId || "")
+                            && !!String(proposed.assignmentId || "")
+                            && !!String(proposed.doctorId || "")
+                            && !!String(proposed.providerId || "");
+                        root.rosterFocusedStaffingSelection = valid ? proposed : ({});
+                        if (row) {
+                            if (!root.openRosterSession(row,
+                                    valid ? "attachPreview" : "connections"))
+                                inlineWorkforceManager.outcome =
+                                    "OPEN ROOM HOLD // NESTED ROOM ROUTE REFUSED";
+                        } else {
+                            inlineWorkforceManager.outcome =
+                                "OPEN ROOM HOLD // ROOM IS NOT IN VERIFIED ROSTER";
+                        }
                     }
                 }
 
@@ -7411,6 +7440,7 @@ PanelWindow {
             pinnedRoomId: root.rosterFocusedRoomId
             pinnedSessionId: root.rosterFocusedSessionId
             initialMode: root.rosterFocusedMode
+            initialAttachmentSelection: root.rosterFocusedStaffingSelection
             roomData: root.rosterFocusedRoomData
             // Reuse existing read-only Hospital directories and PX registry.
             // This is a preview, not an additional staffing owner.

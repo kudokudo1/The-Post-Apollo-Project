@@ -1,0 +1,43 @@
+name: Hospital Surgery Staffing Readiness
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalWorkforceManagerView.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalWorkforceStaffingPolicy.js"
+      - "tests/hospital/test_workforce_staffing_policy.js"
+      - "tests/hospital/test_workforce_staffing_ui_contracts.py"
+      - ".github/workflows/hospital-surgery-staffing-readiness.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalWorkforceManagerView.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalWorkforceStaffingPolicy.js"
+      - "tests/hospital/test_workforce_staffing_policy.js"
+      - "tests/hospital/test_workforce_staffing_ui_contracts.py"
+      - ".github/workflows/hospital-surgery-staffing-readiness.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  staffing-preview-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify fail-closed Room and Provider staffing review
+        run: |
+          node --check services/hospital/HospitalWorkforceStaffingPolicy.js
+          node tests/hospital/test_workforce_staffing_policy.js
+      - name: Ensure inline Surgery view never mutates workers
+        run: |
+          python3 tests/hospital/test_workforce_staffing_ui_contracts.py
+          python3 tests/hospital/test_surgery_inline_workforce_ui_contracts.py
+          python3 tests/hospital/test_workforce_job_activation_ui_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py
+          python3 tests/hospital/test_registered_worker_routes.py

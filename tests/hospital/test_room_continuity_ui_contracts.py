@@ -113,8 +113,9 @@ require('label: "ROOM"' in hospital
         and 'rosterRow.rosterData, "continuity"' in hospital,
         "Every registered worker card should expose direct Room briefing")
 require('root.rosterFocusedMode = modeValue === "connections"' in hospital
-        and 'modeValue === "chat" ? "chat" : "continuity"' in hospital,
-        "Direct worker routes preserve explicit mode choices")
+        and 'modeValue === "chat" ? "chat"' in hospital
+        and 'modeValue === "attachPreview" ? "attachPreview" : "continuity"' in hospital,
+        "Direct worker routes preserve explicit mode choices and safe attachment preview")
 
 if issues:
     print("HOSPITAL ROOM CONTINUITY UI // FAIL")

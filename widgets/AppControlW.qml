@@ -38,6 +38,10 @@ PanelWindow {
     // ============================================================
 
     property bool menuOpen: false
+    // U7b-F: local navigation never waits for inventory/telemetry. A missing
+    // saved item is explained inside the already-open destination.
+    property var pendingFavoriteSelection: null
+    property string favoriteNavigationNotice: ""
     // Owner-owned typed action surface for Hub RUNNING. No service clones.
     property alias hubProcessActionGate: appControlHubGate
     property bool relationshipFocusModeActive: false
@@ -8586,31 +8590,90 @@ PanelWindow {
     // U7b-C // Select an exact saved DesktopEntry in the existing APPS list.
     // This function performs NO desktop launch, shell command, process action,
     // favorite write or action-trigger click. Never select by display name.
+    // No permission handshake for local navigation. This only manages
+    // which saved item is highlighted AFTER AppControl is already visible.
+    function clearFavoriteNavigation() {
+        pendingFavoriteSelection=null;
+        favoriteNavigationNotice="";
+    }
+    function deferFavoriteSelection(kind,value,mode,notice) {
+        pendingFavoriteSelection={kind:kind,value:value,mode:mode};
+        favoriteNavigationNotice=notice;
+        selectedResultIndex=-1; // Do not pretend some other sensor was chosen.
+        Qt.callLater(function(){ appControlWindow.tryResumeFavoriteSelection(); });
+        return true; // The destination is OPEN, even if the item is missing.
+    }
+    function tryResumeFavoriteSelection() {
+        const p=pendingFavoriteSelection;
+        if(!p || !menuOpen || selectedModeIndex!==p.mode) return false;
+        let index=-1;
+        if(p.kind==="app") {
+            const installed=[...DesktopEntries.applications.values];
+            if(!AppFavoriteSelection.ownerAllows(
+                    p.value,favoriteStore.favoriteKeys,installed)) return false;
+            index=AppFavoriteSelection.selectedIndex(
+                p.value,[...filteredApps.values]);
+            if(index<0) return false;
+            rememberedAppKey=p.value;
+        } else if(p.kind==="system") {
+            if(!SystemFavoriteSelection.ownerAllows(
+                    p.value,favoriteStore.favoriteKeys,systemRows))
+                return false;
+            index=SystemFavoriteSelection.selectedIndex(
+                p.value,[...systemResults.values]);
+            if(index<0) return false;
+        } else if(p.kind==="thermal") {
+            const current=ThermalFavoriteSelection.resolve(
+                p.value,favoriteStore.favoriteKeys,thermalRows,fanRows);
+            if(!current.ok) return false;
+            const expectedView=current.kind==="fan"
+                ? thermalController.thermalViewFans
+                : thermalController.thermalViewThermal;
+            if(thermalController.thermalViewMode!==expectedView) return false;
+            index=ThermalFavoriteSelection.selectedIndex(
+                p.value,current.sourceId,[...thermalResults.values],current.kind);
+            if(index<0) return false;
+        } else return false;
+
+        // Refuse stale/colliding items. Never execute any selected result.
+        clearFavoriteNavigation();
+        selectedResultIndex=index;
+        hoveredResultIndex=-1;
+        detailFocused=false;
+        resetDetailActionSelection();
+        Qt.callLater(function() {
+            if(menuOpen && selectedModeIndex===p.mode)
+                resultList.positionViewAtIndex(
+                    appControlWindow.selectedResultIndex,ListView.Contain);
+        });
+        return true;
+    }
+
     function selectSavedApplication(desktopId) {
-        const installed=[...DesktopEntries.applications.values];
-        if (!AppFavoriteSelection.ownerAllows(
-                desktopId,favoriteStore.favoriteKeys,installed))
-            return false;
-        // Only after resolving the original owner inventory do we change UI.
-        // NORMAL shows native and Flatpak installed apps, not hidden commands.
-        if (!menuOpen) menuOpen=true;
-        if (!menuOpen) return false;
+        if (!AppFavoriteSelection.validDesktopId(desktopId)) return false;
+        // Opening an in-house widget is navigation, not an inventory query.
+        if(!menuOpen) menuOpen=true;
         appSourceMode=appSourceNative;
         switchMode(appsModeIndex,false);
         searchInput.text="";
+        const installed=[...DesktopEntries.applications.values];
+        if (!AppFavoriteSelection.ownerAllows(
+                desktopId,favoriteStore.favoriteKeys,installed))
+            return deferFavoriteSelection("app",desktopId,appsModeIndex,
+                "SAVED APP NOT FOUND IN CURRENT INVENTORY // APPS IS OPEN");
         const index=AppFavoriteSelection.selectedIndex(
             desktopId,[...filteredApps.values]);
-        if (index<0 || !AppFavoriteSelection.ownerAllows(
+        if(index<0 || !AppFavoriteSelection.ownerAllows(
                 desktopId,favoriteStore.favoriteKeys,
                 [...DesktopEntries.applications.values]))
-            return false;
+            return deferFavoriteSelection("app",desktopId,appsModeIndex,
+                "SAVED APP NOT AVAILABLE IN APPS LIST // APPS IS OPEN");
+        clearFavoriteNavigation();
         rememberedAppKey=desktopId;
         selectedResultIndex=index;
         hoveredResultIndex=-1;
         detailFocused=false;
         resetDetailActionSelection();
-        // Model delegates may settle one event turn later. Keep the exact
-        // target only if the saved membership still exists at that moment.
         Qt.callLater(function() {
             if (!menuOpen || selectedModeIndex!==appsModeIndex
                     || rememberedAppKey!==desktopId
@@ -8630,20 +8693,22 @@ PanelWindow {
     // U7b-D // Only select a saved core SYSTEM telemetry display row.
     // No reboot/network controls, sensor commands, file paths or PID actions.
     function selectSavedSystemMetric(metric) {
+        if(!SystemFavoriteSelection.validMetric(metric)) return false;
+        if(!menuOpen) menuOpen=true;
+        switchMode(systemModeIndex,false);
+        searchInput.text="";
         const snapshot=Array.isArray(systemRows) ? systemRows.slice() : [];
         if(!SystemFavoriteSelection.ownerAllows(
                 metric,favoriteStore.favoriteKeys,snapshot))
-            return false;
-        // AppControl owns this mode and its one live SystemTelemetry reader.
-        if(!menuOpen) menuOpen=true;
-        if(!menuOpen) return false;
-        switchMode(systemModeIndex,false);
-        searchInput.text="";
+            return deferFavoriteSelection("system",metric,systemModeIndex,
+                "SAVED SYSTEM READING NOT FOUND // SYSTEM IS OPEN");
         const index=SystemFavoriteSelection.selectedIndex(
             metric,[...systemResults.values]);
         if(index<0 || !SystemFavoriteSelection.ownerAllows(
                 metric,favoriteStore.favoriteKeys,systemRows))
-            return false;
+            return deferFavoriteSelection("system",metric,systemModeIndex,
+                "SAVED SYSTEM READING UNAVAILABLE // SYSTEM IS OPEN");
+        clearFavoriteNavigation();
         selectedResultIndex=index;
         hoveredResultIndex=-1;
         detailFocused=false;
@@ -8665,37 +8730,39 @@ PanelWindow {
     // U7b-E // Selection-only view of an existing saved temperature/fan
     // reading. No fan unlock, PWM write, subprocess or sensor controls.
     function selectSavedThermal(token) {
-        const original=ThermalFavoriteSelection.resolve(
-            token,favoriteStore.favoriteKeys,thermalRows,fanRows);
-        if(!original.ok) return false;
-
+        if(!ThermalFavoriteSelection.validToken(token)) return false;
+        // The token's first letter is an allowlisted VIEW type, not an
+        // authority grant. Open that local view before resolving sensors.
         if(!menuOpen) menuOpen=true;
-        if(!menuOpen) return false;
         switchMode(thermalModeIndex,false);
         thermalController.setThermalViewMode(
-            original.kind==="fan"
+            token.charAt(0)==="f"
             ? thermalController.thermalViewFans
             : thermalController.thermalViewThermal);
         searchInput.text="";
-
-        // Revalidate after mode setup, since telemetry can change between
-        // the CPU++ click and the owner-local UI selection.
+        const original=ThermalFavoriteSelection.resolve(
+            token,favoriteStore.favoriteKeys,thermalRows,fanRows);
+        if(!original.ok)
+            return deferFavoriteSelection("thermal",token,thermalModeIndex,
+                "SAVED SENSOR NOT FOUND IN CURRENT READINGS // THERMAL IS OPEN");
         const current=ThermalFavoriteSelection.resolve(
             token,favoriteStore.favoriteKeys,thermalRows,fanRows);
         if(!current.ok || current.sourceId!==original.sourceId
                 || current.kind!==original.kind)
-            return false;
+            return deferFavoriteSelection("thermal",token,thermalModeIndex,
+                "SAVED SENSOR NO LONGER AVAILABLE // THERMAL IS OPEN");
         const index=ThermalFavoriteSelection.selectedIndex(
             token,current.sourceId,[...thermalResults.values],current.kind);
-        if(index<0) return false;
-
+        if(index<0)
+            return deferFavoriteSelection("thermal",token,thermalModeIndex,
+                "SAVED SENSOR NOT VISIBLE IN THIS VIEW // THERMAL IS OPEN");
+        clearFavoriteNavigation();
         selectedResultIndex=index;
         hoveredResultIndex=-1;
         detailFocused=false;
         resetDetailActionSelection();
         Qt.callLater(function() {
             if(!menuOpen || selectedModeIndex!==thermalModeIndex
-                    || selectedResultIndex!==index
                     || thermalController.thermalViewMode!==(
                         original.kind==="fan" ? thermalController.thermalViewFans
                                               : thermalController.thermalViewThermal))

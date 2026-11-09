@@ -4162,15 +4162,14 @@ PanelWindow {
                                             opacity: 0.50
                                         }
                                     }
-                                    // The original target disappears from the playable
-                                    // list immediately, so a short-lived echo at its
-                                    // actual drawn bounds shows the RED impact on it.
+                                    // Gameplay removes the target immediately, but
+                                    // the captured thumbnail stays visible during
+                                    // flight. It turns RED only after impact.
                                     Item {
                                         id: huntHitAnimalEcho
                                         z: 77
                                         visible: camera.huntShotEffect
                                                  && camera.huntShotEffect.hit
-                                                 && huntLaserLayer.impactReached
                                         readonly property var shot: camera.huntShotEffect
                                             || ({rectX: 0, rectY: 0, rectW: 0, rectH: 0,
                                                  path: "", mediaType: ""})
@@ -4183,7 +4182,10 @@ PanelWindow {
                                             anchors.fill: parent
                                             radius: 5
                                             color: Colors.black
-                                            border.color: Colors.red
+                                            border.color: huntLaserLayer.impactReached
+                                                          ? Colors.red
+                                                          : camera.huntTargetColor(
+                                                              huntHitAnimalEcho.shot.profile)
                                             border.width: 2
                                             Image {
                                                 anchors.fill: parent
@@ -4199,10 +4201,12 @@ PanelWindow {
                                                 anchors.fill: parent
                                                 radius: 4
                                                 color: Colors.red
-                                                opacity: 0.40
+                                                opacity: huntLaserLayer.impactReached
+                                                         ? 0.40 : 0
                                             }
                                             GohuText {
                                                 anchors.centerIn: parent
+                                                visible: huntLaserLayer.impactReached
                                                 text: "HIT"
                                                 font.pixelSize: 12
                                                 color: Colors.white

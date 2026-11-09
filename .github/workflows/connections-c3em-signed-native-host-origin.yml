@@ -1,0 +1,76 @@
+name: Connections C3e-M signed native host origin and kernel inode (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eMSignedHostOrigin.py"
+      - "tests/connections/fixtures/C3eMSignedNativeStatusHost.c"
+      - "tests/connections/test_connections_c3em_signed_native_host.py"
+      - ".github/workflows/connections-c3em-signed-native-host-origin.yml"
+      - "docs/connections-c3em-signed-native-host-origin.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-root-signed-native-host:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Source syntax, compiling native ELF and deny-only contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eMSignedHostOrigin.py \
+            tests/connections/test_connections_c3em_signed_native_host.py
+          command -v gpg
+          command -v gpgv
+          command -v gcc
+          mkdir -p "${RUNNER_TEMP}/c3em-native-check"
+          gcc -std=gnu11 -O2 -Wall -Wextra -Werror -fPIE -pie \
+            -o "${RUNNER_TEMP}/c3em-native-check/signed-native-status-host" \
+            tests/connections/fixtures/C3eMSignedNativeStatusHost.c
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          test "$(id -u)" != "0"
+          sudo -n id -u | grep -qx 0
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path("services/connections")
+          assert "readonly property bool credentialActionsEnabled: false" in (base/"ConnectionsBroker.qml").read_text()
+          assert "readonly property bool hostAuthenticated: false" in (base/"ConnectionsRequestStatus.qml").read_text()
+          for path in (*base.glob("*.qml"), *base.glob("*.js"), base/"qmldir"):
+              assert "C3eMSignedHostOrigin" not in path.read_text(), path
+          print("C3EM_PASS // NATIVE_ELF_COMPILES_PRODUCTION_GRANTS_DENIED")
+          PY
+      - name: Real root-signed delegated native host and kernel executable tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n python3 -B tests/connections/test_connections_c3em_signed_native_host.py
+          echo "C3EM_PASS // VERIFIED_SIGNED_RUNNING_NATIVE_HOST_WITHOUT_REAL_GRANT"
+      - name: Preserve K/L reverse-identity and signed recovery regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n python3 -B tests/connections/test_connections_c3el_host_status_observation.py
+          sudo -n python3 -B tests/connections/test_connections_c3ek_protected_witness.py
+          python3 -B tests/connections/test_connections_c3ej_witness_peer.py
+          python3 -B tests/connections/test_connections_c3ei_supervised_supersession.py
+          python3 -B tests/connections/test_connections_c3eh_operator_recovery_gate.py
+          python3 -B tests/connections/test_connections_c3eg_split_commit_recovery.py
+          python3 -B tests/connections/test_connections_c3ef_rollback_witness.py
+          echo "C3EM_PASS // PRIOR_BIDIRECTIONAL_WITNESS_AND_SIGNED_CRASH_GATES"
+      - name: Preserve non-production authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'not a production' docs/connections-c3em-signed-native-host-origin.md
+          grep -Fq 'synthetic status' docs/connections-c3em-signed-native-host-origin.md
+          grep -Fq '"hostAuthenticated": False' tests/connections/c3e_release_trust/C3eMSignedHostOrigin.py
+          echo "C3EM_LIMITATION // SYNTHETIC_KEYS_AND_NATIVE_HOST_NOT_INSTALLED"

@@ -80,54 +80,6 @@ Item {
             color: Colors.cyan
         }
 
-        Rectangle {
-            width: parent.width
-            height: 104
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.cyan
-
-            Column {
-                anchors.fill: parent
-                anchors.margins: 9
-                spacing: 6
-
-                GohuText {
-                    width: parent.width
-                    elide: Text.ElideRight
-                    font.pixelSize: 11
-                    color: explorePanel.activeExplore ? Colors.magenta : Colors.white
-                    text: explorePanel.activeExplore
-                          ? "ACTIVE // " + explorePanel.activeExplore.place.label
-                          : explorePanel.hadExpiredExplore
-                          ? "EXPIRED // HOME" : "NOT ACTIVE"
-                }
-
-                QuietText {
-                    width: parent.width
-                    font.pixelSize: 9
-                    text: explorePanel.activeExplore
-                          ? Number(explorePanel.activeExplore.place.latitude).toFixed(4)
-                            + "°, " + Number(explorePanel.activeExplore.place.longitude).toFixed(4) + "°"
-                          : "HOME REMAINS THE DEFAULT"
-                }
-
-                QuietText {
-                    width: parent.width
-                    font.pixelSize: 9
-                    text: explorePanel.activeExplore
-                          ? explorePanel.activeExplore.expiresAtMs === null
-                            ? "UNTIL RETURN HOME"
-                            : "ENDS IN "
-                              + Math.ceil(explorePanel.registry.remainingMs / 60000)
-                              + " MIN"
-                          : explorePanel.hadExpiredExplore
-                          ? "EXPIRY ENFORCED // PERSISTED RECORD CAN BE CLEARED"
-                          : "SELECT DESTINATION + DURATION BELOW"
-                }
-            }
-        }
-
         QuietText {
             width: parent.width
             wrapMode: Text.WordWrap
@@ -360,6 +312,56 @@ Item {
                             explorePanel.registry.errorCode
                         );
                     }
+                }
+            }
+        }
+
+        // U9b // Active-location status follows destination, duration,
+        // Explore Here and Return Home actions, not preceding the editor.
+        Rectangle {
+            width: parent.width
+            height: 104
+            color: Colors.black
+            border.width: 1
+            border.color: Colors.cyan
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 9
+                spacing: 6
+
+                GohuText {
+                    width: parent.width
+                    elide: Text.ElideRight
+                    font.pixelSize: 11
+                    color: explorePanel.activeExplore ? Colors.magenta : Colors.white
+                    text: explorePanel.activeExplore
+                          ? "ACTIVE // " + explorePanel.activeExplore.place.label
+                          : explorePanel.hadExpiredExplore
+                          ? "EXPIRED // HOME" : "NOT ACTIVE"
+                }
+
+                QuietText {
+                    width: parent.width
+                    font.pixelSize: 9
+                    text: explorePanel.activeExplore
+                          ? Number(explorePanel.activeExplore.place.latitude).toFixed(4)
+                            + "°, " + Number(explorePanel.activeExplore.place.longitude).toFixed(4) + "°"
+                          : "HOME REMAINS THE DEFAULT"
+                }
+
+                QuietText {
+                    width: parent.width
+                    font.pixelSize: 9
+                    text: explorePanel.activeExplore
+                          ? explorePanel.activeExplore.expiresAtMs === null
+                            ? "UNTIL RETURN HOME"
+                            : "ENDS IN "
+                              + Math.ceil(explorePanel.registry.remainingMs / 60000)
+                              + " MIN"
+                          : explorePanel.hadExpiredExplore
+                          ? "EXPIRY ENFORCED // PERSISTED RECORD CAN BE CLEARED"
+                          : "SELECT DESTINATION + DURATION BELOW"
                 }
             }
         }

@@ -44,6 +44,7 @@ for banned in (
 assert '"context": { "notificationScope": scope }' in CONVERTER.read_text()
 assert 'function shouldBlockNotification(entry)' in SVC.read_text()
 assert '"x-post-apollo-account-id"' in SCOPE_TEXT
+assert 'process.env.FLATPAK_ID === "dev.vencord.Vesktop"' in NATIVE_TEXT
 
 NODE = r"""
 import assert from 'node:assert/strict';
@@ -147,6 +148,11 @@ assert(d.kinds.includes('conversation')&&d.kinds.includes('sender'));
 assert(gr.kinds.includes('group')&&gr.kinds.includes('sender'));
 assert(!d.kinds.includes('group'));
 assert(!gr.kinds.includes('conversation'));
+assert.equal(
+ id.notificationArgs(guildEvent,'dev.vencord.Vesktop').find(x=>x.startsWith('--hint=string:desktop-entry:')),
+ '--hint=string:desktop-entry:dev.vencord.Vesktop');
+assert.equal(id.notificationArgs(guildEvent,'unknown.desktop'),null,
+ 'arbitrary desktop-entry identity cannot bypass app-scoped policies');
 const invalid=id.notificationArgs({ ...groupEvent, senderId:'; rm -rf' });
 assert.equal(invalid,null);
 assert.equal(id.notificationArgs({...groupEvent, accountId:''}),null);

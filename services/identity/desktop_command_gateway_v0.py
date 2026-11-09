@@ -184,6 +184,9 @@ class IdentityCommandGateway:
             server.owner = self
             self._server = server
             try:
+                # Record the inode before chmod/checks so a failed start can
+                # safely remove only the socket we just created.
+                self._socket_inode = self._path.lstat().st_ino
                 os.chmod(self._path, 0o600)
                 info = self._path.lstat()
                 if (not stat.S_ISSOCK(info.st_mode)

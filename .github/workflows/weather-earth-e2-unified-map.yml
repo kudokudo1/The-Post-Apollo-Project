@@ -8,6 +8,7 @@ on:
       - 'widgets/weather/StationEarthWaterPane.qml'
       - 'widgets/weather/StationEarthServicesPane.qml'
       - 'widgets/weather/StationEarthOverviewPane.qml'
+      - 'widgets/weather/StationEarthMapHeader.qml'
       - 'widgets/weather/StationEarthOverviewPolicy.js'
       - 'widgets/weather/StationGround.qml'
       - 'widgets/weather/StationWeatherSubjectPanelPolicy.js'
@@ -21,6 +22,8 @@ on:
       - 'tests/weather/test_earth_e5_ground_no_scroll.js'
       - 'tests/weather/test_earth_e6_overview.js'
       - 'tests/weather/test_earth_e7_overview.js'
+      - 'tests/weather/test_earth_e8_c44_header.js'
+      - 'tests/weather/fixtures/E8EarthHeaderNativeShell.qml'
       - 'tests/weather/fixtures/E6EarthOverviewNativeShell.qml'
       - 'tests/weather/fixtures/E5GroundNoScroll.qml'
       - 'tests/weather/fixtures/E2EarthUnifiedNativeShell.qml'
@@ -46,6 +49,7 @@ jobs:
             tests/weather/test_earth_e5_ground_no_scroll.js \
             tests/weather/test_earth_e6_overview.js \
             tests/weather/test_earth_e7_overview.js \
+            tests/weather/test_earth_e8_c44_header.js \
             tests/weather/test_earth_subject_panels_e1.js \
             tests/weather/test_index_earth_cutover_m28h.js \
             tests/weather/test_workspace_landing_w1.js \
@@ -151,5 +155,31 @@ jobs:
           grep -F "E6_NATIVE_PASS // HALF_MAP_THREE_TOPIC_ARROWS_NO_DUPLICATE_MAP" "$work/overview-native.log"
           grep -F "E7_NATIVE_PASS // COSMOS_RAIL_MICROCHARTS_NO_OVERVIEW_SCROLLBAR" "$work/overview-native.log"
           if grep -E 'E6_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/overview-native.log"; then
+            exit 1
+          fi
+      - name: Verify EARTH E8 shared C44 top rail and no nested overview rail
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(pwd)"
+          work="$(mktemp -d /tmp/earth-e8.XXXXXXXX)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -m 700 "$work/home" "$work/runtime" "$work/cache" "$work/config"
+          mkdir -p "$work/config/widgets"
+          cp -a "$root/components" "$work/config/components"
+          cp -a "$root/widgets/weather" "$work/config/widgets/weather"
+          cp -a "$root/services" "$work/config/services"
+          cp "$root/tests/weather/fixtures/E8EarthHeaderNativeShell.qml" "$work/config/shell.qml"
+          rc=0
+          timeout --signal=TERM --kill-after=3s 40s \
+            env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
+            XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            quickshell --no-color -p "$work/config/shell.qml" \
+            > "$work/header-native.log" 2>&1 || rc=$?
+          cat "$work/header-native.log"
+          test "$rc" -eq 0
+          grep -F "E8_NATIVE_PASS // C44_ALL_EARTH_TOP_RAIL_NO_LOWER_DUPLICATE" "$work/header-native.log"
+          if grep -E 'E8_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/header-native.log"; then
             exit 1
           fi

@@ -1,28 +1,37 @@
 import QtQuick
 import "../components"
 
-// ANGEL // EXPLICIT SELECTION COLOR ONLY.
-// Idle/hover/press/focus remain black; only a navigation or history action
-// explicitly opted into selection highlighting gets a yellow background.
-// Favorite membership and ERR status are not navigation selections.
-// Keep this local: the shared button's broad glows are unsafe for Angel rows.
+// ANGEL // STABLE COLOR WASH BY IDENTITY.
+// Every Angel button is always gently washed with its own accent color.
+// Open/selected navigation uses yellow with magenta ink/glow instead.
+// A fully opaque blend prevents translucent compositing changes while scrolling.
+// The shared ActionButton's broad rectangular shadows remain disabled.
 ActionButton {
     id: angelButton
 
-    readonly property color fixedFillColor: Colors.black
+    readonly property color baseFillColor: Colors.black
     readonly property color activeFillColor: Colors.yellow
-    // Only OPEN/SELECT navigation explicitly enables the selection wash.
+    readonly property real washStrength: 0.24
+    readonly property color steadyWashColor: Qt.rgba(
+        baseFillColor.r * (1.0 - washStrength) + accentColor.r * washStrength,
+        baseFillColor.g * (1.0 - washStrength) + accentColor.g * washStrength,
+        baseFillColor.b * (1.0 - washStrength) + accentColor.b * washStrength,
+        1.0
+    )
+    // Selected means OPEN only when this control explicitly opts in.
+    // Stars and ERR markers use selected for their status, not navigation.
     property bool highlightWhenSelected: false
 
-    idleFillColor: fixedFillColor
-    hoverFillColor: fixedFillColor
-    pressedFillColor: fixedFillColor
-    selectedFillColor: activeFillColor
-    keyboardSelectedFillColor: fixedFillColor
+    idleFillColor: steadyWashColor
+    hoverFillColor: steadyWashColor
+    pressedFillColor: steadyWashColor
+    selectedFillColor: highlightWhenSelected ? activeFillColor : steadyWashColor
+    keyboardSelectedFillColor: steadyWashColor
 
-    // Never use the shared hover/press/keyboard fill-state dispatcher.
-    // List scrolling cannot accidentally produce a colored background.
-    color: highlightWhenSelected && selected ? activeFillColor : fixedFillColor
+    // One deterministic color per control identity. Mouse/scroll/focus
+    // cannot turn a different or stale fill on. Selection alone overrides
+    // the default wash with solid yellow for opt-in navigation controls.
+    color: highlightWhenSelected && selected ? activeFillColor : steadyWashColor
 
     selectedForegroundColor: Colors.magenta
     selectedBorderColor: Colors.magenta

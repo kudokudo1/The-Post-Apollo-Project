@@ -3470,7 +3470,7 @@ PanelWindow {
                                     width: 32
                                     height: 28
 
-                                    label: notificationEntry.inheritedRule ? "ZZ*" : "ZZ"
+                                    label: "ZZ"
 
                                     active: notificationEntry.snoozed
                                     // Remain clickable when a parent rule is
@@ -3496,7 +3496,7 @@ PanelWindow {
                                     width: 38
                                     height: 28
 
-                                    label: notificationEntry.inheritedRule ? "DND*" : "DND"
+                                    label: "DND"
 
                                     labelPixelSize: 9
 

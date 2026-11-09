@@ -115,8 +115,11 @@ test("CPU++ shell and AppControl select a saved sensor, never activate fan contr
   const owner=app.split("function selectSavedThermal(token) {")[1]
     .split("function rememberCurrentAppSelection() {")[0];
   assert.ok(owner);
-  assert.match(owner,/ThermalFavoriteSelection\.resolve\(/);
-  assert.match(owner,/favoriteStore\.favoriteKeys/);
+  // U7b-G: read-only opening is intentionally resolved from live owner
+  // rows. The older strict saved-membership policy remains independently
+  // tested above, but no longer blocks view-only navigation.
+  assert.match(owner,/ThermalFavoriteSelection\.resolveVisible\(/);
+  assert.doesNotMatch(owner,/favoriteStore\.favoriteKeys/);
   assert.match(owner,/thermalRows,fanRows/);
   assert.match(owner,/switchMode\(thermalModeIndex,false\)/);
   assert.match(owner,/thermalController\.setThermalViewMode\(/);

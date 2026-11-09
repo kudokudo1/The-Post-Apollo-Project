@@ -298,6 +298,8 @@ grep -F 'U7E_PASS // EXACT_TEMPERATURE_SELECTION' "$log" >/dev/null ||
   { echo "U7E_FAIL // temperature route was not verified"; exit 1; }
 grep -F 'U7E_PASS // EXACT_THERMAL_AND_FAN_SELECTION_NO_ACTIONS' "$log" >/dev/null ||
   { echo "U7E_FAIL // native thermal and fan item clicks were not verified"; exit 1; }
+grep -F 'U7G_PASS // QML_TYPED_LIST_AND_EXACT_LIVE_SENSOR' "$log" >/dev/null ||
+  { echo "U7G_FAIL // native QML typed-list and SENSOR 13 identity were not verified"; exit 1; }
 if find "$work/data" -type f | grep -q .; then
   echo "U4_FAIL // manager created a writer file"; exit 1
 fi

@@ -93,6 +93,40 @@ function resolve(token,savedKeys,thermalRows,fanRows) {
     if(matches!==1) return {ok:false};
     return {ok:true,kind:candidate.kind,sourceId:candidate.sourceId};
 }
+// U7b-G // Selection is a local READ-ONLY view operation, not favorite
+// mutation or privileged device action. Once CPU++ has supplied a bounded,
+// syntactically validated view token, the owner should resolve it against
+// its own LIVE sensor rows, not gate opening the local view on a second
+// favorites-store membership lookup that may be stale.
+// The short token is not an authorization mechanism: only one genuine
+// _thermalRecord in the matching sensor family can be selected. Neither
+// device paths nor raw IDs leave AppControl.
+function resolveVisible(token,thermalRows,fanRows) {
+    if(!validToken(token) || !Array.isArray(thermalRows)
+            || !Array.isArray(fanRows))
+        return {ok:false,reason:"INVALID_CONTEXT"};
+    const kind=token.charAt(0)==="f" ? "fan" : "temperature";
+    const rows=kind==="fan" ? fanRows : thermalRows;
+    let matchId="",matches=0;
+    for(const row of rows) {
+        if(!row || typeof row!=="object"
+                || row._thermalRecord!==true
+                || row.sensorKind!==kind
+                || typeof row.id!=="string") continue;
+        // Reconstruct ONLY AppControl's established favoriteKeyFor()
+        // identity, without consulting stored favorites or display names.
+        const raw="thermal|"+encodeURIComponent(row.id);
+        const parsed=parseSavedKey(raw);
+        if(!parsed || parsed.kind!==kind
+                || tokenForSavedKey(raw)!==token) continue;
+        matches++;
+        if(matches>1) return {ok:false,reason:"AMBIGUOUS_LIVE_ID"};
+        matchId=row.id;
+    }
+    if(matches!==1) return {ok:false,reason:"NO_MATCHING_LIVE_ID"};
+    return {ok:true,reason:"",kind:kind,sourceId:matchId};
+}
+
 function selectedIndex(token,sourceId,visibleRows,kind) {
     if(!validToken(token) || !validSourceId(sourceId)
             || !Array.isArray(visibleRows)

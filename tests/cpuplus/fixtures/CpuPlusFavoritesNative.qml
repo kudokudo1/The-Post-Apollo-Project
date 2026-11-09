@@ -5,6 +5,9 @@ import "widgets/cpuplus"
 import "widgets/appcontrol"
 import "services/favorites/FavoritesManagementPolicy.js" as Management
 import "services/favorites/FavoritesCollectionsPolicy.js" as CollectionRules
+import "services/favorites/FavoritesAppSelectionPolicy.js" as AppPolicy
+import "services/favorites/FavoritesSystemSelectionPolicy.js" as SystemPolicy
+import "services/favorites/FavoritesThermalSelectionPolicy.js" as ThermalPolicy
 
 // Disposable native UI test. Original owners are mocked, no real user stores.
 ShellRoot {
@@ -17,6 +20,55 @@ ShellRoot {
     property bool indexClicked: false
     property int testStage: 0
     property bool done: false
+    // Native Quickshell probe with the REAL JsonAdapter field type.
+    // The old mock used property var and falsely passed Array.isArray().
+    QtObject {
+        id: typedFavorites
+        property list<string> favoriteKeys: [
+            "org.example.Demo.desktop",
+            "system|system%3Acpu",
+            "thermal|thermal%3Anct6798%3ASENSOR%2013"
+        ]
+    }
+    Timer {
+        interval: 1
+        running: true
+        repeat: false
+        onTriggered: {
+            // Qt QML list<string> is array-LIKE, not a JS Array.
+            if(Array.isArray(typedFavorites.favoriteKeys)) {
+                root.fail("U7G_QML_TYPED_LIST_NOT_ARRAY_LIKE");return;
+            }
+            const keys=[];
+            for(let i=0;i<typedFavorites.favoriteKeys.length;i++)
+                keys.push(typedFavorites.favoriteKeys[i]);
+            if(!Array.isArray(keys)
+                    || !AppPolicy.ownerAllows(
+                        "org.example.Demo.desktop",keys,
+                        [{id:"org.example.Demo.desktop"}])
+                    || !SystemPolicy.ownerAllows("cpu",keys,
+                        [{id:"system:cpu",_systemRecord:true}])) {
+                root.fail("U7G_TYPED_LIST_OWNER_COPY_FAILED");return;
+            }
+            const one={
+                id:"thermal:k10temp:SENSOR 13",
+                sensorKind:"temperature",_thermalRecord:true
+            };
+            const wanted={
+                id:"thermal:nct6798:SENSOR 13",
+                sensorKind:"temperature",_thermalRecord:true
+            };
+            const token=ThermalPolicy.tokenForSavedKey(
+                "thermal|thermal%3Anct6798%3ASENSOR%2013");
+            const found=ThermalPolicy.resolveVisible(token,[one,wanted],[]);
+            const collision=ThermalPolicy.resolveVisible(
+                token,[one,wanted,wanted],[]);
+            if(!found.ok || found.sourceId!==wanted.id || collision.ok) {
+                root.fail("U7G_TYPED_LIST_SENSOR_ID_MISMATCH");return;
+            }
+            console.log("U7G_PASS // QML_TYPED_LIST_AND_EXACT_LIVE_SENSOR");
+        }
+    }
     QtObject {
         id: fakeAppControl
         property var thermalRows: []

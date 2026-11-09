@@ -16,11 +16,13 @@ on:
       - 'tests/cpuplus/test_cpuplus_universal_signin_flow_v3.cjs'
       - 'tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs'
       - 'tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs'
+      - 'tests/cpuplus/test_cpuplus_identity_host_seam_v6.py'
       - 'docs/cpuplus-universal-signin-visual-v1.md'
       - 'docs/cpuplus-universal-signin-journey-v2.md'
       - 'docs/cpuplus-universal-signin-flow-v3.md'
       - 'docs/cpuplus-universal-signin-host-boundary-v4.md'
       - 'docs/cpuplus-universal-signin-intent-v5.md'
+      - 'docs/cpuplus-universal-signin-host-seam-v6.md'
       - '.github/workflows/cpuplus-universal-signin-visual-v1.yml'
   push:
     branches: [main, 'feat/cpuplus-signin-*', 'feat/cpuplus-universal-signin-*']
@@ -38,6 +40,7 @@ on:
       - 'tests/cpuplus/test_cpuplus_universal_signin_flow_v3.cjs'
       - 'tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs'
       - 'tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs'
+      - 'tests/cpuplus/test_cpuplus_identity_host_seam_v6.py'
       - '.github/workflows/cpuplus-universal-signin-visual-v1.yml'
 permissions:
   contents: read
@@ -60,6 +63,12 @@ jobs:
         run: node tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs
       - name: Universal Sign-In V5 proposed command envelope (review-only)
         run: node tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs
+      - name: V6 actual Identity Center host and CPU++ integration seam
+        run: |
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_identity_host_seam_v6.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_host_lifecycle_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_session_host_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_private_context_ipc_v0.py' -v
       - name: Existing CPU++ Connections, deny-only and account editor behavior
         run: |
           node tests/cpuplus/test_cpuplus_connections_c1.js

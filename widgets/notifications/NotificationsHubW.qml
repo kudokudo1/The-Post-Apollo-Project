@@ -883,7 +883,8 @@ PanelWindow {
     function scopeTag(kind) {
         const labels = {
             "app": "APP", "website": "SITE", "title": "TITLE",
-            "sender": "SENDER", "conversation": "DM",
+            "sender": "SENDER", "conversation": "CHAT", "group": "GROUP",
+            "thread": "THREAD", "account": "ACCT",
             "server": "SERVER", "channel": "CHAN", "event": "EVENT",
             "resource": "RSRC", "resourceEvent": "R+E"
         };
@@ -3500,8 +3501,8 @@ PanelWindow {
                             // ===== SOURCE-SCOPED / CARD CONTROLS =====
                             //
                             // The footer cycles exact rule targets: APP,
-                            // SITE, declared sender/server/DM/channel/event,
-                            // RESOURCE, RESOURCE+EVENT, or literal TITLE matching.
+                            // SITE, account/contact/DM/group/thread/server/channel
+                            // and event, RESOURCE, R+E, or literal TITLE matching.
                             // FAVS and BLOCK follow the selected scope.
                             // BLOCK rejects future matching intake BEFORE
                             // history; CLEAR ALL still removes existing

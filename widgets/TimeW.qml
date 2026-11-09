@@ -18,8 +18,8 @@ import "../services/time/MachineSelectionPolicy.js" as MachineSelectionPolicy
 import "../services/time/MachineLayoutDiffPolicy.js" as MachineLayoutDiffPolicy
 import "../services/time/MachineRestorePreviewPolicy.js" as MachineRestorePreviewPolicy
 
-// TimeW: standalone temporal window. Manual MACHINE timeline markers are
-// session-local; no screenshots or desktop restoration are implemented.
+// TimeW: standalone temporal window. Manual MACHINE timeline markers are session-local;
+// no screenshots or automatic desktop restoration are implemented.
 // The clock dock and shell wiring are intentionally separate integration steps.
 PanelWindow {
     id: timew
@@ -1067,7 +1067,8 @@ PanelWindow {
         && machineMoveReviewIndex >= 0
         && machineMoveReviewIndex < machineMoveReviewResult.items.length
         ? machineMoveReviewResult.items[machineMoveReviewIndex] : null
-    // M1p confirmation dry run: typed input never becomes M1n approval.
+    // M1p VALIDATE ONLY remains read-only. M1r uses a separate, explicit
+    // operator click for one bounded window placement; never auto-restore.
     property string machineConfirmationTyped: ""
     property bool machineConfirmationBusy: false
     property string machineConfirmationPayload: ""
@@ -1075,6 +1076,14 @@ PanelWindow {
     property string machineConfirmationSubmittedKey: ""
     property string machineConfirmationStatus: "NOT CONFIRMED"
     property var machineConfirmationResult: null
+
+    // One deliberate restore action, not a timeline-wide playback operation.
+    property bool machineApplyBusy: false
+    property string machineApplyPayload: ""
+    property string machineApplyKey: ""
+    property string machineApplySubmittedText: ""
+    property var machineApplyResult: null
+    property string machineApplyStatus: "NOT APPLIED"
     readonly property bool machineReviewReadyForConfirmation:
         machineMoveReviewResult
         && machineMoveReviewResult.kind === "machine-m1o-action-review"
@@ -1094,6 +1103,12 @@ PanelWindow {
         machineConfirmationSubmittedKey = "";
         machineConfirmationResult = null;
         machineConfirmationStatus = "NOT CONFIRMED";
+        machineApplyPayload = "";
+        machineApplyKey = "";
+        machineApplySubmittedText = "";
+        machineApplyResult = null;
+        if (!machineApplyBusy)
+            machineApplyStatus = "NOT APPLIED";
     }
     function machineConfirmPreviewOnly() {
         if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
@@ -1118,6 +1133,35 @@ PanelWindow {
         machineConfirmPreviewProcess.exec(["python3", "-B", "-I",
             Quickshell.shellPath("services/time/MachineMoveConfirmRead.py"),
             "confirm-preview"]);
+    }
+
+    function machineRestoreOneWindow() {
+        if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
+                || machineApplyBusy || machineConfirmationBusy
+                || machineMoveReviewBusy || machineResolverBusy
+                || machineStoreBusy || machineCaptureBusy
+                || !machineReviewReadyForConfirmation
+                || machineConfirmationTyped === ""
+                || machineConfirmationTyped !== machineConfirmationPhrase
+                || !machineSavedItem || !machineOpenedCheckpoint
+                || machineOpenedCheckpoint.checkpoint.id !== machineSavedItem.id
+                || !machineResolverItem
+                || machineResolverItem.status !== "candidate")
+            return;
+        machineApplyKey = machineMoveCandidateKey;
+        machineApplySubmittedText = machineConfirmationTyped;
+        machineApplyPayload = JSON.stringify({
+            checkpoint_id: machineSavedItem.id,
+            document: machineOpenedCheckpoint.document,
+            candidate: machineResolverItem,
+            confirmation_text: machineConfirmationTyped
+        });
+        machineApplyResult = null;
+        machineApplyStatus = "RECHECKING SAVED WINDOW // RESTORE REQUESTED";
+        machineApplyBusy = true;
+        machineApplyOneProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineMoveApply.py"),
+            "apply-one"]);
     }
 
     function machineInvalidateMoveReview() {
@@ -1659,6 +1703,79 @@ PanelWindow {
             if (exitCode !== 0) {
                 timew.machineConfirmationResult = null;
                 timew.machineConfirmationStatus = "CONFIRMATION NOT VALIDATED";
+            }
+        }
+    }
+
+    // M1r opt-in one-window execution. This process is never started by a
+    // checkpoint load, comparison, menu open, timer, or background task.
+    Process {
+        id: machineApplyOneProcess
+        running: false
+        stdinEnabled: true
+        onStarted: {
+            if (timew.machineApplyPayload)
+                machineApplyOneProcess.write(
+                    timew.machineApplyPayload + String.fromCharCode(10));
+            timew.machineApplyPayload = "";
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const result = JSON.parse(this.text);
+                    const valid = timew.menuOpen
+                        && timew.selectedMode === "machine"
+                        && timew.machineStoredViewOpen
+                        && timew.machineApplyKey !== ""
+                        && timew.machineApplyKey === timew.machineMoveCandidateKey
+                        && timew.machineApplySubmittedText !== ""
+                        && timew.machineApplySubmittedText
+                           === timew.machineConfirmationTyped
+                        && timew.machineApplySubmittedText
+                           === timew.machineConfirmationPhrase
+                        && timew.machineResolverItem
+                        && result.kind === "machine-m1q-single-window-result"
+                        && (result.status === "verified_moved"
+                            || result.status === "refused_no_confirmed_move"
+                            || result.status === "uncertain_requires_manual_review")
+                        && typeof result.operation_id === "string"
+                        && result.no_automatic_retry === true
+                        && result.no_automatic_undo === true
+                        && result.app_id === timew.machineResolverItem.app_id
+                        && result.from_workspace
+                           === timew.machineResolverItem.current_workspace
+                        && result.to_workspace
+                           === timew.machineResolverItem.target_workspace;
+                    if (valid) {
+                        // The result is for the preceding candidate, never a
+                        // permit to move it again without a fresh review.
+                        timew.machineInvalidateResolver();
+                        timew.machineApplyResult = result;
+                        timew.machineApplyStatus =
+                            result.status === "verified_moved"
+                            ? "ONE WINDOW MOVED // RE-RESOLVE TO CONTINUE"
+                            : result.status === "refused_no_confirmed_move"
+                            ? "MOVE REFUSED // NO CONFIRMED CHANGE"
+                            : "MOVE UNCERTAIN // CHECK INTERRUPTS";
+                    } else {
+                        timew.machineApplyResult = null;
+                        timew.machineApplyStatus =
+                            "MOVE NOT VERIFIED // CHECK INTERRUPTS";
+                    }
+                } catch (error) {
+                    timew.machineApplyResult = null;
+                    timew.machineApplyStatus =
+                        "INVALID MOVE RESPONSE // CHECK INTERRUPTS";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.machineApplyBusy = false;
+            timew.machineApplyPayload = "";
+            if (exitCode !== 0) {
+                timew.machineApplyResult = null;
+                timew.machineApplyStatus =
+                    "MOVE REFUSED OR INTERRUPTED // CHECK INTERRUPTS";
             }
         }
     }
@@ -4692,7 +4809,7 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
-                            text: "NO SCREENSHOTS OR RESTORATION ACTIVE"
+                            text: "NO SCREENSHOTS OR AUTOMATIC RESTORATION"
                             color: Colors.orange
                             font.pixelSize: 11
                         }
@@ -4960,7 +5077,7 @@ PanelWindow {
                         GohuText {
                             width: parent.width
                             visible: timew.machineReviewReadyForConfirmation
-                            text: "TYPE EXACT PHRASE // DRY RUN ONLY: "
+                            text: "TYPE EXACT PHRASE // VALIDATE OR RESTORE: "
                                   + timew.machineConfirmationPhrase
                             color: Colors.orange
                             font.pixelSize: 10
@@ -5001,6 +5118,9 @@ PanelWindow {
                                     timew.machineConfirmationTyped = text;
                                     timew.machineConfirmationResult = null;
                                     timew.machineConfirmationStatus = "NOT CONFIRMED";
+                                    timew.machineApplyResult = null;
+                                    if (!timew.machineApplyBusy)
+                                        timew.machineApplyStatus = "NOT APPLIED";
                                 }
                             }
                             ActionButton {
@@ -5026,6 +5146,41 @@ PanelWindow {
                             color: Colors.orange
                             font.pixelSize: 10
                             elide: Text.ElideRight
+                        }
+                        Row {
+                            width: parent.width
+                            height: 33
+                            spacing: 7
+                            visible: timew.machineReviewReadyForConfirmation
+                            ActionButton {
+                                width: parent.width
+                                height: parent.height
+                                label: "RESTORE ONE WINDOW"
+                                labelPixelSize: 10
+                                accentColor: Colors.orange
+                                available: timew.machineReviewReadyForConfirmation
+                                           && !timew.machineApplyBusy
+                                           && !timew.machineConfirmationBusy
+                                           && !timew.machineMoveReviewBusy
+                                           && !timew.machineStoreBusy
+                                           && !timew.machineResolverBusy
+                                           && !timew.machineCaptureBusy
+                                           && timew.machineConfirmationTyped !== ""
+                                           && timew.machineConfirmationTyped
+                                              === timew.machineConfirmationPhrase
+                                onLeftClicked: timew.machineRestoreOneWindow()
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: timew.machineApplyBusy
+                                     || timew.machineApplyStatus !== "NOT APPLIED"
+                            text: timew.machineApplyStatus
+                            color: timew.machineApplyResult
+                                   && timew.machineApplyResult.status === "verified_moved"
+                                   ? Colors.cyan : Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
                         }
                         Row {
                             width: parent.width
@@ -5259,7 +5414,7 @@ PanelWindow {
                         }
                         GohuText {
                             width: parent.width
-                            text: "NO SCREENSHOTS OR RESTORATION ACTIVE"
+                            text: "NO SCREENSHOTS OR AUTOMATIC RESTORATION"
                             color: Colors.orange
                             font.pixelSize: 11
                         }

@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = ROOT / "tests/connections/c3e_release_trust"
@@ -99,6 +100,43 @@ class C3eRDurableReplayTests(unittest.TestCase):
         self.assertEqual(stored[0], "consumed")
         self.assertEqual(stored[1], hashlib.sha256(
             self.fixture.report.read_bytes()).hexdigest())
+
+    def test_01a_changed_evidence_after_signature_check_records_only_verified_bytes(self):
+        # Adversarial window: a trusted test hook replaces the caller-owned
+        # pathname AFTER Q has verified and parsed the original snapshot,
+        # but BEFORE R persists its ledger digest. R must never hash that
+        # substituted data or claim it was signature-verified.
+        original_bytes = self.fixture.report.read_bytes()
+        expected_digest = hashlib.sha256(original_bytes).hexdigest()
+        replacement = b"not the original signed evidence"
+        self.assertNotEqual(hashlib.sha256(replacement).hexdigest(),
+                            expected_digest)
+        verify = R.Q.OneUseTestChallenge.verify
+        fixture = self.fixture
+
+        def substitute_after_verified(challenge, *args, **kwargs):
+            receipt = verify(challenge, *args, **kwargs)
+            self.assertEqual(receipt["verifiedEvidenceSHA256"],
+                             expected_digest)
+            fixture.report.write_bytes(replacement)
+            return receipt
+
+        with mock.patch.object(R.Q.OneUseTestChallenge, "verify",
+                               substitute_after_verified):
+            result = self.consume()
+        self.assertTrue(result["challengeConsumedDurablyInCI"])
+        db = R.connect(self.work)
+        try:
+            saved = db.execute(
+                "SELECT signed_evidence_sha256 FROM challenges WHERE digest=?",
+                (hashlib.sha256(self.challenge).hexdigest(),)
+            ).fetchone()
+        finally:
+            db.close()
+        self.assertEqual(saved, (expected_digest,))
+        self.assertNotEqual(saved[0],
+                            hashlib.sha256(self.fixture.report.read_bytes()).hexdigest())
+        self.refuse("CHALLENGE_ALREADY_CONSUMED_DURABLY")
 
     def test_02_replay_refused_by_fresh_verifier_instance(self):
         self.consume()

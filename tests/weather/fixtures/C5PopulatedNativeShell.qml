@@ -526,19 +526,28 @@ ShellRoot {
                 focused.celnav.ready = true;
                 root.phase = 10;
             } else if (root.phase === 10) {
-                // C38 // PLANETS is now a composite. The original C6
-                // twelve-fact inspector remains the mounted SKY NOW child.
+                // C39 // SKY NOW is now a persistent compact strip. The
+                // original C6 12-field record appears on explicit DETAILS.
                 const shell = focused.instrumentItem;
+                const strip = findNamed(shell,"cosmos-c39-fixed-sky-now");
+                const modes = findNamed(shell,"cosmos-c39-planets-inner-modes");
+                if (!shell || !strip || !modes || strip.recordCount !== 2
+                    || strip.currentRecord.name !== "MARS")
+                    return root.fail("C39_SKY_NOW_STRIP_NOT_POPULATED");
+                if (!focused.skyDetailsExpanded) {
+                    focused.skyDetailsIndex = 0;
+                    focused.skyDetailsExpanded = true;
+                    return;
+                }
                 const details = findNamed(shell,"cosmos-c6-record-detail");
-                const submodes = findNamed(shell,"cosmos-c38-planets-inner-modes");
-                if (!shell || !submodes || !details
-                        || details.recordCount !== 2
+                if (!details || details.recordCount !== 2
                         || details.facts[0].value !== "37.5°"
                         || countNamed(details,"cosmos-c6-observation-cell") !== 12)
                     return root.fail("PLANET_TWELVE_FACTS_MISSING");
                 details.selectedIndex = 1;
                 if (details.facts[1].value !== "125.2°")
                     return root.fail("PLANET_NEXT_ITEM_MISSING");
+                focused.skyDetailsExpanded = false;
                 root.phase = 11;
                 root.route = "cosmos/planets-stars/constellations";
             } else if (root.phase === 11) {

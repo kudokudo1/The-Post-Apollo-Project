@@ -73,8 +73,17 @@ def _write_exclusive(path, contents, mode):
 
 
 def _base():
-    base = Path(tempfile.gettempdir()).resolve(strict=True)
-    _private_dir(base) if (base.stat().st_mode & 0o077) == 0 else None
+    # Ignore TMPDIR overrides: never silently create trials under HOME,
+    # an existing browser profile, a worktree or another configured path.
+    candidate = Path("/tmp")
+    if candidate.is_symlink():
+        raise TrialError("UNSAFE TEMP ROOT")
+    try:
+        base = candidate.resolve(strict=True)
+    except OSError as exc:
+        raise TrialError("TEMP ROOT UNAVAILABLE") from exc
+    if base != candidate or not base.is_dir():
+        raise TrialError("UNSUPPORTED TEMP ROOT")
     return base
 
 
@@ -133,7 +142,7 @@ def init_trial():
         "trial_root": str(root),
         "brave_user_data_dir": str(root / "profile"),
         "registration_present": False,
-        "browser_launched": False,
+        "browser_launched_by_tool": False,
         "local_transport_tested": False,
         "window_identity_verified": False,
         "restore_allowed": False,
@@ -203,7 +212,7 @@ def verify_trial(root_path):
         "exact_extension_id": match.group(1),
         "registration_scoped_to_disposable_profile": True,
         "host_source_matches_repo": True,
-        "browser_launched": False,
+        "browser_launched_by_tool": False,
         "local_transport_tested": False,
         "extension_origin_authenticated": False,
         "window_identity_verified": False,

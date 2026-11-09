@@ -48,6 +48,9 @@ Rectangle {
     // The underlying collectors, selected events and map coordinates remain
     // owned by this StationDiscovery instance.
     property bool earthPinnedMap: false
+    // E6 // The same mapPlot fills the top half of EARTH OVERVIEW.
+    // Controls and event records remain exclusively on MAP / EVENTS.
+    property bool earthOverviewMode: false
     property bool earthServicesOnly: false
     property string earthFocusedLayer: "all"
     // E3 // Single fixed MAP control deck. These controls operate on the
@@ -115,8 +118,8 @@ Rectangle {
         selectRadarHistory(choices[(at + 1) % choices.length].minutes);
     }
     function earthLayerSelected(layer) {
-        return !earthPinnedMap || earthFocusedLayer === "all"
-            || earthFocusedLayer === layer;
+        return !earthPinnedMap || earthOverviewMode
+            || earthFocusedLayer === "all" || earthFocusedLayer === layer;
     }
     function earthLayerEnabled(layer) {
         return !earthMapOnly
@@ -1557,6 +1560,7 @@ Rectangle {
         id: pinnedEarthFilters
         objectName: "earth-e2-pinned-filters"
         visible: stationDiscovery.earthPinnedMap
+            && !stationDiscovery.earthOverviewMode
             && !stationDiscovery.earthServicesOnly
             && !stationDiscovery.viewerOpen
         anchors.top: parent.top
@@ -1594,15 +1598,20 @@ Rectangle {
     Item {
         id: pinnedMapHost
         objectName: "earth-e2-pinned-map-host"
-        visible: pinnedEarthFilters.visible
+        visible: (stationDiscovery.earthOverviewMode
+            && !stationDiscovery.viewerOpen)
+            || pinnedEarthFilters.visible
         anchors.top: pinnedEarthFilters.bottom
         anchors.topMargin: visible ? 3 : 0
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: 20
-        anchors.rightMargin: 20
-        height: visible ? Math.min(270,
-            Math.max(120,stationDiscovery.height*0.43)) : 0
+        anchors.leftMargin: stationDiscovery.earthOverviewMode ? 6 : 20
+        anchors.rightMargin: stationDiscovery.earthOverviewMode ? 6 : 20
+        height: visible
+            ? (stationDiscovery.earthOverviewMode
+                ? Math.max(0,stationDiscovery.height-6)
+                : Math.min(270,Math.max(120,stationDiscovery.height*0.43)))
+            : 0
         clip: true
         z: 1
     }
@@ -1613,7 +1622,7 @@ Rectangle {
     Column {
         id: pinnedMapControls
         objectName: "earth-e3-pinned-map-controls"
-        visible: pinnedMapHost.visible
+        visible: pinnedMapHost.visible && !stationDiscovery.earthOverviewMode
         anchors.top: pinnedMapHost.bottom
         anchors.topMargin: visible ? 3 : 0
         anchors.left: pinnedMapHost.left
@@ -1723,6 +1732,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         visible: !stationDiscovery.viewerOpen && !stationDiscovery.earthServicesOnly
+            && !stationDiscovery.earthOverviewMode
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width

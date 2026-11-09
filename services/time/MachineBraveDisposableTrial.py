@@ -22,6 +22,7 @@ import sys
 import tempfile
 import uuid
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from MachineBraveNativeManifest import generate, HOST_NAME
 
 PREFIX = "postapollo-machine-brave-trial-"

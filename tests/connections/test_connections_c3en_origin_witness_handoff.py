@@ -90,6 +90,9 @@ class C3eNOriginWitnessContract(unittest.TestCase):
     def test_02_real_nonroot_kernel_client_to_root_witness_input(self):
         if os.geteuid() != 0:
             self.skipTest("real separate-UID process test requires disposable sudo CI")
+        # Reusing L's subprocess fixture directly (outside its unittest
+        # runner) requires the parent K fixture class initialization.
+        L.C3eLHostStatusObservationTests.setUpClass()
         fx = L.C3eLHostStatusObservationTests(
             "test_01_reverse_kernel_host_identity_and_floor_observed")
         fx.setUp()

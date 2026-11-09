@@ -136,6 +136,13 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
     total = 0
     observed = None
     seen = {marker: False for marker in REQUIRED_MARKERS}
+    # Exact source/transport boundary counters only. Never log UART payload,
+    # process IDs, hashes, credentials, request IDs or guest-originated text.
+    source_opened = False
+    controller_tail_seen = False
+    relay_status_seen = False
+    relay_complete_seen = False
+    candidate_records = 0
     started = time.monotonic()
     try:
         while time.monotonic() - started < 3700:
@@ -151,6 +158,7 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
                     if not stat.S_ISREG(info.st_mode):
                         reject("GUEST_SERIAL_FD_NOT_REGULAR")
                     source = (info.st_dev, info.st_ino)
+                    source_opened = True
             if fd is not None:
                 # Drain the original open inode BEFORE checking its pathname.
                 # C2v's cleanup unlinks the file immediately on full success.
@@ -173,9 +181,16 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
                         for marker in REQUIRED_MARKERS:
                             if marker in line:
                                 seen[marker] = True
+                        if b"C4B_CONTROLLER_GUEST_LOG_BEGIN" in line:
+                            controller_tail_seen = True
+                        if b"C4D_UART_DIAG // " in line:
+                            relay_status_seen = True
+                            if b"C4D_UART_DIAG // ONE_VALID_RECORD_WRITTEN_TO_UART" in line:
+                                relay_complete_seen = True
                         index = line.find(PREFIX)
                         if index == -1:
                             continue
+                        candidate_records += 1
                         extracted = line[index:].rstrip(b"\r")
                         validate_observation(extracted)
                         if observed is None:
@@ -220,6 +235,23 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
             time.sleep(poll)
         reject("GUEST_SERIAL_CAPTURE_TIMEOUT")
     finally:
+        # Fixed labels and bounded counts help distinguish a missing relay
+        # from a missing serial FD or an incomplete final record. This is
+        # diagnostic-only: it cannot satisfy any C4d acceptance condition.
+        print("C4D_CAPTURE_DIAG // "
+              "serial_opened={} bytes_read={} candidate_records={} "
+              "controller_tail={} relay_status={} relay_complete={} "
+              "c3b_origin={} c4b_runtime_origin={} c4c_signed_process={} "
+              "c2v_rollback={} partial_prefix={}".format(
+                  int(source_opened), min(total, MAX_BYTES + 1),
+                  min(candidate_records, 100),
+                  int(controller_tail_seen), int(relay_status_seen),
+                  int(relay_complete_seen),
+                  int(seen[REQUIRED_MARKERS[0]]),
+                  int(seen[REQUIRED_MARKERS[1]]),
+                  int(seen[REQUIRED_MARKERS[2]]),
+                  int(seen[REQUIRED_MARKERS[3]]),
+                  int(PREFIX in pending)), flush=True)
         if fd is not None:
             os.close(fd)
 

@@ -78,3 +78,22 @@ The earlier real standard fixture [C2v run #42519417601](https://github.com/kudo
 - [ ] Full signed all-assets absent and operator acceptance.
 
 **Decision:** This remains a bounded C2v-owned diagnostic proposal; no merge, production activation, bypass of OSTree rollback, or declaration of C4b success. The host 1400-second observation deadline is preserved until the new independent evidence can distinguish exhausted budget from a stuck process.
+
+
+## Exact root-cause evidence // Full C4b run #42524762475
+
+The independent C4b UART1 observer (new as of PR #1571) ran and emitted timestamped samples while the authoritative rollback CLI stalled. The final sample preserved the real CLI output, in order:
+
+```text
+Moving 'b8e75b7...0' to be first deployment
+Transaction complete; bootconfig swap: no; bootversion: boot.1.0, deployment count change: 0
+error: Checking systemd inhibitor locks: Timeout was reached
+```
+
+This is materially narrower than the earlier symptom. The deployment ordering operation completed, but RPM-OSTree failed while checking systemd reboot inhibitors. **No actual second boot occurred and C4b signed-package removal is still unproven.** The observer also saw rpm-ostreed exit when idle and restart for its read-only status checks; those idle exits are not, by themselves, evidence of a broken daemon. C4b restarted the system D-Bus broker during its legitimate denied-client/origin checks; whether that affected logind's inhibitor D-Bus service is a hypothesis, not verified causality.
+
+Follow-up **diagnostic only**: the existing independent observer now samples systemd-logind.service and dbus-broker.service states, read-only loginctl list-inhibitors and the org.freedesktop.login1 Manager ListInhibitors D-Bus method, and bounded logind/broker journal. It reports numeric exit status and bounded output for both inhibitor requests. No inhibitor checks are skipped, no reboot command changes, no D-Bus/session policies are modified, and no production activation is authorized.
+
+Next: run full signed offline Silverblue on the new exact head, determine whether logind is responsive before/during the inhibitor timeout, correlate with C4b's broker restart, then propose the smallest **C2v owner-approved** correction. Do not confuse a reordered pending deployment with a booted clean one.
+
+This evidence and probe do not make C4b PASS; production HOLD and the original signed/SELinux keyring removal acceptance gates remain intact.

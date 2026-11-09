@@ -694,6 +694,10 @@ PanelWindow {
         huntSpeedGainPercent = 10;
         huntSpeedEvery = 5;
         huntAutoRounds = true;
+        // If auto-next was previously OFF and the round is finished,
+        // restoring its default re-arms exactly one pending handoff.
+        // Pause menu still blocks the timer until Resume.
+        huntAutoPending = huntRoundComplete && huntTargets.length === 0;
         huntLastEvent = "SETTINGS // DEFAULTS RESTORED // NEXT ROUND";
         feedback = "HUNT // DEFAULT SETTINGS RESTORED";
         return true;

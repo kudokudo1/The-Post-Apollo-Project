@@ -3,6 +3,7 @@ import qs.components
 import "../services/hospital"
 import "../services/hospital/HospitalWorkforceManagerPolicy.js" as ManagementPolicy
 import "../services/hospital/HospitalWorkforceJobActivationPolicy.js" as JobActivationPolicy
+import "../services/hospital/HospitalWorkforceStaffingPolicy.js" as StaffingPolicy
 
 // Collapsible content inside SURGERY → SHOW WORKERS, not a new Hospital route.
 // All writes require a separate operator REVIEW and CONFIRM. No AI turns.
@@ -10,6 +11,7 @@ Column {
     id: root
     property bool active: false
     property var doctorService: null
+    property var providerService: null
     property var rooms: []
     property var sessions: []
     property bool roomsLoaded: false
@@ -23,6 +25,12 @@ Column {
     property string roomId: makeId("room")
     property string selectedDoctorId: ""
     property string selectedRoomId: ""
+    property string selectedStaffDoctorId: ""
+    property string selectedStaffProviderId: ""
+    property int staffDoctorPage: 0
+    property int staffProviderPage: 0
+    property int staffRoomPage: 0
+    property string staffingReviewKey: ""
     property string selectedDraftAssignmentId: ""
     property bool assignmentListVerified: false
     property string activationArmKey: ""
@@ -36,6 +44,33 @@ Column {
     readonly property int pageSize: 5
     readonly property var doctors: doctorService
         && Array.isArray(doctorService.doctors) ? doctorService.doctors : []
+    readonly property var providers: providerService
+        && Array.isArray(providerService.providers) ? providerService.providers : []
+    readonly property var staffingPlan: StaffingPolicy.plan({
+        roomId: root.selectedRoomId,
+        doctorId: root.selectedStaffDoctorId,
+        providerId: root.selectedStaffProviderId,
+        rooms: root.rooms, sessions: root.sessions,
+        doctors: root.doctors, providers: root.providers,
+        assignments: staffingAssignments.assignments,
+        roomsLoaded: root.roomsLoaded, sessionsLoaded: root.sessionsLoaded,
+        doctorsLoaded: !!root.doctorService && root.doctorService.loaded
+            && !root.doctorService.refreshing,
+        providersLoaded: !!root.providerService && root.providerService.loaded
+            && !root.providerService.refreshing,
+        assignmentsLoaded: staffingAssignments.loaded
+            && staffingAssignments.requestedRoomId === root.selectedRoomId,
+        assignmentsLoading: staffingAssignments.loading,
+        sourceError: root.registryError
+            || (root.doctorService ? root.doctorService.lastError : "")
+            || (root.providerService ? root.providerService.lastError : "")
+            || staffingAssignments.lastError
+    })
+    readonly property string staffingSignature: JSON.stringify({
+        plan: root.staffingPlan, rooms: root.rooms, sessions: root.sessions,
+        assignments: staffingAssignments.assignments,
+        doctors: root.doctors, providers: root.providers
+    })
     readonly property var workerPlan: ManagementPolicy.worker({
         id: root.workerId, name: workerNameField.value,
         role: root.workerRole, doctors: root.doctors, rooms: root.rooms,
@@ -86,6 +121,7 @@ Column {
         assignments: inlineAssignment.assignments
     })
     signal rosterRefreshRequested()
+    signal openRoomRequested(string roomId)
 
     width: parent ? parent.width : 350
     height: visible ? implicitHeight : 0
@@ -101,6 +137,7 @@ Column {
         armedKind = "";
         armedKey = "";
         activationArmKey = "";
+        staffingReviewKey = "";
     }
     function selectMode(value) {
         if (mode === value) return;
@@ -109,6 +146,46 @@ Column {
         outcome = "";
         if (value === "ROOM" && !roomRepositoryField.value)
             roomRepositoryField.value = suggestedRepository;
+    }
+    function refreshStaffing() {
+        root.staffingReviewKey = "";
+        if (!root.active || root.mode !== "STAFFING")
+            return false;
+        const assignmentsRequested = staffingAssignments.refresh();
+        root.rosterRefreshRequested();
+        if (root.providerService && !root.providerService.refreshing)
+            root.providerService.refresh();
+        return assignmentsRequested;
+    }
+    function reviewStaffing() {
+        root.staffingReviewKey = "";
+        const p = root.staffingPlan;
+        if (!root.active || root.mode !== "STAFFING" || root.registryBusy
+                || !p.readyForReview) {
+            root.outcome = "STAFFING HOLD // " +
+                (root.registryBusy ? "PX registry refreshing" : p.blockers.join(" // "));
+            return false;
+        }
+        root.staffingReviewKey = root.staffingSignature;
+        root.outcome = "STAFFING REVIEW // ROOM " + p.roomId
+            + " // ASSIGNMENT #" + p.assignmentId
+            + " // DOCTOR " + p.doctorId
+            + " // PROVIDER " + p.providerId
+            + " // READ ONLY // NO PX WRITE OR AI TURN";
+        return true;
+    }
+    function openStaffingRoom() {
+        const id = String(root.selectedRoomId || "").trim();
+        if (!root.active || root.mode !== "STAFFING"
+                || !id || !root.rooms.some(function(r) {
+                    return String(r.id || r.roomId || "") === id;
+                })) {
+            root.outcome = "OPEN ROOM REFUSED // SELECT A REGISTERED ROOM";
+            return false;
+        }
+        root.staffingReviewKey = "";
+        root.openRoomRequested(id);
+        return true;
     }
     function planFor(kind) {
         return kind === "CREATE_WORKER" ? workerPlan
@@ -240,9 +317,17 @@ Column {
         disarm();
         assignmentListVerified = false;
         selectedDraftAssignmentId = "";
+        selectedStaffDoctorId = "";
+        selectedStaffProviderId = "";
+        staffDoctorPage = 0;
+        staffProviderPage = 0;
         jobPage = 0;
     }
     onSelectedDraftAssignmentIdChanged: activationArmKey = ""
+    onSelectedStaffDoctorIdChanged: staffingReviewKey = ""
+    onSelectedStaffProviderIdChanged: staffingReviewKey = ""
+    onProvidersChanged: staffingReviewKey = ""
+    onDoctorsChanged: staffingReviewKey = ""
     onActiveChanged: {
         disarm();
         if (active)
@@ -254,6 +339,7 @@ Column {
     onRoomsChanged: disarm()
     onSessionsChanged: disarm()
     onRegistryErrorChanged: disarm()
+    onStaffingPlanChanged: staffingReviewKey = ""
     onAssignmentListVerifiedChanged: activationArmKey = ""
 
     Connections {
@@ -287,6 +373,14 @@ Column {
             roomNameField.value = "";
             root.rosterRefreshRequested();
         }
+    }
+    HospitalWorkerAttachmentPreviewService {
+        id: staffingAssignments
+        roomId: root.active && root.mode === "STAFFING"
+            ? root.selectedRoomId : ""
+        onAssignmentsChanged: root.staffingReviewKey = ""
+        onLoadedChanged: root.staffingReviewKey = ""
+        onLastErrorChanged: root.staffingReviewKey = ""
     }
     HospitalAssignmentService {
         id: inlineAssignment
@@ -353,11 +447,12 @@ Column {
             model: [
                 {label:"WORKERS", code:"WORKER"},
                 {label:"NEW ROOM", code:"ROOM"},
-                {label:"JOB", code:"JOB"}
+                {label:"JOB", code:"JOB"},
+                {label:"STAFFING", code:"STAFFING"}
             ]
             HospitalActionButton {
                 required property var modelData
-                width: (root.width - 10) / 3
+                width: (root.width - 15) / 4
                 height: 30
                 label: modelData.label
                 accent: root.mode === modelData.code ? Colors.magenta : Colors.cyan
@@ -683,6 +778,246 @@ Column {
             wrapMode: Text.Wrap
         }
     }
+
+    // STAFFING: first-worker, read-only preflight using saved PX identities.
+    // Handoff to the existing nested Room inspector, NEVER a backend upsert.
+    Column {
+        id: staffingColumn
+        width: root.width
+        spacing: 7
+        visible: root.mode === "STAFFING"
+
+        GohuText {
+            width: parent.width
+            text: "STAFFING // ONE ROOM + ACTIVE READ JOB + DOCTOR + PROVIDER"
+            font.pixelSize: 10
+            color: Colors.magenta
+            wrapMode: Text.Wrap
+        }
+        GohuText {
+            width: parent.width
+            text: "Choose records below. REVIEW STAFFING only checks saved identities. It does not attach a Session, edit Git, or give anyone permission."
+            font.pixelSize: 9
+            color: Colors.blue
+            wrapMode: Text.Wrap
+        }
+        GohuText {
+            width: parent.width
+            text: "1 // SELECT ROOM + ACTIVE ASSIGNMENT"
+            font.pixelSize: 9
+            color: Colors.orange
+        }
+        Repeater {
+            model: root.rooms.slice(root.staffRoomPage * root.pageSize,
+                (root.staffRoomPage + 1) * root.pageSize)
+            Rectangle {
+                required property var modelData
+                width: root.width
+                height: 31
+                color: Colors.black
+                border.width: 1
+                border.color: root.selectedRoomId
+                    === String(modelData.id || modelData.roomId || "")
+                    ? Colors.magenta : Colors.blue
+                GohuText {
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    text: String(modelData.displayName || modelData.team
+                        || modelData.id || "ROOM")
+                        + " // JOB #" + String(modelData.assignmentId || "NONE")
+                    color: Colors.white
+                    font.pixelSize: 9
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.selectedRoomId
+                        = String(modelData.id || modelData.roomId || "")
+                }
+            }
+        }
+        ManagerPageRow {
+            currentPage: root.staffRoomPage
+            count: root.rooms.length
+            onPrevious: root.staffRoomPage--
+            onNext: root.staffRoomPage++
+        }
+        GohuText {
+            width: parent.width
+            text: "2 // SELECT REGISTERED DOCTOR (INTERN / NURSE / DOCTOR)"
+            font.pixelSize: 9
+            color: Colors.orange
+            wrapMode: Text.Wrap
+        }
+        Repeater {
+            model: root.doctors.slice(root.staffDoctorPage * root.pageSize,
+                (root.staffDoctorPage + 1) * root.pageSize)
+            Rectangle {
+                required property var modelData
+                width: root.width
+                height: 31
+                color: Colors.black
+                border.width: 1
+                border.color: root.selectedStaffDoctorId
+                    === String(modelData.id || "") ? Colors.magenta : Colors.blue
+                GohuText {
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    text: String(modelData.name || modelData.id || "WORKER")
+                        + " // " + String(modelData.role || "NO ROLE")
+                        + " // " + String(modelData.status || "UNKNOWN")
+                    color: Colors.white
+                    font.pixelSize: 9
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.selectedStaffDoctorId
+                        = String(modelData.id || "")
+                }
+            }
+        }
+        ManagerPageRow {
+            currentPage: root.staffDoctorPage
+            count: root.doctors.length
+            onPrevious: root.staffDoctorPage--
+            onNext: root.staffDoctorPage++
+        }
+        GohuText {
+            width: parent.width
+            text: "3 // SELECT AVAILABLE AI PROVIDER"
+            font.pixelSize: 9
+            color: Colors.orange
+        }
+        Repeater {
+            model: root.providers.slice(root.staffProviderPage * root.pageSize,
+                (root.staffProviderPage + 1) * root.pageSize)
+            Rectangle {
+                required property var modelData
+                width: root.width
+                height: 31
+                color: Colors.black
+                border.width: 1
+                border.color: root.selectedStaffProviderId
+                    === String(modelData.id || "") ? Colors.magenta : Colors.blue
+                GohuText {
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    text: String(modelData.name || modelData.id || "PROVIDER")
+                        + " // " + (modelData.available === true
+                            ? "AVAILABLE" : "UNAVAILABLE")
+                    color: modelData.available === true ? Colors.white : Colors.orange
+                    font.pixelSize: 9
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.selectedStaffProviderId
+                        = String(modelData.id || "")
+                }
+            }
+        }
+        ManagerPageRow {
+            currentPage: root.staffProviderPage
+            count: root.providers.length
+            onPrevious: root.staffProviderPage--
+            onNext: root.staffProviderPage++
+        }
+        Rectangle {width:parent.width; height:2; color:Colors.magenta}
+        GohuText {
+            width: parent.width
+            text: "SOURCE // " + (staffingAssignments.loading ? "LOADING"
+                : staffingAssignments.loaded ? "PX ASSIGNMENTS READ"
+                : "NOT VERIFIED")
+                + " // " + root.staffingPlan.headline
+            color: root.staffingPlan.readyForReview ? Colors.cyan : Colors.orange
+            font.pixelSize: 9
+            wrapMode: Text.Wrap
+        }
+        GohuText {
+            width: parent.width
+            text: "ROOM " + (root.staffingPlan.roomId || "NONE")
+                + " // JOB #" + (root.staffingPlan.assignmentId || "NONE")
+                + " // " + (root.staffingPlan.assignmentTitle || "NO ACTIVE JOB")
+                + "\nPATIENT " + (root.staffingPlan.repository || "MISSING")
+                + " // BRANCH " + (root.staffingPlan.branch || "MISSING")
+                + " // BED " + (root.staffingPlan.bedPath || "MISSING")
+            color: Colors.blue
+            font.pixelSize: 9
+            wrapMode: Text.WrapAnywhere
+        }
+        Repeater {
+            model: root.staffingPlan.blockers.slice(0, 12)
+            GohuText {
+                required property string modelData
+                width: staffingColumn.width
+                text: "HOLD // " + modelData
+                color: Colors.orange
+                font.pixelSize: 9
+                wrapMode: Text.Wrap
+            }
+        }
+        Repeater {
+            model: root.staffingPlan.notes
+            GohuText {
+                required property string modelData
+                width: staffingColumn.width
+                text: "NOTE // " + modelData
+                color: Colors.cyan
+                font.pixelSize: 9
+                wrapMode: Text.Wrap
+            }
+        }
+        Row {
+            width: parent.width
+            spacing: 6
+            HospitalActionButton {
+                width: (parent.width - 12) / 3
+                height: 30
+                label: "REFRESH"
+                accent: Colors.cyan
+                contentGlowEnabled: false
+                enabledAction: root.active && !root.registryBusy
+                onTriggered: root.refreshStaffing()
+            }
+            HospitalActionButton {
+                width: (parent.width - 12) / 3
+                height: 30
+                label: "REVIEW STAFF"
+                accent: Colors.magenta
+                contentGlowEnabled: false
+                enabledAction: root.active && root.staffingPlan.readyForReview
+                    && !root.registryBusy
+                onTriggered: root.reviewStaffing()
+            }
+            HospitalActionButton {
+                width: (parent.width - 12) / 3
+                height: 30
+                label: "OPEN ROOM"
+                accent: Colors.cyan
+                contentGlowEnabled: false
+                enabledAction: root.active && root.selectedRoomId !== ""
+                onTriggered: root.openStaffingRoom()
+            }
+        }
+        GohuText {
+            width: parent.width
+            text: root.staffingReviewKey
+                && root.staffingReviewKey === root.staffingSignature
+                ? "REVIEWED // EXACT IDs PINNED FOR INSPECTION ONLY"
+                : "NO STAFFING WRITER // Backend authority and atomic ownership check still required"
+            color: root.staffingReviewKey ? Colors.cyan : Colors.orange
+            font.pixelSize: 9
+            wrapMode: Text.Wrap
+        }
+    }
+
     Rectangle {
         width: parent.width
         height: Math.max(30, statusText.implicitHeight + 14)

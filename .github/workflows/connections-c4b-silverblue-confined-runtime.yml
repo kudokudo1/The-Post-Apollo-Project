@@ -130,11 +130,47 @@ jobs:
           # modifies, the temporary first-boot UART file while C2v runs.
           evidence="$RUNNER_TEMP/c4d-guest-evidence"
           mkdir -m 0700 "$evidence"
+          # Explicit fail-closed preflight BEFORE either process starts. Do not
+          # delete or accept an unexpected boot directory from another run.
+          if compgen -G "$RUNNER_TEMP/c2v-silverblue-*" >/dev/null; then
+            echo "C4D_BLOCKED // PREEXISTING_C2V_BOOT_DIRECTORY"
+            exit 2
+          fi
           python3 -B tests/connections/c4b_silverblue/capture_guest_observation.py \
             --runner-temp "$RUNNER_TEMP" \
             --complete "$evidence/original-c2v-result" \
-            --output "$evidence/C4B_OBSERVED.txt" &
+            --output "$evidence/C4B_OBSERVED.txt" \
+            --ready "$evidence/observer-ready" &
           observer_pid="$!"
+          # No C2v boot until the observer has passed its OWN safety preflight.
+          # This prevents C2v's freshly created directory being called stale.
+          observer_ready=0
+          for attempt in $(seq 1 200); do
+            if [[ -e "$evidence/observer-ready" || -L "$evidence/observer-ready" ]]; then
+              [[ ! -L "$evidence/observer-ready" && -f "$evidence/observer-ready" ]] ||
+                { echo "C4D_BLOCKED // OBSERVER_READY_FILE_UNSAFE"; exit 2; }
+              [[ "$(stat -c '%u:%g:%a:%h' "$evidence/observer-ready")" == "$(id -u):$(id -g):600:1" &&
+                 "$(cat "$evidence/observer-ready")" == READY ]] ||
+                { echo "C4D_BLOCKED // OBSERVER_READY_CONTENT_OR_OWNERSHIP_REFUSED"; exit 2; }
+              kill -0 "$observer_pid" 2>/dev/null ||
+                { echo "C4D_BLOCKED // OBSERVER_EXITED_AFTER_READY"; wait "$observer_pid" || :; exit 2; }
+              observer_ready=1
+              break
+            fi
+            if ! kill -0 "$observer_pid" 2>/dev/null; then
+              echo "C4D_BLOCKED // OBSERVER_EXITED_BEFORE_READY"
+              wait "$observer_pid" || :
+              exit 2
+            fi
+            sleep 0.1
+          done
+          if [[ "$observer_ready" != 1 ]]; then
+            echo "C4D_BLOCKED // OBSERVER_STARTUP_READY_TIMEOUT"
+            kill "$observer_pid" 2>/dev/null || :
+            wait "$observer_pid" || :
+            exit 2
+          fi
+          echo "C4D_PASS // OBSERVER_READY_BEFORE_C2V_BOOT"
           vm_rc=0
           C4A_SERVICE_RPM_DIR="$RUNNER_TEMP/c4b-status-rpm" \
             C4B_RUNTIME_ASSETS_DIR="$RUNNER_TEMP/c4b-assets" \

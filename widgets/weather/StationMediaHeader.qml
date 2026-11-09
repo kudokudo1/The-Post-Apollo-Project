@@ -40,7 +40,7 @@ Item {
     ]
     readonly property var railItems:
         activeMode === "radio" ? radioPresets
-        : activeMode === "news" ? Catalog.sections
+        : activeMode === "news" || activeMode === "overview" ? Catalog.sections
         : activeMode === "services" ? servicesSections
         : sections
 
@@ -66,6 +66,8 @@ Item {
         text: mediaHeader.activeMode === "radio" ? "◉ RADIO // NEWS FIRST"
             : mediaHeader.activeMode === "news"
               ? "NEWS // " + mediaHeader.newsSection
+            : mediaHeader.activeMode === "overview"
+              ? "MEDIA // OVERVIEW // NEWS"
             : "MEDIA // " + mediaHeader.activeMode.toUpperCase()
         font.pixelSize: 12
         color: Colors.magenta
@@ -105,20 +107,20 @@ Item {
                 required property var modelData
                 required property int index
                 objectName: "media-m2-mode-" + String(
-                    mediaHeader.activeMode==="news" ? modelData
+                    (mediaHeader.activeMode==="news" || mediaHeader.activeMode==="overview") ? modelData
                     : mediaHeader.activeMode==="radio" ? modelData.name
                     : modelData.id).toLowerCase().replace(/[^a-z0-9]+/g,"-")
                 width: HeaderGeometry.buttonWidth(
                     modeRail.width, Math.max(1,mediaHeader.railItems.length))
                 height: HeaderGeometry.tabHeight
                 label: mediaHeader.activeMode==="radio" ? modelData.name
-                    : mediaHeader.activeMode==="news" ? modelData
+                    : mediaHeader.activeMode==="news" || mediaHeader.activeMode==="overview" ? modelData
                     : modelData.label
                 labelPixelSize: 9
                 contentPadding: 1
                 selected: mediaHeader.activeMode==="radio"
                     ? index===mediaHeader.radioPresetIndex
-                    : mediaHeader.activeMode==="news"
+                    : mediaHeader.activeMode==="news" || mediaHeader.activeMode==="overview"
                     ? modelData===mediaHeader.newsSection
                     : mediaHeader.activeMode==="services"
                     ? modelData.id===mediaHeader.servicesMode
@@ -129,7 +131,7 @@ Item {
                 onClicked: {
                     if(mediaHeader.activeMode==="radio")
                         mediaHeader.radioPresetRequested(index);
-                    else if(mediaHeader.activeMode==="news")
+                    else if(mediaHeader.activeMode==="news" || mediaHeader.activeMode==="overview")
                         mediaHeader.newsSectionRequested(modelData);
                     else if(mediaHeader.activeMode==="services")
                         mediaHeader.servicesModeRequested(modelData.id);

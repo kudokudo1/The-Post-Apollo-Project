@@ -51,8 +51,10 @@ test("M28-T adds exactly two complete native routes without losing the 17 origin
 
 test("MEDIA bottom NEWS // ALL and RADIO // ALL are actual clickable modes, old five families unchanged",()=>{
   const modes=JSON.parse(JSON.stringify(tabs.tabsFor("media/overview")));
-  assert.equal(modes.length,5);
-  assert.deepEqual(modes.map(x=>x.key),["overview","news","watch","radio","creators"]);
+  assert.equal(modes.length,6);
+  assert.deepEqual(modes.map(x=>x.key),["overview","news","watch","radio","creators","services"]);
+  assert.deepEqual(modes[5],{label:"SERVICES",path:"media/services/health",key:"services"});
+  assert.equal(tabs.selectedGroup("media/services/health"),"services");
   const n=modes.find(x=>x.key==="news"),r=modes.find(x=>x.key==="radio");
   assert.deepEqual(n,{label:"NEWS // ALL",path:FULL_NEWS,key:"news"});
   assert.deepEqual(r,{label:"RADIO // ALL",path:FULL_RADIO,key:"radio"});

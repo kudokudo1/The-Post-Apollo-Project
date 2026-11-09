@@ -11,6 +11,9 @@ Rectangle {
     color: Colors.black
     property string subjectRoute: ""
     property real runtimeNowMs: Date.now()
+    // Disposable native fixtures can inspect layout without activating
+    // RadioBrowser, MPD, GDELT or creator-feed requests. True by default.
+    property bool providerActivationAllowed: true
     signal newsMapRequested(var payload)
     signal routeRequested(string path)
 
@@ -21,8 +24,10 @@ Rectangle {
     // NEWS, RADIO or SERVICES owner. No controller or provider is duplicated.
     readonly property var loadedRadio: kind==="radio" && mediaLoader.item
         ? mediaLoader.item : null
-    readonly property var loadedNews: kind==="news" && mediaLoader.item
-        ? mediaLoader.item : null
+    readonly property var loadedNews: mediaLoader.item
+        ? (kind==="news" ? mediaLoader.item
+           : kind==="overview" ? mediaLoader.item.overviewNews : null)
+        : null
     readonly property var loadedServices: kind==="services" && mediaLoader.item
         ? mediaLoader.item : null
     function selectRadioPreset(index) {
@@ -32,7 +37,9 @@ Rectangle {
     function selectNewsChannel(section) {
         if (!loadedNews) return;
         loadedNews.selectSection(section);
-        if (subjectRoute!=="media/news/full")
+        // OVERVIEW's NEWS is already the selected top bay. Filter it in
+        // place; focused NEWS deep routes still return to full NEWS mode.
+        if (kind==="news" && subjectRoute!=="media/news/full")
             mediaPane.routeRequested("media/news/full");
     }
     function selectServiceMode(mode) {
@@ -131,7 +138,7 @@ Rectangle {
     Component {
         id: newsComponent
         StationNewsHub {
-            stationOpen: mediaPane.visible
+            stationOpen: mediaPane.visible && mediaPane.providerActivationAllowed
             subjectRoute: mediaPane.subjectRoute
             embeddedHeader: true
             runtimeNowMs: mediaPane.runtimeNowMs
@@ -144,7 +151,7 @@ Rectangle {
     Component {
         id: radioComponent
         StationRadio {
-            stationOpen: mediaPane.visible
+            stationOpen: mediaPane.visible && mediaPane.providerActivationAllowed
             subjectRoute: mediaPane.subjectRoute
             embeddedHeader: true
         }
@@ -158,8 +165,10 @@ Rectangle {
         Item {
             id: mediaOverview
 
+            objectName: "media-m3-overview"
             readonly property var favoritesBridgeSnapshot:
                 overviewRadio.favoritesBridgeSnapshot
+            readonly property var overviewNews: overviewNewsHub
             readonly property string activeWatchSourceId:
                 activePlayerViewportRect.width > 0
                 ? overviewNewsHub.activeWatchSourceId : ""
@@ -180,8 +189,25 @@ Rectangle {
                        ? mapped : Qt.rect(0, 0, 0, 0);
             }
 
+            // M3 // Keep NEWS first, in its original half-height bay.
+            // Full RADIO cannot fit in the previous 100px lower bay:
+            // its unchanged search + saved squares + transport alone
+            // exceed that height. Scroll the overview as a whole to
+            // reach a genuinely operable full RADIO below NEWS.
+            Flickable {
+                id: overviewScroll
+                objectName: "media-m3-overview-scroll"
+                anchors.fill: parent
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                flickableDirection: Flickable.VerticalFlick
+                interactive: !overviewNewsHub.viewerOpen
+                contentWidth: width
+                contentHeight: reportsBay.height + 8 + overviewRadioBay.height
+
             Rectangle {
                 id: reportsBay
+                objectName: "media-m3-news-top-bay"
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
@@ -192,8 +218,15 @@ Rectangle {
                 StationNewsHub {
                     id: overviewNewsHub
                     anchors.fill: parent
-                    stationOpen: mediaPane.visible
+                    stationOpen: mediaPane.visible && mediaPane.providerActivationAllowed
+                    // REPORTS is still the initial visible NEWS feed.
+                    // The contextual C44 header now selects all six
+                    // original NEWS categories on this same mounted hub.
                     subjectRoute: "media/news/reports"
+                    // Preserve the existing focused REPORTS data route
+                    // while allowing NEWS filters in the overview C44 rail.
+                    overviewChannelFilters: true
+                    section: "REPORTS"
                     embeddedHeader: true
                     runtimeNowMs: mediaPane.runtimeNowMs
                     onNewsMapRequested: function(payload) {
@@ -203,20 +236,27 @@ Rectangle {
             }
 
             Rectangle {
+                id: overviewRadioBay
+                objectName: "media-m3-full-radio-bottom-bay"
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: reportsBay.bottom
                 anchors.topMargin: 8
-                anchors.bottom: parent.bottom
+                height: Math.max(360, mediaOverview.height - reportsBay.height - 8)
                 clip: true
                 color: Colors.black
 
                 StationRadio {
                     id: overviewRadio
+                    objectName: "media-m3-overview-full-radio"
                     anchors.fill: parent
-                    stationOpen: mediaPane.visible
-                    subjectRoute: "media/overview"
+                    stationOpen: mediaPane.visible && mediaPane.providerActivationAllowed
+                    // Use the identical RADIO mode/preset/saved/transport
+                    // contract as MEDIA → RADIO // ALL. No compact bypass.
+                    subjectRoute: "media/radio/full"
+                    embeddedHeader: false
                 }
+            }
             }
         }
     }

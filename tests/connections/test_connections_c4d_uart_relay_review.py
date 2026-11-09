@@ -229,6 +229,59 @@ class DirectGuestRelayReview(unittest.TestCase):
         self.assertNotIn("type(exc).__name__", self.source)
         self.assertNotIn("print(str(exc)", self.source)
 
+    def test_16_producer_stdout_now_has_private_exact_copy_before_guest_relay(self):
+        guest = GUEST.read_text()
+        source = guest.split("stage SIGNED_C3D_RUNNING_HOST_MEASUREMENT_BEGIN", 1)[1]
+        self.assertIn('c4d_record_dir=/run/postapollo-c4d-observation', source)
+        self.assertIn('install -d -m 0700 "$c4d_record_dir"', source)
+        self.assertIn('umask 077', source)
+        self.assertIn('/usr/bin/tee -- "$c4d_record"', source)
+        self.assertIn('<<\'C4B_RUNNING_HOST_PROBE\' | \\', source)
+        self.assertIn('fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"', source)
+        self.assertIn('"$c4d_record" /dev/ttyS0 <<\'C4B_SINGLE_UART_RELAY\'', source)
+        self.assertLess(source.index('/usr/bin/tee -- "$c4d_record"'),
+                        source.index("stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN"))
+        self.assertLess(source.index('C4B_SINGLE_UART_RELAY'),
+                        source.index('rm -f -- "$c4d_record"'))
+        self.assertLess(source.index('rm -f -- "$c4d_record"'),
+                        source.index('rm -rf -- /opt/postapollo-c2o-venv'))
+        self.assertIn('rmdir -- "$c4d_record_dir"', source)
+        self.assertIn('set -Eeuo pipefail', guest)
+
+    def test_17_actual_tee_preserves_one_line_and_private_permissions(self):
+        with tempfile.TemporaryDirectory(prefix="c4d-owner-tee-") as dirname:
+            directory = Path(dirname)
+            out = directory / "observed.txt"
+            script = "set -Eeuo pipefail; umask 077; printf '%s\\n' \"$1\" | /usr/bin/tee -- \"$2\""
+            line = report().decode("ascii")
+            result = subprocess.run(["/usr/bin/bash", "-c", script, "probe",
+                                     line, str(out)],capture_output=True,timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, report() + b"\n")
+            self.assertEqual(out.read_bytes(), report() + b"\n")
+            self.assertEqual(out.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(out.stat().st_nlink, 1)
+
+    def test_18_pipeline_failure_does_not_turn_signed_process_refusal_to_pass(self):
+        with tempfile.TemporaryDirectory(prefix="c4d-owner-tee-") as dirname:
+            out = Path(dirname) / "observed.txt"
+            script = ("set -Eeuo pipefail; umask 077; "
+                      "{ /usr/bin/printf '%s\\n' DENIED; exit 9; } "
+                      "| /usr/bin/tee -- \"$1\"")
+            p = subprocess.run(["/usr/bin/bash", "-c", script, "probe",str(out)],
+                               capture_output=True, timeout=5)
+            self.assertNotEqual(p.returncode, 0)
+            self.assertEqual(out.read_bytes(), b"DENIED\n")
+            self.assertNotIn(PREFIX, out.read_bytes())
+
+    def test_19_signed_producer_stdout_contract_still_exact_c3eu_schema(self):
+        guest = GUEST.read_text()
+        self.assertEqual(guest.count(
+            'print("C4B_OBSERVED // " + json.dumps(observe(),'), 1)
+        self.assertEqual(guest.count("C4B_RUNNING_HOST_PROBE"), 2)
+        self.assertIn("GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1",guest)
+                self.assertIn("C4D_PRODUCER_CAPTURE_UNSAFE_AT_CLEANUP",guest)
+
     def test_11_bounded_full_instrument_log_read_and_existing_c2v_tail(self):
         code = GUEST.read_text()
         self.assertIn("log = os.read(fd, st.st_size + 1)", code)

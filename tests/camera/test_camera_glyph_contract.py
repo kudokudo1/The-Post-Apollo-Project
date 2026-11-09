@@ -130,7 +130,7 @@ class CameraLineGlyphContract(unittest.TestCase):
     def test_keeps_camera_and_social_independently_mounted(self):
         self.assertIn("Screenshot {", self.shell)
         self.assertIn("CameraW {", self.shell)
-        self.assertIn("onToggleRequested: cameraWindow.toggle()", self.shell)
+        self.assertIn("cameraWindow.toggle();", self.shell)
         self.assertIn("id: messagingWindow", self.shell)
         self.assertIn("function prepareCapture(mode)", self.panel)
         self.assertIn("function previewCleanup()", self.panel)

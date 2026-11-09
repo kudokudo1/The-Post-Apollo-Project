@@ -247,7 +247,11 @@ Singleton {
         if (!selected || selected.kind === "app" || isBlocked(key))
             return "";
         const parents = selected.kind === "channel" ? ["server", "app"]
-            : selected.kind === "title" ? ["website", "app"]
+            : selected.kind === "resourceEvent" ? ["resource", "event", "app"]
+            : selected.kind === "resource" ? ["event", "app"]
+            : selected.kind === "event" ? ["resource", "app"]
+            : selected.kind === "title"
+                ? ["resourceEvent", "resource", "event", "website", "app"]
             : ["app"];
         for (let k = 0; k < parents.length; k++) {
             for (let i = 0; i < options.length; i++) {
@@ -264,6 +268,26 @@ Singleton {
 
     function isSnoozed(appKey) {
         return Number(policyFor(appKey).snoozeUntil || 0) > Date.now();
+    }
+
+    // Card indicators must include overlapping resource/event rules, not
+    // only APP-wide state. These are read-only policy projections.
+    function isDndForNotification(entry) {
+        const options = scopeOptionsFor(entry);
+        for (let i = 0; i < options.length; i++) {
+            if (isDnd(options[i].key))
+                return true;
+        }
+        return false;
+    }
+
+    function isSnoozedForNotification(entry) {
+        const options = scopeOptionsFor(entry);
+        for (let i = 0; i < options.length; i++) {
+            if (isSnoozed(options[i].key))
+                return true;
+        }
+        return false;
     }
 
     function shouldSuppress(sourceId, source, websiteHost) {
@@ -296,10 +320,15 @@ Singleton {
         const options = scopeOptionsFor(entry);
         const key = String(selectedKey || "");
         const selected = options.find(function(option) { return option.key === key; });
-        if (!selected || selected.kind === "app")
+        if (!selected || selected.kind === "app"
+                || isDnd(key) || isSnoozed(key))
             return "";
         const parents = selected.kind === "channel" ? ["server", "app"]
-            : selected.kind === "title" ? ["website", "app"]
+            : selected.kind === "resourceEvent" ? ["resource", "event", "app"]
+            : selected.kind === "resource" ? ["event", "app"]
+            : selected.kind === "event" ? ["resource", "app"]
+            : selected.kind === "title"
+                ? ["resourceEvent", "resource", "event", "website", "app"]
             : ["app"];
         const now = Date.now();
         for (let k = 0; k < parents.length; k++) {

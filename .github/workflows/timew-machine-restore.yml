@@ -1,0 +1,32 @@
+name: TimeW MACHINE one-click restore (disposable)
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineRestoreCheckpoint.py"
+      - "services/time/MachineMoveApply.py"
+      - "services/time/MachineWindowResolver.py"
+      - "widgets/TimeW.qml"
+      - "tests/timew/test_machine_one_click_restore.py"
+      - "tests/timew/test_machine_one_click_restore_ui.py"
+      - ".github/workflows/timew-machine-restore.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  one-click-synthetic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fake desktop one-click restore state transitions
+        run: python3 -B -I tests/timew/test_machine_one_click_restore.py
+      - name: UI is one click and diagnostics are optional
+        run: python3 -B -I tests/timew/test_machine_one_click_restore_ui.py
+      - name: Preserve guarded one-window move and journal tests
+        run: |
+          python3 -B -I tests/timew/test_machine_move_apply.py
+          python3 -B -I tests/timew/test_machine_window_move_pilot.py
+          python3 -B -I tests/timew/test_machine_move_journal.py

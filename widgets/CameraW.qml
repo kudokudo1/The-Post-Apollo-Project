@@ -1542,7 +1542,8 @@ PanelWindow {
             batchReceipt = "TRASH // MOVED " + payload.moved
                            + " // SKIPPED " + payload.skipped
                            + " // FAILED " + payload.failed;
-            feedback = batchReceipt;
+            feedback = batchReceipt
+                       + (payload.trashError ? " // " + payload.trashError : "");
             // Preserve paths that could not be moved so the user can
             // remove/re-review them. Never imply all files were trashed
             // when the backend reports a partial result.
@@ -3105,25 +3106,12 @@ PanelWindow {
                         height: 24
                         spacing: 12
                         GohuText {
-                            width: parent.width - 182
+                            width: parent.width
                             height: parent.height
                             verticalAlignment: Text.AlignVCenter
                             font.pixelSize: 13
                             color: Colors.white
                             text: "CLEANUP // FILE REVIEW"
-                        }
-                        ActionButton {
-                            width: 170
-                            height: 24
-                            label: camera.cleanupQueueOpen
-                                   ? "CLOSE QUEUE // " + camera.batchPaths.length
-                                   : "VIEW QUEUE // " + camera.batchPaths.length
-                            labelPixelSize: 9
-                            accentColor: Colors.magenta
-                            selected: camera.cleanupQueueOpen
-                            available: !camera.busy
-                                       && camera.cleanupTechnique !== "desktop"
-                            onLeftClicked: camera.cleanupToggleQueue()
                         }
                     }
 
@@ -3184,12 +3172,14 @@ PanelWindow {
                         ActionButton {
                             width: (parent.width - 8) * 0.68
                             height: 37
-                            label: "MOVE " + camera.batchPaths.length + " TO TRASH"
+                            label: camera.cleanupQueueOpen
+                                   ? "QUEUE OPEN // " + camera.batchPaths.length
+                                   : "VIEW QUEUE // " + camera.batchPaths.length
                             labelPixelSize: 12
-                            accentColor: Colors.red
-                            destructive: true
-                            available: !camera.busy && camera.batchPaths.length > 0
-                            onLeftClicked: camera.trashQueuedNow()
+                            accentColor: Colors.magenta
+                            selected: camera.cleanupQueueOpen
+                            available: !camera.busy
+                            onLeftClicked: camera.cleanupToggleQueue()
                         }
                         ActionButton {
                             width: (parent.width - 8) * 0.32
@@ -3210,8 +3200,8 @@ PanelWindow {
                         elide: Text.ElideRight
                         text: camera.batchReceipt
                               ? camera.batchReceipt
-                              : "ONE CLICK // RECOVERABLE SYSTEM TRASH // "
-                                + camera.batchPaths.length + " MARKED"
+                              : "REVIEW QUEUE // " + camera.batchPaths.length
+                                + " MARKED // RECOVERABLE TRASH"
                     }
 
                     Row {
@@ -3353,12 +3343,12 @@ PanelWindow {
                                     height: 18
                                     font.pixelSize: 9
                                     color: Colors.yellow
-                                    text: "REMOVE TO UNMARK // MOVE N TO TRASH ABOVE // RECOVERABLE"
+                                    text: "REVIEW ITEMS // REMOVE TO UNMARK // TRASH BELOW"
                                     elide: Text.ElideRight
                                 }
                                 Item {
                                     width: parent.width
-                                    height: Math.max(60, cleanupWorkArea.height - 66)
+                                    height: Math.max(40, cleanupWorkArea.height - 112)
                                     ListView {
                                         id: cleanupQueuedList
                                         anchors.fill: parent
@@ -3407,6 +3397,16 @@ PanelWindow {
                                         color: Colors.cyan
                                         text: "QUEUE EMPTY // SELECT MEDIA IN ANY MODE"
                                     }
+                                }
+                                ActionButton {
+                                    width: parent.width
+                                    height: 36
+                                    label: "MOVE " + camera.batchPaths.length + " TO TRASH"
+                                    labelPixelSize: 12
+                                    accentColor: Colors.red
+                                    destructive: true
+                                    available: !camera.busy && camera.batchPaths.length > 0
+                                    onLeftClicked: camera.trashQueuedNow()
                                 }
                             }
                         }

@@ -1169,13 +1169,16 @@ PanelWindow {
         for (var i = 0; i < NotificationsService.sourcePolicies.count; i++) {
             var policy = NotificationsService.sourcePolicies.get(i);
 
-            if (policy.dnd !== true)
+            const snoozeUntil = Number(policy.snoozeUntil || 0);
+            if (policy.dnd !== true && snoozeUntil <= Date.now())
                 continue;
 
             managerDndPolicies.append({
                 "appKey": String(policy.appKey || ""),
                 "source": String(policy.source || ""),
-                "sourceId": String(policy.sourceId || "")
+                "sourceId": String(policy.sourceId || ""),
+                "dnd": policy.dnd === true,
+                "snoozeUntil": snoozeUntil
             });
         }
     }
@@ -2564,7 +2567,7 @@ PanelWindow {
                                 anchors.leftMargin: 4
                                 anchors.rightMargin: 4
                                 height: 24
-                                text: "DO NOT DISTURB  //  " + managerDndPolicies.count
+                                text: "DND / ZZ RULES  //  " + managerDndPolicies.count
                                 pixelSize: 13
                                 textColor: Colors.magenta
                                 glowColor: Colors.magenta
@@ -2587,7 +2590,7 @@ PanelWindow {
                                 anchors.leftMargin: 4
                                 anchors.rightMargin: 4
                                 height: 18
-                                text: "Sources stay suppressed until explicitly ALLOWED."
+                                text: "DND // ALLOW   •   ZZ // WAKE OR AUTO-EXPIRE"
                                 font.pixelSize: 10
                                 color: Colors.white
                                 opacity: 0.72
@@ -2612,6 +2615,8 @@ PanelWindow {
                                     required property string appKey
                                     required property string source
                                     required property string sourceId
+                                    required property bool dnd
+                                    required property double snoozeUntil
                                     width: dndManagerList.width
                                     height: 64
                                     color: "transparent"
@@ -2653,7 +2658,10 @@ PanelWindow {
                                         anchors.leftMargin: 12
                                         anchors.rightMargin: 10
                                         height: 16
-                                        text: dndRule.sourceId !== "" ? dndRule.sourceId : dndRule.appKey
+                                        text: dndRule.dnd
+                                            ? "DND // " + (dndRule.sourceId || dndRule.appKey)
+                                            : "ZZ UNTIL // " + Qt.formatDateTime(
+                                                new Date(dndRule.snoozeUntil), "MM/dd h:mm AP")
                                         font.pixelSize: 9
                                         color: Colors.cyan
                                         elide: Text.ElideRight
@@ -2667,11 +2675,15 @@ PanelWindow {
                                         anchors.rightMargin: 10
                                         width: 72
                                         height: 30
-                                        label: "ALLOW"
+                                        label: dndRule.dnd ? "ALLOW" : "WAKE"
                                         labelPixelSize: 10
                                         active: false
                                         onTriggered: {
-                                            NotificationsService.setDnd(dndRule.appKey, dndRule.sourceId, dndRule.source, false);
+                                            if (dndRule.dnd)
+                                                NotificationsService.setDnd(dndRule.appKey,
+                                                    dndRule.sourceId, dndRule.source, false);
+                                            else
+                                                NotificationsService.clearSnooze(dndRule.appKey);
                                         }
                                     }
                                 }
@@ -2699,7 +2711,7 @@ PanelWindow {
                                 visible: managerDndPolicies.count === 0
                                 width: dndManagerList.width - 40
                                 height: 30
-                                text: "NO SOURCES ON DND"
+                                text: "NO ACTIVE DND OR ZZ RULES"
                                 pixelSize: 12
                                 textColor: Colors.cyan
                                 glowColor: Colors.cyan
@@ -2749,7 +2761,7 @@ PanelWindow {
                                 anchors.leftMargin: 4
                                 anchors.rightMargin: 4
                                 height: 18
-                                text: "UNFAV removes the star, not saved notifications."
+                                text: "APP, SITE, SENDER, SERVER, DM, CHANNEL, TITLE & EVENT"
                                 font.pixelSize: 10
                                 color: Colors.white
                                 opacity: 0.72

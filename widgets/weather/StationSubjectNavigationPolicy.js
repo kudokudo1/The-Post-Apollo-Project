@@ -88,8 +88,21 @@ var SUBJECTS = [
       {id:"eonet",label:"NASA EONET"}, {id:"gdacs",label:"GDACS"}]},
     {id:"fires",label:"FIRES",children:[{id:"hotspots",label:"NASA FIRMS HOTSPOTS"}]},
     {id:"maps",label:"MAPS",children:[
+      {id:"events",label:"UNIFIED MAP // ALL EVENT FILTERS"},
       {id:"overview",label:"EVENT MAP"},
       {id:"full",label:"MAP // ALL ORIGINAL INSTRUMENTS"}]},
+    {id:"water",label:"WATER",children:[
+      {id:"rivers",label:"RIVERS",children:[
+        {id:"gauges",label:"GAUGES"},
+        {id:"nearby",label:"NEARBY COMPARISON"},
+        {id:"flood",label:"FLOOD IMPACTS"},
+        {id:"hydrograph",label:"HYDROGRAPH"}]},
+      {id:"marine",label:"MARINE"},
+      {id:"coast",label:"COAST AND TIDES"}]},
+    {id:"ground",label:"GROUND",children:[
+      {id:"full",label:"GROUND // ENVIRONMENT"}]},
+    {id:"services",label:"SERVICES",children:[
+      {id:"health",label:"LIVE SOURCE STATUS"}]},
     {id:"investigations",label:"INVESTIGATIONS",children:[
       {id:"context",label:"EVENT CONTEXT"}, {id:"dossiers",label:"DOSSIERS"},
       {id:"archive",label:"EVENT ARCHIVE"}]}
@@ -149,7 +162,7 @@ var SUBJECTS = [
 var LEGACY_MODES = {
   home:"weather/overview", ground:"weather/overview",
   sky:"cosmos/overview", space:"cosmos/space-weather/overview",
-  map:"earth/maps/overview", news:"media/news/reports",
+  map:"earth/maps/events", news:"media/news/reports",
   radio:"media/radio/directory", terminal:"tools/terminal/star-map"
 };
 
@@ -170,12 +183,12 @@ var PANELS = {
   "ground-official-alerts":"weather/hazards/alerts",
   "ground-coastal-relationship":"weather/history/relationships/coastal",
   "ground-marine-relationships":"weather/history/relationships/marine",
-  "ground-river-nwps":"weather/water/rivers/gauges",
-  "ground-river-nearby":"weather/water/rivers/nearby",
-  "ground-river-flood-context":"weather/water/rivers/flood",
-  "ground-river-stageflow":"weather/water/rivers/hydrograph",
-  "ground-marine-ndbc":"weather/water/marine",
-  "ground-coast-coops":"weather/water/coast",
+  "ground-river-nwps":"earth/water/rivers/gauges",
+  "ground-river-nearby":"earth/water/rivers/nearby",
+  "ground-river-flood-context":"earth/water/rivers/flood",
+  "ground-river-stageflow":"earth/water/rivers/hydrograph",
+  "ground-marine-ndbc":"earth/water/marine",
+  "ground-coast-coops":"earth/water/coast",
   "ground-lightning-nowcoast":"weather/hazards/lightning",
   "ground-heat-fire-weather":"weather/hazards/heat-fire",
   "ground-air-particulates":"weather/conditions/air",
@@ -216,14 +229,14 @@ var PANELS = {
   "space-bulletins":"cosmos/space-weather/bulletins",
   "map-source-rack":"tools/sources/health",
   "map-natural-earth":"earth/geography/basemap",
-  "map-spatial-canvas":"earth/maps/overview",
+  "map-spatial-canvas":"earth/maps/events",
   "map-earthquake-layer":"earth/geology/earthquakes",
   "map-eonet-layer":"earth/events/eonet",
   "map-gdacs-layer":"earth/events/gdacs",
   "map-firms-hotspots":"earth/fires/hotspots",
-  "map-mrms-radar":"weather/maps/radar",
-  "map-rainviewer":"weather/maps/radar-fallback",
-  "map-hms-smoke":"weather/maps/smoke",
+  "map-mrms-radar":"earth/maps/events",
+  "map-rainviewer":"earth/maps/events",
+  "map-hms-smoke":"earth/maps/events",
   "map-news-mentions":"media/news/locations",
   "map-event-context":"earth/investigations/context",
   "map-dossier-preview":"earth/investigations/dossiers",
@@ -269,7 +282,7 @@ var RELATED = {
   aurora:["cosmos/space-weather/aurora","weather/conditions/current"],
   "river-flood":["weather/water/rivers/flood","earth/events/gdacs"],
   wildfire:["earth/fires/hotspots","weather/hazards/heat-fire","weather/maps/smoke"],
-  "news-location":["media/news/locations","earth/maps/overview"]
+  "news-location":["media/news/locations","earth/maps/events"]
 };
 
 function safePath(value) {

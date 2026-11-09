@@ -166,9 +166,6 @@ Item {
                 readonly property string favoriteKey:
                     Journal.favoriteKey(meaning.digits)
                 selected: FavoritesDefaultStore.isFavorite(favoriteKey)
-                // A favorited number is the one deliberate filled control.
-                selectedFillColor: Qt.rgba(Colors.magenta.r, Colors.magenta.g,
-                                           Colors.magenta.b, 0.28)
                 selectedForegroundColor: Colors.magenta
                 selectedBorderColor: Colors.magenta
                 accentColor: selected ? Colors.magenta : Colors.white

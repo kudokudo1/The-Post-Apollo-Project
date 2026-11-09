@@ -402,6 +402,45 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             assert checked_cli["counts"] == {
                 "outputs": 2, "workspaces": 2, "windows": 3,
             }
+            # MARK NOW is not an in-memory marker: it uses the identical
+            # one-call SAVE CLI with a distinct named moment. A new process
+            # must reopen its UUID, proving durable v1+v2 storage.
+            moment_label = "MARK // CI MOMENT"
+            mark_request = json.dumps({
+                "label": moment_label, "review": None, "selection": None,
+            }).encode("utf-8") + b"\n"
+            cli_mark = subprocess.run(
+                ["python3", "-B", "-I", bridge_cli, "save"],
+                input=mark_request, env=bridge_env,
+                capture_output=True, timeout=15)
+            assert cli_mark.returncode == 0, "NATIVE MARK SAVE FAILED"
+            marked = json.loads(cli_mark.stdout)
+            assert marked["status"] == "saved"
+            assert marked["verification"]["status"] == "readback_verified"
+            assert marked["verification"]["counts"] == {
+                "outputs": 2, "workspaces": 2, "windows": 3,
+            }
+            marker_id = marked["checkpoint"]["id"]
+            assert marker_id != saved_cli["checkpoint"]["id"]
+            assert legacy.load(marker_id)["document"]["label"] == moment_label
+            assert load_geometry(marker_id)["status"] == "loaded"
+            assert legacy.load(saved_cli["checkpoint"]["id"])["status"] == "loaded"
+            notes_mark = subprocess.run(
+                ["python3", "-B", "-I", bridge_cli, "notes-read", marker_id],
+                env=bridge_env, capture_output=True, timeout=15)
+            assert notes_mark.returncode == 0, "NATIVE MARK NOTES READ FAILED"
+            note_data = json.loads(notes_mark.stdout)
+            assert note_data["display_name"] == moment_label
+            assert note_data["revision"] == 0
+            assert note_data["note"] == ""
+            again_mark = subprocess.run(
+                ["python3", "-B", "-I", bridge_cli, "verify", marker_id],
+                env=bridge_env, capture_output=True, timeout=15)
+            assert again_mark.returncode == 0
+            assert json.loads(again_mark.stdout)["status"] == "geometry_verified"
+            assert any(entry["id"] == marker_id for entry in
+                       legacy.listing()["checkpoints"])
+            print("MACHINE PERSISTENT MARK // NEW PROCESS V2 GEOMETRY AND STORED PASS")
             print("MACHINE STORED // REAL HEADLESS SWAY V2 READBACK PASS")
             print("MACHINE PYTHON -I CLI // INSPECT AND SAVE TO PRIVATE SQLITE PASS")
             print("MACHINE M2 CUSTOM REVIEW-BOUND ONE-WINDOW SAVE // REAL SWAY PASS")

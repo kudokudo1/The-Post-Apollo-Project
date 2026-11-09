@@ -835,7 +835,11 @@ PanelWindow {
     // CUSTOMIZE is a separate explicit, capture-bound inspection transaction.
     property bool machineSaveBridgeBusy: false
     property string machineSaveBridgeAction: ""
+    property string machineSaveBridgeOrigin: ""
     property string machineSaveBridgePayload: ""
+    // Persistent MARK is a named v2 geometry checkpoint, not a timeline timestamp.
+    property string machinePersistentMarkDraft: ""
+    property string machinePersistentMarkStatus: "MARK // READY TO CAPTURE"
     property string machineSaveBridgeStatus: "READY // SAVE DESKTOP"
     property string machineGeometryVerifyId: ""
     property string machineGeometryVerifyStatus: "NOT VERIFIED // READ-ONLY CHECK AVAILABLE"
@@ -879,21 +883,23 @@ PanelWindow {
     readonly property var machineCustomValidation:
         MachineSelectionPolicy.validate(machineCustomPolicyPreview, machineCustomExcluded)
 
-    function machineBeginSaveBridge(action, request) {
+    function machineBeginSaveBridge(action, request, origin) {
         if (!menuOpen || selectedMode !== "machine"
                 || machineSaveBridgeBusy || machineStoreBusy
                 || machineCaptureBusy || machineAutoRestoreBusy)
-            return;
+            return false;
         if (action !== "inspect" && action !== "save")
-            return;
+            return false;
         machineSaveBridgeBusy = true;
         machineSaveBridgeAction = action;
+        machineSaveBridgeOrigin = origin || action;
         machineSaveBridgePayload = action === "save" ? JSON.stringify(request) : "";
         machineSaveBridgeStatus = action === "inspect"
                                 ? "CUSTOMIZE // READING DESKTOP"
                                 : "SAVING DESKTOP // VERIFYING LAYOUT";
         machineSaveBridgeProcess.exec(["python3", "-B", "-I",
             Quickshell.shellPath("services/time/MachineSaveBridgeV2.py"), action]);
+        return true;
     }
 
     function machineVerifySelectedGeometry() {
@@ -1061,7 +1067,35 @@ PanelWindow {
     function machineRequestFullSave() {
         machineBeginSaveBridge("save", {
             label: machineSaveLabel(), review: null, selection: null
-        });
+        }, "full");
+    }
+
+    function machineRequestPersistentMark() {
+        if (!menuOpen || selectedMode !== "machine"
+                || machineSaveBridgeBusy || machineStoreBusy
+                || machineCaptureBusy || machineAutoRestoreBusy)
+            return;
+        const typed = machinePersistentMarkDraft.trim();
+        if (typed.length > 40) {
+            machinePersistentMarkStatus = "MARK BLOCKED // NAME TOO LONG";
+            return;
+        }
+        for (let i = 0; i < typed.length; i++) {
+            const cp = typed.charCodeAt(i);
+            if (cp < 32 || cp === 127) {
+                machinePersistentMarkStatus = "MARK BLOCKED // INVALID NAME";
+                return;
+            }
+        }
+        // Use the same Clock display as TIME, never an unrelated UTC clock.
+        // SQLite itself still records an absolute UTC capture timestamp.
+        const clockLabel = clockReadoutText !== "--:--:--//--"
+                         ? clockReadoutText : "MOMENT";
+        const label = "MARK // " + (typed.length ? typed : clockLabel);
+        if (machineBeginSaveBridge("save", {
+            label: label, review: null, selection: null
+        }, "mark"))
+            machinePersistentMarkStatus = "MARKING // SAVING CURRENT DESKTOP";
     }
 
     function machineRequestCustomInspect() {
@@ -1137,7 +1171,7 @@ PanelWindow {
         };
         machineBeginSaveBridge("save", {
             label: machineSaveLabel(), review: review.review, selection: selected
-        });
+        }, "custom");
     }
 
     function machineAcceptSaveBridge(data) {
@@ -1188,6 +1222,9 @@ PanelWindow {
         }
         if (data.status === "error") {
             machineSaveBridgeStatus = "SAVE BLOCKED // " + String(data.reason || "UNKNOWN");
+            if (machineSaveBridgeOrigin === "mark")
+                machinePersistentMarkStatus =
+                    "MARK BLOCKED // " + String(data.reason || "UNKNOWN");
             return;
         }
         if (machineSaveBridgeAction === "inspect" && data.status === "ready"
@@ -1206,6 +1243,9 @@ PanelWindow {
                 && typeof data.checkpoint.id === "string") {
             machineStoreStatus = "SAVE RECORDED // READBACK NOT VERIFIED";
             machineSaveBridgeStatus = "SAVE MAY BE STORED // OPEN STORED TO CHECK";
+            if (machineSaveBridgeOrigin === "mark")
+                machinePersistentMarkStatus =
+                    "MARK MAY BE STORED // CHECK STORED BEFORE RETRY";
             return;
         }
         if (machineSaveBridgeAction === "save" && data.status === "saved"
@@ -1239,6 +1279,13 @@ PanelWindow {
                 + data.verification.counts.outputs + " MON // "
                 + data.verification.counts.workspaces + " WS // "
                 + data.verification.counts.windows + " WINDOWS";
+            if (machineSaveBridgeOrigin === "mark") {
+                machinePersistentMarkStatus = "MARK SAVED + VERIFIED // "
+                    + data.verification.counts.outputs + " MON // "
+                    + data.verification.counts.workspaces + " WS // "
+                    + data.verification.counts.windows + " WINDOWS";
+                machinePersistentMarkDraft = "";
+            }
             return;
         }
         machineSaveBridgeStatus = "UNEXPECTED SAVE RESPONSE";
@@ -1974,6 +2021,14 @@ PanelWindow {
                     timew.machineGeometryVerifyStatus = "GEOMETRY READ UNAVAILABLE";
                 return;
             }
+            if (exitCode !== 0
+                    && timew.machineSaveBridgeAction === "save"
+                    && timew.machineSaveBridgeOrigin === "mark"
+                    && !timew.machinePersistentMarkStatus.startsWith("MARK BLOCKED")
+                    && !timew.machinePersistentMarkStatus.startsWith("MARK SAVED")
+                    && !timew.machinePersistentMarkStatus.startsWith("MARK MAY BE STORED"))
+                timew.machinePersistentMarkStatus =
+                    "MARK OUTCOME UNKNOWN // CHECK STORED BEFORE RETRY";
             if (exitCode !== 0
                     && !timew.machineSaveBridgeStatus.startsWith("SAVE BLOCKED")
                     && !timew.machineSaveBridgeStatus.startsWith("SAVED")
@@ -5009,6 +5064,75 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
+                            text: "MARK // NAME A DESKTOP CHECKPOINT"
+                            color: Colors.magenta
+                            font.pixelSize: 11
+                        }
+                        Row {
+                            id: machinePersistentMarkRow
+                            width: parent.width
+                            height: 35
+                            spacing: 7
+                            TextField {
+                                id: machinePersistentMarkInput
+                                width: Math.max(0, parent.width
+                                        - machinePersistentMarkButton.width
+                                        - machinePersistentMarkRow.spacing)
+                                height: parent.height
+                                maximumLength: 40
+                                text: timew.machinePersistentMarkDraft
+                                placeholderText: "NAME MOMENT // OPTIONAL"
+                                color: Colors.magenta
+                                placeholderTextColor: Colors.cyan
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 11
+                                leftPadding: 8
+                                rightPadding: 8
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: machinePersistentMarkInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                }
+                                onTextEdited: timew.machinePersistentMarkDraft = text
+                                onAccepted: timew.machineRequestPersistentMark()
+                            }
+                            ActionButton {
+                                id: machinePersistentMarkButton
+                                width: 108
+                                height: parent.height
+                                label: timew.machineSaveBridgeBusy
+                                       && timew.machineSaveBridgeOrigin === "mark"
+                                       ? "MARKING..." : "MARK NOW"
+                                labelPixelSize: 11
+                                accentColor: Colors.orange
+                                available: !timew.machineSaveBridgeBusy
+                                           && !timew.machineStoreBusy
+                                           && !timew.machineCaptureBusy
+                                           && !timew.machineAutoRestoreBusy
+                                onLeftClicked: timew.machineRequestPersistentMark()
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machinePersistentMarkStatus
+                            color: timew.machinePersistentMarkStatus.startsWith("MARK SAVED")
+                                   ? Colors.cyan : Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "MARK SAVES GEOMETRY IN STORED // BRAVE TABS + EXACT RESTORE NOT YET VERIFIED"
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+
+                        GohuText {
+                            width: parent.width
                             text: timew.machineSaveBridgeStatus
                             color: timew.machineSaveBridgeStatus.startsWith("SAVED")
                                    ? Colors.cyan : Colors.orange
@@ -5580,8 +5704,8 @@ PanelWindow {
                                 id: machineMarkButton
                                 width: 75
                                 height: parent.height
-                                label: "MARK"
-                                labelPixelSize: 11
+                                label: "TIME ONLY"
+                                labelPixelSize: 9
                                 accentColor: timew.semanticColor
                                 available: timew.machineMarkers.length
                                            < MachineTimelinePolicy.MAX_MARKERS

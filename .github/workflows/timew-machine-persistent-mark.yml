@@ -1,0 +1,36 @@
+name: TimeW MACHINE durable named MARK checkpoint
+
+on:
+  pull_request:
+    paths:
+      - "widgets/TimeW.qml"
+      - "tests/timew/test_machine_persistent_mark_ui.py"
+      - "tests/timew/test_machine_geometry_headless_sway.py"
+      - "tests/timew/test_timew_foundation_contracts.py"
+      - "tests/timew/test_machine_stored_notes_ui_contract.py"
+      - "docs/timew-machine-persistent-mark.md"
+      - ".github/workflows/timew-machine-persistent-mark.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mark-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm durable MARK routes through existing SAVE and keeps legacy timeline distinct
+        run: python3 -B -I tests/timew/test_machine_persistent_mark_ui.py
+      - name: Verify actual SAVE and STORED geometry contracts
+        run: |
+          python3 -B -I tests/timew/test_machine_save_ui_contract.py
+          python3 -B -I tests/timew/test_machine_stored_notes_ui_contract.py
+          python3 -B -I tests/timew/test_machine_save_bridge_v2.py
+          python3 -B -I tests/timew/test_machine_stored_geometry_verify.py
+      - name: Preserve legacy marker semantics and checkpoint storage compatibility
+        run: |
+          python3 -B -I tests/timew/test_machine_checkpoint_store.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_checkpoint_annotations.py

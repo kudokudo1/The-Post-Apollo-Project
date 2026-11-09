@@ -14,7 +14,7 @@ const weatherPane = read("widgets/weather/StationWeatherSubjectPane.qml");
 const navigator = read("widgets/weather/StationSubjectNavigationPolicy.js");
 function policy(source) {
     const context = vm.createContext({});
-    vm.runInContext(source.replace(/^\\.pragma library\\s*$/m,""),context);
+    vm.runInContext(source.replace(/^\.pragma library\s*$/m,""),context);
     return context;
 }
 const gp = policy(groundPolicySource);
@@ -53,27 +53,27 @@ test("E4 moves visible lightning exclusively to the existing WEATHER hazard page
     assert.equal(gp.needsSource("weather/hazards/lightning","lightning"),true);
     assert.equal(gp.visibleFor("ground","weather/hazards/lightning","seismic"),false);
     assert.ok(nav.findRoute("weather/hazards/lightning"));
-    assert.match(weatherPane,/StationGround\\s*\\{/);
-    assert.match(ground,/title: "LIGHTNING \\/\\/ NOAA NOWCOAST"/);
+    assert.match(weatherPane,/StationGround\s*\{/);
+    assert.match(ground,/title: "LIGHTNING \/\/ NOAA NOWCOAST"/);
 });
 
 test("E4 retains one fixed two-tab header and original Ground renderer",()=>{
-    assert.equal((pane.match(/StationGround\\s*\\{/g)||[]).length,1);
+    assert.equal((pane.match(/StationGround\s*\{/g)||[]).length,1);
     assert.match(pane,/property string groundViewMode: "environment"/);
     assert.match(pane,/objectName: "earth-e4-ground-shell"/);
     assert.match(pane,/objectName: "earth-e4-ground-tabs"/);
     assert.match(pane,/objectName: "earth-e4-ground-divider"/);
     assert.match(pane,/objectName: "earth-e4-one-ground-renderer"/);
-    assert.match(pane,/model: \\[\\s*\\{key:"environment",label:"ENVIRONMENT"\\},\\s*\\{key:"air-pollen",label:"AIR \\/\\/ POLLEN"\\}/);
-    assert.match(pane,/HeaderGeometry\\.buttonWidth\\(groundModes\\.width,2\\)/);
-    assert.match(pane,/onClicked: earthPane\\.groundViewMode = modelData\\.key/);
-    assert.match(pane,/subjectRoute: earthPane\\.groundViewMode === "air-pollen"[\\s\\S]*?"earth\\/ground\\/air-pollen" : "earth\\/ground\\/environment"/);
-    assert.match(pane,/anchors\\.top: groundRule\\.bottom/);
-    assert.match(pane,/weatherService: earthPane\\.weatherService/);
-    assert.match(pane,/seismicSource: earthPane\\.seismicSource/);
-    assert.match(pane,/persistentCacheStore: earthPane\\.persistentCacheStore/);
-    assert.match(ground,/onSubjectRouteChanged: \\{/);
-    assert.doesNotMatch(pane,/WeatherServices\\.|\\bProcess\\s*\\{|\\bFileView\\s*\\{/);
+    assert.match(pane,/model: \[\s*\{key:"environment",label:"ENVIRONMENT"\},\s*\{key:"air-pollen",label:"AIR \/\/ POLLEN"\}/);
+    assert.match(pane,/HeaderGeometry\.buttonWidth\(groundModes\.width,2\)/);
+    assert.match(pane,/onClicked: earthPane\.groundViewMode = modelData\.key/);
+    assert.match(pane,/subjectRoute: earthPane\.groundViewMode === "air-pollen"[\s\S]*?"earth\/ground\/air-pollen" : "earth\/ground\/environment"/);
+    assert.match(pane,/anchors\.top: groundRule\.bottom/);
+    assert.match(pane,/weatherService: earthPane\.weatherService/);
+    assert.match(pane,/seismicSource: earthPane\.seismicSource/);
+    assert.match(pane,/persistentCacheStore: earthPane\.persistentCacheStore/);
+    assert.match(ground,/onSubjectRouteChanged: \{/);
+    assert.doesNotMatch(pane,/WeatherServices\.|\bProcess\s*\{|\bFileView\s*\{/);
 });
 
 test("E4 keeps CLASSIC and WEATHER full-source legacy presentation unchanged",()=>{

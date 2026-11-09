@@ -1684,6 +1684,12 @@ PanelWindow {
         machineListCheckpoints();
     }
     function machineListCheckpoints() {
+        if (machineNotesDirty) {
+            machineNotesStatus = "UNSAVED NOTES // SAVE OR CANCEL FIRST";
+            return;
+        }
+        machineNotesDiscard();
+        machineNotesNameOverlay = ({});
         machineGeometryVerifyId = "";
         machineGeometryVerifyResult = null;
         machineGeometryVerifyStatus = "NOT VERIFIED // READ-ONLY CHECK AVAILABLE";
@@ -1699,8 +1705,13 @@ PanelWindow {
         machineStoreRequest("load", null, machineSavedItem.id);
     }
     function machineStepSavedCheckpoint(delta) {
-        if (machineAutoRestoreBusy)
+        if (machineAutoRestoreBusy || machineSaveBridgeBusy || machineStoreBusy)
             return;
+        if (machineNotesDirty) {
+            machineNotesStatus = "UNSAVED NOTES // SAVE OR CANCEL FIRST";
+            return;
+        }
+        machineNotesDiscard();
         machineGeometryVerifyId = "";
         machineGeometryVerifyResult = null;
         machineGeometryVerifyStatus = "NOT VERIFIED // READ-ONLY CHECK AVAILABLE";
@@ -1920,7 +1931,9 @@ PanelWindow {
         running: false
         stdinEnabled: true
         onStarted: {
-            if (timew.machineSaveBridgeAction === "save" && timew.machineSaveBridgePayload)
+            if ((timew.machineSaveBridgeAction === "save"
+                    || timew.machineSaveBridgeAction === "notes-update")
+                    && timew.machineSaveBridgePayload)
                 machineSaveBridgeProcess.write(
                     timew.machineSaveBridgePayload + String.fromCharCode(10));
             timew.machineSaveBridgePayload = "";
@@ -1930,13 +1943,27 @@ PanelWindow {
                 try {
                     timew.machineAcceptSaveBridge(JSON.parse(this.text));
                 } catch (error) {
-                    timew.machineSaveBridgeStatus = "INVALID SAVE RESPONSE";
+                    if (timew.machineSaveBridgeAction.startsWith("notes-"))
+                        timew.machineNotesStatus = "INVALID NOTES RESPONSE";
+                    else
+                        timew.machineSaveBridgeStatus = "INVALID SAVE RESPONSE";
                 }
             }
         }
         onExited: function(exitCode, exitStatus) {
             timew.machineSaveBridgeBusy = false;
             timew.machineSaveBridgePayload = "";
+            if (timew.machineSaveBridgeAction.startsWith("notes-")) {
+                if (exitCode !== 0 && timew.machineSaveBridgeAction === "notes-update"
+                        && !timew.machineNotesStatus.startsWith("NOTES STALE"))
+                    timew.machineNotesStatus =
+                        "NOTES UPDATE UNCERTAIN // REFRESH BEFORE RETRY";
+                else if (exitCode !== 0 && timew.machineSaveBridgeAction === "notes-read"
+                         && timew.machineNotesEditorOpen
+                         && !timew.machineNotesLoaded)
+                    timew.machineNotesStatus = "NOTES READ UNAVAILABLE";
+                return;
+            }
             if (exitCode !== 0 && timew.machineSaveBridgeAction === "verify") {
                 if (timew.machineSavedItem
                         && timew.machineGeometryVerifyId === timew.machineSavedItem.id)
@@ -2013,6 +2040,11 @@ PanelWindow {
         onExited: function(exitCode, exitStatus) {
             timew.machineStoreBusy = false;
             timew.machineStorePayload = "";
+            if (timew.machineStoreAction === "list"
+                    && exitCode === 0 && timew.machineStoreResponse
+                    && timew.machineStoreResponse.status === "listed"
+                    && timew.machineSavedCheckpoints.length > 0)
+                timew.machineRequestNotesList();
             if (exitCode !== 0)
                 timew.machineStoreStatus = timew.machineStoreResponse
                     && timew.machineStoreResponse.status === "error"

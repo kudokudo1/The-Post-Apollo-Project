@@ -68,9 +68,9 @@ test("source status remains visible and unavailable facts do not invent readings
 test("Moon C10 matches the six-pixel COSMOS overview and mode-page stage gutter",()=>{
  const overview=read("widgets/weather/StationCosmosOverviewPane.qml");
  const modes=read("widgets/weather/StationCosmosModesPane.qml");
- assert.match(overview,/anchors\.margins: 6/);
- assert.match(modes,/anchors\.margins: 6/);
- assert.match(moon,/readonly property int contentInset: 6/);
+ assert.match(overview,/anchors\.margins: HeaderGeometry\.inset/);
+ assert.match(modes,/anchors\.margins: HeaderGeometry\.inset/);
+ assert.match(moon,/readonly property int contentInset: HeaderGeometry\.inset/);
  for(const objectName of [
    "cosmos-c9-moon-free-header",
    "cosmos-c9-moon-hero-row"
@@ -82,7 +82,7 @@ test("Moon C10 matches the six-pixel COSMOS overview and mode-page stage gutter"
    assert.match(next,/anchors\.rightMargin: moonPane\.contentInset/);
  }
  assert.match(moon,/id: compactReadings[\s\S]*?width: Math\.max\(1,heroRow\.width-moonMain\.width-heroRow\.spacing\)/);
- assert.match(moon,/anchors\.topMargin: moonPane\.contentInset/);
+ assert.match(moon,/anchors\.topMargin: HeaderGeometry\.inset/);
  assert.match(moon,/anchors\.bottomMargin: moonPane\.contentInset/);
 });
 
@@ -97,8 +97,8 @@ test("C19 MOON overview and year share top modes above source-backed forecast",(
    "cosmos-c18-moon-observation-tab",
    "cosmos-c11-open-moon-year"
  ])assert.ok(moon.includes('objectName: "'+name+'"'),name);
- assert.equal((moon.match(/\(moonModeRail\.width-moonModeRail\.spacing\)\/2/g)||[]).length,2);
- assert.equal((moon.match(/height: 27/g)||[]).length,3);
+ assert.equal((moon.match(/HeaderGeometry\.buttonWidth\(moonModeRail\.width,2\)/g)||[]).length,2);
+ assert.equal((moon.match(/height: HeaderGeometry\.tabHeight/g)||[]).length,3);
  assert.match(moon,/label: "OVERVIEW"[\s\S]*?selected: true/);
  assert.match(moon,/onClicked: moonPane\.routeRequested\("cosmos\/moon\/year"\)/);
  assert.doesNotMatch(moon,/onClicked: moonPane\.routeRequested\("cosmos\/moon\/forecast"\)/);
@@ -183,12 +183,12 @@ test("C22 keeps the enlarged Moon but restores lower source boxes and phase-cont
 test("C23 MOON overview has a cyan two-pixel divider beneath its header tabs",()=>{
  const modes=read("widgets/weather/StationCosmosModesPane.qml");
  assert.match(modes,/id: dividerLine[\s\S]*?anchors\.top: modeRail\.bottom/);
- assert.match(modes,/height: 2\s*color: Colors\.cyan/);
+ assert.match(modes,/height: HeaderGeometry\.ruleHeight\s*color: Colors\.cyan/);
  assert.match(moon,/id: moonHeaderDivider[\s\S]*?objectName: "cosmos-c23-moon-overview-divider"/);
  assert.match(moon,/id: moonHeaderDivider[\s\S]*?anchors\.top: moonModeRail\.bottom/);
- assert.match(moon,/id: moonHeaderDivider[\s\S]*?anchors\.topMargin: 5/);
- assert.match(moon,/id: moonHeaderDivider[\s\S]*?height: 2\s*color: Colors\.cyan/);
- assert.match(moon,/anchors\.top: moonHeaderDivider\.bottom[\s\S]*?anchors\.topMargin: 3/);
+ assert.match(moon,/id: moonHeaderDivider[\s\S]*?anchors\.topMargin: HeaderGeometry\.tabsToRule/);
+ assert.match(moon,/id: moonHeaderDivider[\s\S]*?height: HeaderGeometry\.ruleHeight\s*color: Colors\.cyan/);
+ assert.match(moon,/anchors\.top: moonHeaderDivider\.bottom[\s\S]*?anchors\.topMargin: HeaderGeometry\.ruleToContent/);
  assert.match(moon,/anchors\.leftMargin: moonPane\.contentInset/);
  assert.match(moon,/anchors\.rightMargin: moonPane\.contentInset/);
  assert.doesNotMatch(moon,/Flickable\s*\{|ScrollView\s*\{/);

@@ -1829,6 +1829,7 @@ Rectangle {
 
             Row {
                 id: mapFilterRail
+                objectName: "earth-e3-legacy-eonet-filter"
                 width: parent.width
                 height: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly
                         && !stationDiscovery.earthPinnedMap

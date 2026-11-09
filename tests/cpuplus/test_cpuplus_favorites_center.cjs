@@ -1594,7 +1594,7 @@ test("U8a CPU++ red X closes through the established lifecycle while glow probe 
   const close=cpu.slice(cpu.indexOf("id: cpuPlusCloseButton"),
     cpu.indexOf("id: modeRailHeaderLine"));
   assert.match(close,/text: "×"/);
-  assert.match(close,/font\.pixelSize: 31/);
+  assert.match(close,/font\.pixelSize: 27/);
   assert.match(close,/color: Colors\.black/);
   assert.match(close,/border\.color:[\s\S]*?Colors\.red/);
   assert.match(close,/color: Colors\.red/);
@@ -1816,20 +1816,22 @@ test("U8d network badge reuses the existing Network dock; header red X stays cle
 });
 
 
-test("U9a LOCATION is physically separated into explore, saved and edit bays",()=>{
+test("U9a / U9b LOCATION separates Explore, pinned search/saved, and Home editing",()=>{
   const cpu=read("widgets/CpuPlusW.qml");
   const left=cpu.split("id: sharedInstrumentPane")[1].split("id: targetPane")[0];
   const middle=cpu.split("id: targetPane")[1].split("id: actuatorPane")[0];
   const right=cpu.split("id: actuatorPane")[1];
   assert.match(left,/id: settingsLocationOverviewPane/);
   assert.match(left,/CpuPlusSettingsLocationOverviewPane \{/);
-  assert.match(left,/onHomeCandidateRequested: function\(candidate\)/);
-  assert.match(left,/settingsLocationPane\.fillHomeCandidate\(candidate\)/);
   assert.match(left,/settingsSubMode === "LOCATION"/);
   assert.match(left,/settingsSubMode === "LOCATION"\)\)\s*&& cpuPlusWindow.selectedModeIndex !== 5/);
   assert.match(middle,/id: settingsLocationSelectionPane/);
   assert.match(middle,/CpuPlusSettingsLocationSelectionPane \{/);
   assert.match(middle,/durationKey: settingsLocationOverviewPane\.durationKey/);
+  assert.match(middle,/onHomeCandidateRequested: function\(candidate\)/);
+  assert.match(middle,/settingsLocationPane\.fillHomeCandidate\(candidate\)/);
+  assert.match(middle,/onExploreCandidateRequested: function\(candidate\)/);
+  assert.match(middle,/settingsLocationOverviewPane\.fillExploreCandidate\(candidate\)/);
   assert.match(middle,/anchors\.top: targetSubModeStrip\.bottom/);
   assert.doesNotMatch(middle,/id: settingsCategorySummary/);
   assert.match(right,/id: settingsLocationPane/);
@@ -1837,23 +1839,28 @@ test("U9a LOCATION is physically separated into explore, saved and edit bays",()
   const overview=read("widgets/cpuplus/CpuPlusSettingsLocationOverviewPane.qml");
   const selection=read("widgets/cpuplus/CpuPlusSettingsLocationSelectionPane.qml");
   const editor=read("widgets/cpuplus/CpuPlusSettingsLocationPane.qml");
-  assert.match(overview,/CpuPlusPlaceSearchPanel \{/);
+  assert.doesNotMatch(overview,/CpuPlusPlaceSearchPanel \{/);
   assert.match(overview,/CpuPlusExploreLocationPanel \{/);
-  assert.match(overview,/signal homeCandidateRequested\(var candidate\)/);
+  assert.match(overview,/function fillExploreCandidate\(candidate\)/);
   assert.match(overview,/property alias durationKey: explorePanel\.durationKey/);
-  assert.match(overview,/onUseForExplore: function\(candidate\)/);
   assert.match(overview,/explorePanel\.fillDestination\(candidate\)/);
+  assert.match(overview,/SHARED CONTEXT \/\/ LOCATION/);
+  assert.match(selection,/CpuPlusPlaceSearchPanel \{/);
+  assert.match(selection,/compactPinned: true/);
+  assert.match(selection,/onUseForHome: function\(candidate\)/);
+  assert.match(selection,/onUseForExplore: function\(candidate\)/);
   assert.match(selection,/CpuPlusSavedPlacesPanel \{/);
   assert.match(selection,/durationKey: locationSelection\.durationKey/);
   assert.match(selection,/registry: locationSelection\.registry/);
   assert.match(editor,/function fillHomeCandidate\(candidate\)/);
   assert.match(editor,/registry\.saveHome\(/);
   assert.doesNotMatch(editor,/CpuPlusPlaceSearchPanel|CpuPlusExploreLocationPanel|CpuPlusSavedPlacesPanel/);
-  assert.equal((overview.match(/CpuPlusPlaceSearchPanel \{/g)||[]).length,1);
   assert.equal((overview.match(/CpuPlusExploreLocationPanel \{/g)||[]).length,1);
+  assert.equal((selection.match(/CpuPlusPlaceSearchPanel \{/g)||[]).length,1);
   assert.equal((selection.match(/CpuPlusSavedPlacesPanel \{/g)||[]).length,1);
   assert.equal((editor.match(/saveHome\(/g)||[]).length,1);
   assert.match(cpu,/settingsLocationOverviewPane\.editingText/);
+  assert.match(cpu,/settingsLocationSelectionPane\.editingText/);
   assert.match(cpu,/settingsLocationPane\.editingText/);
 });
 
@@ -1895,12 +1902,12 @@ test("U9a close reuses Hospital's exact U+00D7 glyph, frame and red glow on blac
   const git=read("widgets/GitW.qml");
   const close=cpu.slice(cpu.indexOf("id: cpuPlusCloseButton"),
     cpu.indexOf("id: cpuPlusInternetIndicator"));
-  assert.match(close,/width: 40\s+height: 34/);
+  assert.match(close,/width: 36\s+height: 30/);
   assert.match(close,/color: Colors\.black/);
   assert.match(close,/border\.width: 1/);
   assert.match(close,/border\.color: cpuPlusCloseMouse\.pressed/);
   assert.match(close,/text: "×"/);
-  assert.match(close,/font\.pixelSize: 31/);
+  assert.match(close,/font\.pixelSize: 27/);
   assert.match(close,/color: Colors\.red/);
   assert.match(close,/id: cpuPlusCloseMouse/);
   assert.match(close,/onClicked: cpuPlusWindow\.close\(\)/);

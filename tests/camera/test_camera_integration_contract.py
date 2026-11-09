@@ -5,6 +5,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 DOCK = (ROOT / "modules/Screenshot.qml").read_text()
 PANEL = (ROOT / "widgets/CameraW.qml").read_text()
+CLEANUP = (ROOT / "widgets/CameraCleanupView.qml").read_text()
+TRASH = (ROOT / "modules/Trash.qml").read_text()
 SHELL = (ROOT / "shell.qml").read_text()
 BACKEND = (ROOT / "scripts/camera/camera_cli.py").read_text()
 FILES = (ROOT / "services/files/FileService.qml").read_text()
@@ -21,7 +23,7 @@ class CameraWidgetContracts(unittest.TestCase):
         self.assertIn("id: cameraHost", SHELL)
         self.assertIn("Screenshot {", SHELL)
         self.assertIn("id: cameraDock", SHELL)
-        self.assertIn("onToggleRequested: cameraWindow.toggle()", SHELL)
+        self.assertIn("cameraWindow.toggle();", SHELL)
         self.assertIn("CameraW {", SHELL)
         self.assertIn("screen: shellRoot.screen", SHELL)
         self.assertIn("id: sharedMediaDock", SHELL)
@@ -53,7 +55,7 @@ class CameraWidgetContracts(unittest.TestCase):
         self.assertIn("width: 9", left)
         # Moving dock declarations never transfers their functional owners.
         self.assertIn("id: sharedMediaDock", left)
-        self.assertIn("onToggleRequested: cameraWindow.toggle()", left)
+        self.assertIn("cameraWindow.toggle();", left)
 
     def test_capture_modes_and_hidden_panel_before_shutter(self):
         self.assertIn('label: "REGION"', PANEL)
@@ -133,11 +135,11 @@ class CameraWidgetContracts(unittest.TestCase):
         self.assertIn('run("preview", ["preview-trash"])', PANEL)
         self.assertIn("function confirmCleanup()", PANEL)
         self.assertIn('run("trash", ["trash", id, "MOVE_TO_TRASH"])', PANEL)
-        self.assertIn('label: "PREVIEW MATCHES"', PANEL)
-        self.assertIn('label: camera.trashPreview', PANEL)
+        self.assertIn('label: "PREVIEW MATCHES"', CLEANUP)
+        self.assertIn('label: camera.trashPreview', CLEANUP)
         self.assertIn("destructive: true", PANEL)
         self.assertIn("accentColor: Colors.red", PANEL)
-        self.assertIn("camera.trashPreview.sample.join", PANEL)
+        self.assertIn("camera.trashPreview.sample.join", CLEANUP)
         self.assertIn('PLAN_TTL = 600', BACKEND)
         self.assertIn('MAX_TRASH = 20000', BACKEND)
         self.assertIn('if confirmed != "MOVE_TO_TRASH"', BACKEND)
@@ -146,6 +148,21 @@ class CameraWidgetContracts(unittest.TestCase):
         self.assertIn('subprocess.run([gio, "trash", str(target)]', BACKEND)
         self.assertNotIn('subprocess.run(["rm"', BACKEND)
         self.assertIn('"recoverable": True', BACKEND)
+
+    def test_cleanup_menus_are_physically_in_trash_not_in_camera(self):
+        self.assertNotIn('id: cleanupPage', PANEL)
+        self.assertNotIn('{id: "cleanup", label: "CLEANUP"}', PANEL)
+        self.assertIn('id: cleanupPage', CLEANUP)
+        self.assertIn('id: cleanupHuntView', CLEANUP)
+        self.assertIn('id: cleanupSwipeView', CLEANUP)
+        self.assertIn('id: cleanupQueueView', CLEANUP)
+        self.assertIn('id: cleanupDesktopView', CLEANUP)
+        self.assertIn('CameraCleanupView {', TRASH)
+        self.assertIn('cameraCleanupController: cameraWindow', SHELL)
+        self.assertIn('hostedCleanupActive: trashWindow.menuOpen', SHELL)
+        self.assertIn('hostedCleanupSurface: trashWindow.cleanupContentView', SHELL)
+        self.assertIn('property var batchPaths: []', PANEL)
+        self.assertNotIn('property var batchPaths: []', CLEANUP)
 
     def test_camera_does_not_own_files_media_or_social(self):
         self.assertIn("property string currentDir", FILES)

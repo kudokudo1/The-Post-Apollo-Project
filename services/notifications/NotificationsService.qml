@@ -246,12 +246,22 @@ Singleton {
         const selected = options.find(function(option) { return option.key === key; });
         if (!selected || selected.kind === "app" || isBlocked(key))
             return "";
-        const parents = selected.kind === "channel" ? ["server", "app"]
+        const parents = selected.kind === "channel"
+                ? ["server", "sender", "account", "app"]
+            : selected.kind === "sender"
+                ? ["group", "thread", "conversation", "channel", "server", "account", "app"]
+            : selected.kind === "group" || selected.kind === "thread"
+                || selected.kind === "conversation"
+                ? ["sender", "account", "app"]
+            : selected.kind === "server" || selected.kind === "account"
+                ? ["account", "app"]
             : selected.kind === "resourceEvent" ? ["resource", "event", "app"]
             : selected.kind === "resource" ? ["event", "app"]
             : selected.kind === "event" ? ["resource", "app"]
             : selected.kind === "title"
-                ? ["resourceEvent", "resource", "event", "website", "app"]
+                ? ["group", "thread", "conversation", "channel",
+                   "server", "sender", "account", "resourceEvent",
+                   "resource", "event", "website", "app"]
             : ["app"];
         for (let k = 0; k < parents.length; k++) {
             for (let i = 0; i < options.length; i++) {
@@ -323,12 +333,22 @@ Singleton {
         if (!selected || selected.kind === "app"
                 || isDnd(key) || isSnoozed(key))
             return "";
-        const parents = selected.kind === "channel" ? ["server", "app"]
+        const parents = selected.kind === "channel"
+                ? ["server", "sender", "account", "app"]
+            : selected.kind === "sender"
+                ? ["group", "thread", "conversation", "channel", "server", "account", "app"]
+            : selected.kind === "group" || selected.kind === "thread"
+                || selected.kind === "conversation"
+                ? ["sender", "account", "app"]
+            : selected.kind === "server" || selected.kind === "account"
+                ? ["account", "app"]
             : selected.kind === "resourceEvent" ? ["resource", "event", "app"]
             : selected.kind === "resource" ? ["event", "app"]
             : selected.kind === "event" ? ["resource", "app"]
             : selected.kind === "title"
-                ? ["resourceEvent", "resource", "event", "website", "app"]
+                ? ["group", "thread", "conversation", "channel",
+                   "server", "sender", "account", "resourceEvent",
+                   "resource", "event", "website", "app"]
             : ["app"];
         const now = Date.now();
         for (let k = 0; k < parents.length; k++) {

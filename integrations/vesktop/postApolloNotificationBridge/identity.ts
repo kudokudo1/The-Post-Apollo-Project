@@ -73,7 +73,8 @@ function oneLineLabel(value: unknown): string {
 // Pure command-argument builder, shared by native code and contract tests.
 // It does NOT execute a process. Only this fixed, generic notification is
 // possible through the paired native helper.
-export function notificationArgs(raw: unknown): string[] | null {
+export function notificationArgs(raw: unknown,
+                                 desktopEntry = "vesktop"): string[] | null {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
     const m = raw as Record<string, unknown>;
     const accountId = discordSnowflake(m.accountId);
@@ -93,8 +94,12 @@ export function notificationArgs(raw: unknown): string[] | null {
             || (kind === "direct" && groupId))
         return null;
 
+    // The Flatpak desktop entry is dev.vencord.Vesktop, while a native
+    // Vesktop install commonly reports vesktop. Reject arbitrary callers.
+    if (desktopEntry !== "vesktop" && desktopEntry !== "dev.vencord.Vesktop")
+        return null;
     const hints: Array<[string, string]> = [
-        ["desktop-entry", "vesktop"],
+        ["desktop-entry", desktopEntry],
         ["category", "im.received"],
         ["x-post-apollo-account-id", accountId],
         ["x-post-apollo-sender-id", senderId]

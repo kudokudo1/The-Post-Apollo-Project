@@ -111,9 +111,10 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.doesNotMatch(gallery, /label: "BATCH ON"/);
     assert.doesNotMatch(gallery, /onLeftClicked: camera\.batchToggle\(modelData\)/);
     assert.match(cleanup, /label: "SELECT LOADED"/);
-    assert.match(cleanup, /label: "REVIEW FOR TRASH/);
-    assert.match(cleanup, /label: camera\.batchPreview/);
-    assert.match(cleanup, /" TO TRASH"/);
+    assert.match(cleanup, /label: "MOVE " \+ camera\.batchPaths\.length \+ " TO TRASH"/);
+    assert.match(cleanup, /onLeftClicked: camera\.trashQueuedNow\(\)/);
+    assert.doesNotMatch(cleanup, /label: "REVIEW FOR TRASH/);
+    assert.doesNotMatch(cleanup, /label: "CANCEL REVIEW"/);
     assert.match(cleanup, /label: "CLEAR MARKS"/);
     assert.match(cleanup, /label: "BATCH SCROLL"/);
     assert.match(cleanup, /label: "BATCH GRID"/);
@@ -1409,7 +1410,7 @@ test("Refreshing Cleanup search/filter preserves queue, changing folder clears i
 test("Cleanup queue receipt preserves skipped/failed paths, not just a success count", () => {
     // Source contract verifies successful backend receipt does not
     // erase files that GIO could not move.
-    const start=qml.indexOf('        } else if (action === "trashBatch") {');
+    const start=qml.indexOf('        } else if (action === "trashBatch" || action === "trashBatchNow") {');
     const end=qml.indexOf('        } else if (action === "previewSelected") {',start);
     assert.ok(start>0&&end>start);
     const code=qml.slice(start,end);
@@ -1418,4 +1419,60 @@ test("Cleanup queue receipt preserves skipped/failed paths, not just a success c
     assert.match(code,/SKIPPED/);
     assert.match(code,/FAILED/);
     assert.match(code,/camera\.loadGallery\(false, "cleanup"\)/);
+});
+
+
+test("One click from any Cleanup selection mode executes a single direct Trash command", () => {
+    for(const mode of ["batch","grid","swipe","hunt"]) {
+        const state=createState();
+        state.cleanupTechnique=mode;
+        state.batchPaths=["/tmp/Alpha.png","/tmp/Bravo.mp4"];
+        assert.equal(state.trashQueuedNow(),true);
+        assert.equal(state.called.length,1,"one UI click must start one process");
+        assert.equal(state.called[0].action,"trashBatchNow");
+        assert.deepEqual(Array.from(state.called[0].args),[
+            "trash-batch-now",
+            JSON.stringify(["/tmp/Alpha.png","/tmp/Bravo.mp4"]),
+            "MOVE_TO_TRASH","--folder","/tmp/CameraReview"
+        ]);
+        assert.equal(state.batchPreview,null);
+        assert.equal(state.batchReviewKey,"");
+        // The UI doesn't need to open the queue or request a plan.
+        assert.equal(state.cleanupQueueOpen,false);
+        assert.equal(state.called.some(c=>c.action==="previewBatch"),false);
+        assert.equal(state.called.some(c=>c.action==="trashBatch"),false);
+    }
+});
+
+test("One-click Trash fails closed for empty, busy, stale folder or Gallery scan", () => {
+    const s=createState();
+    assert.equal(s.trashQueuedNow(),false);
+    s.batchToggle(files[0]);
+    s.busy=true;
+    assert.equal(s.trashQueuedNow(),false);
+    s.busy=false;
+    s.galleryRequestedView="gallery";
+    assert.equal(s.trashQueuedNow(),false);
+    s.galleryRequestedView="cleanup";
+    s.cleanupCustomFolder="/tmp/OtherFolder";
+    assert.equal(s.trashQueuedNow(),false);
+    s.cleanupCustomFolder="/tmp/CameraReview";
+    s.cleanupLoadedFolder="/tmp/AnotherFolder";
+    assert.equal(s.trashQueuedNow(),false);
+    assert.equal(s.called.length,0);
+    assert.match(s.feedback,/SCAN CURRENT CLEANUP FOLDER FIRST/);
+    s.cleanupLoadedFolder="/tmp/CameraReview";
+    assert.equal(s.trashQueuedNow(),true);
+    assert.equal(s.called.length,1);
+});
+
+test("Direct-trash response uses existing receipt and preserves failed paths", () => {
+    const c=qml.slice(qml.indexOf("    function consume(raw) {"));
+    assert.match(c,/action === "trashBatch" \|\| action === "trashBatchNow"/);
+    assert.match(c,/payload\.unmovedPaths\.slice\(\)/);
+    assert.match(c,/cleanupQueueOpen = batchPaths\.length > 0/);
+    assert.match(c,/action === "trashBatchNow"\s*\?\s*"TRASH \/\/ NOT MOVED/);
+    assert.match(c,/camera\.loadGallery\(false, "cleanup"\)/);
+    assert.doesNotMatch(qml.slice(qml.indexOf("id: cleanupQueueActions"),
+                          qml.indexOf("id: cleanupSearch")),/batchPreview\.count/);
 });

@@ -262,8 +262,15 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
             const id=decodeURIComponent(match[3]);
             // New-provider resource IDs are also never printed. The label
             // conveys provider and kind only, not source commands/secrets.
+            // ANGEL is an opt-in new provider in the shared default store.
+            // Its exact 1–8 digits are safe to present; other provider IDs
+            // remain opaque. Keep category NEW so the existing default-store
+            // remove/pin controls retain the correct owner and permissions.
+            const angel=valid.provider==="angel" && valid.kind==="number"
+                && /^[0-9]{1,8}$/.test(id);
             add(valid.provider,valid.kind,id,
-                valid.provider.toUpperCase()+" // "+valid.kind.toUpperCase(),
+                angel ? "ANGEL // "+id
+                    : valid.provider.toUpperCase()+" // "+valid.kind.toUpperCase(),
                 "NEW",isFavorite,!isFavorite);
         }
     }

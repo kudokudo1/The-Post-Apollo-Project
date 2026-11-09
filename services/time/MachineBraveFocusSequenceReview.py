@@ -92,7 +92,8 @@ def review_focus_sequence(evidence):
         host_id = sample["focused_host_container_id"]
         _positive_id(browser_id)
         _positive_id(host_id)
-        if (sample["host_app_id"] not in BRAVE_APP_IDS
+        if (not isinstance(sample["host_app_id"], str)
+                or sample["host_app_id"] not in BRAVE_APP_IDS
                 or sample["host_stable_two_reads"] is not True):
             raise FocusSequenceError("UNSTABLE OR NON-BRAVE OBSERVATION")
         requested = sample["requested_at_ms"]

@@ -33,7 +33,8 @@ ShellRoot {
             "run:kitty:zellij","mode:4:Favorite Window","hidden:btop",
             "mode:2:◇  budget-2026.xlsx",
             "mode:2:⌯🗁๋࣭⭑  Properties/",
-            "mode:2:↗  Active Contract.pdf"
+            "mode:2:↗  Active Contract.pdf",
+            "org.example.Demo.desktop"
         ]
         property var favoriteDetailActionKeys: []
         property var favoriteMonitorBoxKeys: []
@@ -292,8 +293,23 @@ ShellRoot {
                             || defaults.mutations || collections.renameCalls!==1) {
                         root.fail("U7B_UNSAFE_EXACT_ROUTE");return;
                     }
-                    root.done=true;
                     console.log("U7B_PASS // EXACT_HOME_PANEL_ONLY_NO_PROVIDER_ACTIONS");
+                    const app=root.options.rows.find(function(row) {
+                        return row.owner==="appcontrol" && row.kind==="item"
+                            && row.key==="fav1:local:appcontrol:item:org.example.Demo.desktop";
+                    });
+                    if(!app) {root.fail("U7C_SAVED_APP_MISSING");return;}
+                    root.selectedKey=app.key;
+                    root.testStage=10;
+                }
+                onAppSelectionRequested: function(desktopId) {
+                    if(root.testStage!==11 || desktopId!=="org.example.Demo.desktop"
+                            || time.removals || places.removals
+                            || defaults.mutations || collections.renameCalls!==1) {
+                        root.fail("U7C_UNSAFE_APP_SELECTION");return;
+                    }
+                    root.done=true;
+                    console.log("U7C_PASS // EXACT_DESKTOP_ENTRY_SELECTION_NO_EXECUTION");
                     Qt.quit();
                 }
             }
@@ -383,7 +399,7 @@ ShellRoot {
             const processGroup=dossier.dossier.groups.find(function(group) {
                 return group.key==="CPU++|KILL";
             });
-            if(!root.options || root.options.total!==21
+            if(!root.options || root.options.total!==22
                || dossier.dossier.total!==root.options.rows.length
                || dossier.collectionView.count!==1
                || dossier.collectionView.groups[0].count!==3
@@ -594,6 +610,22 @@ ShellRoot {
                     itemButton.width/2,itemButton.height/2);
                 root.testStage=9;
                 console.log("U7B_ITEM_READY // x="+Math.round(pt.x)
+                    +" y="+Math.round(pt.y));
+            } else if(root.testStage===10) {
+                const appButton=detail.exactNavigationControl;
+                if(!root.selection || root.selection.owner!=="appcontrol"
+                        || root.selection.menu!=="APPS"
+                        || !root.selection.readOnly
+                        || !detail.appSelection.ok
+                        || detail.appSelection.desktopId!=="org.example.Demo.desktop"
+                        || !appButton || !appButton.available
+                        || appButton.label!=="OPEN ITEM") {
+                    root.fail("U7C_APP_BUTTON_NOT_READY");return;
+                }
+                const pt=appButton.mapToItem(win.contentItem,
+                    appButton.width/2,appButton.height/2);
+                root.testStage=11;
+                console.log("U7C_ITEM_READY // x="+Math.round(pt.x)
                     +" y="+Math.round(pt.y));
             }
         }

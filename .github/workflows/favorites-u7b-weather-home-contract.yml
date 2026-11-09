@@ -11,6 +11,7 @@ on:
       - "services/favorites/FavoritesSystemSelectionPolicy.js"
       - "services/favorites/FavoritesThermalSelectionPolicy.js"
       - "tests/cpuplus/test_favorites_thermal_selection_u7be.cjs"
+      - "tests/cpuplus/test_favorites_immediate_local_navigation_u7bf.cjs"
       - "tests/cpuplus/test_favorites_system_selection_u7bd.cjs"
       - "tests/cpuplus/test_favorites_app_selection_u7bc.cjs"
       - "widgets/AppControlW.qml"
@@ -31,6 +32,7 @@ on:
       - "services/favorites/FavoritesSystemSelectionPolicy.js"
       - "services/favorites/FavoritesThermalSelectionPolicy.js"
       - "tests/cpuplus/test_favorites_thermal_selection_u7be.cjs"
+      - "tests/cpuplus/test_favorites_immediate_local_navigation_u7bf.cjs"
       - "tests/cpuplus/test_favorites_system_selection_u7bd.cjs"
       - "tests/cpuplus/test_favorites_app_selection_u7bc.cjs"
       - "widgets/AppControlW.qml"
@@ -57,3 +59,4 @@ jobs:
           node --test tests/cpuplus/test_favorites_app_selection_u7bc.cjs
           node --test tests/cpuplus/test_favorites_system_selection_u7bd.cjs
           node --test tests/cpuplus/test_favorites_thermal_selection_u7be.cjs
+          node --test tests/cpuplus/test_favorites_immediate_local_navigation_u7bf.cjs

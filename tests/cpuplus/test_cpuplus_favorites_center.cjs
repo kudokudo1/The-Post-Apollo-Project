@@ -2054,8 +2054,10 @@ test("U9c search treats Maryland/MD and United States/USA as equivalent place te
   const app={category:"APP CTRL",menu:"APPS",item:"Markdown Editor"};
   assert.equal(Search.matches(app,"maryland"),false,
     "embedded md in another word must not expand to Maryland");
-  assert.equal(Search.matches(app,"MD"),true,
-    "partial visible substring remains supported");
+  assert.equal(Search.matches(app,"MD"),false,
+    "an abbreviation must not match unrelated words");
+  assert.equal(Search.matches({...app,label:"MD Reader"},"MD"),true,
+    "a visible exact abbreviation remains searchable");
 });
 
 test("U9c filters share yellow fill, magenta border, icon and glow in EVERY selected state",()=>{

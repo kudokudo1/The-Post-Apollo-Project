@@ -721,6 +721,7 @@ def trash_batch(token, confirmation):
         moved = 0
         skipped = 0
         failed = 0
+        unmoved_paths = []
         for target, signature in targets:
             try:
                 st = target.lstat()
@@ -728,19 +729,24 @@ def trash_batch(token, confirmation):
                 if (not stat.S_ISREG(st.st_mode) or target.is_symlink()
                         or current != signature):
                     skipped += 1
+                    unmoved_paths.append(str(target))
                     continue
                 proc = subprocess.run([gio, "trash", str(target)], timeout=18,
                                       capture_output=True, check=False)
                 if proc.returncode:
                     failed += 1
+                    unmoved_paths.append(str(target))
                 else:
                     moved += 1
             except FileNotFoundError:
                 skipped += 1
+                unmoved_paths.append(str(target))
             except (OSError, subprocess.SubprocessError):
                 failed += 1
+                unmoved_paths.append(str(target))
         return {"ok": True, "kind": "trash-batch", "moved": moved,
                 "skipped": skipped, "failed": failed,
+                "unmovedPaths": unmoved_paths,
                 "recoverable": True, "destination": "Freedesktop Trash"}
     finally:
         try:

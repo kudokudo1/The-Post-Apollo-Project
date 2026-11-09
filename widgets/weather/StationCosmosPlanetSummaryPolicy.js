@@ -79,6 +79,35 @@ function eventTime(row, kind, date, name) {
     var e=event(row,kind,date,name);
     return e ? String(e.clock) : "--";
 }
+function datedFacts(row,date,name) {
+    var rise=event(row,"rise",date,name);
+    var transit=event(row,"transit",date,name);
+    var set=event(row,"set",date,name);
+    var status=row ? String(row.status || "UNAVAILABLE") : "NO DATED RESPONSE";
+    function bearing(e) {
+        return e && e.azimuth !== null && e.azimuth !== undefined
+            ? numberDegrees(e.azimuth,360) : "--";
+    }
+    function altitude(e) {
+        return e && e.altitude !== null && e.altitude !== undefined
+            ? numberDegrees(e.altitude,90) : "--";
+    }
+    return [
+        {label:"PLANET",value:name},
+        {label:"SOURCE DATE // LOCAL",value:validDate(date)?date:"--"},
+        {label:"RISE // LOCAL",value:rise ? rise.clock : "--"},
+        {label:"RISE AZ // TRUE NORTH",value:bearing(rise)},
+        {label:"TRANSIT // LOCAL",value:transit ? transit.clock : "--"},
+        {label:"TRANSIT ALTITUDE",value:altitude(transit)},
+        {label:"TRANSIT HEMISPHERE",value:transit && transit.hemisphere
+            ? String(transit.hemisphere) : "--"},
+        {label:"SET // LOCAL",value:set ? set.clock : "--"},
+        {label:"SET AZ // TRUE NORTH",value:bearing(set)},
+        {label:"PROVIDER STATUS",value:status},
+        {label:"SOURCE",value:"USNO MRST"},
+        {label:"PRECISION",value:"ONE MINUTE // DATED EVENTS"}
+    ];
+}
 function selection(requested, records, datedRows, date,
                    currentReady, datedReady, utcSample) {
     var observed = currentReady ? list(records,32) : [];

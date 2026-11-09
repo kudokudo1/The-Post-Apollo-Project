@@ -175,6 +175,12 @@ class AngelJournalContracts(unittest.TestCase):
                       "keyboardSelected"):
             self.assertIn(state + "FillColor: fixedFillColor", local_button)
         self.assertIn("color: fixedFillColor", local_button)
+        # Wide/soft RectangularShadow shapes can tint entire rows even when
+        # the underlying Rectangle paints black; Angel keeps text glow only.
+        self.assertIn("softGlowEnabled: false", local_button)
+        self.assertIn("wideGlowEnabled: false", local_button)
+        self.assertIn("contentGlowEnabled: true", local_button)
+        self.assertNotIn("RectangularShadow {", local_button)
         # No child may override the single fill, including favorite / ERR.
         for content in (PANE, meaning):
             self.assertNotIn("FillColor:", content)

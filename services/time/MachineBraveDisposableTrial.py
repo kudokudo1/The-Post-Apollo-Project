@@ -68,8 +68,19 @@ def _read_regular(path, limit):
 def _write_exclusive(path, contents, mode):
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
     fd = os.open(path, flags, mode)
-    with os.fdopen(fd, "wb") as output:
-        output.write(contents)
+    try:
+        stream = os.fdopen(fd, "wb")
+    except Exception:
+        os.close(fd)
+        path.unlink(missing_ok=True)
+        raise
+    try:
+        with stream:
+            stream.write(contents)
+    except Exception:
+        # Only this O_EXCL-created file is removed on an interrupted write.
+        path.unlink(missing_ok=True)
+        raise
 
 
 def _base():
@@ -134,7 +145,9 @@ def init_trial():
     except Exception:
         # Only files/directories created by this invocation are cleaned up.
         (root / MARKER).unlink(missing_ok=True)
-        (root / "profile").rmdir()
+        profile = root / "profile"
+        if profile.is_dir() and not profile.is_symlink():
+            profile.rmdir()
         root.rmdir()
         raise
     return {

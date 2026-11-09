@@ -386,6 +386,75 @@ PanelWindow {
             menuOpen = !menuOpen;
     }
 
+    // Trash++ is an entry surface, never a second cleanup owner. The existing
+    // Camera queue and validated gallery are authoritative for ALL five
+    // techniques. "queue" is a view of those same batchPaths, not a copy.
+    function selectCleanupTechnique(nextMode) {
+        const mode = String(nextMode || "");
+        if (busy || ["batch", "grid", "swipe", "hunt", "desktop"].indexOf(mode) < 0)
+            return false;
+        if (cleanupTechnique === "hunt" && mode !== "hunt") {
+            huntPaused = true;
+            huntScoped = false;
+            huntHitFlash = false;
+            huntShotEffect = null;
+            huntAutoPending = false;
+            huntSettingsOpen = false;
+            huntPauseMenuOpen = false;
+        }
+        cleanupTechnique = mode;
+        cleanupQueueOpen = false;
+        huntMouseActive = false;
+        huntMouseMovingTicks = 0;
+        batchPreview = null;
+        batchReviewKey = "";
+        return true;
+    }
+
+    function openCleanupFromTrash(requestedMode) {
+        const request = String(requestedMode || "");
+        if (["batch", "grid", "swipe", "hunt", "desktop", "queue"]
+                .indexOf(request) < 0 || busy || nativeRegionSelecting
+                || zoomWebBusy)
+            return false;
+
+        // Preserve the current non-desktop technique when opening the queue.
+        const technique = request === "queue"
+                          ? cleanupTechnique === "desktop" ? "batch"
+                            : cleanupTechnique : request;
+        if (["batch", "grid", "swipe", "hunt", "desktop"].indexOf(technique) < 0)
+            return false;
+
+        const wasVisibleCleanup = menuOpen && activeView === "cleanup";
+        if (activeView === "zoom")
+            hideZoomWeb();
+        if (!selectCleanupTechnique(technique))
+            return false;
+
+        const needScan = !wasVisibleCleanup
+                         || galleryRequestedView !== "cleanup"
+                         || cleanupCustomFolder !== cleanupLoadedFolder;
+        if (needScan && !loadGallery(false, "cleanup"))
+            return false;
+
+        activeView = "cleanup";
+        cleanupQueueOpen = request === "queue";
+        // A fresh scan is launched before mapping the Camera window. This
+        // avoids onMenuOpenChanged starting a status probe first and making
+        // loadGallery() fail its busy guard.
+        menuOpen = true;
+        feedback = "TRASH++ // CAMERA " + request.toUpperCase()
+                   + " // SHARED QUEUE " + batchPaths.length;
+        if (technique === "swipe" && request !== "queue")
+            Qt.callLater(function() {
+                if (camera.menuOpen && camera.activeView === "cleanup"
+                        && camera.cleanupTechnique === "swipe"
+                        && !camera.cleanupQueueOpen)
+                    swipeDeck.forceActiveFocus();
+            });
+        return true;
+    }
+
     onMenuOpenChanged: {
         if (!menuOpen) {
             zoomInstallChoice = "";
@@ -3138,22 +3207,8 @@ PanelWindow {
                                              ? Colors.cyan : Colors.magenta
                                 available: !camera.busy
                                 onLeftClicked: {
-                                    if (camera.cleanupTechnique === "hunt"
-                                            && modelData.id !== "hunt") {
-                                        camera.huntPaused = true;
-                                        camera.huntScoped = false;
-                                        camera.huntHitFlash = false;
-                                        camera.huntShotEffect = null;
-                                        camera.huntAutoPending = false;
-                                        camera.huntSettingsOpen = false;
-                                        camera.huntPauseMenuOpen = false;
-                                    }
-                                    camera.cleanupTechnique = modelData.id;
-                                    camera.cleanupQueueOpen = false;
-                                    camera.huntMouseActive = false;
-                                    camera.huntMouseMovingTicks = 0;
-                                    camera.batchPreview = null;
-                                    camera.batchReviewKey = "";
+                                    if (!camera.selectCleanupTechnique(modelData.id))
+                                        return;
                                     if (modelData.id === "swipe")
                                         Qt.callLater(function() {
                                             swipeDeck.forceActiveFocus();

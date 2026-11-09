@@ -1376,7 +1376,17 @@ PanelWindow {
     // ===== BOTTOM UTILITIES =====================================
     // Trash begins the bottom-left utility family; keep Power isolated on
     // the bottom-right. Both are independent masked PanelWindows.
-    Trash {}
+    Trash {
+        id: trashWindow
+        cameraCleanupQueueCount: cameraWindow.batchPaths.length
+        cameraCleanupBusy: cameraWindow.busy
+        onCleanupRequested: function(technique) {
+            // Camera remains sole owner of the gallery, Swipe/Hunt state,
+            // selection queue, validation and recoverable GIO Trash actions.
+            const accepted = cameraWindow.openCleanupFromTrash(technique);
+            trashWindow.finishCleanupHandoff(accepted, technique);
+        }
+    }
 
     // ===== POWER ================================================
 

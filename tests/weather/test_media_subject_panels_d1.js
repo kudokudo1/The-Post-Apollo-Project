@@ -145,7 +145,7 @@ test("RADIO presents directory, favorites and transport without a duplicate MPD 
 test("MEDIA overview has one NEWS and one RADIO bay while WATCH remains nearby", () => {
   assert.equal(policy.kindForRoute("media/overview"),"overview");
   assert.match(pane,/id: reportsBay/);
-  assert.ok(pane.includes("height: Math.max(52,Math.min(110,mediaOverview.height - 166))"));
+  assert.ok(pane.includes("height: Math.max(52,Math.min(110,mediaOverview.height - 158))"));
   assert.ok(pane.includes("anchors.bottom: parent.bottom"));
   assert.ok(pane.includes("overviewDocked: true"));
   assert.ok(!pane.includes('id: overviewScroll'));

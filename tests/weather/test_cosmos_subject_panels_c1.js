@@ -215,7 +215,7 @@ test("C2 COSMOS overview shows interactive sky graphics and compact core SPACE r
   assert.match(dashboard,/id: skyInstrumentFrame/);
   assert.match(dashboard,/id: spaceMetricRow/);
   assert.match(dashboard,/height: 48/);
-  assert.match(dashboard,/anchors.margins: 6/);
+  assert.match(dashboard,/anchors.margins: HeaderGeometry\.inset/);
   assert.match(dashboard,/anchors.margins: 1/);
   assert.match(dashboard,/MouseArea\s*\{/);
   assert.match(dashboard,/cursorShape: Qt.PointingHandCursor/);

@@ -63,9 +63,12 @@ function assignment(a) {
     const raw = v(source.permissions).toUpperCase().split(/[,\s]+/).filter(Boolean);
     const unknown = raw.filter(p => PERMISSIONS.indexOf(p) < 0);
     if (unknown.length > 0) blockers.push("Unknown permission: " + unknown.join(", "));
-    const permissions = ["READ"].concat(raw.filter(p => p !== "READ"
-        && PERMISSIONS.indexOf(p) >= 0 && raw.indexOf(p) === raw.lastIndexOf(p))
-        .filter((p,i,arr) => arr.indexOf(p) === i));
+    const permissions = ["READ"];
+    raw.forEach(function(p) {
+        if (p !== "READ" && PERMISSIONS.indexOf(p) >= 0
+                && permissions.indexOf(p) < 0)
+            permissions.push(p);
+    });
     return {ready: blockers.length === 0, blockers, roomId, permissions,
         mutationAuthorized: false, activatesAssignment: false};
 }

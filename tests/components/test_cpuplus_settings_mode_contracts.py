@@ -51,15 +51,20 @@ for token in (
 
 # The wide left bay owns SHARED CONTEXT and the explicit Explore editor.
 for token in (
-    "SHARED CONTEXT", "NOT YET WIRED",
-    "CpuPlusExploreLocationPanel {", "id: explorePanel",
+    "NOT YET WIRED",
+    "CpuPlusExploreLocationPanel { "id: explorePanel",
     "explorePanel.editingText", "function fillExploreCandidate(candidate)",
     "explorePanel.fillDestination(candidate)",
-    "registry.effectivePlace", "registry.contextKind",
+    "registry.effectivePlace",
     "property alias durationKey: explorePanel.durationKey",
 ):
     assert token in overview, token
 assert "CpuPlusPlaceSearchPanel {" not in overview
+# Shared context is physically above LOCATION // EXPLORE on the left header.
+assert '"SHARED CONTEXT // "' in cpu
+assert 'String(PlaceRegistry.contextKind || "UNKNOWN")' in cpu
+assert '"LOCATION // EXPLORE"' in cpu
+assert "PlaceRegistry.effectivePlace.label" in cpu
 
 # The middle keeps FIND PLACE pinned above an independently scrolling
 # saved Home/bookmark list; matching results scroll inside SearchPanel.

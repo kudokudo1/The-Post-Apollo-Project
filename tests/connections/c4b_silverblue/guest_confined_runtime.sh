@@ -491,7 +491,7 @@ C4B_RUNNING_HOST_PROBE
   if [[ -c /dev/ttyS0 ]]; then
     timeout --signal=TERM --kill-after=1s 6s "$python" -I -B - \
       /var/tmp/c4b-runtime.log /dev/ttyS0 <<'C4B_SINGLE_UART_RELAY' || true
-import json, os, re, stat, sys
+import json, os, re, select, stat, sys, time
 
 PREFIX = b"C4B_OBSERVED // "
 SCHEMA = "postapollo.connections.c4b-booted-signed-host-observation.v1"
@@ -559,6 +559,24 @@ def selected_line(path):
         raise ValueError("start tick rejected")
     return line
 
+def write_all_serial(fd, payload):
+    # A real UART opened O_NONBLOCK can accept only part of an observation.
+    # Never confuse a short write with a complete validated host record.
+    deadline = time.monotonic() + 4.0
+    sent = 0
+    while sent < len(payload):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or not select.select([], [fd], [], remaining)[1]:
+            raise ValueError("UART_WRITE_TIMEOUT")
+        try:
+            written = os.write(fd, payload[sent:sent + 128])
+        except BlockingIOError:
+            continue
+        if written <= 0:
+            raise ValueError("UART_WRITE_ZERO")
+        sent += written
+    return sent
+
 try:
     payload = selected_line(sys.argv[1]) + b"\n"
     fd = os.open(sys.argv[2], os.O_WRONLY | os.O_NOCTTY | os.O_NONBLOCK |
@@ -566,13 +584,19 @@ try:
     try:
         if not stat.S_ISCHR(os.fstat(fd).st_mode):
             raise ValueError("not serial device")
-        if os.write(fd, payload) != len(payload):
-            raise ValueError("partial serial write")
+        if write_all_serial(fd, payload) != len(payload):
+            raise ValueError("UART_WRITE_INCOMPLETE")
+        print("C4D_UART_DIAG // ONE_VALID_RECORD_WRITTEN_TO_UART", flush=True)
     finally:
         os.close(fd)
-except (OSError, ValueError, UnicodeError, KeyError, TypeError):
-    # Diagnostic-only path: no console failure may alter real guest acceptance.
-    pass
+except (OSError, ValueError, UnicodeError, KeyError, TypeError) as exc:
+    # Diagnostic-only: fixed, bounded type/error label to the private log,
+    # NEVER signal signed process or real rollback success on UART failure.
+    reason = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
+    if len(reason) > 85 or not all(
+            c.isupper() or c.isdigit() or c in "_ " for c in reason):
+        reason = "UART_RELAY_REFUSED"
+    print("C4D_UART_DIAG // " + reason.replace(" ", "_"), flush=True)
 C4B_SINGLE_UART_RELAY
   fi
   echo "C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED"

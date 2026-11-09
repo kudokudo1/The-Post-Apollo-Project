@@ -15,6 +15,14 @@ PLUGIN_TEXT = PLUGIN.read_text(encoding="utf-8")
 NATIVE_TEXT = NATIVE.read_text(encoding="utf-8")
 SCOPE_TEXT = SCOPE.read_text(encoding="utf-8")
 
+# Vencord's build parser rejects a native-helper `as PluginNative<...>`
+# type assertion when that assertion begins the following line. Keep it
+# attached to the same expression to preserve compilation.
+assert (
+    'const Native = VencordNative.pluginHelpers.PostApolloNotificationBridge '
+    'as PluginNative<typeof import("./native")>;' in PLUGIN_TEXT
+), "Native helper assertion must stay on the same line as its expression"
+
 for requirement in (
     'default: false',
     'allowedDiscordChannels(settings.store.channelIds)',

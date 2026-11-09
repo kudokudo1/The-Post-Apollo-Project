@@ -6,8 +6,7 @@ import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { ChannelStore, FluxDispatcher, UserStore } from "@webpack/common";
 import { allowedDiscordChannels, scopedDiscordEvent } from "./identity";
 
-const Native = VencordNative.pluginHelpers.PostApolloNotificationBridge
-    as PluginNative<typeof import("./native")>;
+const Native = VencordNative.pluginHelpers.PostApolloNotificationBridge as PluginNative<typeof import("./native")>;
 
 const settings = definePluginSettings({
     enabled: {

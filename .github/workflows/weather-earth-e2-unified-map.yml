@@ -1,0 +1,84 @@
+name: Weather EARTH E2 unified map and unique screens
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationEarthSubjectPane.qml'
+      - 'widgets/weather/StationEarthSubjectPanelPolicy.js'
+      - 'widgets/weather/StationDiscovery.qml'
+      - 'widgets/weather/StationEarthWaterPane.qml'
+      - 'widgets/weather/StationEarthServicesPane.qml'
+      - 'widgets/weather/StationGround.qml'
+      - 'widgets/weather/StationWeatherSubjectPanelPolicy.js'
+      - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
+      - 'widgets/weather/StationSubjectNavigationPolicy.js'
+      - 'widgets/weather/StationWorkspaceSurface.qml'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'tests/weather/test_earth_e2_unified_map.js'
+      - 'tests/weather/fixtures/E2EarthUnifiedNativeShell.qml'
+      - '.github/workflows/weather-earth-e2-unified-map.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  navigation-and-source-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify EARTH E2 and legacy source/route boundaries
+        run: |
+          node --test \
+            tests/weather/test_earth_e2_unified_map.js \
+            tests/weather/test_earth_subject_panels_e1.js \
+            tests/weather/test_index_earth_cutover_m28h.js \
+            tests/weather/test_workspace_landing_w1.js \
+            tests/weather/subject_navigation_contract.test.js \
+            tests/weather/test_weather_subject_panels_m2a.js \
+            tests/weather/test_weather_subject_panels_m2b.js \
+            tests/weather/test_ground_full_visual_parity_m28q.js \
+            tests/weather/test_station_map_natural_earth_basemap.js \
+            tests/weather/test_station_map_usgs_earthquakes.js
+  native-map-scroll:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:unstable
+    timeout-minutes: 15
+    steps:
+      - name: Install isolated Quickshell and Qt
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git quickshell qt6-qpa-plugins \
+            qml6-module-qtquick-effects qml6-module-qt5compat-graphicaleffects \
+            coreutils findutils
+      - uses: actions/checkout@v4
+      - name: Verify actual pinned map and separate list scrolling without provider calls
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(pwd)"
+          work="$(mktemp -d /tmp/earth-e2.XXXXXXXX)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -m 700 "$work/home" "$work/runtime" "$work/cache" "$work/config"
+          mkdir -p "$work/config/widgets"
+          cp -a "$root/components" "$work/config/components"
+          cp -a "$root/widgets/weather" "$work/config/widgets/weather"
+          cp -a "$root/services" "$work/config/services"
+          cp "$root/tests/weather/fixtures/E2EarthUnifiedNativeShell.qml" "$work/config/shell.qml"
+          rc=0
+          timeout --signal=TERM --kill-after=3s 40s \
+            env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
+            XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            quickshell --no-color -p "$work/config/shell.qml" \
+            > "$work/native.log" 2>&1 || rc=$?
+          cat "$work/native.log"
+          test "$rc" -eq 0
+          grep -F "E2_NATIVE_PASS // PINNED_SINGLE_MAP_SCROLL_FILTERS_SERVICES" "$work/native.log"
+          if grep -E 'E2_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+            exit 1
+          fi

@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+from unittest import mock
 import subprocess
 import sys
 from pathlib import Path
@@ -251,7 +252,90 @@ class C4dSerialCaptureTests(unittest.TestCase):
         self.assertFalse(ready.exists())
         self.assertFalse(output.exists())
 
-    def test_19_workflow_waits_for_ready_before_unchanged_c2v_boot(self):
+    def test_19_normal_c2v_cleanup_unlinks_serial_before_parent_pass(self):
+        # Emulates the genuine #42678598917 failure deterministically:
+        # the first find opens the existing UART; the second lookup happens
+        # AFTER a complete read but BEFORE the parent writes completion.
+        self.payload(observation())
+        original_find = C.find_serial
+        calls = 0
+        def vanish_after_drain(root):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                self.serial.unlink()
+                self.boot.rmdir()
+                return None
+            return original_find(root)
+        def parent_result():
+            time.sleep(.03)
+            self.done.write_text("PASS\\n")
+        parent = threading.Thread(target=parent_result)
+        parent.start()
+        self.addCleanup(parent.join)
+        with mock.patch.object(C, "find_serial", side_effect=vanish_after_drain):
+            self.assertEqual(C.capture(self.root, self.done, poll=.002),
+                             observation())
+        self.assertFalse(self.boot.exists())
+        self.assertGreaterEqual(calls, 2)
+
+    def test_20_unlink_without_rollback_marker_still_refuses(self):
+        self.serial.write_bytes(observation() + b"\\n")
+        original_find = C.find_serial
+        calls = 0
+        def vanish_after_drain(root):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                self.serial.unlink()
+                self.boot.rmdir()
+                return None
+            return original_find(root)
+        self.done.write_text("PASS\\n")
+        with mock.patch.object(C, "find_serial", side_effect=vanish_after_drain):
+            with self.assertRaisesRegex(
+                    C.Refused, "REAL_GUEST_SECURITY_OR_ROLLBACK_MARKERS_MISSING"):
+                C.capture(self.root, self.done, poll=0)
+
+    def test_21_reappearance_after_unlink_refuses_instead_of_switching(self):
+        self.payload(observation())
+        original_find = C.find_serial
+        calls = 0
+        def replace_after_unlink(root):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                self.serial.unlink()
+                self.boot.rmdir()
+                return None
+            if calls == 3:
+                self.boot.mkdir(mode=0o700)
+                self.serial.write_bytes(observation() + b"\\n")
+            return original_find(root)
+        with mock.patch.object(C, "find_serial", side_effect=replace_after_unlink):
+            with self.assertRaisesRegex(
+                    C.Refused, "GUEST_SERIAL_REAPPEARED_AFTER_REMOVAL"):
+                C.capture(self.root, self.done, poll=0)
+
+    def test_22_unlink_followed_by_failure_cannot_export(self):
+        self.payload(observation())
+        original_find = C.find_serial
+        calls = 0
+        def vanished(root):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                self.serial.unlink()
+                self.boot.rmdir()
+                return None
+            return original_find(root)
+        self.done.write_text("FAIL\\n")
+        with mock.patch.object(C, "find_serial", side_effect=vanished):
+            with self.assertRaisesRegex(
+                    C.Refused, "ORIGINAL_TWO_BOOT_LIFECYCLE_DID_NOT_PASS"):
+                C.capture(self.root, self.done, poll=0)
+
+    def test_23_workflow_waits_for_ready_before_unchanged_c2v_boot(self):
         workflow = (Path(__file__).resolve().parents[2] /
                     ".github/workflows/connections-c4b-silverblue-confined-runtime.yml").read_text()
         self.assertIn('if compgen -G "$RUNNER_TEMP/c2v-silverblue-*" >/dev/null', workflow)

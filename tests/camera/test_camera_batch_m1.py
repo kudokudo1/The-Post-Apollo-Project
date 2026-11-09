@@ -92,6 +92,36 @@ class CameraBatchM1Tests(unittest.TestCase):
         self.assertTrue(not_scanned.exists())
         self.assertTrue(self.a.exists())
 
+    def test_unrelated_deep_directory_does_not_block_selected_gallery_media(self):
+        # The Gallery scan remains capped, but a positively discovered file
+        # can still be sent to recoverable Trash.
+        deep = self.home / "Downloads" / "one" / "two" / "three" / "four" / "five"
+        deep.mkdir(parents=True)
+        roots, records, truncated = camera.scan_gallery()
+        self.assertIsNotNone(roots)
+        self.assertTrue(truncated)
+        self.assertIn(str(self.a), [item["path"] for item in records])
+        run = self.mock_trash()
+        result = camera.trash_batch_now(json.dumps([str(self.a)]), "MOVE_TO_TRASH")
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["moved"], 1)
+        self.assertEqual(result["failed"], 0)
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args[0][-1], str(self.a))
+
+    def test_partial_scan_still_rejects_unseen_selected_files(self):
+        deep = self.home / "Downloads" / "one" / "two" / "three" / "four" / "five"
+        deep.mkdir(parents=True)
+        unscanned = self.home / "Documents" / "private.png"
+        unscanned.parent.mkdir()
+        unscanned.write_bytes(b"do not touch")
+        run = self.mock_trash()
+        result = camera.trash_batch_now(json.dumps([str(unscanned)]), "MOVE_TO_TRASH")
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "SCAN_TRUNCATED")
+        self.assertEqual(run.call_count, 0)
+        self.assertTrue(unscanned.exists())
+
     def test_correct_confirmation_mocked_trash_and_replay_rejection(self):
         plan = self.preview()
         self.assertTrue(plan["ok"], plan)

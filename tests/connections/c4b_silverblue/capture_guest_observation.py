@@ -45,6 +45,22 @@ REQUIRED_MARKERS = (
 )
 MAX_LINE = 2048
 MAX_BYTES = 32 * 1024 * 1024
+# No arbitrary guest-provided text in Actions diagnostics. These are exact,
+# fixed failure labels emitted by the C4b guest-side diagnostic-only relay.
+KNOWN_RELAY_REASONS = frozenset((
+    b"LOG_PREP_REFUSED", b"UART_OPEN_REFUSED", b"UART_WRITE_REFUSED",
+    b"GUEST_OBSERVATION_DUPLICATE_KEY",
+    b"GUEST_LOG_UNSAFE", b"GUEST_LOG_CHANGED",
+    b"GUEST_OBSERVATION_MISSING", b"GUEST_OBSERVATION_DUPLICATE",
+    b"GUEST_OBSERVATION_OVERSIZE", b"GUEST_OBSERVATION_JSON_INVALID",
+    b"GUEST_OBSERVATION_SCHEMA_INVALID",
+    b"GUEST_OBSERVATION_DIGEST_INVALID",
+    b"GUEST_OBSERVATION_PROCESS_INVALID",
+    b"GUEST_OBSERVATION_DBUS_PID_MISMATCH",
+    b"GUEST_OBSERVATION_START_INVALID",
+    b"UART_NOT_CHARACTER_DEVICE", b"UART_WRITE_TIMEOUT",
+    b"UART_WRITE_ZERO", b"UART_WRITE_INCOMPLETE",
+))
 
 
 class Refused(Exception):
@@ -142,6 +158,7 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
     controller_tail_seen = False
     relay_status_seen = False
     relay_complete_seen = False
+    relay_reasons = set()
     candidate_records = 0
     started = time.monotonic()
     try:
@@ -183,10 +200,19 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
                                 seen[marker] = True
                         if b"C4B_CONTROLLER_GUEST_LOG_BEGIN" in line:
                             controller_tail_seen = True
-                        if b"C4D_UART_DIAG // " in line:
+                        tag = b"C4D_UART_DIAG // "
+                        if tag in line:
                             relay_status_seen = True
                             if b"C4D_UART_DIAG // ONE_VALID_RECORD_WRITTEN_TO_UART" in line:
                                 relay_complete_seen = True
+                            # Use a fixed bounded whitelist, NOT printable
+                            # guest text. A forged diagnostic cannot authorize
+                            # acceptance and is never added to the evidence.
+                            reason = line.split(tag, 1)[1].strip(b"\r ")
+                            if reason in KNOWN_RELAY_REASONS:
+                                relay_reasons.add(reason)
+                            elif not relay_complete_seen:
+                                relay_reasons.add(b"UNKNOWN")
                         index = line.find(PREFIX)
                         if index == -1:
                             continue
@@ -241,12 +267,15 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
         print("C4D_CAPTURE_DIAG // "
               "serial_opened={} bytes_read={} candidate_records={} "
               "controller_tail={} relay_status={} relay_complete={} "
-              "c3b_origin={} c4b_runtime_origin={} c4c_signed_process={} "
-              "c2v_rollback={} partial_prefix={}".format(
+              "relay_reason={} c3b_origin={} c4b_runtime_origin={} "
+              "c4c_signed_process={} c2v_rollback={} partial_prefix={}".format(
                   int(source_opened), min(total, MAX_BYTES + 1),
                   min(candidate_records, 100),
                   int(controller_tail_seen), int(relay_status_seen),
                   int(relay_complete_seen),
+                  (next(iter(relay_reasons)).decode("ascii")
+                   if len(relay_reasons) == 1 else
+                   ("NONE" if not relay_reasons else "MULTIPLE")),
                   int(seen[REQUIRED_MARKERS[0]]),
                   int(seen[REQUIRED_MARKERS[1]]),
                   int(seen[REQUIRED_MARKERS[2]]),

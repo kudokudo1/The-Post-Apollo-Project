@@ -723,9 +723,10 @@ assert 'MachineTimelinePolicy.appendMarker(machineMarkers, marker)' in window
 assert 'MachineTimelinePolicy.removeMarker(machineMarkers, id)' in window
 assert 'machineMarkerNextId += 1' in window
 assert 'id: machinePane' in window
-assert 'MACHINE // SESSION TIMELINE' in window
+assert 'MACHINE // SAVE DESKTOP' in window
+assert 'ADVANCED // LEGACY CAPTURE AND TIMELINE' in window
 assert 'WINDOW INSTANCE // ELAPSED' in window
-assert 'MANUAL TIME MARKERS // MEMORY ONLY' in window
+assert 'LEGACY MARKERS // MEMORY ONLY // NOT RESTORABLE' in window
 assert 'id: machineMarkerInput' in window
 assert 'maximumLength: MachineTimelinePolicy.MAX_NAME_LENGTH' in window
 assert 'machineMarkerInput.activeFocus' in window

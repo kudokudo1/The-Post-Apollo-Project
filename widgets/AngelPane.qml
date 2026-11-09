@@ -396,8 +396,8 @@ Item {
                     labelPixelSize: 9
                     contentPadding: 1
                     trackLabelGlowLocally: true
-                    // Only the active filter gets yellow; nonselected filters
-                    // stay black even when scrolling or pressing.
+                    // Every filter retains a stable accent-color wash.
+                    // The active filter alone switches to yellow/magenta.
                     accentColor: ink
                     idleBorderColor: edge
                     idleContentGlowColor: edge
@@ -473,8 +473,8 @@ Item {
                         labelHorizontalAlignment: Text.AlignLeft
                         contentPadding: 5
                         trackLabelGlowLocally: true
-                        // Only the opened history row gets yellow with
-                        // magenta text/glow; nonselected entries stay black.
+                        // Every row has its category/favorite color wash;
+                        // only the opened entry switches to yellow/magenta.
                         accentColor: observationEntry.entryInk
                         idleBorderColor: observationEntry.entryEdge
                         idleContentGlowColor: observationEntry.entryEdge

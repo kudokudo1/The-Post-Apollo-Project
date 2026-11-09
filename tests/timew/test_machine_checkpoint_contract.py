@@ -43,8 +43,10 @@ required = [
 for term in required:
     assert term in spec, f"Missing checkpoint boundary: {term}"
 
-# The documentation stage must not introduce a new runtime capability.
-assert 'MACHINE // SESSION TIMELINE' in timew
+# Historical proposal remains intact; the approved v2 SAVE UI supersedes its
+# old primary title while preserving manual marker and no-restore boundaries.
+assert 'MACHINE // SAVE DESKTOP' in timew
+assert 'ADVANCED // LEGACY CAPTURE AND TIMELINE' in timew
 assert 'NO SCREENSHOTS OR AUTOMATIC RESTORATION' in timew
 assert 'MARKERS ARE TIMESTAMPS ONLY // LOST ON RESTART' in timew
 assert "function addMachineMarker()" in timew

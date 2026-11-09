@@ -158,7 +158,7 @@ Rectangle {
         // the originating article object or infer disaster locations.
         const incoming = JSON.parse(JSON.stringify(payload));
         incoming.locations = JSON.parse(JSON.stringify(locations));
-        if (!chooseRoute("earth/maps/overview"))
+        if (!chooseRoute("earth/maps/events"))
             return false;
         newsMentionOverlay = incoming;
         return true;

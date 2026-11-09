@@ -109,6 +109,17 @@ check('onReturnRequested: root.recoveryOpen = false' in room,
 check('No PX transfer, Session mutation' in view
       and 'TRANSFER NOT AUTHORIZED' in view,
       "Claims remain accurate")
+check('function successionContract(a)' in policy
+      and 'latest insertion order must be verified by PX' in policy
+      and 'mutationAuthorized: false' in policy,
+      "Read-only exact predecessor contract must fail closed on ambiguous history")
+check('readonly property var transfer: SuccessorPolicy.successionContract' in view
+      and 'PREDECESSOR SESSION //' in view
+      and 'SUCCESSION HOLD //' in view,
+      "Recovery UI must show pinned previous Session and failed release prerequisites")
+check('NO REPLACEMENT BUTTON YET' in view
+      and 'PX authority and atomic revalidation remain mandatory' in view,
+      "No direct Doctor transfer without authenticated PX authority")
 for forbidden in ('Process {', 'session-put', 'room-bind', 'session-create',
                   'assignment-activate', 'doctor-put', 'agent turn',
                   'quick("GO")', 'pxArgs('):

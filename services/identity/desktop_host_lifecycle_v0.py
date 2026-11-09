@@ -276,6 +276,10 @@ class DesktopHostLifecycle:
                     or not self._seat_ok()):
                 return "HOST_LOST"
             if self._signed_in:
+                if not self._session.has_active_session():
+                    self._signed_in = False
+                    self._allow_callback = False
+                    return "FAILED"
                 return "AUTHENTICATED"
             if self._cancelled:
                 return "CANCELLED"

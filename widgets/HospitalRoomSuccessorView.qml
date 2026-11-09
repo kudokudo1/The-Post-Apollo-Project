@@ -38,6 +38,12 @@ Item {
         sourceError: root.sourceError,
         doctorId: root.successorDoctorId, providerId: root.successorProviderId
     })
+    // Read-only, pinned predecessor contract for the future authority bridge.
+    // READY only means suitable for a fresh backend check, never authorized.
+    readonly property var transfer: SuccessorPolicy.successionContract({
+        plan: root.plan, snapshot: root.snapshot,
+        sessions: root.sessions, sessionsLoaded: root.sessionsLoaded
+    })
     readonly property string briefing: prepared
         ? SuccessorPolicy.briefing({
             roomId: root.roomId, overview: root.overview,
@@ -332,6 +338,48 @@ Item {
                     color: Colors.blue
                     wrapMode: Text.Wrap
                 }
+            }
+            Rectangle {
+                width: parent.width
+                height: 2
+                color: Colors.magenta
+            }
+            GohuText {
+                width: parent.width
+                text: "ATOMIC SUCCESSION // " + root.transfer.status
+                font.pixelSize: 10
+                color: root.transfer.readyForAuthorityCheck ? Colors.cyan : Colors.orange
+                wrapMode: Text.Wrap
+            }
+            GohuText {
+                width: parent.width
+                text: "PREDECESSOR SESSION // "
+                    + (root.transfer.previousSessionId || "NOT VERIFIED")
+                    + " // "
+                    + (root.transfer.previousDoctorId || "NO DOCTOR")
+                    + " // "
+                    + (root.transfer.previousProviderId || "NO PROVIDER")
+                color: Colors.blue
+                font.pixelSize: 9
+                wrapMode: Text.Wrap
+            }
+            Repeater {
+                model: root.transfer.blockers.slice(0, 6)
+                GohuText {
+                    required property string modelData
+                    width: recoveryRows.width
+                    text: "SUCCESSION HOLD // " + modelData
+                    font.pixelSize: 9
+                    color: Colors.orange
+                    wrapMode: Text.Wrap
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: "NO REPLACEMENT BUTTON YET // A recorded terminal Session is not proof of browser death. PX authority and atomic revalidation remain mandatory."
+                color: Colors.blue
+                font.pixelSize: 9
+                wrapMode: Text.Wrap
             }
             GohuText {
                 width: parent.width

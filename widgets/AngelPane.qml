@@ -53,17 +53,18 @@ Item {
         switch (key) {
         case "favorite": return Colors.magenta;
         case "mirror": return Colors.yellow;
-        case "add": return Colors.orange;
+        case "add": return Colors.cyan;
         case "subtract": return Colors.blue;
-        case "multiply": return Colors.cyan;
+        case "multiply": return Colors.omnitrix;
         case "divide": return Colors.green; // regular green, NOT Omnitrix
+        case "sequence": return Colors.orange;
         case "err": return Colors.red;
-        default: return Colors.white; // ALL, REPEAT, SEQUENCE, OTHER
+        default: return Colors.white; // ALL, REPEAT, OTHER
         }
     }
 
     function filterEdge(key) {
-        return key === "sequence" ? Colors.yellow : filterInk(key);
+        return filterInk(key);
     }
 
     function primaryPattern(digits) {

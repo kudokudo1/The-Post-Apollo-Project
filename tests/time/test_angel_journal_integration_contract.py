@@ -135,13 +135,15 @@ class AngelJournalContracts(unittest.TestCase):
             "onLeftClicked: {", 1)[0]
         self.assertIn('case "favorite": return Colors.magenta;', PANE)
         self.assertIn('case "mirror": return Colors.yellow;', PANE)
-        self.assertIn('case "add": return Colors.orange;', PANE)
+        self.assertIn('case "add": return Colors.cyan;', PANE)
         self.assertIn('case "subtract": return Colors.blue;', PANE)
-        self.assertIn('case "multiply": return Colors.cyan;', PANE)
+        self.assertIn('case "multiply": return Colors.omnitrix;', PANE)
         self.assertIn('case "divide": return Colors.green;', PANE)
+        self.assertIn('case "sequence": return Colors.orange;', PANE)
         self.assertIn('case "err": return Colors.red;', PANE)
         self.assertIn('default: return Colors.white;', PANE)
-        self.assertIn('key === "sequence" ? Colors.yellow : filterInk(key)', PANE)
+        self.assertIn('return filterInk(key);', PANE)
+        self.assertNotIn('key === "sequence" ? Colors.yellow', PANE)
         self.assertIn("function visiblePattern(digits)", PANE)
         self.assertIn("patterns.indexOf(activeFilter) >= 0", PANE)
         self.assertIn("pane.visiblePattern(modelData.digits)", entries)
@@ -174,6 +176,14 @@ class AngelJournalContracts(unittest.TestCase):
             local_button)
         self.assertIn(
             "pressedFillColor: selected ? selectedFillColor : idleFillColor",
+            local_button)
+        self.assertIn(
+            "keyboardSelectedFillColor: selected ? selectedFillColor : idleFillColor",
+            local_button)
+        self.assertIn(
+            "color: angelButton.withOpacity(", local_button)
+        self.assertIn(
+            "? angelButton.selectedFillColor : angelButton.idleFillColor",
             local_button)
         self.assertIn(
             "hoverForegroundColor: selected ? selectedForegroundColor : idleForegroundColor",

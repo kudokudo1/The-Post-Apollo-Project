@@ -470,8 +470,8 @@ Item {
                         labelHorizontalAlignment: Text.AlignLeft
                         contentPadding: 5
                         trackLabelGlowLocally: true
-                        // Saved favorites keep their magenta wash; all other
-                        // idle, hovered and pressed history rows remain dark.
+                        // Every row stays black. Favorites and selection
+                        // are distinguished by magenta/colorful ink and glow.
                         accentColor: observationEntry.entryInk
                         idleBorderColor: observationEntry.entryEdge
                         idleContentGlowColor: observationEntry.entryEdge

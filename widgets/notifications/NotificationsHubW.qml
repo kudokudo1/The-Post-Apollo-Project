@@ -864,6 +864,15 @@ PanelWindow {
         return NotificationsService.sourceKey(sourceId, source);
     }
 
+    function scopeTag(kind) {
+        const labels = {
+            "app": "APP", "website": "SITE", "title": "TITLE",
+            "sender": "SENDER", "conversation": "DM",
+            "server": "SERVER", "channel": "CHAN", "event": "EVENT"
+        };
+        return labels[String(kind || "")] || "APP";
+    }
+
     // ===== CLASSIFICATION =========================================
     //
     // Legacy sender group remains the presentation/color-tone choice.
@@ -1085,7 +1094,7 @@ PanelWindow {
             const classification = root.classificationFor(entry.source, entry.sourceId, entry.category, entry.severity);
             const facets = NotificationFacets.facetsFor(entry);
             const reportKind = root.reportKindFor(entry);
-            if (!root.notificationMatches(entry.source, entry.sourceId, entry.title, entry.message, entry.category, entry.severity, classification.group, facets))
+            if (!root.notificationMatches(entry.source, entry.sourceId, entry.title, entry.message, entry.category, entry.severity, classification.group, facets, entry))
                 continue;
             rows.push({
                 ordinal: i,
@@ -1099,6 +1108,10 @@ PanelWindow {
                     "website": String(entry.website || ""),
                     "websiteHost": String(entry.websiteHost || ""),
                     "websiteIcon": String(entry.websiteIcon || ""),
+                    // Flat strings survive ListModel's typed-role conversion;
+                    // no QML callback or native action enters the model.
+                    "scopeInfoJson": JSON.stringify((entry.context || {}).notificationScope || {}),
+                    "eventType": String((entry.context || {}).eventType || ""),
                     "category": String(entry.category || "generic"),
                     "severity": String(entry.severity || "normal"),
                     "createdAt": Number(entry.createdAt || 0),
@@ -1185,13 +1198,14 @@ PanelWindow {
         return Math.round(milliseconds / 60000) + " MIN";
     }
 
-    function notificationMatches(source, sourceId, title, message, category, severity, filterGroup, facets) {
+    function notificationMatches(source, sourceId, title, message, category, severity, filterGroup, facets, entry) {
         // Warning is an overlapping severity view, not a source category.
         if (root.activeFilter === "warning") {
             if (!root.isWarning(category, severity))
                 return false;
         } else if (root.activeFilter === "favorites") {
-            if (!NotificationsService.isFavorite(root.appKeyFor(sourceId, source)))
+            if (!NotificationsService.isFavorite(root.appKeyFor(sourceId, source))
+                    && !NotificationsService.isFavoriteForNotification(entry))
                 return false;
         } else if (root.activeFilter !== "all"
                    && !NotificationFacets.matches(root.activeFilter, facets, false)) {
@@ -2929,6 +2943,8 @@ PanelWindow {
                         required property string website
                         required property string websiteHost
                         required property string websiteIcon
+                        required property string scopeInfoJson
+                        required property string eventType
                         required property string category
                         required property string severity
                         required property double createdAt
@@ -2944,11 +2960,23 @@ PanelWindow {
 
                         readonly property string appKey: root.appKeyFor(notificationEntry.sourceId, notificationEntry.source)
 
-                        readonly property bool favorite: NotificationsService.favoritesRevision >= 0 && NotificationsService.isFavorite(notificationEntry.appKey)
-
-                        // Website-capable cards default to the specific site.
-                        // The SITE/APP selector leaves legacy app-wide controls
-                        // available without changing CLEAR ALL or Favorites.
+                        // Per-card scope selection never changes the source's
+                        // global identity. The exact-title fallback is clearly
+                        // distinguished from structured sender/server IDs.
+                        readonly property var scopeEntry: ({
+                            source: notificationEntry.source,
+                            sourceId: notificationEntry.sourceId,
+                            website: notificationEntry.website,
+                            websiteHost: notificationEntry.websiteHost,
+                            title: notificationEntry.title,
+                            context: {
+                                notificationScope: JSON.parse(notificationEntry.scopeInfoJson || "{}"),
+                                eventType: notificationEntry.eventType
+                            }
+                        })
+                        readonly property var scopeOptions:
+                            NotificationsService.scopeOptionsFor(notificationEntry.scopeEntry)
+                        property int targetScopeIndex: 0
                         property bool targetWholeApp: false
                         // Delegates are recycled: scope must never leak from
                         // one history record into a different notification.
@@ -2964,25 +2992,39 @@ PanelWindow {
                             && NotificationsService.externalActionsRevision >= 0
                             ? NotificationsService.emailActionsFor(notificationEntry.notificationId) : []
                         onNotificationIdChanged: {
+                            targetScopeIndex = 0;
                             targetWholeApp = false;
                             emailDeckOpen = false;
                         }
                         readonly property string websiteKey: NotificationsService.websiteKey(
                             notificationEntry.sourceId, notificationEntry.source, notificationEntry.websiteHost)
-                        readonly property bool targetingWebsite: websiteKey !== "" && !targetWholeApp
-                        readonly property string targetKey: targetingWebsite ? websiteKey : appKey
-                        readonly property string targetLabel: targetingWebsite
-                            ? source + " // " + website : source
-                        readonly property bool inheritedRule: targetingWebsite
-                            && NotificationsService.policyRevision >= 0
-                            && (NotificationsService.isDnd(appKey)
-                                || NotificationsService.isSnoozed(appKey))
+                        readonly property var targetScope: scopeOptions.length > 0
+                            ? scopeOptions[Math.max(0, Math.min(scopeOptions.length - 1, targetScopeIndex))]
+                            : ({ kind: "app", key: appKey, label: "APP", verified: true })
+                        readonly property bool targetingWebsite: targetScope.kind === "website"
+                        readonly property string targetKey: targetScope.key
+                        readonly property string targetLabel: source + " // " + targetScope.label
+                        readonly property bool inheritedRule: NotificationsService.policyRevision >= 0
+                            && NotificationsService.inheritedSuppressionFor(scopeEntry, targetKey)
                         readonly property bool snoozed: NotificationsService.policyRevision >= 0
                             && (NotificationsService.isSnoozed(targetKey)
-                                || (targetingWebsite && NotificationsService.isSnoozed(appKey)))
+                                || (targetingWebsite && NotificationsService.isSnoozed(appKey))
+                                || (!targetWholeApp && NotificationsService.isSnoozed(appKey)))
                         readonly property bool dnd: NotificationsService.policyRevision >= 0
                             && (NotificationsService.isDnd(targetKey)
-                                || (targetingWebsite && NotificationsService.isDnd(appKey)))
+                                || (targetingWebsite && NotificationsService.isDnd(appKey))
+                                || (!targetWholeApp && NotificationsService.isDnd(appKey)))
+                        readonly property bool favorite: NotificationsService.favoritesRevision >= 0
+                            && NotificationsService.isFavoriteForNotification(scopeEntry)
+                        readonly property bool selectedFavorite: NotificationsService.favoritesRevision >= 0
+                            && NotificationsService.isFavorite(targetKey)
+
+                        function cycleTargetScope() {
+                            if (scopeOptions.length < 2)
+                                return;
+                            targetScopeIndex = (targetScopeIndex + 1) % scopeOptions.length;
+                            targetWholeApp = targetScope.kind === "app";
+                        }
 
                         readonly property var classification: root.classificationFor(notificationEntry.source, notificationEntry.sourceId, notificationEntry.category, notificationEntry.severity)
 
@@ -3142,7 +3184,7 @@ PanelWindow {
 
                                 z: 2
 
-                                active: notificationEntry.favorite
+                                active: notificationEntry.selectedFavorite
 
                                 activeColor: Colors.magenta
 
@@ -3151,7 +3193,8 @@ PanelWindow {
                                 labelPixelSize: 17
 
                                 onTriggered: {
-                                    NotificationsService.toggleFavorite(notificationEntry.appKey, notificationEntry.sourceId, notificationEntry.source);
+                                    NotificationsService.toggleFavorite(notificationEntry.targetKey,
+                                        notificationEntry.sourceId, notificationEntry.targetLabel);
                                 }
                             }
 
@@ -3278,7 +3321,11 @@ PanelWindow {
 
                                 z: 1
 
-                                text: notificationEntry.filterGroup.toUpperCase() + "  //  " + notificationEntry.severity.toUpperCase()
+                                text: notificationEntry.filterGroup.toUpperCase()
+                                    + "  //  " + notificationEntry.severity.toUpperCase()
+                                    + "  //  " + (notificationEntry.targetScope.kind === "title"
+                                        ? "TITLE EXACT, NOT VERIFIED SENDER"
+                                        : "SCOPE " + root.scopeTag(notificationEntry.targetScope.kind))
 
                                 pixelSize: root.notificationMetaFontSize
 
@@ -3290,9 +3337,11 @@ PanelWindow {
 
                             // ===== SOURCE-SCOPED / CARD CONTROLS =====
                             //
-                            // SITE/APP selects the DND/ZZ target from the
-                            // bottom row beside the Bring Here arrow.
-                            // FAVS and CLEAR ALL remain app-wide;
+                            // The footer cycles exact rule targets: APP,
+                            // SITE, declared sender/server/DM/channel/event,
+                            // or explicitly labeled literal TITLE matching.
+                            // FAVS follows the selected scope; CLEAR ALL
+                            // remains app-wide;
                             // X dismisses only this notification.
 
                             Row {
@@ -3653,13 +3702,14 @@ PanelWindow {
                                 MiniButton {
                                     width: 44
                                     height: 24
-                                    visible: notificationEntry.websiteKey !== ""
+                                    visible: notificationEntry.scopeOptions.length > 1
                                     label: notificationEntry.targetWholeApp ? "APP"
-                                        : notificationEntry.inheritedRule ? "SITE*" : "SITE"
+                                        : root.scopeTag(notificationEntry.targetScope.kind)
+                                            + (notificationEntry.inheritedRule ? "*" : "")
                                     labelPixelSize: 9
                                     active: !notificationEntry.targetWholeApp
                                     activeColor: Colors.magenta
-                                    onTriggered: notificationEntry.targetWholeApp = !notificationEntry.targetWholeApp
+                                    onTriggered: notificationEntry.cycleTargetScope()
                                 }
 
                                 MiniButton {

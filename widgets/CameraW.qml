@@ -3610,6 +3610,12 @@ PanelWindow {
                             focus: visible && camera.activeView === "cleanup"
 
                             Keys.onPressed: function(event) {
+                                // While paused, only P closes the menu.
+                                // N/Z cannot mutate play under an overlay.
+                                if (camera.huntPauseMenuOpen && event.key !== Qt.Key_P) {
+                                    event.accepted = true;
+                                    return;
+                                }
                                 if (event.key === Qt.Key_N) {
                                     camera.huntStartRound();
                                     event.accepted = true;
@@ -3628,6 +3634,7 @@ PanelWindow {
                                 running: camera.menuOpen && camera.huntAutoRounds
                                          && camera.huntAutoPending
                                          && !camera.huntSettingsOpen
+                                         && !camera.huntPauseMenuOpen
                                          && camera.activeView === "cleanup"
                                          && camera.cleanupTechnique === "hunt"
                                          && !camera.busy
@@ -3706,7 +3713,7 @@ PanelWindow {
                                     height: 27
                                     spacing: 6
                                     ActionButton {
-                                        width: (parent.width - 18) * 0.22
+                                        width: (parent.width - 12) * 0.29
                                         height: 26
                                         label: "SPAWN -"
                                         labelPixelSize: 10
@@ -3716,7 +3723,7 @@ PanelWindow {
                                                            camera.huntSpawnCount - 1)
                                     }
                                     GohuText {
-                                        width: (parent.width - 18) * 0.34
+                                        width: (parent.width - 12) * 0.42
                                         height: 26
                                         verticalAlignment: Text.AlignVCenter
                                         horizontalAlignment: Text.AlignHCenter
@@ -3726,7 +3733,7 @@ PanelWindow {
                                               + " / 10"
                                     }
                                     ActionButton {
-                                        width: (parent.width - 18) * 0.22
+                                        width: (parent.width - 12) * 0.29
                                         height: 26
                                         label: "SPAWN +"
                                         labelPixelSize: 10
@@ -3734,15 +3741,6 @@ PanelWindow {
                                         available: !camera.busy && camera.huntSpawnCount < 10
                                         onLeftClicked: camera.huntSetSpawnCount(
                                                            camera.huntSpawnCount + 1)
-                                    }
-                                    ActionButton {
-                                        width: (parent.width - 18) * 0.22
-                                        height: 26
-                                        label: "SETTINGS"
-                                        labelPixelSize: 9
-                                        accentColor: Colors.yellow
-                                        selected: camera.huntSettingsOpen
-                                        onLeftClicked: camera.huntToggleSettings()
                                     }
                                 }
 
@@ -3991,12 +3989,18 @@ PanelWindow {
                                                                 huntTargetItem.target.path);
                                                             return;
                                                         }
+                                                        // The exact click position, NOT
+                                                        // the target's rectangle center,
+                                                        // determines laser trajectory.
+                                                        const impact = mapToItem(
+                                                            huntArena, mouse.x, mouse.y);
+                                                        camera.huntSetPointer(
+                                                            impact.x, impact.y,
+                                                            huntArena.width, huntArena.height);
                                                         camera.huntFire(
                                                             huntTargetItem.target.path,
-                                                            (huntTargetItem.x + huntTargetItem.width / 2)
-                                                              / huntArena.width,
-                                                            (huntTargetItem.y + huntTargetItem.height / 2)
-                                                              / huntArena.height,
+                                                            impact.x / huntArena.width,
+                                                            impact.y / huntArena.height,
                                                             huntTargetItem.x / huntArena.width,
                                                             huntTargetItem.y / huntArena.height,
                                                             huntTargetItem.width / huntArena.width,
@@ -4029,8 +4033,14 @@ PanelWindow {
                                         property real progress: 0.0
                                         readonly property var shot: camera.huntShotEffect
                                             || ({aimX: 0.5, aimY: 0.5, color: Colors.cyan})
-                                        readonly property real muzzleX: width * 0.5
-                                        readonly property real muzzleY: height * 0.97
+                                        // The cursor IS the aim point. The muzzle is
+                                        // attached to that aim and begins below the
+                                        // visible arena, like a hand-held waist gun,
+                                        // not a fixed weapon on the game board.
+                                        readonly property var entryPoint:
+                                            HuntMotion.laserEntryPoint(shot.aimX)
+                                        readonly property real muzzleX: width * entryPoint.x
+                                        readonly property real muzzleY: height * entryPoint.y
                                         readonly property real impactX: width * shot.aimX
                                         readonly property real impactY: height * shot.aimY
                                         readonly property real dx: impactX - muzzleX
@@ -4252,12 +4262,10 @@ PanelWindow {
                                     ActionButton {
                                         width: (parent.width - 18) / 4
                                         height: 29
-                                        label: camera.huntPaused ? "RESUME" : "PAUSE"
+                                        label: camera.huntPauseMenuOpen ? "RESUME" : "PAUSE"
                                         labelPixelSize: 10
                                         accentColor: Colors.cyan
                                         available: !camera.busy
-                                            && !camera.huntRoundComplete
-                                            && camera.huntTargets.length > 0
                                         onLeftClicked: camera.huntTogglePause()
                                     }
                                     ActionButton {

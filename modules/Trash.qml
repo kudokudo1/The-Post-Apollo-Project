@@ -51,7 +51,7 @@ PanelWindow {
         clearConfirmation();
         if (menuOpen) {
             trashMenu.forceActiveFocus();
-            refresh();
+            refresh(true);
         }
     }
 
@@ -67,8 +67,10 @@ PanelWindow {
         return true;
     }
 
-    function refresh() {
+    function refresh(clearReceipt) {
         if (busy) return false;
+        if (clearReceipt === true)
+            receipt = "";
         return run("index", ["index", String(page)]);
     }
 
@@ -354,7 +356,7 @@ PanelWindow {
                     labelPixelSize: 10
                     accentColor: Colors.green
                     available: !trashLauncher.busy
-                    onLeftClicked: trashLauncher.refresh()
+                    onLeftClicked: trashLauncher.refresh(true)
                 }
             }
 
@@ -362,7 +364,7 @@ PanelWindow {
                 id: trashSearch
                 width: parent.width
                 height: 33
-                placeholderText: "SEARCH FILE NAME // ORIGINAL PATH"
+                placeholderText: "FILTER THIS PAGE // FILE NAME OR LOCATION"
                 color: Colors.white
                 font.pixelSize: 11
                 placeholderTextColor: Colors.cyan
@@ -493,7 +495,7 @@ PanelWindow {
                     available: !trashLauncher.busy && trashLauncher.page > 0
                     onLeftClicked: {
                         trashLauncher.page--;
-                        trashLauncher.refresh();
+                        trashLauncher.refresh(true);
                     }
                 }
 
@@ -520,7 +522,7 @@ PanelWindow {
                                   * trashLauncher.pageSize < trashLauncher.total
                     onLeftClicked: {
                         trashLauncher.page++;
-                        trashLauncher.refresh();
+                        trashLauncher.refresh(true);
                     }
                 }
             }

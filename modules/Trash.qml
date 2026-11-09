@@ -101,7 +101,8 @@ PanelWindow {
 
     function runResearch(action, args) {
         if (!menuOpen || researchBusy || researchBurnId !== ""
-                || (activeMode !== "archive" && activeMode !== "burn"))
+                || (activeMode !== "archive" && activeMode !== "burn"
+                    && !(activeMode === "trash" && action === "list")))
             return false;
         if (["list", "archive", "trash", "restore", "burn"].indexOf(action) < 0)
             return false;
@@ -246,12 +247,13 @@ PanelWindow {
                 && cameraCleanupController)
             cameraCleanupController.suspendHostedCleanup();
         activeMode = requested;
-        if ((requested === "archive" || requested === "burn") && menuOpen)
+        if (menuOpen)
             Qt.callLater(function() {
                 if (trashLauncher.activeMode === "archive") {
                     trashLauncher.refreshArchive();
                     trashLauncher.refreshResearch();
-                } else if (trashLauncher.activeMode === "burn")
+                } else if (trashLauncher.activeMode === "burn"
+                           || trashLauncher.activeMode === "trash")
                     trashLauncher.refreshResearch();
             });
         return true;
@@ -350,7 +352,7 @@ PanelWindow {
                     trashLauncher.refreshArchive();
                     trashLauncher.refreshResearch();
                 });
-            else if (activeMode === "burn")
+            else if (activeMode === "burn" || activeMode === "trash")
                 Qt.callLater(function() { trashLauncher.refreshResearch(); });
         }
     }
@@ -853,12 +855,25 @@ PanelWindow {
                 spacing: 7
 
                 GohuText {
-                    width: parent.width - 104
+                    width: parent.width - 203
                     height: 23
                     font.pixelSize: 11
                     color: Colors.white
                     verticalAlignment: Text.AlignVCenter
                     text: "SYSTEM TRASH // " + trashLauncher.total + " ITEMS"
+                }
+
+                ActionButton {
+                    width: 92
+                    height: 23
+                    label: "COPY BIN " + trashLauncher.researchBinRows.length
+                    labelPixelSize: 9
+                    accentColor: Colors.orange
+                    available: !trashLauncher.researchBusy
+                    onLeftClicked: {
+                        trashLauncher.archiveFilter = "bin";
+                        trashLauncher.setMode("archive");
+                    }
                 }
 
                 ActionButton {

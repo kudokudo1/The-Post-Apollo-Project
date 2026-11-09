@@ -26,7 +26,8 @@ test("E7 replaces only the single full-menu button with three C44-sized direct c
     assert.ok(subject.includes("spacing: HeaderGeometry.tabSpacing"));
     assert.ok(subject.includes("HeaderGeometry.buttonWidth(overviewMainRail.width,3)"));
     assert.ok(subject.includes("anchors.topMargin: HeaderGeometry.tabsToRule"));
-    assert.ok(subject.includes("height: HeaderGeometry.ruleHeight"));
+    assert.ok(subject.includes("height: overview.embeddedHeader ? 0 : HeaderGeometry.ruleHeight"));
+    assert.ok(earth.includes("embeddedHeader: true"));
     assert.ok(subject.includes("onClicked: overview.openTopicRequested(modelData.id)"));
     assert.ok(cosmos.includes('objectName: "cosmos-c44-overview-mode-rail"'));
     for(const topic of context.TOPICS) {

@@ -90,7 +90,7 @@ test("E6 ENVIRONMENT keeps NWS pinned-point semantics separate from USGS and wea
 test("E6 retains one original map canvas in a half-height viewport and no extra providers",()=>{
     assert.equal((pane.match(/StationDiscovery\s*\{/g)||[]).length,1);
     assert.equal((discovery.match(/id: mapPlot\b/g)||[]).length,1);
-    assert.match(pane,/height: earthPane\.overviewMode \? Math\.floor\(earthPane\.height\/2\)/);
+    assert.match(pane,/height: earthPane\.overviewMode\s+\? Math\.floor\(\(earthPane\.height-HeaderGeometry\.contentTop\(\)\)\/2\)/);
     assert.match(pane,/anchors\.top: earthLoader\.bottom/);
     assert.match(pane,/earthOverviewMode: earthPane\.overviewMode/);
     assert.match(discovery,/property bool earthOverviewMode: false/);

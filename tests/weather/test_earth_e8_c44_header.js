@@ -1,0 +1,87 @@
+"use strict";
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
+const root = path.resolve(__dirname,"../..");
+const read = name => fs.readFileSync(path.join(root,name),"utf8");
+const geometrySource = read("widgets/weather/StationSubjectHeaderGeometry.js");
+const ctx=vm.createContext({Math,Number,isFinite});
+vm.runInContext(geometrySource.replace(/^\.pragma library\s*$/m,""),ctx);
+const header=read("widgets/weather/StationEarthMapHeader.qml");
+const parent=read("widgets/weather/StationEarthSubjectPane.qml");
+const overview=read("widgets/weather/StationEarthOverviewPane.qml");
+const water=read("widgets/weather/StationEarthWaterPane.qml");
+const services=read("widgets/weather/StationEarthServicesPane.qml");
+const cosmos=read("widgets/weather/StationCosmosOverviewPane.qml");
+const fixture=read("tests/weather/fixtures/E8EarthHeaderNativeShell.qml");
+
+test("E8 copies exact C44 COSMOS title, tab, rule, content stage boundaries",()=>{
+    assert.equal(ctx.inset,6);
+    assert.equal(ctx.titleHeight,18);
+    assert.equal(ctx.titleToTabs,4);
+    assert.equal(ctx.tabHeight,27);
+    assert.equal(ctx.tabSpacing,4);
+    assert.equal(ctx.tabsToRule,5);
+    assert.equal(ctx.ruleHeight,2);
+    assert.equal(ctx.ruleToContent,3);
+    assert.equal(ctx.titleTop(),6);
+    assert.equal(ctx.tabsTop(),28);
+    assert.equal(ctx.ruleTop(),60);
+    assert.equal(ctx.contentTop(),65);
+    assert.match(header,/height: HeaderGeometry\.contentTop\(\)/);
+    assert.match(header,/anchors\.topMargin: HeaderGeometry\.inset/);
+    assert.match(header,/height: HeaderGeometry\.titleHeight/);
+    assert.match(header,/anchors\.topMargin: HeaderGeometry\.titleToTabs/);
+    assert.match(header,/height: HeaderGeometry\.tabHeight/);
+    assert.match(header,/spacing: HeaderGeometry\.tabSpacing/);
+    assert.match(header,/width: HeaderGeometry\.buttonWidth\(tabs\.width,3\)/);
+    assert.match(header,/anchors\.topMargin: HeaderGeometry\.tabsToRule/);
+    assert.match(header,/height: HeaderGeometry\.ruleHeight/);
+    assert.match(cosmos,/objectName: "cosmos-c44-overview-mode-rail"/);
+    assert.match(cosmos,/height: HeaderGeometry\.tabHeight/);
+});
+
+test("E8 overview full menu controls live in the header ABOVE the map, never twice in the lower half",()=>{
+    assert.match(parent,/StationEarthMapHeader\s*\{/);
+    assert.match(parent,/objectName: "earth-e8-shared-map-header"/);
+    assert.match(parent,/visible: earthPane\.mapFamily/);
+    assert.match(parent,/anchors\.topMargin: earthPane\.mapFamily\s+\? HeaderGeometry\.contentTop\(\) : 0/);
+    assert.match(parent,/height: earthPane\.overviewMode\s+\? Math\.floor\(\(earthPane\.height-HeaderGeometry\.contentTop\(\)\)\/2\)/);
+    assert.match(parent,/embeddedHeader: true/);
+    assert.match(parent,/onOpenTopicRequested: function\(topicId\)/);
+    assert.match(parent,/earthPane\.openEarthFullTopic\(topicId\)/);
+    assert.match(header,/model: earthHeader\.tabs/);
+    assert.match(header,/earthHeader\.openTopicRequested\(modelData\.id\)/);
+    assert.match(header,/earthHeader\.routeRequested\(modelData\.path\)/);
+    assert.match(overview,/visible: !overview\.embeddedHeader/);
+    assert.match(overview,/anchors\.top: overview\.embeddedHeader\s+\? parent\.top : mainDivider\.bottom/);
+    assert.match(overview,/objectName: "earth-e6-overview-arrows"/);
+    assert.equal((parent.match(/StationDiscovery\s*\{/g)||[]).length,1);
+    assert.equal((parent.match(/StationEarthOverviewPane\s*\{/g)||[]).length,1);
+});
+
+test("E8 all EARTH screens preserve their C44 header on the correct owner",()=>{
+    assert.match(parent,/readonly property bool mapFamily: kind === "map"/);
+    assert.match(header,/EARTH \/\/ OVERVIEW/);
+    assert.match(header,/EARTH \/\/ MAP \/ EVENTS/);
+    assert.match(header,/\{id:"full",label:"FULL MAP",path:"earth\/maps\/full"\}/);
+    assert.match(parent,/objectName: "earth-e4-ground-title"/);
+    assert.match(parent,/objectName: "earth-e4-ground-tabs"/);
+    assert.match(parent,/objectName: "earth-e4-ground-divider"/);
+    assert.match(parent,/Height|height: HeaderGeometry\.tabHeight/);
+    for(const [file,names] of [[water,["water-title","water-tabs","water-divider"]],
+                               [services,["services-title","services-tabs","services-divider"]]]) {
+        for(const name of names)assert.ok(file.includes("earth-e2-"+name),name);
+        assert.ok(file.includes("HeaderGeometry.titleToTabs"));
+        assert.ok(file.includes("HeaderGeometry.tabHeight"));
+        assert.ok(file.includes("HeaderGeometry.tabsToRule"));
+        assert.ok(file.includes("HeaderGeometry.ruleToContent"));
+    }
+    assert.match(parent,/StationEarthWaterPane\s*\{/);
+    assert.match(parent,/StationEarthServicesPane\s*\{/);
+    assert.match(fixture,/E8_NATIVE_PASS/);
+    assert.match(fixture,/Weather\.StationEarthMapHeader\s*\{/);
+    assert.match(fixture,/find\(header,"earth-e8-c44-title"\)/);
+});

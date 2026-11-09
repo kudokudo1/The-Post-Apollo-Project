@@ -32,12 +32,43 @@ Rectangle {
 
     readonly property string kind:
         EarthPanelPolicy.kindForRoute(subjectRoute)
+    readonly property bool mapFamily: kind === "map"
+
+    function openEarthFullTopic(topicId) {
+        if (topicId === "water") {
+            earthPane.routeRequested("earth/water/rivers");
+        } else if (topicId === "pollen" || topicId === "environment") {
+            earthPane.groundViewMode = topicId === "pollen"
+                ? "air-pollen" : "environment";
+            earthPane.routeRequested("earth/ground/full");
+        }
+    }
     readonly property var runtimeRows:
         earthPane.kind === "ground" && earthGroundLoader.item
             && Array.isArray(earthGroundLoader.item.runtimeRows)
         ? earthGroundLoader.item.runtimeRows
         : earthLoader.item && Array.isArray(earthLoader.item.runtimeRows)
         ? earthLoader.item.runtimeRows : []
+
+    // E8 // C44 header above (not inside) the EARTH map and overview.
+    // WATER / GROUND / SERVICES have the same C44 title/tab/divider
+    // geometry already and keep their existing own header instances.
+    StationEarthMapHeader {
+        id: mapHeader
+        objectName: "earth-e8-shared-map-header"
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        visible: earthPane.mapFamily
+        subjectRoute: earthPane.subjectRoute
+        z: 2
+        onOpenTopicRequested: function(topicId) {
+            earthPane.openEarthFullTopic(topicId);
+        }
+        onRouteRequested: function(path) {
+            earthPane.routeRequested(path);
+        }
+    }
 
     // One map is kept mounted across EARTH tab switches to preserve
     // pan/zoom, manual source status and the selected event.
@@ -47,8 +78,12 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        height: earthPane.overviewMode ? Math.floor(earthPane.height/2)
-                                       : earthPane.height
+        anchors.topMargin: earthPane.mapFamily
+            ? HeaderGeometry.contentTop() : 0
+        height: earthPane.overviewMode
+            ? Math.floor((earthPane.height-HeaderGeometry.contentTop())/2)
+            : Math.max(0,earthPane.height - (earthPane.mapFamily
+                ? HeaderGeometry.contentTop() : 0))
         active: earthPane.visible && earthPane.kind !== ""
         sourceComponent: earthMapComponent
     }
@@ -68,6 +103,7 @@ Rectangle {
         id: overviewSummary
         objectName: "earth-e6-overview-lower-half"
         visible: earthPane.overviewMode
+        embeddedHeader: true
         anchors.top: earthLoader.bottom
         anchors.left: parent.left
         anchors.right: parent.right
@@ -77,13 +113,7 @@ Rectangle {
         nwsAlertSource: earthPane.nwsAlertSource
         seismicSource: earthPane.seismicSource
         onOpenTopicRequested: function(topicId) {
-            if (topicId === "water") {
-                earthPane.routeRequested("earth/water/rivers");
-            } else if (topicId === "pollen" || topicId === "environment") {
-                earthPane.groundViewMode = topicId === "pollen"
-                    ? "air-pollen" : "environment";
-                earthPane.routeRequested("earth/ground/full");
-            }
+            earthPane.openEarthFullTopic(topicId);
         }
     }
 

@@ -45,7 +45,7 @@ for term in required:
 
 # The documentation stage must not introduce a new runtime capability.
 assert 'MACHINE // SESSION TIMELINE' in timew
-assert 'NO SCREENSHOTS OR RESTORATION ACTIVE' in timew
+assert 'NO SCREENSHOTS OR AUTOMATIC RESTORATION' in timew
 assert 'MARKERS ARE TIMESTAMPS ONLY // LOST ON RESTART' in timew
 assert "function addMachineMarker()" in timew
 assert "function removeMachineMarker(id)" in timew

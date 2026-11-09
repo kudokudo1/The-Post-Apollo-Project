@@ -1,0 +1,34 @@
+name: TimeW MACHINE STORED checkpoint name and notes editor
+
+on:
+  pull_request:
+    paths:
+      - "widgets/TimeW.qml"
+      - "services/time/MachineSaveBridgeV2.py"
+      - "services/time/MachineCheckpointAnnotations.py"
+      - "tests/timew/test_machine_stored_notes_bridge.py"
+      - "tests/timew/test_machine_stored_notes_ui_contract.py"
+      - "docs/timew-machine-stored-notes-editor.md"
+      - ".github/workflows/timew-machine-stored-notes-ui.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stored-notes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify STORED notes UI, independent SAVE RESTORE and root QML properties
+        run: python3 -B -I tests/timew/test_machine_stored_notes_ui_contract.py
+      - name: Exercise isolated Python notes bridge, label overlays and stale conflicts
+        run: python3 -B -I tests/timew/test_machine_stored_notes_bridge.py
+      - name: Preserve atomic metadata, legacy and v2 checkpoint behavior
+        run: |
+          python3 -B -I tests/timew/test_machine_checkpoint_annotations.py
+          python3 -B -I tests/timew/test_machine_checkpoint_store.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_save_bridge_v2.py
+          python3 -B -I tests/timew/test_machine_save_ui_contract.py

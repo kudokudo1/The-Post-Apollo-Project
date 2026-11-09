@@ -1,0 +1,39 @@
+name: TimeW MACHINE M2 native headless geometry capture
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineGeometryV2.py"
+      - "services/time/MachineSwayRead.py"
+      - "services/time/MachineWindowResolver.py"
+      - "tests/timew/test_machine_floating_con.py"
+      - "tests/timew/test_machine_geometry_headless_sway.py"
+      - "tests/timew/test_machine_geometry_headless_contract.py"
+      - "docs/timew-machine-m2-headless-geometry-evidence.md"
+      - ".github/workflows/timew-machine-m2-headless-geometry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-native-geometry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject non-isolated Sway capture paths
+        run: python3 -B -I tests/timew/test_machine_geometry_headless_contract.py
+      - name: Install fresh headless compositor and throwaway window client
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq sway foot fonts-dejavu-core
+      - name: Confirm real Sway capture shape on two private virtual outputs
+        run: python3 -B -I tests/timew/test_machine_geometry_headless_sway.py
+      - name: Preserve synthetic capture and legacy v1 schema
+        run: |
+          python3 -B -I tests/timew/test_machine_geometry_v2.py
+          python3 -B -I tests/timew/test_machine_floating_con.py
+          python3 -B -I tests/timew/test_machine_checkpoint_store.py
+          python3 -B -I tests/timew/test_machine_sway_read.py
+          python3 -B -I tests/timew/test_machine_window_resolver.py

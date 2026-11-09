@@ -62,11 +62,14 @@ def normalize(outputs, workspaces, tree):
         app = node.get("app_id")
         if app is None and isinstance(node.get("window_properties"), dict):
             app = node["window_properties"].get("class")
-        if kind == "con" and isinstance(app, str) and app:
+        # Real Sway represents a floating *client* as floating_con, not
+        # necessarily a con under floating_nodes. Preserve it in v1 captures.
+        if kind in ("con", "floating_con") and isinstance(app, str) and app:
             if workspace is not None and isinstance(app, str) and app:
                 simplified["windows"].append({
                     "app_id": app, "workspace": workspace,
-                    "floating": floating or node.get("floating") in ("user_on", "auto_on")})
+                    "floating": floating or kind == "floating_con"
+                                or node.get("floating") in ("user_on", "auto_on")})
                 if len(simplified["windows"]) > 512:
                     raise PreviewError("too many windows")
         for key, is_floating in (("nodes", floating), ("floating_nodes", True)):

@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""Disposable Brave native transport registration: real temp filesystem test."""
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "services/time"))
+from MachineBraveDisposableTrial import (
+    TrialError, init_trial, register_trial, verify_trial, HOST_MANIFEST,
+    HOST_FILE, MARKER,
+)
+
+EXT_ID = "a" * 32
+
+
+def refused(callback):
+    try:
+        callback()
+    except (TrialError, ValueError, OSError):
+        return
+    raise AssertionError("unsafe disposable-profile operation accepted")
+
+
+def new_root():
+    return Path(init_trial()["trial_root"])
+
+
+# Every write is in a unique, private /tmp fixture, not the user's profile.
+root = new_root()
+try:
+    profile = root / "profile"
+    assert root.stat().st_mode & 0o077 == 0
+    assert profile.stat().st_mode & 0o077 == 0
+    assert (root / MARKER).is_file()
+    assert not (profile / "NativeMessagingHosts").exists()
+    refused(lambda: verify_trial(str(root)))
+    for invalid in ("", "z" * 32, EXT_ID[:-1], "../" + EXT_ID,
+                    EXT_ID + "\n", None, 123):
+        refused(lambda identifier=invalid: register_trial(str(root), identifier))
+        assert not (profile / "NativeMessagingHosts").exists()
+        assert not (root / HOST_FILE).exists()
+
+    result = register_trial(str(root), EXT_ID)
+    assert result["status"] == "disposable_trial_registration_verified"
+    assert result["brave_user_data_dir"] == str(profile)
+    assert result["registration_scoped_to_disposable_profile"] is True
+    assert result["host_source_matches_repo"] is True
+    for key in ("browser_launched", "local_transport_tested",
+                "extension_origin_authenticated", "window_identity_verified",
+                "session_capture_allowed", "restore_allowed"):
+        assert result[key] is False
+    assert result["safe_actions"] == []
+    host = root / HOST_FILE
+    native = profile / "NativeMessagingHosts"
+    manifest_file = native / HOST_MANIFEST
+    assert host.is_file() and os.access(host, os.X_OK)
+    assert host.stat().st_mode & 0o077 == 0
+    assert manifest_file.is_file()
+    assert manifest_file.stat().st_mode & 0o077 == 0
+    manifest = json.loads(manifest_file.read_text())
+    assert manifest["allowed_origins"] == ["chrome-extension://" + EXT_ID + "/"]
+    assert manifest["path"] == str(host)
+    assert manifest["type"] == "stdio"
+    assert verify_trial(str(root)) == result
+
+    before = {str(p.relative_to(root)): p.read_bytes()
+              for p in root.rglob("*") if p.is_file()}
+    assert verify_trial(str(root)) == result
+    after = {str(p.relative_to(root)): p.read_bytes()
+             for p in root.rglob("*") if p.is_file()}
+    assert before == after, "verify unexpectedly wrote profile data"
+    refused(lambda: register_trial(str(root), "b" * 32))
+    assert verify_trial(str(root)) == result, "duplicate registration mutated trial"
+
+    # Verify validates the exact bytes, not merely plausible JSON.
+    manifest_file.write_text(json.dumps(dict(manifest, path="/bin/sh")))
+    refused(lambda: verify_trial(str(root)))
+    manifest_file.write_text(json.dumps(manifest))
+    assert verify_trial(str(root)) == result
+    host.write_bytes(host.read_bytes() + b"\n# modified\n")
+    refused(lambda: verify_trial(str(root)))
+finally:
+    shutil.rmtree(root)
+
+# A preexisting path, symlink, fake trial marker, or another directory
+# must never be accepted, no matter how plausible the ID.
+root = new_root()
+try:
+    other = root / "external"
+    other.mkdir(mode=0o700)
+    (root / "profile").rmdir()
+    (root / "profile").symlink_to(other, target_is_directory=True)
+    refused(lambda: register_trial(str(root), EXT_ID))
+    assert not (other / "NativeMessagingHosts").exists()
+finally:
+    shutil.rmtree(root)
+
+root = new_root()
+try:
+    (root / MARKER).write_text('{"kind":"wrong","trial_id":"bad"}')
+    refused(lambda: register_trial(str(root), EXT_ID))
+    assert not (root / HOST_FILE).exists()
+finally:
+    shutil.rmtree(root)
+
+root = new_root()
+try:
+    (root / HOST_FILE).symlink_to("/dev/null")
+    refused(lambda: register_trial(str(root), EXT_ID))
+    assert not (root / "profile" / "NativeMessagingHosts").exists()
+finally:
+    shutil.rmtree(root)
+
+# A nested, non-temp, or ordinary user profile path is out of scope.
+refused(lambda: register_trial("/home/example/.config/BraveSoftware/Brave-Browser", EXT_ID))
+refused(lambda: verify_trial("/tmp/other/BraveSoftware/Brave-Browser"))
+
+# Real CLI (isolated Python interpreter): init -> register -> verify,
+# no Brave/Sway launch and no storage beyond the generated trial root.
+cli = ROOT / "services/time/MachineBraveDisposableTrial.py"
+def cli_call(*args):
+    return subprocess.run(["python3", "-B", "-I", str(cli), *args],
+                          capture_output=True, timeout=7, check=False)
+
+made = cli_call("init")
+assert made.returncode == 0 and not made.stderr
+created = json.loads(made.stdout)
+cli_root = Path(created["trial_root"])
+try:
+    assert created["status"] == "disposable_trial_initialized"
+    assert created["registration_present"] is False
+    assert created["browser_launched"] is False
+    assert not (cli_root / "profile" / "NativeMessagingHosts").exists()
+    registered = cli_call("register", str(cli_root), EXT_ID)
+    assert registered.returncode == 0 and not registered.stderr
+    assert json.loads(registered.stdout)["status"] == "disposable_trial_registration_verified"
+    verified = cli_call("verify", str(cli_root))
+    assert verified.returncode == 0 and not verified.stderr
+    assert json.loads(verified.stdout) == json.loads(registered.stdout)
+    rejected = cli_call("register", str(cli_root), EXT_ID)
+    assert rejected.returncode == 1
+    assert json.loads(rejected.stdout) == {"status": "refused", "safe_actions": []}
+    assert not rejected.stderr
+finally:
+    shutil.rmtree(cli_root)
+
+manifest = json.loads((ROOT / "integrations/machine/brave-topology/manifest.json").read_text())
+assert manifest["permissions"] == []
+assert manifest["optional_permissions"] == ["nativeMessaging"]
+assert manifest["host_permissions"] == []
+assert manifest["incognito"] == "not_allowed"
+assert "background" not in manifest
+qml = (ROOT / "widgets/TimeW.qml").read_text()
+assert "MachineBraveDisposableTrial" not in qml
+native_host = (ROOT / "services/time/MachineBraveNativeProbe.py").read_text()
+assert "swaymsg" not in native_host
+assert "sqlite3" not in native_host
+assert "MachineBraveDisposableTrial" not in native_host
+
+print("MACHINE Brave // private disposable profile registration and read-only verification PASS")

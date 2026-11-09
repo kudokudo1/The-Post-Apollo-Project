@@ -69,7 +69,7 @@ def tree_windows(tree):
         if not isinstance(node, dict):
             return
         app = node.get("app_id")
-        if node.get("type") == "con" and app in APP_IDS:
+        if node.get("type") in ("con", "floating_con") and app in APP_IDS:
             found.append(node)
         for kind in ("nodes", "floating_nodes"):
             for child in node.get(kind, []):

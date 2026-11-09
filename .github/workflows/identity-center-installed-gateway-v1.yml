@@ -1,0 +1,71 @@
+name: Identity Gateway Installed-Host V1 disposable dpkg/systemd witness
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/installed_gateway_witness_v1.py'
+      - 'tests/identity/test_installed_gateway_v1_ci.py'
+      - 'tests/identity/fixtures/identity_gateway_installed_ci'
+      - '.github/workflows/identity-center-installed-gateway-v1.yml'
+      - 'docs/identity-center-installed-gateway-v1.md'
+  push:
+    branches: [main, 'feat/identity-installed-gateway-*']
+    paths:
+      - 'services/identity/installed_gateway_witness_v1.py'
+      - 'tests/identity/test_installed_gateway_v1_ci.py'
+      - 'tests/identity/fixtures/identity_gateway_installed_ci'
+      - '.github/workflows/identity-center-installed-gateway-v1.yml'
+      - 'docs/identity-center-installed-gateway-v1.md'
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-installed-service:
+    name: Disposable signed dpkg + real supervised Identity gateway
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      POST_APOLLO_ID_INSTALL_CI_ONLY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Confirm hosted Linux with disposable systemd and package manager
+        run: |
+          test "$GITHUB_ACTIONS" = "true"
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
+          test "$RUNNER_OS" = "Linux"
+          test "$(id -u)" -ne 0
+          command -v dpkg-deb
+          command -v dpkg-query
+          command -v systemctl
+          command -v systemd-run
+          sudo -n true
+          systemctl show --property=Version --no-pager >/dev/null
+      - name: Install pinned CI cryptography for real Ed25519 verification
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Compile exact installed-host witness and test fixture
+        run: |
+          python3 -m py_compile services/identity/installed_gateway_witness_v1.py
+          python3 -m py_compile tests/identity/test_installed_gateway_v1_ci.py
+          python3 -m py_compile tests/identity/fixtures/identity_gateway_installed_ci
+      - name: Real signed package install, systemd PID/LSM/module witness and mandatory deny-only receipts
+        run: python3 -m unittest discover -s tests/identity -p 'test_installed_gateway_v1_ci.py' -v
+      - name: Retain existing signed gateway and CPU++ default deny regressions
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_signed_command_client_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_signed_gateway_origin_probe_v0.py' -v
+          node tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs
+          node tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs
+      - name: Verify installed test package/socket service left no residue
+        if: always()
+        run: |
+          if dpkg-query -W post-apollo-identity-ci-fixture 2>/dev/null | grep -Fq 'post-apollo-identity-ci-fixture'; then
+            if test -e /usr/libexec/post-apollo/identity/identity-gateway-ci; then
+              echo "::error::Disposable Identity gateway package was not removed"
+              exit 1
+            fi
+          fi
+          test ! -e /usr/libexec/post-apollo/identity/identity-gateway-ci

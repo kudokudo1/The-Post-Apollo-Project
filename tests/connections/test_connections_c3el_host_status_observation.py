@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import pwd
+import shutil
 import subprocess
 import sys
 import unittest
@@ -59,6 +60,15 @@ class C3eLHostStatusObservationTests(unittest.TestCase):
             "test_01_separate_uid_reads_only_floor_and_leaves_db_intact")
         self.fx.setUp()
         self.addCleanup(self.fx.doCleanups)
+        # Actions checkout under /home/runner is not traversable by nobody.
+        # Stage ONLY this client module inside a root-owned, read-only /run
+        # directory. Its ledger remains private to the root host.
+        self.client_dir = self.fx.base / "client"
+        self.client_dir.mkdir(mode=0o755)
+        self.client_dir.chmod(0o755)
+        client_source = self.client_dir / SOURCE.name
+        shutil.copyfile(SOURCE, client_source)
+        client_source.chmod(0o644)
 
     def _start_client(self):
         uid, gid = self.fx.client_uid, self.fx.client_gid
@@ -67,11 +77,14 @@ class C3eLHostStatusObservationTests(unittest.TestCase):
             os.setgid(gid)
             os.setuid(uid)
         process = subprocess.Popen(
-            [sys.executable, "-u", "-c", CLIENT, str(HERE)], preexec_fn=drop,
+            [sys.executable, "-u", "-c", CLIENT, str(self.client_dir)], preexec_fn=drop,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, text=True, bufsize=1)
         self.addCleanup(self.fx._stop, process)
-        self.assertEqual(process.stdout.readline().strip(), "READY")
+        ready = process.stdout.readline().strip()
+        if ready != "READY":
+            self.fail("C3EL_CLIENT_STARTUP rc=%r stdout=%r stderr=%r" % (
+                process.poll(), ready, process.stderr.read()[-2200:]))
         return process
 
     def _pins(self, host):

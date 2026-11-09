@@ -62,6 +62,7 @@ PanelWindow {
     // confirmBatchTrash() can authorize a physical move to recoverable Trash.
     property var huntTargets: []
     property var huntHistory: []
+    property var huntSparedPaths: []
     property int huntRound: 0
     property int huntTick: 0
     property int huntSecondsLeft: 25
@@ -451,6 +452,7 @@ PanelWindow {
             // Never fire a selection for an earlier folder or filter.
             huntTargets = [];
             huntHistory = [];
+            huntSparedPaths = [];
             huntPaused = true;
             huntRoundComplete = false;
             huntRound = 0;
@@ -775,6 +777,7 @@ PanelWindow {
         const history = huntHistory.slice();
         history.push({
             targets: huntTargets.slice(), paths: batchPaths.slice(),
+            spared: huntSparedPaths.slice(),
             shots: huntShots, hits: huntHits, misses: huntMisses,
             score: huntScore, combo: huntCombo,
             paused: huntPaused, complete: huntRoundComplete
@@ -784,6 +787,11 @@ PanelWindow {
         const next = huntTargets.slice();
         next.splice(index, 1);
         huntTargets = next;
+        if (huntSparedPaths.indexOf(path) < 0) {
+            const spared = huntSparedPaths.slice();
+            spared.push(path);
+            huntSparedPaths = spared;
+        }
         huntHitFlash = false;
         huntShotEffect = null;
         huntLastEvent = "SAFE // SCREEN RECORDING KEPT // NOT QUEUED";
@@ -813,7 +821,8 @@ PanelWindow {
         for (let i = 0; i < galleryFiles.length; i++) {
             const item = galleryFiles[i];
             if (!item || typeof item.path !== "string" || !item.path
-                    || seen[item.path] || batchContains(item.path))
+                    || seen[item.path] || batchContains(item.path)
+                    || huntSparedPaths.indexOf(item.path) >= 0)
                 continue;
             seen[item.path] = true;
             eligible.push(item);
@@ -898,8 +907,17 @@ PanelWindow {
         huntTick++;
         huntSecondsLeft = Math.max(0, 25 - Math.floor(huntTick / 10));
         if (huntTick >= 250) {
-            // Timeouts never queue anything. Unshot files stay eligible for
-            // a later round and are never silently marked for deletion.
+            // A timed-out safe screen recording is spared for later rounds,
+            // so auto-next cannot loop on the same unshootable target.
+            const spared = huntSparedPaths.slice();
+            for (let i = 0; i < huntTargets.length; i++) {
+                const item = huntTargets[i];
+                if (HuntMotion.protectedHuntMedia(item)
+                        && spared.indexOf(item.path) < 0)
+                    spared.push(item.path);
+            }
+            huntSparedPaths = spared;
+            // Unhit regular files remain eligible; nothing enters Trash.
             huntTargets = [];
             huntHistory = [];
             huntPaused = true;
@@ -948,6 +966,7 @@ PanelWindow {
         const history = huntHistory.slice();
         history.push({
             targets: huntTargets.slice(), paths: batchPaths.slice(),
+            spared: huntSparedPaths.slice(),
             shots: huntShots, hits: huntHits, misses: huntMisses,
             score: huntScore, combo: huntCombo,
             paused: huntPaused, complete: huntRoundComplete
@@ -1032,6 +1051,8 @@ PanelWindow {
         huntShotEffect = null;
         huntTargets = last.targets.slice();
         batchPaths = last.paths.slice();
+        huntSparedPaths = last.spared ? last.spared.slice()
+                                    : huntSparedPaths;
         huntShots = last.shots;
         huntHits = last.hits;
         huntMisses = last.misses;

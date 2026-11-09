@@ -184,7 +184,7 @@ class DurableTestVerifier:
 
         verifier = Q.OneUseTestChallenge(challenge)
         try:
-            verifier.verify(
+            verified_receipt = verifier.verify(
                 evidence=evidence, signature=signature,
                 public_key=public_key, pinned_signer=pinned_signer,
                 expected_rpm_sha256=expected_rpm_sha256,
@@ -192,9 +192,12 @@ class DurableTestVerifier:
                 expected_interpreter_sha256=expected_interpreter_sha256,
                 expected_service_pid=expected_service_pid,
                 expected_start_ticks=expected_start_ticks)
-            # Hash only after validated signature. The receipt never grants.
-            signed_sha = hashlib.sha256(Q.safe_bytes(
-                evidence, Q.MAX_EVIDENCE, "EVIDENCE_FILE_UNSAFE")).hexdigest()
+            # The trusted digest comes from Q's SAME verified byte snapshot,
+            # not a second read of the replaceable caller-provided pathname.
+            signed_sha = verified_receipt["verifiedEvidenceSHA256"]
+            if (type(signed_sha) is not str or
+                    Q.HEX64.fullmatch(signed_sha) is None):
+                deny("VERIFIED_DIGEST_MISSING_OR_INVALID")
         except Q.Refused as exc:
             deny("SIGNED_Q_EVIDENCE_REFUSED:" + str(exc))
 

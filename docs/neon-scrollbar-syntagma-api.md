@@ -204,3 +204,74 @@ host-owned reservation, positioner mounting and audit-04 deliberate-extension
 contracts on this page. It is a *host mounting rule*, not an instruction to
 rewrite the shared `NeonScrollBar.qml` renderer or another worker's owned
 `GitChangesView.qml` without handoff.
+
+
+## Compact CPU++ rounded scrollbars: stage 1 before star migration (2026-11-10)
+
+> **State:** staged implementation, awaiting CI and operator visual acceptance.
+> The operator explicitly requested to **repair and inspect the rounded bars
+> first**, and only then consider star-shaped indicators. Do not conflate the
+> two milestones or silently alter the global bar shape.
+
+**Shared rule (proposed for visual acceptance):** Every independently
+scrollable list must expose a position indicator when its content exceeds
+the available viewport. It must sit **inside its own bordered panel**, use
+the shared `NeonScrollBar` geometry, reserve real space between the bar
+and text/buttons, and be centered crosswise within its own slim track.
+Do not align an indicator to the whole window when only a subpanel scrolls.
+Do not place its parent inside a Qt auto-positioning `Column`/Row.
+
+**CPU++ stage-1 concrete layout:**
+
+- Normal vertical bars use `handleStyle: "bar"` even if a separate owner
+  later changes Git/Hospital to `"star"`.
+- Use `geometryHost: theActualFlickable` so the track sits within the
+  *scrollable viewport*, with the shared 2px top/bottom and 4px right inset.
+  In a positioner-backed pane, use `mountingParent` pointing to an
+  **actual non-positioning Item**; leave sibling controls pinned.
+- Reserve at least 24px total from the scroll area width before drawing
+  list-row text, cards, or action controls. The current bar's physical
+  width is still 10px and the visible 7px handle is centered inside it.
+  Glow does not add input-hit width; verify the actual breathing room.
+- The new opt-in `maximumBarHandleHeight` limits how long a **rounded**
+  handle can become. For this initial CPU++ proposal, it is `42` px.
+  Default `0` retains the entire preexisting proportional-length behavior
+  everywhere else, including other widgets' scrollbars.
+- A capped handle intentionally gives up an exact visual fraction
+  of content visible, but its **vertical position** must still accurately
+  reflect the scroll ratio from start to end, and track click/wheel/drag
+  behavior and auto-hide must remain unchanged. Never fake a center
+  position: only cross-axis centering is automatic.
+- Multiple viewports in one menu each own their own indicator. In
+  Favorites++, COLLECTIONS and the main INDEX share the left bay but
+  have distinct scroll ranges; the middle saved-item list gets a third
+  bar. The bottom source-filter row stays pinned and is controlled by its
+  original left/right arrows, rather than gaining a competing vertical bar.
+- In LOCATION, the left Explore editor, middle pinned search results,
+  middle saved places, and right Home editor keep independent scroll bounds.
+  In particular, the saved-places track cannot run alongside the pinned
+  FIND PLACE query above it.
+- `widgets/CpuPlusW.qml` THERMAL/SYSTEM rail placement is a
+  separate owner-controlled seam in Nurse 3r's open scrollbar PR
+  [#252](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/252).
+  Do not overwrite that worker's host edits without a handoff.
+
+**Verification gates before changing the handle shape:**
+
+1. Native QML: capped-bar property clamps to 42px without altering the
+   default proportional length when unset; verify scroll positions at
+   0%, 50%, 100% and keyboard/wheel/drag limits.
+2. Host tests: long and short lists in Favorites++ and LOCATION; no
+   indicator when scrolling is unnecessary; each bar inside its pane
+   below pinned headings, not outside the menu or on top of text.
+3. Runtime desktop: review normal, hovered and pressed colors, rail
+   placement, resized CPU++ modes, multiple active lists, and scrolling
+   at the bottom.
+4. **Operator visual acceptance of rounded stage 1**, then a separate
+   authorized stage-2 PR can change selected handles to `"star"`.
+   Do not make that design decision on the operator's behalf.
+
+**Relation to existing rules:** This adds an opt-in rounded handle cap and
+CPU++ mounting recipe without changing the approved 23-rule NeonScrollBar
+API, the box-side geometry defaults, Git/Hospital star convention,
+deliberate extended rails, or the shared component's hit width.

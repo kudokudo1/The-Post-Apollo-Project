@@ -5,6 +5,8 @@ on:
     paths:
       - "services/time/MachineBraveNativeFocusObserve.py"
       - "services/time/MachineBraveNativeFocusManifest.py"
+      - "services/time/MachineBraveFocusTrial.py"
+      - "tests/timew/test_machine_brave_focus_trial.py"
       - "integrations/machine/brave-topology/focus-observe-*.mjs"
       - "integrations/machine/brave-topology/popup.html"
       - "tests/timew/test_machine_brave_native_focus_observe.py"
@@ -26,6 +28,8 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_brave_native_focus_observe.py
       - name: Verify browser protocol, click gate and no-identity review
         run: node tests/timew/test_machine_brave_native_focus_observe.mjs
+      - name: Verify focus host registration remains in disposable XDG only
+        run: python3 -B -I tests/timew/test_machine_brave_focus_trial.py
       - name: Preserve transport probe no-OS authority
         run: |
           python3 -B -I tests/timew/test_machine_brave_native_probe_contract.py

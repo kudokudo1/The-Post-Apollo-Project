@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from MachineBraveNativeProbe import (
     ORIGIN_PATTERN, ProbeError, _canonical_uuid, read_request, write_response,
 )

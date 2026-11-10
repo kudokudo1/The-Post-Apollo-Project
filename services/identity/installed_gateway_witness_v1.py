@@ -26,6 +26,19 @@ ROLE = "post-apollo.identity.native-command-gateway.ci-v1"
 DOMAIN = b"post-apollo.identity.installed-release.ci-v1\x00"
 PACKAGE = "post-apollo-identity-ci-fixture"
 PREFIX = "/usr/libexec/post-apollo/identity/"
+# V1 is a fixed CI release role, not a general-purpose Python package.
+# A signature over a partial module list must never omit executable code
+# from installed-file measurement. Changing this roster needs a new review.
+REQUIRED_FILES = frozenset(PREFIX + name for name in (
+    "identity-gateway-ci",
+    "desktop_command_gateway_v0.py",
+    "desktop_host_lifecycle_v0.py",
+    "desktop_context_projection_v0.py",
+    "desktop_session_host_v0.py",
+    "native_loopback_callback_v0.py",
+    "private_context_ipc_v0.py",
+    "signed_command_receipt_v0.py",
+))
 KEYS = {"schema","role","epoch","sequence","package","packageSha256",
         "receiptKeySha256","unit","files"}
 SHA = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
@@ -88,16 +101,15 @@ def verify_release(raw, sig, root, epoch, sequence):
             or SHA.fullmatch(m["packageSha256"]) is None
             or type(m["receiptKeySha256"]) is not str
             or SHA.fullmatch(m["receiptKeySha256"]) is None
-            or type(m["files"]) is not dict
-            or not 5 <= len(m["files"]) <= 20):
+            or type(m["files"]) is not dict):
         raise WitnessRefused("Unapproved signed role, release or package")
     for path, digest in m["files"].items():
         if (type(path) is not str or not path.startswith(PREFIX)
                 or "/" in path[len(PREFIX):]
                 or type(digest) is not str or SHA.fullmatch(digest) is None):
             raise WitnessRefused("Invalid module pin")
-    if PREFIX + "identity-gateway-ci" not in m["files"]:
-        raise WitnessRefused("Gateway entrypoint not signed")
+    if set(m["files"]) != REQUIRED_FILES:
+        raise WitnessRefused("Signed installed gateway manifest has missing or extra files")
     try:
         root.verify(sig, DOMAIN + raw)
     except InvalidSignature as exc:

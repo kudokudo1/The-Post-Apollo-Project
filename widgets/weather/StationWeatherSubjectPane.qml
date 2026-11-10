@@ -33,7 +33,8 @@ Rectangle {
         sourceComponent: weatherPane.kind === "ground"
                          ? groundPanel : weatherPane.kind === "home"
                          ? homePanel : weatherPane.kind === "map"
-                         ? mapPanel : skyPanel
+                         ? mapPanel : weatherPane.kind === "services"
+                         ? servicesPanel : skyPanel
     }
 
     Component {
@@ -80,6 +81,51 @@ Rectangle {
             persistentCacheStore: weatherPane.persistentCacheStore
             liveHistoryStore: weatherPane.liveHistoryStore
             runtimeNowMs: weatherPane.runtimeNowMs
+        }
+    }
+
+    // W4: reuse the current SKY and GROUND runtime arrays. No new collectors.
+    Component {
+        id: servicesPanel
+        Item {
+            // Reuse the existing single SKY/GROUND component definitions.
+            // These only exist while SERVICES is selected; no new collector.
+            Loader {
+                id: weatherServicesSky
+                active: true
+                visible: false
+                sourceComponent: skyPanel
+            }
+            Loader {
+                id: weatherServicesGround
+                active: true
+                visible: false
+                sourceComponent: groundPanel
+            }
+            Flickable {
+                anchors.fill: parent
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                contentWidth: width
+                contentHeight: Math.max(height, servicesContent.y + servicesContent.implicitHeight + 10)
+                Column {
+                    id: servicesContent
+                    x: 12
+                    y: 10
+                    width: Math.max(0, parent.width - 24)
+                    spacing: 14
+                    StationRuntimeRack {
+                        objectName: "weather-w4-sky-rack"
+                        title: "WEATHER SERVICES // SKY + ATMOSPHERE"
+                        rows: weatherServicesSky.item ? weatherServicesSky.item.runtimeRows : []
+                    }
+                    StationRuntimeRack {
+                        objectName: "weather-w4-ground-rack"
+                        title: "WEATHER SERVICES // GROUND + HAZARDS"
+                        rows: weatherServicesGround.item ? weatherServicesGround.item.runtimeRows : []
+                    }
+                }
+            }
         }
     }
 

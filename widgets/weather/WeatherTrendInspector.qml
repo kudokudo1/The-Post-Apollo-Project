@@ -82,7 +82,8 @@ Rectangle {
 
         Row {
             width: parent.width
-            height: inspector.compact ? 10 : 16
+            visible: !inspector.compact
+            height: inspector.compact ? 0 : 16
             spacing: 16
 
             GohuText {
@@ -108,7 +109,8 @@ Rectangle {
 
         Rectangle {
             width: parent.width
-            height: inspector.compact ? 26 : 94
+            // Reclaim the compact legend row for meaningful plotted area.
+            height: inspector.compact ? 36 : 94
             color: Colors.black
             border.width: 1
             border.color: Colors.blue
@@ -116,7 +118,7 @@ Rectangle {
             Canvas {
                 id: chart
                 anchors.fill: parent
-                anchors.margins: 7
+                anchors.margins: inspector.compact ? 3 : 7
 
                 function drawSeries(context, values, colorValue, count) {
                     if (!values || values.length < 2)

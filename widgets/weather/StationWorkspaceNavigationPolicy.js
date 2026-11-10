@@ -27,7 +27,8 @@ var GROUPS = {
         {label:"NOW + AIR",path:"weather/conditions/current",key:"conditions"},
         {label:"FORECAST",path:"weather/forecasts/hourly",key:"forecasts"},
         {label:"HAZARDS",path:"weather/hazards/alerts",key:"hazards"},
-        {label:"HISTORY",path:"weather/history/historical-forecast",key:"history"}
+        {label:"HISTORY",path:"weather/history/historical-forecast",key:"history"},
+        {label:"SERVICES",path:"weather/services/health",key:"services"}
     ],
     cosmos:[
         {label:"OVERVIEW",path:"cosmos/overview",key:"overview"},

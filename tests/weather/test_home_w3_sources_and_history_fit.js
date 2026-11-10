@@ -66,13 +66,13 @@ test("W3 compact HISTORY keeps graphs, yesterday, 7-day summary and daily cards 
     assert.ok(home.includes('objectName: "home-w3-history-relations"'));
     assert.ok(home.includes('objectName: "home-w3-history-summary-cards"'));
     assert.ok(home.includes('objectName: "home-w3-history-daily-cards"'));
-    assert.ok(home.includes('height: home.compactHistory ? 72 : 188'));
+    assert.ok(home.includes('Math.max(72, Math.min(108, home.height - 188))'));
     assert.ok(home.includes('height: home.compactHistory ? 58 : 104'));
     assert.ok(home.includes('height: home.compactHistory ? 35 : 66'));
     assert.ok(home.includes('home.compactHistory ? 5 : 24'));
     assert.ok(home.includes('compact: home.compactHistory'));
     assert.ok(trend.includes('property bool compact: false'));
-    assert.ok(trend.includes('height: inspector.compact ? 26 : 94'));
+    assert.ok(trend.includes('height: inspector.compact ? 36 : 94'));
     assert.ok(metric.includes('property bool compact: false'));
     assert.ok(metric.includes('font.pixelSize: card.compact ? 15 : 20'));
     assert.ok(home.includes('title: "RECENT HISTORY // ARCHIVED MODEL"'));

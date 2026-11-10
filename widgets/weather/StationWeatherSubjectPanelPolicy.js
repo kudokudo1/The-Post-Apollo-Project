@@ -27,8 +27,12 @@ var ROUTES = {
   "earth/water/coast": {page:"ground",sections:["coast"]},
   // NOW + AIR aggregates original terrestrial readings in one scrollable
   // StationSky view; detailed ground air/gas/pollen pages stay independent.
-  "weather/conditions/current": {page:"sky", sections:["header","runtime","current","atmosphere"]},
+  "weather/conditions/current": {page:"sky", sections:["header","current","atmosphere"]},
   "weather/conditions/atmosphere": {page:"sky", sections:["header","atmosphere"]},
+  // WEATHER W4: consolidated read-only runtime dashboard, not a collector.
+  "weather/services/health": {page:"services", sections:[]},
+  "weather/services/sky": {page:"sky", sections:[]},
+  "weather/services/ground": {page:"ground", sections:[]},
   "weather/conditions/air": {page:"ground", sections:["header","air-pm","air-gases"]},
   "weather/conditions/pollen": {page:"ground", sections:["header","air-gases","pollen"]},
   // FORECAST restores both original hourly/daily artwork plus the local

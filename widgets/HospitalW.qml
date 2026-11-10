@@ -19,6 +19,7 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    readonly property bool receptionistVoiceBusy: speechInputService.busy
     property bool keyboardActive: true
     property bool keyboardLock: false
     property bool relationshipFocusModeActive: false
@@ -2255,6 +2256,8 @@ PanelWindow {
 
             if (intercomSpeechInputService.busy)
                 intercomSpeechInputService.cancel();
+            if (workforceSpeechInputService.busy)
+                workforceSpeechInputService.cancel();
 
             root.leaveRoomControls();
             root.leaveBedControls();
@@ -2554,6 +2557,13 @@ PanelWindow {
     HospitalSpeechInputService {
         id: intercomSpeechInputService
         audioFileName: "hospital-intercom-voice.wav"
+    }
+
+    // Dedicated local microphone buffer for multiline Surgery editors.
+    // Reception and Intercom retain their existing isolated audio files.
+    HospitalSpeechInputService {
+        id: workforceSpeechInputService
+        audioFileName: "hospital-workforce-dictation.wav"
     }
 
     HospitalRemoteWatcher {
@@ -6375,6 +6385,9 @@ PanelWindow {
                         && root.workforceManagerExpanded
                     doctorService: doctorService
                     providerService: providerService
+                    speechInputService: workforceSpeechInputService
+                    otherVoiceBusy: root.receptionistVoiceBusy
+                        || intercomSpeechInputService.busy
                     rooms: responsibilityService.durableRooms
                     sessions: responsibilityService.durableSessions
                     knownBeds: floorService.allBeds

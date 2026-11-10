@@ -14,6 +14,9 @@ ShellRoot {
     property real requestY: -1
     property real searchY: -1
     property real topicY: -1
+    property real titleY: -1
+    property real bbcViewY: -1
+    property real ajViewY: -1
     property real scrollY: -1
     function find(item,name) {
         if(!item)return null;
@@ -125,6 +128,9 @@ ShellRoot {
                 root.requestY=yRetry;
                 root.searchY=search.mapToItem(reports,0,0).y;
                 root.topicY=topic.mapToItem(reports,0,0).y;
+                root.titleY=title.mapToItem(reports,0,0).y;
+                root.bbcViewY=viewBbc.mapToItem(reports,0,0).y;
+                root.ajViewY=viewAj.mapToItem(reports,0,0).y;
                 root.scrollY=scroll.y;
                 rss.expandedPublisher="bbc-world";
                 reports.newsSourceQuery="BBC";
@@ -155,7 +161,9 @@ ShellRoot {
                     ||aljazeera.mapToItem(reports,0,0).y!==root.requestY
                     ||search.mapToItem(reports,0,0).y!==root.searchY
                     ||topic.mapToItem(reports,0,0).y!==root.topicY
-                    ||title.mapToItem(reports,0,0).y!==titleRail.mapToItem(reports,0,0).y
+                    ||title.mapToItem(reports,0,0).y!==root.titleY
+                    ||viewBbc.mapToItem(reports,0,0).y!==root.bbcViewY
+                    ||viewAj.mapToItem(reports,0,0).y!==root.ajViewY
                     ||scroll.y!==root.scrollY)
                     return root.fail("SCROLL_MOVED_PINNED_REPORTS_CONTROLS");
                 root.done=true;

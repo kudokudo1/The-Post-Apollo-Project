@@ -8,6 +8,10 @@ Column {
     id: publisherFeeds
 
     property bool stationOpen: true
+    // M7 // The focused REPORTS page pins the existing request actions above
+    // its scroll body. This component still owns the only two RSS services,
+    // and keeps VIEW/HIDE plus headlines in the body below.
+    property bool pinnedRequests: false
     // Preserve GDELT's original visual order until the operator opens a feed.
     property string expandedPublisher: ""
     spacing: 8
@@ -22,6 +26,16 @@ Column {
         id: alJazeera
         feedId: "al-jazeera-english"
         active: publisherFeeds.stationOpen && publisherFeeds.visible
+    }
+    readonly property var bbcBackend: bbc
+    readonly property var alJazeeraBackend: alJazeera
+    function requestPublisher(feedId) {
+        const backend = feedId === "bbc-world" ? bbc
+            : feedId === "al-jazeera-english" ? alJazeera : null;
+        if (!stationOpen || !visible || !backend || !backend.canRequest)
+            return false;
+        expandedPublisher = feedId;
+        return backend.request();
     }
 
     StationSectionDivider {
@@ -59,7 +73,10 @@ Column {
                 spacing: 8
 
                 ActionButton {
-                    width: 150
+                    // Original inline requests remain for CLASSIC and
+                    // OVERVIEW; focused REPORTS uses the fixed top rail.
+                    visible: !publisherFeeds.pinnedRequests
+                    width: publisherFeeds.pinnedRequests ? 0 : 150
                     height: 30
                     label: publisherSourceRow.backend.ready
                            ? "REFRESH " + publisherSourceRow.modelData.short

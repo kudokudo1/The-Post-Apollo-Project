@@ -13,15 +13,15 @@ WindowPanelFrame {
     width: 308
     height: 320
     radius: 0
-    // A self-contained popup chassis: solid readable background, magenta
-    // selection border, and its own close/wide outer halo. The glow is
-    // independent of the TimeW frame and never changes action authority.
+    // Original RESYNC yellow identity: its own border and two-stage halo.
+    // Keep the dark opaque background and top-right control anchoring.
+    // The popup is presentation-only; no TimeSettings behavior changes.
     fillColor: Colors.black
     fillOpacity: 1.0
-    borderColor: Colors.magenta
+    borderColor: Colors.yellow
     borderWidth: 1
     glowVisible: true
-    glowColor: Colors.magenta
+    glowColor: Colors.yellow
     closeGlowSpread: 6
     closeGlowOpacity: 0.46
     wideGlowSpread: 13

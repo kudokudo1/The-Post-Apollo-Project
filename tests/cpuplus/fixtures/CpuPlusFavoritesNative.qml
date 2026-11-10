@@ -601,17 +601,19 @@ ShellRoot {
                         || bar.activeHandleExtent()>42.1) {
                     root.fail("CPU_SCROLL_STAGE1_MOUNT_OR_STYLE");return;
                 }
+                // Compare in ONE coordinate system: wrapper-local bar.x
+                // is not directly comparable to pane-local viewport y.
                 const origin=v.mapToItem(entry.host,0,0);
-                if(Math.abs(bar.x-(origin.x+v.width-bar.width-4))>1.1
-                        || Math.abs(bar.y-(origin.y+2))>1.1
+                const rendered=bar.mapToItem(entry.host,0,0);
+                if(Math.abs(rendered.x-(origin.x+v.width-bar.width-4))>1.1
+                        || Math.abs(rendered.y-(origin.y+2))>1.1
                         || Math.abs(bar.height-Math.max(0,v.height-4))>1.1) {
                     console.log("CPU_SCROLL_STAGE1_DIAG // "
                         +String(v.objectName || "unnamed")
-                        +" viewport="+v.x+","+v.y+","+v.width+","+v.height
                         +" origin="+origin.x+","+origin.y
-                        +" bar="+bar.x+","+bar.y+","+bar.width+","+bar.height
-                        +" boxOrigin="+bar.boxOrigin.x+","+bar.boxOrigin.y
-                        +" host="+bar.effectiveGeometryHost);
+                        +" rendered="+rendered.x+","+rendered.y
+                        +" barSize="+bar.width+","+bar.height
+                        +" viewportSize="+v.width+","+v.height);
                     root.fail("CPU_SCROLL_STAGE1_OUTSIDE_OWN_VIEWPORT");return;
                 }
             }

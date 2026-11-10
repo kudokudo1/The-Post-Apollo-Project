@@ -152,6 +152,15 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 os.killpg(current.pid, signal.SIGTERM)
             except (ProcessLookupError, OSError):
                 pass
+            # A model ignoring SIGTERM must not outlive its dictation
+            # session and keep consuming the user's PC resources.
+            def force_stop():
+                if current.poll() is None:
+                    try:
+                        os.killpg(current.pid, signal.SIGKILL)
+                    except (ProcessLookupError, OSError):
+                        pass
+            threading.Timer(1.0, force_stop).start()
 
     def model_started(process):
         nonlocal active_model
@@ -285,7 +294,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 tail = bytes(pending)
                 minimum = RATE * FRAME_BYTES * MIN_TAIL_SECONDS
                 if len(tail) < minimum:
-                    tail += b"\\x00" * (minimum - len(tail))
+                    tail += bytes(minimum - len(tail))
                 enqueue(tail)
             capture_done.set()
             # Sentinel eventually enters after the finite queued chunks.

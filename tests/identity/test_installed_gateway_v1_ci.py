@@ -524,7 +524,9 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
         old_strict_adapter = self._strict_adapter()
         self._stop_service()
         self.assertFalse(old_witness.consistent(self.peer))
-        self.signer = Ed25519PrivateKey.generate()
+        # _refresh_observers is a classmethod: rotate the class-owned signer
+        # used by independent enrollment, not an instance shadow attribute.
+        type(self).signer = Ed25519PrivateKey.generate()
         self._write_signer(self.signer)
         self._start_service("rotated")
         self.assertNotEqual(self.pid, previous_pid)

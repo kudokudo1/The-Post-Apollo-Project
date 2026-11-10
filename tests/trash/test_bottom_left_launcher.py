@@ -267,7 +267,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
             self.assertIn(label, TRASH)
         self.assertIn('SAVE COPY // WEATHER EVENTS OR DEMO SCRAPES.', TRASH)
         self.assertIn('visible: trashLauncher.activeMode === "burn"', TRASH)
-        self.assertIn('Original Weather archives, Hospital and Finance records remain protected.', TRASH)
+        self.assertIn('Weather, Hospital or Finance records', TRASH)
         self.assertNotIn('onLeftClicked: trashLauncher.burnRecord(', TRASH)
         self.assertNotIn('onLeftClicked: trashLauncher.trashRecord(', TRASH)
 
@@ -332,7 +332,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('modelData.kind === "SAVED EVENT"', TRASH)
         self.assertIn('trashLauncher.saveWeatherEventCopy(modelData)', TRASH)
         self.assertIn('? Colors.red : Colors.cyan', TRASH)
-        self.assertIn('Original Weather events, demo scrape exports', TRASH)
+        self.assertIn('Original Weather events, research sources', TRASH)
 
     def test_copy_burn_requires_two_clicks_and_visible_loading(self):
         self.assertIn('function advanceResearchBurn()', TRASH)
@@ -462,7 +462,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn("function armBurnAll()", TRASH)
         self.assertIn("function confirmBurn()", TRASH)
         self.assertIn('label: "BURN ALL"', TRASH)
-        self.assertIn('label: "CONFIRM BURN"', TRASH)
+        self.assertIn('id: confirmManagedResearchBurn', TRASH)
         self.assertIn("run(\"burn\", [\"burn\", confirmUri, confirmOriginal,", TRASH)
         self.assertIn('run("burn-all", ["burn-all", confirmRevision,', TRASH)
         self.assertNotIn('onLeftClicked: trashLauncher.run("burn"', TRASH)

@@ -22,6 +22,11 @@ Item {
     property bool showReferenceExplanation: true
     // Clock owns the schedule control; shared CPU++ basics remain unchanged.
     property bool showAutoTimeCheck: showClockPreview
+    // "all" preserves shared CPU++ behavior; Clock selects visual or sync.
+    property string settingsSection: "all" // all | visual | sync
+    property bool dockFormatAvailable: false
+    property bool dock24Hour: false
+    signal dockFormatRequested(bool use24)
     property bool zonePickerExpanded: false
     readonly property bool zoneSearchFocused: systemZonePicker.searchFocused
 
@@ -43,6 +48,12 @@ Item {
             y: 3
             width: Math.max(0, scroll.width - 8)
             spacing: 12
+
+            Column {
+                id: visualSettingsContent
+                width: parent.width
+                spacing: 12
+                visible: pane.settingsSection !== "sync"
 
             GohuText {
                 text: "DISPLAY // LOCAL CALIBRATION"
@@ -317,6 +328,14 @@ Item {
                 color: Colors.orange
                 font.pixelSize: 11
             }
+            }
+
+            Column {
+                id: syncSettingsContent
+                width: parent.width
+                spacing: 12
+                visible: pane.settingsSection !== "visual"
+
             GohuText {
                 width: parent.width
                 visible: pane.showHostDiagnostics
@@ -677,7 +696,15 @@ Item {
                 font.pixelSize: 9
                 color: Colors.white
             }
+            }
         }
+    }
+
+    onSettingsSectionChanged: {
+        scroll.contentY = 0;
+        zonePickerExpanded = false;
+        if (settingsSection === "sync" && panelVisible)
+            TimeSettings.refreshHostStatus();
     }
 
     onPanelVisibleChanged: {

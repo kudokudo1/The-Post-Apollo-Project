@@ -23,6 +23,11 @@ Item {
     property real maximumValue: 100
     property real currentValue: 0
     property real valueStep: 1
+    // Opt-in bounded hour-like ratchet, without changing existing dial modes.
+    property bool snapContinuousToStep: false
+    // Exact positions for sparse reference labels such as 24H / 48H / 168H.
+    property var numericReferenceValues: []
+    property real continuousDragRawAngle: -90
     property int valueDecimals: 2
     property int currentIndex: 0
     readonly property real previewNumericValue: selectorMode === "continuous"
@@ -145,6 +150,13 @@ Item {
         return Number(Math.max(minimumValue, Math.min(maximumValue, value)).toFixed(decimals));
     }
 
+    function steppedValue(value) {
+        const clamped = Math.max(minimumValue, Math.min(maximumValue, Number(value)));
+        const step = Math.max(0.000001, Number(valueStep));
+        return Math.max(minimumValue, Math.min(maximumValue,
+                        minimumValue + Math.round((clamped - minimumValue) / step) * step));
+    }
+
     function finishFreePosition() {
         const mode = selectorMode;
         const target = boundedAngle(visualAngle);
@@ -156,7 +168,11 @@ Item {
         motionActive = false;
         previewIndex = -1;
         if (mode === "continuous") {
-            const value = reportedValue(valueForAngle(target));
+            const value = reportedValue(
+                snapContinuousToStep ? steppedValue(valueForAngle(target))
+                                     : valueForAngle(target));
+            if (snapContinuousToStep)
+                visualAngle = angleForValue(value);
             if (value !== reportedValue(currentValue))
                 valueRequested(value);
         } else if (mode === "zones" && optionCount() > 0) {
@@ -185,6 +201,10 @@ Item {
     function angleForIndex(index) {
         const count = optionCount();
         if (selectorMode === "continuous") {
+            if (numericReferenceValues
+                    && numericReferenceValues.length === count
+                    && Number.isFinite(Number(numericReferenceValues[index])))
+                return angleForValue(Number(numericReferenceValues[index]));
             // Optional labels are reference marks across the numeric range.
             return arcStartAngle + boundedSweep * (count <= 1 ? 0 : index / (count - 1));
         }
@@ -316,7 +336,8 @@ Item {
     function requestNumericValue(value) {
         if (selectorMode !== "continuous" || !interactive || dragging)
             return;
-        const next = Math.max(minimumValue, Math.min(maximumValue, Number(value)));
+        const bounded = Math.max(minimumValue, Math.min(maximumValue, Number(value)));
+        const next = snapContinuousToStep ? steppedValue(bounded) : bounded;
         const destination = angleForValue(next);
         stopMotion();
         pendingNumeric = true;
@@ -924,9 +945,18 @@ Item {
                 const angle = dialRoot.pointerAngle(mouse.x, mouse.y, width, height);
                 const delta = dialRoot.normalizeDelta(angle - dialRoot.lastPointerAngle);
 
-                dialRoot.visualAngle = dialRoot.selectorMode === "discrete"
-                    ? dialRoot.visualAngle + delta
-                    : dialRoot.boundedAngle(dialRoot.visualAngle + delta);
+                if (dialRoot.selectorMode === "continuous"
+                        && dialRoot.snapContinuousToStep) {
+                    dialRoot.continuousDragRawAngle = dialRoot.boundedAngle(
+                        dialRoot.continuousDragRawAngle + delta);
+                    dialRoot.visualAngle = dialRoot.angleForValue(
+                        dialRoot.steppedValue(dialRoot.valueForAngle(
+                            dialRoot.continuousDragRawAngle)));
+                } else {
+                    dialRoot.visualAngle = dialRoot.selectorMode === "discrete"
+                        ? dialRoot.visualAngle + delta
+                        : dialRoot.boundedAngle(dialRoot.visualAngle + delta);
+                }
                 dialRoot.lastPointerAngle = angle;
                 const now = Date.now();
                 const elapsed = now - dialRoot.lastMoveTime;
@@ -955,6 +985,7 @@ Item {
                 dialRoot.angularVelocity = 0;
                 dialRoot.lastMoveTime = Date.now();
                 dialRoot.dragging = true;
+                dialRoot.continuousDragRawAngle = dialRoot.visualAngle;
                 dialRoot.dragDetentIndex = dialRoot.currentIndex;
                 dialRoot.previewIndex = dialRoot.selectorMode === "continuous"
                     ? -1 : dialRoot.currentIndex;
@@ -979,7 +1010,11 @@ Item {
                 const atBound = dialRoot.selectorMode !== "discrete"
                     && (dialRoot.visualAngle <= dialRoot.arcStartAngle
                         || dialRoot.visualAngle >= dialRoot.arcStartAngle + dialRoot.boundedSweep);
-                if (!atBound && recentlyMoving
+                if (dialRoot.selectorMode === "continuous"
+                        && dialRoot.snapContinuousToStep) {
+                    // Hourly physical detents, no flick overshoot or wraparound.
+                    dialRoot.finishFreePosition();
+                } else if (!atBound && recentlyMoving
                         && Math.abs(dialRoot.angularVelocity) >= dialRoot.flickThreshold) {
                     dialRoot.inertial = true;
                     inertiaTimer.start();

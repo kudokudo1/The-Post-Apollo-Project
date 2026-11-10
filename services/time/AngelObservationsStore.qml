@@ -52,6 +52,8 @@ Scope {
             return;
         const loaded = Journal.parse(raw);
         if (!loaded.ok) {
+            recoveryCheckPending = false;
+            recoveryDiskChecked = false;
             storageState = loaded.reason === "UNSUPPORTED_VERSION"
                            ? "unsupported" : "error";
             errorCode = loaded.reason;

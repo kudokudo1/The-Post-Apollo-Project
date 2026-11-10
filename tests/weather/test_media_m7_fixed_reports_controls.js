@@ -89,5 +89,10 @@ test("M7 only exposes existing manual publisher RSS requests; expanded rows rema
     assert.ok(publisher.includes('feedId: "al-jazeera-english"'));
     assert.equal((publisher.match(/WeatherServices\.StationPublisherRssService\s*\{/g)||[]).length,2);
     assert.ok(!services.includes('StationPublisherFeeds {'));
-    assert.ok(!discovery.includes('Qt.openUrlExternally('));
+    // StationDiscovery has pre-existing, unrelated browser paths. The new
+    // fixed REPORTS controls and the RSS owner must never open one.
+    const fixedDeck=discovery.slice(discovery.indexOf('id: reportsFixedToolbar'),
+                                  discovery.indexOf('id: discoveryScroll'));
+    assert.ok(!fixedDeck.includes('Qt.openUrlExternally('));
+    assert.ok(!publisher.includes('Qt.openUrlExternally('));
 });

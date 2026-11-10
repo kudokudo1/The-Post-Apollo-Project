@@ -497,5 +497,46 @@ umask 077
         self.assertEqual(source.count("def observe():"), 1)
 
 
+    def test_36_signed_verifier_heredoc_starts_with_python_and_guards_exit(self):
+        # Real Fedora run #42856044620 proved a shell parsing defect:
+        # putting "|| fail" between <<'C4B_RUNNING_HOST_PROBE' and Python
+        # injected an indented Bash command as Python's first line.
+        # That failed the probe without invoking the intended failure handler.
+        import ast
+
+        guest = GUEST.read_text()
+        header = (
+            '      "$pid" "$assets/c3d-status.rpm" "$c4d_record" '
+            "<<'C4B_RUNNING_HOST_PROBE'\n"
+        )
+        self.assertEqual(guest.count(header), 1)
+        self.assertIn(
+            '  if GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1 '
+            '\\\n    timeout --signal=TERM --kill-after=5s 60s '
+            '"$python" -I -B - \\\n' + header,
+            guest)
+        payload = guest.split(header, 1)[1].split(
+            "\nC4B_RUNNING_HOST_PROBE\n", 1)[0]
+        self.assertTrue(payload.startswith(
+            "import grp, hashlib, json, os, pwd, re, stat, subprocess, sys\n"))
+        ast.parse(payload)
+        self.assertNotIn(
+            'fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"', payload)
+        self.assertIn(
+            '\nC4B_RUNNING_HOST_PROBE\n'
+            '  then\n'
+            '    : # The verifier completed and created its own exclusive report file.\n'
+            '  else\n'
+            '    fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"\n'
+            '  fi\n'
+            '  [[ -s "$c4d_record" ]] ||\n'
+            '    fail "C4D_PRODUCER_RECORD_EMPTY_AFTER_VERIFIER"',
+            guest)
+        self.assertLess(
+            guest.index('fail "C4D_PRODUCER_RECORD_EMPTY_AFTER_VERIFIER"'),
+            guest.index(
+                'echo "C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED"'))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

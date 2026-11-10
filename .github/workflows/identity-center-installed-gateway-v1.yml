@@ -6,15 +6,17 @@ on:
       - 'services/identity/installed_gateway_witness_v1.py'
       - 'services/identity/installed_command_adapter_v1.py'
       - 'tests/identity/test_installed_gateway_v1_ci.py'
+      - 'tests/identity/test_native_adapter_only_call_path_v1.py'
       - 'tests/identity/fixtures/identity_gateway_installed_ci'
       - '.github/workflows/identity-center-installed-gateway-v1.yml'
       - 'docs/identity-center-installed-gateway-v1.md'
   push:
-    branches: [main, 'feat/identity-installed-gateway-*', 'feat/identity-mandatory-installed-native-adapter-*']
+    branches: [main, 'feat/identity-installed-gateway-*', 'feat/identity-mandatory-installed-native-adapter-*', 'test/identity-native-adapter-only-boundary-*']
     paths:
       - 'services/identity/installed_gateway_witness_v1.py'
       - 'services/identity/installed_command_adapter_v1.py'
       - 'tests/identity/test_installed_gateway_v1_ci.py'
+      - 'tests/identity/test_native_adapter_only_call_path_v1.py'
       - 'tests/identity/fixtures/identity_gateway_installed_ci'
       - '.github/workflows/identity-center-installed-gateway-v1.yml'
       - 'docs/identity-center-installed-gateway-v1.md'
@@ -53,9 +55,12 @@ jobs:
           python3 -m py_compile services/identity/installed_gateway_witness_v1.py
           python3 -m py_compile services/identity/installed_command_adapter_v1.py
           python3 -m py_compile tests/identity/test_installed_gateway_v1_ci.py
+          python3 -m py_compile tests/identity/test_native_adapter_only_call_path_v1.py
           python3 -m py_compile tests/identity/fixtures/identity_gateway_installed_ci
       - name: Real signed package install, systemd PID/LSM/module witness and mandatory deny-only receipts
         run: python3 -m unittest discover -s tests/identity -p 'test_installed_gateway_v1_ci.py' -v
+      - name: Guard shipped native caller path against optional raw-client bypass
+        run: python3 -m unittest discover -s tests/identity -p 'test_native_adapter_only_call_path_v1.py' -v
       - name: Retain existing signed gateway and CPU++ default deny regressions
         run: |
           python3 -m unittest discover -s tests/identity -p 'test_desktop_signed_command_client_v0.py' -v

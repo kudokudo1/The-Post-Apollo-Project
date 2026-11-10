@@ -11,7 +11,7 @@ const home = read("widgets/weather/StationHome.qml");
 const chart = read("widgets/weather/WeatherTrendInspector.qml");
 function policy(code) {
     const sandbox={};
-    vm.runInNewContext(code.replace(/^\\.pragma library\\s*/m, ""), sandbox);
+    vm.runInNewContext(code.replace(/^\.pragma library\s*/m, ""), sandbox);
     return sandbox;
 }
 
@@ -37,15 +37,15 @@ test("SERVICES reuses existing telemetry without additional fetching", () => {
     assert.match(pane,/weatherPane.kind === "services"/);
     assert.match(pane,/rows: weatherServicesSky.runtimeRows/);
     assert.match(pane,/rows: weatherServicesGround.runtimeRows/);
-    assert.match(pane,/subjectRoute: "weather\\/services\\/sky"/);
-    assert.match(pane,/subjectRoute: "weather\\/services\\/ground"/);
-    assert.doesNotMatch(pane,/WeatherServices\\.|Process\\s*\\{|FileView\\s*\\{/);
+    assert.match(pane,/subjectRoute: "weather\/services\/sky"/);
+    assert.match(pane,/subjectRoute: "weather\/services\/ground"/);
+    assert.doesNotMatch(pane,/WeatherServices\.|Process\s*\{|FileView\s*\{/);
 });
 
 test("HOME HISTORY improves the actual plot, keeps no-scroll minimum", () => {
-    assert.match(home,/Math\\.max\\(72, Math\\.min\\(108, home\\.height - 188\\)\\)/);
-    assert.match(home,/interactive: !home\\.compactHistory/);
-    assert.match(chart,/height: inspector\\.compact \\? 36 : 94/);
-    assert.match(chart,/visible: !inspector\\.compact/);
-    assert.match(chart,/anchors\\.margins: inspector\\.compact \\? 3 : 7/);
+    assert.match(home,/Math\.max\(72, Math\.min\(108, home\.height - 188\)\)/);
+    assert.match(home,/interactive: !home\.compactHistory/);
+    assert.match(chart,/height: inspector\.compact \? 36 : 94/);
+    assert.match(chart,/visible: !inspector\.compact/);
+    assert.match(chart,/anchors\.margins: inspector\.compact \? 3 : 7/);
 });

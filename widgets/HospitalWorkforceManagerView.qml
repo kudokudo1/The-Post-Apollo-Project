@@ -6,6 +6,7 @@ import "../services/hospital/HospitalWorkforceJobActivationPolicy.js" as JobActi
 import "../services/hospital/HospitalWorkforceStaffingPolicy.js" as StaffingPolicy
 import "../services/hospital/HospitalFirstBedVerificationPolicy.js" as BedPolicy
 import "../services/hospital/HospitalGitHubOwnerPolicy.js" as GitHubOwnerPolicy
+import "../services/hospital/HospitalConversationIntakePolicy.js" as ConversationIntakePolicy
 
 // Collapsible content inside SURGERY → SHOW WORKERS, not a new Hospital route.
 // All writes require a separate operator REVIEW and CONFIRM. No AI turns.
@@ -39,6 +40,9 @@ Column {
                 return entry.label === "USED IN HOSPITAL";
             }).slice(0, 3)
     property string mode: "WORKER"
+    // Conversation-style local starter draft; no model or PX invocation.
+    property var intakeDraft: ({})
+    property string intakeSource: ""
     property string workerRole: "INT"
     property string workerId: makeId("worker")
     property string roomId: makeId("room")
@@ -181,6 +185,61 @@ Column {
         armedKey = "";
         activationArmKey = "";
         staffingReviewKey = "";
+    }
+    function invalidateIntake() {
+        intakeDraft = ({});
+        intakeSource = "";
+        disarm();
+    }
+    function draftIntake() {
+        root.invalidateIntake();
+        if (!root.active || root.mode !== "SETUP") {
+            root.outcome = "SETUP HOLD // OPEN CHAT SETUP FIRST";
+            return false;
+        }
+        const candidate = ConversationIntakePolicy.proposal(intakeBriefField.value);
+        if (!candidate.ready) {
+            root.outcome = "SETUP HOLD // " + candidate.blockers.join(" // ");
+            return false;
+        }
+        root.intakeDraft = candidate;
+        root.intakeSource = intakeBriefField.value;
+        root.outcome = "LOCAL STARTER DRAFT // NOT AI-GENERATED // REVIEW EACH FIELD";
+        return true;
+    }
+    function applyIntake(section) {
+        const p = root.intakeDraft || {};
+        if (!root.active || root.mode !== "SETUP" || !p.ready
+                || !root.intakeSource
+                || root.intakeSource !== intakeBriefField.value) {
+            root.invalidateIntake();
+            root.outcome = "SETUP REFUSED // DESCRIPTION CHANGED; DRAFT AGAIN";
+            return false;
+        }
+        // These only prefill existing, independently reviewed editors.
+        // They never invoke a writer or create/activate a Provider Session.
+        if (section === "ROOM") {
+            roomNameField.value = p.roomName;
+            root.selectMode("ROOM");
+        } else if (section === "WORKER") {
+            workerNameField.value = p.workerName;
+            root.workerRole = p.role;
+            root.selectMode("WORKER");
+        } else if (section === "JOB") {
+            jobTitleField.value = p.title;
+            jobGoalField.value = p.goal;
+            jobConstraintsField.value = p.constraints;
+            jobDoneField.value = p.definitionDone;
+            jobChecklistField.value = p.checklist;
+            jobPermissionsField.value = "READ";
+            root.selectMode("JOB");
+        } else {
+            return false;
+        }
+        root.disarm();
+        root.outcome = "DRAFT PREFILLED // " + section
+            + " // EDIT FIELDS; REVIEW + CONFIRM REQUIRED // NO AI TURN";
+        return true;
     }
     function applyRoomSuggestions() {
         const proposed = GitHubOwnerPolicy.suggestion(root.suggestedRepository,
@@ -448,6 +507,8 @@ Column {
     onActiveChanged: {
         disarm();
         if (!active)
+            invalidateIntake();
+        if (!active)
             bedProbe.invalidate();
         if (active)
             Qt.callLater(function() {
@@ -578,6 +639,15 @@ Column {
             wrapMode: Text.Wrap
         }
     }
+    HospitalActionButton {
+        width: parent.width
+        height: 30
+        label: "START HERE // DESCRIBE A NEW AI JOB"
+        accent: root.mode === "SETUP" ? Colors.magenta : Colors.cyan
+        selectedAction: root.mode === "SETUP"
+        contentGlowEnabled: false
+        onTriggered: root.selectMode("SETUP")
+    }
     Row {
         width: parent.width
         spacing: 5
@@ -597,6 +667,95 @@ Column {
                 selectedAction: root.mode === modelData.code
                 contentGlowEnabled: false
                 onTriggered: root.selectMode(modelData.code)
+            }
+        }
+    }
+
+    // SETUP: conversation-style intake that only pre-fills existing editors.
+    Column {
+        width: parent.width
+        spacing: 7
+        visible: root.mode === "SETUP"
+        GohuText {
+            width: parent.width
+            text: "NEW AI // TELL HOSPITAL WHAT YOU WANT TO WORK ON"
+            color: Colors.magenta
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
+        GohuText {
+            width: parent.width
+            text: "Describe the job like a chat message. For now this makes a LOCAL STARTER TEMPLATE, not a model-generated answer. You choose the Room, worker and job records before saving."
+            color: Colors.cyan
+            font.pixelSize: 9
+            wrapMode: Text.Wrap
+        }
+        ManagerArea {
+            id: intakeBriefField
+            caption: "YOUR INSTRUCTIONS // WHAT IS THIS AI WORKING ON?"
+            editHeight: 156
+            onEdited: root.invalidateIntake()
+        }
+        HospitalActionButton {
+            width: parent.width
+            height: 30
+            label: "BUILD STARTER DRAFT"
+            accent: Colors.magenta
+            contentGlowEnabled: false
+            enabledAction: root.active
+            onTriggered: root.draftIntake()
+        }
+        GohuText {
+            width: parent.width
+            text: root.intakeDraft.ready
+                ? "LOCAL PROPOSAL // NOT AI-GENERATED"
+                    + "\\nROLE // " + root.intakeDraft.role
+                    + "\\nROOM // " + root.intakeDraft.roomName
+                    + "\\nWORKER // " + root.intakeDraft.workerName
+                    + "\\nJOB // " + root.intakeDraft.title
+                    + "\\nGOAL // " + root.intakeDraft.goal
+                    + "\\nPERMISSIONS // READ ONLY"
+                : "NO DRAFT YET // WRITE YOUR INSTRUCTIONS ABOVE"
+            font.pixelSize: 9
+            color: root.intakeDraft.ready ? Colors.cyan : Colors.orange
+            wrapMode: Text.WrapAnywhere
+        }
+        GohuText {
+            width: parent.width
+            text: "Choose one editor below. Prefilling never creates records. Save Room, Worker and Job independently using their existing REVIEW / CONFIRM controls. The JOB needs a saved Room."
+            font.pixelSize: 9
+            color: Colors.blue
+            wrapMode: Text.Wrap
+        }
+        Row {
+            width: parent.width
+            spacing: 6
+            HospitalActionButton {
+                width: (parent.width - 12) / 3
+                height: 30
+                label: "EDIT ROOM"
+                accent: Colors.cyan
+                contentGlowEnabled: false
+                enabledAction: root.intakeDraft.ready === true
+                onTriggered: root.applyIntake("ROOM")
+            }
+            HospitalActionButton {
+                width: (parent.width - 12) / 3
+                height: 30
+                label: "EDIT WORKER"
+                accent: Colors.cyan
+                contentGlowEnabled: false
+                enabledAction: root.intakeDraft.ready === true
+                onTriggered: root.applyIntake("WORKER")
+            }
+            HospitalActionButton {
+                width: (parent.width - 12) / 3
+                height: 30
+                label: "EDIT JOB"
+                accent: Colors.cyan
+                contentGlowEnabled: false
+                enabledAction: root.intakeDraft.ready === true
+                onTriggered: root.applyIntake("JOB")
             }
         }
     }
@@ -1462,9 +1621,11 @@ Column {
         id: managerArea
         property string caption: ""
         property alias value: edit.text
+        property int editHeight: 79
+        signal edited()
         width: root.width
         spacing: 3
-        height: 94
+        height: editHeight + 15
         GohuText {
             text: managerArea.caption
             color: Colors.blue
@@ -1474,7 +1635,7 @@ Column {
         }
         Rectangle {
             width: parent.width
-            height: 79
+            height: managerArea.editHeight
             color: Colors.black
             border.width: 1
             border.color: Colors.magenta
@@ -1487,6 +1648,7 @@ Column {
                 font.pixelSize: 10
                 wrapMode: TextEdit.Wrap
                 selectByMouse: true
+                onTextChanged: managerArea.edited()
                 clip: true
             }
         }

@@ -7,6 +7,9 @@ on:
       - "widgets/HospitalWorkforceManagerView.qml"
       - "services/hospital/HospitalWorkforceManagerPolicy.js"
       - "services/hospital/HospitalGitHubOwnerPolicy.js"
+      - "services/hospital/HospitalConversationIntakePolicy.js"
+      - "tests/hospital/test_conversation_intake_policy.js"
+      - "tests/hospital/test_conversation_intake_ui_contracts.py"
       - "services/hospital/HospitalGitHubOwnerService.qml"
       - "tests/hospital/test_surgery_github_owner_policy.js"
       - "tests/hospital/test_surgery_github_owner_ui_contracts.py"
@@ -22,6 +25,9 @@ on:
       - "widgets/HospitalWorkforceManagerView.qml"
       - "services/hospital/HospitalWorkforceManagerPolicy.js"
       - "services/hospital/HospitalGitHubOwnerPolicy.js"
+      - "services/hospital/HospitalConversationIntakePolicy.js"
+      - "tests/hospital/test_conversation_intake_policy.js"
+      - "tests/hospital/test_conversation_intake_ui_contracts.py"
       - "services/hospital/HospitalGitHubOwnerService.qml"
       - "tests/hospital/test_surgery_github_owner_policy.js"
       - "tests/hospital/test_surgery_github_owner_ui_contracts.py"
@@ -44,10 +50,13 @@ jobs:
           node tests/hospital/test_surgery_workforce_manager_policy.js
           node --check services/hospital/HospitalGitHubOwnerPolicy.js
           node tests/hospital/test_surgery_github_owner_policy.js
+          node --check services/hospital/HospitalConversationIntakePolicy.js
+          node tests/hospital/test_conversation_intake_policy.js
       - name: Verify embedded Surgery manager and existing UX contract
         run: |
           python3 tests/hospital/test_surgery_inline_workforce_ui_contracts.py
           python3 tests/hospital/test_surgery_github_owner_ui_contracts.py
+          python3 tests/hospital/test_conversation_intake_ui_contracts.py
           python3 tests/hospital/test_workforce_roster_ui_contracts.py
           python3 tests/hospital/test_worker_identity_editor_contracts.py
           python3 tests/hospital/test_registered_worker_routes.py

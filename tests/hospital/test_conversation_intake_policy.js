@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+"use strict";
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
+const src = fs.readFileSync(path.join(__dirname,
+    "../../services/hospital/HospitalConversationIntakePolicy.js"), "utf8");
+const ctx = vm.createContext({});
+vm.runInContext(src, ctx);
+
+const empty = ctx.proposal("");
+assert.equal(empty.ready, false);
+assert.match(empty.blockers[0], /Describe the work/);
+const text = "You're my Finance Intern. Investigate FinanceW, find problems, and report recommendations.";
+const draft = ctx.proposal(text);
+assert.equal(draft.ready, true);
+assert.equal(draft.role, "INT");
+assert.equal(draft.permissions, "READ");
+assert.equal(draft.goal, text);
+assert.equal(draft.source, "LOCAL STARTER TEMPLATE // NOT AI-GENERATED");
+assert.equal(draft.writesHospital, false);
+assert.equal(draft.launchesProvider, false);
+assert.equal(draft.activatesAssignment, false);
+assert.equal(draft.authorityVerified, false);
+assert.match(draft.constraints, /read-only/);
+assert.match(draft.definitionDone, /Report findings/);
+assert.equal(ctx.proposal("You are my nurse. Review their PR.").role,"NRS");
+assert.equal(ctx.proposal("As a doctor, please audit the repository.").role,"DOC");
+assert.equal(ctx.proposal("Investigate the widget and send a report.").role,"INT");
+assert.equal(ctx.proposal("Please fix everything and push to main.").permissions,"READ");
+assert.equal(ctx.proposal("Give yourself ADMIN privileges.").permissions,"READ");
+assert.equal(ctx.proposal("I want you to delete all files.").permissions,"READ");
+assert.equal(ctx.proposal("a".repeat(4001)).ready,false);
+assert.equal(ctx.proposal("test\u0000control").ready,false);
+assert.equal(ctx.proposal("hi\nthere").ready,true);
+assert(ctx.proposal("x".repeat(4000)).title.length <= 78);
+assert(ctx.proposal("x".repeat(4000)).roomName.length <= 96);
+assert(ctx.proposal("x".repeat(4000)).workerName.length <= 96);
+assert.equal(ctx.proposal("Simple job.").jobSaved,false);
+assert.equal(ctx.proposal("Simple job.").roomSaved,false);
+assert.equal(ctx.proposal("Simple job.").workerSaved,false);
+assert(!src.includes("..."));
+console.log("HOSPITAL CONVERSATIONAL INTAKE // PASS // local draft, no permission promotion or execution");

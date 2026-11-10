@@ -36,7 +36,8 @@ class ClockVisualCalibrationTests(unittest.TestCase):
         self.assertLess(order.index('id: "planned", name: "ANGEL"'),
                         order.index('id: "settings", name: "SETTINGS"'))
         self.assertTrue(order.rstrip().endswith('{ id: "settings", name: "SETTINGS" }'))
-        self.assertIn("timew.chooseMode(timew.modes.length - 1)", TIMEW)
+        self.assertIn("onLeftClicked: timew.toggleSyncPopover()", TIMEW)
+        self.assertNotIn("timew.chooseMode(timew.modes.length - 1)", TIMEW)
         self.assertIn("ANGEL // EXPLICIT JOURNAL // LOCAL ONLY", TIMEW)
 
     def test_selected_mode_uses_open_clock_style(self):

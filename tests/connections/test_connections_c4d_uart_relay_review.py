@@ -380,5 +380,90 @@ umask 077
         self.assertNotIn('C4D_PRODUCER_DIAG // " +', guest)
 
 
+    def _actual_report_writer_for_disposable_test(self, root):
+        # Execute the actual embedded producer helper, changing only its
+        # fixed CI absolute path for a private test directory. Linux owner
+        # fields are simulated because source tests run unprivileged.
+        import stat as stat_module
+        from types import SimpleNamespace
+
+        guest = GUEST.read_text()
+        marker = "def write_private_report(path, record):\n"
+        self.assertEqual(guest.count(marker), 1)
+        source = marker + guest.split(marker, 1)[1].split(
+            "\ndef observe():\n", 1)[0]
+        self.assertIn('parent = "/run/postapollo-c4d-observation"', source)
+        source = source.replace(
+            'parent = "/run/postapollo-c4d-observation"',
+            "parent = " + repr(str(root)), 1)
+
+        class Refused(Exception):
+            pass
+
+        def refuse(code):
+            raise Refused(code)
+
+        def root_owned(info):
+            return SimpleNamespace(
+                st_mode=info.st_mode, st_uid=0, st_gid=0,
+                st_nlink=info.st_nlink, st_size=info.st_size,
+                st_dev=info.st_dev, st_ino=info.st_ino)
+
+        proxy = SimpleNamespace(
+            geteuid=lambda: 0,
+            lstat=lambda p: root_owned(os.lstat(p)),
+            fstat=lambda fd: root_owned(os.fstat(fd)),
+            open=os.open, write=os.write, fsync=os.fsync, close=os.close,
+            O_WRONLY=os.O_WRONLY, O_CREAT=os.O_CREAT, O_EXCL=os.O_EXCL,
+            O_NOFOLLOW=os.O_NOFOLLOW, O_CLOEXEC=os.O_CLOEXEC)
+        ns = {"os": proxy, "stat": stat_module, "refuse": refuse}
+        exec(compile(source, "<actual-c4d-guest-report-writer>", "exec"), ns)
+        return ns["write_private_report"], Refused
+
+    def test_33_actual_private_report_writer_exclusive_bounded_bytes(self):
+        with tempfile.TemporaryDirectory(prefix="c4d-producer-writer-") as tmp:
+            root = Path(tmp)
+            root.chmod(0o700)
+            writer, _ = self._actual_report_writer_for_disposable_test(root)
+            path = root / "observation.txt"
+            data = report().decode("ascii")
+            writer(str(path), data)
+            self.assertEqual(path.read_bytes(), report() + b"\n")
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(path.stat().st_nlink, 1)
+            # O_CREAT|O_EXCL refuses a preexisting report instead of
+            # silently overwriting it or claiming stale data.
+            with self.assertRaises(FileExistsError):
+                writer(str(path), data)
+            self.assertEqual(path.read_bytes(), report() + b"\n")
+
+    def test_34_writer_refuses_wrong_path_symlink_and_invalid_bytes(self):
+        with tempfile.TemporaryDirectory(prefix="c4d-producer-refuse-") as tmp:
+            root = Path(tmp)
+            root.chmod(0o700)
+            writer, Refused = self._actual_report_writer_for_disposable_test(root)
+            path = root / "observation.txt"
+            payload = report().decode("ascii")
+            with self.assertRaisesRegex(Refused, "C4D_REPORT_PATH_REFUSED"):
+                writer(str(root / "other.txt"), payload)
+            for bad in ("WRONG_PREFIX", payload + "\nFORGED",
+                        payload + "X" * 2048):
+                with self.subTest(bad=bad[:20]):
+                    with self.assertRaisesRegex(Refused, "C4D_REPORT_BOUND_REFUSED"):
+                        writer(str(path), bad)
+            self.assertFalse(path.exists())
+            existing = root / "protected.txt"
+            existing.write_text("DO_NOT_TOUCH", encoding="ascii")
+            path.symlink_to(existing)
+            with self.assertRaises(OSError):
+                writer(str(path), payload)
+            self.assertEqual(existing.read_text(encoding="ascii"), "DO_NOT_TOUCH")
+            path.unlink()
+            root.chmod(0o755)
+            with self.assertRaisesRegex(Refused, "C4D_REPORT_DIRECTORY_REFUSED"):
+                writer(str(path), payload)
+            self.assertFalse(path.exists())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

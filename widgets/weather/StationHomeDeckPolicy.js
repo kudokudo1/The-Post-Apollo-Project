@@ -6,29 +6,36 @@
 var FORMAT = "post-apollo.weather.home-deck.w2a.v1";
 var ROTATABLE = [
     "home/auto", "home/quick", "home/snapshot",
-    "home/history", "home/runtime", "home/health"
+    "home/history", "home/sources"
 ];
 var MODES = ["mixed", "auto", "pinned"];
 
+function canonicalPath(path) {
+    // W3 // Old favorites are read as one SOURCES tab, without rewriting
+    // the user's existing weather-home-favorites-v1.json at load time.
+    var value=String(path || "");
+    return value === "home/runtime" || value === "home/health"
+        ? "home/sources" : value;
+}
 function isRotatable(path) {
-    return ROTATABLE.indexOf(String(path || "")) >= 0;
+    return ROTATABLE.indexOf(canonicalPath(path)) >= 0;
 }
 function normalizedFavorites(paths) {
     var input = Array.isArray(paths) ? paths : [];
     var unique = [];
     for (var i = 0; i < input.length; i++) {
-        var key = String(input[i] || "");
+        var key = canonicalPath(input[i]);
         if (isRotatable(key) && unique.indexOf(key) < 0)
             unique.push(key);
     }
     return unique;
 }
 function favorite(paths, path) {
-    return normalizedFavorites(paths).indexOf(String(path || "")) >= 0;
+    return normalizedFavorites(paths).indexOf(canonicalPath(path)) >= 0;
 }
 function toggleFavorite(paths, path) {
     var list = normalizedFavorites(paths);
-    var key = String(path || "");
+    var key = canonicalPath(path);
     if (!isRotatable(key))
         return list;
     var index = list.indexOf(key);
@@ -53,10 +60,10 @@ function candidates(current, paths, mode) {
         : ROTATABLE.slice();
     // Never immediately repeat the current panel. If there is only one
     // pinned panel selected, hold it until the operator pins another one.
-    return pool.filter(function(path) { return path !== current; });
+    return pool.filter(function(path) { return path !== canonicalPath(current); });
 }
 function nextRoute(current, paths, mode, randomValue) {
-    var pool = candidates(String(current || ""), paths, mode);
+    var pool = candidates(canonicalPath(current), paths, mode);
     if (pool.length === 0)
         return "";
     var pins = normalizedFavorites(paths);

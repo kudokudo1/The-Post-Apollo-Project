@@ -172,6 +172,12 @@ Scope {
                 voiceError(lastError);
                 return false;
             }
+            // The shared Manage worker must use this front-desk VAD policy
+            // only for the owning recording; it is reset on finish/cancel.
+            liveEngine.vadActive = vadActive;
+            liveEngine.vadSpeechThreshold = vadSpeechThreshold;
+            liveEngine.vadSilenceMs = vadSilenceMs;
+            liveEngine.vadMinimumSpeechMs = vadMinimumSpeechMs;
             if (!liveEngine.startRecording()) {
                 recordingClock.stop();
                 voiceState = "idle";
@@ -253,8 +259,10 @@ Scope {
         recordingStartedAt = 0;
         recordingElapsedSeconds = 0;
 
-        if (liveStreaming && busy && liveEngine)
+        if (liveStreaming && busy && liveEngine) {
             liveEngine.cancel();
+            liveEngine.vadActive = false;
+        }
 
         if (recordProcess.running) {
             recorderCancelled = true;
@@ -300,6 +308,7 @@ Scope {
             root.recordingStartedAt = 0;
             root.recordingElapsedSeconds = 0;
             root.voiceState = root.backendReady ? "idle" : "unavailable";
+            root.liveEngine.vadActive = false;
             root.transcriptionFinished(shouldSubmit);
         }
         function onVoiceError(message) {
@@ -310,6 +319,7 @@ Scope {
             root.submitAfterTranscription = false;
             root.voiceState = root.backendReady ? "idle" : "unavailable";
             root.lastError = String(message || "LOCAL LIVE DICTATION FAILED");
+            root.liveEngine.vadActive = false;
             root.voiceError(root.lastError);
         }
     }

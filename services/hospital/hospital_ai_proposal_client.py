@@ -17,7 +17,7 @@ import urllib.request
 
 ENDPOINT = "https://api.openai.com/v1/responses"
 MODEL = "gpt-4.1-mini"
-MAX_INPUT = 8192
+MAX_INPUT = 32768
 MAX_OUTPUT = 65536
 KEY_RE = re.compile(r"^[A-Za-z0-9_-]{8,120}$")
 ROLE_CODES = frozenset(("INT", "NRS", "DOC"))

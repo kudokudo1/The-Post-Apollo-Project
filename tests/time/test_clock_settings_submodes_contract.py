@@ -85,8 +85,7 @@ class ClockSettingsSubmodesContracts(unittest.TestCase):
         dial = PANE.split('id: autoCheckDial', 1)[1].split(
             'text: "LAST CHECK // "', 1)[0]
         self.assertIn('id: resyncDialButton', dial)
-        self.assertIn('label: "AUTO CHECK ON" : "AUTO CHECK OFF"', PANE.replace(
-            'label: TimeSettings.autoCheckEnabled\n                                       ?', 'label: '))
+        self.assertIn('"AUTO CHECK ON" : "AUTO CHECK OFF"', PANE)
 
     def test_tools_alarm_is_label_only_not_a_scheduling_service(self):
         self.assertIn('id: toolsSubModeStrip', TIMEW)

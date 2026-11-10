@@ -11,7 +11,7 @@ Rectangle {
     signal closeRequested()
 
     width: 308
-    height: 298
+    height: 320
     radius: 0
     color: Colors.black
     border.width: 1
@@ -21,7 +21,7 @@ Rectangle {
     Column {
         anchors.fill: parent
         anchors.margins: 9
-        spacing: 7
+        spacing: 6
 
         Row {
             width: parent.width

@@ -2002,50 +2002,115 @@ PanelWindow {
                             }
                         }
 
-                        // Full-chassis progress fills the ENTIRE button
-                        // from left to right, behind its readable label.
-                        // The action shell remains a normal live button even
-                        // before the first click.
-                        Rectangle {
-                            id: researchBurnLoadFill
-                            x: 2
-                            y: 2
-                            width: Math.max(0, parent.width - 4)
-                                   * trashLauncher.researchBurnLoadProgress
-                            height: Math.max(0, parent.height - 4)
-                            color: Colors.orange
-                            opacity: 0.72
-                            radius: 0
-                            visible: trashLauncher.researchBurnClickArmed
-                        }
-
+                        // Keep the regular ActionButton chassis opaque black
+                        // in idle, hover, pressed AND fully-armed states.
+                        // Progress lives in its rich content slot so it draws
+                        // above the black button fill, not behind an opaque
+                        // overlay. White and clipped black labels ensure that
+                        // text stays readable while orange crosses each glyph.
                         ActionButton {
                             id: confirmManagedResearchBurn
                             anchors.fill: parent
-                            label: !trashLauncher.researchBurnPointerRelocated
-                                   ? "MOVE HERE TO ARM"
-                                   : !trashLauncher.researchBurnClickArmed
-                                   ? "CLICK TO ARM"
-                                   : !trashLauncher.researchBurnLoadComplete
-                                   ? "LOADING SAFETY..."
-                                   : "CLICK AGAIN // BURN"
-                            labelPixelSize: 10
+                            label: ""
                             accentColor: Colors.red
                             destructive: true
+
+                            idleFillColor: Colors.black
+                            hoverFillColor: Colors.black
+                            pressedFillColor: Colors.black
+                            selectedFillColor: Colors.black
+                            keyboardSelectedFillColor: Colors.black
+
                             idleBorderWidth: 2
+                            hoverBorderWidth: 2
+                            pressedBorderWidth: 2
                             idleBorderColor: Colors.red
-                            idleFillColor: "transparent"
-                            hoverFillColor: "transparent"
-                            pressedFillColor: "transparent"
-                            contentGlowIdleOpacity: 0.36
-                            softGlowIdleOpacity: 0.33
-                            wideGlowEnabled: true
-                            wideGlowIdleOpacity: 0.13
+                            hoverBorderColor: Colors.red
+                            pressedBorderColor: Colors.red
+                            selectedBorderColor: Colors.red
+                            keyboardSelectedBorderColor: Colors.red
+
+                            // No wash or glow on an available confirm control.
+                            contentGlowEnabled: false
+                            softGlowEnabled: false
+                            wideGlowEnabled: false
                             available: !trashLauncher.researchBusy
                                        && trashLauncher.researchBurnId !== ""
                                        && trashLauncher.researchBurnRevision
                                           === trashLauncher.researchRevision
                             onLeftClicked: trashLauncher.advanceResearchBurn()
+
+                            Item {
+                                id: researchBurnFace
+                                anchors.fill: parent
+                                readonly property bool loading:
+                                    trashLauncher.researchBurnClickArmed
+                                    && !trashLauncher.researchBurnLoadComplete
+                                readonly property string displayedLabel:
+                                    !trashLauncher.researchBurnPointerRelocated
+                                    ? "MOVE HERE TO ARM"
+                                    : !trashLauncher.researchBurnClickArmed
+                                    ? "CLICK TO ARM"
+                                    : !trashLauncher.researchBurnLoadComplete
+                                    ? "LOADING SAFETY..."
+                                    : "CLICK AGAIN // BURN"
+
+                                // Full-height orange fill is visible ONLY
+                                // during the 850 ms arming animation. At full
+                                // load the normal solid-black button returns.
+                                Rectangle {
+                                    id: researchBurnLoadFill
+                                    x: 2
+                                    y: 2
+                                    width: Math.max(0, parent.width - 4)
+                                           * trashLauncher.researchBurnLoadProgress
+                                    height: Math.max(0, parent.height - 4)
+                                    color: Colors.orange
+                                    radius: 0
+                                    visible: researchBurnFace.loading
+                                }
+
+                                GohuText {
+                                    id: researchBurnLabelWhite
+                                    anchors.centerIn: parent
+                                    width: Math.max(0, parent.width - 12)
+                                    height: parent.height
+                                    font.pixelSize: 10
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                    color: Colors.white
+                                    text: researchBurnFace.displayedLabel
+                                }
+
+                                // Black text is revealed over exactly the
+                                // portion where the orange fill has passed.
+                                // The white label stays visible elsewhere.
+                                Item {
+                                    id: researchBurnLabelClip
+                                    x: researchBurnLoadFill.x
+                                    y: researchBurnLoadFill.y
+                                    width: researchBurnLoadFill.width
+                                    height: researchBurnLoadFill.height
+                                    clip: true
+                                    visible: researchBurnFace.loading
+
+                                    GohuText {
+                                        x: researchBurnLabelWhite.x
+                                           - researchBurnLabelClip.x
+                                        y: researchBurnLabelWhite.y
+                                           - researchBurnLabelClip.y
+                                        width: researchBurnLabelWhite.width
+                                        height: researchBurnLabelWhite.height
+                                        font.pixelSize: 10
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                        elide: Text.ElideRight
+                                        color: Colors.black
+                                        text: researchBurnFace.displayedLabel
+                                    }
+                                }
+                            }
                         }
                     }
 

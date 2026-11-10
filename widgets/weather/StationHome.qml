@@ -1108,7 +1108,10 @@ Rectangle {
             objectName: "home-w3-history-relations"
             visible: home.sectionVisible("relations")
             width: parent.width
-            height: home.compactHistory ? 72 : 188
+            // Keep W3 non-scrolling minimum while using spare height on larger screens.
+            height: home.compactHistory
+                    ? Math.max(72, Math.min(108, home.height - 188))
+                    : 188
             spacing: 12
 
             WeatherTrendInspector {

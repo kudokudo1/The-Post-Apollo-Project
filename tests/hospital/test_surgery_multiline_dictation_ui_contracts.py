@@ -11,11 +11,11 @@ def check(ok, message):
     if not ok:
         issues.append(message)
 
-check(host.count('HospitalSpeechInputService {') >= 3
+check(host.count('HospitalSpeechInputService {') >= 2
+      and 'HospitalLiveDictationService {' in host
       and 'id: workforceSpeechInputService' in host
-      and 'audioFileName: "hospital-workforce-dictation.wav"' in host
       and 'speechInputService: workforceSpeechInputService' in host,
-      "Use existing local Whisper recorder with a unique Surgery audio file")
+      "Use dedicated live Whisper dictation for Surgery, preserve Reception/Intercom")
 check('readonly property bool receptionistVoiceBusy: speechInputService.busy' in host
       and 'otherVoiceBusy: root.receptionistVoiceBusy' in host
       and '|| intercomSpeechInputService.busy' in host
@@ -55,8 +55,8 @@ check('onTranscriptionReady(text, submitRequested)' in manager
       and 'field.focusEditorAtEnd()' in manager,
       "Only insert text, never submit an AI/Room/Worker/Job request")
 check('onVoiceError(message)' in manager
-      and 'root.speechInputService.cancel();' in manager,
-      "Voice failure must discard partially captured local audio")
+      and 'root.cancelDictation();' in manager,
+      "Voice failure restores the original draft and cancels local recording")
 check('onModeChanged:' in manager
       and 'cancelDictation()' in manager
       and 'onActiveChanged:' in manager
@@ -64,16 +64,20 @@ check('onModeChanged:' in manager
       "Abandon recording on section change, menu collapse or close")
 check('root.dictationMode = root.mode' in manager
       and 'startedMode !== root.mode' in manager
-      and 'root.voiceAreaForKey(key)' in manager,
+      and 'root.voiceAreaForKey(key)' in manager
+      and 'root.dictationOriginalText = field.value' in manager,
       "Prevent a late transcript from entering a different section or field")
 check('onTextChanged: managerArea.edited()' in manager
       and 'textFormat: TextEdit.PlainText' in manager
       and 'const result = DictationTextPolicy.appendTranscription(' in manager,
       "Dictation must preserve and extend current plain text")
-check('Quickshell.shellPath("scripts/hospital-reception-stt.sh")' in voice
-      and 'Quickshell.shellPath("scripts/hospital-voice-record.py")' in voice
-      and 'transcriptionReady(' in voice,
-      "Reuse proven local Whisper and PipeWire backend")
+live = (root / "services/hospital/HospitalLiveDictationService.qml").read_text()
+check('Quickshell.shellPath("scripts/hospital-reception-stt.sh")' in live
+      and 'Quickshell.shellPath("scripts/hospital-live-dictation.py")' in live
+      and 'stdout: SplitParser {' in live
+      and 'signal liveTextReady(string text)' in live
+      and 'signal liveFinished()' in live,
+      "Surgery uses live chunked Whisper stream and incremental QML parser")
 check('submitted:false' in policy
       and 'saved:false' in policy
       and 'launched:false' in policy,

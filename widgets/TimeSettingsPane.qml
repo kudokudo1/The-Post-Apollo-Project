@@ -30,6 +30,10 @@ Item {
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        // Let the dial own its scroll wheel and drag gestures. Return normal
+        // menu scrolling as soon as the pointer leaves the dial.
+        interactive: !(pane.showAutoTimeCheck && autoCheckDial.interactive
+                       && (autoCheckDial.pointerOverDial || autoCheckDial.dragging))
         contentWidth: width
         contentHeight: Math.max(height, body.y + body.implicitHeight + 8)
 

@@ -169,33 +169,42 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertNotIn("matchesFilter(", entries)
         self.assertNotIn("activeFilter ===", entries)
 
-    def test_angel_selected_open_yellow_fill_with_magenta_glow(self):
+    def test_angel_default_washes_are_stable_and_selected_open_is_yellow(self):
         local_button = (ROOT / "widgets/AngelActionButton.qml").read_text(
             encoding="utf-8")
         meaning = (ROOT / "widgets/AngelMeaningPane.qml").read_text(
             encoding="utf-8")
         self.assertIn("ActionButton {", local_button)
-        self.assertIn("readonly property color fixedFillColor: Colors.black",
+        self.assertIn("readonly property color baseFillColor: Colors.black",
                       local_button)
         self.assertIn("readonly property color activeFillColor: Colors.yellow",
                       local_button)
+        self.assertIn("readonly property real washStrength: 0.24", local_button)
+        self.assertIn("readonly property color steadyWashColor: Qt.rgba(",
+                      local_button)
+        self.assertIn("accentColor.r * washStrength", local_button)
+        self.assertIn("accentColor.g * washStrength", local_button)
+        self.assertIn("accentColor.b * washStrength", local_button)
         self.assertIn("property bool highlightWhenSelected: false",
                       local_button)
         for state in ("idle", "hover", "pressed", "keyboardSelected"):
-            self.assertIn(state + "FillColor: fixedFillColor", local_button)
-        self.assertIn("selectedFillColor: activeFillColor", local_button)
+            self.assertIn(state + "FillColor: steadyWashColor", local_button)
         self.assertIn(
-            "color: highlightWhenSelected && selected ? activeFillColor : fixedFillColor",
+            "selectedFillColor: highlightWhenSelected ? activeFillColor : steadyWashColor",
             local_button)
+        self.assertIn(
+            "color: highlightWhenSelected && selected ? activeFillColor : steadyWashColor",
+            local_button)
+        # Selected/open gets yellow fill and magenta text/border/text glow.
         self.assertIn("selectedForegroundColor: Colors.magenta", local_button)
         self.assertIn("selectedBorderColor: Colors.magenta", local_button)
         self.assertIn("selectedContentGlowColor: Colors.magenta", local_button)
-        # Filled rectangular shadows caused the earlier visual failure.
+        # Broad rectangular shadows caused the earlier accidental visual
+        # washes. Never reintroduce those to create the intentional fill.
         self.assertIn("softGlowEnabled: false", local_button)
         self.assertIn("wideGlowEnabled: false", local_button)
         self.assertIn("contentGlowEnabled: true", local_button)
         self.assertNotIn("RectangularShadow {", local_button)
-        # Only active view/filter/history/note use the yellow selection fill.
         self.assertEqual(PANE.count("highlightWhenSelected: true"), 5)
         self.assertNotIn("highlightWhenSelected: true", meaning)
         for control in ("favoriteObservation", "errMarkButton"):
@@ -204,6 +213,7 @@ class AngelJournalContracts(unittest.TestCase):
             self.assertNotIn("highlightWhenSelected: true", block)
         for content in (PANE, meaning):
             self.assertNotIn("FillColor:", content)
+            self.assertIn("AngelActionButton {", content)
         self.assertEqual(PANE.count("AngelActionButton {"), 13)
         self.assertEqual(meaning.count("AngelActionButton {"), 2)
         self.assertIn("x: 0", PANE.split("id: favoriteObservation", 1)[1]

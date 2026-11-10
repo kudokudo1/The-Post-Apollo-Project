@@ -14,6 +14,9 @@ ShellRoot {
     property real requestY: -1
     property real searchY: -1
     property real topicY: -1
+    property real titleY: -1
+    property real bbcViewY: -1
+    property real ajViewY: -1
     property real scrollY: -1
     function find(item,name) {
         if(!item)return null;
@@ -80,14 +83,17 @@ ShellRoot {
             const language=find(reports,"media-m7-language-input");
             const clearSource=find(reports,"media-m7-clear-source");
             const clearLanguage=find(reports,"media-m7-clear-language");
-            const topic=find(reports,"media-m7-fixed-topic-rail");
-            const time=find(reports,"media-m7-fixed-time-rail");
-            const region=find(reports,"media-m7-fixed-region-rail");
+            const topic=find(reports,"media-m9-unified-fixed-filter-rail");
+            const title=find(reports,"media-m9-pinned-news-title");
+            const titleRail=find(reports,"media-m9-pinned-news-header-rail");
+            const viewBbc=find(reports,"media-m9-view-bbc");
+            const viewAj=find(reports,"media-m9-view-aljazeera");
+            const legacyTitle=find(reports,"media-m9-legacy-scrolling-news-header");
             const scroll=find(reports,"earth-e2-event-scroll");
             const rss=find(reports,"media-m6-reports-publisher-feeds");
             if(!toolbar||!retry||!bbc||!aljazeera||!search||!source
-                ||!language||!clearSource||!clearLanguage||!topic||!time
-                ||!region||!scroll||!rss) {
+                ||!language||!clearSource||!clearLanguage||!topic||!title
+                ||!titleRail||!viewBbc||!viewAj||!legacyTitle||!scroll||!rss) {
                 if(root.ticks>7)return root.fail("FIXED_REPORTS_CONTROLS_MISSING");
                 return;
             }
@@ -100,12 +106,18 @@ ShellRoot {
                    ||Math.abs(yRetry-yBbc)>1 ||Math.abs(yRetry-yAj)>1
                    ||Math.abs(retry.width-bbc.width)>1
                    ||Math.abs(bbc.width-aljazeera.width)>1
-                   ||toolbar.height<110 ||toolbar.height>155
+                   ||toolbar.height<100 ||toolbar.height>140
                    ||scroll.y < toolbar.y+toolbar.height
                    ||scroll.height<65 ||scroll.y+scroll.height>reports.height+1
                    ||!search.visible ||!source.visible ||!language.visible
-                   ||!topic.visible ||!time.visible ||!region.visible
-                   ||rss.pinnedRequests!==true
+                   ||!topic.visible ||!title.visible ||!titleRail.visible
+                   ||!viewBbc.visible ||!viewAj.visible ||legacyTitle.visible
+                   ||Math.abs(viewBbc.mapToItem(reports,0,0).y
+                               -title.mapToItem(reports,0,0).y)>1
+                   ||Math.abs(viewAj.mapToItem(reports,0,0).y
+                               -title.mapToItem(reports,0,0).y)>1
+                   ||topic.contentWidth<=topic.width
+                   ||rss.pinnedRequests!==true ||rss.pinnedViews!==true
                    ||rss.stationOpen
                    ||rss.bbcBackend.active ||rss.alJazeeraBackend.active
                    ||count(reports,"media-m6-reports-publisher-feeds")!==1)
@@ -116,13 +128,18 @@ ShellRoot {
                 root.requestY=yRetry;
                 root.searchY=search.mapToItem(reports,0,0).y;
                 root.topicY=topic.mapToItem(reports,0,0).y;
+                root.titleY=title.mapToItem(reports,0,0).y;
+                root.bbcViewY=viewBbc.mapToItem(reports,0,0).y;
+                root.ajViewY=viewAj.mapToItem(reports,0,0).y;
                 root.scrollY=scroll.y;
+                rss.expandedPublisher="bbc-world";
                 reports.newsSourceQuery="BBC";
                 reports.newsLanguageQuery="ENGLISH";
                 root.phase=1;return;
             }
             if(root.phase===1) {
                 if(source.text!=="BBC"||language.text!=="ENGLISH"
+                   ||viewBbc.label!=="HIDE BBC" ||viewAj.label!=="VIEW AJ"
                    ||!clearSource.available||!clearLanguage.available)
                     return root.fail("FIXED_SEARCH_FIELDS_NOT_BOUND");
                 clearSource.clicked(null);
@@ -144,6 +161,9 @@ ShellRoot {
                     ||aljazeera.mapToItem(reports,0,0).y!==root.requestY
                     ||search.mapToItem(reports,0,0).y!==root.searchY
                     ||topic.mapToItem(reports,0,0).y!==root.topicY
+                    ||title.mapToItem(reports,0,0).y!==root.titleY
+                    ||viewBbc.mapToItem(reports,0,0).y!==root.bbcViewY
+                    ||viewAj.mapToItem(reports,0,0).y!==root.ajViewY
                     ||scroll.y!==root.scrollY)
                     return root.fail("SCROLL_MOVED_PINNED_REPORTS_CONTROLS");
                 root.done=true;

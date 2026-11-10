@@ -34,9 +34,9 @@ test("M8 overview pins request/search plus one horizontal filter strip instead o
         'media-m7-retry-news','media-m7-request-bbc','media-m7-request-aljazeera',
         'media-m7-fixed-search-rail','media-m7-source-input','media-m7-language-input',
         'media-m7-clear-source','media-m7-clear-language',
-        'media-m8-overview-fixed-filter-rail'
+        'media-m9-unified-fixed-filter-rail'
     ])assert.ok(fixed.includes('objectName: "'+x+'"'),x);
-    assert.ok(fixed.includes('visible: stationDiscovery.compactOverviewReportsToolbar'));
+    assert.ok(fixed.includes('visible: stationDiscovery.reportsToolbarActive'));
     assert.ok(fixed.includes('flickableDirection: Flickable.HorizontalFlick'));
     assert.ok(fixed.includes('model: stationDiscovery.newsTopicOptions'));
     assert.ok(fixed.includes('model: stationDiscovery.newsTimeOptions'));
@@ -54,13 +54,16 @@ test("M8 overview pins request/search plus one horizontal filter strip instead o
     assert.ok(!fixed.includes('Qt.openUrlExternally('));
 });
 
-test("M8 preserves full NEWS M7 three separate filter rails and original RSS ownership",()=>{
-    assert.ok(discovery.includes('id: reportsTopicRail'));
-    assert.ok(discovery.includes('id: reportsTimeRail'));
-    assert.ok(discovery.includes('id: reportsRegionRail'));
-    const full=discovery.slice(discovery.indexOf('id: reportsTopicRail'),
-                               discovery.indexOf('id: compactOverviewFilters'));
-    assert.equal((full.match(/&& !stationDiscovery.compactOverviewReportsToolbar/g)||[]).length,3);
+test("M9 uses one pinned topic/time/region rail for both full NEWS and OVERVIEW",()=>{
+    assert.ok(discovery.includes('id: reportsUnifiedFilters'));
+    assert.ok(discovery.includes('objectName: "media-m9-unified-fixed-filter-rail"'));
+    assert.equal((discovery.match(/id: reportsUnifiedFilters/g)||[]).length,1);
+    assert.ok(discovery.includes('visible: stationDiscovery.reportsToolbarActive'));
+    assert.ok(discovery.includes('contentWidth: unifiedFilterChoices.implicitWidth'));
+    assert.ok(discovery.includes('height: visible ? (stationDiscovery.compactOverviewReportsToolbar ? 18 : 24) : 0'));
+    assert.ok(!discovery.includes('id: reportsTopicRail'));
+    assert.ok(!discovery.includes('id: reportsTimeRail'));
+    assert.ok(!discovery.includes('id: reportsRegionRail'));
     assert.ok(discovery.includes('property bool pinReportsToolbar: false'));
     assert.ok(publisher.includes('feedId: "bbc-world"'));
     assert.ok(publisher.includes('feedId: "al-jazeera-english"'));

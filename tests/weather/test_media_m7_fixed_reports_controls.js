@@ -53,6 +53,7 @@ test("M7 pins RETRY NEWS, BBC and AL JAZEERA request controls on one action row"
     assert.equal((discovery.match(/StationPublisherFeeds\s*\{/g)||[]).length,1);
     assert.ok(discovery.includes('id: publisherFeedsContent'));
     assert.ok(discovery.includes('pinnedRequests: stationDiscovery.reportsToolbarActive'));
+    assert.ok(discovery.includes('pinnedViews: stationDiscovery.reportsToolbarActive'));
 });
 
 test("M7 pinned source and language search, clear actions and all topic/time/region buttons",()=>{
@@ -60,8 +61,7 @@ test("M7 pinned source and language search, clear actions and all topic/time/reg
         'media-m7-fixed-search-rail','media-m7-fixed-source-search',
         'media-m7-fixed-language-search','media-m7-source-input',
         'media-m7-language-input','media-m7-clear-source',
-        'media-m7-clear-language','media-m7-fixed-topic-rail',
-        'media-m7-fixed-time-rail','media-m7-fixed-region-rail'
+        'media-m7-clear-language','media-m9-unified-fixed-filter-rail'
     ])assert.ok(discovery.includes('objectName: "'+x+'"'),x);
     for(const x of [
         'onTextEdited: stationDiscovery.newsSourceQuery = text',
@@ -72,7 +72,7 @@ test("M7 pinned source and language search, clear actions and all topic/time/reg
         'onTriggered: stationDiscovery.selectNewsTime(modelData.hours)',
         'onTriggered: stationDiscovery.selectNewsRegion(modelData.id)'
     ]) assert.ok(discovery.includes(x),x);
-    assert.equal((discovery.match(/flickableDirection: Flickable.HorizontalFlick/g)||[]).length>=3,true);
+    assert.equal((discovery.match(/flickableDirection: Flickable.HorizontalFlick/g)||[]).length>=1,true);
     const legacy=discovery.slice(discovery.indexOf('id: newsTopicRail'),
         discovery.indexOf('// M28-B: MEDIA owns the full article feed.'));
     assert.equal((legacy.match(/&& !stationDiscovery.reportsToolbarActive/g)||[]).length,5);

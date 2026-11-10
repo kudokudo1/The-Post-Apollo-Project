@@ -23,6 +23,7 @@ on:
       - 'tests/weather/test_media_m5_feeds_services.js'
       - 'tests/weather/test_media_m7_fixed_reports_controls.js'
       - 'tests/weather/test_media_m8_overview_reports_toolbar.js'
+      - 'tests/weather/test_media_m9_sticky_headline_view_unified_filters.js'
       - 'widgets/weather/StationPublisherFeeds.qml'
       - 'tests/weather/test_workspace_landing_w1.js'
       - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
@@ -65,6 +66,7 @@ jobs:
           node --test tests/weather/test_media_m5_feeds_services.js
           node --test tests/weather/test_media_m7_fixed_reports_controls.js
           node --test tests/weather/test_media_m8_overview_reports_toolbar.js
+          node --test tests/weather/test_media_m9_sticky_headline_view_unified_filters.js
           node --test tests/weather/test_workspace_landing_w1.js
           node --test tests/weather/test_media_full_visual_parity_m28t.js
   native-fixed-radio:

@@ -22,7 +22,7 @@ test("W3 rotates five HOME panels including the final SOURCES",()=>{
   const routes=native(env.ROTATABLE);
   assert.deepEqual(routes,[
     "home/auto","home/quick","home/snapshot",
-    "home/history","home/sources"
+    "home/history","home/health"
   ]);
   assert.equal(new Set(routes).size,5);
   for(const r of routes) {
@@ -37,12 +37,12 @@ test("W3 rotates five HOME panels including the final SOURCES",()=>{
 
 test("favorites use stable source-independent panel routes, not display indices",()=>{
   const dirty=["home/auto","home/auto","earth/overview","home/runtime",null,7];
-  assert.deepEqual(native(env.normalizedFavorites(dirty)),["home/auto","home/sources"]);
+  assert.deepEqual(native(env.normalizedFavorites(dirty)),["home/auto","home/health"]);
   const pinned=native(env.toggleFavorite(dirty,"home/quick"));
-  assert.deepEqual(pinned,["home/auto","home/sources","home/quick"]);
+  assert.deepEqual(pinned,["home/auto","home/health","home/quick"]);
   assert.equal(env.favorite(pinned,"home/quick"),true);
   assert.deepEqual(native(env.toggleFavorite(pinned,"home/auto")),
-                   ["home/sources","home/quick"]);
+                   ["home/health","home/quick"]);
   assert.deepEqual(native(env.toggleFavorite(pinned,"home/magick")),pinned);
 });
 
@@ -53,11 +53,11 @@ test("AUTO is random, MIXED weights favorites, PINNED never escapes its pins",()
   assert.equal(env.nextMode("pinned"),"mixed");
   assert.equal(env.normalizedMode("bad"),"mixed");
   assert.equal(env.nextRoute("home/auto",[],"auto",0),"home/quick");
-  assert.equal(env.nextRoute("home/auto",[],"auto",0.999999),"home/sources");
+  assert.equal(env.nextRoute("home/auto",[],"auto",0.999999),"home/health");
   const favorites=["home/history","home/health"];
   assert.equal(env.nextRoute("home/auto",favorites,"mixed",0.30),"home/history");
   assert.equal(env.nextRoute("home/auto",favorites,"pinned",0),"home/history");
-  assert.equal(env.nextRoute("home/auto",favorites,"pinned",0.999),"home/sources");
+  assert.equal(env.nextRoute("home/auto",favorites,"pinned",0.999),"home/health");
   assert.equal(env.nextRoute("home/history",["home/history"],"pinned",0.2),"");
   assert.equal(env.nextRoute("home/auto",[],"pinned",0.8),"");
   for (const sample of [0,0.2,0.6,0.9999,1,NaN,-1]) {

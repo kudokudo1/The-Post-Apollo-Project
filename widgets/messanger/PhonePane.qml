@@ -259,7 +259,7 @@ Rectangle {
         if (state === "SERVICE_FAILED")
             return "The oFono service exists but failed to start. The system audio setup needs repair. No changes were made.";
         if (state === "SERVICE_STOPPED")
-            return "oFono is installed but stopped. FINISH CALLING SETUP offers a reviewed, one-time system service start.";
+            return "oFono is installed as a service but is stopped. FINISH CALLING SETUP offers a reviewed, one-time system service start.";
         if (state === "SERVICE_STARTING")
             return "oFono is changing state. Wait until it is stable and check again. No audio changes were made.";
         if (state === "DBUS_NAME_MISSING")

@@ -102,29 +102,12 @@ Rectangle {
                 visible: false
                 sourceComponent: groundPanel
             }
-            Flickable {
+            StationWeatherServicesPane {
                 anchors.fill: parent
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-                contentWidth: width
-                contentHeight: Math.max(height, servicesContent.y + servicesContent.implicitHeight + 10)
-                Column {
-                    id: servicesContent
-                    x: 12
-                    y: 10
-                    width: Math.max(0, parent.width - 24)
-                    spacing: 14
-                    StationRuntimeRack {
-                        objectName: "weather-w4-sky-rack"
-                        title: "WEATHER SERVICES // SKY + ATMOSPHERE"
-                        rows: weatherServicesSky.item ? weatherServicesSky.item.runtimeRows : []
-                    }
-                    StationRuntimeRack {
-                        objectName: "weather-w4-ground-rack"
-                        title: "WEATHER SERVICES // GROUND + HAZARDS"
-                        rows: weatherServicesGround.item ? weatherServicesGround.item.runtimeRows : []
-                    }
-                }
+                skyRows: weatherServicesSky.item
+                    ? weatherServicesSky.item.runtimeRows : []
+                groundRows: weatherServicesGround.item
+                    ? weatherServicesGround.item.runtimeRows : []
             }
         }
     }

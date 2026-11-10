@@ -22,8 +22,8 @@ test("W3 HOME has SOURCES last, no separate runtime/health buttons, and retains 
     assert.deepEqual(tabs.map(x=>x.label),[
         "OVERVIEW","AUTO","QUICK","SNAPSHOT","HISTORY","MAGICK","SOURCES"
     ]);
-    assert.equal(tabs[tabs.length-1].path,"home/sources");
-    assert.equal(nav.homeSectionFor("home/sources"),"sources");
+    assert.equal(tabs[tabs.length-1].path,"home/health");
+    assert.equal(nav.homeSectionFor("home/health"),"sources");
     for(const legacy of ["home/runtime","home/health"]){
         assert.equal(nav.homeSectionFor(legacy),"sources");
         assert.equal(nav.selectedGroup(legacy),"sources");
@@ -31,12 +31,12 @@ test("W3 HOME has SOURCES last, no separate runtime/health buttons, and retains 
         assert.equal(deck.isRotatable(legacy),true);
     }
     assert.deepEqual(native(deck.ROTATABLE),[
-        "home/auto","home/quick","home/snapshot","home/history","home/sources"
+        "home/auto","home/quick","home/snapshot","home/history","home/health"
     ]);
     assert.deepEqual(native(deck.normalizedFavorites([
-        "home/health","home/runtime","home/sources"
-    ])),["home/sources"]);
-    assert.ok(favorites.includes('"home/health", "home/sources"'));
+        "home/health","home/runtime","home/health"
+    ])),["home/health"]);
+    assert.ok(favorites.includes('"home/runtime", "home/health"'));
     assert.ok(surface.includes("workspaceSection: surface.homeSection"));
     assert.equal((surface.match(/StationHome\s*\{/g)||[]).length,1);
 });

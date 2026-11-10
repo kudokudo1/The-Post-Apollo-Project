@@ -23,6 +23,14 @@ This change adds four bounded artifacts:
 
 The CI-only `installed-release.ci-v1` role has a **fixed eight-file roster**: its installed entrypoint plus the seven gateway Python modules. The verifier rejects even a correctly release-root-signed manifest that omits a mandatory module or adds an unexpected file; signature validity alone must not turn partial coverage into a complete installed-runtime measurement. The package builder independently checks its payload against the same roster, and CI includes omission/extra-file adversarial cases. This remains deny-only test evidence, **not** production attestation, C5 consent, or authority to enable CPU++ login.
 
+### Mandatory native adapter gate (November 10, 2026)
+
+The out-of-QML **CI-contract adapter** `services/identity/installed_command_adapter_v1.py` wraps the existing `SignedIdentityCommandClient` without modifying its experimental compatibility API. Unlike the low-level client's optional `enrolled_origin_consistent` constructor input, `InstalledIdentityCommandAdapterV1` requires actual `SignedGatewayOriginProbe` **and** `InstalledGatewayWitness` objects, an independently supplied connected-peer verifier, active-seat verifier, pinned receipt public key and absolute native socket path. It rejects missing witnesses or mismatched PID/start/UID/GID, release epoch/sequence, exact signed entrypoint bytes, or receipt-key fingerprint *before constructing* its client.
+
+Its unoverrideable composite gate calls **both** witnesses for the connected kernel peer. The underlying signed client checks the composite, independent peer and seat before each request and again after each signed receipt, and faults closed on trust loss, process replacement or invalid signatures. The adapter exposes only bounded BEGIN/STATUS/CANCEL/RECOVER observations: no `hostAuthenticated`, provider authorization or credentials.
+
+**Strict limitation:** `InstalledGatewayWitness` is the disposable Ubuntu dpkg/systemd CI witness, not a production Silverblue RPM/OSTree/SELinux or protected C4b release witness. C4b and C5 have not supplied an accepted Identity-specific enrollment/seat/one-use consent interface. The adapter is therefore **not** a desktop activation/authorization grant; CPU++ controls remain disabled. Future production integration requires an independent, explicitly reviewed authority adapter rather than assuming this CI witness is sufficient.
+
 ### Adversarial acceptance covered
 
 - Running **actual installed** gateway process and signed command receipt, with real kernel SO_PEERCRED, external systemd PID, package file/module hashes and current LSM/cgroup observations

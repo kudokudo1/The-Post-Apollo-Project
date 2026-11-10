@@ -12,7 +12,7 @@ PRODUCTION // HOLD
 
 The original C3e-T goal was read-only measurement of the real C3d signed Python status service during the already-passing, booted Fedora Silverblue guest. C4b's owner independently implemented **C4c PR #1646**, merged into main. Historical [signed offline Silverblue #42638232336](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42638232336) reported overall SUCCESS, **but this is no longer sufficient evidence of C4c's signed running-host measurement**. An independent review on November 10 found that the merged guest script's `<<'C4B_RUNNING_HOST_PROBE' ||` command inserted an indented shell `fail` line into Python's standard input before `import grp`. That malformed Python could fail while the surrounding shell still printed `C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED`. The older CI result may still support separately checked boot/rollback controls, but **not successful execution of that embedded verifier**. See [C3e finding #1606](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/1606#issuecomment-6774220264).
 
-Unlike C3e-T's optional CLI, the C4c guest source defines a same-service observation. **Successful execution of its embedded verifier is still a required live test**, not something C3e-U infers from source inspection or a historical PASS marker. Intended to run *after C3b's systemd/D-Bus/SELinux identity checks* and before service stop, the C4c verifier checks the signed C3d RPM with an isolated disposable RPM signer/keyring; the signed RPM's **three file-header SHA-256 values** for its exact host script/unit/bus policy against immutable root-owned installed bytes; actual kernel service PID/start/4x UID/GID and D-Bus process/user owner; interpreter inode and separate SHA-256; `--read-only` invocation; and real RPM package ownership. C4c emits `C4B_OBSERVED // {…}` JSON inside its guest.
+Unlike C3e-T's optional CLI, the C4c guest source defines a same-service observation. **Successful execution of its embedded verifier is still a required live test**, not something C3e-U infers from source inspection or a historical PASS marker. Intended to run *after C3b's systemd/D-Bus/SELinux identity checks* and before service stop, the C4c verifier checks the signed C3d RPM with an isolated disposable RPM signer/keyring; the signed RPM's **three file-header SHA-256 values** for its exact host script/unit/bus policy against immutable root-owned installed bytes; actual kernel service PID/start/4x UID/GID and D-Bus process/user owner; interpreter inode and separate SHA-256; `--read-only` invocation; and real RPM package ownership. On successful execution, C4c is intended to emit `C4B_OBSERVED // {…}` JSON inside its guest.
 
 **C3e-U is the smallest DOC-owned receiving side for this existing real C4c format, not a duplicate guest collector.** It:
 
@@ -34,11 +34,10 @@ A future owner-controlled real evidence handoff would extract one validated `C4B
 
 **2026-11-10 evidence correction:** A corrected heredoc in the C4b-owned draft [#1756](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/1756) now executes Python and refuses invalid observations. [Real exact-head Silverblue #42864373807](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42864373807) then failed closed with `SIGNED_RPM_PACKAGE_IDENTITY_REFUSED`; the original full two-boot/rollback gate did not pass and no artifact was exported. C3e-U/Grammar CI on that head passed, but **only as source/contract tests**. Newer owner draft heads may exist; always reacquire their run status instead of treating this historical failure as the latest.
 
-
-- [ ] 18 new cases, including producer AST schema compatibility, strict pin/refusal checks and CLI, pass on exact PR head.
-- [ ] C4b signed service source policy, C3b installed origin and C3e-Q detached signature tests remain green.
-- [ ] Meta Apollo Grammar and root-pinned/signed RPM release checks remain green.
-- [ ] Independent security/owner review and operator merge disposition.
+- [x] C3e-U's 18 source-contract/CLI/adversarial tests passed in merged [PR #1653](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/1653); these are not genuine guest artifact tests.
+- [x] C3e-U's original CI regression suite passed; future C4b source/guest changes still require their own exact-head verification.
+- [x] C3e-U exact-head CI and Grammar for this documentation correction passed; signed release checks remain a separate evidence boundary.
+- [x] Original C3e-U [PR #1653](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/1653) is merged. This documentation correction is a separate draft awaiting review.
 - [ ] **Real guest output** collected from the C4b owner, with independent package verification and protected transport, before stronger claims.
 
 ## WATCH OUT FOR
@@ -57,13 +56,13 @@ The C4b/C4c owner delivered the in-guest signed-host verifier **source**; its ac
 - [x] Inspect actual C4c schema and C3e-Q/R/S trust boundary.
 - [x] Implement read-only source-checked importer without editing C4b/C4c files.
 - [x] Add new adversarial CLI/source contract tests, CI and handoff.
-- [ ] Repair any observed C3e-U CI failure within DOC lane.
+- [x] Original C3e-U source/contract CI passed on merge and remained green after the independent guest failure.
 - [ ] Independent review/merge authorization and operator acceptance.
 - [ ] C4b owner's bounded real guest report export and signed independent report issuer.
 - [ ] C5 genuine operator consent, production identity authority and first provider transaction.
 
 ## NEXT / DECISIONS
 
-**Next technical target:** when the C4b/C4d owner delivers a corrected genuine CI run with verified embedded Python execution, signed RPM/process identity, full two-boot rollback and one bounded exported `C4B_OBSERVED` record, compare it against **independently established pins** using the existing C3e-U importer. The report remains diagnostic only; do not change C4b-owned code or promote it into protected C3e-Q/R authority. Coordinate exact location/transport with C4b owner through [handoff #1606](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/1606). Keep C3e-U draft and additive, on direct main, without any secret/provider/system change.
+**Next technical target:** when the C4b/C4d owner delivers a corrected genuine CI run with verified embedded Python execution, signed RPM/process identity, full two-boot rollback and one bounded exported `C4B_OBSERVED` record, compare it against **independently established pins** using the existing C3e-U importer. The report remains diagnostic only; do not change C4b-owned code or promote it into protected C3e-Q/R authority. Coordinate exact location/transport with C4b owner through [handoff #1606](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/1606). Keep C3e-U's diagnostic-only implementation on main; this evidence correction is independently reviewable as a draft, with no secret/provider/system change.
 
 Production HOLD, no local workstation modification, no live Hospital registration or cross-worker ownership transfer.

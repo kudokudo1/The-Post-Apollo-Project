@@ -1,117 +1,129 @@
-# MACHINE // Disposable Brave native-host transport experiment
+# MACHINE // Disposable Brave transport trial, isolated XDG registration
 
 **PATIENT:** The-Post-Apollo-Project  
 **ROOM:** TimeW MACHINE / browser session recovery  
-**STAFF ROLE:** DOC (external Hospital-compatible; live registration not verified)  
-**ASSIGNMENT:** Prepare reversible disposable-profile native host test while protecting the real Fedora/Brave profile  
-**STATE:** Repository implementation and isolated CI only; no local activation
+**STAFF ROLE:** DOC (Hospital-compatible, live registration unverified)  
+**PHASE:** Correct disposable native-host registration after operator's Fedora/Brave proof  
+**STATE:** Repository-only patch; no local activation or production host registration
 
-## Mechanism and isolation
+## Mechanism and observed defect
 
-On Linux, Chromium resolves user-level native-messaging hosts under the
-selected **browser user-data directory** in NativeMessagingHosts. Overriding
-that directory with --user-data-dir is supported by Chromium. Brave is
-Chromium-based but actual Brave packaging, command and Fedora/SwayPX behavior
-must still be checked on the operator's workstation.
+Brave's browser data directory (selected by `--user-data-dir`) holds the
+test profile and extension. **Native host manifests are resolved using a
+different Linux configuration directory**. In the operator's native RPM
+Brave 1.94.121 test:
 
-References:
+1. `/tmp/postapollo-machine-brave-trial-*/profile/Default` was correctly
+   used as the disposable browser profile.
+2. The original repository tool registered
+   `profile/NativeMessagingHosts/org.postapollo.machine_brave_probe.json`.
+   Brave logged `Can't find manifest for native messaging host ...`.
+3. The host independently executed and returned a valid nonce/response.
+   SELinux was enforcing and no relevant AVC denial was observed, but the
+   decisive browser error was a missing manifest.
+4. The operator created a host registration under
+   `<trial>/xdg-config/BraveSoftware/Brave-Browser/NativeMessagingHosts/`
+   and launched Brave with
+   `XDG_CONFIG_HOME=<trial>/xdg-config`.
+5. The extension reported
+   **LOCAL TRANSPORT OBSERVED // WINDOW IDENTITY NOT VERIFIED**.
+
+This proves a *single isolated transport roundtrip* on that Fedora/Brave
+instance. It does not prove authenticated extension or process identity,
+a reliable Brave-to-Sway mapping, tab capture, or ability to RESTORE.
+
+Upstream background:
 - https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging
-- https://chromium.googlesource.com/chromium/src/+/HEAD/chrome/common/chrome_paths.cc
 - https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md
 
-The repository adds services/time/MachineBraveDisposableTrial.py with three
-strict, explicit commands:
+## Implementation
 
-- init: create a brand-new private postapollo-machine-brave-trial-* directory
-  directly under /tmp (ignores TMPDIR overrides); a fresh profile/ and
-  a tiny UUID marker. Does not launch Brave or install anything.
-- register ROOT EXTENSION_ID: accept only a marked root directly under the
-  /tmp directory, owned by the invoking user and private (0700).
-  Copy ONLY the source-reviewed transport-only MachineBraveNativeProbe.py
-  into the trial root as an executable, and write ONLY an exact-origin JSON
-  host manifest into ROOT/profile/NativeMessagingHosts. Refuses existing
-  registrations, invalid IDs, symlinks, unexpected paths and overwrites.
-- verify ROOT: read-only validation of exact host source bytes, executable
-  mode, generated manifest path, single allowed extension origin, and
-  private directories. Never starts a process or tests native messaging.
+`services/time/MachineBraveDisposableTrial.py` retains three operations:
 
-The script refuses a symlinked /tmp and never trusts a custom TMPDIR to
-redirect these writes into a home directory. It reports only that **the
-tool** did not launch Brave; it cannot prove a separate browser process
-is not already running.
+- **init:** privately creates a fresh marked root directly under `/tmp`,
+  a `profile/` for browser state, and a separate private `xdg-config/`.
+  It ignores caller `TMPDIR` and never starts Brave.
+- **register ROOT ID:** copies the unchanged transport-only Python probe
+  into ROOT and writes an exact-origin manifest to
+  `ROOT/xdg-config/BraveSoftware/Brave-Browser/NativeMessagingHosts/`.
+  Creates only missing, 0700, same-user, non-symlink subdirectories
+  below the marked root. An existing private BraveSoftware path is
+  allowed because Brave may create it before the ID is known.
+  Refuses invalid IDs, non-trial roots, preexisting host registration,
+  non-private folders, and symlinks. It does not write into
+  `ROOT/profile/NativeMessagingHosts/` or the ordinary home profile.
+- **verify ROOT:** reads the exact host bytes, executable permission,
+  manifest path, one allowed extension origin, and private directory
+  ownership/modes. Never starts a program or claims a browser roundtrip.
 
-No ~/.config/BraveSoftware, XDG desktop configuration, original browser
-profiles, TimeW checkpoints or Sway windows are touched by these routines.
-They do not run under sudo or write to any system registration folder.
-No routine performs cleanup/deletion of the trial profile; closing the
-browser and removing a trial after review requires separate operator
-approval and an explicit path check.
+`MachineBraveTrialLaunchPlan.py plan ROOT BINARY` remains **read-only**.
+It outputs the operator-reviewed Brave command *and*
+`environment_overrides.XDG_CONFIG_HOME` pointing at the same marked
+trial's `xdg-config`. It never launches Brave, installs an extension,
+changes login settings, or grants optional nativeMessaging permission.
 
-## HOW TO USE (future operator-approved local experiment)
+## HOW TO USE // Future separately approved operator trial
 
-**Approval gate:** These commands perform local filesystem writes.
-Do not run on the operator's machine until specifically approved for this
-disposable experiment, and confirm current repo checkout/working tree first.
+Repository source checks, **before any local mutations**:
 
-From an approved checkout of the tested revision:
+```bash
+git status --short
+python3 -B -I services/time/MachineBraveDisposableTrial.py init
+```
 
-1. Run python3 -B -I services/time/MachineBraveDisposableTrial.py init
-   and record the exact returned trial_root and brave_user_data_dir.
-2. Identify the real installed Brave executable. Start a *separate* Brave
-   process with --user-data-dir=<the returned brave_user_data_dir>.
-   Confirm in brave://version that its profile directory belongs under
-   that exact temporary path. STOP if it shows the everyday profile.
-3. In the disposable Brave only, open brave://extensions, enable Developer
-   mode and choose Load unpacked for
-   integrations/machine/brave-topology/ in the approved repository checkout.
-   Record the 32-letter extension ID from this **disposable** instance.
-4. Run python3 -B -I services/time/MachineBraveDisposableTrial.py register
-   <trial_root> <extension_id>, then run its verify command on the same
-   root. Neither command launches Brave or grants permission.
-5. In that trial extension popup, click ALLOW LOCAL CONNECTION, then
-   TEST CONNECTION ONCE. Record only success/failure status, never tabs,
-   URLs or titles. REVOKE LOCAL PERMISSION after the test.
-6. Close the disposable Brave instance. Its trial directory may contain
-   browser history after use, so treat it as private. Review and authorize
-   removal of ONLY that verified trial path separately. Do not remove the
-   normal Brave profile or invoke arbitrary recursive cleanup.
+The `init` operation creates files; execute it **only after the
+operator has separately authorized a disposable local trial**. Record the
+returned `trial_root`, `brave_user_data_dir`, and
+`brave_xdg_config_home`. Then:
 
-If the trial uses a sandboxed/Flatpak Brave, host visibility and
---user-data-dir behavior must be verified independently; the process may
-not see an external repo or temporary host executable. Stop rather than
-installing a host into the normal profile to work around it.
+1. `python3 -B -I services/time/MachineBraveTrialLaunchPlan.py plan '<trial_root>' /usr/bin/brave-browser`.
+   Inspect the exact `candidate_argv` and
+   `environment_overrides.XDG_CONFIG_HOME`. The plan does not start Brave.
+2. With separate permission, launch only the test browser using the
+   specified user-data directory and **process-local XDG_CONFIG_HOME**.
+   Do not export XDG_CONFIG_HOME globally in the shell or change it for
+   the user's normal desktop.
+3. Confirm in `brave://version` that Profile Path begins with the
+   temporary `<trial_root>/profile/` path. Stop if it uses ordinary Brave.
+4. Within that test profile only, open `brave://extensions` → Developer
+   mode → Load unpacked. Choose
+   `integrations/machine/brave-topology`, NOT the temporary profile
+   directory. Record the exact 32-letter ID of **Post-Apollo MACHINE**.
+5. Run `python3 -B -I services/time/MachineBraveDisposableTrial.py
+   register '<trial_root>' '<extension_id>'` and then
+   `... verify '<trial_root>'`. Both must report a manifest under the
+   *isolated XDG config*, never a normal Brave home or profile directory.
+6. From the test extension popup click ALLOW LOCAL CONNECTION, then
+   TEST CONNECTION ONCE. The only successful transport result is
+   LOCAL TRANSPORT OBSERVED // WINDOW IDENTITY NOT VERIFIED.
+   Click REVOKE LOCAL PERMISSION after recording the status.
+7. Close the disposable browser. Treat trial contents as private
+   browser data; deletion is **not** automatic and requires separate
+   operator approval for that exact path.
 
-## ACCEPTANCE / FAILURE RULES
+If an older trial already has the original wrong-path registration,
+do **not** blindly run register again or copy manifests into the
+normal Brave configuration. Inspect/reconcile the test root separately;
+this CLI explicitly refuses overwriting an existing host.
 
-- Registration preflight PASS means only the temporary manifest and
-  transport host have the expected bytes/permissions. It is NOT a real
-  browser/host roundtrip.
-- LOCAL TRANSPORT OBSERVED means only a challenge was sent and the host
-  replied. It is NOT a verified Brave/Sway window pair.
-- Browser/OS focus correlation from #1690 is still unverified diagnostic
-  evidence, NOT an OS handle, private-window proof or restore authority.
-- If a profile path is not temporary, native host cannot be found, extension
-  ID changes, two instances share a profile, a browser starts on the normal
-  profile, or any private-window ambiguity occurs: abort.
-- No browser data, tab sessions, snapshots, credentials, network services,
-  checkpoint revisions, window moves, app relaunch, or RESTORE actions.
-- Consent for later sensitive tab/session metadata is a separate gate.
+## VERIFY / WATCH OUT FOR
 
-## Tests
+CI uses real `/tmp` fixture directories but a fake browser binary that is
+never executed. It exercises init/register/verify and a plan read-back,
+plus invalid IDs, symlinks, private modes, tampered bytes, duplicate
+registration, interrupted writes and rollback.
 
-CI exercises a *real private temporary filesystem* with init, register and
-verify; safe rejection of bogus extension IDs, preexisting paths, bad markers,
-symlinks, duplicate registration, tampered host and manifest; and a separate
-Python -B -I CLI subprocess roundtrip. It checks unchanged Brave manifest,
-native host and TimeW QML constraints.
+Those CI checks do **not** repeat the Fedora browser test or validate
+per-window identity. A valid manifest path, a successful one-shot local
+connection, or A/B/A focus evidence grants **zero** restore authority.
+No tabs, URLs, titles, profiles, secrets or page contents are captured.
 
-This is a **file-system experiment in a disposable CI directory**, not a
-live Brave extension load or native-messaging roundtrip on Fedora/SwayPX.
+No native system host installation, Quickshell reload, SELinux policy
+change, Brave profile modification, Sway action, checkpoint change or
+production activation is authorized by this patch.
 
 ## DECISIONS
 
-The tool never implicitly acts on the real browser or machine. The current
-development assignment remains MACHINE; all local writes, Brave startup,
-extension installation, production activation, cleanup and final acceptance
-remain separately operator-controlled. A diagnostic success grants no
-pairing/session restoration permission.
+Keep the corrected registration and launch preflight as one bounded
+MACHINE patch. Independent review, CI, merge approval and any additional
+local activation remain operator-controlled.

@@ -3,11 +3,11 @@
 
 CLI operations:
   init                  create a new private TEMPORARY trial directory
-  register ROOT ID      register an exact-ID host *inside that trial profile*
+  register ROOT ID      register an exact-ID host under isolated XDG_CONFIG_HOME
   verify ROOT           read-only check of the trial's manifest and host
 
 Never launch Brave, contact Sway, read normal Brave profiles, run a native host,
-save tabs, modify checkpoints or register a host in the user's real profile.
+save tabs, modify checkpoints or register a host in the user's real XDG home.
 Running init/register on an operator's machine is itself a local write and
 requires separate explicit approval. Repo CI uses disposable fixture roots.
 """
@@ -30,6 +30,7 @@ MARKER = ".postapollo-machine-trial.json"
 MARKER_KIND = "machine-brave-disposable-trial-v1"
 HOST_FILE = "MachineBraveNativeProbe.py"
 HOST_MANIFEST = HOST_NAME + ".json"
+XDG_COMPONENTS = ("BraveSoftware", "Brave-Browser", "NativeMessagingHosts")
 ROOT_NAME = re.compile(r"postapollo-machine-brave-trial-[a-zA-Z0-9_-]{6,}\Z")
 ORIGIN = re.compile(r"chrome-extension://([a-p]{32})/\Z")
 MAX_MARKER = 1024
@@ -120,7 +121,47 @@ def _validate_root(value):
     except ValueError as exc:
         raise TrialError("INVALID TRIAL MARKER") from exc
     _private_dir(root / "profile")
+    _private_dir(_xdg_home(root))
     return root
+
+
+def _xdg_home(root):
+    return root / "xdg-config"
+
+
+def _manifest_dir(root):
+    return _xdg_home(root).joinpath(*XDG_COMPONENTS)
+
+
+def _existing_manifest_dir(root):
+    current = _xdg_home(root)
+    _private_dir(current)
+    for segment in XDG_COMPONENTS:
+        current = current / segment
+        _private_dir(current)
+    return current
+
+
+def _create_manifest_dir(root, created):
+    """Make ONLY missing private subfolders of the marked trial's XDG home.
+
+    A browser may have created some subfolders before the extension ID is
+    available. Never overwrite, chmod, or follow a pre-existing symlink.
+    Track new directories in caller-owned list, even on partial failure.
+    """
+    current = _xdg_home(root)
+    _private_dir(current)
+    for segment in XDG_COMPONENTS:
+        current = current / segment
+        if current.is_symlink():
+            raise TrialError("SYMLINK XDG DIRECTORY REFUSED")
+        if current.exists():
+            _private_dir(current)
+        else:
+            current.mkdir(mode=0o700)
+            created.append(current)
+            _private_dir(current)
+    return current
 
 
 def _source_host():
@@ -138,6 +179,7 @@ def init_trial():
     try:
         _private_dir(root)
         (root / "profile").mkdir(mode=0o700)
+        _xdg_home(root).mkdir(mode=0o700)
         marker = {"kind": MARKER_KIND, "trial_id": str(uuid.uuid4())}
         _write_exclusive(root / MARKER,
                          (json.dumps(marker, sort_keys=True) + "\n").encode(),
@@ -148,12 +190,16 @@ def init_trial():
         profile = root / "profile"
         if profile.is_dir() and not profile.is_symlink():
             profile.rmdir()
+        xdg = _xdg_home(root)
+        if xdg.is_dir() and not xdg.is_symlink():
+            xdg.rmdir()
         root.rmdir()
         raise
     return {
         "status": "disposable_trial_initialized",
         "trial_root": str(root),
         "brave_user_data_dir": str(root / "profile"),
+        "brave_xdg_config_home": str(_xdg_home(root)),
         "registration_present": False,
         "browser_launched_by_tool": False,
         "local_transport_tested": False,
@@ -164,44 +210,53 @@ def init_trial():
 
 
 def register_trial(root_path, extension_id):
-    """Explicitly register probe ONLY within an existing marked trial."""
+    """Explicitly register probe ONLY inside a marked trial's XDG home.
+
+    Brave's native Linux host lookup uses the BraveSoftware XDG config
+    path, not profile/NativeMessagingHosts. The operator's successfully
+    isolated Fedora/Brave trial confirmed this lookup behavior.
+    """
     root = _validate_root(root_path)
     host_path = root / HOST_FILE
     manifest = generate(extension_id, str(host_path))
     host_contents = _source_host()
-    host_dir = root / "profile" / "NativeMessagingHosts"
-    if host_dir.exists() or host_dir.is_symlink():
+    target_dir = _manifest_dir(root)
+    target_file = target_dir / HOST_MANIFEST
+    if (host_path.exists() or host_path.is_symlink()
+            or target_file.exists() or target_file.is_symlink()):
         raise TrialError("TRIAL REGISTRATION ALREADY PRESENT")
-    created_dir = created_host = created_manifest = False
+
+    created_dirs = []
+    created_host = False
+    created_manifest = False
     try:
-        host_dir.mkdir(mode=0o700)
-        created_dir = True
-        _private_dir(host_dir)
+        # Registration must never spill into the user's real XDG config.
+        host_dir = _create_manifest_dir(root, created_dirs)
+        if host_dir != target_dir:
+            raise TrialError("XDG PATH MISMATCH")
         _write_exclusive(host_path, host_contents, 0o700)
         created_host = True
         _write_exclusive(
-            host_dir / HOST_MANIFEST,
+            target_file,
             (json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode(),
             0o600,
         )
         created_manifest = True
-    except (OSError, ValueError, TrialError):
+    except Exception:
         if created_manifest:
-            (host_dir / HOST_MANIFEST).unlink()
+            target_file.unlink()
         if created_host:
             host_path.unlink()
-        if created_dir:
-            host_dir.rmdir()
+        for folder in reversed(created_dirs):
+            folder.rmdir()
         raise
     return verify_trial(str(root))
-
 
 def verify_trial(root_path):
     """Read-only structural checks; never claim an actual Brave roundtrip."""
     root = _validate_root(root_path)
     host = root / HOST_FILE
-    host_dir = root / "profile" / "NativeMessagingHosts"
-    _private_dir(host_dir)
+    host_dir = _existing_manifest_dir(root)
     contents = _read_regular(host, MAX_HOST)
     if contents != _source_host() or not (host.stat().st_mode & stat.S_IXUSR):
         raise TrialError("TRIAL HOST MISMATCH")
@@ -222,8 +277,10 @@ def verify_trial(root_path):
         "status": "disposable_trial_registration_verified",
         "trial_root": str(root),
         "brave_user_data_dir": str(root / "profile"),
+        "brave_xdg_config_home": str(_xdg_home(root)),
+        "native_host_manifest": str(host_dir / HOST_MANIFEST),
         "exact_extension_id": match.group(1),
-        "registration_scoped_to_disposable_profile": True,
+        "registration_scoped_to_disposable_trial": True,
         "host_source_matches_repo": True,
         "browser_launched_by_tool": False,
         "local_transport_tested": False,

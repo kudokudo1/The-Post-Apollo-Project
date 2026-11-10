@@ -56,6 +56,11 @@ def plan_launch(trial_root, browser_binary):
         raise LaunchPlanError("INVALID DISPOSABLE PROFILE") from exc
     binary = _candidate_executable(browser_binary, trial_root=root)
     profile = str(root / "profile")
+    xdg = str(root / "xdg-config")
+    expected_manifest = str(
+        root / "xdg-config" / "BraveSoftware" / "Brave-Browser"
+        / "NativeMessagingHosts" / "org.postapollo.machine_brave_probe.json"
+    )
     return {
         "kind": "machine-brave-disposable-native-launch-preview-v1",
         "status": "operator_review_required",
@@ -67,6 +72,10 @@ def plan_launch(trial_root, browser_binary):
             "--no-default-browser-check",
         ],
         "expected_user_data_dir": profile,
+        # The browser's native host lookup follows XDG_CONFIG_HOME,
+        # *not* the --user-data-dir profile on the observed Brave RPM.
+        "environment_overrides": {"XDG_CONFIG_HOME": xdg},
+        "expected_native_host_manifest": expected_manifest,
         "manual_check_url": "brave://version",
         "expected_profile_path_prefix": profile + "/",
         "browser_launched_by_tool": False,

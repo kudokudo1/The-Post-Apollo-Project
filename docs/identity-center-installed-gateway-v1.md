@@ -31,6 +31,14 @@ Its unoverrideable composite gate calls **both** witnesses for the connected ker
 
 **Strict limitation:** `InstalledGatewayWitness` is the disposable Ubuntu dpkg/systemd CI witness, not a production Silverblue RPM/OSTree/SELinux or protected C4b release witness. C4b and C5 have not supplied an accepted Identity-specific enrollment/seat/one-use consent interface. The adapter is therefore **not** a desktop activation/authorization grant; CPU++ controls remain disabled. Future production integration requires an independent, explicitly reviewed authority adapter rather than assuming this CI witness is sufficient.
 
+### Native caller-path and in-flight trust-loss regression (November 10, 2026)
+
+Identity-owned `tests/identity/test_native_adapter_only_call_path_v1.py` inspects shipped `services/**` and `widgets/**` source and fails if a new caller imports or constructs the experimental `SignedIdentityCommandClient` directly instead of going through the mandatory `InstalledIdentityCommandAdapterV1`. It also asserts the adapter still composes **both** live origin and installed-witness predicates, and that CPU++'s existing Sign In/Cancel/Retry readiness flags remain hard-disabled. This is a **source-level regression contract**, not an OS access-control policy or proof that unrelated external code cannot instantiate Python classes. A later owner-reviewed native bridge must preserve this invariant.
+
+The real installed signed-command tests additionally cause **peer trust**, **seat trust** and the **installed-process witness** to be revoked **after the request is sent but before the signed response is accepted**. Each must fault closed despite a valid signed `UNAVAILABLE` receipt. The disposable gateway does not launch a login.
+
+**Production remains blocked:** neither C4b's Identity-specific Silverblue signed RPM/systemd/SELinux/release-and-rollback evidence nor C5's authenticated one-use operator consent is implemented by these tests. UI activation, production signer custody, real provider login and cross-owner source edits are excluded.
+
 ### Adversarial acceptance covered
 
 - Running **actual installed** gateway process and signed command receipt, with real kernel SO_PEERCRED, external systemd PID, package file/module hashes and current LSM/cgroup observations

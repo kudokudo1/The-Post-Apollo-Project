@@ -265,9 +265,9 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('model: trashLauncher.archiveFilteredRows', TRASH)
         for label in ('"EVENTS"', '"DOSSIERS"', '"SCRAPES"'):
             self.assertIn(label, TRASH)
-        self.assertIn('SOURCES READ-ONLY // SAVE COPY ENABLED FOR DEMO SCRAPES ONLY', TRASH)
+        self.assertIn('SAVE COPY // WEATHER EVENTS OR DEMO SCRAPES.', TRASH)
         self.assertIn('visible: trashLauncher.activeMode === "burn"', TRASH)
-        self.assertIn('Only SYSTEM TRASH currently supports Burn.', TRASH)
+        self.assertIn('Original Weather archives, Hospital and Finance records remain protected.', TRASH)
         self.assertNotIn('onLeftClicked: trashLauncher.burnRecord(', TRASH)
         self.assertNotIn('onLeftClicked: trashLauncher.trashRecord(', TRASH)
 
@@ -313,11 +313,37 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('id: confirmManagedResearchBurn', TRASH)
         self.assertIn('id: cancelManagedResearchBurn', TRASH)
         self.assertIn('onLeftClicked: trashLauncher.clearResearchBurn()', TRASH)
-        self.assertIn('onLeftClicked: trashLauncher.confirmResearchBurn()', TRASH)
-        self.assertIn('SCOPE // ONE TRASH++ DEMO RESEARCH COPY', TRASH)
+        self.assertIn('onLeftClicked: trashLauncher.advanceResearchBurn()', TRASH)
+        self.assertIn('SCOPE // ONE TRASH++ MANAGED COPY', TRASH)
         self.assertIn('Original', TRASH) if 'Original' in TRASH else self.assertIn('original demo scrape', TRASH)
         self.assertIn('researchBurnId !== ""', TRASH)
         self.assertIn('clearResearchBurn();', TRASH)
+
+    def test_weather_event_copy_and_red_remove_button(self):
+        self.assertIn('function saveWeatherEventCopy(row)', TRASH)
+        self.assertIn('runResearch("archive-event"', TRASH)
+        self.assertIn('row.sourceEventKey', TRASH)
+        self.assertIn('row.sourceLastCapturedAtMs', TRASH)
+        self.assertIn('modelData.kind === "EVENT HISTORY"', TRASH)
+        self.assertIn('modelData.kind === "SAVED EVENT"', TRASH)
+        self.assertIn('trashLauncher.saveWeatherEventCopy(modelData)', TRASH)
+        self.assertIn('? Colors.red : Colors.cyan', TRASH)
+        self.assertIn('Original Weather events, demo scrape exports', TRASH)
+
+    def test_copy_burn_requires_two_clicks_and_visible_loading(self):
+        self.assertIn('function advanceResearchBurn()', TRASH)
+        self.assertIn('researchBurnClickArmed = true;', TRASH)
+        self.assertIn('!researchBurnClickArmed || !researchBurnLoadComplete', TRASH)
+        self.assertIn('researchBurnArmAnimation.restart();', TRASH)
+        self.assertIn('id: researchBurnArmAnimation', TRASH)
+        self.assertIn('duration: 850', TRASH)
+        self.assertIn('id: researchBurnLoadBar', TRASH)
+        self.assertIn('idleBorderWidth: 2', TRASH)
+        self.assertIn('idleBorderColor: Colors.red', TRASH)
+        self.assertIn('"CLICK AGAIN // BURN"', TRASH)
+        self.assertIn('"CLICK TO ARM"', TRASH)
+        self.assertIn('onLeftClicked: trashLauncher.advanceResearchBurn()', TRASH)
+        self.assertNotIn('onLeftClicked: trashLauncher.confirmResearchBurn()', TRASH)
 
     def test_burn_all_requires_spatially_separate_modal_and_pointer_relocation(self):
         self.assertIn('property bool burnAllPointerRelocated: false', TRASH)

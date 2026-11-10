@@ -39,12 +39,17 @@ PanelWindow {
     // never write targets. Revision increments protect concurrent changes.
     property var researchRows: []
     property int researchRevision: 0
+    property int researchBinCount: 0
+    property string researchBinDigest: ""
     property bool researchBusy: false
     property string researchPending: ""
     property string researchState: "NOT_SCANNED"
     property string researchBurnId: ""
+    property string researchBurnScope: "" // "" | "copy" | "all"
     property string researchBurnTitle: ""
     property int researchBurnRevision: -1
+    property int researchBurnCount: 0
+    property string researchBurnDigest: ""
     property bool researchBurnPointerRelocated: false
     property bool researchBurnClickArmed: false
     property bool researchBurnLoadComplete: false
@@ -107,9 +112,14 @@ PanelWindow {
     function runResearch(action, args) {
         if (!menuOpen || researchBusy || researchBurnId !== ""
                 || (activeMode !== "archive" && activeMode !== "burn"
-                    && !(activeMode === "trash" && action === "list")))
+                    && !(activeMode === "trash"
+                         && ["list", "restore", "burn"].indexOf(action) >= 0)))
             return false;
-        if (["list", "archive", "archive-event", "trash", "restore", "burn"].indexOf(action) < 0)
+        if (["list", "archive", "archive-event", "trash", "restore", "burn",
+             "burn-all"].indexOf(action) < 0)
+            return false;
+        if (activeMode === "trash"
+                && ["list", "restore", "burn"].indexOf(action) < 0)
             return false;
         researchBusy = true;
         researchPending = action;
@@ -143,16 +153,20 @@ PanelWindow {
         if (!payload || payload.ok !== true
                 || payload.kind !== "managed-research"
                 || !Array.isArray(payload.items)
-                || typeof payload.revision !== "number") {
+                || typeof payload.revision !== "number"
+                || typeof payload.binCount !== "number"
+                || typeof payload.binDigest !== "string") {
             researchState = "STALE // " + String(payload && payload.error
                                                 || "RESEARCH STORE UNAVAILABLE");
             return;
         }
         researchRows = payload.items;
         researchRevision = payload.revision;
+        researchBinCount = payload.binCount;
+        researchBinDigest = payload.binDigest;
         researchState = action === "list" ? "READY // SAVED RESEARCH"
                                          : action.toUpperCase() + " // COMPLETE";
-        if (action === "burn")
+        if (action === "burn" || action === "burn-all")
             clearResearchBurn();
     }
 
@@ -197,8 +211,11 @@ PanelWindow {
     function clearResearchBurn() {
         researchBurnArmAnimation.stop();
         researchBurnId = "";
+        researchBurnScope = "";
         researchBurnTitle = "";
         researchBurnRevision = -1;
+        researchBurnCount = 0;
+        researchBurnDigest = "";
         researchBurnPointerRelocated = false;
         researchBurnClickArmed = false;
         researchBurnLoadComplete = false;
@@ -215,7 +232,28 @@ PanelWindow {
                    }) < 0)
             return false;
         researchBurnId = String(row.id);
+        researchBurnScope = "copy";
         researchBurnTitle = String(row.title);
+        researchBurnRevision = researchRevision;
+        researchBurnPointerRelocated = false;
+        researchBurnClickArmed = false;
+        researchBurnLoadComplete = false;
+        researchBurnLoadProgress = 0;
+        return true;
+    }
+
+    function armResearchBurnAll() {
+        if (!menuOpen || activeMode !== "burn" || researchBusy || busy
+                || confirmMode !== "" || researchBurnId !== ""
+                || researchBinCount < 1
+                || researchBinCount !== researchBinRows.length
+                || researchBinDigest.length !== 64)
+            return false;
+        researchBurnId = "__managed_bin_all__"; // impossible record ID
+        researchBurnScope = "all";
+        researchBurnTitle = researchBinCount + " TRASHED MANAGED COPIES";
+        researchBurnCount = researchBinCount;
+        researchBurnDigest = researchBinDigest;
         researchBurnRevision = researchRevision;
         researchBurnPointerRelocated = false;
         researchBurnClickArmed = false;
@@ -245,7 +283,25 @@ PanelWindow {
         if (!researchBurnId || !researchBurnPointerRelocated
                 || !researchBurnClickArmed || !researchBurnLoadComplete
                 || researchBurnRevision !== researchRevision
-                || researchBusy || busy
+                || researchBusy || busy)
+            return false;
+        if (researchBurnScope === "all") {
+            if (activeMode !== "burn"
+                    || researchBurnCount < 1
+                    || researchBurnCount !== researchBinCount
+                    || researchBurnCount !== researchBinRows.length
+                    || researchBurnDigest !== researchBinDigest)
+                return false;
+            const rev = researchBurnRevision;
+            const count = researchBurnCount;
+            const digest = researchBurnDigest;
+            clearResearchBurn();
+            return runResearch("burn-all", [
+                String(rev), String(count), digest,
+                "BURN_ALL_MANAGED_COPIES_CONFIRMED"
+            ]);
+        }
+        if (researchBurnScope !== "copy"
                 || researchRows.findIndex(function(row) {
                     return row.id === researchBurnId && row.state === "trashed";
                 }) < 0)

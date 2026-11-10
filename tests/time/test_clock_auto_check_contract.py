@@ -65,6 +65,38 @@ class ClockAutoReferenceContracts(unittest.TestCase):
         self.assertIn("dialRoot.finishFreePosition()", DIAL)
         self.assertIn("angleForValue(Number(numericReferenceValues[index]))", DIAL)
 
+    def test_shared_dial_labels_are_readable_by_default(self):
+        # Previous defaults were 6/7px markings and an 8px readout.
+        # The defaults affect Radio and Git as well as Clock.
+        self.assertIn("property int numericLabelPixelSize: 12", DIAL)
+        self.assertIn("property int textLabelPixelSize: 10", DIAL)
+        self.assertIn("property int readoutPixelSize: 13", DIAL)
+        self.assertIn("dialRoot.numericLabelPixelSize", DIAL)
+        self.assertIn("dialRoot.textLabelPixelSize", DIAL)
+        self.assertIn("font.pixelSize: dialRoot.readoutPixelSize", DIAL)
+        self.assertNotIn("font.pixelSize: dialRoot.optionCount() > 4 ? 6 : 7", DIAL)
+
+    def test_clock_dial_captures_wheel_and_drag_without_page_flick(self):
+        # Both nested mouse areas must block their Flickable ancestor from
+        # stealing a click or rotary drag halfway through its gesture.
+        self.assertIn("id: rotaryMouse", DIAL)
+        self.assertGreaterEqual(DIAL.count("preventStealing: true"), 2)
+        self.assertIn("WheelHandler {", DIAL)
+        self.assertIn("target: null", DIAL)
+        self.assertIn("PointerDevice.Mouse | PointerDevice.TouchPad", DIAL)
+        self.assertIn("event.accepted = true;", DIAL)
+        self.assertIn("dialRoot.stepIndex(event.angleDelta.y > 0 ? -1 : 1);", DIAL)
+        self.assertIn("readonly property bool pointerOverDial:", DIAL)
+        self.assertIn("id: dialHoverHandler", DIAL)
+        self.assertIn("interactive: !(pane.showAutoTimeCheck && autoCheckDial.interactive", PANE)
+        self.assertIn("autoCheckDial.pointerOverDial || autoCheckDial.dragging", PANE)
+        # Previously approved one-hour bounded nonwrapping detents stay intact.
+        self.assertIn("minimumValue: 1", PANE)
+        self.assertIn("maximumValue: 168", PANE)
+        self.assertIn("snapContinuousToStep: true", PANE)
+        self.assertIn("function steppedValue(value)", DIAL)
+        self.assertIn("dialRoot.finishFreePosition()", DIAL)
+
     def test_operator_controls_and_privacy_remain_visible(self):
         self.assertIn("setAutoCheckIntervalHours(", PANE)
         self.assertIn("setAutoCheckEnabled(", PANE)

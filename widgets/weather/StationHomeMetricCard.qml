@@ -8,6 +8,8 @@ Rectangle {
     property string valueText: "--"
     property string detailText: ""
     property string footerText: ""
+    // W3 // All existing readings; compact presentation is HISTORY-only.
+    property bool compact: false
 
     property color accentColor: Colors.cyan
     property color valueColor: Colors.white
@@ -30,12 +32,12 @@ Rectangle {
 
     Column {
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 5
+        anchors.margins: card.compact ? 4 : 10
+        spacing: card.compact ? 1 : 5
 
         GohuText {
             text: card.title
-            font.pixelSize: 10
+            font.pixelSize: card.compact ? 9 : 10
             color: card.accentColor
             width: parent.width - (card.pinEnabled ? 32 : 0)
             elide: Text.ElideRight
@@ -43,7 +45,7 @@ Rectangle {
 
         GohuText {
             text: card.valueText
-            font.pixelSize: 20
+            font.pixelSize: card.compact ? 15 : 20
             color: card.valueColor
             elide: Text.ElideRight
             width: parent.width
@@ -51,7 +53,7 @@ Rectangle {
 
         QuietText {
             text: card.detailText
-            font.pixelSize: 10
+            font.pixelSize: card.compact ? 8 : 10
             elide: Text.ElideRight
             width: parent.width
             visible: text.length > 0
@@ -78,7 +80,7 @@ Rectangle {
 
         QuietText {
             text: card.footerText
-            font.pixelSize: 9
+            font.pixelSize: card.compact ? 8 : 9
             elide: Text.ElideRight
             width: parent.width
             visible: text.length > 0

@@ -316,13 +316,20 @@ C4B_C3B_DIR_DIAG
     fail "C4D_PRODUCER_DIRECTORY_UNSAFE"
   c4d_record="$c4d_record_dir/observation.txt"
   umask 077
-  # pipefail prevents a failed signed-process probe from being converted to
-  # success just because tee created a file; the original stdout is retained.
-  GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1 \
-    timeout --signal=TERM --kill-after=5s 60s "$python" -I -B - \
-      "$pid" "$assets/c3d-status.rpm" <<'C4B_RUNNING_HOST_PROBE' | \
-    /usr/bin/tee -- "$c4d_record" ||
-    fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"
+  # Capture the verifier's REAL stdout into the protected 0600 file
+  # directly, using noclobber so neither a pre-existing path nor a symlink
+  # can be overwritten. The old extra tee pipeline yielded an empty record
+  # in the real guest. The later strictly validating relay, not this shell,
+  # decides what diagnostic bytes may reach ttyS0. The verifier's exit code
+  # remains authoritative; an empty capture cannot grant host trust.
+  [[ ! -e "$c4d_record" && ! -L "$c4d_record" ]] ||
+    fail "C4D_PRODUCER_RECORD_PREEXISTS"
+  (
+    set -C
+    GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1 \
+      timeout --signal=TERM --kill-after=5s 60s "$python" -I -B - \
+        "$pid" "$assets/c3d-status.rpm" > "$c4d_record" <<'C4B_RUNNING_HOST_PROBE'
+  ) || fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"
 import grp, hashlib, json, os, pwd, re, stat, subprocess, sys
 from pathlib import Path
 
@@ -500,6 +507,13 @@ except (Refused, OSError, KeyError, ValueError, UnicodeError) as exc:
           (str(exc) if isinstance(exc, Refused) else type(exc).__name__), flush=True)
     sys.exit(2)
 C4B_RUNNING_HOST_PROBE
+  # Status-only diagnostics, never echo the producer's unvalidated bytes.
+  # Distinguish a genuinely empty stdout capture from later file replacement.
+  if [[ -s "$c4d_record" ]]; then
+    echo "C4D_PRODUCER_DIAG // DIRECT_STDOUT_CAPTURE_PRESENT"
+  else
+    echo "C4D_PRODUCER_DIAG // DIRECT_STDOUT_CAPTURE_EMPTY"
+  fi
   echo "C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED"
 
   stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN

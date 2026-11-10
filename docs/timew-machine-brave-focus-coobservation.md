@@ -57,12 +57,34 @@ python3 -B -I services/time/MachineBraveNativeFocusManifest.py \
 ```
 
 It only **prints a proposed manifest**; it does not create a file.
-The later authorized disposable setup would copy the host executable,
-set executable permission, and register the generated JSON **only** in
-`$TRIAL/xdg-config/BraveSoftware/Brave-Browser/NativeMessagingHosts/`.
+The new host imports four existing Python modules, so copying **only
+the executable** would fail. Instead, the repository provides a separate
+fail-closed installer for the **already marked and verified** temporary
+Brave trial. It copies the host and its required dependency bundle,
+sets private executable/file permissions and creates the new exact-origin
+manifest without modifying or overwriting the transport-only probe.
+
+**After separate explicit local-write approval**, the operator can run:
+
+```sh
+python3 -B -I services/time/MachineBraveFocusTrial.py \
+  register /tmp/YOUR_APPROVED_MARKED_TRIAL YOUR_TEST_EXTENSION_ID
+python3 -B -I services/time/MachineBraveFocusTrial.py \
+  verify /tmp/YOUR_APPROVED_MARKED_TRIAL
+```
+
+The installer accepts only an existing `/tmp/postapollo-machine-brave-trial-*`
+created by `MachineBraveDisposableTrial.py init`, already registered
+under the **same exact extension ID**. It writes only new files under that
+trial, including
+`$TRIAL/xdg-config/BraveSoftware/Brave-Browser/NativeMessagingHosts/`,
+and refuses symlinks, collisions, mismatched sources, unsafe permissions
+or regular Brave paths.
+
 An isolated test Brave must be launched with both its dedicated
 `--user-data-dir` and `XDG_CONFIG_HOME` matching that trial, as in the
-operator-verified earlier transport test.
+operator-verified earlier transport test. No local registration was
+performed as part of this repository PR.
 
 After explicit local approval and registration: open a normal,
 non-private test Brave window, open the extension popup, grant
@@ -111,6 +133,7 @@ normal Brave, and no automatic background operation.
 - [x] Existing read-only Brave inventory and native probe retained
 - [x] Existing Sway double-read witness reused
 - [x] New isolated native host and pure exact-origin manifest generator
+- [x] Disposable trial-only dependency installer and tamper/refusal tests
 - [x] Explicit browser click with exact challenge/response validation
 - [x] Safety tests, contract tests and dedicated CI workflow
 - [ ] Source CI and independent review

@@ -70,8 +70,9 @@ PanelWindow {
     readonly property var burnDisplayRows: {
         const fileRows = (burnFilter === "all" || burnFilter === "files")
             ? items.map(function(row) {
-                return {entryType:"file", title:row.name, original:row.original,
-                        uri:row.uri, originLabel:row.originLabel};
+                return {entryType:"file", title:row.name, name:row.name,
+                        original:row.original, uri:row.uri,
+                        originLabel:row.originLabel};
             }) : [];
         const copyRows = researchBinRows.filter(function(row) {
             return burnFilter !== "files"

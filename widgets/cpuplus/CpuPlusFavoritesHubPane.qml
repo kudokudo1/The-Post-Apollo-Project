@@ -25,6 +25,8 @@ Item {
     property alias categoryRowRepeater: categoryRowsRepeater
     property alias dossierGroupItems: dossierGroupRepeater
     property alias dossierScrollArea: dossierScroll
+    property alias collectionScrollArea: collectionScroll
+    property alias listScrollArea: listScroll
     property alias collapseAllControl: collapseAllButton
     property alias searchQuery: favoritesSearchInput.text
     property alias collectionGroupItems: collectionGroupRepeater
@@ -243,7 +245,7 @@ Item {
                 contentHeight: collectionRows.implicitHeight
                 Column {
                     id: collectionRows
-                    width: collectionScroll.width
+                    width: Math.max(0,collectionScroll.width-24)
                     spacing: 3
                     Repeater {
                         id: collectionGroupRepeater
@@ -413,7 +415,7 @@ Item {
 
             Column {
                 id: dossierRows
-                width: dossierScroll.width
+                width: Math.max(0,dossierScroll.width-24)
                 spacing: 5
                 Repeater {
                     id: dossierGroupRepeater
@@ -863,7 +865,7 @@ Item {
 
             Column {
                 id: listRows
-                width: listScroll.width
+                width: Math.max(0,listScroll.width-24)
                 spacing: 5
                 Repeater {
                     id: savedItemRows
@@ -1135,6 +1137,39 @@ Item {
                     subfilterScroll.contentX+140)
             }
         }
+    }
+
+    // CPU++ stage 1 // Three scrollable Favorites++ sections have ONE
+    // shared rounded-bar grammar, each bound to its OWN visible viewport.
+    // Mount all tracks on the non-positioning pane, not the two Columns:
+    // otherwise Qt positions the bar BELOW the scrollable content.
+    // The content rows reserve a 24px right gutter for rail and glow.
+    NeonScrollBar {
+        id: collectionScrollTrack
+        flickable: collectionScroll
+        mountingParent: pane
+        geometryHost: collectionScroll
+        handleStyle: "bar"
+        maximumBarHandleHeight: 42
+        visible: pane.area==="overview" && collectionScroll.visible && scrollable
+    }
+    NeonScrollBar {
+        id: dossierScrollTrack
+        flickable: dossierScroll
+        mountingParent: pane
+        geometryHost: dossierScroll
+        handleStyle: "bar"
+        maximumBarHandleHeight: 42
+        visible: pane.area==="overview" && dossierScroll.visible && scrollable
+    }
+    NeonScrollBar {
+        id: listScrollTrack
+        flickable: listScroll
+        mountingParent: pane
+        geometryHost: listScroll
+        handleStyle: "bar"
+        maximumBarHandleHeight: 42
+        visible: pane.area==="selector" && listScroll.visible && scrollable
     }
 
     Column {

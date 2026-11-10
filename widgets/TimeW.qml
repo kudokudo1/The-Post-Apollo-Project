@@ -25,6 +25,7 @@ PanelWindow {
     id: timew
 
     property bool menuOpen: false
+    property bool syncPopoverOpen: false
     property bool keyboardActive: true
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
@@ -1858,6 +1859,28 @@ PanelWindow {
     property int selectedModeIndex: 0
     readonly property string selectedMode: modes[selectedModeIndex].id
     readonly property string selectedName: modes[selectedModeIndex].name
+    // Full heading follows the active TIME mode; the strip keeps CALC.
+    readonly property string headingModeName:
+        selectedMode === "calc" ? "CALCULATOR" : selectedName
+
+    function closeSyncPopover() {
+        syncPopoverOpen = false;
+        // Closing an unconfirmed sheet must not leave a hidden host-time
+        // confirmation pending. An already requested auth is not cancelled.
+        TimeSettings.cancelResync();
+        Qt.callLater(restoreKeyboardFocus);
+    }
+
+    function toggleSyncPopover() {
+        if (syncPopoverOpen) {
+            closeSyncPopover();
+            return;
+        }
+        syncPopoverOpen = true;
+        // Preparation is not execution: CONFIRM remains a separate click
+        // and the existing Polkit/host-time owner retains all authority.
+        TimeSettings.prepareResync();
+    }
 
     function toggle() {
         menuOpen = !menuOpen;
@@ -1888,7 +1911,7 @@ PanelWindow {
             universalFavoritesOpen = false;
             dismissWorldSearchPopup();
             closeConverterDropdowns();
-            TimeSettings.cancelResync();
+            closeSyncPopover();
         }
         if (menuOpen) {
             Qt.callLater(restoreKeyboardFocus);
@@ -1903,6 +1926,8 @@ PanelWindow {
         }
     }
     onSelectedModeChanged: {
+        if (syncPopoverOpen)
+            closeSyncPopover();
         if (selectedMode !== "clock")
             dismissWorldSearchPopup();
         if (selectedMode !== "calc")
@@ -2597,7 +2622,10 @@ PanelWindow {
             if (!timew.navigationKeysAvailable)
                 return;
             if (event.key === Qt.Key_Escape) {
-                timew.menuOpen = false;
+                if (timew.syncPopoverOpen)
+                    timew.closeSyncPopover();
+                else
+                    timew.menuOpen = false;
             } else if (event.key === Qt.Key_Tab
                        || event.key === Qt.Key_Backtab) {
                 const reverse = event.key === Qt.Key_Backtab
@@ -2626,7 +2654,12 @@ PanelWindow {
         sequence: "Esc"
         context: Qt.WindowShortcut
         enabled: timew.navigationKeysAvailable
-        onActivated: timew.menuOpen = false
+        onActivated: {
+            if (timew.syncPopoverOpen)
+                timew.closeSyncPopover();
+            else
+                timew.menuOpen = false;
+        }
     }
 
     WindowPanelFrame {
@@ -2698,6 +2731,140 @@ PanelWindow {
             }
         }
 
+        // Clicking anywhere outside the yellow ⟳ trigger and its popup
+        // dismisses only this overlay. No navigation to SETTINGS is needed.
+        TapHandler {
+            enabled: timew.syncPopoverOpen
+            gesturePolicy: TapHandler.DragThreshold
+            onTapped: function(point, button) {
+                if (button !== Qt.LeftButton)
+                    return;
+                const p = point.position;
+                const menu = syncPopover.mapToItem(timewFrame, 0, 0);
+                const trigger = syncButton.mapToItem(timewFrame, 0, 0);
+                const overMenu = p.x >= menu.x
+                                 && p.x <= menu.x + syncPopover.width
+                                 && p.y >= menu.y
+                                 && p.y <= menu.y + syncPopover.height;
+                const overTrigger = p.x >= trigger.x
+                                    && p.x <= trigger.x + syncButton.width
+                                    && p.y >= trigger.y
+                                    && p.y <= trigger.y + syncButton.height;
+                if (!overMenu && !overTrigger)
+                    timew.closeSyncPopover();
+            }
+        }
+
+        Rectangle {
+            id: syncPopover
+            visible: timew.syncPopoverOpen && timew.menuOpen
+            z: 100
+            width: 306
+            height: 222
+            x: Math.max(8, Math.min(timewFrame.width - width - 8,
+                syncButton.mapToItem(timewFrame, syncButton.width, 0).x - width))
+            y: syncButton.mapToItem(timewFrame, 0, syncButton.height).y + 6
+            color: Colors.black
+            border.color: Colors.yellow
+            border.width: 1
+            radius: 0
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 9
+                spacing: 6
+
+                GohuText {
+                    width: parent.width
+                    height: 19
+                    text: "RESYNC // HOST TIME"
+                    font.pixelSize: 13
+                    color: Colors.yellow
+                }
+                GohuText {
+                    width: parent.width
+                    height: 40
+                    wrapMode: Text.WordWrap
+                    text: "CONFIRM CONTACTS TIME SERVERS (IP VISIBLE). " +
+                          "CORRECTION MAY CHANGE SYSTEM / FILE TIMES."
+                    font.pixelSize: 10
+                    color: Colors.white
+                }
+                Row {
+                    width: parent.width
+                    height: 31
+                    spacing: 6
+                    ActionButton {
+                        width: (parent.width - parent.spacing) / 2
+                        height: 30
+                        label: "CONFIRM RESYNC"
+                        labelPixelSize: 10
+                        contentPadding: 3
+                        accentColor: Colors.yellow
+                        available: TimeSettings.resyncConfirmRequired
+                                   && !TimeSettings.authSessionActive
+                                   && !TimeSettings.resyncAuthPending
+                        onLeftClicked: TimeSettings.requestResync()
+                    }
+                    ActionButton {
+                        width: (parent.width - parent.spacing) / 2
+                        height: 30
+                        label: TimeSettings.resyncConfirmRequired
+                               ? "CANCEL" : "CLOSE"
+                        labelPixelSize: 10
+                        contentPadding: 3
+                        accentColor: Colors.red
+                        onLeftClicked: timew.closeSyncPopover()
+                    }
+                }
+                Row {
+                    width: parent.width
+                    height: 31
+                    spacing: 6
+                    ActionButton {
+                        width: (parent.width - parent.spacing) / 2
+                        height: 30
+                        label: "DIAGNOSE"
+                        labelPixelSize: 10
+                        contentPadding: 3
+                        accentColor: Colors.cyan
+                        available: !TimeSettings.diagnosticBusy
+                        onLeftClicked: TimeSettings.diagnoseResync()
+                    }
+                    ActionButton {
+                        width: (parent.width - parent.spacing) / 2
+                        height: 30
+                        label: "CHECK TIME"
+                        labelPixelSize: 10
+                        contentPadding: 3
+                        accentColor: Colors.magenta
+                        available: !TimeSettings.referenceChecking
+                                   && !TimeSettings.authSessionActive
+                        onLeftClicked: TimeSettings.checkTimeAccuracy()
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    height: 32
+                    wrapMode: Text.WordWrap
+                    elide: Text.ElideRight
+                    text: "RESULT // " + TimeSettings.resyncMessage
+                    font.pixelSize: 10
+                    color: Colors.yellow
+                }
+                GohuText {
+                    width: parent.width
+                    height: 23
+                    elide: Text.ElideRight
+                    text: TimeSettings.diagnosticBusy
+                          ? "DIAG // CHECKING..."
+                          : "DIAG // " + TimeSettings.diagnosticMessage
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                }
+            }
+        }
+
         Column {
             id: chassis
             anchors.fill: parent
@@ -2719,7 +2886,10 @@ PanelWindow {
                     font.pixelSize: 18
                     font.weight: 700
                     color: Colors.magenta
-                    text: "TIME // W"
+                    text: "TIME // " + timew.headingModeName
+                    fontSizeMode: Text.HorizontalFit
+                    minimumPixelSize: 12
+                    elide: Text.ElideRight
                 }
 
                 Rectangle {
@@ -2798,12 +2968,10 @@ PanelWindow {
                     hoverWideGlowColor: Colors.yellow
                     pressedWideGlowColor: Colors.yellow
                     wideGlowEnabled: true
-                    available: TimeSettings.resyncStatus !== "working"
-                               && !TimeSettings.resyncAuthPending
-                    onLeftClicked: {
-                        timew.chooseMode(timew.modes.length - 1);
-                        TimeSettings.prepareResync();
-                    }
+                    // Even while auth/diagnostics are active the operator may
+                    // open the panel to inspect status, never to auto-resync.
+                    available: timew.menuOpen
+                    onLeftClicked: timew.toggleSyncPopover()
                 }
 
                 ActionButton {

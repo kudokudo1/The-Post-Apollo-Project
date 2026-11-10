@@ -78,6 +78,9 @@ check('id: workerNameLabel' in manager
       and 'color: Colors.orange' in manager
       and 'id: workerSepOne' in manager
       and 'id: workerSepTwo' in manager
+      and 'id: staffWorkerName' in manager
+      and 'id: staffSepOne' in manager
+      and 'id: staffSepTwo' in manager
       and 'text: " // "' in manager
       and 'color: Colors.white' in manager
       and 'color: Colors.orange' in manager,

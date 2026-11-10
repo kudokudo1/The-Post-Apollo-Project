@@ -20,6 +20,7 @@ Item {
     property bool showHostDiagnostics: true
     property bool showResyncDiagnostics: true
     property bool showReferenceExplanation: true
+    property bool showAutoTimeCheck: true
     property bool zonePickerExpanded: false
     readonly property bool zoneSearchFocused: systemZonePicker.searchFocused
 
@@ -348,6 +349,136 @@ Item {
                 height: 2
                 color: Colors.cyan
                 opacity: 0.6
+            }
+
+            // Shared Radio/Git encoder, opt-in bounded hourly ratchet.
+            // Range is 1..168 hours (one week), with exact day landmarks.
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: pane.showAutoTimeCheck
+                GohuText {
+                    width: parent.width
+                    text: "AUTO // REFERENCE CHECK INTERVAL"
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                }
+                Row {
+                    width: parent.width
+                    height: 166
+                    spacing: 6
+                    SelectorDial {
+                        id: autoCheckDial
+                        width: 136
+                        height: 160
+                        labelText: "INTERVAL"
+                        selectorMode: "continuous"
+                        minimumValue: 1
+                        maximumValue: 168
+                        valueStep: 1
+                        valueDecimals: 0
+                        snapContinuousToStep: true
+                        options: ["1H", "1D", "2D", "3D", "4D", "5D", "6D", "7D"]
+                        numericReferenceValues: [1, 24, 48, 72, 96, 120, 144, 168]
+                        currentValue: TimeSettings.autoCheckIntervalHours
+                        readoutText: Math.round(previewNumericValue) + "H"
+                        accentColor: Colors.cyan
+                        markerColor: Colors.orange
+                        interactive: TimeSettings.autoCheckCanEdit
+                        onValueRequested: function(hours) {
+                            TimeSettings.setAutoCheckIntervalHours(Math.round(hours));
+                        }
+                    }
+                    Column {
+                        width: Math.max(0, parent.width - autoCheckDial.width - parent.spacing)
+                        spacing: 8
+                        GohuText {
+                            width: parent.width
+                            text: "EVERY // " + TimeSettings.autoCheckIntervalHours + " HOURS"
+                            color: Colors.yellow
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "MAX // 168H // 7 DAYS"
+                            color: Colors.white
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
+                        TimeActionButton {
+                            width: parent.width
+                            height: 34
+                            actionRole: "sync"
+                            label: TimeSettings.autoCheckEnabled
+                                   ? "AUTO CHECK ON" : "AUTO CHECK OFF"
+                            labelPixelSize: 10
+                            selected: TimeSettings.autoCheckEnabled
+                            available: TimeSettings.autoCheckCanEdit
+                            onLeftClicked: {
+                                TimeSettings.setAutoCheckEnabled(
+                                    !TimeSettings.autoCheckEnabled);
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "1H DETENTS // NO WRAP"
+                            color: Colors.cyan
+                            font.pixelSize: 9
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "LAST CHECK // "
+                          + (TimeSettings.autoCheckLastAttemptAtMs > 0
+                             ? Qt.formatDateTime(
+                                 new Date(TimeSettings.autoCheckLastAttemptAtMs),
+                                 "yyyy-MM-dd HH:mm")
+                             : "NEVER")
+                    color: Colors.white
+                    font.pixelSize: 10
+                }
+                GohuText {
+                    width: parent.width
+                    text: "NEXT // "
+                          + (!TimeSettings.autoCheckEnabled ? "OFF"
+                             : TimeSettings.autoCheckNextDueAtMs > 0
+                             ? Qt.formatDateTime(
+                                 new Date(TimeSettings.autoCheckNextDueAtMs),
+                                 "yyyy-MM-dd HH:mm")
+                             : "ON ENABLE")
+                    color: Colors.white
+                    font.pixelSize: 10
+                }
+                GohuText {
+                    width: parent.width
+                    text: "STATUS // " + TimeSettings.autoCheckResult
+                    color: Colors.yellow
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    visible: TimeSettings.autoCheckErrorCode !== ""
+                    width: parent.width
+                    text: "STORAGE // " + TimeSettings.autoCheckErrorCode
+                    color: Colors.orange
+                    font.pixelSize: 10
+                }
+                GohuText {
+                    width: parent.width
+                    text: "Automatic checks contact configured Chrony/NTP sources while Quickshell is running. They may see your IP. Checks NEVER set Linux time; host NTP maintains automatic correction. One-shot RESYNC still requires confirmation and Polkit."
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 2
+                    color: Colors.cyan
+                    opacity: 0.6
+                }
             }
 
             Row {

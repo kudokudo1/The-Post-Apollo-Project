@@ -57,7 +57,8 @@ check('function acceptLivePhrase(text)' in manager
       "Guard live text length and never auto submit")
 check('id: editorFrame' in manager
       and 'anchors.right: parent.right' in manager
-      and 'anchors.top: parent.top' in manager
+      and 'anchors.verticalCenter: parent.verticalCenter' in manager
+      and 'anchors.rightMargin: 2' in manager
       and 'id: micAction' in manager
       and 'label: "CANCEL"' in manager,
       "MIC/STOP and CANCEL live INSIDE each prompt rectangle")
@@ -88,6 +89,53 @@ check('id: workerNameLabel' in manager
 for forbidden in ('OPENAI_API_KEY', 'session-create', 'room-bind',
                   'git checkout', 'git push', 'fetch(', 'requests.post('):
     check(forbidden not in script + live, "Voice process cannot launch or mutate: "+forbidden)
+# Cross-surface repair: preserve a single live local speech transport while
+# keeping explicit SEND/ASK actions separate from streaming text insertion.
+frontdesk = (root / "services/hospital/HospitalSpeechInputService.qml").read_text()
+reception = (root / "widgets/HospitalReceptionistView.qml").read_text()
+intercom = (root / "widgets/HospitalIntercomMenu.qml").read_text()
+check(host.count('liveStreaming: true') == 2
+      and 'otherVoiceBusy: intercomSpeechInputService.busy' in host
+      and 'otherVoiceBusy: speechInputService.busy' in host,
+      "Reception and Intercom opt in to live speech with mutual microphone exclusion")
+check('HospitalLiveDictationService {' in frontdesk
+      and 'liveSpeech.startRecording()' in frontdesk
+      and 'liveSpeech.stopRecording(false)' in frontdesk
+      and 'signal liveTextReady(string text)' in frontdesk
+      and 'signal transcriptionFinished(bool submitRequested)' in frontdesk,
+      "Front desk bypasses legacy WAV recording and sends partial text before STOP")
+check('maxPackets: 48' in frontdesk and 'chunkSeconds: 2' in frontdesk
+      and 'property int maxPackets: 30' in live
+      and 'packetCount > maxPackets' in live,
+      "Shorter 2-second chunks retain the 90-second front-desk bound")
+check('onLiveTextReady(text)' in reception
+      and 'root.acceptVoiceTranscript(text, false);' in reception
+      and 'onTranscriptionFinished(submitRequested)' in reception
+      and 'root.submitReceptionInput();' in reception
+      and 'onVisibleChanged:' in reception,
+      "Reception shows phrases live, does not auto-send and cancels on hide")
+check('onLiveTextReady(text)' in intercom
+      and 'root.acceptVoiceTranscript(text, false);' in intercom
+      and 'onTranscriptionFinished(submitRequested)' in intercom
+      and 'root.sendCurrent();' in intercom,
+      "Intercom shows phrases before STOP without silently dispatching")
+check('color: Colors.magenta' in intercom
+      and 'cursorDelegate: Rectangle {' in intercom
+      and 'color: Colors.orange' in intercom
+      and 'rightMargin: 6' in intercom
+      and 'rightMargin: 4' in intercom,
+      "Intercom has magenta operator text/orange cursor and separated controls")
+mic_section = manager.split('id: micAction', 1)[-1].split('id: cancelAction', 1)[0]
+cancel_section = manager.split('id: cancelAction', 1)[-1].split('label: "CANCEL"', 1)[0]
+check('anchors.rightMargin: 2' in mic_section
+      and 'anchors.verticalCenter: parent.verticalCenter' in mic_section
+      and 'anchors.verticalCenter: parent.verticalCenter' in cancel_section,
+      "Embedded Manager microphone/CANCEL controls are vertically centered with 2px right inset")
+check('parser.add_argument("--vad"' in script
+      and 'parser.add_argument("--chunk-seconds"' in script
+      and 'if vad:' in script and 'heard_speech' in script,
+      "Local stream retains optional silence auto-stop and configurable 2-second chunks")
+
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")
     for issue in issues: print(" - " + issue)

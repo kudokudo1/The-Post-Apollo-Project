@@ -70,6 +70,7 @@ class LiveDictationTests(unittest.TestCase):
         self.assertNotIn("authority", json.dumps(result))
 
     def test_real_stdout_stream_and_stop_with_fake_audio(self):
+        # Test 2-second Reception/Intercom cadence with fake local audio.
         # Truly test the child process while injecting throwaway fake pw-record
         # and fake local whisper helper. No actual microphone or service.
         with tempfile.TemporaryDirectory(prefix="hospital-live-fixture-") as folder:
@@ -96,7 +97,7 @@ class LiveDictationTests(unittest.TestCase):
             helper.chmod(0o700)
             env = dict(os.environ, PATH=str(fakebin) + ":" + os.environ["PATH"])
             process = subprocess.Popen(
-                [sys.executable, str(SCRIPT), str(helper)],
+                [sys.executable, str(SCRIPT), str(helper), "--chunk-seconds", "2"],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
             try:

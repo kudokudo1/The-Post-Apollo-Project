@@ -14,9 +14,16 @@ Scope {
     property int recordingElapsedSeconds: 0
     property double recordingStartedAt: 0
     property bool liveStreaming: true
+    // Reception and Intercom use shorter chunks; Manage keeps its stable default.
+    property int chunkSeconds: 4
+    property bool vadActive: false
+    property int vadSpeechThreshold: 600
+    property int vadSilenceMs: 2200
+    property int vadMinimumSpeechMs: 250
     property bool wasCancelled: false
     property bool doneSeen: false
     property int packetCount: 0
+    property int maxPackets: 30
     readonly property bool recording: voiceState === "recording"
     readonly property bool stopping: voiceState === "stopping"
     readonly property bool transcribing: voiceState === "transcribing"
@@ -63,7 +70,14 @@ Scope {
         recordingStartedAt = Date.now();
         recordingElapsedSeconds = 0;
         voiceState = "recording";
-        liveProcess.exec(["python3", scriptPath, whisperHelper]);
+        const command = ["python3", scriptPath, whisperHelper,
+            "--chunk-seconds", String(Math.max(2, Math.min(4, chunkSeconds)))];
+        if (vadActive) {
+            command.push("--vad", "--threshold", String(vadSpeechThreshold),
+                "--silence-ms", String(vadSilenceMs),
+                "--min-speech-ms", String(vadMinimumSpeechMs));
+        }
+        liveProcess.exec(command);
         clock.restart();
         return true;
     }
@@ -106,7 +120,7 @@ Scope {
             if (!sentence || /^\[\s*(?:BLANK_AUDIO|NO_SPEECH|SILENCE)\s*\]$/i.test(sentence))
                 return;
             packetCount++;
-            if (packetCount > 30) {
+            if (packetCount > maxPackets) {
                 lastError = "LIVE DICTATION LENGTH LIMIT // STOPPING";
                 voiceError(lastError);
                 cancel();

@@ -98,6 +98,12 @@ Rectangle {
     border.width: 1
     border.color: Colors.magenta
 
+    // Leaving Reception must stop capture even when Hospital stays open.
+    onVisibleChanged: {
+        if (!visible && speechInputService && speechInputService.busy)
+            speechInputService.cancel();
+    }
+
     Connections {
         target: root.receptionistService
 
@@ -116,6 +122,13 @@ Rectangle {
                 text,
                 submitRequested
             );
+        }
+        function onLiveTextReady(text) {
+            root.acceptVoiceTranscript(text, false);
+        }
+        function onTranscriptionFinished(submitRequested) {
+            if (submitRequested)
+                root.submitReceptionInput();
         }
     }
 

@@ -418,7 +418,8 @@ test("CPU++ Favorites entries select from their entire row with // breadcrumb se
     "text: pane.favoriteRowLabel(modelData)"
   ]) assert.ok(pane.includes(required),required);
   assert.doesNotMatch(pane,/label:\s*"VIEW"/);
-  assert.ok(fixture.includes("16,row.height/2"));
+  // U9g: after the native hide/show pass, "r" is the same full-row click target.
+  assert.ok(fixture.includes("16,r.height/2"));
   assert.ok(!fixture.includes("row.width-33"));
 });
 

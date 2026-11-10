@@ -43,9 +43,15 @@ class DirectGuestRelayReview(unittest.TestCase):
         self.source = guest.split(needle, 1)[1].split(
             "\nC4B_SINGLE_UART_RELAY\n", 1)[0]
 
-    def relay(self, payload: bytes, *, regular_target=False, with_stdout=False):
+    def relay(self, payload: bytes, *, regular_target=False, with_stdout=False,
+              source_case="regular"):
         path = Path(self.tmp.name) / "c4b-runtime.log"
-        path.write_bytes(payload)
+        if source_case == "directory":
+            path.mkdir()
+        else:
+            path.write_bytes(payload)
+            if source_case == "hardlink":
+                os.link(path, Path(self.tmp.name) / "second-hardlink")
         master, slave = pty.openpty()
         try:
             tty.setraw(slave)
@@ -200,7 +206,28 @@ class DirectGuestRelayReview(unittest.TestCase):
         serial, diagnostic = self.relay(
             b"X" * (2 * 1024 * 1024 + 1), with_stdout=True)
         self.assertEqual(serial, b"")
-        self.assertIn(b"C4D_UART_DIAG // GUEST_LOG_UNSAFE", diagnostic)
+        self.assertIn(b"C4D_UART_DIAG // GUEST_RECORD_OVERSIZE", diagnostic)
+        self.assertNotIn(PREFIX, diagnostic)
+
+    def test_20_zero_size_guest_capture_reports_exact_empty_file(self):
+        serial, diagnostic = self.relay(b"", with_stdout=True)
+        self.assertEqual(serial, b"")
+        self.assertIn(b"C4D_UART_DIAG // GUEST_RECORD_EMPTY", diagnostic)
+        self.assertNotIn(PREFIX, diagnostic)
+
+    def test_21_hardlinked_capture_is_refused_before_parsing(self):
+        serial, diagnostic = self.relay(
+            report() + b"\n", with_stdout=True, source_case="hardlink")
+        self.assertEqual(serial, b"")
+        self.assertIn(b"C4D_UART_DIAG // GUEST_RECORD_LINK_COUNT_INVALID",
+                      diagnostic)
+        self.assertNotIn(PREFIX, diagnostic)
+
+    def test_22_directory_capture_is_refused_before_parsing(self):
+        serial, diagnostic = self.relay(
+            report() + b"\n", with_stdout=True, source_case="directory")
+        self.assertEqual(serial, b"")
+        self.assertIn(b"C4D_UART_DIAG // GUEST_RECORD_NOT_REGULAR", diagnostic)
         self.assertNotIn(PREFIX, diagnostic)
 
     def test_15_relay_defines_only_codes_used_by_host_collector(self):
@@ -213,8 +240,10 @@ class DirectGuestRelayReview(unittest.TestCase):
         module = module_from_spec(spec)
         spec.loader.exec_module(module)
         for value in (
-            "GUEST_OBSERVATION_DUPLICATE_KEY", "GUEST_LOG_UNSAFE",
-            "GUEST_LOG_CHANGED", "GUEST_OBSERVATION_MISSING",
+            "GUEST_OBSERVATION_DUPLICATE_KEY",
+            "GUEST_RECORD_NOT_REGULAR", "GUEST_RECORD_OWNER_MISMATCH",
+            "GUEST_RECORD_LINK_COUNT_INVALID", "GUEST_RECORD_EMPTY",
+            "GUEST_RECORD_OVERSIZE", "GUEST_LOG_CHANGED", "GUEST_OBSERVATION_MISSING",
             "GUEST_OBSERVATION_DUPLICATE", "GUEST_OBSERVATION_OVERSIZE",
             "GUEST_OBSERVATION_JSON_INVALID", "GUEST_OBSERVATION_SCHEMA_INVALID",
             "GUEST_OBSERVATION_DIGEST_INVALID",

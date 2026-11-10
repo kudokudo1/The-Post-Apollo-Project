@@ -1070,8 +1070,7 @@ Item {
                 if (dialRoot.keyboardHost)
                     dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
             }
-
-         }
+        }
 
         // Keyboard ring appears both while the dial is selected by the
         // Git spatial navigator and while it owns direct dial focus.

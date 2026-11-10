@@ -12,7 +12,8 @@ def check(ok, desc):
     if not ok: errors.append(desc)
 
 check('HospitalWorkforceManagerView {' in host
-      and 'suggestedRepository: patientService.repository' in host
+      and 'suggestedRepository: githubService.repoSlug' in host
+      and '|| patientService.repository' in host
       and 'root.workforceManagerExpanded' in host,
       "Retain existing Surgery manager and live Patient suggestion")
 check('id: roomOwnerField' in view
@@ -35,7 +36,7 @@ check('GitHubOwnerPolicy.suggestion(root.suggestedRepository,' in view
       and 'onTextEdited: managerField.edited()' in view,
       "Autofill does not overwrite explicit user edits")
 check('label: "USE MY GITHUB"' in view
-      and 'label: "USE PATIENT"' in view
+      and 'label: "USE CURRENT REPO"' in view
       and 'onTriggered: root.useOwnGitHub()' in view
       and 'onTriggered: root.useCurrentPatient()' in view,
       "Provide explicit account and current Patient autofill controls")
@@ -51,8 +52,8 @@ check('HospitalGitHubOwnerService {' in view
       "Reuse the existing gh account identity with a narrow read-only call")
 check('onRefreshed:' in view
       and 'root.applyRoomSuggestions();' in view
-      and 'if (!root.roomOwnerManuallyEdited && proposed.owner)' in view
-      and 'if (!root.roomRepositoryManuallyEdited && proposed.repository)' in view,
+      and 'if (!root.roomOwnerManuallyEdited)' in view
+      and 'if (!root.roomRepositoryManuallyEdited)' in view,
       "Late Git account results cannot clobber manual owner/repo")
 check('roomCreate.create(p)' in view
       and 'function confirm(kind)' in view

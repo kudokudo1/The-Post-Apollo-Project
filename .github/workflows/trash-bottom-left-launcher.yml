@@ -41,3 +41,5 @@ jobs:
         run: node --test tests/trash/test_camera_cleanup_handoff.cjs
       - name: Verify two-click Burn state machine never deletes on first click
         run: node --test tests/trash/test_burn_copy_two_click.cjs
+      - name: Verify managed-bin-only Burn All and unified Trash filters
+        run: node --test tests/trash/test_managed_bin_burn_all.cjs

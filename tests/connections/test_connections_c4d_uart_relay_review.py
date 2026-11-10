@@ -391,7 +391,7 @@ umask 077
         marker = "def write_private_report(path, record):\n"
         self.assertEqual(guest.count(marker), 1)
         source = marker + guest.split(marker, 1)[1].split(
-            "\ndef observe():\n", 1)[0]
+            "\n@lru_cache(maxsize=1)\ndef observe():\n", 1)[0]
         self.assertIn('parent = "/run/postapollo-c4d-observation"', source)
         source = source.replace(
             'parent = "/run/postapollo-c4d-observation"',

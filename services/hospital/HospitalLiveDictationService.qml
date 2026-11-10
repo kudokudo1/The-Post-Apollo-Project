@@ -16,6 +16,7 @@ Scope {
     property bool liveStreaming: true
     // Reception and Intercom use shorter chunks; Manage keeps its stable default.
     property int chunkSeconds: 4
+    property int firstChunkMs: 1400
     property bool vadActive: false
     property int vadSpeechThreshold: 600
     property int vadSilenceMs: 2200
@@ -71,7 +72,9 @@ Scope {
         recordingElapsedSeconds = 0;
         voiceState = "recording";
         const command = ["python3", scriptPath, whisperHelper,
-            "--chunk-seconds", String(Math.max(2, Math.min(4, chunkSeconds)))];
+            "--chunk-seconds", String(Math.max(2, Math.min(4, chunkSeconds))),
+            "--first-chunk-ms", String(Math.max(1000,
+                Math.min(chunkSeconds * 1000, firstChunkMs)))];
         if (vadActive) {
             command.push("--vad", "--threshold", String(vadSpeechThreshold),
                 "--silence-ms", String(vadSilenceMs),

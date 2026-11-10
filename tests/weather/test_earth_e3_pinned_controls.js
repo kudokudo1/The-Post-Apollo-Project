@@ -20,7 +20,9 @@ test("E3 puts one fixed map-control deck between map and the independently scrol
   assert.match(discovery,/anchors\.top: pinnedMapHost\.bottom/);
   assert.match(discovery,/anchors\.left: pinnedMapHost\.left/);
   assert.match(discovery,/anchors\.right: pinnedMapHost\.right/);
-  assert.match(discovery,/anchors\\.top: reportsFixedToolbar\\.visible\\s*\\? reportsFixedToolbar\\.bottom\\s*: pinnedMapControls\\.visible \\? pinnedMapControls\\.bottom : parent\\.top/);
+  assert.ok(discovery.includes("anchors.top: reportsFixedToolbar.visible"));
+  assert.ok(discovery.includes("? reportsFixedToolbar.bottom"));
+  assert.ok(discovery.includes(": pinnedMapControls.visible ? pinnedMapControls.bottom : parent.top"));
   assert.match(discovery,/height: visible \? 47 : 0/);
   assert.match(fixture,/root\.controlsY=controls\.mapToItem\(map,0,0\)\.y/);
   assert.match(fixture,/MAP_OR_E3_TOOLS_SCROLLED_OR_DUPLICATED/);

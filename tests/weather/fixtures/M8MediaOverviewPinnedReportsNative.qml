@@ -130,8 +130,8 @@ ShellRoot {
                 root.newsY=news.mapToItem(media,0,0).y;
                 root.radioY=radio.mapToItem(media,0,0).y;
                 // Use the existing news hub's active reports owner.
-                media.loadedNews.reportsLoader.item.newsSourceQuery="BBC";
-                media.loadedNews.reportsLoader.item.newsLanguageQuery="ENGLISH";
+                toolbar.parent.newsSourceQuery="BBC";
+                toolbar.parent.newsLanguageQuery="ENGLISH";
                 root.phase=1;return;
             }
             if(root.phase===1) {

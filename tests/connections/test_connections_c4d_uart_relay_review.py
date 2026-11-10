@@ -314,7 +314,8 @@ class DirectGuestRelayReview(unittest.TestCase):
     def test_11_bounded_full_instrument_log_read_and_existing_c2v_tail(self):
         code = GUEST.read_text()
         self.assertIn("log = os.read(fd, st.st_size + 1)", code)
-        self.assertIn("not 0 < st.st_size <= 2 * 1024 * 1024", code)
+        self.assertIn("if st.st_size <= 0:", code)
+        self.assertIn("if st.st_size > 2 * 1024 * 1024:", code)
         c2v = (ROOT / "tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh").read_text()
         self.assertIn("tail -n 110 /var/tmp/c4b-runtime.log", c2v)
         self.assertIn('echo "C4B_CONTROLLER_GUEST_LOG_BEGIN"', c2v)

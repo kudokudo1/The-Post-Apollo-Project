@@ -538,5 +538,62 @@ umask 077
                 'echo "C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED"'))
 
 
+    def test_37_real_rpm_metadata_stdout_separated_from_nokey_stderr(self):
+        # The real Silverblue run passed the PRELAYER RPM identity check,
+        # which inspected stdout only, then refused the same RPM in Python.
+        # Exercise the actual embedded guest command helper, not a rewritten
+        # approximation. RPM's default rpmdb can warn about the test signer
+        # even after a separate imported-key rpmkeys check has passed.
+        import re
+        from types import SimpleNamespace
+
+        guest = GUEST.read_text()
+        marker = "def command(*args):\n"
+        self.assertEqual(guest.count(marker), 1)
+        helper = marker + guest.split(marker, 1)[1].split(
+            "\ndef start(pid):\n", 1)[0]
+        class Refused(Exception):
+            pass
+        def refuse(reason):
+            raise Refused(reason)
+        scenario = {"rc": 0, "stdout": b"", "stderr": b""}
+        def fake_run(args, input, capture_output, timeout):
+            self.assertEqual(input, b"")
+            self.assertTrue(capture_output)
+            self.assertEqual(timeout, 12)
+            return SimpleNamespace(returncode=scenario["rc"],
+                                   stdout=scenario["stdout"],
+                                   stderr=scenario["stderr"])
+        fake_subprocess = SimpleNamespace(run=fake_run, TimeoutExpired=TimeoutError)
+        scope = {"subprocess": fake_subprocess, "re": re, "refuse": refuse}
+        exec(compile(helper, "<actual-c4d-rpm-command>", "exec"), scope)
+        query = scope["command"]
+        rpm_identity = "postapollo-connections-c3d-ci-status 0.1 noarch"
+        rpm_args = ("rpm", "-qp", "--qf", "%{NAME} %{VERSION} %{ARCH}",
+                    "/var/lib/c4b-runtime-assets/c3d-status.rpm")
+        scenario.update(
+            rc=0, stdout=rpm_identity.encode("ascii"),
+            stderr=(b"warning: signed RPM Header RSA/SHA256 Signature, "
+                    b"key ID A1B2C3D4: NOKEY\n"))
+        self.assertEqual(query(*rpm_args), rpm_identity)
+        # The independent rpmkeys --dbpath signature check retains its original
+        # command behavior and does not get replaced with unauthenticated data.
+        self.assertIn("NOKEY", query("rpmkeys", "--checksig"))
+        scenario.update(stderr=b"")
+        self.assertEqual(query(*rpm_args), rpm_identity)
+        for bad in (b"warning: BAD\n", b"warning: NOKEY\nFORGED\n",
+                    b"warning: NOKEY; SIGNATURE_INVALID\n"):
+            with self.subTest(bad=bad):
+                scenario.update(stderr=bad)
+                with self.assertRaisesRegex(Refused, "RPM_METADATA_DIAGNOSTIC_REFUSED"):
+                    query(*rpm_args)
+        scenario.update(rc=2, stderr=b"")
+        with self.assertRaisesRegex(Refused, "OBSERVATION_COMMAND_REFUSED"):
+            query(*rpm_args)
+        scenario.update(rc=0, stdout=b"x" * 32769, stderr=b"")
+        with self.assertRaisesRegex(Refused, "OBSERVATION_COMMAND_REFUSED"):
+            query(*rpm_args)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

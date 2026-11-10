@@ -328,6 +328,7 @@ C4B_C3B_DIR_DIAG
     fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"
 import grp, hashlib, json, os, pwd, re, stat, subprocess, sys
 from pathlib import Path
+from functools import lru_cache
 
 HOST = "/usr/libexec/post-apollo/connections-status-host"
 UNIT = "postapollo-connections-status.service"
@@ -428,6 +429,7 @@ def write_private_report(path, record):
     finally:
         os.close(fd)
 
+@lru_cache(maxsize=1)
 def observe():
     if (os.geteuid() != 0 or os.environ.get("GITHUB_ACTIONS") != "true"
             or os.environ.get("POST_APOLLO_C4B_TEST_GUEST") != "1"
@@ -523,7 +525,7 @@ def observe():
             or Path(f"/proc/{pid}/cmdline").read_bytes() != raw or
             hash_root_file(rpm, 0o600, 4 * 1024 * 1024)[0] != package_sha):
         refuse("SIGNED_SERVICE_CHANGED_DURING_OBSERVATION")
-    value = dict(schema="postapollo.connections.c4b-booted-signed-host-observation.v1",
+    return dict(schema="postapollo.connections.c4b-booted-signed-host-observation.v1",
                 signed_rpm_sha256=package_sha, signed_script_sha256=script_sha,
                 running_script_sha256=script_sha, interpreter_sha256=h.hexdigest(),
                 service_pid=pid, dbus_owner_pid=pid, process_start_ticks=tick,
@@ -532,12 +534,15 @@ def observe():
                 evidenceCryptographicallyAttested=False, hostAuthenticated=False,
                 canApprove=False, credentialActionsEnabled=False,
                 productionAuthority=False)
-    write_private_report(
-        sys.argv[3], "C4B_OBSERVED // " +
-        json.dumps(value, sort_keys=True, separators=(",", ":")))
-    return value
 
 try:
+    # First call performs all original running-service checks. Cache only this
+    # in-process, unchanged report so the original C4c stdout contract can
+    # emit precisely the same bytes after the exclusive private persistence.
+    measured = observe()
+    write_private_report(
+        sys.argv[3], "C4B_OBSERVED // " +
+        json.dumps(measured, sort_keys=True, separators=(",", ":")))
     print("C4B_OBSERVED // " + json.dumps(observe(), sort_keys=True, separators=(",", ":")),
           flush=True)
 except (Refused, OSError, KeyError, ValueError, UnicodeError) as exc:

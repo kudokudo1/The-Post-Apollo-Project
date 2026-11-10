@@ -58,7 +58,7 @@ check('function acceptLivePhrase(text)' in manager
 check('id: editorFrame' in manager
       and 'anchors.right: parent.right' in manager
       and 'anchors.verticalCenter: parent.verticalCenter' in manager
-      and 'anchors.rightMargin: 2' in manager
+      and 'anchors.rightMargin: 7' in manager
       and 'id: micAction' in manager
       and 'label: "CANCEL"' in manager,
       "MIC/STOP and CANCEL live INSIDE each prompt rectangle")

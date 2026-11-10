@@ -33,6 +33,7 @@ Scope {
     property var noteDraft: null
     property var pendingNoteDraft: null
     property bool recoveryDiskChecked: false
+    property bool recoveryCheckPending: false
     readonly property var observations: document.observations
     readonly property int total: observations.length
     readonly property bool writable:
@@ -58,7 +59,10 @@ Scope {
             return;
         }
         document = loaded.document;
-        recoveryDiskChecked = true;
+        // Initial load is NOT an explicit check for the recovery action.
+        // Only a fresh CHECK DISK request can arm a retry.
+        recoveryDiskChecked = recoveryCheckPending;
+        recoveryCheckPending = false;
         storageState = document.observations.length ? "ready" : "empty";
         errorCode = "";
         feedback = "JOURNAL READY // " + document.observations.length;
@@ -164,7 +168,12 @@ Scope {
     function checkRecoveryFromDisk() {
         if (writePhase !== "" || draftState !== "ready")
             return false;
-        return reloadFromDisk();
+        recoveryCheckPending = true;
+        if (!reloadFromDisk()) {
+            recoveryCheckPending = false;
+            return false;
+        }
+        return true;
     }
 
     function retryNoteDraft() {
@@ -211,6 +220,8 @@ Scope {
         onLoadFailed: function(error) {
             if (angel.writePhase !== "")
                 return;
+            angel.recoveryCheckPending = false;
+            angel.recoveryDiskChecked = false;
             if (error === FileViewError.FileNotFound) {
                 angel.document = Journal.emptyDocument();
                 angel.storageState = "empty";

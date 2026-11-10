@@ -7,6 +7,9 @@ Scope {
 
     property string voiceState: "checking"
     property bool backendReady: false
+    // Opt-in for Reception/Intercom; keeps legacy recording as a fallback.
+    property bool liveStreaming: false
+    property bool otherVoiceBusy: false
     property string backendStatus: "CHECKING"
     property string lastError: ""
     property string lastTranscript: ""
@@ -60,6 +63,8 @@ Scope {
         vadEnabled && vadAvailable
 
     signal transcriptionReady(string text, bool submitRequested)
+    signal liveTextReady(string text)
+    signal transcriptionFinished(bool submitRequested)
     signal voiceError(string message)
 
     function compactError(value) {
@@ -128,6 +133,11 @@ Scope {
     function startRecording() {
         if (busy)
             return false;
+        if (otherVoiceBusy) {
+            lastError = "MIC BUSY // ANOTHER HOSPITAL VOICE INPUT IS ACTIVE";
+            voiceError(lastError);
+            return false;
+        }
 
         if (!backendReady) {
             probe();
@@ -146,6 +156,27 @@ Scope {
         recordingElapsedSeconds = 0;
         recordingClock.restart();
         voiceState = "recording";
+
+        if (liveStreaming) {
+            // No persistent Reception WAV and no stop-before-inference path.
+            // The already used Manage helper owns and reaps its PipeWire child.
+            if (!liveSpeech.backendReady) {
+                liveSpeech.probe();
+                recordingClock.stop();
+                voiceState = "idle";
+                lastError = "LOCAL LIVE MICROPHONE UNAVAILABLE // CHECK PIPEWIRE AND WHISPER";
+                voiceError(lastError);
+                return false;
+            }
+            if (!liveSpeech.startRecording()) {
+                recordingClock.stop();
+                voiceState = "idle";
+                lastError = liveSpeech.lastError || "LOCAL LIVE MICROPHONE REFUSED";
+                voiceError(lastError);
+                return false;
+            }
+            return true;
+        }
 
         recordProcess.command =
             vadActive
@@ -185,6 +216,16 @@ Scope {
         stopRequested = true;
         recordingClock.stop();
         voiceState = "stopping";
+        if (liveStreaming) {
+            if (!liveSpeech.stopRecording(false)) {
+                voiceState = "recording";
+                stopRequested = false;
+                submitAfterTranscription = false;
+                recordingClock.restart();
+                return false;
+            }
+            return true;
+        }
         recordProcess.running = false;
         return true;
     }
@@ -208,6 +249,9 @@ Scope {
         recordingStartedAt = 0;
         recordingElapsedSeconds = 0;
 
+        if (liveStreaming && liveSpeech.busy)
+            liveSpeech.cancel();
+
         if (recordProcess.running) {
             recorderCancelled = true;
             recordProcess.running = false;
@@ -226,6 +270,46 @@ Scope {
     Component.onCompleted: {
         probe();
         probeVad();
+    }
+
+    // The live worker has no submission authority. Phrases go straight to
+    // the editor; only a separate user SEND/ASK action may dispatch them.
+    HospitalLiveDictationService {
+        id: liveSpeech
+        chunkSeconds: 2
+        vadActive: root.vadActive
+        vadSpeechThreshold: root.vadSpeechThreshold
+        vadSilenceMs: root.vadSilenceMs
+        vadMinimumSpeechMs: root.vadMinimumSpeechMs
+
+        onLiveTextReady: function(text) {
+            if (!root.liveStreaming || !root.busy)
+                return;
+            root.lastTranscript = String(text || "");
+            root.liveTextReady(text);
+        }
+        onLiveFinished: function() {
+            if (!root.liveStreaming || !root.busy)
+                return;
+            const shouldSubmit = root.submitAfterTranscription;
+            root.submitAfterTranscription = false;
+            root.stopRequested = false;
+            root.recordingClock.stop();
+            root.recordingStartedAt = 0;
+            root.recordingElapsedSeconds = 0;
+            root.voiceState = root.backendReady ? "idle" : "unavailable";
+            root.transcriptionFinished(shouldSubmit);
+        }
+        onVoiceError: function(message) {
+            if (!root.liveStreaming || !root.busy)
+                return;
+            root.recordingClock.stop();
+            root.stopRequested = false;
+            root.submitAfterTranscription = false;
+            root.voiceState = root.backendReady ? "idle" : "unavailable";
+            root.lastError = String(message || "LOCAL LIVE DICTATION FAILED");
+            root.voiceError(root.lastError);
+        }
     }
 
     Timer {

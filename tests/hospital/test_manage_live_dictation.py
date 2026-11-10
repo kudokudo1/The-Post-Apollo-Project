@@ -129,6 +129,125 @@ class LiveDictationTests(unittest.TestCase):
                     process.wait(timeout=3)
                 selector.close()
 
+    def test_short_final_speech_is_flushed_after_stop(self):
+        # Two chunks: 1.4s initial speech, then 0.4s tail. Previously the
+        # remaining subsecond tail was silently thrown away on STOP.
+        with tempfile.TemporaryDirectory(prefix="hospital-tail-voice-") as folder:
+            root = Path(folder)
+            fakebin = root / "bin"
+            fakebin.mkdir()
+            recorder = fakebin / "pw-record"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys,time\n"
+                "speech=(1500).to_bytes(2,'little',signed=True)\n"
+                "for _ in range(18):\n"
+                " sys.stdout.buffer.write(speech*1600)\n"
+                " sys.stdout.buffer.flush()\n"
+                " time.sleep(0.008)\n"
+                "time.sleep(15)\n"
+            )
+            recorder.chmod(0o700)
+            helper = root / "whisper.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ \"$1\" == '--check' ]]; then exit 0; fi\n"
+                "printf 'Recognized.\\n'\n"
+            )
+            helper.chmod(0o700)
+            env = dict(os.environ, PATH=str(fakebin) + ":" + os.environ["PATH"])
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), str(helper),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+            try:
+                selector = selectors.DefaultSelector()
+                selector.register(process.stdout, selectors.EVENT_READ)
+                first = None
+                deadline = time.monotonic() + 7
+                while time.monotonic() < deadline:
+                    if not selector.select(timeout=0.4):
+                        continue
+                    data = json.loads(process.stdout.readline())
+                    if data["kind"] == "partial":
+                        first = data["text"]
+                        break
+                    if data["kind"] == "error":
+                        self.fail(str(data))
+                self.assertEqual(first, "Recognized.")
+                time.sleep(0.2)
+                process.stdin.write("STOP\n")
+                process.stdin.flush()
+                process.stdin.close()
+                process.wait(timeout=8)
+                remaining = [
+                    json.loads(line) for line in process.stdout.read().splitlines()
+                ]
+                second = [row["text"] for row in remaining
+                          if row["kind"] == "partial"]
+                self.assertEqual(second, ["Recognized."],
+                                 "Subsecond final phrase must not vanish")
+                self.assertEqual(process.returncode, 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=3)
+                selector.close()
+
+    def test_cancel_reaps_owned_whisper_model(self):
+        # A stuck fake model records its real PID; CANCEL must end both it
+        # and the Python/PipeWire owner without waiting for a 15s timeout.
+        with tempfile.TemporaryDirectory(prefix="hospital-cancel-voice-") as folder:
+            root = Path(folder)
+            fakebin = root / "bin"
+            fakebin.mkdir()
+            recorder = fakebin / "pw-record"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys,time\n"
+                "speech=(1300).to_bytes(2,'little',signed=True)\n"
+                "for _ in range(16):\n"
+                " sys.stdout.buffer.write(speech*1600)\n"
+                " sys.stdout.buffer.flush()\n"
+                " time.sleep(0.008)\n"
+                "time.sleep(30)\n"
+            )
+            recorder.chmod(0o700)
+            pid_file = root / "whisper-pid"
+            helper = root / "whisper.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ \"$1\" == '--check' ]]; then exit 0; fi\n"
+                "printf '%s' \"$\" > \"$HOSPITAL_MODEL_PID_FILE\"\n"
+                "exec sleep 30\n"
+            )
+            helper.chmod(0o700)
+            env = dict(os.environ, PATH=str(fakebin) + ":" + os.environ["PATH"],
+                       HOSPITAL_MODEL_PID_FILE=str(pid_file))
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), str(helper),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+            try:
+                deadline = time.monotonic() + 7
+                while time.monotonic() < deadline and not pid_file.exists():
+                    time.sleep(0.05)
+                self.assertTrue(pid_file.exists(), "Fake Whisper must start")
+                model_pid = int(pid_file.read_text())
+                process.stdin.write("CANCEL\n")
+                process.stdin.flush()
+                process.stdin.close()
+                process.wait(timeout=7)
+                self.assertEqual(process.returncode, 130)
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(model_pid, 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=3)
+
     def test_real_stdout_stream_and_stop_with_fake_audio(self):
         # Test 2-second Reception/Intercom cadence with fake local audio.
         # Truly test the child process while injecting throwaway fake pw-record

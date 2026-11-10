@@ -1858,6 +1858,29 @@ PanelWindow {
     property int selectedModeIndex: 0
     readonly property string selectedMode: modes[selectedModeIndex].id
     readonly property string selectedName: modes[selectedModeIndex].name
+    readonly property string headerModeName:
+        selectedMode === "calc" ? "CALCULATOR" : selectedName
+
+    // The ⟳ header opens this local action menu. Only the existing
+    // TimeSettings singleton can request diagnostics or a host correction.
+    property bool resyncPopupOpen: false
+
+    function dismissResyncPopup() {
+        resyncPopupOpen = false;
+        TimeSettings.cancelResync();
+    }
+
+    function toggleResyncPopup() {
+        if (resyncPopupOpen) {
+            dismissResyncPopup();
+            return;
+        }
+        resyncPopupOpen = true;
+        // Preparation only arms the existing two-step confirmation.
+        // It never launches Chrony/Polkit or changes host time.
+        if (!TimeSettings.resyncConfirmRequired)
+            TimeSettings.prepareResync();
+    }
 
     function toggle() {
         menuOpen = !menuOpen;
@@ -1888,7 +1911,7 @@ PanelWindow {
             universalFavoritesOpen = false;
             dismissWorldSearchPopup();
             closeConverterDropdowns();
-            TimeSettings.cancelResync();
+            dismissResyncPopup();
         }
         if (menuOpen) {
             Qt.callLater(restoreKeyboardFocus);
@@ -1903,6 +1926,8 @@ PanelWindow {
         }
     }
     onSelectedModeChanged: {
+        if (resyncPopupOpen)
+            dismissResyncPopup();
         if (selectedMode !== "clock")
             dismissWorldSearchPopup();
         if (selectedMode !== "calc")
@@ -2597,7 +2622,10 @@ PanelWindow {
             if (!timew.navigationKeysAvailable)
                 return;
             if (event.key === Qt.Key_Escape) {
-                timew.menuOpen = false;
+                if (timew.resyncPopupOpen)
+                    timew.dismissResyncPopup();
+                else
+                    timew.menuOpen = false;
             } else if (event.key === Qt.Key_Tab
                        || event.key === Qt.Key_Backtab) {
                 const reverse = event.key === Qt.Key_Backtab
@@ -2626,7 +2654,12 @@ PanelWindow {
         sequence: "Esc"
         context: Qt.WindowShortcut
         enabled: timew.navigationKeysAvailable
-        onActivated: timew.menuOpen = false
+        onActivated: {
+            if (timew.resyncPopupOpen)
+                timew.dismissResyncPopup();
+            else
+                timew.menuOpen = false;
+        }
     }
 
     WindowPanelFrame {
@@ -2647,7 +2680,8 @@ PanelWindow {
         // buttons, without consuming their own clicks. Search/popup taps stay
         // open; other taps close suggestions and restore window navigation.
         TapHandler {
-            enabled: timew.worldSearchPopupOpen
+            enabled: timew.resyncPopupOpen
+                     || timew.worldSearchPopupOpen
                      || worldSearchInput.activeFocus
                      || timew.activeConverterDropdown !== ""
                      || converterSourcePicker.searchFocused
@@ -2660,6 +2694,16 @@ PanelWindow {
                     return;
                 const px = point.position.x;
                 const py = point.position.y;
+                if (timew.resyncPopupOpen) {
+                    const sync = syncButton.mapToItem(timewFrame, 0, 0);
+                    const pop = resyncPopup.mapToItem(timewFrame, 0, 0);
+                    const onTrigger = px >= sync.x && px <= sync.x + syncButton.width
+                                      && py >= sync.y && py <= sync.y + syncButton.height;
+                    const onPopup = px >= pop.x && px <= pop.x + resyncPopup.width
+                                    && py >= pop.y && py <= pop.y + resyncPopup.height;
+                    if (!onTrigger && !onPopup)
+                        timew.dismissResyncPopup();
+                }
                 if (timew.selectedMode === "clock") {
                     const search = worldSearchArea.mapToItem(timewFrame, 0, 0);
                     const withinSearch = px >= search.x
@@ -2718,8 +2762,11 @@ PanelWindow {
                     verticalAlignment: Text.AlignVCenter
                     font.pixelSize: 18
                     font.weight: 700
+                    fontSizeMode: Text.HorizontalFit
+                    minimumPixelSize: 12
+                    elide: Text.ElideRight
                     color: Colors.magenta
-                    text: "TIME // W"
+                    text: "TIME // " + timew.headerModeName
                 }
 
                 Rectangle {
@@ -2798,12 +2845,10 @@ PanelWindow {
                     hoverWideGlowColor: Colors.yellow
                     pressedWideGlowColor: Colors.yellow
                     wideGlowEnabled: true
-                    available: TimeSettings.resyncStatus !== "working"
-                               && !TimeSettings.resyncAuthPending
-                    onLeftClicked: {
-                        timew.chooseMode(timew.modes.length - 1);
-                        TimeSettings.prepareResync();
-                    }
+                    // Keep status and diagnostic access available while a
+                    // confirmed correction is awaiting authorization.
+                    selected: timew.resyncPopupOpen
+                    onLeftClicked: timew.toggleResyncPopup()
                 }
 
                 ActionButton {
@@ -6807,6 +6852,22 @@ PanelWindow {
                     }
                 }
             }
+        }
+
+        // Above the mode strip and page; anchored to the ⟳ header control.
+        // The popover calls the same TimeSettings actions as SETTINGS below.
+        TimeResyncPopup {
+            id: resyncPopup
+            z: 100
+            visible: timew.menuOpen && timew.resyncPopupOpen
+            x: {
+                const at = syncButton.mapToItem(timewFrame, 0, 0);
+                return Math.max(8, Math.min(timewFrame.width - width - 8,
+                                            at.x + syncButton.width - width));
+            }
+            y: syncButton.mapToItem(timewFrame, 0, 0).y
+               + syncButton.height + 7
+            onCloseRequested: timew.dismissResyncPopup()
         }
     }
 }

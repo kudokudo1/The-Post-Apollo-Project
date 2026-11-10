@@ -765,8 +765,12 @@ assert "id: machineCaptureProcess" in window
 assert "id: machineStoreProcess" in window
 assert "id: machineResolverProcess" in window
 
-# Universal visual language remains: magenta header, cyan divider, borderless modes.
-assert 'text: "TIME // W"' in window
+# Universal visual language remains: magenta mode-aware header, cyan divider,
+# borderless modes. The top ⟳ opens local controls without changing modes.
+assert 'text: "TIME // " + timew.headerModeName' in window
+assert 'selectedMode === "calc" ? "CALCULATOR" : selectedName' in window
+assert 'onLeftClicked: timew.toggleResyncPopup()' in window
+assert 'text: "TIME // W"' not in window
 assert "color: Colors.magenta" in window
 assert "id: headerDivider" in window
 assert "height: 2\n                color: Colors.cyan" in window

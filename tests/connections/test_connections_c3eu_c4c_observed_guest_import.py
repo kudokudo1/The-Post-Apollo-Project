@@ -16,6 +16,7 @@ from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "tests/connections/c3e_release_trust/C3eUObservedGuestImport.py"
@@ -325,11 +326,18 @@ class C3eUC4cImportContract(unittest.TestCase):
                 self.refuse("C4C_REPORT_NONCANONICAL_REFUSED", raw=raw)
 
     def test_21_deep_json_recursion_fails_closed_with_bounded_refusal(self):
-        # < MAX_LINE bytes, but nesting can exceed Python JSON's recursion
-        # limit. It must produce a normal deny-only CLI receipt, not traceback.
+        # Python versions can differ on whether this deep payload parses or
+        # trips the recursion limit. Either outcome must be a normal refusal.
         deep = U.PREFIX + b"[" * 1200 + b"0" + b"]" * 1200 + b"\n"
         self.assertLess(len(deep), U.MAX_LINE)
-        self.refuse("C4C_REPORT_JSON_REFUSED", raw=deep)
+        with self.assertRaises(U.Refused) as caught:
+            self.check(raw=deep)
+        self.assertIn(str(caught.exception),
+                      ("C4C_REPORT_JSON_REFUSED", "C4C_REPORT_SHAPE_REFUSED"))
+        # Independently force the parser's recursion exception to prove that
+        # the decoder maps it to its bounded fail-closed diagnostic result.
+        with patch.object(U.json, "loads", side_effect=RecursionError("nested")):
+            self.refuse("C4C_REPORT_JSON_REFUSED", raw=self.line())
         args = [
             sys.executable, "-B", str(SOURCE),
             "--rpm-sha256", self.rpm,
@@ -343,7 +351,8 @@ class C3eUC4cImportContract(unittest.TestCase):
         self.assertEqual(result.returncode, 3, result.stderr)
         self.assertEqual(result.stderr, b"")
         receipt = json.loads(result.stdout)
-        self.assertEqual(receipt["refused"], "C4C_REPORT_JSON_REFUSED")
+        self.assertIn(receipt["refused"],
+                      ("C4C_REPORT_JSON_REFUSED", "C4C_REPORT_SHAPE_REFUSED"))
         for key in U.DENY_FLAGS:
             self.assertFalse(receipt[key])
 

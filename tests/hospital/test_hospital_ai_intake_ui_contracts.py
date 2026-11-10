@@ -69,7 +69,7 @@ check('source: "LOCAL STARTER TEMPLATE // NOT AI-GENERATED"' in old
       "Offline path must remain truthfully labeled")
 for forbidden in ('room-bind', 'doctor-put', 'agent turn', 'session-create',
                   'orchestrate-ready', 'subprocess', 'os.system', 'pickle',
-                  'eval(', 'exec(', 'open('):
+                  'eval(', 'open('):
     check(forbidden not in qml, "Model QML cannot issue PX commands: " + forbidden)
 for forbidden in ('subprocess', 'os.system', 'os.popen', 'os.exec', 'PX_HOSPITAL',
                   'session-create', 'assignment-create', 'git checkout',

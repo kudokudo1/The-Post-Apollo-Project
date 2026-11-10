@@ -48,17 +48,18 @@ class LiveDictationTests(unittest.TestCase):
         self.assertEqual(live.clean_transcript("Hi \x00"), "")
 
     def test_chunk_calls_local_whisper_only_for_speech(self):
-        with mock.patch.object(live.subprocess, "run") as run:
+        with mock.patch.object(live.subprocess, "Popen") as popen:
             self.assertEqual(live.transcribe_chunk("never-called", pcm(0, 4)), "")
-            run.assert_not_called()
-            run.return_value.returncode = 0
-            run.return_value.stdout = "[BLANK_AUDIO]\nWork on Finance."
+            popen.assert_not_called()
+            child = popen.return_value
+            child.returncode = 0
+            child.communicate.return_value = ("[BLANK_AUDIO]\\nWork on Finance.", "")
             self.assertEqual(live.transcribe_chunk("local-stt.sh", pcm(1300, 4)),
                              "Work on Finance.")
-            command = run.call_args.args[0]
+            command = popen.call_args.args[0]
             self.assertEqual(command[:2], ["bash", "local-stt.sh"])
-            self.assertEqual(run.call_args.kwargs["timeout"], 25)
-            self.assertEqual(run.call_args.kwargs["check"], False)
+            self.assertEqual(child.communicate.call_args.kwargs["timeout"], 15)
+            self.assertTrue(popen.call_args.kwargs["start_new_session"])
             self.assertFalse(Path(command[2]).exists(),
                              "Temporary WAV must be removed at completion")
 

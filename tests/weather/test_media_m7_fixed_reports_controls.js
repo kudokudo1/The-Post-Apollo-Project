@@ -23,7 +23,7 @@ test("M7 pins full NEWS; M8 adds a separately sized OVERVIEW toolbar without cha
     assert.ok(discovery.includes('id: reportsFixedToolbar'));
     assert.ok(discovery.includes('objectName: "media-m7-reports-pinned-toolbar"'));
     assert.ok(discovery.includes('visible: stationDiscovery.domain === "news"'));
-    assert.ok(discovery.includes('&& stationDiscovery.pinReportsToolbar'));
+    assert.ok(discovery.includes('&& stationDiscovery.reportsToolbarActive'));
     assert.ok(discovery.includes('id: discoveryScroll'));
     assert.ok(discovery.includes('anchors.top: reportsFixedToolbar.visible'));
     assert.ok(discovery.includes('? reportsFixedToolbar.bottom'));

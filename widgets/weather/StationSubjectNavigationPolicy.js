@@ -34,7 +34,9 @@ var SUBJECTS = [
       {id:"aqi",label:"AQI + WEATHER"},
       {id:"marine",label:"MARINE + WAVES"},
       {id:"coastal",label:"PRESSURE + WATER LEVEL"},
-      {id:"rivers",label:"PRECIP + RIVER STAGE"}]}]}
+      {id:"rivers",label:"PRECIP + RIVER STAGE"}]}]},
+    {id:"services",label:"SERVICES",children:[
+      {id:"health",label:"LIVE WEATHER SERVICE HEALTH"}]}
   ]},
   {id:"cosmos",label:"COSMOS",sections:[
     {id:"overview",label:"OVERVIEW"},

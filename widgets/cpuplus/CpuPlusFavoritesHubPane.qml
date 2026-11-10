@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import "../../components"
 import "../../services/favorites/FavoritesDossierIndexPolicy.js" as Dossier
 import "../../services/favorites/FavoritesSearchPolicy.js" as Search

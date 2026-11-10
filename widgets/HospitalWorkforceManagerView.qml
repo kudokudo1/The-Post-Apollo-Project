@@ -189,7 +189,20 @@ Column {
     function invalidateIntake() {
         intakeDraft = ({});
         intakeSource = "";
+        aiIntake.reset();
         disarm();
+    }
+    function requestAiIntake() {
+        root.invalidateIntake();
+        if (!root.active || root.mode !== "SETUP") {
+            root.outcome = "AI SETUP HOLD // OPEN START HERE";
+            return false;
+        }
+        const ok = aiIntake.generate(intakeBriefField.value);
+        root.outcome = ok
+            ? "AI PROPOSAL REQUESTED // ONLY SUBMITTED BRIEF SENT // NO TOOLS"
+            : "AI SETUP HOLD // " + aiIntake.lastError;
+        return ok;
     }
     function draftIntake() {
         root.invalidateIntake();
@@ -285,6 +298,8 @@ Column {
     }
     function selectMode(value) {
         if (mode === value) return;
+        if (value !== "SETUP")
+            aiIntake.reset();
         mode = value;
         disarm();
         outcome = "";
@@ -552,6 +567,32 @@ Column {
             root.rosterRefreshRequested();
         }
     }
+    HospitalAiProposalService {
+        id: aiIntake
+        onFinished: function(result) {
+            if (!root.active || root.mode !== "SETUP"
+                    || intakeBriefField.value !== aiIntake.pendingBrief)
+                return;
+            if (!result || result.ready !== true) {
+                root.outcome = "AI PROPOSAL HOLD // " + aiIntake.lastError;
+                return;
+            }
+            // No authority flows from model text: fields remain a draft and
+            // existing REVIEW / CONFIRM buttons are the only record writers.
+            if (result.permissions !== "READ"
+                    || ["INT", "NRS", "DOC"].indexOf(result.role) < 0
+                    || result.writesHospital !== false
+                    || result.launchesProvider !== false) {
+                root.outcome = "AI PROPOSAL REFUSED // INVALID PERMISSIONS";
+                return;
+            }
+            root.intakeDraft = result;
+            root.intakeSource = aiIntake.pendingBrief;
+            root.disarm();
+            root.outcome = "AI PROPOSAL RECEIVED // HUMAN REVIEW REQUIRED"
+                + " // NO ROOM, WORKER OR JOB SAVED";
+        }
+    }
     HospitalGitHubOwnerService {
         id: githubOwner
         onRefreshed: {
@@ -685,7 +726,7 @@ Column {
         }
         GohuText {
             width: parent.width
-            text: "Describe the job like a chat message. For now this makes a LOCAL STARTER TEMPLATE, not a model-generated answer. You choose the Room, worker and job records before saving."
+            text: "Describe the job like a chat. BUILD STARTER DRAFT works offline. ASK AI uses a configured OpenAI API key to propose fields without tools. Nothing saves until you review and confirm."
             color: Colors.cyan
             font.pixelSize: 9
             wrapMode: Text.Wrap
@@ -696,19 +737,48 @@ Column {
             editHeight: 156
             onEdited: root.invalidateIntake()
         }
-        HospitalActionButton {
+        Row {
             width: parent.width
-            height: 30
-            label: "BUILD STARTER DRAFT"
-            accent: Colors.magenta
-            contentGlowEnabled: false
-            enabledAction: root.active
-            onTriggered: root.draftIntake()
+            spacing: 6
+            HospitalActionButton {
+                width: (parent.width - 6) / 2
+                height: 30
+                label: "BUILD STARTER DRAFT"
+                accent: Colors.cyan
+                contentGlowEnabled: false
+                enabledAction: root.active
+                onTriggered: root.draftIntake()
+            }
+            HospitalActionButton {
+                width: (parent.width - 6) / 2
+                height: 30
+                label: aiIntake.busy ? "ASKING AI..." : "ASK AI // SEND BRIEF"
+                accent: Colors.magenta
+                contentGlowEnabled: false
+                enabledAction: root.active && !aiIntake.busy
+                onTriggered: root.requestAiIntake()
+            }
+        }
+        GohuText {
+            width: parent.width
+            text: "ASK AI sends ONLY the entered description to OpenAI. API access and charges depend on your configured account. No repository, account records, files or credentials are sent. The local starter does not use the network."
+            font.pixelSize: 8
+            color: Colors.orange
+            wrapMode: Text.Wrap
+        }
+        GohuText {
+            width: parent.width
+            text: aiIntake.busy ? "AI PROPOSAL // REQUEST IN PROGRESS"
+                : aiIntake.lastError ? "AI PROPOSAL // " + aiIntake.lastError
+                : "AI PROPOSAL // OPTIONAL, REQUIRES CONFIGURED OPENAI_API_KEY"
+            font.pixelSize: 8
+            color: aiIntake.lastError ? Colors.orange : Colors.blue
+            wrapMode: Text.Wrap
         }
         GohuText {
             width: parent.width
             text: root.intakeDraft.ready
-                ? "LOCAL PROPOSAL // NOT AI-GENERATED"
+                ? String(root.intakeDraft.source || "LOCAL PROPOSAL // NOT AI-GENERATED")
                     + "\\nROLE // " + root.intakeDraft.role
                     + "\\nROOM // " + root.intakeDraft.roomName
                     + "\\nWORKER // " + root.intakeDraft.workerName

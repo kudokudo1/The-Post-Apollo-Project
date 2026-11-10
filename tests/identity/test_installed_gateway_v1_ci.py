@@ -35,7 +35,7 @@ sys.path.insert(0, str(ROOT / "services" / "identity"))
 from desktop_command_gateway_v0 import KernelPeer, COMMAND_SOCKET, _peer
 from desktop_signed_command_client_v0 import SignedIdentityCommandClient
 from installed_gateway_witness_v1 import (
-    DOMAIN, PACKAGE, PREFIX, ROLE, SCHEMA, InstalledGatewayWitness,
+    DOMAIN, PACKAGE, PREFIX, REQUIRED_FILES, ROLE, SCHEMA, InstalledGatewayWitness,
     WitnessRefused, canonical as installed_canonical,
 )
 from signed_gateway_origin_probe_v0 import (
@@ -145,6 +145,8 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
         for file in sorted(payload.iterdir()):
             file.chmod(0o555)
             cls.file_hashes[str(Path(PREFIX) / file.name)] = _digest(file)
+        if set(cls.file_hashes) != REQUIRED_FILES:
+            raise RuntimeError("CI gateway package differs from signed V1 module roster")
         control = root / "DEBIAN"
         control.mkdir(mode=0o755)
         (control / "control").write_text(
@@ -418,6 +420,20 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
         mutated["files"] = dict(base["files"])
         mutated["files"][PREFIX + "desktop_context_projection_v0.py"] = "f"*64
         self.assertFalse(witness_signed(mutated).consistent(self.peer))
+        # A correctly signed release must not omit a real installed module.
+        # The old size-only manifest validation accepted this incomplete list.
+        mutated = dict(base, files=dict(base["files"]))
+        del mutated["files"][PREFIX + "desktop_context_projection_v0.py"]
+        with self.assertRaises(WitnessRefused):
+            witness_signed(mutated)
+        mutated = dict(base, files=dict(base["files"]))
+        del mutated["files"][PREFIX + ENTRYPOINT]
+        with self.assertRaises(WitnessRefused):
+            witness_signed(mutated)
+        mutated = dict(base, files=dict(base["files"]))
+        mutated["files"][PREFIX + "unexpected-extra-module.py"] = "f"*64
+        with self.assertRaises(WitnessRefused):
+            witness_signed(mutated)
         mutated = dict(base, unit="post-apollo-identity-ci-not-running.service")
         self.assertFalse(witness_signed(mutated).consistent(self.peer))
         mutated = dict(base, epoch=1)

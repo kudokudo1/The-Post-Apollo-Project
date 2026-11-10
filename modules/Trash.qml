@@ -39,12 +39,17 @@ PanelWindow {
     // never write targets. Revision increments protect concurrent changes.
     property var researchRows: []
     property int researchRevision: 0
+    property int researchBinCount: 0
+    property string researchBinDigest: ""
     property bool researchBusy: false
     property string researchPending: ""
     property string researchState: "NOT_SCANNED"
     property string researchBurnId: ""
+    property string researchBurnScope: "" // "" | "copy" | "all"
     property string researchBurnTitle: ""
     property int researchBurnRevision: -1
+    property int researchBurnCount: 0
+    property string researchBurnDigest: ""
     property bool researchBurnPointerRelocated: false
     property bool researchBurnClickArmed: false
     property bool researchBurnLoadComplete: false
@@ -107,9 +112,14 @@ PanelWindow {
     function runResearch(action, args) {
         if (!menuOpen || researchBusy || researchBurnId !== ""
                 || (activeMode !== "archive" && activeMode !== "burn"
-                    && !(activeMode === "trash" && action === "list")))
+                    && !(activeMode === "trash"
+                         && ["list", "restore", "burn"].indexOf(action) >= 0)))
             return false;
-        if (["list", "archive", "archive-event", "trash", "restore", "burn"].indexOf(action) < 0)
+        if (["list", "archive", "archive-event", "trash", "restore", "burn",
+             "burn-all"].indexOf(action) < 0)
+            return false;
+        if (activeMode === "trash"
+                && ["list", "restore", "burn"].indexOf(action) < 0)
             return false;
         researchBusy = true;
         researchPending = action;
@@ -143,16 +153,20 @@ PanelWindow {
         if (!payload || payload.ok !== true
                 || payload.kind !== "managed-research"
                 || !Array.isArray(payload.items)
-                || typeof payload.revision !== "number") {
+                || typeof payload.revision !== "number"
+                || typeof payload.binCount !== "number"
+                || typeof payload.binDigest !== "string") {
             researchState = "STALE // " + String(payload && payload.error
                                                 || "RESEARCH STORE UNAVAILABLE");
             return;
         }
         researchRows = payload.items;
         researchRevision = payload.revision;
+        researchBinCount = payload.binCount;
+        researchBinDigest = payload.binDigest;
         researchState = action === "list" ? "READY // SAVED RESEARCH"
                                          : action.toUpperCase() + " // COMPLETE";
-        if (action === "burn")
+        if (action === "burn" || action === "burn-all")
             clearResearchBurn();
     }
 
@@ -197,8 +211,11 @@ PanelWindow {
     function clearResearchBurn() {
         researchBurnArmAnimation.stop();
         researchBurnId = "";
+        researchBurnScope = "";
         researchBurnTitle = "";
         researchBurnRevision = -1;
+        researchBurnCount = 0;
+        researchBurnDigest = "";
         researchBurnPointerRelocated = false;
         researchBurnClickArmed = false;
         researchBurnLoadComplete = false;
@@ -207,6 +224,7 @@ PanelWindow {
 
     function armResearchBurn(row) {
         if (!menuOpen || researchBusy || busy || confirmMode !== ""
+                || researchBurnId !== ""
                 || !row || (row.kind !== "SAVED RESEARCH"
                             && row.kind !== "SAVED EVENT")
                 || row.state !== "trashed"
@@ -215,7 +233,28 @@ PanelWindow {
                    }) < 0)
             return false;
         researchBurnId = String(row.id);
+        researchBurnScope = "copy";
         researchBurnTitle = String(row.title);
+        researchBurnRevision = researchRevision;
+        researchBurnPointerRelocated = false;
+        researchBurnClickArmed = false;
+        researchBurnLoadComplete = false;
+        researchBurnLoadProgress = 0;
+        return true;
+    }
+
+    function armResearchBurnAll() {
+        if (!menuOpen || activeMode !== "burn" || researchBusy || busy
+                || confirmMode !== "" || researchBurnId !== ""
+                || researchBinCount < 1
+                || researchBinCount !== researchBinRows.length
+                || researchBinDigest.length !== 64)
+            return false;
+        researchBurnId = "__managed_bin_all__"; // impossible record ID
+        researchBurnScope = "all";
+        researchBurnTitle = researchBinCount + " TRASHED MANAGED COPIES";
+        researchBurnCount = researchBinCount;
+        researchBurnDigest = researchBinDigest;
         researchBurnRevision = researchRevision;
         researchBurnPointerRelocated = false;
         researchBurnClickArmed = false;
@@ -226,6 +265,7 @@ PanelWindow {
 
     function advanceResearchBurn() {
         if (!researchBurnId || !researchBurnPointerRelocated
+                || confirmMode !== ""
                 || researchBurnRevision !== researchRevision
                 || researchBusy || busy)
             return false;
@@ -245,7 +285,25 @@ PanelWindow {
         if (!researchBurnId || !researchBurnPointerRelocated
                 || !researchBurnClickArmed || !researchBurnLoadComplete
                 || researchBurnRevision !== researchRevision
-                || researchBusy || busy
+                || researchBusy || busy)
+            return false;
+        if (researchBurnScope === "all") {
+            if (activeMode !== "burn"
+                    || researchBurnCount < 1
+                    || researchBurnCount !== researchBinCount
+                    || researchBurnCount !== researchBinRows.length
+                    || researchBurnDigest !== researchBinDigest)
+                return false;
+            const rev = researchBurnRevision;
+            const count = researchBurnCount;
+            const digest = researchBurnDigest;
+            clearResearchBurn();
+            return runResearch("burn-all", [
+                String(rev), String(count), digest,
+                "BURN_ALL_MANAGED_COPIES_CONFIRMED"
+            ]);
+        }
+        if (researchBurnScope !== "copy"
                 || researchRows.findIndex(function(row) {
                     return row.id === researchBurnId && row.state === "trashed";
                 }) < 0)
@@ -363,6 +421,36 @@ PanelWindow {
     property string confirmRevision: ""
     property int confirmCount: 0
     property bool burnAllPointerRelocated: false
+
+    // One visual Trash list. Files still use GIO and saved records still
+    // use the isolated, revision-controlled managed-copy backend.
+    property string trashViewFilter: "all"
+    readonly property bool trashShowsFiles:
+        trashViewFilter === "all" || trashViewFilter === "files"
+    readonly property var trashDisplayRows: {
+        const fileRows = trashShowsFiles
+            ? filteredItems.map(function(item) {
+                return {entryType:"file", name:item.name,
+                        originLabel:item.originLabel, uri:item.uri,
+                        original:item.original};
+            }) : [];
+        const needle = String(trashSearch.text || "").trim().toLowerCase();
+        const copyRows = researchBinRows.filter(function(row) {
+            if (trashViewFilter === "files") return false;
+            if (trashViewFilter === "events" && row.kind !== "SAVED EVENT")
+                return false;
+            if (trashViewFilter === "research" && row.kind !== "SAVED RESEARCH")
+                return false;
+            return !needle || (String(row.title) + " " + String(row.source)
+                               + " " + String(row.details) + " " + String(row.id))
+                               .toLowerCase().indexOf(needle) >= 0;
+        }).map(function(row) {
+            return {entryType:"record", name:row.title, kind:row.kind,
+                    originLabel:row.source + " // " + row.recordedAt,
+                    record:row};
+        });
+        return fileRows.concat(copyRows);
+    }
 
     readonly property var filteredItems: items.filter(function(item) {
         const needle = String(trashSearch.text || "").trim().toLowerCase();
@@ -918,23 +1006,21 @@ PanelWindow {
                 GohuText {
                     width: parent.width - 203
                     height: 23
-                    font.pixelSize: 11
+                    font.pixelSize: 10
                     color: Colors.white
                     verticalAlignment: Text.AlignVCenter
-                    text: "SYSTEM TRASH // " + trashLauncher.total + " ITEMS"
+                    text: "FILES " + trashLauncher.total
+                          + " // RECORDS " + trashLauncher.researchBinRows.length
                 }
 
                 ActionButton {
                     width: 92
                     height: 23
-                    label: "COPY BIN " + trashLauncher.researchBinRows.length
+                    label: "RECORD BIN " + trashLauncher.researchBinRows.length
                     labelPixelSize: 9
                     accentColor: Colors.orange
                     available: !trashLauncher.researchBusy
-                    onLeftClicked: {
-                        trashLauncher.archiveFilter = "bin";
-                        trashLauncher.setMode("archive");
-                    }
+                    onLeftClicked: trashLauncher.trashViewFilter = "records"
                 }
 
                 ActionButton {
@@ -953,7 +1039,7 @@ PanelWindow {
                 visible: trashLauncher.activeMode === "trash"
                 width: parent.width
                 height: 33
-                placeholderText: "FILTER THIS PAGE // FILE NAME OR LOCATION"
+                placeholderText: "SEARCH TRASH // FILES, EVENTS OR RESEARCH COPIES"
                 color: Colors.white
                 font.pixelSize: 11
                 placeholderTextColor: Colors.cyan
@@ -966,11 +1052,42 @@ PanelWindow {
                 }
             }
 
+            Row {
+                id: trashSourceFilters
+                width: parent.width
+                height: 27
+                spacing: 4
+                visible: trashLauncher.activeMode === "trash"
+
+                Repeater {
+                    model: [
+                        {id:"all", label:"ALL"},
+                        {id:"files", label:"FILES"},
+                        {id:"records", label:"RECORDS"},
+                        {id:"events", label:"EVENTS"},
+                        {id:"research", label:"RESEARCH"}
+                    ]
+                    ActionButton {
+                        required property var modelData
+                        width: (trashSourceFilters.width - 16) / 5
+                        height: 26
+                        label: modelData.label
+                        labelPixelSize: 9
+                        accentColor: modelData.id === "files"
+                                     ? Colors.cyan
+                                     : modelData.id === "records"
+                                     ? Colors.orange : Colors.magenta
+                        selected: trashLauncher.trashViewFilter === modelData.id
+                        onLeftClicked: trashLauncher.trashViewFilter = modelData.id
+                    }
+                }
+            }
+
             Item {
                 id: trashListBox
                 visible: trashLauncher.activeMode === "trash"
                 width: parent.width
-                height: Math.max(95, trashMenu.height - 290
+                height: Math.max(90, trashMenu.height - 323
                                  - (trashLauncher.confirmMode === "item" ? 46 : 0))
 
                 ListView {
@@ -980,7 +1097,7 @@ PanelWindow {
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     spacing: 4
-                    model: trashLauncher.filteredItems
+                    model: trashLauncher.trashDisplayRows
 
                     delegate: Rectangle {
                         id: trashEntry
@@ -989,7 +1106,8 @@ PanelWindow {
                         height: 55
                         color: Colors.dark
                         border.width: 1
-                        border.color: Colors.green
+                        border.color: trashEntry.modelData.entryType === "record"
+                                      ? Colors.orange : Colors.green
                         radius: 0
 
                         Column {
@@ -1001,7 +1119,9 @@ PanelWindow {
                             GohuText {
                                 width: parent.width
                                 height: 19
-                                text: String(trashEntry.modelData.name || "UNNAMED FILE")
+                                text: (trashEntry.modelData.entryType === "record"
+                                       ? "[COPY] " : "[FILE] ")
+                                      + String(trashEntry.modelData.name || "UNNAMED")
                                 color: Colors.white
                                 font.pixelSize: 11
                                 verticalAlignment: Text.AlignVCenter
@@ -1032,20 +1152,37 @@ PanelWindow {
                                 labelPixelSize: 10
                                 accentColor: Colors.green
                                 available: !trashLauncher.busy
-                                onLeftClicked: trashLauncher.restoreItem(
-                                                   trashEntry.modelData)
+                                           && !trashLauncher.researchBusy
+                                           && trashLauncher.researchBurnId === ""
+                                onLeftClicked: {
+                                    if (trashEntry.modelData.entryType === "record")
+                                        trashLauncher.restoreResearchCopy(
+                                            trashEntry.modelData.record);
+                                    else
+                                        trashLauncher.restoreItem(
+                                            trashEntry.modelData);
+                                }
                             }
 
                             ActionButton {
                                 width: 55
                                 height: 31
-                                label: "BURN"
-                                labelPixelSize: 10
+                                label: trashEntry.modelData.entryType === "record"
+                                       ? "BURN COPY" : "BURN"
+                                labelPixelSize: 9
                                 accentColor: Colors.red
                                 destructive: true
                                 available: !trashLauncher.busy
-                                onLeftClicked: trashLauncher.armBurn(
-                                                   trashEntry.modelData)
+                                           && !trashLauncher.researchBusy
+                                           && trashLauncher.researchBurnId === ""
+                                onLeftClicked: {
+                                    if (trashEntry.modelData.entryType === "record")
+                                        trashLauncher.armResearchBurn(
+                                            trashEntry.modelData.record);
+                                    else
+                                        trashLauncher.armBurn(
+                                            trashEntry.modelData);
+                                }
                             }
                         }
                     }
@@ -1062,12 +1199,13 @@ PanelWindow {
 
                 GohuText {
                     anchors.centerIn: parent
-                    visible: trashLauncher.filteredItems.length === 0
+                    visible: trashLauncher.trashDisplayRows.length === 0
                     font.pixelSize: 11
                     color: Colors.cyan
                     text: trashLauncher.total === 0
+                          && trashLauncher.researchBinRows.length === 0
                           ? "TRASH EMPTY // NOTHING TO RESTORE"
-                          : "NO MATCHES ON THIS PAGE"
+                          : "NO MATCHES // CHOOSE A SOURCE FILTER"
                 }
             }
 
@@ -1083,7 +1221,8 @@ PanelWindow {
                     label: "PREVIOUS"
                     labelPixelSize: 9
                     accentColor: Colors.cyan
-                    available: !trashLauncher.busy && trashLauncher.page > 0
+                    available: trashLauncher.trashShowsFiles
+                               && !trashLauncher.busy && trashLauncher.page > 0
                     onLeftClicked: {
                         trashLauncher.page--;
                         trashLauncher.refresh(true);
@@ -1097,9 +1236,11 @@ PanelWindow {
                     font.pixelSize: 10
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
-                    text: "PAGE " + (trashLauncher.page + 1) + " // "
-                          + Math.max(1, Math.ceil(trashLauncher.total
-                                                  / trashLauncher.pageSize))
+                    text: trashLauncher.trashShowsFiles
+                          ? "FILE PAGE " + (trashLauncher.page + 1) + " // "
+                            + Math.max(1, Math.ceil(trashLauncher.total
+                                                    / trashLauncher.pageSize))
+                          : "MANAGED BIN // " + trashLauncher.trashDisplayRows.length
                 }
 
                 ActionButton {
@@ -1108,7 +1249,8 @@ PanelWindow {
                     label: "NEXT"
                     labelPixelSize: 9
                     accentColor: Colors.cyan
-                    available: !trashLauncher.busy
+                    available: trashLauncher.trashShowsFiles
+                               && !trashLauncher.busy
                                && (trashLauncher.page + 1)
                                   * trashLauncher.pageSize < trashLauncher.total
                     onLeftClicked: {
@@ -1580,13 +1722,41 @@ PanelWindow {
                             }
                         }
 
-                        ActionButton {
-                            width: 172
-                            height: 30
-                            label: "VIEW SYSTEM TRASH"
-                            labelPixelSize: 10
-                            accentColor: Colors.green
-                            onLeftClicked: trashLauncher.setMode("trash")
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 8
+
+                            ActionButton {
+                                width: Math.max(128, parent.width - 150)
+                                height: 32
+                                label: "VIEW TRASH"
+                                labelPixelSize: 10
+                                accentColor: Colors.green
+                                onLeftClicked: {
+                                    trashLauncher.trashViewFilter = "records";
+                                    trashLauncher.setMode("trash");
+                                }
+                            }
+
+                            // Separate from GIO's existing SYSTEM TRASH
+                            // BURN ALL, which remains on the Trash page.
+                            ActionButton {
+                                id: burnAllManagedCopiesButton
+                                width: 142
+                                height: 32
+                                label: "BURN ALL COPIES"
+                                labelPixelSize: 9
+                                accentColor: Colors.red
+                                destructive: true
+                                available: !trashLauncher.researchBusy
+                                           && !trashLauncher.busy
+                                           && trashLauncher.researchBurnId === ""
+                                           && trashLauncher.researchBinCount > 0
+                                           && trashLauncher.researchBinCount
+                                              === trashLauncher.researchBinRows.length
+                                onLeftClicked: trashLauncher.armResearchBurnAll()
+                            }
                         }
                     }
                 }
@@ -1762,7 +1932,9 @@ PanelWindow {
                 GohuText {
                     width: parent.width
                     font.pixelSize: 17
-                    text: "BURN SAVED COPY // FINAL REVIEW"
+                    text: trashLauncher.researchBurnScope === "all"
+                          ? "BURN ALL COPIES // FINAL REVIEW"
+                          : "BURN SAVED COPY // FINAL REVIEW"
                     color: Colors.red
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
@@ -1778,7 +1950,10 @@ PanelWindow {
                     width: parent.width
                     font.pixelSize: 11
                     color: Colors.yellow
-                    text: "SCOPE // ONE TRASH++ MANAGED COPY"
+                    text: trashLauncher.researchBurnScope === "all"
+                          ? "SCOPE // MANAGED BIN ONLY // "
+                            + trashLauncher.researchBurnCount + " COPIES"
+                          : "SCOPE // ONE TRASH++ MANAGED COPY"
                     wrapMode: Text.WordWrap
                 }
 
@@ -1795,7 +1970,10 @@ PanelWindow {
                     font.pixelSize: 11
                     color: Colors.cyan
                     wrapMode: Text.WordWrap
-                    text: "This permanently deletes ONE saved copy from Trash++'s record store. Original Weather events, demo scrape exports, Hospital and Finance records remain untouched. The backend rechecks identity and revision."
+                    text: trashLauncher.researchBurnScope === "all"
+                          ? "This destroys ONLY " + trashLauncher.researchBurnCount
+                            + " trashed Trash++ managed copies. Active archived copies, GIO system Trash, original Weather events, demo scrapes, Hospital and Finance records are NOT affected. The backend rechecks bin count, revision and record-ID digest."
+                          : "This permanently deletes ONE saved copy from Trash++'s record store. Original Weather events, demo scrape exports, Hospital and Finance records remain untouched. The backend rechecks identity and revision."
                 }
 
                 GohuText {
@@ -1824,6 +2002,23 @@ PanelWindow {
                             }
                         }
 
+                        // Full-chassis progress fills the ENTIRE button
+                        // from left to right, behind its readable label.
+                        // The action shell remains a normal live button even
+                        // before the first click.
+                        Rectangle {
+                            id: researchBurnLoadFill
+                            x: 2
+                            y: 2
+                            width: Math.max(0, parent.width - 4)
+                                   * trashLauncher.researchBurnLoadProgress
+                            height: Math.max(0, parent.height - 4)
+                            color: Colors.orange
+                            opacity: 0.72
+                            radius: 0
+                            visible: trashLauncher.researchBurnClickArmed
+                        }
+
                         ActionButton {
                             id: confirmManagedResearchBurn
                             anchors.fill: parent
@@ -1837,12 +2032,11 @@ PanelWindow {
                             labelPixelSize: 10
                             accentColor: Colors.red
                             destructive: true
-                            // Normal, visible, interactive button from first
-                            // render. Pointer relocation and the deliberate
-                            // second click are enforced by handler + backend.
                             idleBorderWidth: 2
                             idleBorderColor: Colors.red
-                            idleFillColor: Colors.black
+                            idleFillColor: "transparent"
+                            hoverFillColor: "transparent"
+                            pressedFillColor: "transparent"
                             contentGlowIdleOpacity: 0.36
                             softGlowIdleOpacity: 0.33
                             wideGlowEnabled: true
@@ -1852,17 +2046,6 @@ PanelWindow {
                                        && trashLauncher.researchBurnRevision
                                           === trashLauncher.researchRevision
                             onLeftClicked: trashLauncher.advanceResearchBurn()
-                        }
-
-                        Rectangle {
-                            id: researchBurnLoadBar
-                            anchors.bottom: parent.bottom
-                            anchors.left: parent.left
-                            height: 4
-                            width: Math.max(0, parent.width - 4)
-                                   * trashLauncher.researchBurnLoadProgress
-                            color: Colors.orange
-                            visible: trashLauncher.researchBurnClickArmed
                         }
                     }
 

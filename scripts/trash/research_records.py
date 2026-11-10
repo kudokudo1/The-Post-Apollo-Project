@@ -343,6 +343,13 @@ def _lock(dirfd):
         _fail("MANAGED_STORE_LOCK_FAILED")
 
 
+def _bin_identity(document):
+    """Inventory witness of only trashed managed-copy IDs, sorted and bounded."""
+    ids = sorted(r["id"] for r in document["records"] if r["state"] == "trashed")
+    digest = hashlib.sha256("\\n".join(ids).encode("ascii")).hexdigest()
+    return len(ids), digest
+
+
 def _summary(document, result="INDEX"):
     items = []
     for record in document["records"]:
@@ -375,16 +382,22 @@ def _summary(document, result="INDEX"):
             },
         })
     items.sort(key=lambda r: (-r["archivedAtMs"], r["id"]))
+    bin_count, bin_digest = _bin_identity(document)
     return {"ok": True, "kind": "managed-research", "result": result,
-            "revision": document["revision"], "total": len(items), "items": items}
+            "revision": document["revision"], "total": len(items),
+            "binCount": bin_count, "binDigest": bin_digest, "items": items}
 
 
 def operate(action, data_dir, record_id="", expected_revision=None,
-            confirmation="", when="", home_dir=None):
-    if action not in ("list", "archive", "archive-event", "trash", "restore", "burn"):
+            confirmation="", when="", home_dir=None, expected_count=None,
+            expected_digest=""):
+    if action not in ("list", "archive", "archive-event", "trash", "restore", "burn",
+                      "burn-all"):
         _fail("ACTION_NOT_PERMITTED")
     if action == "burn" and confirmation != "BURN_SAVED_COPY_CONFIRMED":
         _fail("BURN_CONFIRMATION_REQUIRED")
+    if action == "burn-all" and confirmation != "BURN_ALL_MANAGED_COPIES_CONFIRMED":
+        _fail("BURN_ALL_CONFIRMATION_REQUIRED")
     dirfd = _root(data_dir)
     lockfd = None
     try:
@@ -398,7 +411,20 @@ def operate(action, data_dir, record_id="", expected_revision=None,
             _fail("STALE_MANAGED_REVISION")
         if document["revision"] >= MAX_REVISION:
             _fail("MANAGED_STORE_CAPACITY")
-        if action in ("archive", "archive-event"):
+        if action == "burn-all":
+            current_count, current_digest = _bin_identity(document)
+            if (type(expected_count) is not int or expected_count < 1
+                    or current_count != expected_count
+                    or not isinstance(expected_digest, str)
+                    or len(expected_digest) != 64
+                    or expected_digest != current_digest):
+                _fail("STALE_MANAGED_BIN")
+            # Authoritative source-owned archived copies are not touched.
+            # This only removes the already-trashed managed snapshot copies.
+            document["records"] = [
+                r for r in document["records"] if r["state"] != "trashed"
+            ]
+        elif action in ("archive", "archive-event"):
             if action == "archive":
                 content_key, content = "page", _source_page(
                     record_id, when, home_dir or Path.home())
@@ -458,6 +484,10 @@ def main(argv):
             result = operate(argv[1], argv[2], argv[3], int(argv[4]))
         elif len(argv) == 6 and argv[1] == "burn":
             result = operate("burn", argv[2], argv[3], int(argv[4]), argv[5])
+        elif len(argv) == 7 and argv[1] == "burn-all":
+            result = operate("burn-all", argv[2], expected_revision=int(argv[3]),
+                             expected_count=int(argv[4]), expected_digest=argv[5],
+                             confirmation=argv[6])
         else:
             _fail("ACTION_NOT_PERMITTED")
     except (LifecycleError, ValueError) as exc:

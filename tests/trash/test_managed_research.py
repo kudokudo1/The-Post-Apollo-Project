@@ -236,6 +236,93 @@ class ManagedResearchTests(unittest.TestCase):
                             when="1760001000000")
         self.assertFalse((self.data / records.STORE_NAME).exists())
 
+    def test_managed_bin_burn_all_uses_count_revision_digest_and_preserves_active(self):
+        original = self.source.read_bytes()
+        weather_path = self.data / records.WEATHER_EVENT_NAME
+        weather_path.write_text(json.dumps(weather_document()), encoding="utf-8")
+        weather_original = weather_path.read_bytes()
+        first = self.run_action("archive", page()["url"], 0,
+                                when=page()["observedAt"])
+        first_id = first["items"][0]["id"]
+        self.run_action("trash", first_id, 1)
+        archived_again = self.run_action("archive", page()["url"], 2,
+                                         when=page()["observedAt"])
+        active_id = next(x["id"] for x in archived_again["items"]
+                         if x["state"] == "archived")
+        event = self.run_action("archive-event", "usgs|quake-17", 3,
+                                when="1760001000000")
+        event_id = next(x["id"] for x in event["items"]
+                        if x["kind"] == "SAVED EVENT")
+        current = self.run_action("trash", event_id, 4)
+        self.assertEqual(current["revision"], 5)
+        self.assertEqual(current["binCount"], 2)
+        self.assertEqual(len(current["binDigest"]), 64)
+        self.assertEqual(current["total"], 3)
+
+        def burn_all(revision=5, count=2, digest=None,
+                     token="BURN_ALL_MANAGED_COPIES_CONFIRMED"):
+            return records.operate("burn-all", str(self.data),
+                                   expected_revision=revision,
+                                   expected_count=count,
+                                   expected_digest=current["binDigest"] if digest is None else digest,
+                                   confirmation=token, home_dir=self.home)
+
+        for params, expected in [
+            ({"token":""}, "BURN_ALL_CONFIRMATION_REQUIRED"),
+            ({"revision":4}, "STALE_MANAGED_REVISION"),
+            ({"count":3}, "STALE_MANAGED_BIN"),
+            ({"count":0}, "STALE_MANAGED_BIN"),
+            ({"digest":"0"*64}, "STALE_MANAGED_BIN"),
+        ]:
+            with self.subTest(params=params):
+                with self.assertRaisesRegex(records.LifecycleError, expected):
+                    burn_all(**params)
+                self.assertEqual(self.run_action("list")["revision"], 5)
+
+        cleaned = burn_all()
+        self.assertEqual(cleaned["result"], "BURN-ALL")
+        self.assertEqual(cleaned["binCount"], 0)
+        self.assertEqual(cleaned["total"], 1)
+        self.assertEqual(cleaned["revision"], 6)
+        self.assertEqual(cleaned["items"][0]["id"], active_id)
+        self.assertEqual(cleaned["items"][0]["state"], "archived")
+        self.assertEqual(self.source.read_bytes(), original)
+        self.assertEqual(weather_path.read_bytes(), weather_original)
+
+    def test_managed_bin_burn_all_refuses_empty_without_touching_other_files(self):
+        unrelated = self.data / "keep-user-files.txt"
+        unrelated.write_text("do not touch me", encoding="utf-8")
+        first = self.run_action("archive", page()["url"], 0,
+                                when=page()["observedAt"])
+        before = (self.data / records.STORE_NAME).read_bytes()
+        with self.assertRaisesRegex(records.LifecycleError, "STALE_MANAGED_BIN"):
+            records.operate("burn-all", str(self.data), expected_revision=1,
+                            expected_count=0, expected_digest=first["binDigest"],
+                            confirmation="BURN_ALL_MANAGED_COPIES_CONFIRMED",
+                            home_dir=self.home)
+        self.assertEqual((self.data / records.STORE_NAME).read_bytes(), before)
+        self.assertEqual(unrelated.read_text(), "do not touch me")
+        self.assertEqual(self.run_action("list")["total"], 1)
+
+    def test_managed_bin_burn_all_cli_uses_explicit_scoped_verb(self):
+        first = self.run_action("archive", page()["url"], 0,
+                                when=page()["observedAt"])
+        rid = first["items"][0]["id"]
+        bin_list = self.run_action("trash", rid, 1)
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = records.main([
+                "research_records.py", "burn-all", str(self.data),
+                str(bin_list["revision"]), str(bin_list["binCount"]),
+                bin_list["binDigest"], "BURN_ALL_MANAGED_COPIES_CONFIRMED"
+            ])
+        self.assertEqual(code, 0)
+        reply = json.loads(output.getvalue())
+        self.assertTrue(reply["ok"])
+        self.assertEqual(reply["binCount"], 0)
+        self.assertEqual(reply["total"], 0)
+        self.assertTrue(self.source.exists())
+
     def test_refuse_direct_burn_without_trash_and_explicit_token(self):
         first = self.run_action("archive", page()["url"], 0,
                                 when=page()["observedAt"])

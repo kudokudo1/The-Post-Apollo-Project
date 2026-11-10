@@ -379,7 +379,7 @@ class C4dSerialCaptureTests(unittest.TestCase):
 
     def test_29_multiple_conflicting_diagnostic_codes_report_only_multiple(self):
         self.serial.write_bytes(
-            b"C4D_UART_DIAG // GUEST_LOG_UNSAFE\n" +
+            b"C4D_UART_DIAG // GUEST_RECORD_EMPTY\n" +
             b"C4D_UART_DIAG // GUEST_OBSERVATION_MISSING\n" +
             b"\n".join(C.REQUIRED_MARKERS) + b"\n")
         self.done.write_text("PASS\n")
@@ -390,7 +390,7 @@ class C4dSerialCaptureTests(unittest.TestCase):
                 C.capture(self.root, self.done, poll=0)
         diag = stream.getvalue()
         self.assertIn("relay_reason=MULTIPLE", diag)
-        self.assertNotIn("GUEST_LOG_UNSAFE", diag)
+        self.assertNotIn("GUEST_RECORD_EMPTY", diag)
 
     def test_25_valid_guest_record_logs_counts_but_not_the_payload(self):
         self.payload(observation())

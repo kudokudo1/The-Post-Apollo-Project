@@ -66,7 +66,8 @@ assert 'SCHEMA_VERSION = 1' in legacy
 assert 'function createMarker' in timeline  # old session-only state preserved
 
 assert qml.count('Process {') == 15
-assert qml.count('onTextEdited:') == 19
+assert qml.count('onTextEdited:') == 20
+assert 'onTextEdited: timew.machineBraveTabDraft = text' in qml
 roots = re.findall(r'^    (?:readonly )?property\s+\w+\s+(\w+)\s*[:=]',
                    qml, flags=re.MULTILINE)
 assert roots and len(roots) == len(set(roots)), 'Duplicate QML root property'

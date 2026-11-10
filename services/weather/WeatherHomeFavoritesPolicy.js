@@ -7,7 +7,7 @@ var VERSION = 1;
 var MAX_CARD_KEYS = 32;
 var PANELS = [
     "home/auto", "home/quick", "home/snapshot",
-    "home/history", "home/runtime", "home/health"
+    "home/history", "home/runtime", "home/health", "home/sources"
 ];
 
 function empty() {

@@ -2206,8 +2206,124 @@ PanelWindow {
                     width: parent.width
                     font.pixelSize: 10
                     color: Colors.green
-                    text: "CANCEL RETURNS TO YOUR RECORDS // NOTHING IS BURNED"
+                    text: "CANCEL RETURNS TO BURN // NO DELETION"
                     wrapMode: Text.WordWrap
+                }
+            }
+
+            // Stays here until DONE. Every listed name came from the actual
+            // successful backend result, never a guessed input selection.
+            Column {
+                id: burnResultContent
+                anchors.centerIn: parent
+                width: Math.min(parent.width - 30, 370)
+                spacing: 10
+                visible: trashLauncher.burnUiStage === "result"
+                         || trashLauncher.burnUiStage === "error"
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 17
+                    horizontalAlignment: Text.AlignHCenter
+                    color: trashLauncher.burnReceiptVerified
+                           ? Colors.green : Colors.orange
+                    wrapMode: Text.WordWrap
+                    text: trashLauncher.burnUiStage === "error"
+                          ? "BURN // VERIFICATION FAILED"
+                          : trashLauncher.burnReceiptVerified
+                          ? "BURN // VERIFIED RESULT"
+                          : "BURN // PARTIAL OR UNVERIFIED"
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 2
+                    color: Colors.orange
+                }
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 11
+                    color: Colors.yellow
+                    wrapMode: Text.WordWrap
+                    text: trashLauncher.burnReceiptScope
+                          + " // " + trashLauncher.burnReceiptCount
+                          + " CONFIRMED OF " + trashLauncher.burnReceiptRequested
+                }
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 11
+                    color: trashLauncher.burnReceiptVerified
+                           ? Colors.cyan : Colors.orange
+                    wrapMode: Text.WordWrap
+                    text: trashLauncher.burnReceiptMessage
+                }
+
+                Item {
+                    width: parent.width
+                    height: Math.max(85, Math.min(210, trashMenu.height - 245))
+                    ListView {
+                        id: burnReceiptList
+                        anchors.fill: parent
+                        clip: true
+                        spacing: 4
+                        boundsBehavior: Flickable.StopAtBounds
+                        model: trashLauncher.burnReceiptItems
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: burnReceiptList.width
+                            height: 45
+                            color: Colors.dark
+                            radius: 0
+                            border.width: 1
+                            border.color: Colors.cyan
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                spacing: 2
+                                GohuText {
+                                    width: parent.width
+                                    height: 16
+                                    font.pixelSize: 10
+                                    color: Colors.white
+                                    elide: Text.ElideMiddle
+                                    text: String(modelData.name)
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    height: 15
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                    elide: Text.ElideMiddle
+                                    text: String(modelData.kind)
+                                          + " // " + String(modelData.source)
+                                }
+                            }
+                        }
+                    }
+                    NeonScrollBar {
+                        flickable: burnReceiptList
+                        x: parent.width - width
+                        height: parent.height
+                        geometryMode: "viewport"
+                        handleStyle: "star"
+                        visible: scrollable
+                    }
+                    GohuText {
+                        anchors.centerIn: parent
+                        visible: trashLauncher.burnReceiptItems.length === 0
+                        font.pixelSize: 10
+                        color: Colors.orange
+                        text: "NO DELETIONS VERIFIED // REVIEW STATUS ABOVE"
+                    }
+                }
+
+                ActionButton {
+                    id: burnReceiptDone
+                    width: parent.width
+                    height: 40
+                    label: "DONE // RETURN TO BURN"
+                    labelPixelSize: 11
+                    accentColor: Colors.green
+                    onLeftClicked: trashLauncher.dismissBurnReceipt()
                 }
             }
         }

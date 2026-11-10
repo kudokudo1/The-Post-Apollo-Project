@@ -50,8 +50,14 @@ CONTRACT = {
     'clip: containGlow && trackTopExtension <= 0':
         "preserve intentional rail extensions outside the normal track bounds",
     # Availability / reveal // 005–011, 023
-    'Math.min(trackLength, Math.max(minimumHandleHeight, proportional))':
-        "short bar handles shrink rather than protrude",
+    'const normal = Math.min(trackLength,':
+        "short normal handles still shrink within their track",
+    'Math.max(minimumHandleHeight, proportional)':
+        "normal handle retains its minimum size",
+    'property int maximumBarHandleHeight: 0':
+        "compact handle limit is opt-in; global default unchanged",
+    'Math.min(normal, Math.max(minimumHandleHeight, maximumBarHandleHeight))':
+        "opt-in rounded handle cap does not affect star artwork",
     'Math.min(trackLength,': "short star handles shrink rather than protrude",
     'property bool autoHide: true': "legacy auto-hide compatibility",
     'property string visibilityMode: ""': "explicit visibility policies",

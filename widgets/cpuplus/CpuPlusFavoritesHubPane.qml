@@ -705,17 +705,17 @@ Item {
             border.color: favoritesSearchInput.activeFocus
                 ? Colors.magenta : Colors.cyan
 
-            // Center both hint and typed text in the available terminal
-            // width, excluding the destructive clear button on the right.
+            // Place the hint and typed query on the LEFT. Center both
+            // vertically within the 32px search terminal, not horizontally.
             QuietText {
-                anchors.horizontalCenter: favoritesSearchInput.horizontalCenter
+                anchors.left: favoritesSearchInput.left
                 anchors.verticalCenter: parent.verticalCenter
                 width: favoritesSearchInput.width
                 visible: favoritesSearchInput.text.length===0
                 text: "⌕  SEARCH // NAME, MENU, PLACE..."
                 font.pixelSize: 9
                 color: Colors.cyan
-                horizontalAlignment: Text.AlignHCenter
+                horizontalAlignment: Text.AlignLeft
                 elide: Text.ElideRight
             }
             TextInput {
@@ -728,7 +728,8 @@ Item {
                 height: 22
                 font.family: GohuFont.family
                 font.pixelSize: 11
-                horizontalAlignment: TextInput.AlignHCenter
+                horizontalAlignment: TextInput.AlignLeft
+                verticalAlignment: TextInput.AlignVCenter
                 color: Colors.magenta
                 selectionColor: Colors.magenta
                 selectedTextColor: Colors.black

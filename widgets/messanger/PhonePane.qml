@@ -3529,7 +3529,7 @@ Rectangle {
                           : phonePane.stageState === "UNAVAILABLE"
                           ? "Stage placement could not be verified. The terminal may remain external; no phone or audio change was made by Social."
                           : phonePane.stagePurpose === "OFONO"
-                          ? "Placing Fedora's interactive installer inside PHONE. Review its transaction and confirmation."
+                          ? "Placing the calling setup terminal inside PHONE. Review each change and approve it separately."
                           : "Placing BlueFerry's terminal inside the PHONE workspace..."
                     color: Colors.orange
                     font.pixelSize: 10

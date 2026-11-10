@@ -4,7 +4,9 @@ function appendTranscription(currentText, spokenText, maximumLength) {
     const prior = String(currentText === null || currentText === undefined
         ? "" : currentText);
     const spoken = String(spokenText === null || spokenText === undefined
-        ? "" : spokenText).replace(/\s+/g, " ").trim();
+        ? "" : spokenText)
+        .replace(/\[\s*(?:BLANK_AUDIO|NO_SPEECH|NO_AUDIO|SILENCE)\s*\]/gi, "")
+        .replace(/\s+/g, " ").trim();
     const cap = Math.min(16000, Math.max(1, Number(maximumLength || 4000)));
     if (!spoken || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(spoken))
         return {accepted:false, text:prior, reason:"NO USABLE SPEECH DETECTED"};

@@ -277,6 +277,7 @@ Scope {
     HospitalLiveDictationService {
         id: liveSpeech
         chunkSeconds: 2
+        firstChunkMs: 1400
         maxPackets: 48 // 90 seconds / 2-second chunks plus final tail
         vadActive: root.vadActive
         vadSpeechThreshold: root.vadSpeechThreshold

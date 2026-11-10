@@ -81,10 +81,10 @@ class LiveDictationTests(unittest.TestCase):
                 "#!/usr/bin/env python3\n"
                 "import sys,time\n"
                 "x=(1300).to_bytes(2,'little',signed=True)\n"
-                "for _ in range(120):\n"
+                "for _ in range(500):\n"
                 " sys.stdout.buffer.write(x*1600)\n"
                 " sys.stdout.buffer.flush()\n"
-                " time.sleep(0.004)\n"
+                " time.sleep(0.008)\n"
             )
             fake_recorder.chmod(0o700)
             helper = root / "local-whisper.sh"

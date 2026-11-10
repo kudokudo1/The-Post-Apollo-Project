@@ -7,6 +7,7 @@ on:
       - 'widgets/weather/StationWeatherSubjectPanelPolicy.js'
       - 'widgets/weather/StationWeatherSubjectPane.qml'
       - 'tests/weather/test_weather_w4_services_history.js'
+      - 'tests/weather/fixtures/W4WeatherServicesNative.qml'
       - 'widgets/weather/StationHomeMetricCard.qml'
       - 'widgets/weather/WeatherTrendInspector.qml'
       - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
@@ -80,5 +81,32 @@ jobs:
           test "$rc" -eq 0
           grep -F "W3_NATIVE_PASS // SOURCES_LAST_AND_HISTORY_FITS_520X300" "$work/native.log"
           if grep -E 'W3_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+            exit 1
+          fi
+
+      - name: Native WEATHER SERVICES reuse of one SKY and one GROUND component
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(pwd)"
+          work="$(mktemp -d /tmp/weather-w4.XXXXXXXX)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -m 700 "$work/home" "$work/runtime" "$work/cache" "$work/config"
+          mkdir -p "$work/config/widgets"
+          cp -a "$root/components" "$work/config/components"
+          cp -a "$root/widgets/weather" "$work/config/widgets/weather"
+          cp -a "$root/services" "$work/config/services"
+          cp "$root/tests/weather/fixtures/W4WeatherServicesNative.qml" "$work/config/shell.qml"
+          rc=0
+          timeout --signal=TERM --kill-after=3s 40s \
+            env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
+            XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            quickshell --no-color -p "$work/config/shell.qml" \
+            > "$work/native.log" 2>&1 || rc=$?
+          cat "$work/native.log"
+          test "$rc" -eq 0
+          grep -F "W4_NATIVE_PASS // WEATHER_SERVICE_RACKS_MOUNTED" "$work/native.log"
+          if grep -E 'W4_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi

@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'services/identity/installed_gateway_witness_v1.py'
+      - 'services/identity/installed_command_adapter_v1.py'
       - 'tests/identity/test_installed_gateway_v1_ci.py'
       - 'tests/identity/fixtures/identity_gateway_installed_ci'
       - '.github/workflows/identity-center-installed-gateway-v1.yml'
@@ -12,6 +13,7 @@ on:
     branches: [main, 'feat/identity-installed-gateway-*']
     paths:
       - 'services/identity/installed_gateway_witness_v1.py'
+      - 'services/identity/installed_command_adapter_v1.py'
       - 'tests/identity/test_installed_gateway_v1_ci.py'
       - 'tests/identity/fixtures/identity_gateway_installed_ci'
       - '.github/workflows/identity-center-installed-gateway-v1.yml'
@@ -49,6 +51,7 @@ jobs:
       - name: Compile exact installed-host witness and test fixture
         run: |
           python3 -m py_compile services/identity/installed_gateway_witness_v1.py
+          python3 -m py_compile services/identity/installed_command_adapter_v1.py
           python3 -m py_compile tests/identity/test_installed_gateway_v1_ci.py
           python3 -m py_compile tests/identity/fixtures/identity_gateway_installed_ci
       - name: Real signed package install, systemd PID/LSM/module witness and mandatory deny-only receipts

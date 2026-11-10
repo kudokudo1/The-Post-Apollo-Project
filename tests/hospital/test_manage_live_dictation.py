@@ -232,10 +232,16 @@ class LiveDictationTests(unittest.TestCase):
                 stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
             try:
                 deadline = time.monotonic() + 7
-                while time.monotonic() < deadline and not pid_file.exists():
+                model_pid = None
+                while time.monotonic() < deadline:
+                    # The fixture PID file may exist before its write closes.
+                    # Do not race the shell writing "$" into that file.
+                    value = pid_file.read_text().strip() if pid_file.exists() else ""
+                    if value.isdigit():
+                        model_pid = int(value)
+                        break
                     time.sleep(0.05)
-                self.assertTrue(pid_file.exists(), "Fake Whisper must start")
-                model_pid = int(pid_file.read_text())
+                self.assertIsNotNone(model_pid, "Fake Whisper must start")
                 process.stdin.write("CANCEL\n")
                 process.stdin.flush()
                 process.stdin.close()

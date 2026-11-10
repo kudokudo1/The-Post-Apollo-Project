@@ -224,6 +224,7 @@ PanelWindow {
 
     function armResearchBurn(row) {
         if (!menuOpen || researchBusy || busy || confirmMode !== ""
+                || researchBurnId !== ""
                 || !row || (row.kind !== "SAVED RESEARCH"
                             && row.kind !== "SAVED EVENT")
                 || row.state !== "trashed"
@@ -264,6 +265,7 @@ PanelWindow {
 
     function advanceResearchBurn() {
         if (!researchBurnId || !researchBurnPointerRelocated
+                || confirmMode !== ""
                 || researchBurnRevision !== researchRevision
                 || researchBusy || busy)
             return false;
@@ -1037,7 +1039,7 @@ PanelWindow {
                 visible: trashLauncher.activeMode === "trash"
                 width: parent.width
                 height: 33
-                placeholderText: "FILTER THIS PAGE // FILE NAME OR LOCATION"
+                placeholderText: "SEARCH TRASH // FILES, EVENTS OR RESEARCH COPIES"
                 color: Colors.white
                 font.pixelSize: 11
                 placeholderTextColor: Colors.cyan
@@ -1720,13 +1722,41 @@ PanelWindow {
                             }
                         }
 
-                        ActionButton {
-                            width: 172
-                            height: 30
-                            label: "VIEW SYSTEM TRASH"
-                            labelPixelSize: 10
-                            accentColor: Colors.green
-                            onLeftClicked: trashLauncher.setMode("trash")
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 8
+
+                            ActionButton {
+                                width: Math.max(128, parent.width - 150)
+                                height: 32
+                                label: "VIEW TRASH"
+                                labelPixelSize: 10
+                                accentColor: Colors.green
+                                onLeftClicked: {
+                                    trashLauncher.trashViewFilter = "records";
+                                    trashLauncher.setMode("trash");
+                                }
+                            }
+
+                            // Separate from GIO's existing SYSTEM TRASH
+                            // BURN ALL, which remains on the Trash page.
+                            ActionButton {
+                                id: burnAllManagedCopiesButton
+                                width: 142
+                                height: 32
+                                label: "BURN ALL COPIES"
+                                labelPixelSize: 9
+                                accentColor: Colors.red
+                                destructive: true
+                                available: !trashLauncher.researchBusy
+                                           && !trashLauncher.busy
+                                           && trashLauncher.researchBurnId === ""
+                                           && trashLauncher.researchBinCount > 0
+                                           && trashLauncher.researchBinCount
+                                              === trashLauncher.researchBinRows.length
+                                onLeftClicked: trashLauncher.armResearchBurnAll()
+                            }
                         }
                     }
                 }
@@ -1902,7 +1932,9 @@ PanelWindow {
                 GohuText {
                     width: parent.width
                     font.pixelSize: 17
-                    text: "BURN SAVED COPY // FINAL REVIEW"
+                    text: trashLauncher.researchBurnScope === "all"
+                          ? "BURN ALL COPIES // FINAL REVIEW"
+                          : "BURN SAVED COPY // FINAL REVIEW"
                     color: Colors.red
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
@@ -1918,7 +1950,10 @@ PanelWindow {
                     width: parent.width
                     font.pixelSize: 11
                     color: Colors.yellow
-                    text: "SCOPE // ONE TRASH++ MANAGED COPY"
+                    text: trashLauncher.researchBurnScope === "all"
+                          ? "SCOPE // MANAGED BIN ONLY // "
+                            + trashLauncher.researchBurnCount + " COPIES"
+                          : "SCOPE // ONE TRASH++ MANAGED COPY"
                     wrapMode: Text.WordWrap
                 }
 
@@ -1935,7 +1970,10 @@ PanelWindow {
                     font.pixelSize: 11
                     color: Colors.cyan
                     wrapMode: Text.WordWrap
-                    text: "This permanently deletes ONE saved copy from Trash++'s record store. Original Weather events, demo scrape exports, Hospital and Finance records remain untouched. The backend rechecks identity and revision."
+                    text: trashLauncher.researchBurnScope === "all"
+                          ? "This destroys ONLY " + trashLauncher.researchBurnCount
+                            + " trashed Trash++ managed copies. Active archived copies, GIO system Trash, original Weather events, demo scrapes, Hospital and Finance records are NOT affected. The backend rechecks bin count, revision and record-ID digest."
+                          : "This permanently deletes ONE saved copy from Trash++'s record store. Original Weather events, demo scrape exports, Hospital and Finance records remain untouched. The backend rechecks identity and revision."
                 }
 
                 GohuText {
@@ -1964,6 +2002,23 @@ PanelWindow {
                             }
                         }
 
+                        // Full-chassis progress fills the ENTIRE button
+                        // from left to right, behind its readable label.
+                        // The action shell remains a normal live button even
+                        // before the first click.
+                        Rectangle {
+                            id: researchBurnLoadFill
+                            x: 2
+                            y: 2
+                            width: Math.max(0, parent.width - 4)
+                                   * trashLauncher.researchBurnLoadProgress
+                            height: Math.max(0, parent.height - 4)
+                            color: Colors.orange
+                            opacity: 0.72
+                            radius: 0
+                            visible: trashLauncher.researchBurnClickArmed
+                        }
+
                         ActionButton {
                             id: confirmManagedResearchBurn
                             anchors.fill: parent
@@ -1977,12 +2032,11 @@ PanelWindow {
                             labelPixelSize: 10
                             accentColor: Colors.red
                             destructive: true
-                            // Normal, visible, interactive button from first
-                            // render. Pointer relocation and the deliberate
-                            // second click are enforced by handler + backend.
                             idleBorderWidth: 2
                             idleBorderColor: Colors.red
-                            idleFillColor: Colors.black
+                            idleFillColor: "transparent"
+                            hoverFillColor: "transparent"
+                            pressedFillColor: "transparent"
                             contentGlowIdleOpacity: 0.36
                             softGlowIdleOpacity: 0.33
                             wideGlowEnabled: true
@@ -1992,17 +2046,6 @@ PanelWindow {
                                        && trashLauncher.researchBurnRevision
                                           === trashLauncher.researchRevision
                             onLeftClicked: trashLauncher.advanceResearchBurn()
-                        }
-
-                        Rectangle {
-                            id: researchBurnLoadBar
-                            anchors.bottom: parent.bottom
-                            anchors.left: parent.left
-                            height: 4
-                            width: Math.max(0, parent.width - 4)
-                                   * trashLauncher.researchBurnLoadProgress
-                            color: Colors.orange
-                            visible: trashLauncher.researchBurnClickArmed
                         }
                     }
 

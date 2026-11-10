@@ -444,5 +444,46 @@ class C4dSerialCaptureTests(unittest.TestCase):
         self.assertIn('if-no-files-found: error', workflow)
 
 
+    def test_30_guest_capture_transition_is_fixed_status_only(self):
+        # Empty producer output cannot be turned into an accepted report by
+        # adding plausible diagnostic text to the existing serial log.
+        for initial, at_relay, expected in (
+                (b"EMPTY", b"EMPTY", "EMPTY_TO_EMPTY"),
+                (b"PRESENT", b"EMPTY", "PRESENT_TO_EMPTY"),
+                (b"EMPTY", b"PRESENT", "EMPTY_TO_PRESENT"),
+                (b"PRESENT", b"PRESENT", "PRESENT_TO_PRESENT")):
+            with self.subTest(initial=initial, at_relay=at_relay):
+                status = (b"C4D_PRODUCER_DIAG // capture_initial=" + initial +
+                          b" capture_at_relay=" + at_relay)
+                self.serial.write_bytes(
+                    b"\n".join(C.REQUIRED_MARKERS) + b"\n" +
+                    b"C4B_CONTROLLER_GUEST_LOG_BEGIN\n" +
+                    status + b"\nC4D_UART_DIAG // GUEST_RECORD_EMPTY\n")
+                self.done.write_text("PASS\n")
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    with self.assertRaisesRegex(
+                            C.Refused, "NO_REAL_GUEST_OBSERVATION_CAPTURED"):
+                        C.capture(self.root, self.done, poll=0)
+                self.assertIn("producer_capture=" + expected,
+                              output.getvalue())
+                self.assertIn("candidate_records=0", output.getvalue())
+
+    def test_31_forged_guest_capture_state_is_never_echoed_or_trusted(self):
+        attacker = b"credential=UNTRUSTED_GUEST_TEXT"
+        self.serial.write_bytes(
+            b"\n".join(C.REQUIRED_MARKERS) + b"\n" +
+            b"C4D_PRODUCER_DIAG // capture_initial=PRESENT "
+            b"capture_at_relay=" + attacker + b"\n")
+        self.done.write_text("PASS\n")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            with self.assertRaisesRegex(
+                    C.Refused, "NO_REAL_GUEST_OBSERVATION_CAPTURED"):
+                C.capture(self.root, self.done, poll=0)
+        self.assertIn("producer_capture=UNKNOWN", output.getvalue())
+        self.assertNotIn(attacker.decode(), output.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

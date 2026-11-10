@@ -5,6 +5,7 @@ import "../services/hospital/HospitalWorkforceManagerPolicy.js" as ManagementPol
 import "../services/hospital/HospitalWorkforceJobActivationPolicy.js" as JobActivationPolicy
 import "../services/hospital/HospitalWorkforceStaffingPolicy.js" as StaffingPolicy
 import "../services/hospital/HospitalFirstBedVerificationPolicy.js" as BedPolicy
+import "../services/hospital/HospitalGitHubOwnerPolicy.js" as GitHubOwnerPolicy
 
 // Collapsible content inside SURGERY → SHOW WORKERS, not a new Hospital route.
 // All writes require a separate operator REVIEW and CONFIRM. No AI turns.
@@ -25,6 +26,18 @@ Column {
     property string registryError: ""
     property bool registryBusy: false
     property string suggestedRepository: ""
+    property bool roomOwnerManuallyEdited: false
+    property bool roomRepositoryManuallyEdited: false
+    readonly property string selectedGitHubRepository:
+        GitHubOwnerPolicy.compose(roomOwnerField.value, roomRepoField.value)
+    readonly property var currentPatientRepository:
+        GitHubOwnerPolicy.splitRepository(root.suggestedRepository)
+    // Registered Room records supply owner suggestions, not extra credentials.
+    readonly property var otherKnownGitHubOwners:
+        GitHubOwnerPolicy.ownerOptions(root.rooms, root.suggestedRepository,
+            githubOwner.login).filter(function(entry) {
+                return entry.label === "USED IN HOSPITAL";
+            }).slice(0, 3)
     property string mode: "WORKER"
     property string workerRole: "INT"
     property string workerId: makeId("worker")
@@ -107,7 +120,7 @@ Column {
     })
     readonly property var roomPlan: ManagementPolicy.room({
         id: root.roomId, name: roomNameField.value,
-        repository: roomRepositoryField.value, doctors: root.doctors,
+        repository: root.selectedGitHubRepository, doctors: root.doctors,
         rooms: root.rooms, sessions: root.sessions,
         doctorsLoaded: !!root.doctorService && root.doctorService.loaded,
         roomsLoaded: root.roomsLoaded, sessionsLoaded: root.sessionsLoaded,
@@ -169,13 +182,58 @@ Column {
         activationArmKey = "";
         staffingReviewKey = "";
     }
+    function applyRoomSuggestions() {
+        const proposed = GitHubOwnerPolicy.suggestion(root.suggestedRepository,
+            githubOwner.login);
+        if (!root.roomOwnerManuallyEdited && proposed.owner)
+            roomOwnerField.value = proposed.owner;
+        if (!root.roomRepositoryManuallyEdited && proposed.repository)
+            roomRepoField.value = proposed.repository;
+    }
+    function useOwnGitHub() {
+        if (!githubOwner.loaded || !githubOwner.login) {
+            root.outcome = "GITHUB ACCOUNT NOT VERIFIED // USE PATIENT OR TYPE OWNER";
+            return;
+        }
+        roomOwnerField.value = githubOwner.login;
+        root.roomOwnerManuallyEdited = true;
+        root.disarm();
+        root.outcome = "GITHUB OWNER // @" + githubOwner.login
+            + " // REVIEW THE REPOSITORY NAME BEFORE SAVING";
+    }
+    function useKnownGitHubOwner(owner) {
+        const chosen = GitHubOwnerPolicy.part(owner);
+        if (!chosen) return false;
+        roomOwnerField.value = chosen;
+        root.roomOwnerManuallyEdited = true;
+        root.disarm();
+        root.outcome = "GITHUB OWNER // " + chosen
+            + " // OWNER KNOWN FROM ANOTHER ROOM, NOT AN AUTHENTICATED ACCOUNT";
+        return true;
+    }
+    function useCurrentPatient() {
+        const current = root.currentPatientRepository;
+        if (!current.owner || !current.repository) {
+            root.outcome = "CURRENT PATIENT UNAVAILABLE // SELECT A GITHUB REPOSITORY";
+            return;
+        }
+        roomOwnerField.value = current.owner;
+        roomRepoField.value = current.repository;
+        root.roomOwnerManuallyEdited = true;
+        root.roomRepositoryManuallyEdited = true;
+        root.disarm();
+        root.outcome = "CURRENT PATIENT SELECTED // " + root.selectedGitHubRepository;
+    }
     function selectMode(value) {
         if (mode === value) return;
         mode = value;
         disarm();
         outcome = "";
-        if (value === "ROOM" && !roomRepositoryField.value)
-            roomRepositoryField.value = suggestedRepository;
+        if (value === "ROOM") {
+            root.applyRoomSuggestions();
+            if (!githubOwner.loaded && !githubOwner.reading)
+                githubOwner.refresh();
+        }
     }
     function refreshStaffing() {
         root.staffingReviewKey = "";
@@ -393,9 +451,15 @@ Column {
             bedProbe.invalidate();
         if (active)
             Qt.callLater(function() {
-                if (root.active && !roomRepositoryField.value)
-                    roomRepositoryField.value = root.suggestedRepository;
+                if (!root.active) return;
+                root.applyRoomSuggestions();
+                if (!githubOwner.loaded && !githubOwner.reading)
+                    githubOwner.refresh();
             });
+    }
+    onSuggestedRepositoryChanged: {
+        if (active && mode === "ROOM")
+            applyRoomSuggestions();
     }
     onRoomsChanged: {
         disarm();
@@ -425,6 +489,13 @@ Column {
             }
             root.pendingKind = "";
             root.rosterRefreshRequested();
+        }
+    }
+    HospitalGitHubOwnerService {
+        id: githubOwner
+        onRefreshed: {
+            // Late account responses only change fields the user has NOT edited.
+            root.applyRoomSuggestions();
         }
     }
     HospitalWorkforceRoomCreateService {
@@ -659,7 +730,80 @@ Column {
             font.pixelSize: 9
         }
         ManagerField {id:roomNameField; caption:"ROOM NAME"}
-        ManagerField {id:roomRepositoryField; caption:"PATIENT // GITHUB OWNER/REPO"}
+        GohuText {
+            width: parent.width
+            text: "GITHUB OWNER = the account or organization hosting the repository. NOT the worker, Doctor or person assigned the job."
+            font.pixelSize: 9
+            color: Colors.cyan
+            wrapMode: Text.Wrap
+        }
+        ManagerField {
+            id: roomOwnerField
+            caption: "GITHUB OWNER // ACCOUNT OR ORGANIZATION"
+            onEdited: {
+                root.roomOwnerManuallyEdited = true;
+                root.disarm();
+            }
+        }
+        Row {
+            width: root.width
+            spacing: 6
+            HospitalActionButton {
+                width: (parent.width - 6) / 2
+                height: 29
+                label: "USE MY GITHUB"
+                accent: Colors.magenta
+                contentGlowEnabled: false
+                enabledAction: githubOwner.loaded && !!githubOwner.login
+                onTriggered: root.useOwnGitHub()
+            }
+            HospitalActionButton {
+                width: (parent.width - 6) / 2
+                height: 29
+                label: "USE PATIENT"
+                accent: Colors.cyan
+                contentGlowEnabled: false
+                enabledAction: !!root.currentPatientRepository.owner
+                onTriggered: root.useCurrentPatient()
+            }
+        }
+        GohuText {
+            width: parent.width
+            text: githubOwner.reading ? "MY GITHUB // READING SIGNED-IN ACCOUNT"
+                : githubOwner.loaded ? "MY GITHUB // @" + githubOwner.login
+                : "MY GITHUB // NOT VERIFIED; CURRENT PATIENT OR MANUAL OWNER STILL WORK"
+            font.pixelSize: 8
+            color: githubOwner.loaded ? Colors.cyan : Colors.orange
+            wrapMode: Text.Wrap
+        }
+        Repeater {
+            model: root.otherKnownGitHubOwners
+            HospitalActionButton {
+                required property var modelData
+                width: root.width
+                height: 27
+                label: "RECENT GITHUB OWNER // " + modelData.owner
+                accent: Colors.blue
+                contentGlowEnabled: false
+                onTriggered: root.useKnownGitHubOwner(modelData.owner)
+            }
+        }
+        ManagerField {
+            id: roomRepoField
+            caption: "REPOSITORY // PROJECT NAME ON THAT GITHUB ACCOUNT"
+            onEdited: {
+                root.roomRepositoryManuallyEdited = true;
+                root.disarm();
+            }
+        }
+        GohuText {
+            width: parent.width
+            text: "PATIENT // GITHUB.COM/" + root.selectedGitHubRepository
+                + "\nOWNER = WHOSE GITHUB ACCOUNT // REPOSITORY = WHICH PROJECT"
+            font.pixelSize: 9
+            color: root.roomPlan.ready ? Colors.cyan : Colors.orange
+            wrapMode: Text.WrapAnywhere
+        }
         GohuText {
             width: parent.width
             text: "ID // " + root.roomId
@@ -1280,6 +1424,7 @@ Column {
         id: managerField
         property string caption: ""
         property alias value: input.text
+        signal edited()
         width: root.width
         spacing: 3
         height: 43
@@ -1306,6 +1451,7 @@ Column {
                 font.pixelSize: 10
                 selectByMouse: true
                 maximumLength: 256
+                onTextEdited: managerField.edited()
                 verticalAlignment: TextInput.AlignVCenter
                 clip: true
             }

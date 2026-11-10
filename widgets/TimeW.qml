@@ -7013,7 +7013,7 @@ PanelWindow {
                                  : "SETTINGS // VISUAL TIME + TIMEZONE")
                               : timew.selectedMode === "tools"
                               ? (timew.toolsView === "alarm" ? "TOOLS // ALARM // PLANNED"
-                                 : "TOOLS // MONOTONIC MEASUREMENT")
+                                 : "TOOLS // STOPWATCH + COUNTDOWN // MONOTONIC")
                               : "ANGEL // EXPLICIT JOURNAL // LOCAL ONLY"
                         color: Colors.white
                         font.pixelSize: 11

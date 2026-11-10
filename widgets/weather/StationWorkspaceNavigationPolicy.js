@@ -20,7 +20,7 @@ var GROUPS = {
         {label:"SNAPSHOT",path:"home/snapshot",key:"snapshot"},
         {label:"HISTORY",path:"home/history",key:"history"},
         {label:"MAGICK",path:"home/magick",key:"magick"},
-        {label:"SOURCES",path:"home/sources",key:"sources"}
+        {label:"SOURCES",path:"home/health",key:"sources"}
     ],
     weather:[
         {label:"OVERVIEW",path:"weather/overview",key:"overview"},
@@ -89,11 +89,11 @@ function homeSectionFor(path) {
     // Old HOME/RUNTIME and HOME/HEALTH bookmarks remain valid, but both
     // now open the same final SOURCES screen. No saved routes are deleted.
     if (key==="runtime" || key==="health") return "sources";
-    var allowed=["overview","auto","quick","snapshot","history","magick","sources"];
+    var allowed=["overview","auto","quick","snapshot","history","magick"];
     return allowed.indexOf(key)>=0?key:"overview";
 }
 function isHomeRoute(path) {
-    return typeof path === "string" && /^home\/(overview|auto|quick|snapshot|history|runtime|health|magick|sources)$/.test(path);
+    return typeof path === "string" && /^home\/(overview|auto|quick|snapshot|history|runtime|health|magick)$/.test(path);
 }
 function selectedGroup(path) {
     var family=familyFor(path);

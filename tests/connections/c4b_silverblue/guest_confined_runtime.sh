@@ -353,6 +353,19 @@ def command(*args):
         refuse("OBSERVATION_COMMAND_UNAVAILABLE")
     if p.returncode or len(p.stdout) + len(p.stderr) > 32768:
         refuse("OBSERVATION_COMMAND_REFUSED")
+    if args[0] == "rpm":
+        # The guest prelayer already verified this SAME signed RPM's identity
+        # using rpm's stdout. The normal system rpmdb may not trust the
+        # disposable key and can emit a harmless NOKEY warning on stderr.
+        # The separate rpmkeys --dbpath KEYDB --checksig check above remains
+        # mandatory for signature authority. Never concatenate diagnostic
+        # stderr into exact package/member identity or ownership results.
+        diagnostics = p.stderr.decode("utf-8", "strict").strip()
+        if diagnostics and not all(
+                re.fullmatch(r"warning: .*\\bNOKEY\\b", line)
+                for line in diagnostics.splitlines()):
+            refuse("RPM_METADATA_DIAGNOSTIC_REFUSED")
+        return p.stdout.decode("utf-8", "strict").strip()
     return (p.stdout + p.stderr).decode("utf-8", "strict").strip()
 
 def start(pid):

@@ -228,6 +228,8 @@ PanelWindow {
         try { payload = JSON.parse(String(raw || "").trim()); }
         catch (error) {
             researchState = "STALE // INVALID MANAGED RESPONSE";
+            if (action === "burn" || action === "burn-all")
+                failBurnReceipt(researchState);
             return;
         }
         if (!payload || payload.ok !== true
@@ -311,7 +313,7 @@ PanelWindow {
 
     function armResearchBurn(row) {
         if (!menuOpen || researchBusy || busy || confirmMode !== ""
-                || researchBurnId !== ""
+                || researchBurnId !== "" || burnUiStage !== ""
                 || !row || (row.kind !== "SAVED RESEARCH"
                             && row.kind !== "SAVED EVENT")
                 || row.state !== "trashed"
@@ -327,13 +329,14 @@ PanelWindow {
         researchBurnClickArmed = false;
         researchBurnLoadComplete = false;
         researchBurnLoadProgress = 0;
+        activeMode = "burn";
         return true;
     }
 
     function armResearchBurnAll() {
         if (!menuOpen || activeMode !== "burn" || researchBusy || busy
                 || confirmMode !== "" || researchBurnId !== ""
-                || researchBinCount < 1
+                || burnUiStage !== "" || researchBinCount < 1
                 || researchBinCount !== researchBinRows.length
                 || researchBinDigest.length !== 64)
             return false;
@@ -351,10 +354,14 @@ PanelWindow {
     }
 
     function advanceResearchBurn() {
-        if (!researchBurnId || !researchBurnPointerRelocated
-                || confirmMode !== ""
-                || researchBurnRevision !== researchRevision
-                || researchBusy || busy)
+        const isFile = confirmMode === "item" || confirmMode === "all";
+        const isCopy = researchBurnId !== "";
+        if (burnUiStage !== "" || (!isFile && !isCopy)
+                || !researchBurnPointerRelocated || researchBusy || busy
+                || (isCopy && researchBurnRevision !== researchRevision)
+                || (isFile && confirmMode === "all"
+                    && (confirmRevision !== revision
+                        || confirmCount !== total)))
             return false;
         if (!researchBurnClickArmed) {
             researchBurnClickArmed = true;
@@ -365,12 +372,17 @@ PanelWindow {
         }
         if (!researchBurnLoadComplete)
             return false;
-        return confirmResearchBurn();
+        // Display the clicked magenta feedback first. Deletion starts only
+        // after a separate short, visible feedback interval.
+        burnUiStage = "clicked";
+        burnCommitDelay.restart();
+        return true;
     }
 
     function confirmResearchBurn() {
         if (!researchBurnId || !researchBurnPointerRelocated
                 || !researchBurnClickArmed || !researchBurnLoadComplete
+                || burnUiStage !== "working"
                 || researchBurnRevision !== researchRevision
                 || researchBusy || busy)
             return false;
@@ -384,7 +396,6 @@ PanelWindow {
             const rev = researchBurnRevision;
             const count = researchBurnCount;
             const digest = researchBurnDigest;
-            clearResearchBurn();
             return runResearch("burn-all", [
                 String(rev), String(count), digest,
                 "BURN_ALL_MANAGED_COPIES_CONFIRMED"
@@ -397,7 +408,6 @@ PanelWindow {
             return false;
         const id = researchBurnId;
         const rev = researchBurnRevision;
-        clearResearchBurn();
         return runResearch("burn", [
             id, String(rev), "BURN_SAVED_COPY_CONFIRMED"
         ]);
@@ -423,7 +433,7 @@ PanelWindow {
     function setMode(nextMode) {
         const requested = String(nextMode || "");
         if (busy || researchBusy || confirmMode !== ""
-                || researchBurnId !== ""
+                || researchBurnId !== "" || burnUiStage !== ""
                 || lifecycleModes.indexOf(requested) < 0)
             return false;
         if (requested === "cleanup" && activeMode !== "cleanup") {

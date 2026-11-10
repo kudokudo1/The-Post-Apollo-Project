@@ -592,7 +592,8 @@ ShellRoot {
             ];
             for(const entry of rails) {
                 const v=entry.viewport,bar=entry.bar;
-                if(!bar || !v || bar.parent!==entry.host
+                if(!bar || !v || bar.parent!==v.parent
+                        || bar.parent===entry.host
                         || bar.geometryHost!==v
                         || bar.handleStyle!=="bar"
                         || bar.maximumBarHandleHeight!==42

@@ -53,7 +53,7 @@ class LiveDictationTests(unittest.TestCase):
             popen.assert_not_called()
             child = popen.return_value
             child.returncode = 0
-            child.communicate.return_value = ("[BLANK_AUDIO]\\nWork on Finance.", "")
+            child.communicate.return_value = ("[BLANK_AUDIO]\nWork on Finance.", "")
             self.assertEqual(live.transcribe_chunk("local-stt.sh", pcm(1300, 4)),
                              "Work on Finance.")
             command = popen.call_args.args[0]

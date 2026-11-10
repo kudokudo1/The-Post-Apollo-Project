@@ -160,6 +160,7 @@ Item {
                 id: favoriteNumberButton
                 width: 34
                 height: parent.height
+                washByDefault: false
                 label: "★"
                 labelPixelSize: 13
                 contentPadding: 2

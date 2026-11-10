@@ -779,12 +779,12 @@ Column {
             width: parent.width
             text: root.intakeDraft.ready
                 ? String(root.intakeDraft.source || "LOCAL PROPOSAL // NOT AI-GENERATED")
-                    + "\\nROLE // " + root.intakeDraft.role
-                    + "\\nROOM // " + root.intakeDraft.roomName
-                    + "\\nWORKER // " + root.intakeDraft.workerName
-                    + "\\nJOB // " + root.intakeDraft.title
-                    + "\\nGOAL // " + root.intakeDraft.goal
-                    + "\\nPERMISSIONS // READ ONLY"
+                    + "\nROLE // " + root.intakeDraft.role
+                    + "\nROOM // " + root.intakeDraft.roomName
+                    + "\nWORKER // " + root.intakeDraft.workerName
+                    + "\nJOB // " + root.intakeDraft.title
+                    + "\nGOAL // " + root.intakeDraft.goal
+                    + "\nPERMISSIONS // READ ONLY"
                 : "NO DRAFT YET // WRITE YOUR INSTRUCTIONS ABOVE"
             font.pixelSize: 9
             color: root.intakeDraft.ready ? Colors.cyan : Colors.orange

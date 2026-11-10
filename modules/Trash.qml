@@ -1781,59 +1781,105 @@ PanelWindow {
 
                     Column {
                         anchors.fill: parent
-                        anchors.margins: 9
-                        spacing: 9
+                        anchors.margins: 8
+                        spacing: 7
 
                         GohuText {
                             width: parent.width
-                            height: 28
+                            height: 24
                             font.pixelSize: 13
                             color: Colors.yellow
-                            text: "BURN // SAVED COPY BIN // "
-                                  + trashLauncher.researchBinRows.length
+                            text: "BURN // " + trashLauncher.total + " FILES // "
+                                  + trashLauncher.researchBinRows.length + " COPIES"
                         }
+
                         GohuText {
                             width: parent.width
-                            height: 43
-                            wrapMode: Text.WordWrap
-                            font.pixelSize: 10
+                            height: 34
+                            font.pixelSize: 9
                             color: Colors.cyan
-                            text: "Burn requires a separate confirmation. Only trashed, Trash++-owned Weather EVENT or DEMO RESEARCH copies appear here. Original Weather archives, Hospital and Finance records remain protected."
+                            wrapMode: Text.WordWrap
+                            text: "ONE BURN WORKSPACE // file deletion uses GIO; saved copies use their own verified store. Every Burn uses the same confirmation and result screen."
+                        }
+
+                        Row {
+                            id: burnSourceFilters
+                            width: parent.width
+                            height: 27
+                            spacing: 4
+                            Repeater {
+                                model: [
+                                    {id:"all", label:"ALL"},
+                                    {id:"files", label:"FILES"},
+                                    {id:"records", label:"COPIES"},
+                                    {id:"events", label:"EVENTS"},
+                                    {id:"research", label:"RESEARCH"}
+                                ]
+                                ActionButton {
+                                    required property var modelData
+                                    width: (burnSourceFilters.width - 16) / 5
+                                    height: 27
+                                    label: modelData.label
+                                    labelPixelSize: 9
+                                    accentColor: modelData.id === "files"
+                                                 ? Colors.cyan : Colors.magenta
+                                    selected: trashLauncher.burnFilter === modelData.id
+                                    available: trashLauncher.burnUiStage === ""
+                                    onLeftClicked: trashLauncher.burnFilter = modelData.id
+                                }
+                            }
                         }
 
                         Item {
                             width: parent.width
-                            height: Math.max(100, researchBurnReview.height - 145)
+                            height: Math.max(90, researchBurnReview.height - 194)
 
                             ListView {
                                 id: researchBurnList
                                 width: parent.width - 14
                                 height: parent.height
                                 clip: true
-                                spacing: 6
+                                spacing: 5
                                 boundsBehavior: Flickable.StopAtBounds
-                                model: trashLauncher.researchBinRows
+                                model: trashLauncher.burnDisplayRows
 
                                 delegate: Rectangle {
                                     required property var modelData
                                     width: researchBurnList.width
-                                    height: 64
+                                    height: 59
                                     color: Colors.dark
                                     radius: 0
                                     border.width: 1
-                                    border.color: Colors.orange
+                                    border.color: modelData.entryType === "file"
+                                                  ? Colors.green : Colors.orange
 
-                                    GohuText {
+                                    Column {
                                         anchors.left: parent.left
-                                        anchors.leftMargin: 7
+                                        anchors.leftMargin: 6
                                         anchors.right: burnCopyButton.left
                                         anchors.rightMargin: 8
                                         anchors.verticalCenter: parent.verticalCenter
-                                        font.pixelSize: 10
-                                        color: Colors.white
-                                        elide: Text.ElideRight
-                                        text: String(modelData.title)
-                                              + " // " + String(modelData.recordedAt)
+                                        spacing: 4
+
+                                        GohuText {
+                                            width: parent.width
+                                            height: 18
+                                            font.pixelSize: 10
+                                            color: Colors.white
+                                            elide: Text.ElideMiddle
+                                            text: (modelData.entryType === "file"
+                                                   ? "[FILE] " : "[COPY] ")
+                                                  + String(modelData.title)
+                                        }
+
+                                        GohuText {
+                                            width: parent.width
+                                            height: 16
+                                            font.pixelSize: 9
+                                            color: Colors.cyan
+                                            elide: Text.ElideMiddle
+                                            text: String(modelData.originLabel || "")
+                                        }
                                     }
 
                                     ActionButton {
@@ -1843,13 +1889,19 @@ PanelWindow {
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: 105
                                         height: 33
-                                        label: "BURN COPY"
-                                        labelPixelSize: 9
+                                        label: "BURN"
+                                        labelPixelSize: 10
                                         accentColor: Colors.red
                                         destructive: true
-                                        available: !trashLauncher.researchBusy
-                                                   && trashLauncher.researchBurnId === ""
-                                        onLeftClicked: trashLauncher.armResearchBurn(modelData)
+                                        available: !trashLauncher.busy
+                                                   && !trashLauncher.researchBusy
+                                                   && !trashLauncher.burnConfirmationOpen
+                                        onLeftClicked: {
+                                            if (modelData.entryType === "file")
+                                                trashLauncher.armBurn(modelData);
+                                            else
+                                                trashLauncher.armResearchBurn(modelData.record);
+                                        }
                                     }
                                 }
                             }
@@ -1865,10 +1917,10 @@ PanelWindow {
 
                             GohuText {
                                 anchors.centerIn: parent
-                                visible: trashLauncher.researchBinRows.length === 0
+                                visible: trashLauncher.burnDisplayRows.length === 0
                                 color: Colors.cyan
                                 font.pixelSize: 11
-                                text: "NO MANAGED COPIES PENDING PURGE"
+                                text: "NOTHING IN THIS BURN FILTER"
                             }
                         }
 
@@ -1876,37 +1928,58 @@ PanelWindow {
                             width: parent.width
                             height: 32
                             spacing: 8
-
                             ActionButton {
-                                width: Math.max(128, parent.width - 150)
+                                width: Math.max(128, parent.width - 151)
                                 height: 32
                                 label: "VIEW TRASH"
                                 labelPixelSize: 10
                                 accentColor: Colors.green
-                                onLeftClicked: {
-                                    trashLauncher.trashViewFilter = "records";
-                                    trashLauncher.setMode("trash");
-                                }
+                                available: trashLauncher.burnUiStage === ""
+                                           && !trashLauncher.burnConfirmationOpen
+                                onLeftClicked: trashLauncher.setMode("trash")
                             }
 
-                            // Separate from GIO's existing SYSTEM TRASH
-                            // BURN ALL, which remains on the Trash page.
+                            // One Burn All control. Its scope comes from the
+                            // selected filter; there is no combined backend
+                            // that silently grants authority over both stores.
                             ActionButton {
                                 id: burnAllManagedCopiesButton
-                                width: 142
+                                width: 143
                                 height: 32
-                                label: "BURN ALL COPIES"
-                                labelPixelSize: 9
+                                label: "BURN ALL"
+                                labelPixelSize: 10
                                 accentColor: Colors.red
                                 destructive: true
-                                available: !trashLauncher.researchBusy
-                                           && !trashLauncher.busy
-                                           && trashLauncher.researchBurnId === ""
-                                           && trashLauncher.researchBinCount > 0
-                                           && trashLauncher.researchBinCount
-                                              === trashLauncher.researchBinRows.length
-                                onLeftClicked: trashLauncher.armResearchBurnAll()
+                                available: !trashLauncher.busy
+                                           && !trashLauncher.researchBusy
+                                           && !trashLauncher.burnConfirmationOpen
+                                           && (trashLauncher.burnFilter === "files"
+                                               ? trashLauncher.total > 0
+                                                 && trashLauncher.revision.length === 64
+                                               : trashLauncher.burnFilter === "records"
+                                                 && trashLauncher.researchBinCount > 0
+                                                 && trashLauncher.researchBinCount
+                                                    === trashLauncher.researchBinRows.length)
+                                onLeftClicked: {
+                                    if (trashLauncher.burnFilter === "files")
+                                        trashLauncher.armBurnAll();
+                                    else if (trashLauncher.burnFilter === "records")
+                                        trashLauncher.armResearchBurnAll();
+                                }
                             }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            height: 23
+                            font.pixelSize: 9
+                            color: Colors.yellow
+                            wrapMode: Text.WordWrap
+                            text: trashLauncher.burnFilter === "files"
+                                  ? "BURN ALL // SYSTEM TRASH ONLY"
+                                  : trashLauncher.burnFilter === "records"
+                                  ? "BURN ALL // MANAGED COPIES ONLY"
+                                  : "BURN ALL // CHOOSE FILES OR COPIES FOR EXACT SCOPE"
                         }
                     }
                 }

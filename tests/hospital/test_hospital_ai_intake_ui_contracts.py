@@ -62,7 +62,7 @@ check('"permissions"] = {"type": "string", "enum": ["READ"]}' in client
       and '"authorityVerified": False' in client,
       "Schema and local code both prevent write permission promotion")
 check('class NoRedirect' in client and 'timeout=20' in client
-      and 'MAX_OUTPUT = 65536' in client and 'MAX_INPUT = 8192' in client,
+      and 'MAX_OUTPUT = 65536' in client and 'MAX_INPUT = 65536' in client,
       "Enforce trusted endpoint, bounded request and response")
 check('source: "LOCAL STARTER TEMPLATE // NOT AI-GENERATED"' in old
       and 'LOCAL STARTER DRAFT // NOT AI-GENERATED' in view,

@@ -99,11 +99,15 @@ class TrashBackendTests(unittest.TestCase):
             self.assertEqual(run.call_count, 1)
 
         with patch.object(trash, "_run", side_effect=[
-                result(self.rows), result("")]) as run:
+                result(self.rows), result(""),
+                result(f"trash:///Other%20item.txt\\t{self.second}\\n")]) as run:
             data = trash.item_action("burn", "trash:///Camera%201.png",
                                      str(self.first), "BURN_CONFIRMED")
         self.assertEqual(data["message"], "BURNED")
-        self.assertEqual(run.call_args_list[-1].args[0],
+        self.assertTrue(data["verified"])
+        self.assertEqual([x["name"] for x in data["burnedItems"]],
+                         ["Camera 1.png"])
+        self.assertEqual(run.call_args_list[1].args[0],
                          ["/usr/bin/gio", "remove", "trash:///Camera%201.png"])
 
     def test_no_permanent_delete_if_index_failed_or_item_missing(self):
@@ -132,11 +136,42 @@ class TrashBackendTests(unittest.TestCase):
             self.assertEqual(run.call_count, 2)
 
         with patch.object(trash, "_run", side_effect=[
-                result(self.rows), result("")]) as run:
+                result(self.rows), result(""), result("")]) as run:
             data = trash.burn_all(stamp, "2", "BURN_ALL_CONFIRMED")
         self.assertEqual(data["count"], 2)
-        self.assertEqual(run.call_args_list[-1].args[0],
+        self.assertTrue(data["verified"])
+        self.assertFalse(data["partial"])
+        self.assertEqual(data["burnedCount"], 2)
+        self.assertEqual([x["name"] for x in data["burnedItems"]],
+                         ["Camera 1.png", "Other item.txt"])
+        self.assertEqual(run.call_args_list[1].args[0],
                          ["/usr/bin/gio", "trash", "--empty"])
+
+    def test_bulk_burn_receipt_never_claims_remaining_items(self):
+        rows = trash.parse_listing(self.rows)
+        stamp = trash._revision(rows)
+        with patch.object(trash, "_run", side_effect=[
+                result(self.rows), result(""),
+                result(f"trash:///Other%20item.txt\\t{self.second}\\n")]):
+            data = trash.burn_all(stamp, "2", "BURN_ALL_CONFIRMED")
+        self.assertTrue(data["verified"])
+        self.assertTrue(data["partial"])
+        self.assertEqual(data["burnedCount"], 1)
+        self.assertEqual(data["remainingCount"], 1)
+        self.assertEqual([x["name"] for x in data["burnedItems"]],
+                         ["Camera 1.png"])
+
+    def test_successful_command_without_post_index_is_not_verified(self):
+        rows = trash.parse_listing(self.rows)
+        stamp = trash._revision(rows)
+        with patch.object(trash, "_run", side_effect=[
+                result(self.rows), result(""),
+                result("", 1, "index failed")]):
+            data = trash.burn_all(stamp, "2", "BURN_ALL_CONFIRMED")
+        self.assertFalse(data["verified"])
+        self.assertTrue(data["partial"])
+        self.assertEqual(data["burnedItems"], [])
+        self.assertEqual(data["remainingCount"], 2)
 
     def test_burn_all_refuses_empty_trash_or_invalid_index(self):
         with patch.object(trash, "_run", return_value=result("")) as run:

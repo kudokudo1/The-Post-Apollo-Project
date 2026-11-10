@@ -18,7 +18,8 @@ function suggestion(currentPatient, githubLogin) {
     const own = part(githubLogin);
     // Reuse the exact Patient when one is selected; do NOT construct a
     // nonexistent own-login + foreign repository combination.
-    if (patient.owner) return {...patient, source: "CURRENT PATIENT"};
+    if (patient.owner) return {owner: patient.owner, repository: patient.repository,
+                               source: "CURRENT PATIENT"};
     if (own) return {owner: own, repository: "", source: "SIGNED-IN GITHUB"};
     return {owner: "", repository: "", source: "MANUAL ENTRY"};
 }

@@ -47,6 +47,14 @@ MAX_LINE = 2048
 MAX_BYTES = 32 * 1024 * 1024
 # No arbitrary guest-provided text in Actions diagnostics. These are exact,
 # fixed failure labels emitted by the C4b guest-side diagnostic-only relay.
+# Guest-provided size hints are never authorization, just bounded diagnostics.
+# Translate only exact fixed strings; never echo arbitrary serial input.
+KNOWN_CAPTURE_TRANSITIONS = {
+    b"PRESENT capture_at_relay=PRESENT": "PRESENT_TO_PRESENT",
+    b"PRESENT capture_at_relay=EMPTY": "PRESENT_TO_EMPTY",
+    b"EMPTY capture_at_relay=PRESENT": "EMPTY_TO_PRESENT",
+    b"EMPTY capture_at_relay=EMPTY": "EMPTY_TO_EMPTY",
+}
 KNOWN_RELAY_REASONS = frozenset((
     b"LOG_PREP_REFUSED", b"UART_OPEN_REFUSED", b"UART_WRITE_REFUSED",
     b"GUEST_OBSERVATION_DUPLICATE_KEY",
@@ -161,6 +169,7 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
     relay_status_seen = False
     relay_complete_seen = False
     relay_reasons = set()
+    capture_transitions = set()
     candidate_records = 0
     started = time.monotonic()
     try:
@@ -215,6 +224,11 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
                                 relay_reasons.add(reason)
                             elif not relay_complete_seen:
                                 relay_reasons.add(b"UNKNOWN")
+                        producer_tag = b"C4D_PRODUCER_DIAG // capture_initial="
+                        if producer_tag in line:
+                            state = line.split(producer_tag, 1)[1].strip(b"\r ")
+                            capture_transitions.add(
+                                KNOWN_CAPTURE_TRANSITIONS.get(state, "UNKNOWN"))
                         index = line.find(PREFIX)
                         if index == -1:
                             continue
@@ -269,7 +283,8 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
         print("C4D_CAPTURE_DIAG // "
               "serial_opened={} bytes_read={} candidate_records={} "
               "controller_tail={} relay_status={} relay_complete={} "
-              "relay_reason={} c3b_origin={} c4b_runtime_origin={} "
+              "relay_reason={} producer_capture={} "
+              "c3b_origin={} c4b_runtime_origin={} "
               "c4c_signed_process={} c2v_rollback={} partial_prefix={}".format(
                   int(source_opened), min(total, MAX_BYTES + 1),
                   min(candidate_records, 100),
@@ -278,6 +293,9 @@ def capture(root: Path, completed: Path, *, poll: float = 0.1) -> bytes:
                   (next(iter(relay_reasons)).decode("ascii")
                    if len(relay_reasons) == 1 else
                    ("NONE" if not relay_reasons else "MULTIPLE")),
+                  (next(iter(capture_transitions))
+                   if len(capture_transitions) == 1 else
+                   ("NONE" if not capture_transitions else "MULTIPLE")),
                   int(seen[REQUIRED_MARKERS[0]]),
                   int(seen[REQUIRED_MARKERS[1]]),
                   int(seen[REQUIRED_MARKERS[2]]),

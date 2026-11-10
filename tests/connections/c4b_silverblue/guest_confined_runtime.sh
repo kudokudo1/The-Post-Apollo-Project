@@ -400,9 +400,9 @@ def write_private_report(path, record):
     if (not stat.S_ISDIR(pst.st_mode) or pst.st_uid != 0 or pst.st_gid != 0
             or stat.S_IMODE(pst.st_mode) != 0o700):
         refuse("C4D_REPORT_DIRECTORY_REFUSED")
-    raw = (record + "\\n").encode("ascii", "strict")
+    raw = (record + "\n").encode("ascii", "strict")
     if (not raw.startswith(b"C4B_OBSERVED // {")
-            or len(raw) > 2048 or raw.count(b"\\n") != 1):
+            or len(raw) > 2048 or raw.count(b"\n") != 1):
         refuse("C4D_REPORT_BOUND_REFUSED")
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                  os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)

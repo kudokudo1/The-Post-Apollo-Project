@@ -549,9 +549,18 @@ def selected_line(path):
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
         st = os.fstat(fd)
-        if (not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid()
-                or st.st_nlink != 1 or not 0 < st.st_size <= 2 * 1024 * 1024):
-            raise ValueError("GUEST_LOG_UNSAFE")
+        # Report only symbolic predicate failures. Never dump process IDs,
+        # UID values, file bytes, filenames or digests to the host console.
+        if not stat.S_ISREG(st.st_mode):
+            raise ValueError("GUEST_RECORD_NOT_REGULAR")
+        if st.st_uid != os.geteuid():
+            raise ValueError("GUEST_RECORD_OWNER_MISMATCH")
+        if st.st_nlink != 1:
+            raise ValueError("GUEST_RECORD_LINK_COUNT_INVALID")
+        if st.st_size <= 0:
+            raise ValueError("GUEST_RECORD_EMPTY")
+        if st.st_size > 2 * 1024 * 1024:
+            raise ValueError("GUEST_RECORD_OVERSIZE")
         # The original signed-service record may be farther back than the
         # last 16 KiB after teardown. Read the whole bounded, verified inode
         # instead of silently discarding a valid earlier observation.
@@ -642,7 +651,9 @@ except (OSError, ValueError, UnicodeError, KeyError, TypeError) as exc:
     # These statuses are hints, not acceptance evidence or authorization.
     allowed = frozenset((
         "GUEST_OBSERVATION_DUPLICATE_KEY",
-        "GUEST_LOG_UNSAFE", "GUEST_LOG_CHANGED",
+        "GUEST_RECORD_NOT_REGULAR", "GUEST_RECORD_OWNER_MISMATCH",
+        "GUEST_RECORD_LINK_COUNT_INVALID", "GUEST_RECORD_EMPTY",
+        "GUEST_RECORD_OVERSIZE", "GUEST_LOG_CHANGED",
         "GUEST_OBSERVATION_MISSING", "GUEST_OBSERVATION_DUPLICATE",
         "GUEST_OBSERVATION_OVERSIZE", "GUEST_OBSERVATION_JSON_INVALID",
         "GUEST_OBSERVATION_SCHEMA_INVALID",

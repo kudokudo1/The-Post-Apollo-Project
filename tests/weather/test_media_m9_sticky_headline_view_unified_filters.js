@@ -67,8 +67,8 @@ test("M9 one horizontal TOPIC/TIME/REGION filter rail is pinned in both view siz
 test("M9 moves VIEW control surface without duplicating RSS services or article INSPECT",()=>{
     assert.ok(discovery.includes('pinnedViews: stationDiscovery.reportsToolbarActive'));
     assert.ok(discovery.includes('pinnedRequests: stationDiscovery.reportsToolbarActive'));
-    assert.equal((discovery.match(/StationPublisherFeeds\\s*\\{/g)||[]).length,1);
-    assert.equal((publisher.match(/WeatherServices\\.StationPublisherRssService\\s*\\{/g)||[]).length,2);
+    assert.equal((discovery.match(/StationPublisherFeeds\s*\{/g)||[]).length,1);
+    assert.equal((publisher.match(/WeatherServices\.StationPublisherRssService\s*\{/g)||[]).length,2);
     assert.ok(publisher.includes('property bool pinnedViews: false'));
     assert.ok(publisher.includes('function togglePublisherView(feedId)'));
     assert.ok(publisher.includes('if (!stationOpen || !visible || !backend || !backend.ready)'));

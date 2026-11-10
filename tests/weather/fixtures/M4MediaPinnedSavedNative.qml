@@ -73,7 +73,7 @@ ShellRoot {
             const firstRecent=find(strips,"media-m4-docked-recent-tile");
             if(!row||!f||!r||!first||!firstRecent)return;
             if(root.phase===0) {
-                if(strips.height!==36||!row.visible
+                if(strips.height!==28||!row.visible
                     ||count(strips,"media-m4-docked-favorite-tile")!==10
                     ||count(strips,"media-m4-docked-recent-tile")!==8
                     ||Math.abs(first.width-first.height)>0.1

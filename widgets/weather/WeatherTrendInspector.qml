@@ -10,6 +10,8 @@ import "WeatherRelationshipPolicy.js" as RelationshipPolicy
 Rectangle {
     id: inspector
 
+    // W3 // Shrink only when HOME HISTORY is selected; keep same samples.
+    property bool compact: false
     property string title: "RELATIONSHIP"
     property string leftLabel: "LEFT"
     property string rightLabel: "RIGHT"
@@ -38,7 +40,7 @@ Rectangle {
     color: Colors.dark
     border.width: 1
     border.color: Colors.cyan
-    height: 188
+    height: compact ? 72 : 188
 
     SystemServices.GraphHistory {
         id: graphHistory
@@ -51,12 +53,12 @@ Rectangle {
 
     Column {
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 7
+        anchors.margins: inspector.compact ? 4 : 10
+        spacing: inspector.compact ? 2 : 7
 
         Row {
             width: parent.width
-            height: 18
+            height: inspector.compact ? 12 : 18
             spacing: 10
 
             GohuText {
@@ -79,7 +81,7 @@ Rectangle {
 
         Row {
             width: parent.width
-            height: 16
+            height: inspector.compact ? 10 : 16
             spacing: 16
 
             GohuText {
@@ -105,7 +107,7 @@ Rectangle {
 
         Rectangle {
             width: parent.width
-            height: 94
+            height: inspector.compact ? 26 : 94
             color: Colors.black
             border.width: 1
             border.color: Colors.blue
@@ -185,7 +187,7 @@ Rectangle {
         QuietText {
             width: parent.width
             text: inspector.footerText
-            font.pixelSize: 8
+            font.pixelSize: inspector.compact ? 7 : 8
             wrapMode: Text.WordWrap
             color: Colors.orange
         }

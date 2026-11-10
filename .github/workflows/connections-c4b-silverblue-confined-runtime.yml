@@ -5,6 +5,8 @@ on:
     paths:
       - "tests/connections/c4b_silverblue/**"
       - "tests/connections/test_connections_c4b_silverblue_contract.py"
+      - "tests/connections/test_connections_c4d_guest_observation_export.py"
+      - "tests/connections/test_connections_c4d_uart_relay_review.py"
       - "tests/connections/c2v_silverblue/**"
       - ".github/workflows/connections-c4b-silverblue-confined-runtime.yml"
       - "docs/connections-c4b-silverblue-confined-runtime.md"

@@ -2261,7 +2261,9 @@ test("U9f middle Favorites rows use selected-over-hover full-row palette and glo
   // Both glyph lines receive the selected magenta and hover orange treatment.
   assert.match(row,/color: favoriteRow\.isOpen \? Colors\.magenta\s*: favoriteRow\.isHovered \? Colors\.orange : Colors\.white/);
   assert.match(row,/color: favoriteRow\.isOpen \? Colors\.magenta : Colors\.orange/);
-  assert.match(row,/RectangularShadow \{/);
+  assert.doesNotMatch(row,/^\s*RectangularShadow \{/m);
+  assert.match(row,/color: "transparent"/);
+  assert.match(row,/border\.color: favoriteRow\.rowAccent/);
   assert.match(row,/visible: favoriteRow\.isOpen \|\| favoriteRow\.isHovered/);
   assert.equal((row.match(/SafeDropShadow \{/g)||[]).length,2);
   for(const id of ["rowTitle","rowStatus"]) {
@@ -2284,4 +2286,70 @@ test("U9f middle Favorites row stays selection-only with keyboard and whole-row 
   assert.match(row,/event\.key===Qt\.Key_Space/);
   assert.match(row,/onWheel: function\(wheel\) \{ wheel\.accepted=false; \}/);
   assert.doesNotMatch(row,/execDetached|Process \{|setFavorite\(|killProcess\(|deleteCollection\(|saveHome\(/);
+});
+
+
+test("U9g Favorites++ uses Angel-repaired opaque open-only faces, not tinted broad shadows",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const angel=read("widgets/AngelActionButton.qml");
+  const top=pane.slice(pane.indexOf("id: categoryFilterFlow"),
+                      pane.indexOf("id: favoritesSearchBar"));
+  const bottom=pane.slice(pane.indexOf("id: subfilterButtons"),
+                         pane.indexOf("id: menuFilterNext",pane.indexOf("id: subfilterButtons")));
+  for(const [name,region] of [["top",top],["bottom",bottom]]) {
+    assert.match(region,/selected: filterOpen/);
+    assert.match(region,/color: filterOpen \? Colors\.yellow : Colors\.black/);
+    assert.match(region,/idleFillColor: Colors\.black/);
+    assert.match(region,/selectedFillColor: Colors\.yellow/);
+    assert.match(region,/softGlowEnabled: false/);
+    assert.match(region,/wideGlowEnabled: false/);
+    assert.match(region,/contentGlowEnabled: true/);
+    assert.match(region,/color: "transparent"/);
+    assert.match(region,/border\.color: Colors\.magenta/);
+    assert.match(region,/visible: filterOpen/);
+    assert.doesNotMatch(region,/softGlowEnabled: true|wideGlowEnabled: true/);
+  }
+  // The original Angels repair is the explicit precedent, not a new
+  // interpretation of the generalized ActionButton state dispatcher.
+  assert.match(angel,/color: highlightWhenSelected && selected \? activeFillColor : defaultFillColor/);
+  assert.match(angel,/softGlowEnabled: false/);
+  assert.match(angel,/wideGlowEnabled: false/);
+  assert.match(angel,/contentGlowEnabled: true/);
+});
+
+test("U9g middle rows keep hover/open semantics without a broad filled glow",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const row=pane.slice(pane.indexOf("id: favoriteRow"),
+                       pane.indexOf("// One full-row selection target."));
+  assert.match(row,/readonly property bool isOpen:/);
+  assert.match(row,/readonly property bool isHovered:\s*!isOpen &&/);
+  assert.match(row,/color: isOpen \|\| isHovered \? Colors\.yellow : Colors\.black/);
+  assert.match(row,/border\.color: rowAccent/);
+  assert.match(row,/Rectangle \{/);
+  assert.match(row,/anchors\.margins: -2/);
+  assert.match(row,/color: "transparent"/);
+  assert.doesNotMatch(row,/^\s*RectangularShadow \{/m);
+  assert.equal((row.match(/SafeDropShadow \{/g)||[]).length,2);
+  assert.match(row,/safeSource: rowTitle/);
+  assert.match(row,/safeSource: rowStatus/);
+  assert.match(row,/requestedVisible: favoriteRow\.isOpen \|\| favoriteRow\.isHovered/);
+});
+
+test("U9g native fixture actively hides and reopens the selector before pointer test",()=>{
+  const fixture=read("tests/cpuplus/fixtures/CpuPlusFavoritesNative.qml");
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  assert.match(pane,/property alias categoryRowRepeater: categoryRowsRepeater/);
+  assert.match(pane,/id: categoryRowsRepeater/);
+  assert.match(pane,/property alias categoryButtons: categoryIconRepeater/);
+  assert.match(pane,/id: categoryIconRepeater/);
+  assert.match(fixture,/selector\.visible=false;/);
+  assert.match(fixture,/id: paintReopenTimer/);
+  assert.match(fixture,/selector\.visible=true;/);
+  assert.match(fixture,/idle\.filterOpen \|\| !open\.filterOpen/);
+  assert.match(fixture,/idle\.softGlowEnabled \|\| open\.softGlowEnabled/);
+  assert.match(fixture,/U9G_REOPEN_PAINT_CHANGED/);
+  assert.match(fixture,/U9G_PASS \/\/ REOPEN_IDLE_BLACK_OPEN_YELLOW_NO_FILLED_GLOW/);
+  assert.match(fixture,/root\.ready=true/);
+  // No event/writer privilege is added by the visual test seam.
+  assert.doesNotMatch(pane,/execDetached\(|onClicked:\s*.+deleteCollection/);
 });

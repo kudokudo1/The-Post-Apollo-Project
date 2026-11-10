@@ -21,6 +21,8 @@ Item {
     property var selectedResource: null
     // Expose rendered rows for native selector/a11y testing, not actuation.
     property alias favoriteRowRepeater: savedItemRows
+    // Native reopen lifecycle test seam, read-only visual inspection.
+    property alias categoryRowRepeater: categoryRowsRepeater
     property alias dossierGroupItems: dossierGroupRepeater
     property alias dossierScrollArea: dossierScroll
     property alias collapseAllControl: collapseAllButton
@@ -567,8 +569,11 @@ Item {
                 Math.min(40,Math.max(30,(width-(upperCount-1)*4)/upperCount))
 
             Repeater {
+                id: categoryRowsRepeater
                 model: 2
                 Row {
+                    // Inspect rendered filter buttons without sending actions.
+                    property alias categoryButtons: categoryIconRepeater
                     required property int index
                     readonly property var rowKeys: index===0
                         ? categoryFilterFlow.categoryKeys.slice(
@@ -584,6 +589,7 @@ Item {
                     height: 30
 
                     Repeater {
+                        id: categoryIconRepeater
                         model: rowKeys
                         ActionButton {
                             required property string modelData
@@ -628,6 +634,14 @@ Item {
                                 pane.filterMode===modelData
                             selected: filterOpen
                             accentColor: frameInk
+                            // U9g // AngelActionButton fix: a direct opaque
+                            // surface wins over lingering press/hover state
+                            // after a hide/show cycle. Color only follows
+                            // semantic OPEN, never a cached pointer state.
+                            color: filterOpen ? Colors.yellow : Colors.black
+                            softGlowEnabled: false
+                            wideGlowEnabled: false
+                            contentGlowEnabled: true
 
                             // U8d // Only the currently opened filter gets
                             // yellow fill + magenta icon/glows. Inactive
@@ -688,6 +702,18 @@ Item {
                             softGlowSelectedOpacity: 0.72
                             softGlowKeyboardSelectedOpacity: 0.72
 
+                            // Outline-only active halo; keeps the
+                            // magenta glow without painting the button face.
+                            Rectangle {
+                                anchors.fill: parent
+                                anchors.margins: -2
+                                z: -1
+                                color: "transparent"
+                                border.width: 1
+                                border.color: Colors.magenta
+                                opacity: 0.48
+                                visible: filterOpen
+                            }
                             onLeftClicked: pane.filterMode=modelData
                         }
                     }
@@ -864,15 +890,20 @@ Item {
                         border.width: 1
                         border.color: rowAccent
 
-                        // Do not run per-row glow shaders for idle entries.
-                        // Only the hovered and opened rows render effects.
-                        RectangularShadow {
+                        // U9g // Angel precedent (12e129ba): a
+                        // RectangularShadow is a FULL tinted area, not an
+                        // outline. Compositing on reopen can reveal its
+                        // colored wash despite the row's opaque fill.
+                        // Use only a transparent outline and glyph glows.
+                        Rectangle {
                             anchors.fill: parent
+                            anchors.margins: -2
                             z: -1
-                            spread: 3
+                            color: "transparent"
+                            border.width: 1
+                            border.color: favoriteRow.rowAccent
                             visible: favoriteRow.isOpen || favoriteRow.isHovered
-                            opacity: favoriteRow.isOpen ? 0.58 : 0.50
-                            color: favoriteRow.rowAccent
+                            opacity: favoriteRow.isOpen ? 0.62 : 0.48
                         }
 
                         Column {
@@ -1026,6 +1057,13 @@ Item {
                                 pane.menuFilter===modelData
                             selected: filterOpen
                             accentColor: Colors.cyan
+                            // Same deterministic OPEN-only fill as the main
+                            // filter row, not ActionButton's cached pointer
+                            // or press-state color.
+                            color: filterOpen ? Colors.yellow : Colors.black
+                            softGlowEnabled: false
+                            wideGlowEnabled: false
+                            contentGlowEnabled: true
                             idleFillColor: Colors.black
                             hoverFillColor:
                                 filterOpen ? Colors.yellow : Colors.black
@@ -1068,6 +1106,16 @@ Item {
                                 filterOpen ? Colors.magenta : Colors.cyan
                             contentGlowPressedOpacity: 0.68
                             softGlowSelectedOpacity: 0.72
+                            Rectangle {
+                                anchors.fill: parent
+                                anchors.margins: -2
+                                z: -1
+                                color: "transparent"
+                                border.width: 1
+                                border.color: Colors.magenta
+                                opacity: 0.48
+                                visible: filterOpen
+                            }
                             onLeftClicked: pane.menuFilter=modelData
                         }
                     }

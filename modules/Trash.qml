@@ -46,6 +46,9 @@ PanelWindow {
     property string researchBurnTitle: ""
     property int researchBurnRevision: -1
     property bool researchBurnPointerRelocated: false
+    property bool researchBurnClickArmed: false
+    property bool researchBurnLoadComplete: false
+    property real researchBurnLoadProgress: 0
 
     readonly property var researchBinRows: researchRows.filter(function(row) {
         return row.state === "trashed";
@@ -55,9 +58,11 @@ PanelWindow {
         if (selected === "events" && row.kind !== "EVENT HISTORY") return false;
         if (selected === "dossiers" && row.kind !== "SAVED DOSSIER") return false;
         if (selected === "scrapes" && row.kind !== "WEB SCRAPE") return false;
-        if (selected === "copies" && (row.kind !== "SAVED RESEARCH"
+        if (selected === "copies" && ((row.kind !== "SAVED RESEARCH"
+                                      && row.kind !== "SAVED EVENT")
                                       || row.state !== "archived")) return false;
-        if (selected === "bin" && (row.kind !== "SAVED RESEARCH"
+        if (selected === "bin" && ((row.kind !== "SAVED RESEARCH"
+                                   && row.kind !== "SAVED EVENT")
                                    || row.state !== "trashed")) return false;
         const q = archiveSearchText.trim().toLowerCase();
         return !q || (String(row.title) + " " + String(row.source)
@@ -104,7 +109,7 @@ PanelWindow {
                 || (activeMode !== "archive" && activeMode !== "burn"
                     && !(activeMode === "trash" && action === "list")))
             return false;
-        if (["list", "archive", "trash", "restore", "burn"].indexOf(action) < 0)
+        if (["list", "archive", "archive-event", "trash", "restore", "burn"].indexOf(action) < 0)
             return false;
         researchBusy = true;
         researchPending = action;
@@ -161,30 +166,49 @@ PanelWindow {
         ]);
     }
 
+    function saveWeatherEventCopy(row) {
+        if (!row || row.kind !== "EVENT HISTORY"
+                || !row.sourceEventKey
+                || typeof row.sourceLastCapturedAtMs !== "number")
+            return false;
+        return runResearch("archive-event", [
+            String(row.sourceEventKey),
+            String(row.sourceLastCapturedAtMs),
+            String(researchRevision)
+        ]);
+    }
+
     function trashResearchCopy(row) {
-        if (!row || row.kind !== "SAVED RESEARCH"
+        if (!row || (row.kind !== "SAVED RESEARCH"
+                      && row.kind !== "SAVED EVENT")
                 || row.state !== "archived")
             return false;
         return runResearch("trash", [String(row.id), String(researchRevision)]);
     }
 
     function restoreResearchCopy(row) {
-        if (!row || row.kind !== "SAVED RESEARCH"
+        if (!row || (row.kind !== "SAVED RESEARCH"
+                      && row.kind !== "SAVED EVENT")
                 || row.state !== "trashed")
             return false;
         return runResearch("restore", [String(row.id), String(researchRevision)]);
     }
 
     function clearResearchBurn() {
+        researchBurnArmAnimation.stop();
         researchBurnId = "";
         researchBurnTitle = "";
         researchBurnRevision = -1;
         researchBurnPointerRelocated = false;
+        researchBurnClickArmed = false;
+        researchBurnLoadComplete = false;
+        researchBurnLoadProgress = 0;
     }
 
     function armResearchBurn(row) {
         if (!menuOpen || researchBusy || busy || confirmMode !== ""
-                || !row || row.kind !== "SAVED RESEARCH"
+                || !row || (row.kind !== "SAVED RESEARCH"
+                            && row.kind !== "SAVED EVENT")
                 || row.state !== "trashed"
                 || researchRows.findIndex(function(r) {
                        return r.id === row.id && r.state === "trashed";
@@ -194,11 +218,32 @@ PanelWindow {
         researchBurnTitle = String(row.title);
         researchBurnRevision = researchRevision;
         researchBurnPointerRelocated = false;
+        researchBurnClickArmed = false;
+        researchBurnLoadComplete = false;
+        researchBurnLoadProgress = 0;
         return true;
+    }
+
+    function advanceResearchBurn() {
+        if (!researchBurnId || !researchBurnPointerRelocated
+                || researchBurnRevision !== researchRevision
+                || researchBusy || busy)
+            return false;
+        if (!researchBurnClickArmed) {
+            researchBurnClickArmed = true;
+            researchBurnLoadComplete = false;
+            researchBurnLoadProgress = 0;
+            researchBurnArmAnimation.restart();
+            return true;
+        }
+        if (!researchBurnLoadComplete)
+            return false;
+        return confirmResearchBurn();
     }
 
     function confirmResearchBurn() {
         if (!researchBurnId || !researchBurnPointerRelocated
+                || !researchBurnClickArmed || !researchBurnLoadComplete
                 || researchBurnRevision !== researchRevision
                 || researchBusy || busy
                 || researchRows.findIndex(function(row) {
@@ -547,6 +592,22 @@ PanelWindow {
                     trashLauncher.archiveState = "STALE // INDEX PROCESS FAILED";
                 }
             });
+        }
+    }
+
+    // First remote click visibly loads before the destructive second click.
+    NumberAnimation {
+        id: researchBurnArmAnimation
+        target: trashLauncher
+        property: "researchBurnLoadProgress"
+        from: 0
+        to: 1
+        duration: 850
+        easing.type: Easing.Linear
+        onFinished: {
+            if (trashLauncher.researchBurnId !== ""
+                    && trashLauncher.researchBurnClickArmed)
+                trashLauncher.researchBurnLoadComplete = true;
         }
     }
 

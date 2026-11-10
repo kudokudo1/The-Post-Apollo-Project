@@ -2184,16 +2184,20 @@ test("U9d fuzzy place and AppControl queries preserve aliases and safe display b
   assert.equal(Search.matches(app,"hiddensecret"),false);
 });
 
-test("U9d Favorites search input centers magenta text and orange caret, with red-on-black clear X",()=>{
+test("U9e Favorites search is left-aligned, vertically centered, magenta with orange caret and red X",()=>{
   const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
   const section=pane.slice(pane.indexOf("id: favoritesSearchBar"),
     pane.indexOf('text: pane.filterMode==="GROUP"',pane.indexOf("id: favoritesSearchBar")));
   const input=section.slice(section.indexOf("TextInput {"),
     section.indexOf("ActionButton {"));
   const clear=section.slice(section.indexOf("id: favoritesSearchClear"));
-  assert.match(section,/anchors\.horizontalCenter: favoritesSearchInput\.horizontalCenter/);
-  assert.match(section,/horizontalAlignment: Text\.AlignHCenter/);
-  assert.match(input,/horizontalAlignment: TextInput\.AlignHCenter/);
+  assert.match(section,/anchors\.left: favoritesSearchInput\.left/);
+  assert.match(section,/anchors\.verticalCenter: parent\.verticalCenter/);
+  assert.match(section,/horizontalAlignment: Text\.AlignLeft/);
+  assert.match(input,/horizontalAlignment: TextInput\.AlignLeft/);
+  assert.match(input,/verticalAlignment: TextInput\.AlignVCenter/);
+  assert.match(input,/anchors\.verticalCenter: parent\.verticalCenter/);
+  assert.match(input,/height: 22/);
   assert.match(input,/color: Colors\.magenta/);
   assert.match(input,/cursorDelegate: Rectangle \{/);
   assert.match(input,/height: favoritesSearchInput\.font\.pixelSize\+4/);

@@ -2090,7 +2090,6 @@ PanelWindow {
                             idleBorderColor: Colors.red
                             hoverBorderColor: Colors.red
                             pressedBorderColor: Colors.red
-                            selectedBorderColor: Colors.red
                             keyboardSelectedBorderColor: Colors.red
 
                             // Opaque black in idle. A brief magenta halo marks

@@ -10,7 +10,7 @@ on:
       - '.github/workflows/identity-center-installed-gateway-v1.yml'
       - 'docs/identity-center-installed-gateway-v1.md'
   push:
-    branches: [main, 'feat/identity-installed-gateway-*']
+    branches: [main, 'feat/identity-installed-gateway-*', 'feat/identity-mandatory-installed-native-adapter-*']
     paths:
       - 'services/identity/installed_gateway_witness_v1.py'
       - 'services/identity/installed_command_adapter_v1.py'

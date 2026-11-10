@@ -845,39 +845,101 @@ Item {
                         id: favoriteRow
                         width: listRows.width
                         height: modelData.readOnly ? 58 : 46
-                        border.width: 1
-                        border.color: pane.selectedResource
+
+                        // U9f // OPEN outranks HOVER. Both use the same
+                        // whole-row visual grammar as the shared ActionButton:
+                        // idle black/cyan, hover yellow/orange, open
+                        // yellow/magenta. This is visual state ONLY.
+                        readonly property bool isOpen:
+                            !!pane.selectedResource
                             && pane.selectedResource.key===modelData.key
-                            ? Colors.magenta
-                            : rowHit.containsMouse || rowHit.activeFocus
-                              ? Colors.orange : Colors.cyan
-                        color: "#1B0623"
+                        readonly property bool isHovered:
+                            !isOpen && (rowHit.containsMouse || rowHit.activeFocus)
+                        readonly property color rowAccent:
+                            isOpen ? Colors.magenta
+                            : isHovered ? Colors.orange : Colors.cyan
+
+                        color: isOpen || isHovered ? Colors.yellow : Colors.black
+                        border.width: 1
+                        border.color: rowAccent
+
+                        // Do not run per-row glow shaders for idle entries.
+                        // Only the hovered and opened rows render effects.
+                        RectangularShadow {
+                            anchors.fill: parent
+                            z: -1
+                            spread: 3
+                            visible: favoriteRow.isOpen || favoriteRow.isHovered
+                            opacity: favoriteRow.isOpen ? 0.58 : 0.50
+                            color: favoriteRow.rowAccent
+                        }
+
                         Column {
+                            id: rowContent
                             anchors.fill: parent
                             anchors.margins: 6
                             spacing: 1
                             GohuText {
+                                id: rowTitle
                                 width: parent.width
                                 height: modelData.readOnly ? 30 : 15
                                 text: pane.favoriteRowLabel(modelData)
                                 textFormat: Text.PlainText
-                                color: Colors.white
+                                color: favoriteRow.isOpen ? Colors.magenta
+                                    : favoriteRow.isHovered ? Colors.orange : Colors.white
                                 font.pixelSize: 10
                                 wrapMode: Text.Wrap
                                 maximumLineCount: modelData.readOnly ? 2 : 1
                                 elide: Text.ElideRight
                             }
                             GohuText {
+                                id: rowStatus
                                 width: parent.width
                                 text: modelData.readOnly
                                     ? modelData.favoriteType+" // READ ONLY"
                                     : modelData.category
                                       +" // "+(modelData.readOnly?"READ ONLY":modelData.isPinned?"PINNED":"SAVED")
                                 textFormat: Text.PlainText
-                                color: Colors.orange
+                                color: favoriteRow.isOpen ? Colors.magenta : Colors.orange
                                 font.pixelSize: 9
                                 elide: Text.ElideRight
                             }
+                        }
+
+                        // Text glow follows the exact rendered glyph positions.
+                        // SafeDropShadow disconnects when the row leaves its
+                        // window, and stays off for unselected/unhovered rows.
+                        SafeDropShadow {
+                            x: rowContent.x + rowTitle.x
+                            y: rowContent.y + rowTitle.y
+                            width: rowTitle.width
+                            height: rowTitle.height
+                            z: 2
+                            safeSource: rowTitle
+                            requestedVisible: favoriteRow.isOpen || favoriteRow.isHovered
+                            horizontalOffset: 0
+                            verticalOffset: 0
+                            radius: 6
+                            samples: 9
+                            opacity: favoriteRow.isOpen ? 0.72 : 0.60
+                            color: favoriteRow.rowAccent
+                            transparentBorder: true
+                        }
+                        SafeDropShadow {
+                            x: rowContent.x + rowStatus.x
+                            y: rowContent.y + rowStatus.y
+                            width: rowStatus.width
+                            height: rowStatus.height
+                            z: 2
+                            safeSource: rowStatus
+                            requestedVisible: favoriteRow.isOpen || favoriteRow.isHovered
+                            horizontalOffset: 0
+                            verticalOffset: 0
+                            radius: 5
+                            samples: 7
+                            opacity: favoriteRow.isOpen ? 0.66 : 0.48
+                            color: favoriteRow.rowAccent
+                            transparentBorder: true
                         }
                         // One full-row selection target. No nested VIEW control,
                         // writer, process action or permission elevation.

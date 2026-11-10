@@ -3,6 +3,7 @@ import { projectBraveTopology } from "./topology.mjs";
 const refreshButton = document.getElementById("refresh");
 const status = document.getElementById("status");
 const counts = document.getElementById("counts");
+const tabPattern = document.getElementById("tab-pattern");
 const windowList = document.getElementById("window-list");
 
 function item(tag, value) {

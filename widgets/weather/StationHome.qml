@@ -1705,8 +1705,10 @@ Rectangle {
                      && home.homeFavoritesStore
                      && (home.homeFavoritesStore.storageState === "error"
                          || home.homeFavoritesStore.storageState === "unsupported")
-            text: "HOME BOOKMARKS UNAVAILABLE // FILE PRESERVED // "
-                  + home.homeFavoritesStore.errorCode
+            text: home.homeFavoritesStore
+                  ? "HOME BOOKMARKS UNAVAILABLE // FILE PRESERVED // "
+                    + home.homeFavoritesStore.errorCode
+                  : ""
             wrapMode: Text.WordWrap
             font.pixelSize: 10
         }

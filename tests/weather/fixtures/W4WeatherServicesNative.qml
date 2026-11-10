@@ -3,8 +3,9 @@ import QtQuick.Window
 import Quickshell
 import "widgets/weather" as Weather
 
-// W5 // Disposable 520x300 native check of the original services owner.
-// Checks canonical dark screen, pinned header/cards/report and list-only scroll.
+// W5 // Disposable native visual-layout fixture with synthetic rows.
+// The wiring and original source-owner boundaries are covered by source tests.
+// No weather service, network collector, or desktop integration is launched.
 ShellRoot {
     id: root
     property int ticks: 0
@@ -14,6 +15,27 @@ ShellRoot {
     property real originalCardsY: 0
     property real originalReportY: 0
 
+    function sampleRows(prefix, count) {
+        const rows = [];
+        for (let i = 0; i < count; i++)
+            rows.push({
+                id: prefix + "-" + String(i),
+                label: prefix.toUpperCase() + " SERVICE " + (i+1),
+                transport: i % 5 === 0 ? "LOADING" : "READY",
+                availability: i % 5 === 0 ? "READING"
+                    : i % 4 === 0 ? "CACHE_FRESH" : "LIVE",
+                receivedAgeMinutes: i+1,
+                observationAgeMinutes: i+2,
+                ageBand: "FRESH",
+                cadenceMs: 900000,
+                mode: "NORMAL_POLL",
+                retention: "PERSISTENT_LAST_GOOD",
+                expireMs: 21600000,
+                detail: "SYNTHETIC NATIVE FIXTURE"
+            });
+        return rows;
+    }
+
     function find(item, name) {
         if (!item) return null;
         if (item.objectName === name) return item;
@@ -21,7 +43,6 @@ ShellRoot {
             const found = find(child, name);
             if (found) return found;
         }
-        if (item.item) return find(item.item, name);
         return null;
     }
     function fail(message) {
@@ -37,10 +58,11 @@ ShellRoot {
         height: 300
         visible: true
         color: "black"
-        Weather.StationWeatherSubjectPane {
-            id: subject
+        Weather.StationWeatherServicesPane {
+            id: pane
             anchors.fill: parent
-            subjectRoute: "weather/services/health"
+            skyRows: root.sampleRows("sky",8)
+            groundRows: root.sampleRows("ground",8)
         }
     }
 
@@ -51,13 +73,12 @@ ShellRoot {
         onTriggered: {
             root.ticks++;
             if (root.ticks > 30) return root.fail("TIMEOUT");
-            const pane = root.find(subject, "weather-w5-services-pane");
-            const head = root.find(subject, "weather-w5-fixed-header");
-            const cards = root.find(subject, "weather-w5-summary-cards");
-            const rows = root.find(subject, "weather-w5-runtime-rows");
-            const scroll = root.find(subject, "weather-w5-detail-scroll");
-            const report = root.find(subject, "weather-w5-selected-report");
-            if (!pane || !head || !cards || !rows || !scroll || !report) {
+            const head = root.find(pane, "weather-w5-fixed-header");
+            const cards = root.find(pane, "weather-w5-summary-cards");
+            const rows = root.find(pane, "weather-w5-runtime-rows");
+            const scroll = root.find(pane, "weather-w5-detail-scroll");
+            const report = root.find(pane, "weather-w5-selected-report");
+            if (!head || !cards || !rows || !scroll || !report) {
                 if (root.ticks > 10) return root.fail("W5_NODES_MISSING");
                 return;
             }
@@ -65,8 +86,8 @@ ShellRoot {
                 const background = String(pane.color).toLowerCase();
                 if (background === "#ffffff" || background === "white")
                     return root.fail("WHITE_SERVICES_BACKGROUND");
-                if (!Array.isArray(pane.runtimeRows) || pane.runtimeRows.length < 2)
-                    return root.fail("SERVICE_RUNTIME_MISSING");
+                if (!Array.isArray(pane.runtimeRows) || pane.runtimeRows.length !== 16)
+                    return root.fail("SERVICE_RUNTIME_ROWS_NOT_DEDUPED");
                 if (cards.height !== 65 || scroll.height <= 10)
                     return root.fail("SUMMARY_OR_SCROLL_VIEWPORT");
                 if (scroll.contentHeight <= scroll.height)

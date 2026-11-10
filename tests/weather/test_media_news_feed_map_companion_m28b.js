@@ -97,7 +97,9 @@ test("EARTH MAPS is compact, EONET source route retains full event list",()=>{
   const mapStart=qml.indexOf("id: mapCanvasSection");
   const places=qml.indexOf("MAP COMPANION // ARTICLE MENTIONED PLACES");
   const eventList=qml.indexOf("EARTH MAP CONTEXT // EONET EVENTS IN VIEW");
-  const retry=qml.indexOf('label: "RETRY NEWS"');
+  // A new fixed REPORTS RETRY button precedes the map in source order.
+  // Check the legacy scrolling REPORTS control that follows EARTH instead.
+  const retry=qml.indexOf('label: "RETRY NEWS"',eventList);
   assert.ok(mapStart < places && places < eventList && eventList < retry,
             "EARTH companion must follow the map and precede unrelated sections");
 });

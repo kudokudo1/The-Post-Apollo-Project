@@ -142,16 +142,15 @@ def _existing_manifest_dir(root):
     return current
 
 
-def _create_manifest_dir(root):
+def _create_manifest_dir(root, created):
     """Make ONLY missing private subfolders of the marked trial's XDG home.
 
     A browser may have created some subfolders before the extension ID is
     available. Never overwrite, chmod, or follow a pre-existing symlink.
-    Return the exact new directories for safe reverse-order rollback.
+    Track new directories in caller-owned list, even on partial failure.
     """
     current = _xdg_home(root)
     _private_dir(current)
-    created = []
     for segment in XDG_COMPONENTS:
         current = current / segment
         if current.is_symlink():
@@ -162,7 +161,7 @@ def _create_manifest_dir(root):
             current.mkdir(mode=0o700)
             created.append(current)
             _private_dir(current)
-    return current, created
+    return current
 
 
 def _source_host():
@@ -232,7 +231,7 @@ def register_trial(root_path, extension_id):
     created_manifest = False
     try:
         # Registration must never spill into the user's real XDG config.
-        host_dir, created_dirs = _create_manifest_dir(root)
+        host_dir = _create_manifest_dir(root, created_dirs)
         if host_dir != target_dir:
             raise TrialError("XDG PATH MISMATCH")
         _write_exclusive(host_path, host_contents, 0o700)

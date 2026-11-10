@@ -251,7 +251,7 @@ Column {
         }
         root.disarm();
         root.outcome = "DRAFT PREFILLED // " + section
-            + " // EDIT FIELDS; REVIEW + CONFIRM REQUIRED // NO AI TURN";
+            + " // EDIT FIELDS; REVIEW + CONFIRM REQUIRED // NO WORKER SESSION";
         return true;
     }
     function applyRoomSuggestions() {

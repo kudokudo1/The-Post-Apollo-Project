@@ -8,6 +8,7 @@ UART artifact was retrieved. This consumer explicitly REFUSES production use.
 from __future__ import annotations
 
 import ast
+import hashlib
 from copy import deepcopy
 import importlib.util
 import json
@@ -245,6 +246,64 @@ class C3eUC4cImportContract(unittest.TestCase):
         self.assertEqual(self.report["schema"], U.SCHEMA)
         self.assertIs(self.check()["installedGuestMeasured"],False)
         self.assertFalse(self.check()["evidenceCryptographicallyAttested"])
+
+
+    def test_19_actual_silverblue_artifact_source_matched_diagnostic_only(self):
+        # REAL artifact: C4b signed Fedora Silverblue exact-head CI
+        # https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42894509754
+        # artifact id 13800918170; ZIP SHA256 ac083f693ac139058b22ea9dd2b0e37767a04f0c30e17fc45de3fdfce599c7a9.
+        # This is a canonical reconstruction of the artifact's ONE diagnostic
+        # guest line; the matching line SHA256 pins its exact 819 bytes.
+        # It is NOT signed C3e-Q evidence or independent PID/interpreter/RPM attestation.
+        guest = {**self.report,
+                 "signed_rpm_sha256": "8b9c9e7cd11ae225b85102a8df35ac4053abe08ea7b9a9553b5325e8567174d9",
+                 "signed_script_sha256": "1bc6cc2030efc08f873bc8f73a9644d869482e3e70c6553a108ade9d97441ce5",
+                 "running_script_sha256": "1bc6cc2030efc08f873bc8f73a9644d869482e3e70c6553a108ade9d97441ce5",
+                 "interpreter_sha256": "40850fe1e2df0c14378c12bfaa02b5cda35619e09a8ee50ca3cf2bdb36fc019f",
+                 "service_pid": 2857, "dbus_owner_pid": 2857,
+                 "process_start_ticks": "1235",
+                 "service_uid": 992, "service_gid": 995}
+        raw = self.line(value=guest)
+        self.assertEqual(len(raw), 819)
+        self.assertEqual(
+            hashlib.sha256(raw).hexdigest(),
+            "e3fa68a28a3160262632785d656855fa62a079dbf8e95c0d4e1e76aa5da44bb9")
+        # This is the one pin independently reproducible from the tracked
+        # repository bytes at CI head fe1f1d0c. All other "pins" below are
+        # replayed guest values solely to exercise C3e-U schema compatibility.
+        src = (ROOT / "tests/connections/c2r_selinux_domain/C2rStatusHost.py")
+        independent_script_sha = hashlib.sha256(src.read_bytes()).hexdigest()
+        self.assertEqual(independent_script_sha, guest["signed_script_sha256"])
+        assert_only_format_pins = {
+            "independent_signed_rpm_sha256": guest["signed_rpm_sha256"],
+            "independent_signed_script_sha256": independent_script_sha,
+            "independent_interpreter_sha256": guest["interpreter_sha256"],
+            "expected_service_pid": guest["service_pid"],
+            "expected_start_ticks": guest["process_start_ticks"],
+            "expected_service_uid": guest["service_uid"],
+            "expected_service_gid": guest["service_gid"],
+        }
+        result = U.inspect(report_line=raw, **assert_only_format_pins)
+        self.assertTrue(result["c4cSchemaCompatible"])
+        self.assertTrue(result["reportMatchesSuppliedIndependentPins"])
+        self.assertTrue(result["reportSourceIsGuestSelfObservation"])
+        self.assertFalse(result["installedGuestMeasured"])
+        for key in U.DENY_FLAGS:
+            self.assertIs(result[key], False)
+        # A separately provided differing RPM/interpreter/process pin must
+        # still reject the otherwise well-formed real artifact.
+        for k, value, refusal in (
+            ("independent_signed_rpm_sha256", "f"*64,
+             "C4C_SIGNED_ARTIFACT_OR_RUNNING_BYTES_PIN_MISMATCH"),
+            ("independent_interpreter_sha256", "f"*64,
+             "C4C_SIGNED_ARTIFACT_OR_RUNNING_BYTES_PIN_MISMATCH"),
+            ("expected_service_pid", guest["service_pid"] + 1,
+             "C4C_SYSTEMD_DBUS_PROCESS_PIN_MISMATCH"),
+        ):
+            with self.subTest(k=k):
+                with self.assertRaisesRegex(U.Refused, refusal):
+                    U.inspect(report_line=raw,
+                              **{**assert_only_format_pins, k: value})
 
 
 if __name__=="__main__":

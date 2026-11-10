@@ -38,11 +38,12 @@ for key, alias in [
           key+" must route transcript back only to its selected text editor")
 check('component ManagerArea: Column {' in manager
       and 'property string voiceKey: ""' in manager
-      and 'HospitalActionButton {' in manager
+      and 'id: micAction' in manager
+      and 'text: "🗣︎"' in manager
+      and 'color: Colors.omnitrix' in manager
       and 'label: "CANCEL"' in manager
-      and '"STOP"' in manager
-      and ': "MIC"' in manager,
-      "Share MIC, STOP and CANCEL controls across multiline fields")
+      and 'onClicked: root.toggleDictation(managerArea.voiceKey)' in manager,
+      "Share Reception talking-person MIC/STOP toggle and CANCEL across multiline fields")
 check('svc.startRecording()' in manager
       and 'svc.stopRecording(false)' in manager
       and 'root.speechInputService.cancel()' in manager,

@@ -11,6 +11,7 @@ on:
       - "services/hospital/HospitalDictationTextPolicy.js"
       - "tests/hospital/test_surgery_dictation_text_policy.js"
       - "tests/hospital/test_surgery_multiline_dictation_ui_contracts.py"
+      - "tests/hospital/test_surgery_manage_input_visuals.py"
       - "tests/hospital/test_conversation_intake_policy.js"
       - "tests/hospital/test_conversation_intake_ui_contracts.py"
       - "services/hospital/HospitalGitHubOwnerService.qml"
@@ -32,6 +33,7 @@ on:
       - "services/hospital/HospitalDictationTextPolicy.js"
       - "tests/hospital/test_surgery_dictation_text_policy.js"
       - "tests/hospital/test_surgery_multiline_dictation_ui_contracts.py"
+      - "tests/hospital/test_surgery_manage_input_visuals.py"
       - "tests/hospital/test_conversation_intake_policy.js"
       - "tests/hospital/test_conversation_intake_ui_contracts.py"
       - "services/hospital/HospitalGitHubOwnerService.qml"
@@ -66,6 +68,7 @@ jobs:
           python3 tests/hospital/test_surgery_github_owner_ui_contracts.py
           python3 tests/hospital/test_conversation_intake_ui_contracts.py
           python3 tests/hospital/test_surgery_multiline_dictation_ui_contracts.py
+          python3 tests/hospital/test_surgery_manage_input_visuals.py
           python3 tests/hospital/test_workforce_roster_ui_contracts.py
           python3 tests/hospital/test_worker_identity_editor_contracts.py
           python3 tests/hospital/test_registered_worker_routes.py

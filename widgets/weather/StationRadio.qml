@@ -381,8 +381,14 @@ Rectangle {
                 visible: stationRadio.overviewDocked
                 width: parent.width
                 height: stationRadio.overviewDocked ? 10 : 0
-                text: "◉ RADIO // NEWS FIRST // "
-                    + stationRadio.headerStatus
+                // The single fixed label also carries the status that
+                // previously used a second footer row in the compact dock.
+                text: "◉ RADIO // " + stationRadio.headerStatus
+                    + " // " + (controller.errorText !== ""
+                        ? controller.message
+                        : stationRadio.loadedMedia && stationRadio.loadedMedia.item
+                          ? "LOADED " + String(stationRadio.loadedMedia.item.title || "--")
+                          : stationRadio.notice)
                 color: Colors.cyan
                 font.pixelSize: 10
                 elide: Text.ElideRight
@@ -511,10 +517,10 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: savedStrips.bottom
         anchors.topMargin: savedStrips.visible
-            ? (stationRadio.overviewDocked ? 2 : 3) : 0
+            ? (stationRadio.overviewDocked ? 1 : 3) : 0
         anchors.bottom: fixedTransport.top
         anchors.bottomMargin: fixedTransport.visible
-            ? (stationRadio.overviewDocked ? 2 : 3) : 0
+            ? (stationRadio.overviewDocked ? 1 : 3) : 0
         clip: true
         contentWidth: width
         contentHeight: content.implicitHeight + 12
@@ -701,7 +707,7 @@ Rectangle {
         anchors.bottom: parent.bottom
         anchors.leftMargin: 8
         anchors.rightMargin: 8
-        anchors.bottomMargin: 3
+        anchors.bottomMargin: stationRadio.overviewDocked ? 2 : 3
         visible: !stationRadio.compactOverview
         height: visible ? implicitHeight : 0
         spacing: 2
@@ -793,6 +799,7 @@ Rectangle {
 
             GohuText {
             visible: stationRadio.sectionVisible("status")
+                && !stationRadio.overviewDocked
                 width: parent.width
                 text: controller.errorText !== ""
                       ? controller.message

@@ -1,0 +1,36 @@
+name: TimeW MACHINE Brave opt-in focus co-observation
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineBraveNativeFocusObserve.py"
+      - "services/time/MachineBraveNativeFocusManifest.py"
+      - "integrations/machine/brave-topology/focus-observe-*.mjs"
+      - "integrations/machine/brave-topology/popup.html"
+      - "tests/timew/test_machine_brave_native_focus_observe.py"
+      - "tests/timew/test_machine_brave_native_focus_observe.mjs"
+      - "docs/timew-machine-brave-focus-coobservation.md"
+      - ".github/workflows/timew-machine-brave-focus-coobservation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focus-coobservation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify framing, bounded Sway reads, privacy and refusal
+        run: python3 -B -I tests/timew/test_machine_brave_native_focus_observe.py
+      - name: Verify browser protocol, click gate and no-identity review
+        run: node tests/timew/test_machine_brave_native_focus_observe.mjs
+      - name: Preserve transport probe no-OS authority
+        run: |
+          python3 -B -I tests/timew/test_machine_brave_native_probe_contract.py
+          python3 -B -I tests/timew/test_machine_brave_native_probe.py
+      - name: Preserve read-only Brave inventory and Sway focus
+        run: |
+          python3 -B -I tests/timew/test_machine_brave_topology_contract.py
+          python3 -B -I tests/timew/test_machine_brave_focus_witness.py

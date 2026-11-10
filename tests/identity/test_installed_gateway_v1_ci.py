@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from unittest.mock import patch
 import pwd
 import secrets
 import shutil
@@ -514,6 +515,40 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
             denied.begin()
         self.assertTrue(denied.faulted)
         self.assertFalse((self.runtime / "identity-display-v0.sock").exists())
+
+    def test_g_native_adapter_rejects_trust_loss_after_signed_reply(self):
+        # Exercise the real installed service and its signed UNAVAILABLE
+        # response. These gates initially approve the connected peer, then
+        # revoke it during the same transaction before the client can accept
+        # the reply. The native client must fault rather than return a phase.
+        def approve_once():
+            count = [0]
+            def gate(*_args):
+                count[0] += 1
+                return count[0] == 1
+            return gate
+
+        seat_lost = self._strict_adapter(seat=approve_once())
+        with self.assertRaises(ReceiptRejected):
+            seat_lost.begin()
+        self.assertTrue(seat_lost.faulted)
+
+        peer_lost = self._strict_adapter(trust=approve_once())
+        with self.assertRaises(ReceiptRejected):
+            peer_lost.begin()
+        self.assertTrue(peer_lost.faulted)
+
+        # The installed witness is also rechecked after the signed receipt,
+        # rather than trusting a one-time launch-time observation.
+        with patch.object(self.witness, "consistent",
+                          side_effect=[True, False]) as inspect_witness:
+            witness_lost = self._strict_adapter()
+            with self.assertRaises(ReceiptRejected):
+                witness_lost.begin()
+            self.assertTrue(witness_lost.faulted)
+            self.assertEqual(inspect_witness.call_count, 2)
+        self.assertFalse((self.runtime / "identity-display-v0.sock").exists())
+        self.assertTrue(self.witness.consistent(self.peer))
 
     def test_z_restart_and_receipt_key_rotation_require_new_enrollment(self):
         previous_pid = self.pid

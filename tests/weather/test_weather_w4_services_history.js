@@ -35,10 +35,10 @@ test("WEATHER has one final SERVICES tab and NOW + AIR is data-only", () => {
 test("SERVICES reuses existing telemetry without additional fetching", () => {
     assert.match(pane,/id: servicesPanel/);
     assert.match(pane,/weatherPane.kind === "services"/);
-    assert.match(pane,/rows: weatherServicesSky.runtimeRows/);
-    assert.match(pane,/rows: weatherServicesGround.runtimeRows/);
-    assert.match(pane,/subjectRoute: "weather\/services\/sky"/);
-    assert.match(pane,/subjectRoute: "weather\/services\/ground"/);
+    assert.match(pane,/rows: weatherServicesSky.item \\? weatherServicesSky.item.runtimeRows : \\[\\]/);
+    assert.match(pane,/rows: weatherServicesGround.item \\? weatherServicesGround.item.runtimeRows : \\[\\]/);
+    assert.match(pane,/sourceComponent: skyPanel/);
+    assert.match(pane,/sourceComponent: groundPanel/);
     assert.doesNotMatch(pane,/WeatherServices\.|Process\s*\{|FileView\s*\{/);
 });
 

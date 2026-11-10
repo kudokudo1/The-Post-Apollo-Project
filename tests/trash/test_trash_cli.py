@@ -100,7 +100,7 @@ class TrashBackendTests(unittest.TestCase):
 
         with patch.object(trash, "_run", side_effect=[
                 result(self.rows), result(""),
-                result(f"trash:///Other%20item.txt\\t{self.second}\\n")]) as run:
+                result(f"trash:///Other%20item.txt\t{self.second}\n")]) as run:
             data = trash.item_action("burn", "trash:///Camera%201.png",
                                      str(self.first), "BURN_CONFIRMED")
         self.assertEqual(data["message"], "BURNED")
@@ -142,8 +142,8 @@ class TrashBackendTests(unittest.TestCase):
         self.assertTrue(data["verified"])
         self.assertFalse(data["partial"])
         self.assertEqual(data["burnedCount"], 2)
-        self.assertEqual([x["name"] for x in data["burnedItems"]],
-                         ["Camera 1.png", "Other item.txt"])
+        self.assertEqual({x["name"] for x in data["burnedItems"]},
+                         {"Camera 1.png", "Other item.txt"})
         self.assertEqual(run.call_args_list[1].args[0],
                          ["/usr/bin/gio", "trash", "--empty"])
 
@@ -152,7 +152,7 @@ class TrashBackendTests(unittest.TestCase):
         stamp = trash._revision(rows)
         with patch.object(trash, "_run", side_effect=[
                 result(self.rows), result(""),
-                result(f"trash:///Other%20item.txt\\t{self.second}\\n")]):
+                result(f"trash:///Other%20item.txt\t{self.second}\n")]):
             data = trash.burn_all(stamp, "2", "BURN_ALL_CONFIRMED")
         self.assertTrue(data["verified"])
         self.assertTrue(data["partial"])

@@ -1331,6 +1331,9 @@ PanelWindow {
 
             TimeW {
                 id: timewWindow
+                // Bind the Settings format buttons to the already-mounted
+                // dock Clock rather than duplicating the format preference.
+                dockClock: clockDock
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
                 keyboardActive: !relationshipFocus.active
                 relationshipFocusModeActive: relationshipFocus.active

@@ -534,9 +534,13 @@ Rectangle {
 
             verticalAlignment: TextInput.AlignVCenter
             clip: true
-            color: Colors.white
+            color: Colors.magenta
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
+            cursorDelegate: Rectangle {
+                width: 2
+                color: Colors.orange
+            }
             font.pixelSize: 11
             enabled:
                 !root.speechInputService.stopping
@@ -617,7 +621,7 @@ Rectangle {
         anchors {
             right: micButton.left
             top: transcriptFrame.bottom
-            rightMargin: 6
+            rightMargin: 4
             topMargin: 8
         }
 
@@ -697,7 +701,8 @@ Rectangle {
         anchors {
             right: voiceCancelButton.left
             top: transcriptFrame.bottom
-            rightMargin: voiceCancelButton.visible ? 6 : 0
+            // Always leave a gap to SEND even when CANCEL has zero width.
+            rightMargin: 6
             topMargin: 8
         }
 

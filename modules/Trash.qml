@@ -55,6 +55,83 @@ PanelWindow {
     property bool researchBurnLoadComplete: false
     property real researchBurnLoadProgress: 0
 
+    // One Burn view + one confirmation + one post-operation receipt.
+    // System files remain GIO-owned; copies remain managed-store-owned.
+    property string burnFilter: "all" // all | files | records | events | research
+    property string burnUiStage: "" // "" | clicked | working | result | error
+    property var burnReceiptItems: []
+    property int burnReceiptCount: 0
+    property int burnReceiptRequested: 0
+    property bool burnReceiptVerified: false
+    property string burnReceiptMessage: ""
+    property string burnReceiptScope: ""
+    readonly property bool burnConfirmationOpen:
+        confirmMode !== "" || researchBurnId !== "" || burnUiStage !== ""
+    readonly property var burnDisplayRows: {
+        const fileRows = (burnFilter === "all" || burnFilter === "files")
+            ? items.map(function(row) {
+                return {entryType:"file", title:row.name, original:row.original,
+                        uri:row.uri, originLabel:row.originLabel};
+            }) : [];
+        const copyRows = researchBinRows.filter(function(row) {
+            return burnFilter !== "files"
+                   && (burnFilter !== "events" || row.kind === "SAVED EVENT")
+                   && (burnFilter !== "research" || row.kind === "SAVED RESEARCH");
+        }).map(function(row) {
+            return {entryType:"record", title:row.title, record:row,
+                    originLabel:row.source + " // " + row.recordedAt};
+        });
+        return fileRows.concat(copyRows);
+    }
+
+    function showBurnReceipt(payload, scope, attempted) {
+        // Accept only an explicit backend outcome, never a guessed success.
+        const list = payload && Array.isArray(payload.burnedItems)
+            ? payload.burnedItems : [];
+        burnReceiptItems = list.slice(0, 2500).map(function(row) {
+            return {name:String(row.name || "UNNAMED"),
+                    kind:String(row.kind || "UNKNOWN"),
+                    source:String(row.source || row.original || "")};
+        });
+        burnReceiptCount = burnReceiptItems.length;
+        burnReceiptRequested = attempted;
+        burnReceiptVerified = payload && payload.verified === true
+                              && payload.partial !== true
+                              && burnReceiptCount === attempted;
+        burnReceiptScope = scope;
+        burnReceiptMessage = burnReceiptVerified
+            ? "BURN VERIFIED // " + burnReceiptCount + " ITEMS"
+            : "PARTIAL OR UNVERIFIED // "
+              + burnReceiptCount + " CONFIRMED OF " + attempted;
+        burnUiStage = "result";
+        activeMode = "burn";
+    }
+
+    function failBurnReceipt(message) {
+        burnReceiptVerified = false;
+        burnReceiptMessage = "NOT CONFIRMED // "
+                             + String(message || "BACKEND UNAVAILABLE");
+        burnUiStage = "error";
+        activeMode = "burn";
+    }
+
+    function dismissBurnReceipt() {
+        if (burnUiStage === "working" || burnUiStage === "clicked")
+            return false;
+        burnCommitDelay.stop();
+        clearConfirmation();
+        clearResearchBurn();
+        burnUiStage = "";
+        burnReceiptItems = [];
+        burnReceiptCount = 0;
+        burnReceiptRequested = 0;
+        burnReceiptVerified = false;
+        burnReceiptMessage = "";
+        burnReceiptScope = "";
+        activeMode = "burn";
+        return true;
+    }
+
     readonly property var researchBinRows: researchRows.filter(function(row) {
         return row.state === "trashed";
     })
@@ -110,7 +187,10 @@ PanelWindow {
     }
 
     function runResearch(action, args) {
-        if (!menuOpen || researchBusy || researchBurnId !== ""
+        if (!menuOpen || researchBusy
+                || (researchBurnId !== ""
+                    && !(burnUiStage === "working"
+                         && ["burn", "burn-all"].indexOf(action) >= 0))
                 || (activeMode !== "archive" && activeMode !== "burn"
                     && !(activeMode === "trash"
                          && ["list", "restore", "burn"].indexOf(action) >= 0)))
@@ -158,6 +238,8 @@ PanelWindow {
                 || typeof payload.binDigest !== "string") {
             researchState = "STALE // " + String(payload && payload.error
                                                 || "RESEARCH STORE UNAVAILABLE");
+            if (action === "burn" || action === "burn-all")
+                failBurnReceipt(researchState);
             return;
         }
         researchRows = payload.items;
@@ -166,8 +248,13 @@ PanelWindow {
         researchBinDigest = payload.binDigest;
         researchState = action === "list" ? "READY // SAVED RESEARCH"
                                          : action.toUpperCase() + " // COMPLETE";
-        if (action === "burn" || action === "burn-all")
-            clearResearchBurn();
+        if (action === "burn" || action === "burn-all") {
+            const expected = researchBurnScope === "all"
+                             ? researchBurnCount : 1;
+            showBurnReceipt(payload, researchBurnScope === "all"
+                            ? "MANAGED COPIES // ALL" : "MANAGED COPY",
+                            expected);
+        }
     }
 
     function saveDemoCopy(row) {
@@ -381,7 +468,8 @@ PanelWindow {
     readonly property bool burnWarning:
         confirmMode !== "" || pendingAction === "burn"
         || pendingAction === "burn-all" || researchBurnId !== ""
-        || researchPending === "burn"
+        || researchPending === "burn" || researchPending === "burn-all"
+        || burnUiStage !== ""
 
     function stepChassis(direction) {
         const index = chassisSizes.indexOf(chassisSize);

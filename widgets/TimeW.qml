@@ -2760,7 +2760,7 @@ PanelWindow {
             visible: timew.syncPopoverOpen && timew.menuOpen
             z: 100
             width: 306
-            height: 222
+            height: 251
             x: Math.max(8, Math.min(timewFrame.width - width - 8,
                 syncButton.mapToItem(timewFrame, syncButton.width, 0).x - width))
             y: syncButton.mapToItem(timewFrame, 0, syncButton.height).y + 6
@@ -2861,6 +2861,14 @@ PanelWindow {
                           : "DIAG // " + TimeSettings.diagnosticMessage
                     font.pixelSize: 9
                     color: Colors.cyan
+                }
+                GohuText {
+                    width: parent.width
+                    height: 21
+                    elide: Text.ElideRight
+                    text: "TIME // " + TimeSettings.referenceMessage
+                    font.pixelSize: 9
+                    color: Colors.white
                 }
             }
         }

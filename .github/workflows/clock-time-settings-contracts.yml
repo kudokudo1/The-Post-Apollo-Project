@@ -75,7 +75,7 @@ jobs:
           const vm = require('vm');
           const raw = fs.readFileSync('services/time/TimeAutoCheckPolicy.js', 'utf8');
           const p = {};
-          vm.runInNewContext(raw.replace(/^\\.pragma library\\s*/, ''), p);
+          vm.runInNewContext(raw.replace(/^\.pragma library\s*/, ''), p);
           const first = p.initialDocument();
           assert.equal(first.enabled, false);
           assert.equal(first.intervalHours, 6);

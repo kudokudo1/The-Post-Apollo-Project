@@ -19,6 +19,7 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    readonly property bool receptionistVoiceBusy: speechInputService.busy
     property bool keyboardActive: true
     property bool keyboardLock: false
     property bool relationshipFocusModeActive: false
@@ -6385,7 +6386,7 @@ PanelWindow {
                     doctorService: doctorService
                     providerService: providerService
                     speechInputService: workforceSpeechInputService
-                    otherVoiceBusy: speechInputService.busy
+                    otherVoiceBusy: root.receptionistVoiceBusy
                         || intercomSpeechInputService.busy
                     rooms: responsibilityService.durableRooms
                     sessions: responsibilityService.durableSessions

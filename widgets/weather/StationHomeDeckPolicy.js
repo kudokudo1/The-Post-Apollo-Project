@@ -6,16 +6,15 @@
 var FORMAT = "post-apollo.weather.home-deck.w2a.v1";
 var ROTATABLE = [
     "home/auto", "home/quick", "home/snapshot",
-    "home/history", "home/sources"
+    "home/history", "home/health"
 ];
 var MODES = ["mixed", "auto", "pinned"];
 
 function canonicalPath(path) {
-    // W3 // Old favorites are read as one SOURCES tab, without rewriting
-    // the user's existing weather-home-favorites-v1.json at load time.
+    // W3 // SOURCES remains the established home/health persisted ID.
+    // Old RUNTIME favorites map to the same screen without a store rewrite.
     var value=String(path || "");
-    return value === "home/runtime" || value === "home/health"
-        ? "home/sources" : value;
+    return value === "home/runtime" ? "home/health" : value;
 }
 function isRotatable(path) {
     return ROTATABLE.indexOf(canonicalPath(path)) >= 0;

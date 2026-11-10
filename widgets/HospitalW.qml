@@ -2545,6 +2545,9 @@ PanelWindow {
 
     HospitalSpeechInputService {
         id: speechInputService
+        liveStreaming: true
+        otherVoiceBusy: intercomSpeechInputService.busy
+            || workforceSpeechInputService.busy
 
         onVoiceError: function(message) {
             receptionistService.append(
@@ -2556,13 +2559,15 @@ PanelWindow {
 
     HospitalSpeechInputService {
         id: intercomSpeechInputService
+        liveStreaming: true
+        otherVoiceBusy: speechInputService.busy
+            || workforceSpeechInputService.busy
         audioFileName: "hospital-intercom-voice.wav"
     }
 
-    // Dedicated local microphone buffer for multiline Surgery editors.
-    // Reception and Intercom retain their existing isolated audio files.
-    // Dedicated incremental local PipeWire + Whisper stream for the five
-    // Surgery Manage editors; Reception and Intercom remain unchanged.
+    // The three voice controls share the local streaming backend, but own
+    // separate capture processes and refuse microphone concurrency.
+    // The five Surgery Manage editors keep their dedicated dictation state.
     HospitalLiveDictationService {
         id: workforceSpeechInputService
     }

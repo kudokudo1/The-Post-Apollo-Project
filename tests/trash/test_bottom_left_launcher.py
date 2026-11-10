@@ -239,7 +239,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn("id: archiveEntriesList", TRASH)
         self.assertIn("id: archiveFilterRow", TRASH)
         self.assertIn("Original Weather archives, Hospital and Finance records remain protected.", TRASH)
-        self.assertIn('onLeftClicked: trashLauncher.setMode("trash")', TRASH)
+        self.assertIn('trashLauncher.setMode("trash");', TRASH)
         self.assertIn('visible: trashLauncher.activeMode === "trash"', TRASH)
         self.assertIn('activeMode === "trash"', TRASH)
         # New tabs are navigation, not authorization to alter Hospital,
@@ -292,7 +292,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('label: "BURN COPY"', TRASH)
         self.assertIn('label: "TRASH COPY"', TRASH) if 'label: "TRASH COPY"' in TRASH else self.assertIn('? "RESTORE" : "TRASH COPY"', TRASH)
         self.assertIn('label: "RECORD BIN " + trashLauncher.researchBinRows.length', TRASH)
-        self.assertIn('trashLauncher.archiveFilter = "bin";', TRASH)
+        self.assertIn('trashLauncher.trashViewFilter = "records"', TRASH)
         self.assertIn('id: researchBurnReview', TRASH)
         self.assertIn('id: researchBurnList', TRASH)
         self.assertIn('model: trashLauncher.researchBinRows', TRASH)

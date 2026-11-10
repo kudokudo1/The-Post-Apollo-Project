@@ -74,6 +74,37 @@ Item {
                 font.pixelSize: 12
                 color: Colors.cyan
             }
+            Row {
+                width: parent.width
+                height: visible ? 34 : 0
+                spacing: 6
+                visible: pane.showClockPreview && pane.dockFormatAvailable
+                GohuText {
+                    width: Math.max(0, parent.width - 132 - 2 * parent.spacing)
+                    height: parent.height
+                    verticalAlignment: Text.AlignVCenter
+                    text: "DOCK // FORMAT"
+                    color: Colors.cyan
+                    font.pixelSize: 11
+                }
+                TimeActionButton {
+                    actionRole: "time"
+                    width: 66
+                    height: 32
+                    label: "12H"
+                    selected: !pane.dock24Hour
+                    onLeftClicked: pane.dockFormatRequested(false)
+                }
+                TimeActionButton {
+                    actionRole: "time"
+                    width: 66
+                    height: 32
+                    label: "24H"
+                    selected: pane.dock24Hour
+                    onLeftClicked: pane.dockFormatRequested(true)
+                }
+            }
+
             GohuText {
                 width: parent.width
                 wrapMode: Text.WordWrap
@@ -433,18 +464,37 @@ Item {
                             font.pixelSize: 10
                             wrapMode: Text.WordWrap
                         }
-                        TimeActionButton {
+                        Row {
                             width: parent.width
                             height: 34
-                            actionRole: "sync"
-                            label: TimeSettings.autoCheckEnabled
-                                   ? "AUTO CHECK ON" : "AUTO CHECK OFF"
-                            labelPixelSize: 10
-                            selected: TimeSettings.autoCheckEnabled
-                            available: TimeSettings.autoCheckCanEdit
-                            onLeftClicked: {
-                                TimeSettings.setAutoCheckEnabled(
-                                    !TimeSettings.autoCheckEnabled);
+                            spacing: 6
+                            TimeActionButton {
+                                width: pane.settingsSection === "all"
+                                       ? parent.width : (parent.width - parent.spacing) / 2
+                                height: 34
+                                actionRole: "sync"
+                                label: TimeSettings.autoCheckEnabled
+                                       ? "AUTO CHECK ON" : "AUTO CHECK OFF"
+                                labelPixelSize: 9
+                                selected: TimeSettings.autoCheckEnabled
+                                available: TimeSettings.autoCheckCanEdit
+                                onLeftClicked: {
+                                    TimeSettings.setAutoCheckEnabled(
+                                        !TimeSettings.autoCheckEnabled);
+                                }
+                            }
+                            TimeActionButton {
+                                id: resyncDialButton
+                                width: (parent.width - parent.spacing) / 2
+                                height: 34
+                                visible: pane.settingsSection !== "all"
+                                actionRole: "sync"
+                                label: "⟳ RESYNC"
+                                labelPixelSize: 10
+                                available: pane.showResyncTrigger
+                                           && TimeSettings.resyncStatus !== "working"
+                                           && !TimeSettings.resyncAuthPending
+                                onLeftClicked: TimeSettings.prepareResync()
                             }
                         }
                         GohuText {
@@ -510,7 +560,8 @@ Item {
 
             Row {
                 width: parent.width
-                height: 32
+                visible: pane.settingsSection === "all"
+                height: visible ? 32 : 0
                 spacing: 6
 
                 GohuText {

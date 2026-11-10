@@ -316,19 +316,16 @@ C4B_C3B_DIR_DIAG
     fail "C4D_PRODUCER_DIRECTORY_UNSAFE"
   c4d_record="$c4d_record_dir/observation.txt"
   umask 077
-  # Capture the verifier's REAL stdout into the protected 0600 file
-  # directly, using noclobber so neither a pre-existing path nor a symlink
-  # can be overwritten. The old extra tee pipeline yielded an empty record
-  # in the real guest. The later strictly validating relay, not this shell,
-  # decides what diagnostic bytes may reach ttyS0. The verifier's exit code
-  # remains authoritative; an empty capture cannot grant host trust.
+  # The same verifier writes the one bounded report using exclusive,
+  # nofollow creation in a root-only directory. Actual Silverblue tests
+  # showed the previous successful verifier's shell stdout capture was
+  # EMPTY immediately, so that transport cannot be relied upon.
   [[ ! -e "$c4d_record" && ! -L "$c4d_record" ]] ||
     fail "C4D_PRODUCER_RECORD_PREEXISTS"
-  set -C
   GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1 \
     timeout --signal=TERM --kill-after=5s 60s "$python" -I -B - \
-      "$pid" "$assets/c3d-status.rpm" > "$c4d_record" <<'C4B_RUNNING_HOST_PROBE' ||
-    { set +C; fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"; }
+      "$pid" "$assets/c3d-status.rpm" "$c4d_record" <<'C4B_RUNNING_HOST_PROBE' ||
+    fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"
 import grp, hashlib, json, os, pwd, re, stat, subprocess, sys
 from pathlib import Path
 
@@ -393,12 +390,50 @@ def hash_root_file(path, expected_mode, limit):
     finally:
         if fd is not None: os.close(fd)
 
+def write_private_report(path, record):
+    # No second observer or grant: only the original signed-process probe.
+    # Enforce exact root-only directory and single regular report inode.
+    parent = "/run/postapollo-c4d-observation"
+    if os.geteuid() != 0 or path != parent + "/observation.txt":
+        refuse("C4D_REPORT_PATH_REFUSED")
+    pst = os.lstat(parent)
+    if (not stat.S_ISDIR(pst.st_mode) or pst.st_uid != 0 or pst.st_gid != 0
+            or stat.S_IMODE(pst.st_mode) != 0o700):
+        refuse("C4D_REPORT_DIRECTORY_REFUSED")
+    raw = (record + "\\n").encode("ascii", "strict")
+    if (not raw.startswith(b"C4B_OBSERVED // {")
+            or len(raw) > 2048 or raw.count(b"\\n") != 1):
+        refuse("C4D_REPORT_BOUND_REFUSED")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                 os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    try:
+        before = os.fstat(fd)
+        if (not stat.S_ISREG(before.st_mode) or before.st_uid != 0
+                or before.st_gid != 0 or before.st_nlink != 1
+                or stat.S_IMODE(before.st_mode) != 0o600
+                or before.st_size != 0):
+            refuse("C4D_REPORT_FILE_REFUSED")
+        written = 0
+        while written < len(raw):
+            count = os.write(fd, raw[written:])
+            if count <= 0:
+                refuse("C4D_REPORT_WRITE_REFUSED")
+            written += count
+        os.fsync(fd)
+        after = os.fstat(fd)
+        if ((before.st_dev, before.st_ino) != (after.st_dev, after.st_ino)
+                or after.st_size != len(raw)
+                or after.st_nlink != 1):
+            refuse("C4D_REPORT_WRITE_INTEGRITY_REFUSED")
+    finally:
+        os.close(fd)
+
 def observe():
     if (os.geteuid() != 0 or os.environ.get("GITHUB_ACTIONS") != "true"
             or os.environ.get("POST_APOLLO_C4B_TEST_GUEST") != "1"
             or not Path("/run/ostree-booted").exists()):
         refuse("DISPOSABLE_SILVERBLUE_SCOPE_REFUSED")
-    if len(sys.argv) != 3 or not sys.argv[1].isdecimal():
+    if len(sys.argv) != 4 or not sys.argv[1].isdecimal():
         refuse("PROCESS_ID_ARGUMENT_REFUSED")
     pid = int(sys.argv[1])
     rpm = sys.argv[2]
@@ -488,7 +523,7 @@ def observe():
             or Path(f"/proc/{pid}/cmdline").read_bytes() != raw or
             hash_root_file(rpm, 0o600, 4 * 1024 * 1024)[0] != package_sha):
         refuse("SIGNED_SERVICE_CHANGED_DURING_OBSERVATION")
-    return dict(schema="postapollo.connections.c4b-booted-signed-host-observation.v1",
+    value = dict(schema="postapollo.connections.c4b-booted-signed-host-observation.v1",
                 signed_rpm_sha256=package_sha, signed_script_sha256=script_sha,
                 running_script_sha256=script_sha, interpreter_sha256=h.hexdigest(),
                 service_pid=pid, dbus_owner_pid=pid, process_start_ticks=tick,
@@ -497,6 +532,10 @@ def observe():
                 evidenceCryptographicallyAttested=False, hostAuthenticated=False,
                 canApprove=False, credentialActionsEnabled=False,
                 productionAuthority=False)
+    write_private_report(
+        sys.argv[3], "C4B_OBSERVED // " +
+        json.dumps(value, sort_keys=True, separators=(",", ":")))
+    return value
 
 try:
     print("C4B_OBSERVED // " + json.dumps(observe(), sort_keys=True, separators=(",", ":")),
@@ -506,7 +545,6 @@ except (Refused, OSError, KeyError, ValueError, UnicodeError) as exc:
           (str(exc) if isinstance(exc, Refused) else type(exc).__name__), flush=True)
     sys.exit(2)
 C4B_RUNNING_HOST_PROBE
-  set +C
   # Status-only diagnostics, never echo the producer's unvalidated bytes.
   # Distinguish a genuinely empty stdout capture from later file replacement.
   if [[ -s "$c4d_record" ]]; then

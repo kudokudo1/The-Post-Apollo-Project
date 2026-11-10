@@ -102,7 +102,9 @@ def transcribe_chunk(stt_helper: str, audio: bytes) -> str:
     return clean_transcript(result.stdout)
 
 
-def live(stt_helper: str) -> int:
+def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
+         vad: bool = False, threshold: int = 600,
+         silence_ms: int = 2200, min_speech_ms: int = 250) -> int:
     if not Path(stt_helper).is_file():
         print(packet("error", detail="LOCAL WHISPER HELPER UNAVAILABLE"),
               flush=True)
@@ -167,8 +169,12 @@ def live(stt_helper: str) -> int:
     def capture():
         pending = bytearray()
         received = 0
-        target = RATE * FRAME_BYTES * CHUNK_SECONDS
+        # Shorter phrases can be shown sooner without changing Manage's default.
+        target = RATE * FRAME_BYTES * max(2, min(4, chunk_seconds))
         limit = RATE * FRAME_BYTES * MAX_SECONDS
+        heard_speech = False
+        speech_ms = 0
+        quiet_ms = 0
 
         def enqueue(raw):
             if not raw or not is_speech(raw):
@@ -188,10 +194,28 @@ def live(stt_helper: str) -> int:
                     break
                 pending.extend(data)
                 received += len(data)
+                if vad:
+                    samples = array.array("h")
+                    samples.frombytes(data[:len(data) - len(data) % 2])
+                    if sys.byteorder != "little":
+                        samples.byteswap()
+                    rms = math.sqrt(sum(int(x) * int(x) for x in samples)
+                                    / max(1, len(samples)))
+                    frame_ms = round(len(data) * 1000 / (RATE * FRAME_BYTES))
+                    if rms >= max(1, threshold):
+                        speech_ms += frame_ms
+                        quiet_ms = 0
+                        if speech_ms >= max(100, min_speech_ms):
+                            heard_speech = True
+                    elif heard_speech:
+                        quiet_ms += frame_ms
+                    else:
+                        speech_ms = 0
                 if len(pending) >= target:
                     enqueue(bytes(pending[:target]))
                     del pending[:target]
-                if received >= limit:
+                if (vad and heard_speech and quiet_ms >= max(300, silence_ms)) \
+                        or received >= limit:
                     stopping.set()
                     halt_child()
                     break
@@ -253,8 +277,15 @@ def live(stt_helper: str) -> int:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("stt_helper")
+    parser.add_argument("--chunk-seconds", type=int, default=CHUNK_SECONDS)
+    parser.add_argument("--vad", action="store_true")
+    parser.add_argument("--threshold", type=int, default=600)
+    parser.add_argument("--silence-ms", type=int, default=2200)
+    parser.add_argument("--min-speech-ms", type=int, default=250)
     args = parser.parse_args()
-    return live(args.stt_helper)
+    return live(args.stt_helper, chunk_seconds=args.chunk_seconds,
+                vad=args.vad, threshold=args.threshold,
+                silence_ms=args.silence_ms, min_speech_ms=args.min_speech_ms)
 
 
 if __name__ == "__main__":

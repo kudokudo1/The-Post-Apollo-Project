@@ -1729,13 +1729,19 @@ Column {
             height: 28
             color: Colors.black
             border.width: 1
-            border.color: Colors.magenta
+            border.color: Colors.orange
             TextInput {
                 id: input
                 anchors.fill: parent
                 anchors.leftMargin: 7
                 anchors.rightMargin: 7
-                color: Colors.white
+                color: Colors.magenta
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.black
+                cursorDelegate: Rectangle {
+                    width: 2
+                    color: Colors.orange
+                }
                 font.family: "GohuFont 11 Nerd Font Mono"
                 font.pixelSize: 10
                 selectByMouse: true
@@ -1764,7 +1770,7 @@ Column {
         signal edited()
         width: root.width
         spacing: 3
-        height: editHeight + 27 + (showVoiceLine ? 15 : 0)
+        height: editHeight + 33 + (showVoiceLine ? 15 : 0)
 
         function focusEditorAtEnd() {
             edit.cursorPosition = edit.text.length;
@@ -1773,7 +1779,7 @@ Column {
 
         Row {
             width: managerArea.width
-            height: 24
+            height: 30
             spacing: 5
             GohuText {
                 width: Math.max(50, parent.width - micAction.width
@@ -1785,30 +1791,73 @@ Column {
                 font.pixelSize: 9
                 elide: Text.ElideRight
             }
-            HospitalActionButton {
+            // Reception's talking-person microphone, scaled for the Manage
+            // editor header. Green Omnitrix at rest/recording, orange hover.
+            Rectangle {
                 id: micAction
-                width: managerArea.voiceKey ? 64 : 0
-                height: 24
-                visible: !!managerArea.voiceKey
-                label: "🗣︎"
-                accent: Colors.omnitrix
-                selectedAction: managerArea.voiceActive
-                    && root.speechInputService
-                    && root.speechInputService.recording
-                contentGlowEnabled: false
-                enabledAction: root.active && !!root.speechInputService
+                readonly property bool canAct:
+                    root.active && !!root.speechInputService
                     && (managerArea.voiceActive
                         && root.speechInputService.recording
-                        || (!root.speechInputService.busy
-                            && !root.otherVoiceBusy))
-                onTriggered: root.toggleDictation(managerArea.voiceKey)
+                        || (!root.speechInputService.busy && !root.otherVoiceBusy))
+                width: managerArea.voiceKey ? 36 : 0
+                height: parent.height
+                visible: !!managerArea.voiceKey
+                color: micMouse.pressed ? Colors.black : Colors.dark
+                border.width: (managerArea.voiceActive || micMouse.containsMouse)
+                    ? 2 : 1
+                border.color: managerArea.voiceActive && root.speechInputService
+                    && root.speechInputService.recording
+                    ? Colors.omnitrix
+                    : managerArea.voiceActive && root.speechInputService
+                        && root.speechInputService.busy
+                    ? Colors.orange
+                    : micMouse.containsMouse && canAct
+                    ? Colors.orange : Colors.omnitrix
+                opacity: canAct ? 1.0 : 0.48
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 4
+                    z: -1
+                    opacity: micMouse.containsMouse && micAction.canAct
+                        ? 0.48 : 0.34
+                    color: micMouse.containsMouse && micAction.canAct
+                        ? Colors.orange : Colors.omnitrix
+                }
+
+                GohuText {
+                    anchors.centerIn: parent
+                    anchors.verticalCenterOffset: 1
+                    text: "🗣︎"
+                    font.pixelSize: 22
+                    color: micMouse.containsMouse && micAction.canAct
+                        ? Colors.orange : Colors.omnitrix
+                    layer.enabled: true
+                    layer.effect: DropShadow {
+                        radius: 7
+                        samples: 9
+                        opacity: 0.54
+                        color: micMouse.containsMouse && micAction.canAct
+                            ? Colors.orange : Colors.omnitrix
+                        transparentBorder: true
+                    }
+                }
+                MouseArea {
+                    id: micMouse
+                    anchors.fill: parent
+                    enabled: micAction.canAct
+                    hoverEnabled: true
+                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: root.toggleDictation(managerArea.voiceKey)
+                }
             }
             HospitalActionButton {
                 id: cancelAction
                 visible: managerArea.voiceActive && !!root.speechInputService
                     && root.speechInputService.busy
                 width: visible ? 62 : 0
-                height: 24
+                height: 30
                 label: "CANCEL"
                 accent: Colors.red
                 contentGlowEnabled: false
@@ -1820,12 +1869,18 @@ Column {
             height: managerArea.editHeight
             color: Colors.black
             border.width: 1
-            border.color: Colors.magenta
+            border.color: Colors.orange
             TextEdit {
                 id: edit
                 anchors.fill: parent
                 anchors.margins: 6
-                color: Colors.white
+                color: Colors.magenta
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.black
+                cursorDelegate: Rectangle {
+                    width: 2
+                    color: Colors.orange
+                }
                 font.family: "GohuFont 11 Nerd Font Mono"
                 font.pixelSize: 10
                 wrapMode: TextEdit.Wrap

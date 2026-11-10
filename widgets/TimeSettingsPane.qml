@@ -20,7 +20,8 @@ Item {
     property bool showHostDiagnostics: true
     property bool showResyncDiagnostics: true
     property bool showReferenceExplanation: true
-    property bool showAutoTimeCheck: true
+    // Clock owns the schedule control; shared CPU++ basics remain unchanged.
+    property bool showAutoTimeCheck: showClockPreview
     property bool zonePickerExpanded: false
     readonly property bool zoneSearchFocused: systemZonePicker.searchFocused
 

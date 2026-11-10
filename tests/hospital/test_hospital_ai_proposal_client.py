@@ -57,6 +57,8 @@ class HospitalAiClientTests(unittest.TestCase):
     def test_strict_input(self):
         self.assertEqual(client.parse_input(self.request())[0],
                          "You're my Finance Intern. Inspect FinanceW.")
+        # 3000 non-ASCII characters fit the 4000-character UI limit.
+        self.assertEqual(len(client.parse_input(self.request("🌍" * 3000))[0]), 3000)
         for raw in (
             "", "not json", "[]", "{}", json.dumps({"brief": "hello"}),
             json.dumps({"brief": "x", "requestKey": "bad key"}),

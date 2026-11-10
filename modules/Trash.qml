@@ -1958,7 +1958,7 @@ PanelWindow {
             id: managedResearchBurnConfirm
             anchors.fill: parent
             z: 95
-            visible: trashLauncher.researchBurnId !== ""
+            visible: trashLauncher.burnConfirmationOpen
             color: Colors.black
             radius: 0
             border.width: 2
@@ -1971,16 +1971,20 @@ PanelWindow {
             }
 
             Column {
+                id: burnReviewContent
                 anchors.centerIn: parent
                 width: Math.min(parent.width - 30, 360)
                 spacing: 14
+                visible: trashLauncher.burnUiStage !== "result"
+                         && trashLauncher.burnUiStage !== "error"
 
                 GohuText {
                     width: parent.width
                     font.pixelSize: 17
-                    text: trashLauncher.researchBurnScope === "all"
-                          ? "BURN ALL COPIES // FINAL REVIEW"
-                          : "BURN SAVED COPY // FINAL REVIEW"
+                    text: (trashLauncher.researchBurnScope === "all"
+                           || trashLauncher.confirmMode === "all")
+                          ? "BURN ALL // FINAL REVIEW"
+                          : "BURN ITEM // FINAL REVIEW"
                     color: Colors.red
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
@@ -1996,9 +2000,12 @@ PanelWindow {
                     width: parent.width
                     font.pixelSize: 11
                     color: Colors.yellow
-                    text: trashLauncher.researchBurnScope === "all"
-                          ? "SCOPE // MANAGED BIN ONLY // "
-                            + trashLauncher.researchBurnCount + " COPIES"
+                    text: trashLauncher.confirmMode === "all"
+                          ? "SCOPE // SYSTEM TRASH // " + trashLauncher.confirmCount + " FILES"
+                          : trashLauncher.confirmMode === "item"
+                          ? "SCOPE // ONE SYSTEM TRASH FILE"
+                          : trashLauncher.researchBurnScope === "all"
+                          ? "SCOPE // MANAGED BIN // " + trashLauncher.researchBurnCount + " COPIES"
                           : "SCOPE // ONE TRASH++ MANAGED COPY"
                     wrapMode: Text.WordWrap
                 }
@@ -2008,7 +2015,11 @@ PanelWindow {
                     font.pixelSize: 13
                     color: Colors.white
                     elide: Text.ElideRight
-                    text: trashLauncher.researchBurnTitle
+                    text: trashLauncher.confirmMode === "all"
+                          ? trashLauncher.confirmCount + " SYSTEM TRASH FILES"
+                          : trashLauncher.confirmMode === "item"
+                          ? trashLauncher.confirmName
+                          : trashLauncher.researchBurnTitle
                 }
 
                 GohuText {
@@ -2016,10 +2027,14 @@ PanelWindow {
                     font.pixelSize: 11
                     color: Colors.cyan
                     wrapMode: Text.WordWrap
-                    text: trashLauncher.researchBurnScope === "all"
+                    text: trashLauncher.confirmMode === "all"
+                          ? "This empties Linux Trash across mounts, but never managed copies or source-owned Weather, Hospital or Finance records. GIO rechecks the full index revision."
+                          : trashLauncher.confirmMode === "item"
+                          ? "This permanently removes ONE verified Linux Trash file. Managed copies and source records remain untouched."
+                          : trashLauncher.researchBurnScope === "all"
                           ? "This destroys ONLY " + trashLauncher.researchBurnCount
-                            + " trashed Trash++ managed copies. Active archived copies, GIO system Trash, original Weather events, demo scrapes, Hospital and Finance records are NOT affected. The backend rechecks bin count, revision and record-ID digest."
-                          : "This permanently deletes ONE saved copy from Trash++'s record store. Original Weather events, demo scrape exports, Hospital and Finance records remain untouched. The backend rechecks identity and revision."
+                            + " trashed managed copies. Linux Trash and active copies remain untouched. The backend rechecks count, revision and digest."
+                          : "This permanently deletes ONE managed copy. Original Weather events, research sources, Hospital and Finance records remain untouched."
                 }
 
                 GohuText {
@@ -2043,7 +2058,8 @@ PanelWindow {
                         HoverHandler {
                             id: managedResearchArrival
                             onHoveredChanged: {
-                                if (hovered && trashLauncher.researchBurnId !== "")
+                                if (hovered && trashLauncher.burnConfirmationOpen
+                                        && trashLauncher.burnUiStage === "")
                                     trashLauncher.researchBurnPointerRelocated = true;
                             }
                         }
@@ -2076,14 +2092,24 @@ PanelWindow {
                             selectedBorderColor: Colors.red
                             keyboardSelectedBorderColor: Colors.red
 
-                            // No wash or glow on an available confirm control.
+                            // Opaque black in idle. A brief magenta halo marks
+                            // the committed click before irreversible backend IO.
+                            selected: trashLauncher.burnUiStage === "clicked"
+                            selectedBorderWidth: 2
+                            selectedBorderColor: Colors.magenta
                             contentGlowEnabled: false
                             softGlowEnabled: false
-                            wideGlowEnabled: false
-                            available: !trashLauncher.researchBusy
-                                       && trashLauncher.researchBurnId !== ""
-                                       && trashLauncher.researchBurnRevision
-                                          === trashLauncher.researchRevision
+                            wideGlowEnabled: trashLauncher.burnUiStage === "clicked"
+                            wideGlowSelectedOpacity: 0.36
+                            selectedWideGlowColor: Colors.magenta
+                            unavailableOpacity: 1.0
+                            available: !trashLauncher.busy
+                                       && !trashLauncher.researchBusy
+                                       && trashLauncher.burnUiStage === ""
+                                       && trashLauncher.burnConfirmationOpen
+                                       && (trashLauncher.confirmMode !== ""
+                                           || trashLauncher.researchBurnRevision
+                                              === trashLauncher.researchRevision)
                             onLeftClicked: trashLauncher.advanceResearchBurn()
 
                             Item {
@@ -2093,7 +2119,11 @@ PanelWindow {
                                     trashLauncher.researchBurnClickArmed
                                     && !trashLauncher.researchBurnLoadComplete
                                 readonly property string displayedLabel:
-                                    !trashLauncher.researchBurnPointerRelocated
+                                    trashLauncher.burnUiStage === "clicked"
+                                    ? "CONFIRMING..."
+                                    : trashLauncher.burnUiStage === "working"
+                                    ? "BURNING..."
+                                    : !trashLauncher.researchBurnPointerRelocated
                                     ? "MOVE HERE TO ARM"
                                     : !trashLauncher.researchBurnClickArmed
                                     ? "CLICK TO ARM"
@@ -2167,7 +2197,8 @@ PanelWindow {
                         label: "CANCEL // SAFE"
                         labelPixelSize: 10
                         accentColor: Colors.cyan
-                        onLeftClicked: trashLauncher.clearResearchBurn()
+                        available: trashLauncher.burnUiStage === ""
+                        onLeftClicked: trashLauncher.dismissBurnReceipt()
                     }
                 }
 

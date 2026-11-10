@@ -241,7 +241,6 @@ class CallingSetupGuiTests(unittest.TestCase):
 
     def test_not_missing_or_forged_grant_blocks_any_launch(self):
         cases = [
-            evidence(state="SERVICE_STOPPED", package="INSTALLED", serviceLoad="loaded"),
             evidence(state="SERVICE_UNIT_MISSING", package="UNKNOWN"),
             evidence(state="SERVICE_FAILED"), evidence(package="UNKNOWN"),
             evidence(serviceLoad="loaded"), {}, None, [],
@@ -257,6 +256,44 @@ class CallingSetupGuiTests(unittest.TestCase):
                     find=programs(), launcher=launcher, already_open=lambda: False)
                 self.locked(result)
                 self.assertIn(result["status"], ("NOT_APPLICABLE", "DIAGNOSIS_UNAVAILABLE"))
+                launcher.assert_not_called()
+
+    def test_installed_ofono_hfp_uses_same_terminal_even_outside_fedora(self):
+        launcher = mock.Mock()
+        view = evidence(state="SERVICE_STOPPED", package="INSTALLED",
+                        serviceLoad="loaded", serviceActive="inactive")
+        result = gui.open_support(
+            prerequisite=lambda: view, is_fedora=lambda: False,
+            find=programs(), launcher=launcher, already_open=lambda: False)
+        self.locked(result)
+        self.assertEqual(result["status"], "STAGED_TERMINAL_REQUESTED")
+        argv = launcher.call_args.args[0]
+        self.assertEqual(argv[-2:], [
+            str(FILE.with_name("PhoneHfpSetupSession.py")), "--interactive-hfp"])
+        self.assertEqual(argv[2], gui.INSTALL_APP_ID)
+
+    def test_rpm_unknown_but_loaded_oFono_service_can_use_hfp(self):
+        launcher = mock.Mock()
+        view = evidence(state="AUDIO_PATH_UNVERIFIED", package="UNKNOWN",
+                        serviceLoad="loaded", serviceActive="active")
+        result = gui.open_support(
+            prerequisite=lambda: view, is_fedora=lambda: False,
+            find=programs(), launcher=launcher, already_open=lambda: False)
+        self.locked(result)
+        self.assertEqual(result["status"], "STAGED_TERMINAL_REQUESTED")
+        self.assertEqual(launcher.call_args.args[0][-1], "--interactive-hfp")
+
+    def test_masked_or_failed_service_never_launches_setup(self):
+        for state in ("SERVICE_MASKED", "SERVICE_FAILED", "SERVICE_UNIT_MISSING",
+                      "DBUS_NAME_MISSING", "SERVICE_STARTING"):
+            with self.subTest(state=state):
+                launcher = mock.Mock()
+                view = evidence(state=state, package="INSTALLED",
+                                serviceLoad="loaded", serviceActive="failed")
+                result = gui.open_support(
+                    prerequisite=lambda: view, is_fedora=lambda: False,
+                    find=programs(), launcher=launcher, already_open=lambda: False)
+                self.assertEqual(result["status"], "NOT_APPLICABLE")
                 launcher.assert_not_called()
 
     def test_only_fedora_is_supported(self):

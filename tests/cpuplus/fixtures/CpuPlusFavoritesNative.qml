@@ -566,6 +566,20 @@ ShellRoot {
             }
             const row=selector.favoriteRowRepeater.itemAt(0);
             if(!row) return;
+            // U9f // Test the REAL painted native row rather than only a
+            // source-string convention. This fixture begins selected.
+            function near(actual,expected) {
+                return Math.abs(actual-expected/255)<0.015;
+            }
+            if(!row.isOpen || row.isHovered
+                    || !near(row.color.r,242) || !near(row.color.g,190)
+                    || !near(row.color.b,78)
+                    || !near(row.border.color.r,199)
+                    || !near(row.border.color.g,78)
+                    || !near(row.border.color.b,199)) {
+                root.fail("U9F_OPEN_ROW_PALETTE");return;
+            }
+            console.log("U9F_PASS // OPEN_YELLOW_MAGENTA_ROW");
             root.ready=true;
             // Click the LEFT TEXT AREA, far from the former VIEW button.
             // This verifies the complete row now owns selection.

@@ -982,12 +982,14 @@ Rectangle {
         }
 
         StationSectionDivider {
+            objectName: "home-w3-sources-title"
             visible: home.sourcesWorkspace
             width: parent.width
             title: "SOURCES // LIVE RUNTIME + PROVIDER HEALTH"
         }
 
         StationRuntimeRack {
+            objectName: "home-w3-sources-runtime"
             visible: home.sectionVisible("runtime")
             width: parent.width
             rows: home.runtimeRows
@@ -1551,6 +1553,7 @@ Rectangle {
         Grid {
             visible: home.sectionVisible("health")
             id: sourceHealthGrid
+            objectName: "home-w3-sources-health"
             width: parent.width
             columns: 3
             columnSpacing: 12

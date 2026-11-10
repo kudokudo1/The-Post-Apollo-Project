@@ -8,6 +8,10 @@ on:
       - "services/hospital/HospitalWorkforceManagerPolicy.js"
       - "services/hospital/HospitalGitHubOwnerPolicy.js"
       - "services/hospital/HospitalConversationIntakePolicy.js"
+      - "services/hospital/HospitalAiProposalService.qml"
+      - "services/hospital/hospital_ai_proposal_client.py"
+      - "tests/hospital/test_hospital_ai_proposal_client.py"
+      - "tests/hospital/test_hospital_ai_intake_ui_contracts.py"
       - "tests/hospital/test_conversation_intake_policy.js"
       - "tests/hospital/test_conversation_intake_ui_contracts.py"
       - "services/hospital/HospitalGitHubOwnerService.qml"
@@ -26,6 +30,10 @@ on:
       - "services/hospital/HospitalWorkforceManagerPolicy.js"
       - "services/hospital/HospitalGitHubOwnerPolicy.js"
       - "services/hospital/HospitalConversationIntakePolicy.js"
+      - "services/hospital/HospitalAiProposalService.qml"
+      - "services/hospital/hospital_ai_proposal_client.py"
+      - "tests/hospital/test_hospital_ai_proposal_client.py"
+      - "tests/hospital/test_hospital_ai_intake_ui_contracts.py"
       - "tests/hospital/test_conversation_intake_policy.js"
       - "tests/hospital/test_conversation_intake_ui_contracts.py"
       - "services/hospital/HospitalGitHubOwnerService.qml"
@@ -52,11 +60,14 @@ jobs:
           node tests/hospital/test_surgery_github_owner_policy.js
           node --check services/hospital/HospitalConversationIntakePolicy.js
           node tests/hospital/test_conversation_intake_policy.js
+          python3 -m py_compile services/hospital/hospital_ai_proposal_client.py
+          python3 tests/hospital/test_hospital_ai_proposal_client.py
       - name: Verify embedded Surgery manager and existing UX contract
         run: |
           python3 tests/hospital/test_surgery_inline_workforce_ui_contracts.py
           python3 tests/hospital/test_surgery_github_owner_ui_contracts.py
           python3 tests/hospital/test_conversation_intake_ui_contracts.py
+          python3 tests/hospital/test_hospital_ai_intake_ui_contracts.py
           python3 tests/hospital/test_workforce_roster_ui_contracts.py
           python3 tests/hospital/test_worker_identity_editor_contracts.py
           python3 tests/hospital/test_registered_worker_routes.py

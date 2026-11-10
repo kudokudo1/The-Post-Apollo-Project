@@ -125,11 +125,21 @@ Rectangle {
             refreshPhoneAudioControls();
             return;
         }
-        if (callPrerequisiteCheck !== "CHECKED"
-                || callPrerequisiteReport.state !== "PACKAGE_NOT_INSTALLED"
-                || callPrerequisiteReport.package !== "NOT_INSTALLED"
-                || callPrerequisiteReport.serviceLoad !== "not-found")
+        if (callPrerequisiteCheck !== "CHECKED")
             return;
+        if (callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED") {
+            if (callPrerequisiteReport.package !== "NOT_INSTALLED"
+                    || callPrerequisiteReport.serviceLoad !== "not-found")
+                return;
+        } else if (callPrerequisiteReport.state !== "SERVICE_STOPPED"
+                   && callPrerequisiteReport.state !== "AUDIO_PATH_UNVERIFIED") {
+            return;
+        } else if (callPrerequisiteReport.serviceLoad !== "loaded"
+                   || (callPrerequisiteReport.serviceActive !== "active"
+                       && callPrerequisiteReport.serviceActive !== "inactive")
+                   || callPrerequisiteReport.package === "NOT_INSTALLED") {
+            return;
+        }
         if (!stageHoleValid) {
             // Never launch a terminal behind an unusably small Social panel.
             callSetupStatus = "STAGE_BAY_TOO_SMALL";
@@ -150,7 +160,7 @@ Rectangle {
             return "Opening the oFono installer in PHONE...";
         if (callSetupStatus === "STAGED_TERMINAL_REQUESTED"
                 || callSetupStatus === "STAGED_TERMINAL_EXISTING")
-            return "Fedora's interactive installer runs in the PHONE terminal below. Use FOCUS TERMINAL if typing fails; after the command finishes, the terminal closes automatically. An active transaction is never killed by closing PHONE. Social has not assumed installation succeeded.";
+            return "Fedora's interactive installer runs in the PHONE terminal for missing oFono. Once installed, guided systemd and WirePlumber HFP setup uses the same PHONE terminal. Use FOCUS TERMINAL if typing fails; after the command finishes, the terminal closes automatically. An active transaction is never killed by closing PHONE. Social has not assumed installation succeeded or calling is ready.";
         if (callSetupStatus === "GUI_OPEN_REQUESTED")
             return "A native PackageKit installer was requested. Review and approve it there, then choose CHECK AGAIN. No installation was confirmed by Social.";
         if (callSetupStatus === "RECHECKING")
@@ -158,7 +168,9 @@ Rectangle {
         if (callSetupStatus === "INSTALL_NOT_CONFIRMED")
             return "oFono is still reported missing. On Silverblue, an rpm-ostree install is not active until a separately approved reboot. Check rpm-ostree status before retrying setup. No audio changes were made by Social.";
         if (callSetupStatus === "FOLLOWUP_REQUIRED")
-            return "Package check completed. The next step is shown below. CHECK AGAIN updates the existing service and call statuses without changing audio. On Silverblue, complete the separate reboot before expecting oFono to appear.";
+            return "Setup session ended. CHECK AGAIN refreshes prerequisites. Silverblue requires a separate reboot after package installation; service and HFP changes require separate confirmations.";
+        if (callSetupStatus === "READY_TO_CONTINUE")
+            return "oFono is installed. FINISH CALLING SETUP reviews service, user D-Bus access and the WirePlumber HFP backend. Each change needs a separate confirmation; CALLS ON PC remains a separate opt-in.";
         if (callSetupStatus === "STAGE_BAY_TOO_SMALL")
             return "PHONE is too small for an interactive installer. Enlarge the Social panel and try SET UP CALLING again. No external window was opened.";
         if (callSetupStatus === "TERMINAL_UNAVAILABLE")
@@ -184,12 +196,13 @@ Rectangle {
 
     // Explain the existing sanitized statuses without claiming verified audio.
     function callProgressText() {
-        if (callSetupStatus !== "FOLLOWUP_REQUIRED"
+        if ((callSetupStatus !== "FOLLOWUP_REQUIRED"
+                && callSetupStatus !== "READY_TO_CONTINUE")
                 || callPrerequisiteCheck !== "CHECKED")
             return "";
         var stage = callPrerequisiteReport.state;
         if (stage === "SERVICE_STOPPED")
-            return "oFono is installed, but its system service is stopped. It needs separately approved system-audio setup; PHONE will not start it automatically.";
+            return "oFono is installed but stopped. FINISH CALLING SETUP can request a one-time, separately approved service start; nothing starts automatically.";
         if (stage === "SERVICE_FAILED" || stage === "SERVICE_MASKED")
             return "oFono's service needs system-audio repair before calling. Your existing phone pairing and media settings remain untouched.";
         if (stage === "SERVICE_UNIT_MISSING" || stage === "INSPECTION_UNAVAILABLE")
@@ -246,7 +259,7 @@ Rectangle {
         if (state === "SERVICE_FAILED")
             return "The oFono service exists but failed to start. The system audio setup needs repair. No changes were made.";
         if (state === "SERVICE_STOPPED")
-            return "oFono is installed as a service but is stopped. It must be started through an approved system setup before calls can use this computer.";
+            return "oFono is installed as a service but is stopped. FINISH CALLING SETUP offers a reviewed, one-time system service start.";
         if (state === "SERVICE_STARTING")
             return "oFono is changing state. Wait until it is stable and check again. No audio changes were made.";
         if (state === "DBUS_NAME_MISSING")
@@ -1878,7 +1891,8 @@ Rectangle {
                     if (phonePane.callSetupStatus === "RECHECKING") {
                         phonePane.callSetupStatus = r.state === "PACKAGE_NOT_INSTALLED"
                                                     ? "INSTALL_NOT_CONFIRMED"
-                                                    : "FOLLOWUP_REQUIRED";
+                                                    : ["SERVICE_STOPPED", "AUDIO_PATH_UNVERIFIED"].indexOf(r.state) >= 0
+                                                      ? "READY_TO_CONTINUE" : "FOLLOWUP_REQUIRED";
                     }
                 } catch (error) {
                     phonePane.callPrerequisiteReport = ({});
@@ -3369,12 +3383,17 @@ Rectangle {
                         height: 36
                         visible: phonePane.callPrerequisiteCheck === "CHECKED"
                                  && (phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
-                                     || phonePane.callSetupStatus === "FOLLOWUP_REQUIRED")
+                                     || phonePane.callPrerequisiteReport.state === "SERVICE_STOPPED"
+                                     || phonePane.callPrerequisiteReport.state === "AUDIO_PATH_UNVERIFIED"
+                                     || phonePane.callSetupStatus === "FOLLOWUP_REQUIRED"
+                                     || phonePane.callSetupStatus === "READY_TO_CONTINUE")
                         label: phonePane.callSetupStatus === "GUI_OPEN_REQUESTED"
                                || phonePane.callSetupStatus === "FOLLOWUP_REQUIRED"
                                ? "CHECK AGAIN"
                                : phonePane.callSetupStatus === "INSTALL_NOT_CONFIRMED"
-                                 ? "RETRY SETUP" : "SET UP CALLING"
+                                 ? "RETRY SETUP"
+                                 : phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
+                                   ? "SET UP CALLING" : "FINISH CALLING SETUP"
                         labelPixelSize: 10
                         accentColor: Colors.magenta
                         interactive: !callSetupProcess.running
@@ -3389,6 +3408,16 @@ Rectangle {
                         visible: installCallingSupport.visible
                                  && phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
                         text: "Only oFono. Review and confirm the Fedora package transaction inside PHONE. Social never approves it automatically. Silverblue stages a new deployment; reboot is a separate action, never automatic."
+                        color: Colors.white
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: installCallingSupport.visible
+                                 && phonePane.callPrerequisiteReport.state !== "PACKAGE_NOT_INSTALLED"
+                        text: "For an installed oFono service on systemd + WirePlumber 0.5+, review each step in the PHONE terminal. Setup never silently starts a service, overwrites HFP settings or enables calls. Other Linux package managers need their own installer."
                         color: Colors.white
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap
@@ -3493,14 +3522,14 @@ Rectangle {
                     visible: phonePane.stageWanted || phonePane.stageState === "UNAVAILABLE" || phonePane.stageState === "FINISHED"
                     text: phonePane.stageState === "ALIGNED"
                           ? (phonePane.stagePurpose === "OFONO"
-                             ? "OFONO INSTALL // TERMINAL BELOW"
+                             ? "CALLING SETUP // TERMINAL BELOW"
                              : "BLUEFERRY SETUP // TERMINAL BELOW")
                           : phonePane.stageState === "FINISHED"
                           ? "Terminal closed. Checking the latest provider and package status..."
                           : phonePane.stageState === "UNAVAILABLE"
                           ? "Stage placement could not be verified. The terminal may remain external; no phone or audio change was made by Social."
                           : phonePane.stagePurpose === "OFONO"
-                          ? "Placing Fedora's interactive installer inside PHONE. Review its transaction and confirmation."
+                          ? "Placing the calling setup terminal inside PHONE. Review each change and approve it separately."
                           : "Placing BlueFerry's terminal inside the PHONE workspace..."
                     color: Colors.orange
                     font.pixelSize: 10

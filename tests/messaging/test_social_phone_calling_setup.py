@@ -19,7 +19,7 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('label: phonePane.callSetupStatus === "GUI_OPEN_REQUESTED"', self.ui)
         self.assertIn('|| phonePane.callSetupStatus === "FOLLOWUP_REQUIRED"', self.ui)
         self.assertIn('? "CHECK AGAIN"', self.ui)
-        self.assertIn('? "RETRY SETUP" : "SET UP CALLING"', self.ui)
+        self.assertIn('? "RETRY SETUP"', self.ui)
         self.assertIn('onTriggered: phonePane.callingSupportSetup()', self.ui)
         self.assertIn('callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"', self.ui)
         self.assertIn('id: connectPhoneAction', self.ui)
@@ -37,7 +37,7 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('setupState !== "CHECKED"', action)
         self.assertIn('callPrerequisiteReport.package !== "NOT_INSTALLED"', action)
         self.assertIn('callPrerequisiteReport.serviceLoad !== "not-found"', action)
-        self.assertIn('callPrerequisiteReport.state !== "PACKAGE_NOT_INSTALLED"', action)
+        self.assertIn('callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"', action)
         self.assertIn('callSetupProcess.running = true;', action)
         self.assertIn('PhoneCallingSetupHandoff.py', action)
         self.assertIn('"--open-ofono"', action)
@@ -58,7 +58,7 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('|| phonePane.callSetupStatus === "FOLLOWUP_REQUIRED"',
                       control)
         self.assertIn('? "CHECK AGAIN"', control)
-        self.assertIn('? "RETRY SETUP" : "SET UP CALLING"', control)
+        self.assertIn('? "RETRY SETUP"', control)
         self.assertEqual(self.ui.count('id: installCallingSupport'), 1)
         self.assertEqual(self.ui.count('id: connectPhoneAction'), 1)
 
@@ -70,9 +70,18 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('callSetupStatus = "RECHECKING";', action)
         self.assertIn('diagnoseCallPrerequisites();', action)
         self.assertIn('refreshPhoneAudioControls();', action)
-        self.assertIn('callPrerequisiteReport.state !== "PACKAGE_NOT_INSTALLED"',
+        self.assertIn('callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"',
                       action)
         self.assertIn('callSetupProcess.running = true;', action)
+
+    def test_same_button_progresses_to_guarded_portable_hfp_setup(self):
+        self.assertIn('callPrerequisiteReport.state === "SERVICE_STOPPED"', self.ui)
+        self.assertIn('callPrerequisiteReport.state === "AUDIO_PATH_UNVERIFIED"', self.ui)
+        self.assertIn('"READY_TO_CONTINUE"', self.ui)
+        self.assertIn('"FINISH CALLING SETUP"', self.ui)
+        self.assertIn('systemd + WirePlumber 0.5+', self.ui)
+        self.assertIn('separate confirmation', self.ui)
+        self.assertEqual(self.ui.count('id: installCallingSupport'), 1)
 
     def test_post_install_status_distinguishes_hfp_states_without_claiming_audio(self):
         start = self.ui.index('function callProgressText()')
@@ -111,7 +120,7 @@ class CallingSetupUiTests(unittest.TestCase):
             '&& phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"',
             text_block)
         self.assertIn('No installation was confirmed by Social.', self.ui)
-        self.assertIn('Package check completed.', self.ui)
+        self.assertIn('Setup session ended.', self.ui)
 
     def test_an_installer_request_is_never_reported_as_installed(self):
         self.assertIn('id: callSetupProcess', self.ui)
@@ -128,7 +137,7 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('r.status === "STAGED_TERMINAL_EXISTING"', self.ui)
         self.assertIn('No installation was confirmed by Social.', self.ui)
         self.assertIn('oFono is still reported missing.', self.ui)
-        self.assertIn('CHECK AGAIN updates the existing service and call statuses', self.ui)
+        self.assertIn('CHECK AGAIN refreshes prerequisites.', self.ui)
 
     def test_fedora_native_approval_and_missing_installer_explained(self):
         self.assertIn("Review and confirm the Fedora package transaction inside PHONE", self.ui)
@@ -179,7 +188,7 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('WeatherStage.StationChassisCutout {', self.ui)
         self.assertIn('result.verifiedHole === true', self.ui)
         self.assertIn('visible: phonePane.stageHoleActive', self.ui)
-        self.assertIn('"OFONO INSTALL // TERMINAL BELOW"', self.ui)
+        self.assertIn('"CALLING SETUP // TERMINAL BELOW"', self.ui)
         self.assertIn('phonePane.callSetupStatus = "RECHECKING";', self.ui)
         self.assertIn('phonePane.diagnoseCallPrerequisites();', self.ui)
         self.assertIn('phonePane.refreshPhoneAudioControls();', self.ui)
@@ -225,7 +234,7 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('pkexec = trusted_program("pkexec", find=find)', self.helper)
         self.assertIn('dnf5 = trusted_dnf5(find=find)', self.helper)
         self.assertIn('from PhoneInstallCommandDiscovery import (', self.helper)
-        self.assertIn('backend_ready = bool(pkcon or (pkexec and dnf5))', self.helper)
+        self.assertIn('backend_ready = True if hfp_needed else bool(pkcon or (pkexec and dnf5))', self.helper)
         for forbidden in ("sudo ", "dnf install", "subprocess.run(",
                           "bluetoothctl pair", "systemctl start", "shell=True",
                           "sendMessage(", "getContacts("):

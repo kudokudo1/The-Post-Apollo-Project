@@ -322,10 +322,12 @@ C4B_C3B_DIR_DIAG
   # EMPTY immediately, so that transport cannot be relied upon.
   [[ ! -e "$c4d_record" && ! -L "$c4d_record" ]] ||
     fail "C4D_PRODUCER_RECORD_PREEXISTS"
-  GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1 \
+  # The heredoc payload must start immediately on the next line. Placing an
+  # "|| fail" command here previously injected it as Python's line 1 and
+  # incorrectly let the shell report signed-observation success.
+  if GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1 \
     timeout --signal=TERM --kill-after=5s 60s "$python" -I -B - \
-      "$pid" "$assets/c3d-status.rpm" "$c4d_record" <<'C4B_RUNNING_HOST_PROBE' ||
-    fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"
+      "$pid" "$assets/c3d-status.rpm" "$c4d_record" <<'C4B_RUNNING_HOST_PROBE'
 import grp, hashlib, json, os, pwd, re, stat, subprocess, sys
 from pathlib import Path
 from functools import lru_cache
@@ -550,6 +552,13 @@ except (Refused, OSError, KeyError, ValueError, UnicodeError) as exc:
           (str(exc) if isinstance(exc, Refused) else type(exc).__name__), flush=True)
     sys.exit(2)
 C4B_RUNNING_HOST_PROBE
+  then
+    : # The verifier completed and created its own exclusive report file.
+  else
+    fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"
+  fi
+  [[ -s "$c4d_record" ]] ||
+    fail "C4D_PRODUCER_RECORD_EMPTY_AFTER_VERIFIER"
   # Status-only diagnostics, never echo the producer's unvalidated bytes.
   # Distinguish a genuinely empty stdout capture from later file replacement.
   if [[ -s "$c4d_record" ]]; then

@@ -115,10 +115,11 @@ Scope {
             lastTranscript = sentence;
             liveTextReady(sentence);
         } else if (data.kind === "done") {
+            // Keep the microphone busy until the owned child fully exits;
+            // otherwise a second click can race against the old process.
             doneSeen = true;
             clock.stop();
-            voiceState = backendReady ? "idle" : "unavailable";
-            liveFinished();
+            voiceState = "stopping";
         } else if (data.kind === "error") {
             lastError = String(data.detail || "LOCAL DICTATION FAILED").slice(0,160);
             voiceError(lastError);
@@ -167,6 +168,10 @@ Scope {
             root.recordingElapsedSeconds = 0;
             root.voiceState = root.backendReady ? "idle" : "unavailable";
             root.clockStop();
+            if (root.doneSeen) {
+                root.liveFinished();
+                return;
+            }
             if (!root.doneSeen) {
                 root.lastError = Number(code) === 0
                     ? "LIVE DICTATION ENDED WITHOUT FINAL RECEIPT"

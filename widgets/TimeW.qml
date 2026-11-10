@@ -6854,19 +6854,22 @@ PanelWindow {
             }
         }
 
-        // Above the mode strip and page; anchored to the ⟳ header control.
-        // The popover calls the same TimeSettings actions as SETTINGS below.
+        // Above the mode strip, directly below the rightmost ⟳ and ×
+        // header controls. Right-align to ×, not to ⟳, so the popup stays
+        // visually attached to the full control pair instead of floating
+        // towards the middle. Outside-click detection maps the actual bounds.
         TimeResyncPopup {
             id: resyncPopup
             z: 100
             visible: timew.menuOpen && timew.resyncPopupOpen
             x: {
-                const at = syncButton.mapToItem(timewFrame, 0, 0);
+                const close = closeButton.mapToItem(timewFrame, 0, 0);
+                const rightEdge = close.x + closeButton.width;
                 return Math.max(8, Math.min(timewFrame.width - width - 8,
-                                            at.x + syncButton.width - width));
+                                            rightEdge - width));
             }
-            y: syncButton.mapToItem(timewFrame, 0, 0).y
-               + syncButton.height + 7
+            y: closeButton.mapToItem(timewFrame, 0, 0).y
+               + closeButton.height + 7
             onCloseRequested: timew.dismissResyncPopup()
         }
     }

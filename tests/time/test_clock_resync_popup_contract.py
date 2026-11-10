@@ -82,6 +82,41 @@ class TimeResyncPopupContracts(unittest.TestCase):
         self.assertIn("width: 308", POPUP)
         self.assertIn("height: 320", POPUP)
 
+    def test_popup_is_right_anchored_beneath_both_header_buttons(self):
+        placement = TIMEW.split("TimeResyncPopup {", 1)[1].split(
+            "onCloseRequested:", 1)[0]
+        self.assertIn("const close = closeButton.mapToItem(timewFrame, 0, 0);",
+                      placement)
+        self.assertIn("const rightEdge = close.x + closeButton.width;", placement)
+        self.assertIn("rightEdge - width", placement)
+        self.assertIn("timewFrame.width - width - 8", placement)
+        self.assertIn("Math.max(8, Math.min(", placement)
+        self.assertIn("y: closeButton.mapToItem(timewFrame, 0, 0).y", placement)
+        self.assertIn("+ closeButton.height + 7", placement)
+        self.assertNotIn("at.x + syncButton.width - width", placement)
+        # The outside-click detector still maps the popup's actual bounds.
+        self.assertIn("resyncPopup.mapToItem(timewFrame, 0, 0)", TIMEW)
+        self.assertIn("if (!onTrigger && !onPopup)", TIMEW)
+
+    def test_popup_owns_glowing_border_and_background(self):
+        self.assertIn('import "../components"', POPUP)
+        self.assertIn("WindowPanelFrame {", POPUP)
+        self.assertIn("fillColor: Colors.black", POPUP)
+        self.assertIn("fillOpacity: 1.0", POPUP)
+        self.assertIn("borderColor: Colors.magenta", POPUP)
+        self.assertIn("borderWidth: 1", POPUP)
+        self.assertIn("glowVisible: true", POPUP)
+        self.assertIn("glowColor: Colors.magenta", POPUP)
+        self.assertIn("closeGlowSpread: 6", POPUP)
+        self.assertIn("closeGlowOpacity: 0.46", POPUP)
+        self.assertIn("wideGlowSpread: 13", POPUP)
+        self.assertIn("wideGlowOpacity: 0.18", POPUP)
+        self.assertIn("clipContent: true", POPUP)
+        self.assertNotIn("RectangularShadow {", POPUP)
+        # No new subprocesses or clock writers may enter a visual-only patch.
+        self.assertNotIn("Process {", POPUP)
+        self.assertNotIn("pkexec", POPUP)
+
     def test_original_settings_and_host_security_owner_unchanged(self):
         self.assertIn('label: "CONFIRM RESYNC"', SETTINGS)
         self.assertIn("TimeSettings.requestResync()", SETTINGS)

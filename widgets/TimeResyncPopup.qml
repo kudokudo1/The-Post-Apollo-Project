@@ -5,7 +5,7 @@ import "../components"
 // Clock's top ⟳ menu. This is presentation only: the existing shared
 // TimeSettings service owns confirmation, authorization, diagnostics and
 // reference checks. Merely opening this menu never changes Linux time.
-Rectangle {
+WindowPanelFrame {
     id: popup
 
     signal closeRequested()
@@ -13,10 +13,20 @@ Rectangle {
     width: 308
     height: 320
     radius: 0
-    color: Colors.black
-    border.width: 1
-    border.color: Colors.yellow
-    clip: true
+    // A self-contained popup chassis: solid readable background, magenta
+    // selection border, and its own close/wide outer halo. The glow is
+    // independent of the TimeW frame and never changes action authority.
+    fillColor: Colors.black
+    fillOpacity: 1.0
+    borderColor: Colors.magenta
+    borderWidth: 1
+    glowVisible: true
+    glowColor: Colors.magenta
+    closeGlowSpread: 6
+    closeGlowOpacity: 0.46
+    wideGlowSpread: 13
+    wideGlowOpacity: 0.18
+    clipContent: true
 
     Column {
         anchors.fill: parent

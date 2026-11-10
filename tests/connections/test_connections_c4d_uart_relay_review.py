@@ -258,24 +258,29 @@ class DirectGuestRelayReview(unittest.TestCase):
         self.assertNotIn("type(exc).__name__", self.source)
         self.assertNotIn("print(str(exc)", self.source)
 
-    def test_16_producer_stdout_direct_exclusive_capture_before_relay(self):
+    def test_16_same_process_private_report_writer_before_relay(self):
         guest = GUEST.read_text()
         source = guest.split("stage SIGNED_C3D_RUNNING_HOST_MEASUREMENT_BEGIN", 1)[1]
         self.assertIn('c4d_record_dir=/run/postapollo-c4d-observation', source)
         self.assertIn('install -d -m 0700 "$c4d_record_dir"', source)
         self.assertIn('umask 077', source)
-        self.assertIn('set -C', source)
-        self.assertLess(source.index('set -C'),
-                        source.index('> "$c4d_record" <<\'C4B_RUNNING_HOST_PROBE\''))
-        self.assertIn('> "$c4d_record" <<\'C4B_RUNNING_HOST_PROBE\'', source)
-        self.assertNotIn('/usr/bin/tee -- "$c4d_record"', source)
-        self.assertIn('fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"', source)
+        self.assertNotIn('set -C', source)
+        self.assertIn(
+            '"$pid" "$assets/c3d-status.rpm" "$c4d_record" '
+            "<<'C4B_RUNNING_HOST_PROBE'", source)
+        self.assertNotIn('> "$c4d_record"', source)
+        self.assertIn('def write_private_report(path, record):', source)
+        self.assertIn('os.O_CREAT | os.O_EXCL', source)
+        self.assertIn('os.O_NOFOLLOW | os.O_CLOEXEC', source)
+        self.assertIn('os.fsync(fd)', source)
+        self.assertIn('write_private_report(\n        sys.argv[3]', source)
         self.assertIn('DIRECT_STDOUT_CAPTURE_PRESENT', source)
         self.assertIn('DIRECT_STDOUT_CAPTURE_EMPTY', source)
-        self.assertIn('"$c4d_record" /dev/ttyS0 <<\'C4B_SINGLE_UART_RELAY\'', source)
-        self.assertLess(source.index('> "$c4d_record" <<\'C4B_RUNNING_HOST_PROBE\''),
+        self.assertIn(
+            '"$c4d_record" /dev/ttyS0 <<\'C4B_SINGLE_UART_RELAY\'', source)
+        self.assertLess(source.index('write_private_report(\n        sys.argv[3]'),
                         source.index("stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN"))
-        self.assertLess(source.index('C4B_SINGLE_UART_RELAY'),
+        self.assertLess(source.index("C4B_SINGLE_UART_RELAY"),
                         source.index('rm -f -- "$c4d_record"'))
         self.assertLess(source.index('rm -f -- "$c4d_record"'),
                         source.index('rm -rf -- /opt/postapollo-c2o-venv'))

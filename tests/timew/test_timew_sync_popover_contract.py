@@ -39,6 +39,7 @@ assert 'CONFIRM CONTACTS TIME SERVERS (IP VISIBLE)' in popup
 assert 'CORRECTION MAY CHANGE SYSTEM / FILE TIMES.' in popup
 assert 'TimeSettings.resyncMessage' in popup
 assert 'TimeSettings.diagnosticMessage' in popup
+assert 'TimeSettings.referenceMessage' in popup
 assert 'timew.chooseMode(' not in popup
 assert 'TimeSettings.prepareResync()' not in popup
 

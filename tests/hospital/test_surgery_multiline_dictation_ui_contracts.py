@@ -53,6 +53,9 @@ check('onTranscriptionReady(text, submitRequested)' in manager
       and 'field.value = result.text;' in manager
       and 'field.focusEditorAtEnd()' in manager,
       "Only insert text, never submit an AI/Room/Worker/Job request")
+check('onVoiceError(message)' in manager
+      and 'root.speechInputService.cancel();' in manager,
+      "Voice failure must discard partially captured local audio")
 check('onModeChanged:' in manager
       and 'cancelDictation()' in manager
       and 'onActiveChanged:' in manager

@@ -36,7 +36,7 @@ check('softGlowEnabled: true' in (ROOT / "components/HospitalActionButton.qml").
       "Existing single outer glow remains active")
 for marker in ('mode: "WORKER"', 'mode === "ROOM"', 'mode === "JOB"',
                'id: workerNameField', 'id:roomNameField',
-               'id:roomRepositoryField', 'id:jobGoalField',
+               'id: roomOwnerField', 'id: roomRepoField', 'id:jobGoalField',
                'id:jobPermissionsField', 'model: root.doctors.slice(',
                'model: root.rooms.slice(',
                'role: root.workerRole', 'source: "'):

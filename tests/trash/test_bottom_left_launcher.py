@@ -239,7 +239,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn("id: archiveEntriesList", TRASH)
         self.assertIn("id: archiveFilterRow", TRASH)
         self.assertIn("Weather, Hospital or Finance records", TRASH)
-        self.assertIn('trashLauncher.setMode("trash");', TRASH)
+        self.assertIn('onLeftClicked: trashLauncher.setMode("trash")', TRASH)
         self.assertIn('visible: trashLauncher.activeMode === "trash"', TRASH)
         self.assertIn('activeMode === "trash"', TRASH)
         # New tabs are navigation, not authorization to alter Hospital,

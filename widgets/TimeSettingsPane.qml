@@ -383,6 +383,9 @@ Item {
                         valueStep: 1
                         valueDecimals: 0
                         snapContinuousToStep: true
+                        numericDetentInterval: 6
+                        numericDetentOrigin: 0
+                        showNumericDetentTicks: true
                         options: ["1H", "1D", "2D", "3D", "4D", "5D", "6D", "7D"]
                         numericReferenceValues: [1, 24, 48, 72, 96, 120, 144, 168]
                         currentValue: TimeSettings.autoCheckIntervalHours
@@ -427,7 +430,7 @@ Item {
                         }
                         GohuText {
                             width: parent.width
-                            text: "1H DETENTS // NO WRAP"
+                            text: "6H DETENTS // NO WRAP"
                             color: Colors.cyan
                             font.pixelSize: 9
                             wrapMode: Text.WordWrap

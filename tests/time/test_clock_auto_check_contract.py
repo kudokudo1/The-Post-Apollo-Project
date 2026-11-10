@@ -68,9 +68,9 @@ class ClockAutoReferenceContracts(unittest.TestCase):
     def test_shared_dial_labels_are_readable_by_default(self):
         # Previous defaults were 6/7px markings and an 8px readout.
         # The defaults affect Radio and Git as well as Clock.
-        self.assertIn("property int numericLabelPixelSize: 12", DIAL)
-        self.assertIn("property int textLabelPixelSize: 10", DIAL)
-        self.assertIn("property int readoutPixelSize: 13", DIAL)
+        self.assertIn("property int numericLabelPixelSize: 10", DIAL)
+        self.assertIn("property int textLabelPixelSize: 8", DIAL)
+        self.assertIn("property int readoutPixelSize: 11", DIAL)
         self.assertIn("dialRoot.numericLabelPixelSize", DIAL)
         self.assertIn("dialRoot.textLabelPixelSize", DIAL)
         self.assertIn("font.pixelSize: dialRoot.readoutPixelSize", DIAL)
@@ -90,12 +90,44 @@ class ClockAutoReferenceContracts(unittest.TestCase):
         self.assertIn("id: dialHoverHandler", DIAL)
         self.assertIn("interactive: !(pane.showAutoTimeCheck && autoCheckDial.interactive", PANE)
         self.assertIn("autoCheckDial.pointerOverDial || autoCheckDial.dragging", PANE)
-        # Previously approved one-hour bounded nonwrapping detents stay intact.
+        # Approved bounds and nonwrapping behavior remain intact.
         self.assertIn("minimumValue: 1", PANE)
         self.assertIn("maximumValue: 168", PANE)
         self.assertIn("snapContinuousToStep: true", PANE)
         self.assertIn("function steppedValue(value)", DIAL)
         self.assertIn("dialRoot.finishFreePosition()", DIAL)
+
+    def test_six_hour_stops_keep_endpoints_and_day_numbers(self):
+        self.assertIn("numericDetentInterval: 6", PANE)
+        self.assertIn("numericDetentOrigin: 0", PANE)
+        self.assertIn("showNumericDetentTicks: true", PANE)
+        self.assertIn("6H DETENTS // NO WRAP", PANE)
+        self.assertIn("property real numericDetentInterval: 0", DIAL)
+        self.assertIn("property bool showNumericDetentTicks: false", DIAL)
+        self.assertIn("numericDetentOrigin", DIAL)
+        self.assertIn("numericDetentInterval", DIAL)
+        self.assertIn("Math.round((clamped - origin) / step)", DIAL)
+        self.assertIn("Math.max(minimumValue, Math.min(maximumValue, upper))", DIAL)
+        self.assertIn("Math.floor(", DIAL)
+        self.assertIn("numericReferenceValues.indexOf(numericValue) < 0", DIAL)
+        self.assertIn("color: detentTick.active ? Colors.orange : dialRoot.labelColor", DIAL)
+        # The ratchet retains the special 1H endpoint, then 6H multiples.
+        stops = [1] + list(range(6, 169, 6))
+        self.assertEqual(stops[:4], [1, 6, 12, 18])
+        self.assertEqual(stops[-1], 168)
+        self.assertEqual(len(stops), 29)
+        self.assertTrue(all(stops[i] < stops[i + 1] for i in range(len(stops) - 1)))
+        for day in range(24, 169, 24):
+            self.assertIn(day, stops)
+
+    def test_numeric_markers_react_to_dial_angle(self):
+        self.assertIn("function isOptionActive(index) {", DIAL)
+        self.assertIn("Math.abs(visualAngle - angleForIndex(index)) <= 3.5", DIAL)
+        self.assertIn('selectorMode === "continuous"', DIAL)
+        self.assertIn("Colors.orange : dialRoot.markerColor", DIAL)
+        self.assertIn("shadowColor: dialRoot.isOptionActive(optionMark.index)", DIAL)
+        self.assertIn("shadowOpacity: dialRoot.optionGlowStrength(optionMark.index)", DIAL)
+        self.assertIn("if (isOptionActive(index))", DIAL)
 
     def test_operator_controls_and_privacy_remain_visible(self):
         self.assertIn("setAutoCheckIntervalHours(", PANE)

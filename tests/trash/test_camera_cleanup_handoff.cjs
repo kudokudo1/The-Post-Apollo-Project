@@ -93,6 +93,7 @@ function trashHarness(overrides={}) {
         busy:false,
         researchBusy:false,
         researchBurnId:"",
+        burnUiStage:"",
         cameraCleanupBusy:false,
         confirmMode:"",
         cameraCleanupController:camera,
@@ -223,8 +224,9 @@ test("Busy or unowned actions fail closed and preserve current menu",()=>{
     const ctx=trashHarness({activeMode:"cleanup"});
     assert.equal(vm.runInContext('requestCameraCleanup("burn-all")',ctx),false);
     assert.equal(ctx.menuOpen,true);
-    assert.match(trashSource,/onLeftClicked: trashLauncher.armBurnAll\(\)/);
-    assert.match(trashSource,/id: burnAllConfirmMenu/);
-    assert.match(trashSource,/burnAllPointerRelocated/);
+    assert.match(trashSource,/onLeftClicked: trashLauncher.setMode\("burn"\)/);
+    assert.match(trashSource,/id: managedResearchBurnConfirm/);
+    assert.match(trashSource,/burnConfirmationOpen/);
+    assert.doesNotMatch(trashSource,/id: burnAllConfirmMenu/);
     assert.doesNotMatch(trashMethods,/gio|trashQueuedNow|trash-batch-now/);
 });

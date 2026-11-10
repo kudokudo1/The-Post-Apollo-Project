@@ -1,154 +1,190 @@
 "use strict";
-// Synthetic QML controller test. No Quickshell host, local Trash, or files.
-const fs = require("node:fs");
-const path = require("node:path");
-const vm = require("node:vm");
-const assert = require("node:assert/strict");
-const test = require("node:test");
+// Synthetic QML Burn click + receipt lifecycle. No GIO or local files.
+const fs=require("node:fs"), path=require("node:path"), vm=require("node:vm");
+const assert=require("node:assert/strict"), test=require("node:test");
+const qml=fs.readFileSync(path.resolve(__dirname,"../../modules/Trash.qml"),"utf8");
 
-const qml = fs.readFileSync(
-    path.resolve(__dirname, "../../modules/Trash.qml"), "utf8");
-
-function fnSource(name) {
-    const start = qml.indexOf("    function " + name + "(");
-    assert.notEqual(start, -1, "missing QML function: " + name);
-    const brace = qml.indexOf("{", start);
-    let nesting = 0;
-    for (let i = brace; i < qml.length; i++) {
-        if (qml[i] === "{") nesting++;
-        if (qml[i] === "}") nesting--;
-        if (nesting === 0) return qml.slice(start, i + 1);
+function method(name) {
+    const i=qml.indexOf("    function "+name+"(");
+    assert.ok(i>=0,"missing method "+name);
+    const start=qml.indexOf("{",i);
+    let n=0;
+    for(let j=start;j<qml.length;j++) {
+        if(qml[j]==="{")n++;
+        if(qml[j]==="}")n--;
+        if(n===0)return qml.slice(i,j+1);
     }
-    throw new Error("unterminated method " + name);
+    throw Error("bad method "+name);
 }
+const methods=[
+    "armResearchBurn","advanceResearchBurn","confirmResearchBurn",
+    "clearResearchBurn","clearConfirmation","showBurnReceipt",
+    "failBurnReceipt","dismissBurnReceipt","armBurn","confirmBurn"
+].map(method).join("\n");
 
-const methods = [
-    "armResearchBurn", "advanceResearchBurn", "confirmResearchBurn",
-    "clearResearchBurn"
-].map(fnSource).join("\n");
-const sample = {
-    id: "0123456789abcdef0123456789abcdef",
-    kind: "SAVED EVENT", title: "Earthquake saved copy",
-    state: "trashed"
-};
+const copy={id:"0123456789abcdef0123456789abcdef",kind:"SAVED EVENT",
+            title:"Storm copy",state:"trashed"};
 function harness(overrides={}) {
-    const context = {
-        menuOpen: true,
-        researchBusy: false,
-        busy: false,
-        confirmMode: "",
-        researchRows: [{...sample}],
-        researchRevision: 8,
-        researchBurnId: "",
-        researchBurnTitle: "",
-        researchBurnRevision: -1,
-        researchBurnPointerRelocated: false,
-        researchBurnClickArmed: false,
-        researchBurnLoadComplete: false,
-        researchBurnLoadProgress: 0,
-        operations: [],
-        animationRestarted: 0,
-        animationStopped: 0,
-        researchBurnArmAnimation: {
-            restart(){ context.animationRestarted++ },
-            stop(){ context.animationStopped++ }
+    const ctx={
+        menuOpen:true,activeMode:"burn",busy:false,researchBusy:false,
+        confirmMode:"",confirmUri:"",confirmOriginal:"",confirmName:"",
+        confirmRevision:"",confirmCount:0,burnAllPointerRelocated:false,
+        total:1,revision:"b".repeat(64),
+        researchRows:[copy],researchRevision:8,researchBurnId:"",
+        researchBurnTitle:"",researchBurnScope:"",researchBurnRevision:-1,
+        researchBurnCount:0,researchBurnDigest:"",researchBinCount:1,
+        researchBinRows:[copy],researchBinDigest:"d".repeat(64),
+        researchBurnPointerRelocated:false,researchBurnClickArmed:false,
+        researchBurnLoadComplete:false,researchBurnLoadProgress:0,
+        burnUiStage:"",burnReceiptItems:[],burnReceiptRequested:0,
+        burnReceiptCount:0,burnReceiptVerified:false,
+        burnReceiptMessage:"",burnReceiptScope:"",
+        calls:[],started:0,stopped:0,delays:0,delayStops:0,
+        researchBurnArmAnimation:{
+            restart(){ctx.started++},stop(){ctx.stopped++}
         },
-        runResearch(action,args) {
-            context.operations.push({action,args: Array.from(args)});
+        burnCommitDelay:{
+            restart(){ctx.delays++},stop(){ctx.delayStops++}
+        },
+        runResearch(action,args){
+            ctx.calls.push({engine:"copies",action,args:Array.from(args)});
+            return true;
+        },
+        run(action,args){
+            ctx.calls.push({engine:"gio",action,args:Array.from(args)});
             return true;
         },
         ...overrides
     };
-    vm.createContext(context);
-    vm.runInContext(methods, context);
-    return context;
+    vm.createContext(ctx);
+    vm.runInContext(methods,ctx);
+    return ctx;
 }
-
-test("first Burn button click only arms, second before load cannot delete", ()=>{
-    const ctx = harness();
-    assert.equal(vm.runInContext("armResearchBurn(researchRows[0])",ctx),true);
+function armTwoClicks(ctx,expression){
+    assert.equal(vm.runInContext(expression,ctx),true);
     assert.equal(vm.runInContext("advanceResearchBurn()",ctx),false);
-    assert.deepEqual(Array.from(ctx.operations),[]);
-    ctx.researchBurnPointerRelocated = true;
+    ctx.researchBurnPointerRelocated=true;
     assert.equal(vm.runInContext("advanceResearchBurn()",ctx),true);
     assert.equal(ctx.researchBurnClickArmed,true);
-    assert.equal(ctx.researchBurnLoadComplete,false);
-    assert.equal(ctx.animationRestarted,1);
+    assert.equal(ctx.started,1);
     assert.equal(vm.runInContext("advanceResearchBurn()",ctx),false);
-    assert.deepEqual(Array.from(ctx.operations),[]);
-});
-
-test("click after loading burns exactly one trashed managed copy", ()=>{
-    const ctx = harness();
-    vm.runInContext("armResearchBurn(researchRows[0])",ctx);
-    ctx.researchBurnPointerRelocated = true;
-    vm.runInContext("advanceResearchBurn()",ctx);
-    ctx.researchBurnLoadProgress = 1;
-    ctx.researchBurnLoadComplete = true;
+    ctx.researchBurnLoadComplete=true;
     assert.equal(vm.runInContext("advanceResearchBurn()",ctx),true);
-    assert.deepEqual(Array.from(ctx.operations), [{
-        action: "burn",
-        args: [sample.id, "8", "BURN_SAVED_COPY_CONFIRMED"]
-    }]);
+    assert.equal(ctx.burnUiStage,"clicked");
+    assert.equal(ctx.delays,1);
+    assert.equal(ctx.calls.length,0);
+}
+
+test("single copy persists through second-click glow and background commit",()=>{
+    const ctx=harness();
+    armTwoClicks(ctx,"armResearchBurn(researchRows[0])");
+    assert.equal(ctx.researchBurnId,copy.id);
+    ctx.burnUiStage="working"; // simulated 420ms delayed callback
+    assert.equal(vm.runInContext("confirmResearchBurn()",ctx),true);
+    assert.equal(ctx.calls.length,1);
+    assert.deepEqual(Array.from(ctx.calls[0].args),
+       [copy.id,"8","BURN_SAVED_COPY_CONFIRMED"]);
+    assert.equal(ctx.researchBurnId,copy.id); // do not close before receipt
+    vm.runInContext(
+       'showBurnReceipt({verified:true,burnedItems:[{name:"Storm copy",kind:"SAVED EVENT",source:"WEATHER"}]},"MANAGED COPY",1)',
+       ctx);
+    assert.equal(ctx.burnUiStage,"result");
+    assert.equal(ctx.burnReceiptVerified,true);
+    assert.equal(ctx.burnReceiptItems[0].name,"Storm copy");
+    assert.equal(ctx.activeMode,"burn");
+    assert.equal(vm.runInContext("dismissBurnReceipt()",ctx),true);
     assert.equal(ctx.researchBurnId,"");
-    assert.equal(ctx.researchBurnClickArmed,false);
-    assert.equal(ctx.researchBurnLoadComplete,false);
+    assert.equal(ctx.burnUiStage,"");
+    assert.equal(ctx.activeMode,"burn");
 });
 
-test("stale revision and removed target refuse even fully armed confirmation", ()=>{
-    const ctx = harness();
-    vm.runInContext("armResearchBurn(researchRows[0])",ctx);
-    ctx.researchBurnPointerRelocated = true;
-    vm.runInContext("advanceResearchBurn()",ctx);
-    ctx.researchBurnLoadComplete = true;
-    ctx.researchRevision = 9;
-    assert.equal(vm.runInContext("advanceResearchBurn()",ctx),false);
-    assert.equal(ctx.operations.length,0);
-    ctx.researchRevision = 8;
-    ctx.researchRows = [];
-    assert.equal(vm.runInContext("advanceResearchBurn()",ctx),false);
-    assert.equal(ctx.operations.length,0);
+test("single GIO file uses identical confirmation and waits for named receipt",()=>{
+    const ctx=harness();
+    const item={name:"note.txt",uri:"trash:///note.txt",original:"/tmp/note.txt"};
+    ctx.file=item;
+    armTwoClicks(ctx,"armBurn(file)");
+    assert.equal(ctx.activeMode,"burn");
+    assert.equal(ctx.confirmMode,"item");
+    assert.equal(ctx.confirmName,"note.txt");
+    ctx.burnUiStage="working";
+    assert.equal(vm.runInContext("confirmBurn()",ctx),true);
+    assert.deepEqual(Array.from(ctx.calls[0].args),
+       ["burn",item.uri,item.original,"BURN_CONFIRMED"]);
+    assert.equal(ctx.confirmMode,"item");
+    vm.runInContext(
+      'showBurnReceipt({verified:true,burnedItems:[{name:"note.txt",kind:"SYSTEM FILE",original:"/tmp/note.txt"}]},"SYSTEM TRASH // FILE",1)',
+      ctx);
+    assert.equal(ctx.burnReceiptItems[0].name,"note.txt");
+    assert.equal(ctx.activeMode,"burn");
+    vm.runInContext("dismissBurnReceipt()",ctx);
+    assert.equal(ctx.confirmMode,"");
 });
 
-test("cancel resets both click and loading state without submitting Burn", ()=>{
-    const ctx = harness();
+test("cancel before commit and incomplete animation cannot delete",()=>{
+    const ctx=harness();
     vm.runInContext("armResearchBurn(researchRows[0])",ctx);
-    ctx.researchBurnPointerRelocated = true;
+    ctx.researchBurnPointerRelocated=true;
     vm.runInContext("advanceResearchBurn()",ctx);
-    assert.equal(vm.runInContext("clearResearchBurn()",ctx),undefined);
+    assert.equal(vm.runInContext("advanceResearchBurn()",ctx),false);
+    assert.equal(ctx.calls.length,0);
+    assert.equal(vm.runInContext("dismissBurnReceipt()",ctx),true);
+    assert.equal(ctx.calls.length,0);
     assert.equal(ctx.researchBurnId,"");
-    assert.equal(ctx.researchBurnClickArmed,false);
-    assert.equal(ctx.researchBurnLoadComplete,false);
-    assert.equal(ctx.researchBurnLoadProgress,0);
-    assert.equal(ctx.animationStopped,1);
-    assert.equal(ctx.operations.length,0);
 });
 
-test("weather and research copies have identical scoped Burn safety", ()=>{
-    for (const kind of ["SAVED EVENT", "SAVED RESEARCH"]) {
-        const ctx=harness({researchRows:[{...sample,kind}]});
-        assert.equal(vm.runInContext("armResearchBurn(researchRows[0])",ctx),true);
-        assert.equal(ctx.researchBurnTitle,sample.title);
+test("working and second-click flash do not allow early dismissal",()=>{
+    for(const stage of ["clicked","working"]) {
+        const ctx=harness({burnUiStage:stage});
+        assert.equal(vm.runInContext("dismissBurnReceipt()",ctx),false);
+        assert.equal(ctx.burnUiStage,stage);
+        assert.equal(ctx.calls.length,0);
     }
-    const ctx=harness({researchRows:[{...sample,state:"archived"}]});
-    assert.equal(vm.runInContext("armResearchBurn(researchRows[0])",ctx),false);
-    assert.equal(ctx.operations.length,0);
 });
 
-test("normal bordered button stays available before pointer relocation", ()=>{
-    const start=qml.indexOf("id: confirmManagedResearchBurn");
-    assert.notEqual(start,-1);
-    const end=qml.indexOf("id: cancelManagedResearchBurn",start);
-    const surface=qml.slice(start,end);
-    assert.match(surface,/idleBorderWidth: 2/);
-    assert.match(surface,/idleBorderColor: Colors.red/);
-    assert.match(surface,/available: !trashLauncher.researchBusy/);
-    const enabled=surface.slice(surface.indexOf("available:"),surface.indexOf("onLeftClicked:"));
-    assert.doesNotMatch(enabled,/researchBurnPointerRelocated/);
-    assert.match(surface,/onLeftClicked: trashLauncher.advanceResearchBurn\(\)/);
-    assert.match(surface,/CLICK TO ARM/);
-    assert.match(surface,/CLICK AGAIN \/\/ BURN/);
-    assert.match(qml,/id: researchBurnArmAnimation/);
-    assert.match(qml,/duration: 850/);
-    assert.match(qml,/onFinished:/);
+test("failure and partial verification never claim everything was burned",()=>{
+    const ctx=harness();
+    vm.runInContext('failBurnReceipt("GIO_INDEX_UNAVAILABLE")',ctx);
+    assert.equal(ctx.burnUiStage,"error");
+    assert.equal(ctx.burnReceiptVerified,false);
+    assert.match(ctx.burnReceiptMessage,/NOT CONFIRMED/);
+    vm.runInContext(
+      'showBurnReceipt({verified:true,partial:true,burnedItems:[{name:"one.txt",kind:"SYSTEM FILE"}]},"SYSTEM TRASH // ALL",2)',ctx);
+    assert.equal(ctx.burnReceiptVerified,false);
+    assert.equal(ctx.burnReceiptCount,1);
+    assert.equal(ctx.burnReceiptRequested,2);
+    assert.equal(ctx.burnUiStage,"result");
+});
+
+test("one visual modal and one Burn workspace hold result until DONE",()=>{
+    assert.equal((qml.match(/id: managedResearchBurnConfirm/g)||[]).length,1);
+    assert.doesNotMatch(qml,/id: burnAllConfirmMenu/);
+    assert.match(qml,/visible: trashLauncher\.burnConfirmationOpen/);
+    assert.match(qml,/id: burnReviewContent/);
+    assert.match(qml,/id: burnResultContent/);
+    assert.match(qml,/id: burnReceiptList/);
+    assert.match(qml,/model: trashLauncher\.burnReceiptItems/);
+    assert.match(qml,/id: burnReceiptDone/);
+    assert.match(qml,/DONE \/\/ RETURN TO BURN/);
+    assert.match(qml,/function showBurnReceipt\(/);
+    assert.match(qml,/function failBurnReceipt\(/);
+    assert.match(qml,/burnUiStage = "clicked";/);
+    assert.match(qml,/interval: 420/);
+    assert.match(qml,/selected: trashLauncher\.burnUiStage === "clicked"/);
+    assert.match(qml,/selectedBorderColor: Colors\.magenta/);
+    assert.match(qml,/onLeftClicked: trashLauncher\.advanceResearchBurn\(\)/);
+    assert.match(qml,/visible: researchBurnFace\.loading/);
+    assert.match(qml,/id: researchBurnLabelClip/);
+});
+
+test("single Burn menu filters both sources and requires scope for bulk",()=>{
+    assert.match(qml,/id: burnSourceFilters/);
+    assert.match(qml,/model: trashLauncher\.burnDisplayRows/);
+    assert.match(qml,/fileRows\.concat\(copyRows\)/);
+    for(const v of ["all","files","records","events","research"]){
+        assert.ok(qml.includes('{id:"'+v+'", label:'),v);
+    }
+    assert.match(qml,/onLeftClicked: trashLauncher\.setMode\("burn"\)/);
+    assert.match(qml,/trashLauncher\.burnFilter === "files"/);
+    assert.match(qml,/trashLauncher\.burnFilter === "records"/);
+    assert.match(qml,/onLeftClicked: \{\s+if \(trashLauncher\.burnFilter === "files"\)/);
 });

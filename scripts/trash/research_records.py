@@ -411,6 +411,14 @@ def operate(action, data_dir, record_id="", expected_revision=None,
             _fail("STALE_MANAGED_REVISION")
         if document["revision"] >= MAX_REVISION:
             _fail("MANAGED_STORE_CAPACITY")
+        # Snapshot receipt candidates BEFORE mutation, from the validated
+        # source-managed store, then return them ONLY after a durable write.
+        receipt_before = (
+            [item for item in _summary(document)["items"]
+             if item["state"] == "trashed"
+             and (action == "burn-all" or item["id"] == record_id)]
+            if action in ("burn", "burn-all") else []
+        )
         if action == "burn-all":
             current_count, current_digest = _bin_identity(document)
             if (type(expected_count) is not int or expected_count < 1
@@ -466,7 +474,16 @@ def operate(action, data_dir, record_id="", expected_revision=None,
                 document["records"].remove(entry)
         document["revision"] += 1
         _write_store(dirfd, document)
-        return _summary(document, action.upper())
+        result = _summary(document, action.upper())
+        if action in ("burn", "burn-all"):
+            result["verified"] = True
+            result["burnedCount"] = len(receipt_before)
+            result["burnedItems"] = [
+                {"id": item["id"], "kind": item["kind"],
+                 "name": item["title"], "source": item["source"]}
+                for item in receipt_before
+            ]
+        return result
     finally:
         if lockfd is not None:
             os.close(lockfd)

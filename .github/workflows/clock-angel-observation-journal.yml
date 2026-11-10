@@ -6,9 +6,11 @@ on:
       - "widgets/AngelPane.qml"
       - "widgets/TimeW.qml"
       - "services/time/AngelObservationPolicy.js"
+      - "services/time/AngelNoteDraftPolicy.js"
       - "services/time/AngelObservationsStore.qml"
       - "services/time/qmldir"
       - "tests/time/test_angel_observation_policy.cjs"
+      - "tests/time/test_angel_note_draft_policy.cjs"
       - "tests/time/test_angel_journal_integration_contract.py"
       - "tests/time/test_clock_visual_calibration_contract.py"
       - ".github/workflows/clock-angel-observation-journal.yml"
@@ -17,9 +19,11 @@ on:
       - "widgets/AngelPane.qml"
       - "widgets/TimeW.qml"
       - "services/time/AngelObservationPolicy.js"
+      - "services/time/AngelNoteDraftPolicy.js"
       - "services/time/AngelObservationsStore.qml"
       - "services/time/qmldir"
       - "tests/time/test_angel_observation_policy.cjs"
+      - "tests/time/test_angel_note_draft_policy.cjs"
       - "tests/time/test_angel_journal_integration_contract.py"
       - "tests/time/test_clock_visual_calibration_contract.py"
       - ".github/workflows/clock-angel-observation-journal.yml"
@@ -31,6 +35,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: ANGEL pure observation schema and numeric classifications
         run: node tests/time/test_angel_observation_policy.cjs
+      - name: ANGEL durable note draft and conflict-safe recovery
+        run: node tests/time/test_angel_note_draft_policy.cjs
       - name: ANGEL journal singleton and TimeW UI integration
         run: python3 -m unittest discover -s tests/time -p 'test_angel_journal_integration_contract.py' -v
       - name: Preserve TimeW existing stopwatch world machine and keyboard paths

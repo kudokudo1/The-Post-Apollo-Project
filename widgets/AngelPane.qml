@@ -14,6 +14,9 @@ Item {
     property string selectedId: ""
     property string pendingDeleteId: ""
     property string editingNoteId: ""
+    property string noteInFlightId: ""
+    property bool reviewingDraft: false
+    property string noteSaveFeedback: ""
     property string activeFilter: "all"
     property string activeView: "journal"
     property string meaningSelection: ""
@@ -114,26 +117,78 @@ Item {
     }
 
     function editObservationNote(row) {
-        if (!row)
+        if (!row || pane.noteInFlightId !== "")
             return;
         pane.selectedId = row.id;
         pane.pendingDeleteId = "";
+        pane.reviewingDraft = false;
+        pane.noteSaveFeedback = "";
         pane.editingNoteId = row.id;
         noteField.text = String(row.note || "");
         noteField.forceActiveFocus();
     }
 
+    function reviewNoteDraft() {
+        const draft = AngelObservationsStore.noteDraft;
+        if (!draft || pane.noteInFlightId !== "")
+            return;
+        pane.selectedId = draft.id;
+        pane.pendingDeleteId = "";
+        pane.reviewingDraft = true;
+        pane.editingNoteId = draft.id;
+        noteField.text = draft.after;
+        pane.noteSaveFeedback = "RECOVERY REVIEW // READ ONLY";
+        noteField.forceActiveFocus();
+    }
+
     function closeNoteEditor() {
+        if (pane.noteInFlightId !== "")
+            return; // Never discard the visible note during a write.
         pane.editingNoteId = "";
+        pane.reviewingDraft = false;
         noteField.focus = false;
     }
 
     function saveNote() {
-        if (pane.editingNoteId === "" || !AngelObservationsStore.writable)
+        if (pane.editingNoteId === "" || pane.reviewingDraft
+                || pane.noteInFlightId !== ""
+                || !AngelObservationsStore.writable)
             return;
-        if (AngelObservationsStore.saveObservationNote(
-                    pane.editingNoteId, noteField.text))
-            closeNoteEditor();
+        const id = pane.editingNoteId;
+        if (AngelObservationsStore.saveObservationNote(id, noteField.text)) {
+            // Accepted for staging is NOT saved. Close only on the actual
+            // journal FileView.onSaved receipt below.
+            pane.noteInFlightId = id;
+            pane.noteSaveFeedback = "WRITING // NOTE KEPT OPEN";
+        } else {
+            pane.noteSaveFeedback = AngelObservationsStore.feedback;
+        }
+    }
+
+    function retryDraft() {
+        if (AngelObservationsStore.retryNoteDraft()) {
+            pane.noteInFlightId = AngelObservationsStore.noteDraft.id;
+            pane.noteSaveFeedback = "RECOVERY WRITE // WAITING FOR RECEIPT";
+        }
+    }
+
+    Connections {
+        target: AngelObservationsStore
+        function onNoteSaved(id) {
+            if (pane.noteInFlightId !== id)
+                return;
+            pane.noteInFlightId = "";
+            pane.noteSaveFeedback = "SAVED TO LOCAL JOURNAL";
+            pane.closeNoteEditor();
+        }
+        function onNoteSaveFailed(id, reason) {
+            if (pane.noteInFlightId !== id)
+                return;
+            pane.noteInFlightId = "";
+            // Do not erase/reconstruct noteField.text on a timeout or failure.
+            pane.noteSaveFeedback = "SAVE NOT CONFIRMED // " + reason
+                                    + " // COPY TEXT BEFORE EXIT";
+        }
     }
 
     function recordClock() {
@@ -422,11 +477,76 @@ Item {
             elide: Text.ElideRight
         }
 
+        Column {
+            id: noteRecoveryControls
+            width: parent.width
+            height: visible ? 65 : 0
+            spacing: 4
+            visible: AngelObservationsStore.draftState === "ready"
+                     || (AngelObservationsStore.storageState === "stalled"
+                         && AngelObservationsStore.pendingKind === "note")
+
+            GohuText {
+                width: parent.width
+                font.pixelSize: 9
+                color: Colors.orange
+                text: "NOTE RECOVERY // "
+                      + AngelObservationsStore.noteDraftDisposition.toUpperCase()
+                      + (AngelObservationsStore.noteDraft
+                         ? " // " + AngelObservationsStore.noteDraft.id : "")
+            }
+            Row {
+                width: parent.width
+                height: 30
+                spacing: 4
+                AngelActionButton {
+                    width: Math.max(20, (parent.width - parent.spacing * 2) / 3)
+                    height: parent.height
+                    label: "CHECK DISK"
+                    labelPixelSize: 8
+                    accentColor: Colors.cyan
+                    available: AngelObservationsStore.writePhase === ""
+                               && AngelObservationsStore.draftState === "ready"
+                    onLeftClicked: AngelObservationsStore.checkRecoveryFromDisk()
+                }
+                AngelActionButton {
+                    width: Math.max(20, (parent.width - parent.spacing * 2) / 3)
+                    height: parent.height
+                    label: AngelObservationsStore.noteDraftDisposition === "already-saved"
+                           ? "CLEAR" : "RETRY"
+                    labelPixelSize: 8
+                    accentColor: Colors.orange
+                    available: AngelObservationsStore.writePhase === ""
+                               && AngelObservationsStore.recoveryDiskChecked
+                               && AngelObservationsStore.draftState === "ready"
+                               && (AngelObservationsStore.noteDraftDisposition === "recoverable"
+                                   || AngelObservationsStore.noteDraftDisposition === "already-saved")
+                    onLeftClicked: {
+                        if (AngelObservationsStore.noteDraftDisposition === "already-saved")
+                            AngelObservationsStore.clearVerifiedDraft();
+                        else
+                            pane.retryDraft();
+                    }
+                }
+                AngelActionButton {
+                    width: Math.max(20, (parent.width - parent.spacing * 2) / 3)
+                    height: parent.height
+                    label: "REVIEW"
+                    labelPixelSize: 8
+                    accentColor: Colors.magenta
+                    available: AngelObservationsStore.draftState === "ready"
+                    onLeftClicked: pane.reviewNoteDraft()
+                }
+            }
+        }
+
         Item {
             id: angelHistoryArea
             width: parent.width
-            height: Math.max(96, angelJournalView.height - 325
-                                 - (noteEditor.visible ? 40 : 0))
+            height: Math.max(72, angelJournalView.height - 325
+                                 - (noteEditor.visible ? 40 : 0)
+                                 - (noteRecoveryControls.visible ? 65 : 0)
+                                 - (pane.noteSaveFeedback !== "" ? 16 : 0))
 
             ListView {
                 id: angelHistoryList
@@ -523,6 +643,7 @@ Item {
                         highlightWhenSelected: true
                         selectedForegroundColor: Colors.magenta
                         available: AngelObservationsStore.writable
+                                   && pane.noteInFlightId === ""
                         onLeftClicked: pane.editObservationNote(modelData)
                     }
                 }
@@ -578,6 +699,7 @@ Item {
                 font.family: "GohuFont 11 Nerd Font Mono"
                 font.pixelSize: 11
                 maximumLength: AngelPolicy.MAX_NOTE_LENGTH
+                readOnly: pane.reviewingDraft || pane.noteInFlightId !== ""
                 selectByMouse: true
                 background: Rectangle {
                     color: Colors.black
@@ -600,6 +722,8 @@ Item {
                 labelPixelSize: 9
                 accentColor: Colors.orange
                 available: AngelObservationsStore.writable
+                           && pane.noteInFlightId === ""
+                           && !pane.reviewingDraft
                 onLeftClicked: pane.saveNote()
             }
             AngelActionButton {
@@ -609,6 +733,7 @@ Item {
                 label: "CANCEL"
                 labelPixelSize: 9
                 accentColor: Colors.cyan
+                available: pane.noteInFlightId === ""
                 onLeftClicked: pane.closeNoteEditor()
             }
         }
@@ -696,6 +821,15 @@ Item {
                     }
                 }
             }
+        }
+
+        GohuText {
+            width: parent.width
+            text: pane.noteSaveFeedback
+            visible: pane.noteSaveFeedback !== ""
+            font.pixelSize: 9
+            color: Colors.orange
+            elide: Text.ElideRight
         }
 
         GohuText {

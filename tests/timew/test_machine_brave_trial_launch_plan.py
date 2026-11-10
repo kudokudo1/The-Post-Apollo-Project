@@ -48,6 +48,13 @@ try:
         "--no-default-browser-check",
     ]
     assert result["expected_user_data_dir"] == str(trial / "profile")
+    assert result["environment_overrides"] == {
+        "XDG_CONFIG_HOME": str(trial / "xdg-config")
+    }
+    assert result["expected_native_host_manifest"] == str(
+        trial / "xdg-config" / "BraveSoftware" / "Brave-Browser"
+        / "NativeMessagingHosts" / "org.postapollo.machine_brave_probe.json"
+    )
     assert result["manual_check_url"] == "brave://version"
     assert result["expected_profile_path_prefix"] == str(trial / "profile") + "/"
     for key in (

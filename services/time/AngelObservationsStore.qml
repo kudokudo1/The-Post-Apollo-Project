@@ -26,6 +26,9 @@ Scope {
     property var pendingDocument: null
     property string pendingKind: ""
     property string pendingNoteId: ""
+    // A no-op NOTE SAVE reports synchronously without ever arming FileView.
+    // Read by the pane immediately after saveObservationNote() returns false.
+    property bool lastNoteUnchanged: false
     // "draft" -> sidecar ack; "journal" -> observation journal ack.
     // Never start two writer operations on the same journal concurrently.
     property string writePhase: ""
@@ -122,6 +125,7 @@ Scope {
     }
 
     function saveObservationNote(id, note) {
+        lastNoteUnchanged = false;
         if (!writable) {
             feedback = "NOTE NOT STARTED // JOURNAL OR DRAFT NEEDS RECOVERY";
             return false;
@@ -132,6 +136,17 @@ Scope {
             return false;
         }
         const row = observations.find(function(item) { return item.id === id; });
+        // Journal.setNote validates the input and normalizes whitespace.
+        // If it produces the SAME stored note, do not create a draft,
+        // start a watchdog or touch either FileView. Empty note on an
+        // already-empty observation is also a successful no-op.
+        const storedNote = row && typeof row.note === "string" ? row.note : "";
+        const desiredNote = note.trim();
+        if (storedNote === desiredNote) {
+            lastNoteUnchanged = true;
+            feedback = "NOTE UNCHANGED // NO WRITE NEEDED";
+            return false;
+        }
         const prepared = Draft.create(row, note, Date.now());
         if (!prepared.ok) {
             feedback = "NOTE NOT STARTED // " + prepared.reason;

@@ -766,7 +766,8 @@ assert "id: machineStoreProcess" in window
 assert "id: machineResolverProcess" in window
 
 # Universal visual language remains: magenta header, cyan divider, borderless modes.
-assert 'text: "TIME // W"' in window
+assert 'text: "TIME // " + timew.headingModeName' in window
+assert 'selectedMode === "calc" ? "CALCULATOR" : selectedName' in window
 assert "color: Colors.magenta" in window
 assert "id: headerDivider" in window
 assert "height: 2\n                color: Colors.cyan" in window

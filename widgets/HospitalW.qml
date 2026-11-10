@@ -2546,6 +2546,7 @@ PanelWindow {
     HospitalSpeechInputService {
         id: speechInputService
         liveStreaming: true
+        liveEngine: workforceSpeechInputService
         otherVoiceBusy: intercomSpeechInputService.busy
             || workforceSpeechInputService.busy
 
@@ -2560,18 +2561,20 @@ PanelWindow {
     HospitalSpeechInputService {
         id: intercomSpeechInputService
         liveStreaming: true
+        liveEngine: workforceSpeechInputService
         otherVoiceBusy: speechInputService.busy
             || workforceSpeechInputService.busy
         audioFileName: "hospital-intercom-voice.wav"
     }
 
-    // The three voice controls share the local streaming backend, but own
-    // separate capture processes and refuse microphone concurrency.
-    // The five Surgery Manage editors keep their dedicated dictation state.
+    // Reception, Intercom and Manage all use the SAME owner/process, instead
+    // of independent nested workers competing for CPU, PipeWire and Whisper.
+    // Front-desk wrappers retain their own UI/submit state; no parallel mics.
     HospitalLiveDictationService {
         id: workforceSpeechInputService
         chunkSeconds: 2
         firstChunkMs: 1400
+        maxPackets: 48
     }
 
     HospitalRemoteWatcher {

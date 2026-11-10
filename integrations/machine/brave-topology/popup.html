@@ -31,6 +31,14 @@
       <button type="button" id="revoke-local">REVOKE LOCAL PERMISSION</button>
       <p id="local-status" role="status" aria-live="polite">LOCAL HOST // NOT CONTACTED</p>
     </section>
+    <section class="local-link" aria-label="Optional live host focus observation">
+      <h2>SWAY FOCUS // EXPLICIT DIAGNOSTIC</h2>
+      <p>Read which Brave desktop workspace is focused when you click.
+      Requires its own separately registered disposable native host and the
+      local connection permission above. This does not pair windows.</p>
+      <button type="button" id="observe-focus">TEST FOCUS CANDIDATE ONCE</button>
+      <p id="focus-status" role="status" aria-live="polite">FOCUS // NOT OBSERVED // NOT LINKED</p>
+    </section>
     <section class="limits" aria-label="Recovery limitations">
       <p>Window numbers last only for this browser run. They are not Sway window IDs.</p>
       <p>No private windows, page addresses, titles, profiles or tab contents are read or saved.</p>
@@ -39,5 +47,6 @@
   </main>
   <script type="module" src="popup.mjs"></script>
   <script type="module" src="native-probe-ui.mjs"></script>
+  <script type="module" src="focus-observe-ui.mjs"></script>
 </body>
 </html>

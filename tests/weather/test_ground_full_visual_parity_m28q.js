@@ -55,7 +55,7 @@ test("GROUND full survives in old WEATHER INDEX while EARTH owns its new main ta
     const tabs=workspace.tabsFor(FULL);
     assert.equal(tabs.some(x=>["ground","water","maps"].includes(x.key)),false);
     assert.equal(workspace.familyFor(FULL),"weather");
-    assert.equal(tabs.length,5);
+    assert.equal(tabs.length,6);
     const earthTabs=workspace.tabsFor("earth/overview");
     const ground=earthTabs.find(x=>x.key==="ground");
     const water=earthTabs.find(x=>x.key==="water");

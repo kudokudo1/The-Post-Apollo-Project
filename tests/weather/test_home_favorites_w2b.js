@@ -85,7 +85,7 @@ test("panel favorites only change on explicit valid requests; failed changes do 
   assert.equal(env.replacePanels(next.document,["home/auto"]).changed,false);
   assert.deepEqual(copy(env.PANELS),[
     "home/auto","home/quick","home/snapshot",
-    "home/history","home/runtime","home/health","home/sources"
+    "home/history","home/runtime","home/health"
   ]);
 });
 

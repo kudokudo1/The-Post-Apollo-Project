@@ -2071,8 +2071,8 @@ Column {
             Rectangle {
                 id: micAction
                 anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.margins: 4
+                anchors.rightMargin: 2
+                anchors.verticalCenter: parent.verticalCenter
                 readonly property bool canAct:
                     root.active && !!root.speechInputService
                     && (managerArea.voiceActive
@@ -2128,8 +2128,7 @@ Column {
                 id: cancelAction
                 anchors.right: micAction.left
                 anchors.rightMargin: 4
-                anchors.top: parent.top
-                anchors.topMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
                 visible: managerArea.voiceActive && !!root.speechInputService
                     && root.speechInputService.busy
                 width: visible ? 58 : 0

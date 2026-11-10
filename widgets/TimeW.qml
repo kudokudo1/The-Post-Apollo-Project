@@ -831,6 +831,35 @@ PanelWindow {
     readonly property string machineUtcNow:
         MachineTimelinePolicy.utcStamp(localClock.date.getTime())
 
+    // MACHINE: operator-pasted, tab-count-only recognition hint.
+    // No browser IPC into the widget, no verified Sway link, no checkpoint write.
+    property string machineBraveTabDraft: ""
+    readonly property var machineBraveTabCountsPreview:
+        machineParseBraveTabCounts(machineBraveTabDraft)
+
+    function machineParseBraveTabCounts(text) {
+        if (typeof text !== "string" || text.length > 256)
+            return null;
+        const raw = text.trim();
+        if (!raw.length)
+            return [];
+        const parts = raw.split(/\s*\/\/\s*/);
+        if (parts.length > 64)
+            return null;
+        let total = 0;
+        const counts = [];
+        for (const part of parts) {
+            if (!/^(0|[1-9]\d{0,3})$/.test(part))
+                return null;
+            const n = Number(part);
+            if (n > 2048 || total + n > 8192)
+                return null;
+            total += n;
+            counts.push(n);
+        }
+        return counts;
+    }
+
     // MACHINE v2: SAVE captures and persists without a preview prerequisite.
     // CUSTOMIZE is a separate explicit, capture-bound inspection transaction.
     property bool machineSaveBridgeBusy: false
@@ -5188,6 +5217,62 @@ PanelWindow {
                             width: parent.width
                             text: "GEOMETRY SAVE // BROWSER TABS + EXACT RESTORE STILL IN DEVELOPMENT"
                             color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+
+                        // Manually copy the browser-side signature here if desired.
+                        // This is a visual hint only, never a Sway window match,
+                        // a stored tab list, or a prerequisite to SAVE/RESTORE.
+                        GohuText {
+                            width: parent.width
+                            text: "BRAVE // TAB COUNT PREVIEW"
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                        }
+                        TextField {
+                            id: machineBraveTabInput
+                            width: parent.width
+                            height: 32
+                            maximumLength: 256
+                            text: timew.machineBraveTabDraft
+                            placeholderText: "PASTE COUNT PATTERN // 2 // 5 // 6"
+                            color: Colors.magenta
+                            placeholderTextColor: Colors.cyan
+                            selectionColor: Colors.magenta
+                            selectedTextColor: Colors.black
+                            font.family: "GohuFont 11 Nerd Font Mono"
+                            font.pixelSize: 11
+                            leftPadding: 8
+                            rightPadding: 8
+                            cursorDelegate: Rectangle {
+                                width: 2
+                                color: Colors.orange
+                            }
+                            background: Rectangle {
+                                color: Colors.black
+                                border.width: 1
+                                border.color: machineBraveTabInput.activeFocus
+                                              ? Colors.magenta : Colors.cyan
+                            }
+                            onTextEdited: timew.machineBraveTabDraft = text
+                        }
+                        MachineBraveTabPattern {
+                            width: parent.width
+                            counts: timew.machineBraveTabCountsPreview || []
+                            labelColor: Colors.cyan
+                            separatorColor: Colors.white
+                            numberColor: Colors.orange
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineBraveTabCountsPreview === null
+                                  ? "INVALID COUNTS // USE 2 // 5 // 6"
+                                  : timew.machineBraveTabCountsPreview.length > 0
+                                    ? "BROWSER LIST ORDER // UNLINKED // NOT SAVED"
+                                    : "NO BRAVE COUNTS ENTERED // UNLINKED"
+                            color: timew.machineBraveTabCountsPreview === null
+                                   ? Colors.orange : Colors.cyan
                             font.pixelSize: 10
                             wrapMode: Text.Wrap
                         }

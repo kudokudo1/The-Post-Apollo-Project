@@ -188,7 +188,7 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('WeatherStage.StationChassisCutout {', self.ui)
         self.assertIn('result.verifiedHole === true', self.ui)
         self.assertIn('visible: phonePane.stageHoleActive', self.ui)
-        self.assertIn('"OFONO INSTALL // TERMINAL BELOW"', self.ui)
+        self.assertIn('"CALLING SETUP // TERMINAL BELOW"', self.ui)
         self.assertIn('phonePane.callSetupStatus = "RECHECKING";', self.ui)
         self.assertIn('phonePane.diagnoseCallPrerequisites();', self.ui)
         self.assertIn('phonePane.refreshPhoneAudioControls();', self.ui)

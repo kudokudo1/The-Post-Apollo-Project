@@ -306,5 +306,47 @@ class C3eUC4cImportContract(unittest.TestCase):
                               **{**assert_only_format_pins, k: value})
 
 
+    def test_20_noncanonical_guest_report_bytes_refused(self):
+        # The guest's actual writer uses sorted compact ASCII JSON. Equivalent
+        # JSON with whitespace, reordered keys or ASCII escape variants must
+        # not masquerade as the same exact byte-level diagnostic report.
+        canonical = self.line().rstrip(b"\n")
+        cases = (
+            U.PREFIX + json.dumps(self.report,
+                                  separators=(",", ":")).encode() + b"\n",
+            U.PREFIX + json.dumps(self.report,
+                                  sort_keys=True).encode() + b"\n",
+            canonical.replace(b'"schema":', b'"\\u0073chema":') + b"\n",
+            canonical + b" \n",
+        )
+        self.assertEqual(len(cases), len(set(cases)))
+        for raw in cases:
+            with self.subTest(raw=raw[:70]):
+                self.refuse("C4C_REPORT_NONCANONICAL_REFUSED", raw=raw)
+
+    def test_21_deep_json_recursion_fails_closed_with_bounded_refusal(self):
+        # < MAX_LINE bytes, but nesting can exceed Python JSON's recursion
+        # limit. It must produce a normal deny-only CLI receipt, not traceback.
+        deep = U.PREFIX + b"[" * 1200 + b"0" + b"]" * 1200 + b"\n"
+        self.assertLess(len(deep), U.MAX_LINE)
+        self.refuse("C4C_REPORT_JSON_REFUSED", raw=deep)
+        args = [
+            sys.executable, "-B", str(SOURCE),
+            "--rpm-sha256", self.rpm,
+            "--script-sha256", self.script,
+            "--interpreter-sha256", self.python,
+            "--service-pid", "9881", "--start-ticks", "111337",
+            "--service-uid", "997", "--service-gid", "997",
+        ]
+        result = subprocess.run(
+            args, input=deep, capture_output=True, timeout=8)
+        self.assertEqual(result.returncode, 3, result.stderr)
+        self.assertEqual(result.stderr, b"")
+        receipt = json.loads(result.stdout)
+        self.assertEqual(receipt["refused"], "C4C_REPORT_JSON_REFUSED")
+        for key in U.DENY_FLAGS:
+            self.assertFalse(receipt[key])
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)

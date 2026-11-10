@@ -14,6 +14,12 @@ Scope {
     property int recordingElapsedSeconds: 0
     property double recordingStartedAt: 0
     property bool liveStreaming: true
+    // Reception and Intercom use shorter chunks; Manage keeps its stable default.
+    property int chunkSeconds: 4
+    property bool vadActive: false
+    property int vadSpeechThreshold: 600
+    property int vadSilenceMs: 2200
+    property int vadMinimumSpeechMs: 250
     property bool wasCancelled: false
     property bool doneSeen: false
     property int packetCount: 0
@@ -63,7 +69,14 @@ Scope {
         recordingStartedAt = Date.now();
         recordingElapsedSeconds = 0;
         voiceState = "recording";
-        liveProcess.exec(["python3", scriptPath, whisperHelper]);
+        const command = ["python3", scriptPath, whisperHelper,
+            "--chunk-seconds", String(Math.max(2, Math.min(4, chunkSeconds)))];
+        if (vadActive) {
+            command.push("--vad", "--threshold", String(vadSpeechThreshold),
+                "--silence-ms", String(vadSilenceMs),
+                "--min-speech-ms", String(vadMinimumSpeechMs));
+        }
+        liveProcess.exec(command);
         clock.restart();
         return true;
     }

@@ -7,9 +7,9 @@ Item {
     property string labelText: "SELECT"
     // Shared hardware-label defaults: numeric markings must be readable even
     // on the smaller Radio navigation encoder. Other dials may override.
-    property int numericLabelPixelSize: 12
-    property int textLabelPixelSize: 10
-    property int readoutPixelSize: 13
+    property int numericLabelPixelSize: 10
+    property int textLabelPixelSize: 8
+    property int readoutPixelSize: 11
     property var options: []
     property var displayOptions: []
     // "discrete" preserves the accepted Git behavior. "continuous" exposes
@@ -30,6 +30,12 @@ Item {
     property real valueStep: 1
     // Opt-in bounded hour-like ratchet, without changing existing dial modes.
     property bool snapContinuousToStep: false
+    // Optional major detents anchored at numericDetentOrigin, preserving the
+    // true minimum as a separate endpoint (1H then 6H, 12H ... 168H).
+    // A zero interval preserves the existing valueStep behavior.
+    property real numericDetentInterval: 0
+    property real numericDetentOrigin: 0
+    property bool showNumericDetentTicks: false
     // Exact positions for sparse reference labels such as 24H / 48H / 168H.
     property var numericReferenceValues: []
     property real continuousDragRawAngle: -90
@@ -149,9 +155,17 @@ Item {
         }
     }
 
+    function isOptionActive(index) {
+        if (selectorMode !== "continuous")
+            return index === indicatedIndex;
+        // The continuous mode has no currentIndex. Track the actual pointer
+        // angle instead, so day labels light up when the handle reaches them.
+        return Math.abs(visualAngle - angleForIndex(index)) <= 3.5;
+    }
+
     function optionGlowStrength(index) {
-        if (index === indicatedIndex)
-            return rotating ? 1.0 : dialHovered ? 0.92 : 0.78;
+        if (isOptionActive(index))
+            return 1.0;
         return index === hoveredOptionIndex ? 0.76 : 0.22;
     }
 
@@ -180,9 +194,18 @@ Item {
 
     function steppedValue(value) {
         const clamped = Math.max(minimumValue, Math.min(maximumValue, Number(value)));
-        const step = Math.max(0.000001, Number(valueStep));
-        return Math.max(minimumValue, Math.min(maximumValue,
-                        minimumValue + Math.round((clamped - minimumValue) / step) * step));
+        const major = Number(numericDetentInterval);
+        const useMajor = Number.isFinite(major) && major > 0;
+        const step = useMajor ? major : Math.max(0.000001, Number(valueStep));
+        const origin = useMajor ? Number(numericDetentOrigin) : minimumValue;
+        const snapped = origin + Math.round((clamped - origin) / step) * step;
+        // Always retain both hard endpoints, even if they are not multiples
+        // of the detent interval. Never wrap back through the unused arc.
+        const endpoint = Math.abs(clamped - minimumValue) <= Math.abs(clamped - snapped)
+                         ? minimumValue : snapped;
+        const upper = Math.abs(clamped - maximumValue) < Math.abs(clamped - endpoint)
+                      ? maximumValue : endpoint;
+        return Math.max(minimumValue, Math.min(maximumValue, upper));
     }
 
     function finishFreePosition() {
@@ -383,7 +406,9 @@ Item {
             return;
         if (selectorMode === "continuous") {
             const base = pendingNumeric ? pendingNumericValue : currentValue;
-            requestNumericValue(base + Number(delta) * Math.max(0.000001, valueStep));
+            const interval = numericDetentInterval > 0
+                             ? numericDetentInterval : Math.max(0.000001, valueStep);
+            requestNumericValue(base + Number(delta) * interval);
         } else {
             requestIndex((pendingIndex >= 0 ? pendingIndex : currentIndex) + Number(delta));
         }
@@ -852,6 +877,58 @@ Item {
             }
         }
 
+        // Six-hour tactile detents get understated cyan marks, not 28
+        // competing labels. Where a DAY number exists, its label replaces
+        // the tick. This feature is opt-in for the Clock interval dial.
+        Repeater {
+            model: dialRoot.selectorMode === "continuous"
+                   && dialRoot.showNumericDetentTicks
+                   && dialRoot.numericDetentInterval > 0
+                   ? Math.max(0, Math.floor(
+                       (dialRoot.maximumValue - dialRoot.numericDetentOrigin)
+                       / dialRoot.numericDetentInterval))
+                   : 0
+
+            delegate: Item {
+                id: detentTick
+                required property int index
+                readonly property real numericValue:
+                    dialRoot.numericDetentOrigin
+                    + (index + 1) * dialRoot.numericDetentInterval
+                readonly property real angle: dialRoot.angleForValue(numericValue)
+                readonly property real radians: angle * Math.PI / 180
+                readonly property real radiusFromCenter: 51
+                readonly property bool active:
+                    Math.abs(dialRoot.previewNumericValue - numericValue) < 0.1
+
+                visible: numericValue >= dialRoot.minimumValue
+                         && numericValue <= dialRoot.maximumValue
+                         && (!dialRoot.numericReferenceValues
+                             || dialRoot.numericReferenceValues.indexOf(numericValue) < 0)
+
+                width: 6
+                height: 6
+                x: dialStage.width / 2 + Math.cos(radians) * radiusFromCenter - width / 2
+                y: dialStage.height / 2 + Math.sin(radians) * radiusFromCenter - height / 2
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 2
+                    height: 5
+                    rotation: detentTick.angle - 90
+                    color: detentTick.active ? Colors.orange : dialRoot.labelColor
+                    opacity: detentTick.active ? 1.0 : 0.66
+                    layer.enabled: detentTick.active
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: Colors.orange
+                        shadowOpacity: 0.95
+                        shadowBlur: 0.82
+                    }
+                }
+            }
+        }
+
         // Each printed position is itself a direct-jump control.
         Repeater {
             model: dialRoot.optionCount()
@@ -882,18 +959,20 @@ Item {
                         /^[+-]?\d/.test(dialRoot.optionDisplay(index))
                         ? dialRoot.numericLabelPixelSize
                         : dialRoot.textLabelPixelSize
-                    color: index === dialRoot.indicatedIndex
-                           ? dialRoot.markerColor
+                    color: dialRoot.isOptionActive(index)
+                           ? (dialRoot.selectorMode === "continuous"
+                              ? Colors.orange : dialRoot.markerColor)
                            : dialRoot.labelColor
 
                     layer.enabled: true
                     layer.effect: MultiEffect {
                         shadowEnabled: true
-                        shadowColor: optionMark.index === dialRoot.indicatedIndex
-                                     ? dialRoot.markerColor
+                        shadowColor: dialRoot.isOptionActive(optionMark.index)
+                                     ? (dialRoot.selectorMode === "continuous"
+                                        ? Colors.orange : dialRoot.markerColor)
                                      : dialRoot.labelColor
                         shadowOpacity: dialRoot.optionGlowStrength(optionMark.index)
-                        shadowBlur: optionMark.index === dialRoot.indicatedIndex ? 0.85 : 0.46
+                        shadowBlur: dialRoot.isOptionActive(optionMark.index) ? 0.95 : 0.46
                     }
                 }
 

@@ -693,6 +693,7 @@ Column {
         ManagerArea {
             id: intakeBriefField
             caption: "YOUR INSTRUCTIONS // WHAT IS THIS AI WORKING ON?"
+            editHeight: 156
             onEdited: root.invalidateIntake()
         }
         HospitalActionButton {
@@ -1620,10 +1621,11 @@ Column {
         id: managerArea
         property string caption: ""
         property alias value: edit.text
+        property int editHeight: 79
         signal edited()
         width: root.width
         spacing: 3
-        height: 94
+        height: editHeight + 15
         GohuText {
             text: managerArea.caption
             color: Colors.blue
@@ -1633,7 +1635,7 @@ Column {
         }
         Rectangle {
             width: parent.width
-            height: 79
+            height: managerArea.editHeight
             color: Colors.black
             border.width: 1
             border.color: Colors.magenta

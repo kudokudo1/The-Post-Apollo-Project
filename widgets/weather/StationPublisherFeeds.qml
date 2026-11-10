@@ -12,6 +12,9 @@ Column {
     // its scroll body. This component still owns the only two RSS services,
     // and keeps VIEW/HIDE plus headlines in the body below.
     property bool pinnedRequests: false
+    // M9 // NEWS/REPORTS pins VIEW/HIDE beside the cyan headline title;
+    // the same single RSS component keeps all expanded article rows below.
+    property bool pinnedViews: false
     // Preserve GDELT's original visual order until the operator opens a feed.
     property string expandedPublisher: ""
     spacing: 8
@@ -36,6 +39,14 @@ Column {
             return false;
         expandedPublisher = feedId;
         return backend.request();
+    }
+    function togglePublisherView(feedId) {
+        const backend = feedId === "bbc-world" ? bbc
+            : feedId === "al-jazeera-english" ? alJazeera : null;
+        if (!stationOpen || !visible || !backend || !backend.ready)
+            return false;
+        expandedPublisher = expandedPublisher === feedId ? "" : feedId;
+        return true;
     }
 
     StationSectionDivider {
@@ -69,12 +80,13 @@ Column {
 
             Row {
                 width: parent.width
-                height: 32
+                visible: !(publisherFeeds.pinnedRequests && publisherFeeds.pinnedViews)
+                height: visible ? 32 : 0
                 spacing: 8
 
                 ActionButton {
-                    // Original inline requests remain for CLASSIC and
-                    // OVERVIEW; focused REPORTS uses the fixed top rail.
+                    // CLASSIC keeps original inline requests; fixed REPORTS
+                    // routes use the already-present top request rail.
                     visible: !publisherFeeds.pinnedRequests
                     width: publisherFeeds.pinnedRequests ? 0 : 150
                     height: 30
@@ -91,7 +103,8 @@ Column {
                     }
                 }
                 ActionButton {
-                    width: 86
+                    visible: !publisherFeeds.pinnedViews
+                    width: publisherFeeds.pinnedViews ? 0 : 86
                     height: 30
                     label: publisherFeeds.expandedPublisher
                            === publisherSourceRow.modelData.id ? "HIDE" : "VIEW"
@@ -115,6 +128,18 @@ Column {
                 }
             }
 
+            // A short source status remains in the report body after the
+            // old button row is replaced by pinned VIEW/HIDE actions.
+            QuietText {
+                visible: publisherFeeds.pinnedViews
+                width: parent.width
+                text: publisherSourceRow.modelData.label + " // "
+                      + publisherSourceRow.backend.sourceState
+                font.pixelSize: 9
+                color: publisherSourceRow.backend.failed
+                    ? Colors.orange : publisherSourceRow.sourceColor
+                elide: Text.ElideRight
+            }
             QuietText {
                 width: parent.width
                 text: publisherSourceRow.backend.retryWaitSeconds > 0

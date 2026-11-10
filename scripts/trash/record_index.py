@@ -123,10 +123,15 @@ def _event_rows(doc):
             if not isinstance(snap, dict) or _timestamp(snap.get("capturedAtMs")) == 0:
                 raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
         stamp = max(_timestamp(snap.get("capturedAtMs")) for snap in snaps)
-        rows.append(_row("WEATHER // EVENT", "weather-event:" + key,
-                         event.get("title") or event_id, stamp,
-                         f"{source.upper()} // {event_id} // {len(snaps)} SNAPSHOTS",
-                         "EVENT HISTORY"))
+        row = _row("WEATHER // EVENT", "weather-event:" + key,
+                   event.get("title") or event_id, stamp,
+                   f"{source.upper()} // {event_id} // {len(snaps)} SNAPSHOTS",
+                   "EVENT HISTORY")
+        # Exact identity + latest snapshot time are revalidated against the
+        # original Weather archive before creating an independent copy.
+        row["sourceEventKey"] = key
+        row["sourceLastCapturedAtMs"] = stamp
+        rows.append(row)
     return rows
 
 

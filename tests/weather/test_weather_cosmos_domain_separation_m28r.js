@@ -24,7 +24,7 @@ const [cosmos,weather,workspace,nav]=contexts;
 const sectionNames=src=>[...new Set([...src.matchAll(/sectionVisible\("([^"]+)"\)/g)].map(m=>m[1]))].sort();
 const astronomy=["header","astronomy","moon","iss","eclipses","celestial-fix","planet-clock","meteor"];
 const terrestrial={
-  "runtime":"weather/conditions/current",
+  "runtime":"weather/services/health",
   "current":"weather/conditions/current",
   "atmosphere":"weather/conditions/current",
   "hourly":"weather/forecasts/hourly",
@@ -46,7 +46,9 @@ test("all 14 original SKY sections are partitioned: observatory in COSMOS, terre
     assert.equal(cosmos.visibleFor("sky","cosmos/sky/full",section),
       astronomy.includes(section),"COSMOS astronomical ownership "+section);
     if(Object.prototype.hasOwnProperty.call(terrestrial,section))
-      assert.equal(weather.visibleFor("sky",terrestrial[section],section),true,
+      assert.equal(section==="runtime"
+        ? weather.kindForRoute(terrestrial[section])==="services"
+        : weather.visibleFor("sky",terrestrial[section],section),true,
         "WEATHER must render original "+section);
     else if(section !== "header")
       for(const p of ["weather/conditions/current","weather/forecasts/hourly"])
@@ -67,10 +69,12 @@ test("NOW + AIR shows Earth observations and atmosphere; FORECAST shows full hou
   assert.equal(nav.findRoute(forecast.path).subject,"weather");
   assert.equal(weather.kindForRoute(now.path),"sky");
   assert.equal(weather.kindForRoute(forecast.path),"sky");
-  for(const s of ["header","runtime","current","atmosphere"])
+  for(const s of ["header","current","atmosphere"])
     assert.equal(weather.visibleFor("sky",now.path,s),true);
   for(const s of ["header","hourly","daily","twilight"])
     assert.equal(weather.visibleFor("sky",forecast.path,s),true);
+  assert.equal(weather.visibleFor("sky",now.path,"runtime"),false);
+  assert.equal(weather.kindForRoute("weather/services/health"),"services");
   assert.equal(weather.visibleFor("sky",now.path,"hourly"),false);
   assert.equal(weather.visibleFor("sky",forecast.path,"current"),false);
   for(const route of ["weather/conditions/air","weather/conditions/pollen","weather/forecasts/air"]){

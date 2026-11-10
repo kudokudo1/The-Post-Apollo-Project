@@ -510,8 +510,10 @@ C4B_RUNNING_HOST_PROBE
   # Status-only diagnostics, never echo the producer's unvalidated bytes.
   # Distinguish a genuinely empty stdout capture from later file replacement.
   if [[ -s "$c4d_record" ]]; then
+    c4d_capture_initial=PRESENT
     echo "C4D_PRODUCER_DIAG // DIRECT_STDOUT_CAPTURE_PRESENT"
   else
+    c4d_capture_initial=EMPTY
     echo "C4D_PRODUCER_DIAG // DIRECT_STDOUT_CAPTURE_EMPTY"
   fi
   echo "C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED"
@@ -532,6 +534,16 @@ C4B_RUNNING_HOST_PROBE
   # Python is deleted; the unchanged controller relays its final log tail.
   # Serial I/O is strictly best effort and must NEVER grant host authority or
   # change the signed service's acceptance/rollback lifecycle.
+  # Keep a fixed, non-sensitive copy of the creation-time vs relay-time
+  # capture state in the existing final guest-log tail. These are size-only
+  # diagnostics, NOT proof of report origin, contents, signer, or consent.
+  # The later nofollow/inode/schema checks remain authoritative.
+  if [[ -s "$c4d_record" ]]; then
+    c4d_capture_at_relay=PRESENT
+  else
+    c4d_capture_at_relay=EMPTY
+  fi
+  echo "C4D_PRODUCER_DIAG // capture_initial=$c4d_capture_initial capture_at_relay=$c4d_capture_at_relay"
   if [[ -c /dev/ttyS0 ]]; then
     timeout --signal=TERM --kill-after=1s 6s "$python" -I -B - \
       "$c4d_record" /dev/ttyS0 <<'C4B_SINGLE_UART_RELAY' || true

@@ -9,6 +9,10 @@ on:
       - "services/hospital/HospitalGitHubOwnerPolicy.js"
       - "services/hospital/HospitalConversationIntakePolicy.js"
       - "services/hospital/HospitalDictationTextPolicy.js"
+      - "services/hospital/HospitalLiveDictationService.qml"
+      - "scripts/hospital-live-dictation.py"
+      - "tests/hospital/test_manage_live_dictation.py"
+      - "tests/hospital/test_manage_inline_live_ui_contracts.py"
       - "tests/hospital/test_surgery_dictation_text_policy.js"
       - "tests/hospital/test_surgery_multiline_dictation_ui_contracts.py"
       - "tests/hospital/test_surgery_manage_input_visuals.py"
@@ -31,6 +35,10 @@ on:
       - "services/hospital/HospitalGitHubOwnerPolicy.js"
       - "services/hospital/HospitalConversationIntakePolicy.js"
       - "services/hospital/HospitalDictationTextPolicy.js"
+      - "services/hospital/HospitalLiveDictationService.qml"
+      - "scripts/hospital-live-dictation.py"
+      - "tests/hospital/test_manage_live_dictation.py"
+      - "tests/hospital/test_manage_inline_live_ui_contracts.py"
       - "tests/hospital/test_surgery_dictation_text_policy.js"
       - "tests/hospital/test_surgery_multiline_dictation_ui_contracts.py"
       - "tests/hospital/test_surgery_manage_input_visuals.py"
@@ -62,6 +70,8 @@ jobs:
           node tests/hospital/test_conversation_intake_policy.js
           node --check services/hospital/HospitalDictationTextPolicy.js
           node tests/hospital/test_surgery_dictation_text_policy.js
+          python3 -m py_compile scripts/hospital-live-dictation.py
+          python3 tests/hospital/test_manage_live_dictation.py
       - name: Verify embedded Surgery manager and existing UX contract
         run: |
           python3 tests/hospital/test_surgery_inline_workforce_ui_contracts.py
@@ -69,6 +79,7 @@ jobs:
           python3 tests/hospital/test_conversation_intake_ui_contracts.py
           python3 tests/hospital/test_surgery_multiline_dictation_ui_contracts.py
           python3 tests/hospital/test_surgery_manage_input_visuals.py
+          python3 tests/hospital/test_manage_inline_live_ui_contracts.py
           python3 tests/hospital/test_workforce_roster_ui_contracts.py
           python3 tests/hospital/test_worker_identity_editor_contracts.py
           python3 tests/hospital/test_registered_worker_routes.py

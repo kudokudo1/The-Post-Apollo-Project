@@ -219,7 +219,7 @@ class LiveDictationTests(unittest.TestCase):
             helper.write_text(
                 "#!/usr/bin/env bash\n"
                 "if [[ \"$1\" == '--check' ]]; then exit 0; fi\n"
-                "printf '%s' \"$\" > \"$HOSPITAL_MODEL_PID_FILE\"\n"
+                "printf '%s' \"$BASHPID\" > \"$HOSPITAL_MODEL_PID_FILE\"\n"
                 "exec sleep 30\n"
             )
             helper.chmod(0o700)
@@ -235,7 +235,7 @@ class LiveDictationTests(unittest.TestCase):
                 model_pid = None
                 while time.monotonic() < deadline:
                     # The fixture PID file may exist before its write closes.
-                    # Do not race the shell writing "$" into that file.
+                    # Do not race the shell completing its PID file write.
                     value = pid_file.read_text().strip() if pid_file.exists() else ""
                     if value.isdigit():
                         model_pid = int(value)

@@ -81,21 +81,26 @@ class TimeResyncPopupContracts(unittest.TestCase):
         self.assertIn("TimeSettings.cancelResync();", TIMEW)
         self.assertIn("width: 308", POPUP)
         self.assertIn("height: 320", POPUP)
-
+   
     def test_popup_is_right_anchored_beneath_both_header_buttons(self):
         placement = TIMEW.split("TimeResyncPopup {", 1)[1].split(
-            "onCloseRequested:", 1)[0]
-        self.assertIn("const close = closeButton.mapToItem(timewFrame, 0, 0);",
-                      placement)
-        self.assertIn("const rightEdge = close.x + closeButton.width;", placement)
-        self.assertIn("rightEdge - width", placement)
-        self.assertIn("timewFrame.width - width - 8", placement)
-        self.assertIn("Math.max(8, Math.min(", placement)
-        self.assertIn("y: closeButton.mapToItem(timewFrame, 0, 0).y", placement)
-        self.assertIn("+ closeButton.height + 7", placement)
-        self.assertNotIn("at.x + syncButton.width - width", placement)
-        # The outside-click detector still maps the popup's actual bounds.
-        self.assertIn("resyncPopup.mapToItem(timewFrame, 0, 0)", TIMEW)
+            "onCloseRequested:", 1
+        )[0]
+
+        self.assertIn("anchors.right: parent.right", placement)
+        self.assertIn("anchors.rightMargin: 14", placement)
+        self.assertIn(
+            "y: closeButton.mapToItem(timewFrame, 0, 0).y", placement
+        )
+        self.assertIn("+ closeButton.height + 25", placement)
+
+        self.assertNotIn("x: {", placement)
+        self.assertNotIn("rightEdge - width", placement)
+
+        # Preserve outside-click dismissal.
+        self.assertIn(
+            "resyncPopup.mapToItem(timewFrame, 0, 0)", TIMEW
+        )
         self.assertIn("if (!onTrigger && !onPopup)", TIMEW)
 
     def test_popup_owns_glowing_border_and_background(self):

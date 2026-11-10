@@ -6862,14 +6862,12 @@ PanelWindow {
             id: resyncPopup
             z: 100
             visible: timew.menuOpen && timew.resyncPopupOpen
-            x: {
-                const close = closeButton.mapToItem(timewFrame, 0, 0);
-                const rightEdge = close.x + closeButton.width;
-                return Math.max(8, Math.min(timewFrame.width - width - 8,
-                                            rightEdge - width));
-            }
-            y: closeButton.mapToItem(timewFrame, 0, 0).y
-               + closeButton.height + 7
+
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+
+            y: closeButton.mapToItem(timewFrame, 0, 0).y + closeButton.height + 25
+
             onCloseRequested: timew.dismissResyncPopup()
         }
     }

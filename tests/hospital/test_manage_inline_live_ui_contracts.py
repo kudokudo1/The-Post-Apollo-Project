@@ -110,6 +110,9 @@ check('property var liveEngine: null' in frontdesk
       and 'signal liveTextReady(string text)' in frontdesk
       and 'signal transcriptionFinished(bool submitRequested)' in frontdesk,
       "Front desks forward live text from the same Manage worker, no nested mic")
+check('liveEngine.vadActive = vadActive' in frontdesk
+      and frontdesk.count('liveEngine.vadActive = false') >= 3,
+      "Front-desk VAD applies only to its own capture, not the next Manage job")
 check('maxPackets: 48' in host and 'chunkSeconds: 2' in host
       and 'property int maxPackets: 30' in live
       and 'packetCount > maxPackets' in live,

@@ -2361,19 +2361,26 @@ test("U9g native fixture actively hides and reopens the selector before pointer 
 test("CPU++ stage-1 Favorites++ scroll indicators cover both left lists and middle saved items",()=>{
   const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
   const filters=[
-    ["collectionScroll","collectionScrollTrack","overview"],
-    ["dossierScroll","dossierScrollTrack","overview"],
-    ["listScroll","listScrollTrack","selector"]
+    ["collectionScroll","collectionScrollTrack","collectionViewportHost","overview"],
+    ["dossierScroll","dossierScrollTrack","dossierViewportHost","overview"],
+    ["listScroll","listScrollTrack","listViewportHost","selector"]
   ];
   assert.match(pane,/property alias collectionScrollArea: collectionScroll/);
   assert.match(pane,/property alias dossierScrollArea: dossierScroll/);
   assert.match(pane,/property alias listScrollArea: listScroll/);
-  for(const [viewport,indicator,area] of filters) {
-    const start=pane.indexOf("id: "+indicator);
-    assert.ok(start>=0,indicator);
-    const section=pane.slice(start,start+340);
+  assert.match(pane,/property alias collectionScrollIndicator: collectionScrollTrack/);
+  assert.match(pane,/property alias dossierScrollIndicator: dossierScrollTrack/);
+  assert.match(pane,/property alias listScrollIndicator: listScrollTrack/);
+  for(const [viewport,indicator,wrapper,area] of filters) {
+    const wrapperStart=pane.indexOf("id: "+wrapper);
+    const viewportStart=pane.indexOf("id: "+viewport,wrapperStart);
+    const barStart=pane.indexOf("id: "+indicator,viewportStart);
+    assert.ok(wrapperStart>=0 && viewportStart>wrapperStart && barStart>viewportStart,
+      "the scroll area and rail share a stable Item wrapper: "+viewport);
+    assert.match(pane.slice(wrapperStart-42,wrapperStart),/Item \{/);
+    const section=pane.slice(barStart,barStart+370);
     assert.match(section,new RegExp("flickable: "+viewport));
-    assert.match(section,/mountingParent: pane/);
+    assert.match(section,new RegExp("mountingParent: "+wrapper));
     assert.match(section,new RegExp("geometryHost: "+viewport));
     assert.match(section,/handleStyle: "bar"/);
     assert.match(section,/maximumBarHandleHeight: 42/);
@@ -2390,14 +2397,11 @@ test("CPU++ stage-1 Favorites++ scroll indicators cover both left lists and midd
     assert.match(section,new RegExp(
       "width: Math\\.max\\(0,"+viewport+"\\.width-24\\)"));
   }
-  const start=pane.indexOf("id: collectionScrollTrack");
-  const end=pane.indexOf("id: details",start);
-  const bars=pane.slice(start,end);
-  assert.equal((bars.match(/NeonScrollBar \{/g)||[]).length,2,
-    "collection and dossier indicators share overview pane");
-  assert.ok(pane.indexOf("id: listScrollTrack")>start);
-  assert.ok(pane.indexOf("id: listScrollTrack")<end);
+  assert.equal((pane.match(/NeonScrollBar \{/g)||[]).length,3);
   assert.match(pane,/onClicked: pane\.selectionRequested\(modelData\.key\)/);
+  const native=read("tests/cpuplus/fixtures/CpuPlusFavoritesNative.qml");
+  assert.match(native,/CPU_SCROLL_STAGE1_PASS \/\/ 3_BOUNDED_FAVORITES_RAILS/);
+  assert.match(native,/bar\.parent!==v\.parent/);
 });
 
 test("CPU++ stage-1 Location panes use viewport-bound rounded bars and clear gutters",()=>{

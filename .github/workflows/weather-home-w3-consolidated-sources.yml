@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'widgets/weather/StationHome.qml'
+      - 'widgets/weather/StationWeatherSubjectPanelPolicy.js'
+      - 'widgets/weather/StationWeatherSubjectPane.qml'
+      - 'tests/weather/test_weather_w4_services_history.js'
       - 'widgets/weather/StationHomeMetricCard.qml'
       - 'widgets/weather/WeatherTrendInspector.qml'
       - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
@@ -30,6 +33,7 @@ jobs:
       - name: W3 HOME source-only routes, compact HISTORY and existing navigation/store contracts
         run: |
           node --test tests/weather/test_home_w3_sources_and_history_fit.js
+          node --test tests/weather/test_weather_w4_services_history.js
           node --test tests/weather/test_workspace_landing_w1.js
           node --test tests/weather/test_workspace_left_rail_w1r.js
           node --test tests/weather/test_home_deck_w2a.js

@@ -46,6 +46,8 @@ PanelWindow {
     // Presentation choice is local to TimeW; it does not change the Clock
     // dock or Hub preference. The Hub helper is pure and owns no clock tick.
     property bool use24Hour: true
+    // Shell provides the actual dock Clock instance for the 12/24H switch.
+    property var dockClock: null
     // Keep raw system time unchanged for Hub / legacy TimeW contracts.
     readonly property var localTimeSnapshot:
         LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)
@@ -519,6 +521,7 @@ PanelWindow {
 
     // TOOLS subview selection is local and does not affect the other modes.
     property string toolsView: "stopwatch"
+    property string settingsView: "visual"
 
     // COUNTDOWN // up to eight independent, named session-local timers.
     // One monotonic ElapsedTimer supplies timestamps for all records.
@@ -4458,7 +4461,7 @@ PanelWindow {
 
                         ModeButton {
                             width: (toolsSubModeStrip.width
-                                    - toolsSubModeStrip.spacing) / 2
+                                    - toolsSubModeStrip.spacing * 2) / 3
                             height: parent.height
                             bordered: false
                             textOnly: true
@@ -4474,7 +4477,7 @@ PanelWindow {
 
                         ModeButton {
                             width: (toolsSubModeStrip.width
-                                    - toolsSubModeStrip.spacing) / 2
+                                    - toolsSubModeStrip.spacing * 2) / 3
                             height: parent.height
                             bordered: false
                             textOnly: true
@@ -4486,6 +4489,46 @@ PanelWindow {
                                 timew.toolsView = "countdown";
                                 timew.refreshCountdowns();
                             }
+                        }
+
+                        ModeButton {
+                            width: (toolsSubModeStrip.width
+                                    - toolsSubModeStrip.spacing * 2) / 3
+                            height: parent.height
+                            bordered: false
+                            textOnly: true
+                            labelText: "ALARM"
+                            labelFontSize: 11
+                            idlePrimaryColor: timew.semanticColor
+                            selected: timew.toolsView === "alarm"
+                            onTriggered: timew.toolsView = "alarm"
+                        }
+                    }
+
+                    Column {
+                        id: alarmPlaceholderPane
+                        visible: timew.selectedMode === "tools"
+                                 && timew.toolsView === "alarm"
+                        width: parent.width
+                        spacing: 12
+                        GohuText {
+                            width: parent.width
+                            text: "ALARM // PLANNED"
+                            color: Colors.cyan
+                            font.pixelSize: 14
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "ALARM CONTROLS // NOT IMPLEMENTED"
+                            color: Colors.white
+                            font.pixelSize: 11
+                        }
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: "Navigation placeholder only. No alarm scheduling, notifications, timers or host actions run here."
+                            color: Colors.orange
+                            font.pixelSize: 10
                         }
                     }
 
@@ -6898,12 +6941,50 @@ PanelWindow {
                         }
                     }
 
+                    Row {
+                        id: settingsSubModeStrip
+                        visible: timew.selectedMode === "settings"
+                        width: parent.width
+                        height: 34
+                        spacing: 6
+                        ModeButton {
+                            width: (settingsSubModeStrip.width - settingsSubModeStrip.spacing) / 2
+                            height: parent.height
+                            bordered: false
+                            textOnly: true
+                            labelText: "VISUAL TIME"
+                            labelFontSize: 11
+                            idlePrimaryColor: timew.semanticColor
+                            selected: timew.settingsView === "visual"
+                            onTriggered: timew.settingsView = "visual"
+                        }
+                        ModeButton {
+                            width: (settingsSubModeStrip.width - settingsSubModeStrip.spacing) / 2
+                            height: parent.height
+                            bordered: false
+                            textOnly: true
+                            labelText: "SYNC"
+                            labelFontSize: 11
+                            idlePrimaryColor: timew.semanticColor
+                            selected: timew.settingsView === "sync"
+                            onTriggered: timew.settingsView = "sync"
+                        }
+                    }
+
                     TimeSettingsPane {
                         id: clockSettingsPane
                         width: parent.width
-                        height: 505
+                        height: 505 - settingsSubModeStrip.height - parent.spacing
                         visible: timew.selectedMode === "settings"
+                        settingsSection: timew.settingsView
+                        showResyncTrigger: true
                         calibratedPreview: timew.clockReadoutText
+                        dockFormatAvailable: timew.dockClock !== null
+                        dock24Hour: timew.dockClock ? timew.dockClock.is24Hour : false
+                        onDockFormatRequested: function(use24) {
+                            if (timew.dockClock !== null)
+                                timew.dockClock.is24Hour = use24;
+                        }
                     }
 
                     AngelPane {
@@ -6928,9 +7009,11 @@ PanelWindow {
                               : timew.selectedMode === "machine"
                               ? "MACHINE // LOCAL CHECKPOINTS"
                               : timew.selectedMode === "settings"
-                              ? "SETTINGS // DISPLAY OFFSET + SYSTEM STATUS"
+                              ? (timew.settingsView === "sync" ? "SETTINGS // REFERENCE + RESYNC"
+                                 : "SETTINGS // VISUAL TIME + TIMEZONE")
                               : timew.selectedMode === "tools"
-                              ? "TOOLS // STOPWATCH + COUNTDOWN // MONOTONIC"
+                              ? (timew.toolsView === "alarm" ? "TOOLS // ALARM // PLANNED"
+                                 : "TOOLS // MONOTONIC MEASUREMENT")
                               : "ANGEL // EXPLICIT JOURNAL // LOCAL ONLY"
                         color: Colors.white
                         font.pixelSize: 11

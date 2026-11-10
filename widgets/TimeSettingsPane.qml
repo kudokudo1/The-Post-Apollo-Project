@@ -4,7 +4,7 @@ import qs.services.time
 import "../components"
 
 // Settings UI only. All mutations are delegated to one reusable service.
-// No duplicate clock, timezone engine, config writer, or background sync.
+// No duplicate clock, timezone engine, or privileged host correction path.
 Item {
     id: pane
     property bool panelVisible: visible
@@ -448,7 +448,7 @@ Item {
                              ? Qt.formatDateTime(
                                  new Date(TimeSettings.autoCheckNextDueAtMs),
                                  "yyyy-MM-dd HH:mm")
-                             : "ON ENABLE")
+                             : "DUE NOW")
                     color: Colors.white
                     font.pixelSize: 10
                 }

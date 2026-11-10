@@ -361,6 +361,18 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('onLeftClicked: trashLauncher.advanceResearchBurn()', TRASH)
         self.assertNotIn('onLeftClicked: trashLauncher.confirmResearchBurn()', TRASH)
 
+    def test_burn_confirm_button_has_one_selected_border_binding(self):
+        # QML fails the entire Trash type when a property is assigned twice
+        # on one ActionButton. Check the exact native startup failure seam.
+        button = section(TRASH,
+                         'id: confirmManagedResearchBurn',
+                         'id: researchBurnFace')
+        self.assertEqual(button.count('selectedBorderColor:'), 1)
+        self.assertIn('selectedBorderColor: Colors.magenta', button)
+        self.assertIn('idleBorderColor: Colors.red', button)
+        self.assertIn('keyboardSelectedBorderColor: Colors.red', button)
+        self.assertNotIn('selectedBorderColor: Colors.red', button)
+
     def test_trash_filters_show_files_and_trashed_managed_copies(self):
         self.assertIn('property string trashViewFilter: "all"', TRASH)
         self.assertIn('readonly property var trashDisplayRows:', TRASH)

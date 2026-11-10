@@ -23,6 +23,7 @@ Column {
     // One active microphone for long-form fields; no auto submit or save.
     property string dictationField: ""
     property string dictationMode: ""
+    property string dictationOriginalText: ""
     property string dictationFeedbackField: ""
     property string dictationFeedback: ""
     property var rooms: []
@@ -214,6 +215,9 @@ Column {
         }
         root.dictationField = key;
         root.dictationMode = root.mode;
+        // A live mic locks just this editor until STOP; CANCEL restores the
+        // exact pre-recording text without losing an unrelated form's values.
+        root.dictationOriginalText = field.value;
         root.dictationFeedbackField = key;
         root.dictationFeedback = "STARTING MICROPHONE // LOCAL TRANSCRIPTION";
         const started = svc.startRecording();
@@ -226,14 +230,51 @@ Column {
     }
     function cancelDictation() {
         const target = root.dictationField;
+        const field = root.voiceAreaForKey(target);
         if (root.speechInputService && root.speechInputService.busy)
             root.speechInputService.cancel();
+        if (field && root.speechInputService
+                && root.speechInputService.liveStreaming === true)
+            field.value = root.dictationOriginalText;
         root.dictationField = "";
         root.dictationMode = "";
+        root.dictationOriginalText = "";
         if (target) {
             root.dictationFeedbackField = target;
             root.dictationFeedback = "DICTATION CANCELLED // ORIGINAL TEXT PRESERVED";
         }
+    }
+    function acceptLivePhrase(text) {
+        const key = root.dictationField;
+        const field = root.voiceAreaForKey(key);
+        if (!root.active || !field || root.mode !== root.dictationMode
+                || (key === "intake" ? root.mode !== "SETUP" : root.mode !== "JOB"))
+            return false;
+        const result = DictationTextPolicy.appendTranscription(
+            field.value, text, field.voiceMaxLength);
+        root.dictationFeedbackField = key;
+        if (!result.accepted) {
+            if (result.reason.indexOf("TEXT LIMIT") >= 0
+                    && root.speechInputService.recording)
+                root.speechInputService.stopRecording(false);
+            root.dictationFeedback = result.reason;
+            return false;
+        }
+        field.value = result.text;
+        root.dictationFeedback = "LIVE TEXT // EDIT AFTER STOP // NEVER AUTO SUBMITTED";
+        return true;
+    }
+    function finishLiveDictation() {
+        if (!root.dictationField)
+            return;
+        const key = root.dictationField;
+        const field = root.voiceAreaForKey(key);
+        root.dictationField = "";
+        root.dictationMode = "";
+        root.dictationOriginalText = "";
+        root.dictationFeedbackField = key;
+        root.dictationFeedback = "LIVE TRANSCRIPT READY // REVIEW BEFORE SUBMIT";
+        if (field) field.focusEditorAtEnd();
     }
     function acceptDictation(text) {
         const key = root.dictationField;
@@ -627,19 +668,25 @@ Column {
     Connections {
         target: root.speechInputService
         function onTranscriptionReady(text, submitRequested) {
-            // Intentionally ignore submitRequested: dictation never submits.
-            root.acceptDictation(text);
+            // Legacy post-STOP recorder fallback, never a form submission.
+            if (!root.speechInputService
+                    || root.speechInputService.liveStreaming !== true)
+                root.acceptDictation(text);
+        }
+        function onLiveTextReady(text) {
+            root.acceptLivePhrase(text);
+        }
+        function onLiveFinished() {
+            root.finishLiveDictation();
         }
         function onVoiceError(message) {
             if (!root.dictationField)
                 return;
-            root.dictationFeedbackField = root.dictationField;
-            root.dictationFeedback = String(message || "LOCAL DICTATION FAILED").slice(0,180);
-            // Also discard any partially recorded local WAV on error.
-            if (root.speechInputService)
-                root.speechInputService.cancel();
-            root.dictationField = "";
-            root.dictationMode = "";
+            const messageText = String(message || "LOCAL DICTATION FAILED").slice(0,180);
+            const fieldKey = root.dictationField;
+            root.cancelDictation();
+            root.dictationFeedbackField = fieldKey;
+            root.dictationFeedback = messageText;
         }
     }
 

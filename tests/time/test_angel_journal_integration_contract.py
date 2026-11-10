@@ -95,10 +95,11 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn('AngelObservationsStore.clearVerifiedDraft()', PANE)
         self.assertIn('AngelObservationsStore.retryNoteDraft()', PANE)
         self.assertIn('readOnly: pane.reviewingDraft || pane.noteInFlightId !== ""', PANE)
-        self.assertIn('available: pane.noteInFlightId === ""', PANE)
+        self.assertIn('available: pane.reviewingDraft || pane.noteInFlightId === ""', PANE)
         save = PANE.split('function saveNote() {', 1)[1].split(
             'function retryDraft() {', 1)[0]
-        self.assertNotIn('closeNoteEditor()', save)
+        self.assertIn('else if (AngelObservationsStore.lastNoteUnchanged)', save)
+        self.assertIn('pane.closeNoteEditor()', save)
         receipt = PANE.split('function onNoteSaved(id)', 1)[1].split(
             'function onNoteSaveFailed', 1)[0]
         self.assertIn('pane.closeNoteEditor()', receipt)
@@ -107,6 +108,38 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertNotIn('pane.closeNoteEditor()', failure)
         self.assertIn('COPY TEXT BEFORE EXIT', failure)
         self.assertNotIn('FileView {', PANE)
+
+    def test_noop_note_and_readonly_review_never_start_writes(self):
+        service = STORE.split('function saveObservationNote(id, note) {', 1)[1].split(
+            'function acceptDraftLoaded(raw) {', 1)[0]
+        self.assertIn('lastNoteUnchanged = false;', service)
+        self.assertIn('const next = Journal.setNote(document, id, note);', service)
+        self.assertIn('const storedNote = row && typeof row.note', service)
+        self.assertIn('const desiredNote = note.trim();', service)
+        self.assertIn('if (storedNote === desiredNote)', service)
+        self.assertIn('lastNoteUnchanged = true;', service)
+        self.assertIn('NOTE UNCHANGED // NO WRITE NEEDED', service)
+        self.assertLess(service.index('if (storedNote === desiredNote)'),
+                        service.index('Draft.create(row, note, Date.now())'))
+        self.assertLess(service.index('if (storedNote === desiredNote)'),
+                        service.index('draftFile.setText('))
+        self.assertLess(service.index('if (storedNote === desiredNote)'),
+                        service.index('saveWatchdog.restart()'))
+        review = PANE.split('function reviewNoteDraft() {', 1)[1].split(
+            'function closeNoteEditor() {', 1)[0]
+        self.assertIn('if (pane.reviewingDraft && pane.editingNoteId === draft.id)', review)
+        self.assertIn('pane.closeNoteEditor()', review)
+        self.assertNotIn('saveObservationNote(', review)
+        self.assertNotIn('retryNoteDraft(', review)
+        self.assertNotIn('clearVerifiedDraft(', review)
+        close = PANE.split('function closeNoteEditor() {', 1)[1].split(
+            'function saveNote() {', 1)[0]
+        self.assertIn('pane.noteInFlightId !== "" && !pane.reviewingDraft', close)
+        self.assertIn('REVIEW CLOSED // NO WRITE', close)
+        self.assertIn('label: pane.reviewingDraft ? "CLOSE REVIEW" : "REVIEW"', PANE)
+        self.assertIn('label: pane.reviewingDraft ? "CLOSE" : "CANCEL"', PANE)
+        self.assertIn('available: pane.reviewingDraft || pane.noteInFlightId === ""', PANE)
+        self.assertIn('WRITE STALLED // RESTART TO CHECK DISK // NO RETRY', PANE)
 
     def test_recording_is_explicit_and_preserves_utc_context(self):
         self.assertIn("function recordClock()", PANE)

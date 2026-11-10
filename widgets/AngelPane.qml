@@ -130,8 +130,16 @@ Item {
 
     function reviewNoteDraft() {
         const draft = AngelObservationsStore.noteDraft;
-        if (!draft || pane.noteInFlightId !== "")
+        if (!draft)
             return;
+        // REVIEW is a read-only toggle, never a write request.
+        // Pressing it twice dismisses the preview rather than reopening it.
+        if (pane.reviewingDraft && pane.editingNoteId === draft.id) {
+            pane.closeNoteEditor();
+            return;
+        }
+        if (pane.noteInFlightId !== "")
+            return; // A different unsaved note must remain visible.
         pane.selectedId = draft.id;
         pane.pendingDeleteId = "";
         pane.reviewingDraft = true;
@@ -142,11 +150,16 @@ Item {
     }
 
     function closeNoteEditor() {
-        if (pane.noteInFlightId !== "")
+        // A read-only review never owns an in-flight writer. It must remain
+        // dismissible regardless of the journal store's stalled state.
+        if (pane.noteInFlightId !== "" && !pane.reviewingDraft)
             return; // Never discard the visible note during a write.
+        const wasReview = pane.reviewingDraft;
         pane.editingNoteId = "";
         pane.reviewingDraft = false;
         noteField.focus = false;
+        if (wasReview)
+            pane.noteSaveFeedback = "REVIEW CLOSED // NO WRITE";
     }
 
     function saveNote() {
@@ -160,6 +173,12 @@ Item {
             // journal FileView.onSaved receipt below.
             pane.noteInFlightId = id;
             pane.noteSaveFeedback = "WRITING // NOTE KEPT OPEN";
+        } else if (AngelObservationsStore.lastNoteUnchanged) {
+            // No sidecar, main journal, or watchdog ran. Dismiss the
+            // unchanged editor immediately, without pretending a write
+            // acknowledgement was received.
+            pane.closeNoteEditor();
+            pane.noteSaveFeedback = "NOTE UNCHANGED // NO WRITE NEEDED";
         } else {
             pane.noteSaveFeedback = AngelObservationsStore.feedback;
         }
@@ -490,10 +509,12 @@ Item {
                 width: parent.width
                 font.pixelSize: 9
                 color: Colors.orange
-                text: "NOTE RECOVERY // "
-                      + AngelObservationsStore.noteDraftDisposition.toUpperCase()
-                      + (AngelObservationsStore.noteDraft
-                         ? " // " + AngelObservationsStore.noteDraft.id : "")
+                text: AngelObservationsStore.storageState === "stalled"
+                      ? "WRITE STALLED // RESTART TO CHECK DISK // NO RETRY"
+                      : "NOTE RECOVERY // "
+                        + AngelObservationsStore.noteDraftDisposition.toUpperCase()
+                        + (AngelObservationsStore.noteDraft
+                           ? " // " + AngelObservationsStore.noteDraft.id : "")
             }
             Row {
                 width: parent.width
@@ -531,7 +552,7 @@ Item {
                 AngelActionButton {
                     width: Math.max(20, (parent.width - parent.spacing * 2) / 3)
                     height: parent.height
-                    label: "REVIEW"
+                    label: pane.reviewingDraft ? "CLOSE REVIEW" : "REVIEW"
                     labelPixelSize: 8
                     accentColor: Colors.magenta
                     available: AngelObservationsStore.draftState === "ready"
@@ -730,10 +751,10 @@ Item {
                 id: cancelNoteButton
                 width: 60
                 height: parent.height
-                label: "CANCEL"
+                label: pane.reviewingDraft ? "CLOSE" : "CANCEL"
                 labelPixelSize: 9
                 accentColor: Colors.cyan
-                available: pane.noteInFlightId === ""
+                available: pane.reviewingDraft || pane.noteInFlightId === ""
                 onLeftClicked: pane.closeNoteEditor()
             }
         }

@@ -324,12 +324,11 @@ C4B_C3B_DIR_DIAG
   # remains authoritative; an empty capture cannot grant host trust.
   [[ ! -e "$c4d_record" && ! -L "$c4d_record" ]] ||
     fail "C4D_PRODUCER_RECORD_PREEXISTS"
-  (
-    set -C
-    GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1 \
-      timeout --signal=TERM --kill-after=5s 60s "$python" -I -B - \
-        "$pid" "$assets/c3d-status.rpm" > "$c4d_record" <<'C4B_RUNNING_HOST_PROBE'
-  ) || fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"
+  set -C
+  GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1 \
+    timeout --signal=TERM --kill-after=5s 60s "$python" -I -B - \
+      "$pid" "$assets/c3d-status.rpm" > "$c4d_record" <<'C4B_RUNNING_HOST_PROBE' ||
+    { set +C; fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"; }
 import grp, hashlib, json, os, pwd, re, stat, subprocess, sys
 from pathlib import Path
 
@@ -507,6 +506,7 @@ except (Refused, OSError, KeyError, ValueError, UnicodeError) as exc:
           (str(exc) if isinstance(exc, Refused) else type(exc).__name__), flush=True)
     sys.exit(2)
 C4B_RUNNING_HOST_PROBE
+  set +C
   # Status-only diagnostics, never echo the producer's unvalidated bytes.
   # Distinguish a genuinely empty stdout capture from later file replacement.
   if [[ -s "$c4d_record" ]]; then

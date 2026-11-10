@@ -32,6 +32,9 @@ Rectangle {
     // MEDIA owns a dedicated SERVICES surface for RSS publisher feeds,
     // runtime health and source racks. NEWS still owns GDELT headlines.
     property bool mediaNewsServicesSplit: false
+    // Only the focused MEDIA NEWS/REPORTS screen pins a compact control
+    // deck. CLASSIC NEWS and the half-height OVERVIEW stay unchanged.
+    property bool pinReportsToolbar: false
     function newsGroupVisible(group) {
         return MediaPanelPolicy.newsGroupVisible(newsSubjectRoute,group);
     }
@@ -1725,12 +1728,304 @@ Rectangle {
         }
     }
 
+
+    // MEDIA M7 // Fixed request and filter controls. The GDELT collector
+    // remains 'source' below; the one publisherFeedsContent instance owns
+    // both BBC and Al Jazeera. Only content within discoveryScroll moves.
+    Column {
+        id: reportsFixedToolbar
+        objectName: "media-m7-reports-pinned-toolbar"
+        anchors.top: parent.top
+        anchors.topMargin: 3
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: 8
+        anchors.rightMargin: 8
+        spacing: 2
+        visible: stationDiscovery.domain === "news"
+                 && stationDiscovery.pinReportsToolbar
+                 && !stationDiscovery.viewerOpen
+        height: visible ? implicitHeight : 0
+        z: 2
+
+        Row {
+            id: reportsRequestRail
+            objectName: "media-m7-fixed-request-rail"
+            width: parent.width
+            height: 25
+            spacing: 4
+            visible: stationDiscovery.newsGroupVisible("request")
+            ActionButton {
+                objectName: "media-m7-retry-news"
+                width: (reportsRequestRail.width - 2*reportsRequestRail.spacing)/3
+                height: 24
+                label: "RETRY NEWS"
+                labelPixelSize: 10
+                available: source.canRetry
+                onClicked: source.refresh(true)
+            }
+            ActionButton {
+                objectName: "media-m7-request-bbc"
+                width: (reportsRequestRail.width - 2*reportsRequestRail.spacing)/3
+                height: 24
+                label: publisherFeedsContent.bbcBackend.ready
+                    ? "REFRESH BBC" : "LOAD BBC"
+                labelPixelSize: 10
+                accentColor: Colors.cyan
+                available: publisherFeedsContent.bbcBackend.canRequest
+                onClicked: publisherFeedsContent.requestPublisher("bbc-world")
+            }
+            ActionButton {
+                objectName: "media-m7-request-aljazeera"
+                width: (reportsRequestRail.width - 2*reportsRequestRail.spacing)/3
+                height: 24
+                label: publisherFeedsContent.alJazeeraBackend.ready
+                    ? "REFRESH AL JAZEERA" : "LOAD AL JAZEERA"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                available: publisherFeedsContent.alJazeeraBackend.canRequest
+                onClicked: publisherFeedsContent.requestPublisher("al-jazeera-english")
+            }
+        }
+
+        // Source and language search fields plus their own CLEAR buttons
+        // share one fixed row, not the scrolling headline list.
+        Row {
+            id: reportsSearchRail
+            objectName: "media-m7-fixed-search-rail"
+            width: parent.width
+            height: 27
+            spacing: 6
+            visible: stationDiscovery.newsGroupVisible("filters")
+            Row {
+                id: pinnedSourceSearch
+                objectName: "media-m7-fixed-source-search"
+                width: (reportsSearchRail.width-reportsSearchRail.spacing)/2
+                height: 26
+                spacing: 3
+                Rectangle {
+                    width: pinnedSourceSearch.width - 49
+                    height: 25
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: pinnedSourceInput.activeFocus
+                                  ? Colors.magenta : Colors.cyan
+                    QuietText {
+                        anchors.centerIn: parent
+                        visible: pinnedSourceInput.text.length === 0
+                                 && !pinnedSourceInput.activeFocus
+                        text: "PUBLISHER / COUNTRY"
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                    }
+                    TextInput {
+                        id: pinnedSourceInput
+                        objectName: "media-m7-source-input"
+                        anchors.fill: parent
+                        anchors.leftMargin: 6
+                        anchors.rightMargin: 6
+                        verticalAlignment: TextInput.AlignVCenter
+                        horizontalAlignment: TextInput.AlignHCenter
+                        color: Colors.magenta
+                        selectionColor: Colors.magenta
+                        selectedTextColor: Colors.black
+                        font.family: "GohuFont 11 Nerd Font Mono"
+                        font.pixelSize: 10
+                        clip: true
+                        text: stationDiscovery.newsSourceQuery
+                        onTextEdited: stationDiscovery.newsSourceQuery = text
+                        Keys.onEscapePressed: {
+                            stationDiscovery.newsSourceQuery = "";
+                            event.accepted = true;
+                        }
+                    }
+                }
+                ActionButton {
+                    objectName: "media-m7-clear-source"
+                    width: 46
+                    height: 25
+                    label: "CLEAR"
+                    labelPixelSize: 9
+                    available: stationDiscovery.newsSourceQuery !== ""
+                    onClicked: stationDiscovery.newsSourceQuery = ""
+                }
+            }
+            Row {
+                id: pinnedLanguageSearch
+                objectName: "media-m7-fixed-language-search"
+                width: (reportsSearchRail.width-reportsSearchRail.spacing)/2
+                height: 26
+                spacing: 3
+                Rectangle {
+                    width: pinnedLanguageSearch.width - 49
+                    height: 25
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: pinnedLanguageInput.activeFocus
+                                  ? Colors.magenta : Colors.cyan
+                    QuietText {
+                        anchors.centerIn: parent
+                        visible: pinnedLanguageInput.text.length === 0
+                                 && !pinnedLanguageInput.activeFocus
+                        text: "LANGUAGE / CODE"
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                    }
+                    TextInput {
+                        id: pinnedLanguageInput
+                        objectName: "media-m7-language-input"
+                        anchors.fill: parent
+                        anchors.leftMargin: 6
+                        anchors.rightMargin: 6
+                        verticalAlignment: TextInput.AlignVCenter
+                        horizontalAlignment: TextInput.AlignHCenter
+                        color: Colors.magenta
+                        selectionColor: Colors.magenta
+                        selectedTextColor: Colors.black
+                        font.family: "GohuFont 11 Nerd Font Mono"
+                        font.pixelSize: 10
+                        clip: true
+                        text: stationDiscovery.newsLanguageQuery
+                        onTextEdited: stationDiscovery.newsLanguageQuery = text
+                        Keys.onEscapePressed: {
+                            stationDiscovery.newsLanguageQuery = "";
+                            event.accepted = true;
+                        }
+                    }
+                }
+                ActionButton {
+                    objectName: "media-m7-clear-language"
+                    width: 46
+                    height: 25
+                    label: "CLEAR"
+                    labelPixelSize: 9
+                    available: stationDiscovery.newsLanguageQuery !== ""
+                    onClicked: stationDiscovery.newsLanguageQuery = ""
+                }
+            }
+        }
+
+        // Original topic, time and region choice models. All remain visible
+        // in fixed horizontal rails, scroll sideways only if width is tight.
+        Flickable {
+            id: reportsTopicRail
+            objectName: "media-m7-fixed-topic-rail"
+            width: parent.width
+            height: visible ? 24 : 0
+            visible: stationDiscovery.newsGroupVisible("filters")
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.HorizontalFlick
+            contentWidth: topicChoices.implicitWidth
+            contentHeight: height
+            Row {
+                id: topicChoices
+                spacing: 3
+                Repeater {
+                    model: stationDiscovery.newsTopicOptions
+                    delegate: ModeButton {
+                        required property var modelData
+                        width: modelData.id === "weather" ? 102 : 87
+                        height: 23
+                        textOnly: true
+                        horizontalContent: true
+                        bordered: false
+                        selected: stationDiscovery.newsTopic === modelData.id
+                        labelText: modelData.label
+                        labelFontSize: 9
+                        idlePrimaryColor: Colors.cyan
+                        selectedPrimaryColor: Colors.magenta
+                        perimeterGlowColor: Colors.orange
+                        onTriggered: stationDiscovery.selectNewsTopic(modelData.id)
+                    }
+                }
+            }
+        }
+
+        Flickable {
+            id: reportsTimeRail
+            objectName: "media-m7-fixed-time-rail"
+            width: parent.width
+            height: visible ? 24 : 0
+            visible: stationDiscovery.newsGroupVisible("filters")
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.HorizontalFlick
+            contentWidth: timeChoices.implicitWidth
+            contentHeight: height
+            Row {
+                id: timeChoices
+                spacing: 3
+                Repeater {
+                    model: stationDiscovery.newsTimeOptions
+                    delegate: ModeButton {
+                        required property var modelData
+                        width: modelData.hours === 0 ? 92 : 65
+                        height: 23
+                        textOnly: true
+                        horizontalContent: true
+                        bordered: false
+                        selected: stationDiscovery.newsMaxAgeHours === modelData.hours
+                        labelText: modelData.label
+                        labelFontSize: 9
+                        idlePrimaryColor: Colors.cyan
+                        selectedPrimaryColor: Colors.magenta
+                        perimeterGlowColor: Colors.orange
+                        onTriggered: stationDiscovery.selectNewsTime(modelData.hours)
+                    }
+                }
+            }
+        }
+
+        Flickable {
+            id: reportsRegionRail
+            objectName: "media-m7-fixed-region-rail"
+            width: parent.width
+            height: visible ? 24 : 0
+            visible: stationDiscovery.newsGroupVisible("filters")
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.HorizontalFlick
+            contentWidth: regionChoices.implicitWidth
+            contentHeight: height
+            Row {
+                id: regionChoices
+                spacing: 3
+                Repeater {
+                    model: stationDiscovery.newsRegionOptions
+                    delegate: ModeButton {
+                        required property var modelData
+                        width: modelData.id === "" ? 87 : 99
+                        height: 23
+                        textOnly: true
+                        horizontalContent: true
+                        bordered: false
+                        selected: stationDiscovery.newsSourceRegion === modelData.id
+                        labelText: modelData.label
+                        labelFontSize: 9
+                        idlePrimaryColor: Colors.cyan
+                        selectedPrimaryColor: Colors.magenta
+                        perimeterGlowColor: Colors.orange
+                        onTriggered: stationDiscovery.selectNewsRegion(modelData.id)
+                    }
+                }
+            }
+        }
+        Rectangle {
+            width: parent.width
+            height: 1
+            color: Colors.cyan
+        }
+    }
+
     Flickable {
         id: discoveryScroll
         objectName: "earth-e2-event-scroll"
-        anchors.top: pinnedMapControls.visible
-            ? pinnedMapControls.bottom : parent.top
-        anchors.topMargin: pinnedMapControls.visible ? 4 : 0
+        anchors.top: reportsFixedToolbar.visible
+            ? reportsFixedToolbar.bottom
+            : pinnedMapControls.visible ? pinnedMapControls.bottom : parent.top
+        anchors.topMargin: reportsFixedToolbar.visible ? 3
+            : pinnedMapControls.visible ? 4 : 0
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -1744,7 +2039,7 @@ Rectangle {
         Column {
             id: content
             x: 20
-            y: 12
+            y: stationDiscovery.pinReportsToolbar ? 4 : 12
             width: Math.max(0, discoveryScroll.width - 40)
             spacing: 12
 
@@ -3793,6 +4088,7 @@ Rectangle {
                 width: parent.width
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
+                         && !stationDiscovery.pinReportsToolbar
                 spacing: 12
                 ActionButton {
                     width: 102
@@ -3818,7 +4114,9 @@ Rectangle {
             // M6 // Manual publisher RSS controls belong in NEWS → REPORTS.
             // GDELT remains the single separate article/headline provider.
             StationPublisherFeeds {
+                id: publisherFeedsContent
                 objectName: "media-m6-reports-publisher-feeds"
+                pinnedRequests: stationDiscovery.pinReportsToolbar
                 width: parent.width
                 visible: stationDiscovery.domain === "news"
                          && stationDiscovery.newsGroupVisible("request")
@@ -3833,6 +4131,7 @@ Rectangle {
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
                          && stationDiscovery.newsGroupVisible("filters")
+                         && !stationDiscovery.pinReportsToolbar
                 spacing: 7
 
                 Repeater {
@@ -3882,6 +4181,7 @@ Rectangle {
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
                          && stationDiscovery.newsGroupVisible("filters")
+                         && !stationDiscovery.pinReportsToolbar
                 spacing: 8
 
                 Rectangle {
@@ -3957,6 +4257,7 @@ Rectangle {
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
                          && stationDiscovery.newsGroupVisible("filters")
+                         && !stationDiscovery.pinReportsToolbar
                 spacing: 7
 
                 Repeater {
@@ -4003,6 +4304,7 @@ Rectangle {
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
                          && stationDiscovery.newsGroupVisible("filters")
+                         && !stationDiscovery.pinReportsToolbar
                 spacing: 8
 
                 Rectangle {
@@ -4080,6 +4382,7 @@ Rectangle {
                 height: stationDiscovery.domain === "news" ? 42 : 0
                 visible: stationDiscovery.domain === "news"
                          && stationDiscovery.newsGroupVisible("filters")
+                         && !stationDiscovery.pinReportsToolbar
                 spacing: 7
 
                 Repeater {

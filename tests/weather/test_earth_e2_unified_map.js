@@ -74,7 +74,9 @@ test("E2 the actual original mapPlot is reparented into a fixed viewport, not du
  assert.match(discovery,/objectName: "earth-e2-pinned-map-host"/);
  assert.match(discovery,/parent: mapCanvasSection/);
  assert.match(discovery,/states: State\s*\{[\s\S]*?when: stationDiscovery\.earthPinnedMap[\s\S]*?ParentChange\s*\{[\s\S]*?target: mapPlot[\s\S]*?parent: pinnedMapHost[\s\S]*?x: 0[\s\S]*?y: 0/);
- assert.match(discovery,/anchors\.top: pinnedMapControls\.visible\s*\? pinnedMapControls\.bottom : parent\.top/);
+  assert.ok(discovery.includes("anchors.top: reportsFixedToolbar.visible"));
+  assert.ok(discovery.includes("? reportsFixedToolbar.bottom"));
+  assert.ok(discovery.includes(": pinnedMapControls.visible ? pinnedMapControls.bottom : parent.top"));
  assert.match(discovery,/anchors\.top: pinnedMapHost\.bottom/);
  assert.match(discovery,/id: discoveryScroll/);
  assert.match(discovery,/contentHeight: Math\.max\(height, content\.y \+ content\.implicitHeight \+ 12\)/);

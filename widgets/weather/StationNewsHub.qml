@@ -259,6 +259,11 @@ Rectangle {
                 domain: "news"
                 stationOpen: stationNewsHub.stationOpen
                 newsSubjectRoute: stationNewsHub.subjectRoute
+                // A 520x300 OVERVIEW already has an intentionally small
+                // NEWS bay. Only the full focused NEWS screen gets M7's
+                // anchored request/search/filter deck.
+                pinReportsToolbar: stationNewsHub.subjectRoute.indexOf("media/news/") === 0
+                    && !stationNewsHub.overviewChannelFilters
                 mediaNewsServicesSplit: true
                 runtimeNowMs: stationNewsHub.runtimeNowMs
                 onNewsMapRequested: function(payload) {

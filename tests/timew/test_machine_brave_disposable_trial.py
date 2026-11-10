@@ -169,7 +169,8 @@ finally:
 root = new_root()
 try:
     existing = root / "xdg-config" / "BraveSoftware" / "Brave-Browser"
-    existing.mkdir(parents=True, mode=0o700)
+    existing.parent.mkdir(mode=0o700)
+    existing.mkdir(mode=0o700)
     assert register_trial(str(root), EXT_ID)["status"] == "disposable_trial_registration_verified"
     assert native_dir(root).is_dir()
 finally:

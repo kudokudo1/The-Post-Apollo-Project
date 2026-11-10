@@ -69,6 +69,65 @@ class LiveDictationTests(unittest.TestCase):
         self.assertNotIn("submit", json.dumps(result))
         self.assertNotIn("authority", json.dumps(result))
 
+    def test_opening_words_arrive_without_waiting_for_stop(self):
+        # The fake recorder emits 1.5s of speech, then stays open but silent.
+        # A 2-second-only capture would withhold its first partial forever.
+        with tempfile.TemporaryDirectory(prefix="hospital-early-voice-") as folder:
+            root = Path(folder)
+            fakebin = root / "bin"
+            fakebin.mkdir()
+            recorder = fakebin / "pw-record"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys,time\n"
+                "speech=(1400).to_bytes(2,'little',signed=True)\n"
+                "for _ in range(15):\n"
+                " sys.stdout.buffer.write(speech*1600)\n"
+                " sys.stdout.buffer.flush()\n"
+                " time.sleep(0.02)\n"
+                "time.sleep(15)\n"
+            )
+            recorder.chmod(0o700)
+            helper = root / "whisper.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ \"$1\" == '--check' ]]; then exit 0; fi\n"
+                "printf 'First words while listening.\\n'\n"
+            )
+            helper.chmod(0o700)
+            env = dict(os.environ, PATH=str(fakebin) + ":" + os.environ["PATH"])
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), str(helper),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+            selector = selectors.DefaultSelector()
+            try:
+                selector.register(process.stdout, selectors.EVENT_READ)
+                partial = None
+                deadline = time.monotonic() + 8
+                while time.monotonic() < deadline:
+                    if not selector.select(timeout=0.5):
+                        continue
+                    event = json.loads(process.stdout.readline())
+                    if event["kind"] == "partial":
+                        partial = event["text"]
+                        self.assertIsNone(process.poll(), "Mic must remain open")
+                        break
+                    if event["kind"] == "error":
+                        self.fail(str(event))
+                self.assertEqual(partial, "First words while listening.")
+                process.stdin.write("STOP\n")
+                process.stdin.flush()
+                process.stdin.close()
+                process.wait(timeout=18)
+                self.assertEqual(process.returncode, 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=3)
+                selector.close()
+
     def test_real_stdout_stream_and_stop_with_fake_audio(self):
         # Test 2-second Reception/Intercom cadence with fake local audio.
         # Truly test the child process while injecting throwaway fake pw-record

@@ -58,7 +58,7 @@ check('function acceptLivePhrase(text)' in manager
 check('id: editorFrame' in manager
       and 'anchors.right: parent.right' in manager
       and 'anchors.verticalCenter: parent.verticalCenter' in manager
-      and 'anchors.rightMargin: 2' in manager
+      and 'anchors.rightMargin: 7' in manager
       and 'id: micAction' in manager
       and 'label: "CANCEL"' in manager,
       "MIC/STOP and CANCEL live INSIDE each prompt rectangle")
@@ -127,14 +127,28 @@ check('color: Colors.magenta' in intercom
       "Intercom has magenta operator text/orange cursor and separated controls")
 mic_section = manager.split('id: micAction', 1)[-1].split('id: cancelAction', 1)[0]
 cancel_section = manager.split('id: cancelAction', 1)[-1].split('label: "CANCEL"', 1)[0]
-check('anchors.rightMargin: 2' in mic_section
+check('anchors.rightMargin: 7' in mic_section
       and 'anchors.verticalCenter: parent.verticalCenter' in mic_section
       and 'anchors.verticalCenter: parent.verticalCenter' in cancel_section,
-      "Embedded Manager microphone/CANCEL controls are vertically centered with 2px right inset")
+      "Embedded Manager microphone/CANCEL controls remain vertically centered, shifted 5px left")
 check('parser.add_argument("--vad"' in script
       and 'parser.add_argument("--chunk-seconds"' in script
       and 'if vad:' in script and 'heard_speech' in script,
       "Local stream retains optional silence auto-stop and configurable 2-second chunks")
+
+check('firstChunkMs: 1400' in frontdesk
+      and 'firstChunkMs: 1400' in host
+      and 'first_chunk_ms' in script
+      and 'first_target' in script
+      and 'first_chunk_sent = first_chunk_sent or sent' in script,
+      "All Hospital microphones queue the opening speech segment earlier")
+check('voiceSelected: root.speechInputService.busy' in reception
+      and 'color: micButton.voiceSelected ? Colors.yellow' in reception
+      and 'color: micButton.voiceSelected ? Colors.magenta' in reception
+      and 'voiceSelected: root.speechInputService.busy' in intercom
+      and 'color: micButton.voiceSelected ? Colors.yellow' in intercom
+      and 'color: micButton.voiceSelected ? Colors.magenta' in intercom,
+      "Front desk microphones use canonical active/open selection colors")
 
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")

@@ -2570,6 +2570,8 @@ PanelWindow {
     // The five Surgery Manage editors keep their dedicated dictation state.
     HospitalLiveDictationService {
         id: workforceSpeechInputService
+        chunkSeconds: 2
+        firstChunkMs: 1400
     }
 
     HospitalRemoteWatcher {

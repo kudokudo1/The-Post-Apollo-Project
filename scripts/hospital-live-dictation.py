@@ -103,7 +103,7 @@ def transcribe_chunk(stt_helper: str, audio: bytes) -> str:
 
 
 def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
-         vad: bool = False, threshold: int = 600,
+         first_chunk_ms: int = 1400, vad: bool = False, threshold: int = 600,
          silence_ms: int = 2200, min_speech_ms: int = 250) -> int:
     if not Path(stt_helper).is_file():
         print(packet("error", detail="LOCAL WHISPER HELPER UNAVAILABLE"),
@@ -170,7 +170,13 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
         pending = bytearray()
         received = 0
         # Shorter phrases can be shown sooner without changing Manage's default.
+        # Send the opening speech segment sooner. Subsequent segments use the
+        # normal cadence so a slow local model cannot spawn a new inference
+        # for every word; the recognition queue remains bounded.
         target = RATE * FRAME_BYTES * max(2, min(4, chunk_seconds))
+        first_target = RATE * FRAME_BYTES * max(
+            1000, min(1000 * max(2, min(4, chunk_seconds)), first_chunk_ms)) // 1000
+        first_chunk_sent = False
         limit = RATE * FRAME_BYTES * MAX_SECONDS
         heard_speech = False
         speech_ms = 0
@@ -178,14 +184,16 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
 
         def enqueue(raw):
             if not raw or not is_speech(raw):
-                return
+                return False
             try:
                 clips.put(raw, timeout=0.3)
+                return True
             except queue.Full:
                 stopping_error.set()
                 send("error", detail="LOCAL MODEL TOO SLOW // DICTATION STOPPED")
                 stopping.set()
                 halt_child()
+                return False
 
         try:
             while not stopping.is_set() and not cancelled.is_set():
@@ -211,9 +219,11 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                         quiet_ms += frame_ms
                     else:
                         speech_ms = 0
-                if len(pending) >= target:
-                    enqueue(bytes(pending[:target]))
-                    del pending[:target]
+                next_size = target if first_chunk_sent else first_target
+                if len(pending) >= next_size:
+                    sent = enqueue(bytes(pending[:next_size]))
+                    del pending[:next_size]
+                    first_chunk_sent = first_chunk_sent or sent
                 if (vad and heard_speech and quiet_ms >= max(300, silence_ms)) \
                         or received >= limit:
                     stopping.set()
@@ -278,13 +288,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("stt_helper")
     parser.add_argument("--chunk-seconds", type=int, default=CHUNK_SECONDS)
+    parser.add_argument("--first-chunk-ms", type=int, default=1400)
     parser.add_argument("--vad", action="store_true")
     parser.add_argument("--threshold", type=int, default=600)
     parser.add_argument("--silence-ms", type=int, default=2200)
     parser.add_argument("--min-speech-ms", type=int, default=250)
     args = parser.parse_args()
     return live(args.stt_helper, chunk_seconds=args.chunk_seconds,
-                vad=args.vad, threshold=args.threshold,
+                first_chunk_ms=args.first_chunk_ms, vad=args.vad, threshold=args.threshold,
                 silence_ms=args.silence_ms, min_speech_ms=args.min_speech_ms)
 
 

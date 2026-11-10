@@ -15,6 +15,9 @@ ShellRoot {
     property real requestY: -1
     property real searchY: -1
     property real filtersY: -1
+    property real titleY: -1
+    property real bbcViewY: -1
+    property real ajViewY: -1
     property real newsY: -1
     property real radioY: -1
     function find(item,name) {
@@ -149,6 +152,9 @@ ShellRoot {
                 root.requestY=rY;
                 root.searchY=search.mapToItem(offlineReportsProbe,0,0).y;
                 root.filtersY=compact.mapToItem(offlineReportsProbe,0,0).y;
+                root.titleY=title.mapToItem(offlineReportsProbe,0,0).y;
+                root.bbcViewY=bbcView.mapToItem(offlineReportsProbe,0,0).y;
+                root.ajViewY=ajView.mapToItem(offlineReportsProbe,0,0).y;
                 root.newsY=news.mapToItem(offlineReportsProbe,0,0).y;
                 root.radioY=radio.mapToItem(offlineReportsProbe,0,0).y;
                 // Use the existing news hub's active reports owner.
@@ -179,6 +185,9 @@ ShellRoot {
                     ||aljazeera.mapToItem(offlineReportsProbe,0,0).y!==root.requestY
                     ||search.mapToItem(offlineReportsProbe,0,0).y!==root.searchY
                     ||compact.mapToItem(offlineReportsProbe,0,0).y!==root.filtersY
+                    ||title.mapToItem(offlineReportsProbe,0,0).y!==root.titleY
+                    ||bbcView.mapToItem(offlineReportsProbe,0,0).y!==root.bbcViewY
+                    ||ajView.mapToItem(offlineReportsProbe,0,0).y!==root.ajViewY
                     ||news.mapToItem(offlineReportsProbe,0,0).y!==root.newsY
                     ||radio.mapToItem(offlineReportsProbe,0,0).y!==root.radioY)
                     return root.fail("OVERVIEW_NEWS_SCROLL_MOVED_FIXED_RAIL");

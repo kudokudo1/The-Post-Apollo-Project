@@ -126,3 +126,81 @@ Keyboard `Keys.onPressed` supports arrows, Page Up/Down, Home/End **when the scr
 - `autoHide`, `wheelStep`, `clickToJump`, `preserveDragOffset`, `handleGlowStyle`, `railDecoration`, and handle/rail aliases remain available.
 
 **Verification required before main:** run the existing `tests/components/test_neon_scrollbar_contracts.py`, the new `tests/components/test_neon_scrollbar_syntagma_contracts.py`, QML compilation/lint where supported, resize and fade tests, pointer and wheel tests in both orientations, keyboard focus isolation, and review of all legacy consumers. Static contract tests do not prove Qt runtime behavior.
+
+
+## Positioner-hosted scrollbars must remain inside their visual box (2026-11-10)
+
+> **Status:** Proposed technical rule and diagnosed Git CHANGES host defect.
+> Implementation in `GitChangesView.qml` belongs to the Nurse 3r
+> [scrollbar-coverage PR #252](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/252),
+> not this documentation-only branch. Operator desktop verification is pending.
+
+**Issue:** A standard scrollbar can appear **below the menu or outside its
+containing box** even when its target `Flickable` has `clip: true`. The
+`NeonScrollBar` component is reparented by default to the target's
+`flickable.parent`. If that parent is a Qt Quick `Column`, `Row`,
+`Grid` or other auto-positioning container, the scrollbar itself becomes a
+layout child and can be placed *after* the viewport. Flickable clipping does
+not constrain a scrollbar that is no longer inside the Flickable.
+
+**Proposed host-side rule:** The **track** and the moving **handle** must
+remain within the usable section of the same bordered menu box as the
+scrollable content. A normal vertical track must use the shared component's
+right-side box placement, 4px edge inset, 2px box-top/bottom clearances, and
+its approved star/bar artwork for the owning module. Only an explicitly
+authorized extension such as `trackTopExtension` may protrude beyond the
+normal box. Do not silently widen the pointer/drag area to include glow.
+
+When a scrollable pane is inside a `Column` or another positioner, use a
+**non-positioning overlay parent** and bind the geometry to the **actual
+scroll viewport/section**, not to a full window, a scroll-content `Column`,
+or the positioning parent's content height:
+
+```qml
+// Example only: verify the parent hierarchy of the actual host first.
+NeonScrollBar {
+    flickable: changesScroll1
+    handleStyle: "star"                 // Git/Hospital established variant
+    mountingParent: changesScroll1.parent.parent // must be a non-positioner
+    geometryHost: changesScroll1       // exact scrollable box
+    // geometryMode: "box" is the default.
+}
+```
+
+The preferred alternative is a dedicated non-positioning `Item` viewport
+wrapper that owns the Flickable and the scrollbar as separate overlay siblings.
+The host must reserve `reservedExtent` next to list content, preventing the
+rail/handle from obscuring the last characters or row actions. Do not solve
+the problem by setting `clip: false`, pushing tracks outside the window, or
+modifying `NeonScrollBar` defaults to compensate for one incorrectly mounted
+host.
+
+**Git CHANGES audit:** At the source checkpoint
+`79b67639f194df6f8a70cce3c87f219b6a041287`, the bars bound to
+`changesScroll1`, `2`, `3`, `4`, `6`, and `7` are declared under
+`Column`-hosted Flickables without an explicit `mountingParent`; their
+default reparenting can turn each rail into a Column layout child.
+`changesScroll5` uses a different Rectangle parent and must be reviewed
+individually, not blindly normalized.
+
+**Verification required:**
+
+1. Inspect the resolved `scrollbar.parent` at runtime. For a normal
+   overlaid track, it must **not** be an auto-positioned Column/Row child.
+2. Force content longer than the viewport, and measure actual track
+   `x`, `y`, `width`, `height` against the bordered scroll section. Include
+   header/footer clearance and do not count shadow padding as hit geometry.
+3. Check all relevant Git CHANGES submodes (FILES/preview, HUNKS/lines,
+   STASHES/preview, CONFLICTS), window resize, empty states, auto-hide,
+   keyboard focus and nested-wheel containment.
+4. Keep Git's star-shaped handle, configured glow and source palette.
+   Do not alter staging, commit, stash or conflict execution paths.
+5. Run the canonical NeonScrollBar source/native tests and a host-level
+   native geometry regression. Live Quickshell/operator visual acceptance
+   remains separate from CI.
+
+**Ownership/relationship:** This extends the existing box-side geometry,
+host-owned reservation, positioner mounting and audit-04 deliberate-extension
+contracts on this page. It is a *host mounting rule*, not an instruction to
+rewrite the shared `NeonScrollBar.qml` renderer or another worker's owned
+`GitChangesView.qml` without handoff.

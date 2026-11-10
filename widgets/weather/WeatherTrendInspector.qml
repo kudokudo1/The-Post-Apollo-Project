@@ -10,6 +10,8 @@ import "WeatherRelationshipPolicy.js" as RelationshipPolicy
 Rectangle {
     id: inspector
 
+    // W3 // Shrink only when HOME HISTORY is selected; keep same samples.
+    property bool compact: false
     property string title: "RELATIONSHIP"
     property string leftLabel: "LEFT"
     property string rightLabel: "RIGHT"
@@ -38,7 +40,7 @@ Rectangle {
     color: Colors.dark
     border.width: 1
     border.color: Colors.cyan
-    height: 188
+    height: compact ? 72 : 188
 
     SystemServices.GraphHistory {
         id: graphHistory
@@ -51,26 +53,27 @@ Rectangle {
 
     Column {
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 7
+        anchors.margins: inspector.compact ? 4 : 10
+        spacing: inspector.compact ? 2 : 7
 
         Row {
             width: parent.width
-            height: 18
+            height: inspector.compact ? 12 : 18
             spacing: 10
 
             GohuText {
-                width: Math.max(0, parent.width - 250)
+                width: inspector.compact ? Math.max(92,parent.width - 100)
+                      : Math.max(0, parent.width - 250)
                 text: inspector.title
-                font.pixelSize: 11
+                font.pixelSize: inspector.compact ? 9 : 11
                 color: Colors.magenta
                 elide: Text.ElideRight
             }
 
             GohuText {
-                width: 240
+                width: inspector.compact ? Math.max(0,parent.width - 105) : 240
                 text: inspector.summaryText
-                font.pixelSize: 9
+                font.pixelSize: inspector.compact ? 8 : 9
                 color: Colors.white
                 horizontalAlignment: Text.AlignRight
                 elide: Text.ElideRight
@@ -79,7 +82,7 @@ Rectangle {
 
         Row {
             width: parent.width
-            height: 16
+            height: inspector.compact ? 10 : 16
             spacing: 16
 
             GohuText {
@@ -105,7 +108,7 @@ Rectangle {
 
         Rectangle {
             width: parent.width
-            height: 94
+            height: inspector.compact ? 26 : 94
             color: Colors.black
             border.width: 1
             border.color: Colors.blue
@@ -185,8 +188,9 @@ Rectangle {
         QuietText {
             width: parent.width
             text: inspector.footerText
-            font.pixelSize: 8
-            wrapMode: Text.WordWrap
+            font.pixelSize: inspector.compact ? 7 : 8
+            wrapMode: inspector.compact ? Text.NoWrap : Text.WordWrap
+            elide: inspector.compact ? Text.ElideRight : Text.ElideNone
             color: Colors.orange
         }
     }

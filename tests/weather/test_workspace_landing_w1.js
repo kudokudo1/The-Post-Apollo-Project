@@ -36,7 +36,7 @@ test("seven main-mode families open real landing pages, not route-directory root
 });
 
 test("bottom row modes are navigable real paths with clear family grouping",()=>{
-  const sizes={home:8,weather:5,cosmos:6,earth:5,media:6,magick:6,tools:5};
+  const sizes={home:7,weather:5,cosmos:6,earth:5,media:6,magick:6,tools:5};
   for(const family of nav.FAMILIES) {
     const modes=JSON.parse(JSON.stringify(nav.tabsFor(family.landing)));
     assert.equal(modes.length,sizes[family.id],family.id);
@@ -58,8 +58,8 @@ test("bottom row modes are navigable real paths with clear family grouping",()=>
   assert.equal(nav.selectedGroup("media/news/viewer"),"news");
 });
 
-test("HOME tab focus is bounded to the existing ten section families",()=>{
-  assert.deepEqual(["overview","auto","quick","snapshot","history","runtime","health","magick"],
+test("HOME has final SOURCES tab with legacy RUNTIME/HEALTH routes",()=>{
+  assert.deepEqual(["overview","auto","quick","snapshot","history","magick","sources"],
     JSON.parse(JSON.stringify(nav.GROUPS.home.map(x=>x.key))));
   for(const mode of nav.GROUPS.home)
     assert.equal(nav.homeSectionFor(mode.path),mode.key);
@@ -69,15 +69,21 @@ test("HOME tab focus is bounded to the existing ten section families",()=>{
   assert.match(home,/SubjectPanelPolicy\.visibleFor\("home", subjectRoute, section\)/);
   assert.match(home,/workspaceSection === "auto"/);
   assert.match(home,/section === "relevant" \|\| section === "alerts"/);
-  for(const section of ["quick","snapshot","history","runtime","health"])
+  for(const section of ["quick","snapshot","history","overview"])
     assert.ok(home.includes('workspaceSection === "'+section+'"'),section);
+  assert.ok(home.includes('if (sourcesWorkspace)'));
+  for(const legacy of ["home/runtime","home/health"]) {
+    assert.equal(nav.homeSectionFor(legacy),"sources");
+    assert.equal(nav.selectedGroup(legacy),"sources");
+    assert.equal(nav.isHomeRoute(legacy),true);
+  }
   assert.match(home,/onWorkspaceSectionChanged:/);
 });
 
 test("single original HOME retains ranking, timer, snapshots, history and runtime racks",()=>{
   assert.equal((workspace.match(/StationHome\s*\{/g)||[]).length,1);
   assert.match(workspace,/id: originalHome/);
-  assert.match(workspace,/workspaceSection: surface\.homeSection === "overview"/);
+  assert.match(workspace,/workspaceSection: surface\.homeSection/);
   assert.match(workspace,/StationMagickSubjectPane\s*\{/);
   for(const value of [
     "StationHomePolicy.rankRelevant(","activeWatchIds","relevanceClockMs",

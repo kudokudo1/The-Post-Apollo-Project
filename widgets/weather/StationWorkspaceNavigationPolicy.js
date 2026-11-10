@@ -19,9 +19,8 @@ var GROUPS = {
         {label:"QUICK",path:"home/quick",key:"quick"},
         {label:"SNAPSHOT",path:"home/snapshot",key:"snapshot"},
         {label:"HISTORY",path:"home/history",key:"history"},
-        {label:"RUNTIME",path:"home/runtime",key:"runtime"},
-        {label:"SOURCES",path:"home/health",key:"health"},
-        {label:"MAGICK",path:"home/magick",key:"magick"}
+        {label:"MAGICK",path:"home/magick",key:"magick"},
+        {label:"SOURCES",path:"home/health",key:"sources"}
     ],
     weather:[
         {label:"OVERVIEW",path:"weather/overview",key:"overview"},
@@ -87,7 +86,10 @@ function tabsFor(path) {
 function homeSectionFor(path) {
     if (familyFor(path)!=="home") return "";
     var key=String(path||"").split("/")[1]||"overview";
-    var allowed=["overview","auto","quick","snapshot","history","runtime","health","magick"];
+    // Old HOME/RUNTIME and HOME/HEALTH bookmarks remain valid, but both
+    // now open the same final SOURCES screen. No saved routes are deleted.
+    if (key==="runtime" || key==="health") return "sources";
+    var allowed=["overview","auto","quick","snapshot","history","magick"];
     return allowed.indexOf(key)>=0?key:"overview";
 }
 function isHomeRoute(path) {
@@ -102,6 +104,8 @@ function selectedGroup(path) {
             if(groups[j].path===path) return groups[j].key;
     }
     var group=tokens[1]||"overview";
+    if (family==="home" && (group==="runtime" || group==="health"))
+        return "sources";
     // All original map / event / geography / investigation deep links
     // belong to the one consolidated MAP / EVENTS tab.
     if(family==="earth" && ["maps","geography","geology",

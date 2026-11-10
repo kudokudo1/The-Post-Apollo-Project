@@ -15,9 +15,20 @@ Rectangle {
     // Empty route preserves original CLASSIC HOME.
     property string subjectRoute: ""
     property string workspaceSection: ""
+    // HOME W3 // HISTORY retains both chart relationships and the seven-day
+    // archive in a compact single viewport without wheel scrolling.
+    readonly property bool compactHistory:
+        subjectRoute === "" && workspaceSection === "history"
+    readonly property bool sourcesWorkspace:
+        subjectRoute === "" && (workspaceSection === "sources"
+            || workspaceSection === "runtime" || workspaceSection === "health")
     function sectionVisible(section) {
         if (subjectRoute === "" && workspaceSection !== "") {
             if (section === "header") return true;
+            if (workspaceSection === "overview")
+                return section !== "runtime" && section !== "health";
+            if (sourcesWorkspace)
+                return section === "runtime" || section === "health";
             if (workspaceSection === "auto")
                 return section === "relevant" || section === "alerts";
             if (workspaceSection === "quick")
@@ -26,8 +37,6 @@ Rectangle {
                 return section === "snapshot" || section === "alerts";
             if (workspaceSection === "history")
                 return section === "history" || section === "relations";
-            if (workspaceSection === "runtime") return section === "runtime";
-            if (workspaceSection === "health") return section === "health";
             return false;
         }
         return SubjectPanelPolicy.visibleFor("home", subjectRoute, section);
@@ -915,32 +924,36 @@ Rectangle {
 
     Flickable {
         id: homeScroll
+        objectName: "home-w3-content-scroll"
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        interactive: !home.compactHistory
         contentWidth: width
         contentHeight: Math.max(
             height,
-            homeContent.y + homeContent.implicitHeight + 24
+            homeContent.y + homeContent.implicitHeight
+                + (home.compactHistory ? 4 : 24)
         )
 
         Column {
             id: homeContent
+            objectName: "home-w3-content-column"
             x: 24
-            y: 24
+            y: home.compactHistory ? 5 : 24
             width: Math.max(0, homeScroll.width - 48)
-            spacing: 14
+            spacing: home.compactHistory ? 3 : 14
 
         Row {
             visible: home.sectionVisible("header")
             width: parent.width
-            height: 28
+            height: home.compactHistory ? 22 : 28
 
             GohuText {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: home.subjectRoute === ""
                 text: "⌂  HOME"
-                font.pixelSize: 24
+                font.pixelSize: home.compactHistory ? 19 : 24
                 color: Colors.magenta
             }
 
@@ -959,14 +972,24 @@ Rectangle {
 
             GohuText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: home.subjectRoute.indexOf("weather/history/") === 0
-                      ? "WEATHER HISTORY" : "AUTO SNAPSHOT"
+                text: home.compactHistory
+                      || home.subjectRoute.indexOf("weather/history/") === 0
+                      ? "WEATHER HISTORY"
+                      : home.sourcesWorkspace ? "SOURCE DIRECTORY" : "AUTO SNAPSHOT"
                 font.pixelSize: 12
                 color: Colors.orange
             }
         }
 
+        StationSectionDivider {
+            objectName: "home-w3-sources-title"
+            visible: home.sourcesWorkspace
+            width: parent.width
+            title: "SOURCES // LIVE RUNTIME + PROVIDER HEALTH"
+        }
+
         StationRuntimeRack {
+            objectName: "home-w3-sources-runtime"
             visible: home.sectionVisible("runtime")
             width: parent.width
             rows: home.runtimeRows
@@ -1076,18 +1099,22 @@ Rectangle {
         }
 
         StationSectionDivider {
-            visible: home.sectionVisible("relations")
+            visible: home.sectionVisible("relations") && !home.compactHistory
             width: parent.width
             title: "LIVE HISTORY // AQI RELATIONSHIPS"
         }
 
         Row {
+            objectName: "home-w3-history-relations"
             visible: home.sectionVisible("relations")
             width: parent.width
+            height: home.compactHistory ? 72 : 188
             spacing: 12
 
             WeatherTrendInspector {
                 width: (parent.width - 12) / 2
+                height: parent.height
+                compact: home.compactHistory
                 title: "AQI ↔ HUMIDITY"
                 leftLabel: "AQI"
                 rightLabel: "HUMIDITY %"
@@ -1105,6 +1132,8 @@ Rectangle {
 
             WeatherTrendInspector {
                 width: (parent.width - 12) / 2
+                height: parent.height
+                compact: home.compactHistory
                 title: "AQI ↔ WIND"
                 leftLabel: "AQI"
                 rightLabel: "WIND MPH"
@@ -1233,12 +1262,14 @@ Rectangle {
         }
 
         Column {
+            objectName: "home-w3-history-archive"
             visible: home.sectionVisible("history")
             width: parent.width
-            spacing: 9
+            spacing: home.compactHistory ? 3 : 9
 
             Row {
                 width: parent.width
+                height: home.compactHistory ? 12 : implicitHeight
                 spacing: 12
 
                 SecondaryText {
@@ -1277,13 +1308,15 @@ Rectangle {
             }
 
             Row {
+                objectName: "home-w3-history-summary-cards"
                 width: parent.width
-                height: 104
+                height: home.compactHistory ? 58 : 104
                 spacing: 12
 
                 StationHomeMetricCard {
                     width: (parent.width - 24) / 3
                     height: parent.height
+                    compact: home.compactHistory
                     title: "YESTERDAY // SAME HOUR"
                     valueText: home.historySameHour
                                ? home.historyTemp(home.historySameHour.tempF)
@@ -1313,6 +1346,7 @@ Rectangle {
                 StationHomeMetricCard {
                     width: (parent.width - 24) / 3
                     height: parent.height
+                    compact: home.compactHistory
                     title: "7-DAY TEMP RANGE"
                     valueText: home.historyReady
                                ? home.historyTemp(home.historySummary.maxHighF)
@@ -1334,6 +1368,7 @@ Rectangle {
                 StationHomeMetricCard {
                     width: (parent.width - 24) / 3
                     height: parent.height
+                    compact: home.compactHistory
                     title: "PRECIP // 7 DAYS"
                     valueText: home.historyReady
                                ? home.historyPrecip(
@@ -1363,8 +1398,9 @@ Rectangle {
 
             Row {
                 id: historyDailyRow
+                objectName: "home-w3-history-daily-cards"
                 width: parent.width
-                height: 66
+                height: home.compactHistory ? 35 : 66
                 spacing: 6
 
                 Repeater {
@@ -1383,14 +1419,14 @@ Rectangle {
 
                         Column {
                             anchors.fill: parent
-                            anchors.margins: 5
-                            spacing: 3
+                            anchors.margins: home.compactHistory ? 2 : 5
+                            spacing: home.compactHistory ? 1 : 3
 
                             SecondaryText {
                                 width: parent.width
                                 horizontalAlignment: Text.AlignHCenter
                                 text: home.historyDateLabel(modelData.date)
-                                font.pixelSize: 9
+                                font.pixelSize: home.compactHistory ? 8 : 9
                             }
 
                             GohuText {
@@ -1399,7 +1435,7 @@ Rectangle {
                                 text: home.historyTemp(modelData.maxTempF)
                                       + " / "
                                       + home.historyTemp(modelData.minTempF)
-                                font.pixelSize: 10
+                                font.pixelSize: home.compactHistory ? 9 : 10
                                 color: Colors.white
                             }
 
@@ -1410,7 +1446,7 @@ Rectangle {
                                       + home.historyPrecip(
                                           modelData.precipitationIn
                                         )
-                                font.pixelSize: 8
+                                font.pixelSize: home.compactHistory ? 7 : 8
                             }
                         }
                     }
@@ -1517,6 +1553,7 @@ Rectangle {
         Grid {
             visible: home.sectionVisible("health")
             id: sourceHealthGrid
+            objectName: "home-w3-sources-health"
             width: parent.width
             columns: 3
             columnSpacing: 12
@@ -1668,8 +1705,10 @@ Rectangle {
                      && home.homeFavoritesStore
                      && (home.homeFavoritesStore.storageState === "error"
                          || home.homeFavoritesStore.storageState === "unsupported")
-            text: "HOME BOOKMARKS UNAVAILABLE // FILE PRESERVED // "
-                  + home.homeFavoritesStore.errorCode
+            text: home.homeFavoritesStore
+                  ? "HOME BOOKMARKS UNAVAILABLE // FILE PRESERVED // "
+                    + home.homeFavoritesStore.errorCode
+                  : ""
             wrapMode: Text.WordWrap
             font.pixelSize: 10
         }
@@ -1680,6 +1719,6 @@ Rectangle {
         flickable: homeScroll
         handleStyle: "star"
         geometryHost: home
-        visible: scrollable
+        visible: scrollable && !home.compactHistory
     }
 }

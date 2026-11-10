@@ -28,6 +28,36 @@ def page():
     }
 
 
+def weather_event():
+    snap = {
+        "sourceId": "usgs", "sourceLabel": "USGS",
+        "eventId": "quake-17", "eventKey": "usgs|quake-17",
+        "capturedAtMs": 1760001000000, "sourceTimeMs": 1760000000000,
+        "title": "Earthquake test marker", "typeLabel": "EARTHQUAKE",
+        "latitude": 34.0, "longitude": -117.0,
+        "payload": {
+            "magnitude": 4.2, "place": "Test Valley",
+            "time": 1760000000000, "updated": 1760001000000,
+            "depthKm": 13
+        }
+    }
+    return {
+        "sourceId": "usgs", "sourceLabel": "USGS", "eventId": "quake-17",
+        "eventKey": "usgs|quake-17", "title": "Earthquake test marker",
+        "typeLabel": "EARTHQUAKE",
+        "firstCapturedAtMs": 1760001000000,
+        "lastCapturedAtMs": 1760001000000,
+        "snapshots": [snap]
+    }
+
+
+def weather_document():
+    return {
+        "schema": records.WEATHER_EVENT_SCHEMA, "version": 1,
+        "revision": 3, "events": {"usgs|quake-17": weather_event()}
+    }
+
+
 class ManagedResearchTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -84,6 +114,127 @@ class ManagedResearchTests(unittest.TestCase):
         self.assertEqual(burnt["revision"], 5)
         self.assertEqual(self.run_action("list")["total"], 0)
         self.assertEqual(self.source.read_bytes(), original)
+
+    def test_event_archive_copies_full_snapshot_and_never_mutates_weather(self):
+        path = self.data / records.WEATHER_EVENT_NAME
+        path.write_text(json.dumps(weather_document()), encoding="utf-8")
+        before = path.read_bytes()
+        saved = self.run_action("archive-event", "usgs|quake-17", 0,
+                                when="1760001000000")
+        self.assertEqual(saved["total"], 1)
+        self.assertEqual(saved["items"][0]["kind"], "SAVED EVENT")
+        self.assertEqual(saved["items"][0]["source"], "WEATHER // EVENT COPY")
+        self.assertIn("1 SNAPSHOTS", saved["items"][0]["details"])
+        rid = saved["items"][0]["id"]
+        self.assertEqual(len(rid), 32)
+        store = json.loads((self.data / records.STORE_NAME).read_text())
+        self.assertEqual(store["records"][0]["event"], weather_event())
+        self.assertEqual(path.read_bytes(), before)
+        trashed = self.run_action("trash", rid, 1)
+        self.assertEqual(trashed["items"][0]["state"], "trashed")
+        restored = self.run_action("restore", rid, 2)
+        self.assertEqual(restored["items"][0]["state"], "archived")
+        self.run_action("trash", rid, 3)
+        self.run_action("burn", rid, 4, "BURN_SAVED_COPY_CONFIRMED")
+        self.assertEqual(self.run_action("list")["total"], 0)
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_trashing_old_copy_does_not_block_new_demo_or_event_copy(self):
+        path = self.data / records.WEATHER_EVENT_NAME
+        path.write_text(json.dumps(weather_document()), encoding="utf-8")
+        original = path.read_bytes()
+        first = self.run_action("archive", page()["url"], 0,
+                                when=page()["observedAt"])
+        old_demo = first["items"][0]["id"]
+        self.run_action("trash", old_demo, 1)
+        # Previous v1 content-derived IDs collided even though old item was
+        # only in Trash. The fresh copy now has its own unique identity.
+        second = self.run_action("archive", page()["url"], 2,
+                                 when=page()["observedAt"])
+        new_demo = next(x["id"] for x in second["items"]
+                        if x["state"] == "archived")
+        self.assertNotEqual(old_demo, new_demo)
+        self.assertEqual(len(second["items"]), 2)
+        event_saved = self.run_action("archive-event", "usgs|quake-17", 3,
+                                      when="1760001000000")
+        old_event = next(x["id"] for x in event_saved["items"]
+                         if x["kind"] == "SAVED EVENT")
+        self.run_action("trash", old_event, 4)
+        new_event_set = self.run_action("archive-event", "usgs|quake-17", 5,
+                                        when="1760001000000")
+        new_event = next(x["id"] for x in new_event_set["items"]
+                         if x["kind"] == "SAVED EVENT" and x["state"] == "archived")
+        self.assertNotEqual(old_event, new_event)
+        self.assertEqual(new_event_set["total"], 4)
+        # Restoring the old one is still possible; independent saved copies
+        # may intentionally coexist.
+        both = self.run_action("restore", old_event, 6)
+        self.assertEqual(sum(x["kind"] == "SAVED EVENT"
+                             and x["state"] == "archived"
+                             for x in both["items"]), 2)
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_legacy_hashed_demo_record_migrates_without_renaming(self):
+        source = records._page(page())
+        legacy_id = records._identity(source)
+        legacy = {
+            "schema": records.STORE_SCHEMA, "version": 1, "revision": 1,
+            "records": [{
+                "id": legacy_id, "state": "trashed",
+                "archivedAtMs": 1760001000000, "page": source
+            }]
+        }
+        self.save_store(json.dumps(legacy))
+        new = self.run_action("archive", page()["url"], 1,
+                              when=page()["observedAt"])
+        self.assertEqual(new["total"], 2)
+        self.assertNotEqual(legacy_id, next(x["id"] for x in new["items"]
+                                            if x["state"] == "archived"))
+        # Legacy item is still individually restorable and burnable.
+        self.run_action("restore", legacy_id, 2)
+        self.run_action("trash", legacy_id, 3)
+        self.run_action("burn", legacy_id, 4, "BURN_SAVED_COPY_CONFIRMED")
+        self.assertEqual(self.run_action("list")["total"], 1)
+
+    def test_event_copy_requires_exact_source_identity_and_current_timestamp(self):
+        path = self.data / records.WEATHER_EVENT_NAME
+        path.write_text(json.dumps(weather_document()))
+        for key, stamp in (
+            ("usgs|quake-17", "1760000999999"),
+            ("finance|quake-17", "1760001000000"),
+            ("usgs|not-found", "1760001000000"),
+            ("usgs|quake-17", "not-a-timestamp"),
+        ):
+            with self.subTest(key=key, stamp=stamp):
+                with self.assertRaises(records.LifecycleError):
+                    self.run_action("archive-event", key, 0, when=stamp)
+                self.assertFalse((self.data / records.STORE_NAME).exists())
+        source_bytes = path.read_bytes()
+        path.unlink()
+        hidden = self.root / "weather-protected.json"
+        hidden.write_bytes(source_bytes)
+        path.symlink_to(hidden)
+        with self.assertRaisesRegex(records.LifecycleError, "SOURCE_UNREADABLE"):
+            self.run_action("archive-event", "usgs|quake-17", 0,
+                            when="1760001000000")
+        self.assertEqual(hidden.read_bytes(), source_bytes)
+
+    def test_event_copy_rejects_inconsistent_snapshots_and_oversize(self):
+        path = self.data / records.WEATHER_EVENT_NAME
+        document = weather_document()
+        document["events"]["usgs|quake-17"]["snapshots"][0]["sourceId"] = "other"
+        path.write_text(json.dumps(document))
+        with self.assertRaisesRegex(records.LifecycleError,
+                                    "INVALID_WEATHER_EVENT"):
+            self.run_action("archive-event", "usgs|quake-17", 0,
+                            when="1760001000000")
+        document = weather_document()
+        document["events"]["usgs|quake-17"]["snapshots"][0]["payload"]["large"] = "x" * 70000
+        path.write_text(json.dumps(document))
+        with self.assertRaisesRegex(records.LifecycleError, "EVENT_COPY_TOO_LARGE"):
+            self.run_action("archive-event", "usgs|quake-17", 0,
+                            when="1760001000000")
+        self.assertFalse((self.data / records.STORE_NAME).exists())
 
     def test_refuse_direct_burn_without_trash_and_explicit_token(self):
         first = self.run_action("archive", page()["url"], 0,

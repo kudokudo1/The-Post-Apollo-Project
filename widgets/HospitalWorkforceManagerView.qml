@@ -7,6 +7,7 @@ import "../services/hospital/HospitalWorkforceStaffingPolicy.js" as StaffingPoli
 import "../services/hospital/HospitalFirstBedVerificationPolicy.js" as BedPolicy
 import "../services/hospital/HospitalGitHubOwnerPolicy.js" as GitHubOwnerPolicy
 import "../services/hospital/HospitalConversationIntakePolicy.js" as ConversationIntakePolicy
+import "../services/hospital/HospitalDictationTextPolicy.js" as DictationTextPolicy
 
 // Collapsible content inside SURGERY → SHOW WORKERS, not a new Hospital route.
 // All writes require a separate operator REVIEW and CONFIRM. No AI turns.
@@ -15,6 +16,13 @@ Column {
     property bool active: false
     property var doctorService: null
     property var providerService: null
+    property var speechInputService: null
+    property bool otherVoiceBusy: false
+    // One active microphone for long-form fields; no auto submit or save.
+    property string dictationField: ""
+    property string dictationMode: ""
+    property string dictationFeedbackField: ""
+    property string dictationFeedback: ""
     property var rooms: []
     property var sessions: []
     property var knownBeds: []
@@ -175,6 +183,79 @@ Column {
     spacing: 8
     visible: active
 
+    function voiceAreaForKey(key) {
+        if (key === "intake") return intakeBriefField;
+        if (key === "goal") return jobGoalField;
+        if (key === "constraints") return jobConstraintsField;
+        if (key === "done") return jobDoneField;
+        if (key === "checklist") return jobChecklistField;
+        return null;
+    }
+    function toggleDictation(key) {
+        const svc = root.speechInputService;
+        const field = root.voiceAreaForKey(key);
+        if (!root.active || !svc || !field || !key
+                || (root.mode !== "SETUP" && root.mode !== "JOB"))
+            return false;
+        if (svc.recording) {
+            if (root.dictationField !== key)
+                return false;
+            const stopping = svc.stopRecording(false);
+            if (stopping)
+                root.dictationFeedback = "STOPPED // TRANSCRIBING LOCALLY // NO SUBMIT";
+            return stopping;
+        }
+        if (svc.busy || root.otherVoiceBusy) {
+            root.dictationFeedbackField = key;
+            root.dictationFeedback = "MIC BUSY // WAIT FOR THE OTHER RECORDING";
+            return false;
+        }
+        root.dictationField = key;
+        root.dictationMode = root.mode;
+        root.dictationFeedbackField = key;
+        root.dictationFeedback = "STARTING MICROPHONE // LOCAL TRANSCRIPTION";
+        const started = svc.startRecording();
+        if (!started) {
+            root.dictationField = "";
+            root.dictationMode = "";
+            root.dictationFeedback = "MIC UNAVAILABLE // CHECK LOCAL WHISPER AND PIPEWIRE";
+        }
+        return started;
+    }
+    function cancelDictation() {
+        const target = root.dictationField;
+        if (root.speechInputService && root.speechInputService.busy)
+            root.speechInputService.cancel();
+        root.dictationField = "";
+        root.dictationMode = "";
+        if (target) {
+            root.dictationFeedbackField = target;
+            root.dictationFeedback = "DICTATION CANCELLED // ORIGINAL TEXT PRESERVED";
+        }
+    }
+    function acceptDictation(text) {
+        const key = root.dictationField;
+        const startedMode = root.dictationMode;
+        root.dictationField = "";
+        root.dictationMode = "";
+        const field = root.voiceAreaForKey(key);
+        if (!root.active || !field
+                || startedMode !== root.mode
+                || (key !== "intake" && startedMode !== "JOB")
+                || (key === "intake" && startedMode !== "SETUP"))
+            return false;
+        const result = DictationTextPolicy.appendTranscription(
+            field.value, text, field.voiceMaxLength);
+        root.dictationFeedbackField = key;
+        root.dictationFeedback = result.reason;
+        if (!result.accepted)
+            return false;
+        // Append to the CURRENT field text. Concurrent user typing is kept.
+        // This is not a form submit, job approval or AI request.
+        field.value = result.text;
+        field.focusEditorAtEnd();
+        return true;
+    }
     function makeId(prefix) {
         return prefix + "-" + Date.now().toString(36)
             + "-" + Math.floor(Math.random() * 0x7fffffff).toString(36)
@@ -507,6 +588,8 @@ Column {
     onActiveChanged: {
         disarm();
         if (!active)
+            cancelDictation();
+        if (!active)
             invalidateIntake();
         if (!active)
             bedProbe.invalidate();
@@ -517,6 +600,10 @@ Column {
                 if (!githubOwner.loaded && !githubOwner.reading)
                     githubOwner.refresh();
             });
+    }
+    onModeChanged: {
+        if (root.dictationField && root.mode !== root.dictationMode)
+            cancelDictation();
     }
     onSuggestedRepositoryChanged: {
         if (active && mode === "ROOM")
@@ -530,6 +617,22 @@ Column {
     onRegistryErrorChanged: disarm()
     onStaffingPlanChanged: staffingReviewKey = ""
     onAssignmentListVerifiedChanged: activationArmKey = ""
+
+    Connections {
+        target: root.speechInputService
+        function onTranscriptionReady(text, submitRequested) {
+            // Intentionally ignore submitRequested: dictation never submits.
+            root.acceptDictation(text);
+        }
+        function onVoiceError(message) {
+            if (!root.dictationField)
+                return;
+            root.dictationFeedbackField = root.dictationField;
+            root.dictationFeedback = String(message || "LOCAL DICTATION FAILED").slice(0,180);
+            root.dictationField = "";
+            root.dictationMode = "";
+        }
+    }
 
     Connections {
         target: root.doctorService
@@ -693,6 +796,8 @@ Column {
         ManagerArea {
             id: intakeBriefField
             caption: "YOUR INSTRUCTIONS // WHAT IS THIS AI WORKING ON?"
+            voiceKey: "intake"
+            voiceMaxLength: 4000
             editHeight: 156
             onEdited: root.invalidateIntake()
         }
@@ -1041,10 +1146,10 @@ Column {
             wrapMode: Text.WrapAnywhere
         }
         ManagerField {id:jobTitleField; caption:"JOB TITLE"}
-        ManagerArea {id:jobGoalField; caption:"GOAL"}
-        ManagerArea {id:jobConstraintsField; caption:"CONSTRAINTS / FILE OWNERSHIP"}
-        ManagerArea {id:jobDoneField; caption:"DEFINITION OF DONE"}
-        ManagerArea {id:jobChecklistField; caption:"CHECKLIST"}
+        ManagerArea {id:jobGoalField; caption:"GOAL"; voiceKey:"goal"; voiceMaxLength:4000}
+        ManagerArea {id:jobConstraintsField; caption:"CONSTRAINTS / FILE OWNERSHIP"; voiceKey:"constraints"; voiceMaxLength:4000}
+        ManagerArea {id:jobDoneField; caption:"DEFINITION OF DONE"; voiceKey:"done"; voiceMaxLength:4000}
+        ManagerArea {id:jobChecklistField; caption:"CHECKLIST"; voiceKey:"checklist"; voiceMaxLength:4000}
         ManagerField {id:jobPermissionsField; caption:"PERMISSIONS"; Component.onCompleted:value="READ"}
         GohuText {
             width: parent.width

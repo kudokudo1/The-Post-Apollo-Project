@@ -187,18 +187,34 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn("accentColor.b * washStrength", local_button)
         self.assertIn("property bool highlightWhenSelected: false",
                       local_button)
+        self.assertIn("property bool washByDefault: true", local_button)
+        self.assertIn("washByDefault ? steadyWashColor : baseFillColor",
+                      local_button)
         for state in ("idle", "hover", "pressed", "keyboardSelected"):
-            self.assertIn(state + "FillColor: steadyWashColor", local_button)
+            self.assertIn(state + "FillColor: defaultFillColor", local_button)
         self.assertIn(
-            "selectedFillColor: highlightWhenSelected ? activeFillColor : steadyWashColor",
+            "selectedFillColor: highlightWhenSelected ? activeFillColor : defaultFillColor",
             local_button)
         self.assertIn(
-            "color: highlightWhenSelected && selected ? activeFillColor : steadyWashColor",
+            "color: highlightWhenSelected && selected ? activeFillColor : defaultFillColor",
             local_button)
         # Selected/open gets yellow fill and magenta text/border/text glow.
         self.assertIn("selectedForegroundColor: Colors.magenta", local_button)
         self.assertIn("selectedBorderColor: Colors.magenta", local_button)
         self.assertIn("selectedContentGlowColor: Colors.magenta", local_button)
+        # Leave the default category wash on observation rows only.
+        filters = PANE.split("id: angelPatternFilters", 1)[1].split(
+            "id: angelHistoryArea", 1)[0]
+        self.assertIn("washByDefault: false", filters)
+        for component in ("favoriteObservation", "noteObservation"):
+            block = PANE.split("id: " + component, 1)[1].split(
+                "onLeftClicked:", 1)[0]
+            self.assertIn("washByDefault: false", block)
+        meaning_favorite = meaning.split("id: favoriteNumberButton", 1)[1]
+        self.assertIn("washByDefault: false", meaning_favorite)
+        observation_row = PANE.split("id: observationSelect", 1)[1].split(
+            "onLeftClicked:", 1)[0]
+        self.assertNotIn("washByDefault: false", observation_row)
         # Broad rectangular shadows caused the earlier accidental visual
         # washes. Never reintroduce those to create the intentional fill.
         self.assertIn("softGlowEnabled: false", local_button)

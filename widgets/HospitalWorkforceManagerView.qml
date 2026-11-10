@@ -1002,16 +1002,100 @@ Column {
                 border.width: 1
                 border.color: root.selectedDoctorId === String(modelData.id || "")
                     ? Colors.magenta : Colors.blue
-                GohuText {
+                Row {
                     anchors.fill: parent
                     anchors.margins: 5
-                    font.pixelSize: 9
-                    text: String(modelData.name || modelData.id || "")
-                        + " // " + String(modelData.role || "")
-                        + " // " + String(modelData.status || "")
-                    color: Colors.white
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
+                    spacing: 0
+                    clip: true
+
+                    // Worker display names and details are orange, while
+                    // slash dividers stay white with the SAME orange glow.
+                    GohuText {
+                        id: workerNameLabel
+                        text: String(modelData.name || modelData.id || "")
+                        font.pixelSize: 9
+                        color: Colors.orange
+                        width: Math.max(0, Math.min(implicitWidth,
+                            parent.width - workerSepOne.implicitWidth
+                                - workerRoleLabel.implicitWidth
+                                - workerSepTwo.implicitWidth
+                                - workerStatusLabel.implicitWidth))
+                        height: parent.height
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: workerSepOne
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: workerRoleLabel
+                        text: String(modelData.role || "")
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: workerSepTwo
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: workerStatusLabel
+                        text: String(modelData.status || "")
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
                 }
                 MouseArea {
                     anchors.fill: parent

@@ -16,7 +16,8 @@ check(host.count('HospitalSpeechInputService {') >= 3
       and 'audioFileName: "hospital-workforce-dictation.wav"' in host
       and 'speechInputService: workforceSpeechInputService' in host,
       "Use existing local Whisper recorder with a unique Surgery audio file")
-check('otherVoiceBusy: speechInputService.busy' in host
+check('readonly property bool receptionistVoiceBusy: speechInputService.busy' in host
+      and 'otherVoiceBusy: root.receptionistVoiceBusy' in host
       and '|| intercomSpeechInputService.busy' in host
       and 'workforceSpeechInputService.cancel();' in host,
       "Refuse concurrent Reception/Intercom recording and cancel on Hospital close")

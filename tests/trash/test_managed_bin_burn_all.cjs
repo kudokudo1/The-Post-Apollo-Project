@@ -155,11 +155,30 @@ test("combined Trash list has file/record filters and owner-specific actions",()
     assert.match(qml,/trashLauncher\.armBurn\(/);
 });
 
-test("loading fill expands across full button face, not thin bottom bar",()=>{
-    assert.match(qml,/id: researchBurnLoadFill/);
-    assert.match(qml,/height: Math\.max\(0, parent\.height - 4\)/);
-    assert.match(qml,/\* trashLauncher\.researchBurnLoadProgress/);
-    assert.match(qml,/idleFillColor: "transparent"/);
-    assert.match(qml,/hoverFillColor: "transparent"/);
-    assert.doesNotMatch(qml,/id: researchBurnLoadBar/);
+test("loading fill covers full button face with black clipped label and no wash",()=>{
+    const start=qml.indexOf("id: confirmManagedResearchBurn");
+    const end=qml.indexOf("id: cancelManagedResearchBurn",start);
+    const button=qml.slice(start,end);
+    assert.match(button,/label: ""/);
+    assert.match(button,/id: researchBurnFace/);
+    assert.match(button,/id: researchBurnLoadFill/);
+    assert.match(button,/height: Math\.max\(0, parent\.height - 4\)/);
+    assert.match(button,/\* trashLauncher\.researchBurnLoadProgress/);
+    assert.match(button,/id: researchBurnLabelWhite/);
+    assert.match(button,/id: researchBurnLabelClip/);
+    assert.match(button,/clip: true/);
+    assert.match(button,/color: Colors\.black\s+text: researchBurnFace\.displayedLabel/);
+    assert.match(button,/color: Colors\.white\s+text: researchBurnFace\.displayedLabel/);
+    assert.match(button,/visible: researchBurnFace\.loading/);
+    assert.match(button,/&& !trashLauncher\.researchBurnLoadComplete/);
+    // A black fill in every visual button state. Arming is a reversible
+    // visual animation; after loading, the opaque black face returns.
+    for (const state of ["idle", "hover", "pressed", "selected", "keyboardSelected"]) {
+        assert.ok(button.includes(state+"FillColor: Colors.black"),state);
+    }
+    for (const glow of ["contentGlowEnabled","softGlowEnabled","wideGlowEnabled"]) {
+        assert.ok(button.includes(glow+": false"),glow);
+    }
+    assert.doesNotMatch(button,/FillColor: "transparent"/);
+    assert.doesNotMatch(button,/id: researchBurnLoadBar/);
 });

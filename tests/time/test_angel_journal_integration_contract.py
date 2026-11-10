@@ -31,7 +31,7 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn("singleton AngelObservationsStore 1.0 AngelObservationsStore.qml", MODULE)
         self.assertIn("singleton TimeSettings 1.0 TimeSettings.qml", MODULE)
         self.assertIn('angel-observations-v1.json', STORE)
-        self.assertEqual(STORE.count("FileView {"), 1)
+        self.assertEqual(STORE.count("FileView {"), 2)
         self.assertIn("atomicWrites: true", STORE)
         self.assertIn("watchChanges: false", STORE)
         self.assertIn("blockWrites: false", STORE)
@@ -51,6 +51,62 @@ class AngelJournalContracts(unittest.TestCase):
                               "Http", "NetworkManager", "chronyd"):
                 self.assertNotIn(forbidden, code)
         self.assertIn("apollo-hub-notes-v1.json", NOTES)
+
+    def test_note_draft_is_durable_before_journal_and_recovery_guarded(self):
+        draft_policy = (ROOT / "services/time/AngelNoteDraftPolicy.js").read_text(
+            encoding="utf-8")
+        self.assertIn('angel-note-draft-v1.json', STORE)
+        self.assertIn('import "AngelNoteDraftPolicy.js" as Draft', STORE)
+        self.assertIn('atomicWrites: true', STORE)
+        self.assertEqual(STORE.count('FileView {'), 2)
+        self.assertIn('function saveObservationNote(id, note)', STORE)
+        self.assertIn('Draft.create(row, note, Date.now())', STORE)
+        self.assertIn('draftFile.setText(JSON.stringify(prepared.document', STORE)
+        self.assertIn('if (angel.draftState === "writing" && angel.writePhase === "draft"', STORE)
+        self.assertIn('angel.beginJournalWrite(next, "note", id)', STORE)
+        self.assertIn('function retryNoteDraft()', STORE)
+        self.assertIn('recoveryDiskChecked', STORE)
+        self.assertIn('noteDraftDisposition !== "recoverable"', STORE)
+        self.assertIn('noteDraftDisposition !== "already-saved"', STORE)
+        self.assertIn('function checkRecoveryFromDisk()', STORE)
+        self.assertIn('recoveryCheckPending = true', STORE)
+        self.assertIn('recoveryDiskChecked = recoveryCheckPending', STORE)
+        self.assertIn('angel.noteSaved(id)', STORE)
+        self.assertIn('angel.beginDraftClear()', STORE)
+        self.assertIn('signal noteSaveFailed(string id, string reason)', STORE)
+        self.assertIn('id: saveWatchdog', STORE)
+        self.assertIn('interval: 12000', STORE)
+        self.assertIn('storageState = "stalled"', STORE)
+        self.assertIn('WRITE STALLED // NO RETRY // RESTART TO RECOVER', STORE)
+        self.assertNotIn('waitForJob()', STORE)
+        self.assertIn('function disposition(draft, observations)', draft_policy)
+        self.assertIn('"already-saved"', draft_policy)
+        self.assertIn('"identity-conflict"', draft_policy)
+        self.assertIn('"conflict"', draft_policy)
+
+    def test_note_editor_waits_for_actual_save_acknowledgment(self):
+        self.assertIn('function onNoteSaved(id)', PANE)
+        self.assertIn('function onNoteSaveFailed(id, reason)', PANE)
+        self.assertIn('pane.noteInFlightId = id', PANE)
+        self.assertIn('pane.noteSaveFeedback = "WRITING // NOTE KEPT OPEN"', PANE)
+        self.assertIn('function reviewNoteDraft()', PANE)
+        self.assertIn('function retryDraft()', PANE)
+        self.assertIn('AngelObservationsStore.checkRecoveryFromDisk()', PANE)
+        self.assertIn('AngelObservationsStore.clearVerifiedDraft()', PANE)
+        self.assertIn('AngelObservationsStore.retryNoteDraft()', PANE)
+        self.assertIn('readOnly: pane.reviewingDraft || pane.noteInFlightId !== ""', PANE)
+        self.assertIn('available: pane.noteInFlightId === ""', PANE)
+        save = PANE.split('function saveNote() {', 1)[1].split(
+            'function retryDraft() {', 1)[0]
+        self.assertNotIn('closeNoteEditor()', save)
+        receipt = PANE.split('function onNoteSaved(id)', 1)[1].split(
+            'function onNoteSaveFailed', 1)[0]
+        self.assertIn('pane.closeNoteEditor()', receipt)
+        failure = PANE.split('function onNoteSaveFailed(id, reason)', 1)[1].split(
+            'Row {', 1)[0]
+        self.assertNotIn('pane.closeNoteEditor()', failure)
+        self.assertIn('COPY TEXT BEFORE EXIT', failure)
+        self.assertNotIn('FileView {', PANE)
 
     def test_recording_is_explicit_and_preserves_utc_context(self):
         self.assertIn("function recordClock()", PANE)
@@ -122,7 +178,7 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn('errMarked: row.errMarked === true', POLICY)
         self.assertIn('errMarked: false', POLICY)
         self.assertIn('atomicWrites: true', STORE)
-        self.assertEqual(STORE.count("FileView {"), 1)
+        self.assertEqual(STORE.count("FileView {"), 2)
         self.assertNotIn("FileView {", PANE)
 
     def test_semantic_filter_and_entry_colors_are_consistent(self):

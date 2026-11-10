@@ -5,6 +5,11 @@ Item {
     id: dialRoot
 
     property string labelText: "SELECT"
+    // Shared hardware-label defaults: numeric markings must be readable even
+    // on the smaller Radio navigation encoder. Other dials may override.
+    property int numericLabelPixelSize: 12
+    property int textLabelPixelSize: 10
+    property int readoutPixelSize: 13
     property var options: []
     property var displayOptions: []
     // "discrete" preserves the accepted Git behavior. "continuous" exposes
@@ -52,6 +57,9 @@ Item {
     property int completionPulseCount: 3
     property int feedbackPulsePhase: 0
     property bool dialHovered: false
+    // Full footprint, not just the 90px knob: lets enclosing Flickables
+    // relinquish wheel/drag interaction whenever the pointer is on the dial.
+    readonly property bool pointerOverDial: dialHoverHandler.hovered
     property int hoveredOptionIndex: -1
     readonly property bool rotating: dragging || motionActive
     readonly property real ringGlowStrength: !interactive ? 0.10
@@ -92,6 +100,26 @@ Item {
     activeFocusOnTab: true
     opacity: interactive ? 1.0 : 0.42
     Behavior on opacity { NumberAnimation { duration: 125 } }
+
+    HoverHandler {
+        id: dialHoverHandler
+    }
+
+    // Handle wheel events across the *entire* dial, including numeric labels.
+    // No automatic property rotation; each wheel tick uses existing steps.
+    WheelHandler {
+        target: null
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: function(event) {
+            if (!dialRoot.interactive || event.angleDelta.y === 0)
+                return;
+            dialRoot.forceActiveFocus();
+            dialRoot.stepIndex(event.angleDelta.y > 0 ? -1 : 1);
+            if (dialRoot.keyboardHost)
+                dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
+            event.accepted = true;
+        }
+    }
 
     onLoadingStateChanged: {
         feedbackTimer.stop();
@@ -837,8 +865,8 @@ Item {
                 readonly property real labelRadius: 48
                 readonly property real radians: labelAngle * Math.PI / 180
 
-                width: 38
-                height: 16
+                width: 42
+                height: 18
 
                 x: dialStage.width / 2
                    + Math.cos(radians) * labelRadius
@@ -850,7 +878,10 @@ Item {
                 GohuText {
                     anchors.centerIn: parent
                     text: dialRoot.optionDisplay(index)
-                    font.pixelSize: dialRoot.optionCount() > 4 ? 6 : 7
+                    font.pixelSize:
+                        /^[+-]?\d/.test(dialRoot.optionDisplay(index))
+                        ? dialRoot.numericLabelPixelSize
+                        : dialRoot.textLabelPixelSize
                     color: index === dialRoot.indicatedIndex
                            ? dialRoot.markerColor
                            : dialRoot.labelColor
@@ -869,6 +900,7 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     anchors.margins: -4
+                    preventStealing: true
                     enabled: dialRoot.interactive
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -906,6 +938,8 @@ Item {
         MouseArea {
             id: rotaryMouse
 
+            // Flickable must never steal a rotation midway through a drag.
+            preventStealing: true
             anchors.centerIn: parent
             width: 90
             height: 90
@@ -1037,19 +1071,7 @@ Item {
                     dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
             }
 
-            onWheel: function(wheel) {
-                if (wheel.angleDelta.y === 0)
-                    return;
-
-                dialRoot.forceActiveFocus();
-                dialRoot.stepIndex(wheel.angleDelta.y > 0 ? -1 : 1);
-
-                if (dialRoot.keyboardHost)
-                    dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
-
-                wheel.accepted = true;
-            }
-        }
+         }
 
         // Keyboard ring appears both while the dial is selected by the
         // Git spatial navigator and while it owns direct dial focus.
@@ -1083,8 +1105,8 @@ Item {
         text: dialRoot.readoutText
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
-        font.pixelSize: 8
+        font.pixelSize: dialRoot.readoutPixelSize
         color: dialRoot.interactive ? Colors.white : Colors.orange
-        opacity: dialRoot.interactive ? 0.82 : 0.72
+        opacity: dialRoot.interactive ? 1.0 : 0.78
     }
 }

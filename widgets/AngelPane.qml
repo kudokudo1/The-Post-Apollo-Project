@@ -396,8 +396,9 @@ Item {
                     labelPixelSize: 9
                     contentPadding: 1
                     trackLabelGlowLocally: true
-                    // Every filter retains a stable accent-color wash.
-                    // The active filter alone switches to yellow/magenta.
+                    // Filters stay black when idle; their active state
+                    // still uses the intentional yellow/magenta selection.
+                    washByDefault: false
                     accentColor: ink
                     idleBorderColor: edge
                     idleContentGlowColor: edge
@@ -495,6 +496,7 @@ Item {
                         x: 0
                         width: 30
                         height: parent.height
+                        washByDefault: false
                         label: "★"
                         labelPixelSize: 13
                         contentPadding: 2
@@ -512,6 +514,7 @@ Item {
                         x: observationSelect.x + observationSelect.width + 4
                         width: 30
                         height: parent.height
+                        washByDefault: false
                         label: "+"
                         labelPixelSize: 14
                         contentPadding: 2

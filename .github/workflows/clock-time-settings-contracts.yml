@@ -6,22 +6,26 @@ on:
       - "modules/Clock.qml"
       - "widgets/TimeW.qml"
       - "widgets/TimeSettingsPane.qml"
+      - "widgets/TimeResyncPopup.qml"
       - "services/time/TimeSettings.qml"
       - "services/time/TimeSettingsPolicy.js"
       - "services/time/TimeHostControl.py"
       - "services/time/qmldir"
       - "tests/time/test_clock_settings_contract.py"
+      - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
   push:
     paths:
       - "modules/Clock.qml"
       - "widgets/TimeW.qml"
       - "widgets/TimeSettingsPane.qml"
+      - "widgets/TimeResyncPopup.qml"
       - "services/time/TimeSettings.qml"
       - "services/time/TimeSettingsPolicy.js"
       - "services/time/TimeHostControl.py"
       - "services/time/qmldir"
       - "tests/time/test_clock_settings_contract.py"
+      - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
 
 jobs:
@@ -29,8 +33,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify Python time control and integration contracts
-        run: python3 -m unittest discover -s tests/time -p 'test_clock_settings_contract.py' -v
+      - name: Verify Python time control, popup and integration contracts
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_settings_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_resync_popup_contract.py' -v
       - name: Check bounded visual calibration policy
         run: |
           node <<'JS'

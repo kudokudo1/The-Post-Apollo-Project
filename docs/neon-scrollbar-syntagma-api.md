@@ -227,8 +227,11 @@ Do not place its parent inside a Qt auto-positioning `Column`/Row.
   later changes Git/Hospital to `"star"`.
 - Use `geometryHost: theActualFlickable` so the track sits within the
   *scrollable viewport*, with the shared 2px top/bottom and 4px right inset.
-  In a positioner-backed pane, use `mountingParent` pointing to an
-  **actual non-positioning Item**; leave sibling controls pinned.
+  In a positioner-backed pane, wrap the scrolling viewport in a
+  **stable non-positioning Item** that is the single Column child, and mount
+  the scrollbar as the Flickable's sibling inside that same Item. This
+  avoids stale `mapToItem` origins when the Column reflows. Leave pinned
+  controls outside the viewport wrapper.
 - Reserve at least 24px total from the scroll area width before drawing
   list-row text, cards, or action controls. The current bar's physical
   width is still 10px and the visible 7px handle is centered inside it.

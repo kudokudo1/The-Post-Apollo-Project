@@ -115,10 +115,12 @@ Rectangle {
                     width: Math.max(0, parent.width - 24)
                     spacing: 14
                     StationRuntimeRack {
+                        objectName: "weather-w4-sky-rack"
                         title: "WEATHER SERVICES // SKY + ATMOSPHERE"
                         rows: weatherServicesSky.item ? weatherServicesSky.item.runtimeRows : []
                     }
                     StationRuntimeRack {
+                        objectName: "weather-w4-ground-rack"
                         title: "WEATHER SERVICES // GROUND + HAZARDS"
                         rows: weatherServicesGround.item ? weatherServicesGround.item.runtimeRows : []
                     }

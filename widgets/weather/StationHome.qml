@@ -932,7 +932,8 @@ Rectangle {
         contentWidth: width
         contentHeight: Math.max(
             height,
-            homeContent.y + homeContent.implicitHeight + 24
+            homeContent.y + homeContent.implicitHeight
+                + (home.compactHistory ? 4 : 24)
         )
 
         Column {

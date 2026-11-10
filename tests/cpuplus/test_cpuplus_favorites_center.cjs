@@ -2218,3 +2218,70 @@ test("U9e Favorites search is left-aligned, vertically centered, magenta with or
                        "deleteCollection(","openUrl(","resourceId"])
     assert.equal(section.includes(unsafe),false,unsafe);
 });
+
+
+test("U9f middle Favorites rows use selected-over-hover full-row palette and glows",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const from=pane.indexOf("id: favoriteRow");
+  const to=pane.indexOf("// One full-row selection target.",from);
+  assert.ok(from>=0 && to>from);
+  const row=pane.slice(from,to);
+  assert.match(row,/readonly property bool isOpen:/);
+  assert.match(row,/pane\.selectedResource\.key===modelData\.key/);
+  assert.match(row,/readonly property bool isHovered:\s*!isOpen && \(rowHit\.containsMouse \|\| rowHit\.activeFocus\)/);
+  assert.match(row,/color: isOpen \|\| isHovered \? Colors\.yellow : Colors\.black/);
+  assert.match(row,/border\.color: rowAccent/);
+  assert.match(row,/readonly property color rowAccent:\s*isOpen \? Colors\.magenta\s*: isHovered \? Colors\.orange : Colors\.cyan/);
+  const colorTokens={magenta:"#C74EC7",orange:"#ED981A",cyan:"#55CFCA",yellow:"#F2BE4E",black:"#1B0623"};
+  function evaluate(isSelected,hovered,focused) {
+    const o={Colors:colorTokens,modelData:{key:"a"},
+      pane:{selectedResource:isSelected?{key:"a"}:{key:"b"}},
+      rowHit:{containsMouse:hovered,activeFocus:focused}};
+    const extract=(first,last)=>row.split(first)[1].split(last)[0].trim();
+    o.isOpen=vm.runInNewContext(extract("readonly property bool isOpen:",
+      "readonly property bool isHovered:"),o);
+    o.isHovered=vm.runInNewContext(extract("readonly property bool isHovered:",
+      "readonly property color rowAccent:"),o);
+    o.rowAccent=vm.runInNewContext(extract("readonly property color rowAccent:",
+      "\n\n                        color:"),o);
+    const fill=vm.runInNewContext(extract("\n                        color:",
+      "\n                        border.width:"),o);
+    return {isOpen:o.isOpen,isHovered:o.isHovered,accent:o.rowAccent,fill};
+  }
+  assert.deepEqual(evaluate(false,false,false),
+    {isOpen:false,isHovered:false,accent:colorTokens.cyan,fill:colorTokens.black});
+  assert.deepEqual(evaluate(false,true,false),
+    {isOpen:false,isHovered:true,accent:colorTokens.orange,fill:colorTokens.yellow});
+  assert.deepEqual(evaluate(false,false,true),
+    {isOpen:false,isHovered:true,accent:colorTokens.orange,fill:colorTokens.yellow});
+  assert.deepEqual(evaluate(true,true,true),
+    {isOpen:true,isHovered:false,accent:colorTokens.magenta,fill:colorTokens.yellow});
+  assert.deepEqual(evaluate(true,false,false),
+    {isOpen:true,isHovered:false,accent:colorTokens.magenta,fill:colorTokens.yellow});
+  // Both glyph lines receive the selected magenta and hover orange treatment.
+  assert.match(row,/color: favoriteRow\.isOpen \? Colors\.magenta\s*: favoriteRow\.isHovered \? Colors\.orange : Colors\.white/);
+  assert.match(row,/color: favoriteRow\.isOpen \? Colors\.magenta : Colors\.orange/);
+  assert.match(row,/RectangularShadow \{/);
+  assert.match(row,/visible: favoriteRow\.isOpen \|\| favoriteRow\.isHovered/);
+  assert.equal((row.match(/SafeDropShadow \{/g)||[]).length,2);
+  for(const id of ["rowTitle","rowStatus"]) {
+    assert.match(row,new RegExp("safeSource: "+id));
+  }
+  assert.equal((row.match(/requestedVisible: favoriteRow\.isOpen \|\| favoriteRow\.isHovered/g)||[]).length,2);
+  assert.match(row,/color: favoriteRow\.rowAccent/);
+});
+
+test("U9f middle Favorites row stays selection-only with keyboard and whole-row input",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const row=pane.slice(pane.indexOf("id: favoriteRow"),
+                       pane.indexOf("NO SUPPORTED SAVED ITEMS IN THIS FILTER"));
+  assert.match(row,/id: rowHit/);
+  assert.match(row,/anchors\.fill: parent/);
+  assert.match(row,/onClicked: pane\.selectionRequested\(modelData\.key\)/);
+  assert.match(row,/Accessible\.onPressAction: pane\.selectionRequested\(modelData\.key\)/);
+  assert.match(row,/event\.key===Qt\.Key_Return/);
+  assert.match(row,/event\.key===Qt\.Key_Enter/);
+  assert.match(row,/event\.key===Qt\.Key_Space/);
+  assert.match(row,/onWheel: function\(wheel\) \{ wheel\.accepted=false; \}/);
+  assert.doesNotMatch(row,/execDetached|Process \{|setFavorite\(|killProcess\(|deleteCollection\(|saveHome\(/);
+});

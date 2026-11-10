@@ -1722,21 +1722,80 @@ Column {
         }
     }
 
+    // Shared multi-line editor. Uses Hospital's existing local Whisper input,
+    // not a network recognizer. The same controls apply to every long prompt.
     component ManagerArea: Column {
         id: managerArea
         property string caption: ""
         property alias value: edit.text
         property int editHeight: 79
+        property string voiceKey: ""
+        property int voiceMaxLength: 4000
+        readonly property bool voiceActive:
+            !!voiceKey && root.dictationField === voiceKey
+        readonly property bool showVoiceLine:
+            !!voiceKey && (voiceActive
+                || root.dictationFeedbackField === voiceKey)
         signal edited()
         width: root.width
         spacing: 3
-        height: editHeight + 15
-        GohuText {
-            text: managerArea.caption
-            color: Colors.blue
-            font.pixelSize: 9
-            height: 12
-            width: parent.width
+        height: editHeight + 27 + (showVoiceLine ? 15 : 0)
+
+        function focusEditorAtEnd() {
+            edit.cursorPosition = edit.text.length;
+            edit.forceActiveFocus();
+        }
+
+        Row {
+            width: managerArea.width
+            height: 24
+            spacing: 5
+            GohuText {
+                width: Math.max(50, parent.width - micAction.width
+                    - cancelAction.width - parent.spacing * 2)
+                height: parent.height
+                verticalAlignment: Text.AlignVCenter
+                text: managerArea.caption
+                color: Colors.blue
+                font.pixelSize: 9
+                elide: Text.ElideRight
+            }
+            HospitalActionButton {
+                id: micAction
+                width: managerArea.voiceKey ? 64 : 0
+                height: 24
+                visible: !!managerArea.voiceKey
+                label: managerArea.voiceActive
+                    && root.speechInputService
+                    && root.speechInputService.recording
+                    ? "STOP"
+                    : managerArea.voiceActive && root.speechInputService
+                        && root.speechInputService.busy
+                    ? "WAIT..."
+                    : "MIC"
+                accent: managerArea.voiceActive ? Colors.magenta : Colors.cyan
+                selectedAction: managerArea.voiceActive
+                    && root.speechInputService
+                    && root.speechInputService.recording
+                contentGlowEnabled: false
+                enabledAction: root.active && !!root.speechInputService
+                    && (managerArea.voiceActive
+                        && root.speechInputService.recording
+                        || (!root.speechInputService.busy
+                            && !root.otherVoiceBusy))
+                onTriggered: root.toggleDictation(managerArea.voiceKey)
+            }
+            HospitalActionButton {
+                id: cancelAction
+                visible: managerArea.voiceActive && !!root.speechInputService
+                    && root.speechInputService.busy
+                width: visible ? 62 : 0
+                height: 24
+                label: "CANCEL"
+                accent: Colors.red
+                contentGlowEnabled: false
+                onTriggered: root.cancelDictation()
+            }
         }
         Rectangle {
             width: parent.width
@@ -1752,10 +1811,28 @@ Column {
                 font.family: "GohuFont 11 Nerd Font Mono"
                 font.pixelSize: 10
                 wrapMode: TextEdit.Wrap
+                textFormat: TextEdit.PlainText
                 selectByMouse: true
                 onTextChanged: managerArea.edited()
                 clip: true
             }
+        }
+        GohuText {
+            width: parent.width
+            height: managerArea.showVoiceLine ? 12 : 0
+            visible: managerArea.showVoiceLine
+            text: managerArea.voiceActive && root.speechInputService
+                && root.speechInputService.recording
+                ? "LISTENING " + root.speechInputService.recordingElapsedLabel
+                    + " // STOP TO INSERT TEXT, CANCEL TO DISCARD"
+                : managerArea.voiceActive && root.speechInputService
+                    && (root.speechInputService.stopping
+                        || root.speechInputService.transcribing)
+                ? "LOCAL WHISPER // TRANSCRIBING // NO FORM SUBMISSION"
+                : root.dictationFeedback
+            color: managerArea.voiceActive ? Colors.magenta : Colors.orange
+            font.pixelSize: 8
+            elide: Text.ElideRight
         }
     }
 }

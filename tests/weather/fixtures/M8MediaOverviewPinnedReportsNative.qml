@@ -175,6 +175,9 @@ ShellRoot {
                     ||radio.mapToItem(offlineReportsProbe,0,0).y!==root.radioY)
                     return root.fail("OVERVIEW_NEWS_SCROLL_MOVED_FIXED_RAIL");
                 media.subjectRoute="media/news/full";
+                // The real full NEWS route gets the complete content height,
+                // not the half-height OVERVIEW fixture used above.
+                offlineReportsProbe.height=250;
                 offlineReportsProbe.compactOverviewReportsToolbar=false;
                 offlineReportsProbe.pinReportsToolbar=true;
                 root.phase=3;

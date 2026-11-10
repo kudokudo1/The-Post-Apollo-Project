@@ -14,7 +14,7 @@ function proposal(briefValue) {
     if (brief.length > 4000) blockers.push("Description exceeds the 4000 character intake limit");
     if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(brief))
         blockers.push("Description contains unsupported control characters");
-    const match = /\b(?:you(?:'re| are)?|my|as an?|role(?: is|:)?)[\s:,-]*(intern|nurse|doctor)\b/i.exec(brief);
+    const match = /(?:\byou(?:'re| are)\b|\bmy\b|\bas an?\b|\brole\s*(?:is|:))[^.!?\n]{0,50}\b(intern|nurse|doctor)\b/i.exec(brief);
     const roleWord = match ? match[1].toLowerCase() : "intern";
     const role = roleWord === "doctor" ? "DOC" : roleWord === "nurse" ? "NRS" : "INT";
     let first = compact(brief.split(/[\n.!?]/)[0], 78);

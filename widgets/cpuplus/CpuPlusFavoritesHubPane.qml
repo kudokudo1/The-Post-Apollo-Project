@@ -21,6 +21,8 @@ Item {
     property var selectedResource: null
     // Expose rendered rows for native selector/a11y testing, not actuation.
     property alias favoriteRowRepeater: savedItemRows
+    // Native reopen lifecycle test seam, read-only visual inspection.
+    property alias categoryRowRepeater: categoryRowsRepeater
     property alias dossierGroupItems: dossierGroupRepeater
     property alias dossierScrollArea: dossierScroll
     property alias collapseAllControl: collapseAllButton
@@ -567,8 +569,11 @@ Item {
                 Math.min(40,Math.max(30,(width-(upperCount-1)*4)/upperCount))
 
             Repeater {
+                id: categoryRowsRepeater
                 model: 2
                 Row {
+                    // Inspect rendered filter buttons without sending actions.
+                    property alias categoryButtons: categoryIconRepeater
                     required property int index
                     readonly property var rowKeys: index===0
                         ? categoryFilterFlow.categoryKeys.slice(
@@ -584,6 +589,7 @@ Item {
                     height: 30
 
                     Repeater {
+                        id: categoryIconRepeater
                         model: rowKeys
                         ActionButton {
                             required property string modelData

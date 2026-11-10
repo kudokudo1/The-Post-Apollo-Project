@@ -88,29 +88,19 @@ Rectangle {
     Component {
         id: servicesPanel
         Item {
-            StationSky {
+            // Reuse the existing single SKY/GROUND component definitions.
+            // These only exist while SERVICES is selected; no new collector.
+            Loader {
                 id: weatherServicesSky
+                active: true
                 visible: false
-                width: 0
-                height: 0
-                subjectRoute: "weather/services/sky"
-                weatherService: weatherPane.weatherService
-                runtimeNowMs: weatherPane.runtimeNowMs
+                sourceComponent: skyPanel
             }
-            StationGround {
+            Loader {
                 id: weatherServicesGround
+                active: true
                 visible: false
-                width: 0
-                height: 0
-                subjectRoute: "weather/services/ground"
-                weatherService: weatherPane.weatherService
-                nwsAlertSource: weatherPane.nwsAlertSource
-                seismicSource: weatherPane.seismicSource
-                lightningSource: weatherPane.lightningSource
-                riverSource: weatherPane.riverSource
-                persistentCacheStore: weatherPane.persistentCacheStore
-                liveHistoryStore: weatherPane.liveHistoryStore
-                runtimeNowMs: weatherPane.runtimeNowMs
+                sourceComponent: groundPanel
             }
             Flickable {
                 anchors.fill: parent
@@ -126,11 +116,11 @@ Rectangle {
                     spacing: 14
                     StationRuntimeRack {
                         title: "WEATHER SERVICES // SKY + ATMOSPHERE"
-                        rows: weatherServicesSky.runtimeRows
+                        rows: weatherServicesSky.item ? weatherServicesSky.item.runtimeRows : []
                     }
                     StationRuntimeRack {
                         title: "WEATHER SERVICES // GROUND + HAZARDS"
-                        rows: weatherServicesGround.runtimeRows
+                        rows: weatherServicesGround.item ? weatherServicesGround.item.runtimeRows : []
                     }
                 }
             }

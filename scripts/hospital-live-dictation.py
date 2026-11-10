@@ -120,6 +120,8 @@ def live(stt_helper: str) -> int:
     clips = queue.Queue(maxsize=MAX_QUEUE)
     send_lock = threading.Lock()
     capture_done = threading.Event()
+    recognition_done = threading.Event()
+    stopping_error = threading.Event()
     recorder = None
 
     def send(kind, text="", detail=""):
@@ -174,6 +176,7 @@ def live(stt_helper: str) -> int:
             try:
                 clips.put(raw, timeout=0.3)
             except queue.Full:
+                stopping_error.set()
                 send("error", detail="LOCAL MODEL TOO SLOW // DICTATION STOPPED")
                 stopping.set()
                 halt_child()
@@ -197,7 +200,7 @@ def live(stt_helper: str) -> int:
                 enqueue(bytes(pending))
             capture_done.set()
             # Sentinel eventually enters after the finite queued chunks.
-            while not cancelled.is_set():
+            while not cancelled.is_set() and not recognition_done.is_set():
                 try:
                     clips.put(None, timeout=0.2)
                     break
@@ -217,13 +220,15 @@ def live(stt_helper: str) -> int:
             try:
                 phrase = transcribe_chunk(stt_helper, chunk)
             except (RuntimeError, OSError, subprocess.TimeoutExpired):
+                stopping_error.set()
                 send("error", detail="LOCAL WHISPER CHUNK FAILED")
                 stopping.set()
                 halt_child()
                 break
             if phrase:
                 send("partial", text=phrase)
-        if not cancelled.is_set():
+        recognition_done.set()
+        if not cancelled.is_set() and not stopping_error.is_set():
             send("done")
 
     command_thread = threading.Thread(target=read_commands, daemon=True)

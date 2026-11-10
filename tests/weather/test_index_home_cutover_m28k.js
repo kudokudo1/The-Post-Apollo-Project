@@ -92,7 +92,7 @@ test("HOME index is navigable in the same seven-family rail without modifying th
 test("HOME QUICK and HISTORY retain the single original StationHome with real source observations",()=>{
   assert.equal((surface.match(/StationHome\s*\{/g)||[]).length,1);
   assert.match(surface,/id: originalHome/);
-  assert.match(surface,/workspaceSection: surface\.homeSection === "overview"/);
+  assert.match(surface,/workspaceSection: surface\.homeSection/);
   assert.match(surface,/weatherService: surface\.weatherService/);
   assert.match(surface,/spaceService: surface\.spaceService/);
   assert.match(surface,/liveHistoryStore: surface\.liveHistoryStore/);

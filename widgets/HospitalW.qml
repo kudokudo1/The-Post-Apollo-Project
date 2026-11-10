@@ -6398,7 +6398,10 @@ PanelWindow {
                     registryError: responsibilityService.graphError
                     registryBusy: responsibilityService.graphLoading
                         || doctorService.refreshing
-                    suggestedRepository: patientService.repository
+                    // Prefer the active Git Floor's origin, available before
+                    // the asynchronous Patient refresh; preserve Patient fallback.
+                    suggestedRepository: githubService.repoSlug
+                        || patientService.repository
                     onDiscoverBedsRequested: {
                         // Only refresh the existing read-only Git floor scan.
                         // No branch switch, worktree creation or Room mutation.

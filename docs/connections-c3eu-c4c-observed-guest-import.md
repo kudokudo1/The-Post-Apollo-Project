@@ -26,11 +26,13 @@ The C3e-U CLI reads the bounded line from stdin and prints a single JSON diagnos
 
 ## HOW TO USE
 
-Source-only GitHub CI runs `.github/workflows/connections-c3eu-c4c-observed-guest-import.yml`. It validates against the *actual C4c source-defined producer schema* and 18 adversarial local input cases, plus C4b/C3b and C3e-Q deny-only regressions.
+Source-only GitHub CI runs `.github/workflows/connections-c3eu-c4c-observed-guest-import.yml`. It validates against the *actual C4c source-defined producer schema*, the original 18 adversarial local input cases, and a new exact-byte replay of the first real exported C4d observation; plus C4b/C3b and C3e-Q deny-only regressions.
 
-A future owner-controlled real evidence handoff would extract one validated `C4B_OBSERVED //` line from C4b's signed guest test results and supply **independently verified** hashes and process identity. That requires the C4b owner to decide how to export the bounded report as a reviewable guest artifact while preserving the current two-boot rollback and cleanup. This PR itself does not alter the guest, its CI log collection, or the C4b owner workflow.
+The C4b owner has now exported a bounded real `C4B_OBSERVED //` line as [CI artifact `c4d-one-guest-observation`, artifact 13800918170, run #42894509754](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42894509754), after original two-boot rollback PASS. C3e DOC inspected that exact ZIP, reconstructed the one line for deterministic regression, and independently computed the signed/running **script** SHA from the exact CI-head tracked source. The other ephemeral RPM/interpreter/process pins still require **independent** signers/witnesses; the copied guest fields must never be used as production evidence. This DOC PR does not alter the guest, C2v, or C4b exporter.
 
 ## VERIFY
+
+**2026-11-10 genuine exported-artifact review:** [C4b/C4d exact-head CI #42894509754](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42894509754) **SUCCESS**, head `fe1f1d0c9175c07a73f04c3c5bcdf611e486bea1`. Logs show both actual Fedora Silverblue boots/rollback, the signed C3d process check and `C4D_PASS // SIGNED_SILVERBLUE_TWO_BOOT_AND_ONE_OBSERVATION_GATE`. GitHub uploaded precisely one `C4B_OBSERVED.txt`, containing 18 expected fields and all six production-authority flags false. The new DOC regression reconstructs the exact original 819-byte artifact via its SHA-256 and replays it into the real C3e-U `inspect()` implementation. Only the signed/running **script** SHA is independently derived from tracked CI-head source. This CI test is **diagnostic compatibility**, not an independent proof of the signed RPM/interpreter PID custody.
 
 **2026-11-10 evidence correction:** A corrected heredoc in the C4b-owned draft [#1756](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/1756) now executes Python and refuses invalid observations. [Real exact-head Silverblue #42864373807](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42864373807) then failed closed with `SIGNED_RPM_PACKAGE_IDENTITY_REFUSED`; the original full two-boot/rollback gate did not pass and no artifact was exported. C3e-U/Grammar CI on that head passed, but **only as source/contract tests**. Newer owner draft heads may exist; always reacquire their run status instead of treating this historical failure as the latest.
 
@@ -38,31 +40,35 @@ A future owner-controlled real evidence handoff would extract one validated `C4B
 - [x] C3e-U's original CI regression suite passed; future C4b source/guest changes still require their own exact-head verification.
 - [x] C3e-U exact-head CI and Grammar for this documentation correction passed; signed release checks remain a separate evidence boundary.
 - [x] Original C3e-U [PR #1653](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/1653) is merged. This documentation correction is a separate draft awaiting review.
-- [ ] **Real guest output** collected from the C4b owner, with independent package verification and protected transport, before stronger claims.
+- [x] **Real guest output** collected from the C4b owner's full successful CI run and one-line artifact; archive/entry digest and independently sourced script digest checked.
+- [ ] Independently authenticated ephemeral RPM/interpreter/guest PID-start and protected transport/custody verified before stronger claims.
 
 ## WATCH OUT FOR
 
-The **actual real guest UART JSON is not exported** as a standalone artifact in the successful #42638232336 workflow. The positive C3e-U local unit-test report therefore uses *synthetic values matching the exact real C4c source schema*. It is source-contract compatibility, **not authenticated C4c guest evidence**. Repeating the exact schema, passing independent *caller-supplied* pins, or seeing real host-process checks in a separate CI step does not prove that a hostile guest or controller has not fabricated the plaintext report.
+Historical #42638232336 exported no standalone real UART record. The **newer successful #42894509754** exported one bounded `C4B_OBSERVED.txt`. Its ZIP SHA-256 `ac083f693ac139058b22ea9dd2b0e37767a04f0c30e17fc45de3fdfce599c7a9` matches GitHub's published artifact digest, and the lone 819-byte line has SHA-256 `e3fa68a28a3160262632785d656855fa62a079dbf8e95c0d4e1e76aa5da44bb9`. The independent *repository source* script SHA-256 is `1bc6cc2030efc08f873bc8f73a9644d869482e3e70c6553a108ade9d97441ce5`, matching the guest's `signed_script_sha256` and `running_script_sha256`. Replaying other values **from the guest itself** exercises the importer format only and is explicitly **not independently pinned RPM/interpreter/PID evidence**. An attacker controlling the guest or controller could still forge plaintext.
 
-Even if the guest result is later exported, it is still only **guest self-observation**. For protected C3e-Q/R/S use, an independently enrolled signer, challenge origin, trusted report transport, signed actual package reference, durable anti-replay outside the compromised guest, and operator-authorized consent remain separate requirements. Do not sign arbitrary C4c diagnostic JSON under a disposable local key and call it verified attestation. C3e-U deliberately produces **no Q-compatible signed envelope** and no authority escalation.
+Although the guest result is now exported, it remains **guest self-observation**. For protected C3e-Q/R/S use, an independently enrolled signer, challenge origin, trusted report transport, signed actual package reference, durable anti-replay outside the compromised guest, and operator-authorized consent remain separate requirements. Do not sign arbitrary C4c diagnostic JSON under a disposable local key and call it verified attestation. C3e-U deliberately produces **no Q-compatible signed envelope** and no authority escalation.
 
-The C4b/C4c owner delivered the in-guest signed-host verifier **source**; its actual successful execution and bounded export still require a corrected real guest run. C3e-T was not specifically invoked, and duplicating guest-owned measurements in DOC would not independently authenticate an unsigned observation. The remaining problem is exporting authentic evidence into DOC and ultimately binding it to an independently protected witness.
+The C4b/C4c owner delivered the in-guest signed-host verifier, and #42894509754 demonstrated a corrected successful real guest run with the bounded export, signed-service checks and both original boot/rollback gates. C3e-T was not specifically invoked, and duplicating guest-owned measurements in DOC would not independently authenticate an unsigned observation. The remaining trust gap is a **protected, independent RPM/interpreter/PID-start witness and signed challenge/replay custody**, not guest plaintext availability.
 
 ## CHECKLIST
 
 - [x] Verify C3e-T #1643 and C4c #1646 merged into current main.
 - [x] Reconcile the historical C4c workflow's overall PASS with the later-discovered false-positive embedded Python success marker.
-- [ ] Independently verify corrected C4c embedded verifier success, actual two-boot rollback, and exactly one bounded artifact in the same exact-head run.
+- [x] Verify corrected C4c embedded verifier, real two-boot rollback, and one bounded artifact are reported PASS in the exact-head CI run #42894509754.
+- [x] Independently validate exported ZIP/line hashes, exact source-derived script digest and 18-field deny-only schema.
+- [ ] Obtain independent authenticated RPM, interpreter, PID/start and anti-replay witnesses for anything above diagnostic compatibility.
 - [x] Inspect actual C4c schema and C3e-Q/R/S trust boundary.
 - [x] Implement read-only source-checked importer without editing C4b/C4c files.
 - [x] Add new adversarial CLI/source contract tests, CI and handoff.
 - [x] Original C3e-U source/contract CI passed on merge and remained green after the independent guest failure.
 - [ ] Independent review/merge authorization and operator acceptance.
-- [ ] C4b owner's bounded real guest report export and signed independent report issuer.
+- [x] C4b owner produced a bounded diagnostic real guest artifact; PR #1762 remains subject to owner review/merge decision.
+- [ ] Independently enrolled/protected signed report issuer and trust inputs; C3e-U does not implement them.
 - [ ] C5 genuine operator consent, production identity authority and first provider transaction.
 
 ## NEXT / DECISIONS
 
-**Next technical target:** when the C4b/C4d owner delivers a corrected genuine CI run with verified embedded Python execution, signed RPM/process identity, full two-boot rollback and one bounded exported `C4B_OBSERVED` record, compare it against **independently established pins** using the existing C3e-U importer. The report remains diagnostic only; do not change C4b-owned code or promote it into protected C3e-Q/R authority. Coordinate exact location/transport with C4b owner through [handoff #1606](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/1606). Keep C3e-U's diagnostic-only implementation on main; this evidence correction is independently reviewable as a draft, with no secret/provider/system change.
+**Next technical target:** complete independent review of the exported diagnostic against the existing C3e-U importer and record its exact source/ZIP/line provenance. The *script* pin is independently source-verified, but the ephemeral RPM/interpreter/PID/start pins and remote origin still need an independent signed witness before C3e-Q/R promotion. Do not change C4b-owned code or treat a guest self-report as protected authority. Coordinate exact location/transport with C4b owner through [handoff #1606](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/1606). Keep C3e-U's diagnostic-only implementation on main; this evidence correction is independently reviewable as a draft, with no secret/provider/system change.
 
 Production HOLD, no local workstation modification, no live Hospital registration or cross-worker ownership transfer.

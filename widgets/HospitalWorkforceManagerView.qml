@@ -629,6 +629,9 @@ Column {
                 return;
             root.dictationFeedbackField = root.dictationField;
             root.dictationFeedback = String(message || "LOCAL DICTATION FAILED").slice(0,180);
+            // Also discard any partially recorded local WAV on error.
+            if (root.speechInputService)
+                root.speechInputService.cancel();
             root.dictationField = "";
             root.dictationMode = "";
         }

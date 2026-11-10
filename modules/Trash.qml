@@ -420,6 +420,36 @@ PanelWindow {
     property int confirmCount: 0
     property bool burnAllPointerRelocated: false
 
+    // One visual Trash list. Files still use GIO and saved records still
+    // use the isolated, revision-controlled managed-copy backend.
+    property string trashViewFilter: "all"
+    readonly property bool trashShowsFiles:
+        trashViewFilter === "all" || trashViewFilter === "files"
+    readonly property var trashDisplayRows: {
+        const fileRows = trashShowsFiles
+            ? filteredItems.map(function(item) {
+                return {entryType:"file", name:item.name,
+                        originLabel:item.originLabel, uri:item.uri,
+                        original:item.original};
+            }) : [];
+        const needle = String(trashSearch.text || "").trim().toLowerCase();
+        const copyRows = researchBinRows.filter(function(row) {
+            if (trashViewFilter === "files") return false;
+            if (trashViewFilter === "events" && row.kind !== "SAVED EVENT")
+                return false;
+            if (trashViewFilter === "research" && row.kind !== "SAVED RESEARCH")
+                return false;
+            return !needle || (String(row.title) + " " + String(row.source)
+                               + " " + String(row.details) + " " + String(row.id))
+                               .toLowerCase().indexOf(needle) >= 0;
+        }).map(function(row) {
+            return {entryType:"record", name:row.title, kind:row.kind,
+                    originLabel:row.source + " // " + row.recordedAt,
+                    record:row};
+        });
+        return fileRows.concat(copyRows);
+    }
+
     readonly property var filteredItems: items.filter(function(item) {
         const needle = String(trashSearch.text || "").trim().toLowerCase();
         if (!needle) return true;
@@ -974,23 +1004,21 @@ PanelWindow {
                 GohuText {
                     width: parent.width - 203
                     height: 23
-                    font.pixelSize: 11
+                    font.pixelSize: 10
                     color: Colors.white
                     verticalAlignment: Text.AlignVCenter
-                    text: "SYSTEM TRASH // " + trashLauncher.total + " ITEMS"
+                    text: "FILES " + trashLauncher.total
+                          + " // RECORDS " + trashLauncher.researchBinRows.length
                 }
 
                 ActionButton {
                     width: 92
                     height: 23
-                    label: "COPY BIN " + trashLauncher.researchBinRows.length
+                    label: "RECORD BIN " + trashLauncher.researchBinRows.length
                     labelPixelSize: 9
                     accentColor: Colors.orange
                     available: !trashLauncher.researchBusy
-                    onLeftClicked: {
-                        trashLauncher.archiveFilter = "bin";
-                        trashLauncher.setMode("archive");
-                    }
+                    onLeftClicked: trashLauncher.trashViewFilter = "records"
                 }
 
                 ActionButton {
@@ -1022,11 +1050,42 @@ PanelWindow {
                 }
             }
 
+            Row {
+                id: trashSourceFilters
+                width: parent.width
+                height: 27
+                spacing: 4
+                visible: trashLauncher.activeMode === "trash"
+
+                Repeater {
+                    model: [
+                        {id:"all", label:"ALL"},
+                        {id:"files", label:"FILES"},
+                        {id:"records", label:"RECORDS"},
+                        {id:"events", label:"EVENTS"},
+                        {id:"research", label:"RESEARCH"}
+                    ]
+                    ActionButton {
+                        required property var modelData
+                        width: (trashSourceFilters.width - 16) / 5
+                        height: 26
+                        label: modelData.label
+                        labelPixelSize: 9
+                        accentColor: modelData.id === "files"
+                                     ? Colors.cyan
+                                     : modelData.id === "records"
+                                     ? Colors.orange : Colors.magenta
+                        selected: trashLauncher.trashViewFilter === modelData.id
+                        onLeftClicked: trashLauncher.trashViewFilter = modelData.id
+                    }
+                }
+            }
+
             Item {
                 id: trashListBox
                 visible: trashLauncher.activeMode === "trash"
                 width: parent.width
-                height: Math.max(95, trashMenu.height - 290
+                height: Math.max(90, trashMenu.height - 323
                                  - (trashLauncher.confirmMode === "item" ? 46 : 0))
 
                 ListView {
@@ -1036,7 +1095,7 @@ PanelWindow {
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     spacing: 4
-                    model: trashLauncher.filteredItems
+                    model: trashLauncher.trashDisplayRows
 
                     delegate: Rectangle {
                         id: trashEntry
@@ -1045,7 +1104,8 @@ PanelWindow {
                         height: 55
                         color: Colors.dark
                         border.width: 1
-                        border.color: Colors.green
+                        border.color: trashEntry.modelData.entryType === "record"
+                                      ? Colors.orange : Colors.green
                         radius: 0
 
                         Column {
@@ -1057,7 +1117,9 @@ PanelWindow {
                             GohuText {
                                 width: parent.width
                                 height: 19
-                                text: String(trashEntry.modelData.name || "UNNAMED FILE")
+                                text: (trashEntry.modelData.entryType === "record"
+                                       ? "[COPY] " : "[FILE] ")
+                                      + String(trashEntry.modelData.name || "UNNAMED")
                                 color: Colors.white
                                 font.pixelSize: 11
                                 verticalAlignment: Text.AlignVCenter
@@ -1088,20 +1150,37 @@ PanelWindow {
                                 labelPixelSize: 10
                                 accentColor: Colors.green
                                 available: !trashLauncher.busy
-                                onLeftClicked: trashLauncher.restoreItem(
-                                                   trashEntry.modelData)
+                                           && !trashLauncher.researchBusy
+                                           && trashLauncher.researchBurnId === ""
+                                onLeftClicked: {
+                                    if (trashEntry.modelData.entryType === "record")
+                                        trashLauncher.restoreResearchCopy(
+                                            trashEntry.modelData.record);
+                                    else
+                                        trashLauncher.restoreItem(
+                                            trashEntry.modelData);
+                                }
                             }
 
                             ActionButton {
                                 width: 55
                                 height: 31
-                                label: "BURN"
-                                labelPixelSize: 10
+                                label: trashEntry.modelData.entryType === "record"
+                                       ? "BURN COPY" : "BURN"
+                                labelPixelSize: 9
                                 accentColor: Colors.red
                                 destructive: true
                                 available: !trashLauncher.busy
-                                onLeftClicked: trashLauncher.armBurn(
-                                                   trashEntry.modelData)
+                                           && !trashLauncher.researchBusy
+                                           && trashLauncher.researchBurnId === ""
+                                onLeftClicked: {
+                                    if (trashEntry.modelData.entryType === "record")
+                                        trashLauncher.armResearchBurn(
+                                            trashEntry.modelData.record);
+                                    else
+                                        trashLauncher.armBurn(
+                                            trashEntry.modelData);
+                                }
                             }
                         }
                     }
@@ -1118,12 +1197,13 @@ PanelWindow {
 
                 GohuText {
                     anchors.centerIn: parent
-                    visible: trashLauncher.filteredItems.length === 0
+                    visible: trashLauncher.trashDisplayRows.length === 0
                     font.pixelSize: 11
                     color: Colors.cyan
                     text: trashLauncher.total === 0
+                          && trashLauncher.researchBinRows.length === 0
                           ? "TRASH EMPTY // NOTHING TO RESTORE"
-                          : "NO MATCHES ON THIS PAGE"
+                          : "NO MATCHES // CHOOSE A SOURCE FILTER"
                 }
             }
 
@@ -1139,7 +1219,8 @@ PanelWindow {
                     label: "PREVIOUS"
                     labelPixelSize: 9
                     accentColor: Colors.cyan
-                    available: !trashLauncher.busy && trashLauncher.page > 0
+                    available: trashLauncher.trashShowsFiles
+                               && !trashLauncher.busy && trashLauncher.page > 0
                     onLeftClicked: {
                         trashLauncher.page--;
                         trashLauncher.refresh(true);
@@ -1153,9 +1234,11 @@ PanelWindow {
                     font.pixelSize: 10
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
-                    text: "PAGE " + (trashLauncher.page + 1) + " // "
-                          + Math.max(1, Math.ceil(trashLauncher.total
-                                                  / trashLauncher.pageSize))
+                    text: trashLauncher.trashShowsFiles
+                          ? "FILE PAGE " + (trashLauncher.page + 1) + " // "
+                            + Math.max(1, Math.ceil(trashLauncher.total
+                                                    / trashLauncher.pageSize))
+                          : "MANAGED BIN // " + trashLauncher.trashDisplayRows.length
                 }
 
                 ActionButton {
@@ -1164,7 +1247,8 @@ PanelWindow {
                     label: "NEXT"
                     labelPixelSize: 9
                     accentColor: Colors.cyan
-                    available: !trashLauncher.busy
+                    available: trashLauncher.trashShowsFiles
+                               && !trashLauncher.busy
                                && (trashLauncher.page + 1)
                                   * trashLauncher.pageSize < trashLauncher.total
                     onLeftClicked: {

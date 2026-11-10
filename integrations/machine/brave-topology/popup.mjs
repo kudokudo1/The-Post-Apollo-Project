@@ -3,6 +3,7 @@ import { projectBraveTopology } from "./topology.mjs";
 const refreshButton = document.getElementById("refresh");
 const status = document.getElementById("status");
 const counts = document.getElementById("counts");
+const tabPattern = document.getElementById("tab-pattern");
 const windowList = document.getElementById("window-list");
 
 function item(tag, value) {
@@ -13,6 +14,19 @@ function item(tag, value) {
 
 function show(topology) {
   windowList.replaceChildren();
+  tabPattern.replaceChildren();
+  // These numbers are strictly browser-side, in the displayed list order.
+  // Counts are recognition hints, never Sway identity or restore authority.
+  const label = item("span", "TABS");
+  label.className = "pattern-label";
+  tabPattern.appendChild(label);
+  for (const entry of topology.windows) {
+    const separator = item("span", "//");
+    separator.className = "pattern-separator";
+    const number = item("span", String(entry.tab_count));
+    number.className = "pattern-number";
+    tabPattern.append(separator, number);
+  }
   counts.textContent =
     topology.counts.browser_windows + " WINDOWS // "
     + topology.counts.tabs + " TABS // "
@@ -49,6 +63,7 @@ async function inspectOnce() {
   status.textContent = "READING NORMAL BRAVE WINDOWS";
   counts.textContent = "";
   windowList.replaceChildren();
+  tabPattern.replaceChildren();
   try {
     if (!chrome.windows || typeof chrome.windows.getAll !== "function"
         || typeof chrome.windows.getCurrent !== "function") {

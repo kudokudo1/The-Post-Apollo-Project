@@ -238,7 +238,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn("id: archiveRecordsView", TRASH)
         self.assertIn("id: archiveEntriesList", TRASH)
         self.assertIn("id: archiveFilterRow", TRASH)
-        self.assertIn("Only SYSTEM TRASH currently supports Burn.", TRASH)
+        self.assertIn("Original Weather archives, Hospital and Finance records remain protected.", TRASH)
         self.assertIn('onLeftClicked: trashLauncher.setMode("trash")', TRASH)
         self.assertIn('visible: trashLauncher.activeMode === "trash"', TRASH)
         self.assertIn('activeMode === "trash"', TRASH)

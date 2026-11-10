@@ -148,7 +148,7 @@ Item {
                     delegate: Rectangle {
                         id: resultCard
                         required property var modelData
-                        width: Math.max(0,matchesBody.width-(searchPanel.compactPinned ? 10 : 0))
+                        width: Math.max(0,matchesBody.width-(searchPanel.compactPinned ? 24 : 0))
                         height: 112
                         color: Colors.black
                         border.width: 1
@@ -242,10 +242,11 @@ Item {
             }
             NeonScrollBar {
                 flickable: matchesScroll
+                mountingParent: matchesViewport
+                geometryHost: matchesScroll
+                handleStyle: "bar"
+                maximumBarHandleHeight: 42
                 visible: searchPanel.compactPinned && scrollable
-                x: parent.width-width
-                y: 0
-                height: parent.height
             }
         }
 

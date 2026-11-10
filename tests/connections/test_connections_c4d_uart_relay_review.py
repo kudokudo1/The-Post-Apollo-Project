@@ -258,17 +258,22 @@ class DirectGuestRelayReview(unittest.TestCase):
         self.assertNotIn("type(exc).__name__", self.source)
         self.assertNotIn("print(str(exc)", self.source)
 
-    def test_16_producer_stdout_now_has_private_exact_copy_before_guest_relay(self):
+    def test_16_producer_stdout_direct_exclusive_capture_before_relay(self):
         guest = GUEST.read_text()
         source = guest.split("stage SIGNED_C3D_RUNNING_HOST_MEASUREMENT_BEGIN", 1)[1]
         self.assertIn('c4d_record_dir=/run/postapollo-c4d-observation', source)
         self.assertIn('install -d -m 0700 "$c4d_record_dir"', source)
         self.assertIn('umask 077', source)
-        self.assertIn('/usr/bin/tee -- "$c4d_record"', source)
-        self.assertIn('<<\'C4B_RUNNING_HOST_PROBE\' | \\', source)
+        self.assertIn('set -C', source)
+        self.assertLess(source.index('set -C'),
+                        source.index('> "$c4d_record" <<\'C4B_RUNNING_HOST_PROBE\''))
+        self.assertIn('> "$c4d_record" <<\'C4B_RUNNING_HOST_PROBE\'', source)
+        self.assertNotIn('/usr/bin/tee -- "$c4d_record"', source)
         self.assertIn('fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"', source)
+        self.assertIn('DIRECT_STDOUT_CAPTURE_PRESENT', source)
+        self.assertIn('DIRECT_STDOUT_CAPTURE_EMPTY', source)
         self.assertIn('"$c4d_record" /dev/ttyS0 <<\'C4B_SINGLE_UART_RELAY\'', source)
-        self.assertLess(source.index('/usr/bin/tee -- "$c4d_record"'),
+        self.assertLess(source.index('> "$c4d_record" <<\'C4B_RUNNING_HOST_PROBE\''),
                         source.index("stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN"))
         self.assertLess(source.index('C4B_SINGLE_UART_RELAY'),
                         source.index('rm -f -- "$c4d_record"'))
@@ -277,31 +282,60 @@ class DirectGuestRelayReview(unittest.TestCase):
         self.assertIn('rmdir -- "$c4d_record_dir"', source)
         self.assertIn('set -Eeuo pipefail', guest)
 
-    def test_17_actual_tee_preserves_one_line_and_private_permissions(self):
-        with tempfile.TemporaryDirectory(prefix="c4d-owner-tee-") as dirname:
-            directory = Path(dirname)
-            out = directory / "observed.txt"
-            script = "set -Eeuo pipefail; umask 077; printf '%s\\n' \"$1\" | /usr/bin/tee -- \"$2\""
-            line = report().decode("ascii")
+    def test_17_actual_exclusive_stdout_capture_retains_0600_bytes(self):
+        with tempfile.TemporaryDirectory(prefix="c4d-direct-capture-") as dirname:
+            out = Path(dirname) / "observed.txt"
+            script = """set -Eeuo pipefail
+umask 077
+[[ ! -e "$2" && ! -L "$2" ]]
+( set -C; /usr/bin/printf '%s\\n' "$1" > "$2" )
+"""
+            payload = report().decode("ascii")
             result = subprocess.run(["/usr/bin/bash", "-c", script, "probe",
-                                     line, str(out)],capture_output=True,timeout=5)
+                                     payload, str(out)], capture_output=True, timeout=5)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout, report() + b"\n")
+            self.assertEqual(result.stdout, b"")
             self.assertEqual(out.read_bytes(), report() + b"\n")
             self.assertEqual(out.stat().st_mode & 0o777, 0o600)
             self.assertEqual(out.stat().st_nlink, 1)
 
-    def test_18_pipeline_failure_does_not_turn_signed_process_refusal_to_pass(self):
-        with tempfile.TemporaryDirectory(prefix="c4d-owner-tee-") as dirname:
+    def test_18_failed_signed_process_propagates_exit_code(self):
+        with tempfile.TemporaryDirectory(prefix="c4d-direct-capture-") as dirname:
             out = Path(dirname) / "observed.txt"
-            script = ("set -Eeuo pipefail; umask 077; "
-                      "{ /usr/bin/printf '%s\\n' DENIED; exit 9; } "
-                      "| /usr/bin/tee -- \"$1\"")
-            p = subprocess.run(["/usr/bin/bash", "-c", script, "probe",str(out)],
+            script = """set -Eeuo pipefail
+umask 077
+( set -C; { /usr/bin/printf '%s\\n' DENIED; exit 9; } > "$1" )
+"""
+            p = subprocess.run(["/usr/bin/bash", "-c", script, "probe", str(out)],
                                capture_output=True, timeout=5)
             self.assertNotEqual(p.returncode, 0)
             self.assertEqual(out.read_bytes(), b"DENIED\n")
             self.assertNotIn(PREFIX, out.read_bytes())
+
+    def test_23_preexisting_capture_is_not_overwritten_even_by_symlink(self):
+        with tempfile.TemporaryDirectory(prefix="c4d-direct-capture-") as dirname:
+            root = Path(dirname)
+            real = root / "original"
+            real.write_text("PROTECTED", encoding="ascii")
+            for name, path in (
+                ("file", root / "file"),
+                ("symlink", root / "symlink"),
+            ):
+                with self.subTest(name=name):
+                    if name == "file":
+                        path.write_text("EXISTS", encoding="ascii")
+                    else:
+                        path.symlink_to(real)
+                    script = """set -Eeuo pipefail
+( set -C; /usr/bin/printf '%s\\n' ATTACKER > "$1" )
+"""
+                    result = subprocess.run(
+                        ["/usr/bin/bash", "-c", script, "probe", str(path)],
+                        capture_output=True, timeout=5)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(real.read_text(encoding="ascii"), "PROTECTED")
+                    if name == "file":
+                        self.assertEqual(path.read_text(encoding="ascii"), "EXISTS")
 
     def test_19_signed_producer_stdout_contract_still_exact_c3eu_schema(self):
         guest = GUEST.read_text()

@@ -435,3 +435,78 @@ Retain the existing Power-specific glow recipe and structural geometry.
 This is a behavior safeguard with static test coverage. Live Quickshell
 keyboard and mouse verification remains pending; do **not** claim operator
 runtime acceptance on the basis of source-level CI.
+
+
+### U9g // No accidental button wash after menu hide/reopen (2026-11-10)
+
+**Status:** Operator-reported regression, implementation under review; live
+desktop acceptance of this repair is pending. The existing operator-approved
+visual states still apply: Favorites++ main/menu filters have black *inactive*
+faces, yellow *selected/open* faces with magenta ink and border. Middle saved
+item rows are black at rest, yellow/orange while genuinely hovered and
+yellow/magenta while selected. Do **not** interpret "no accidental wash" as
+"disable the intentional open or hover fill."
+
+**Reproduction:** Open CPU++ → Favorites++, close it, then open again. Some
+inactive buttons appeared to acquire the colored full-face "special button"
+wash. The operator identified the earlier Clock → Angels repair as a precedent.
+The image is evidence of the symptom, not proof of a particular Qt compositor
+cause.
+
+**Source precedent, confirmed by history:**
+- `widgets/AngelActionButton.qml`, commits `b9ba97f` and `b2264a0`:
+  paint the final Rectangle surface from a **deterministic semantic state**
+  using an explicitly opaque color, not whichever hover/press/keyboard branch
+  happens to be active when a menu reappears. Angels deliberately keep a
+  *stable category wash* where specified and opt into yellow only for OPEN.
+- Angel commit `12e129b`: `RectangularShadow` paints a colored filled
+  rectangle, not merely a thin outline. Its interior can become visible as a
+  wash under Qt list compositing; the Angel fix disabled `softGlowEnabled`
+  and `wideGlowEnabled` while preserving source-local content glow.
+
+**U9g Favorites++ implementation:**
+- In `widgets/cpuplus/CpuPlusFavoritesHubPane.qml`, the top category icon
+  and bottom menu-filter `ActionButton` instances now explicitly bind
+  `color: filterOpen ? Colors.yellow : Colors.black` (both colors opaque).
+  Semantic selection (`filterOpen`), not temporary hover/press or a remembered
+  keyboard state, determines the **final surface paint** across hide/show.
+- These filter instances disable the shared component's *broad filled*
+  `softGlow` and `wideGlow`, retaining glyph `contentGlow` and adding only
+  a **transparent, border-only magenta outline** for the selected state.
+  The existing operator-approved inactive module-colored icons and borders
+  and active magenta accents remain intact.
+- Middle saved-entry rows retain their authored black idle, yellow/orange
+  hover, yellow/magenta selected states. The full-area `RectangularShadow`
+  was replaced with a transparent outline. Their two guarded glyph glows
+  still operate on hover/selection. Selection continues to outrank hover.
+- No storage, navigation, owner capability or menu opening behavior changed.
+
+**Reusable technical rule for other menu/button regressions:**
+
+1. Find the **actual final painted face** (`color`, and any alpha/layer
+   effects), separately from `idleFillColor` / `hoverFillColor` defaults.
+   Give it one deterministic, opaque binding to its intended semantic state.
+   Preserve the documented visual-state exception for that widget.
+2. Inspect all **broad-area `RectangularShadow`/wide halo layers**. They are
+   filled tinted effects and can look like an accidental background after
+   compositing, reparenting, scrolling or hide/show. Disable them on affected
+   controls when the design requires an unwashed face. Use glyph-local glows
+   and/or transparent outline strokes instead; don't globally disable valid
+   broad halos on unrelated controls.
+3. Distinguish a **genuine current hover** from an open/selected state:
+   selection must persist through hover, while an unselected control must
+   return to its authored idle fill when neither active condition holds.
+4. Test **hide → show/reopen** in native QML, not merely initial construction
+   or source-string inspection. Assert both an idle control's actual `color`
+   and a selected control's actual `color` after the cycle, plus the absence
+   of broad glows. Keep owner actions and saved state untouched.
+
+**Verification boundary:** `tests/cpuplus/fixtures/CpuPlusFavoritesNative.qml`
+performs a selector hide/show and checks actual idle/open filter RGB; the
+`test_cpuplus_favorites_center.cjs` contracts reject broad shadows and
+unwanted fill-state fallthrough. Exact-head CI and live operator review must
+be recorded separately. Do not claim all GPUs/Wayland compositors are proven
+from this fixture alone.
+
+**Semantic rule owner:** [Syntagma OPERATE // Post-Apollo icon grammar](https://github.com/kudokudo1/Meta-Apollo-Logos-Syntagma/blob/main/OPERATE/POST-APOLLO-ICON-GRAMMAR.md).
+Numerical QML implementation stays here, not copied into that grammar.

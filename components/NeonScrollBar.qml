@@ -120,6 +120,10 @@ Item {
     property int railWidth: 3
     property int barHandleWidth: 7
     property int minimumHandleHeight: 24
+    // Optional maximum for compact normal bars. Zero preserves the legacy
+    // proportional handle in every existing consumer. Stage 1 CPU++ opts
+    // in before any separate star-handle visual decision.
+    property int maximumBarHandleHeight: 0
     property int starHandleSize: 14
 
     property int topInset: 5
@@ -529,7 +533,11 @@ Item {
             return trackLength;
         const proportional = trackLength * Math.min(1,
             viewportExtent / Math.max(contentExtent, 1));
-        return Math.min(trackLength, Math.max(minimumHandleHeight, proportional));
+        const normal = Math.min(trackLength,
+            Math.max(minimumHandleHeight, proportional));
+        return maximumBarHandleHeight > 0
+            ? Math.min(normal, Math.max(minimumHandleHeight, maximumBarHandleHeight))
+            : normal;
     }
     function activeHandleExtent() {
         return Math.max(0, Math.min(trackLength,

@@ -9,9 +9,12 @@ on:
       - "widgets/TimeResyncPopup.qml"
       - "services/time/TimeSettings.qml"
       - "services/time/TimeSettingsPolicy.js"
+      - "services/time/TimeAutoCheckPolicy.js"
+      - "components/SelectorDial.qml"
       - "services/time/TimeHostControl.py"
       - "services/time/qmldir"
       - "tests/time/test_clock_settings_contract.py"
+      - "tests/time/test_clock_auto_check_contract.py"
       - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
   push:
@@ -22,9 +25,12 @@ on:
       - "widgets/TimeResyncPopup.qml"
       - "services/time/TimeSettings.qml"
       - "services/time/TimeSettingsPolicy.js"
+      - "services/time/TimeAutoCheckPolicy.js"
+      - "components/SelectorDial.qml"
       - "services/time/TimeHostControl.py"
       - "services/time/qmldir"
       - "tests/time/test_clock_settings_contract.py"
+      - "tests/time/test_clock_auto_check_contract.py"
       - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
 
@@ -37,6 +43,7 @@ jobs:
         run: |
           python3 -m unittest discover -s tests/time -p 'test_clock_settings_contract.py' -v
           python3 -m unittest discover -s tests/time -p 'test_clock_resync_popup_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_auto_check_contract.py' -v
       - name: Check bounded visual calibration policy
         run: |
           node <<'JS'
@@ -59,4 +66,36 @@ jobs:
           assert.equal(policy.parse(JSON.stringify({version:1,displayOffsetMs:0})).ok,true);
           assert.equal(policy.parse(JSON.stringify({version:2,displayOffsetMs:0})).ok,false);
           assert.equal(policy.parse('not json').ok,false);
+          JS
+      - name: Validate durable reference cadence and bounded day/hour rules
+        run: |
+          node <<'JS'
+          const assert = require('assert/strict');
+          const fs = require('fs');
+          const vm = require('vm');
+          const raw = fs.readFileSync('services/time/TimeAutoCheckPolicy.js', 'utf8');
+          const p = {};
+          vm.runInNewContext(raw.replace(/^\.pragma library\s*/, ''), p);
+          const first = p.initialDocument();
+          assert.equal(first.enabled, false);
+          assert.equal(first.intervalHours, 6);
+          assert.equal(p.validHours(1), true);
+          assert.equal(p.validHours(168), true);
+          for (const bad of [0, 169, -1, 1.5, NaN, Infinity, '6']) {
+            assert.equal(p.validHours(bad), false);
+          }
+          assert.equal(p.parse(JSON.stringify(first)).ok, true);
+          assert.equal(p.parse(JSON.stringify({...first, intervalHours:169})).ok, false);
+          assert.equal(p.parse(JSON.stringify({...first, version:2})).ok, false);
+          assert.equal(p.parse('null').ok, false);
+          assert.equal(p.parse('bad-json').ok, false);
+          const enabled = p.withSchedule(first, true, 168).document;
+          assert.equal(p.isDue(enabled, 1000000, 0), true);
+          const stamped = p.withAttempt(enabled, 1000000).document;
+          assert.equal(p.isDue(stamped, 1000000 + 167*3600000, 0), false);
+          assert.equal(p.isDue(stamped, 1000000 + 168*3600000, 0), true);
+          assert.equal(p.nextDueAtMs(stamped, 0), 1000000 + 168*3600000);
+          assert.equal(p.isDue(stamped, 999999, 0), true); // clock jumped back
+          assert.equal(p.isDue(p.withSchedule(stamped, false, 168).document, 1000000 + 168*3600000, 0), false);
+          assert.equal(p.withSchedule(first, true, 2.2).ok, false);
           JS

@@ -362,7 +362,7 @@ def command(*args):
         # stderr into exact package/member identity or ownership results.
         diagnostics = p.stderr.decode("utf-8", "strict").strip()
         if diagnostics and not all(
-                re.fullmatch(r"warning: .*\\bNOKEY\\b", line)
+                re.fullmatch(r"warning: .*\bNOKEY\b", line)
                 for line in diagnostics.splitlines()):
             refuse("RPM_METADATA_DIAGNOSTIC_REFUSED")
         return p.stdout.decode("utf-8", "strict").strip()

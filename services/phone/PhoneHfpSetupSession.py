@@ -11,7 +11,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
 from typing import Callable
@@ -180,9 +179,12 @@ def run_session(
         print("Review other WirePlumber HFP backend settings; no file was overwritten.")
         return 2
     if active == "inactive":
-        sudo_path = sudo if sudo is not None else shutil.which("sudo")
-        if (not isinstance(sudo_path, str) or not sudo_path.startswith("/usr/bin/")
-                or not Path("/usr/bin/systemctl").exists()):
+        sudo_path = sudo if sudo is not None else (
+            "/usr/bin/sudo" if Path("/usr/bin/sudo").is_file() else "/bin/sudo"
+        )
+        if (sudo_path not in ("/usr/bin/sudo", "/bin/sudo")
+                or not Path(sudo_path).is_file()
+                or not Path("/usr/bin/systemctl").is_file()):
             print("Trusted sudo/systemctl is unavailable. No service change attempted.")
             return 2
         if approve("Type START OFONO to start the system service once: ") != ACK_START:
@@ -221,6 +223,11 @@ def run_session(
             print("Restart declined; newly created file removed.")
             review()
             return 1
+        if _config_status(target, roots) != "CONFIGURED":
+            _rollback_our_file(target)
+            print("HFP configuration changed before restart; review it separately.")
+            review()
+            return 2
         ok, _ = _call(
             ["systemctl", "--user", "restart", "wireplumber.service"], runner)
         if not ok or not _user_audio_active(runner):

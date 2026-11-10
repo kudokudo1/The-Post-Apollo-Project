@@ -35,6 +35,9 @@ Rectangle {
     // Only the focused MEDIA NEWS/REPORTS screen pins a compact control
     // deck. CLASSIC NEWS and the half-height OVERVIEW stay unchanged.
     property bool pinReportsToolbar: false
+    property bool compactOverviewReportsToolbar: false
+    readonly property bool reportsToolbarActive:
+        pinReportsToolbar || compactOverviewReportsToolbar
     function newsGroupVisible(group) {
         return MediaPanelPolicy.newsGroupVisible(newsSubjectRoute,group);
     }
@@ -1741,9 +1744,9 @@ Rectangle {
         anchors.right: parent.right
         anchors.leftMargin: 8
         anchors.rightMargin: 8
-        spacing: 2
+        spacing: stationDiscovery.compactOverviewReportsToolbar ? 1 : 2
         visible: stationDiscovery.domain === "news"
-                 && stationDiscovery.pinReportsToolbar
+                 && stationDiscovery.reportsToolbarActive
                  && !stationDiscovery.viewerOpen
         height: visible ? implicitHeight : 0
         z: 2
@@ -1752,13 +1755,13 @@ Rectangle {
             id: reportsRequestRail
             objectName: "media-m7-fixed-request-rail"
             width: parent.width
-            height: 25
+            height: stationDiscovery.compactOverviewReportsToolbar ? 22 : 25
             spacing: 4
             visible: stationDiscovery.newsGroupVisible("request")
             ActionButton {
                 objectName: "media-m7-retry-news"
                 width: (reportsRequestRail.width - 2*reportsRequestRail.spacing)/3
-                height: 24
+                height: stationDiscovery.compactOverviewReportsToolbar ? 21 : 24
                 label: "RETRY NEWS"
                 labelPixelSize: 10
                 available: source.canRetry
@@ -1767,7 +1770,7 @@ Rectangle {
             ActionButton {
                 objectName: "media-m7-request-bbc"
                 width: (reportsRequestRail.width - 2*reportsRequestRail.spacing)/3
-                height: 24
+                height: stationDiscovery.compactOverviewReportsToolbar ? 21 : 24
                 label: publisherFeedsContent.bbcBackend.ready
                     ? "REFRESH BBC" : "LOAD BBC"
                 labelPixelSize: 10
@@ -1778,7 +1781,7 @@ Rectangle {
             ActionButton {
                 objectName: "media-m7-request-aljazeera"
                 width: (reportsRequestRail.width - 2*reportsRequestRail.spacing)/3
-                height: 24
+                height: stationDiscovery.compactOverviewReportsToolbar ? 21 : 24
                 label: publisherFeedsContent.alJazeeraBackend.ready
                     ? "REFRESH AL JAZEERA" : "LOAD AL JAZEERA"
                 labelPixelSize: 9
@@ -1794,18 +1797,18 @@ Rectangle {
             id: reportsSearchRail
             objectName: "media-m7-fixed-search-rail"
             width: parent.width
-            height: 27
+            height: stationDiscovery.compactOverviewReportsToolbar ? 24 : 27
             spacing: 6
             visible: stationDiscovery.newsGroupVisible("filters")
             Row {
                 id: pinnedSourceSearch
                 objectName: "media-m7-fixed-source-search"
                 width: (reportsSearchRail.width-reportsSearchRail.spacing)/2
-                height: 26
+                height: stationDiscovery.compactOverviewReportsToolbar ? 23 : 26
                 spacing: 3
                 Rectangle {
                     width: pinnedSourceSearch.width - 49
-                    height: 25
+                    height: stationDiscovery.compactOverviewReportsToolbar ? 22 : 25
                     color: Colors.dark
                     border.width: 1
                     border.color: pinnedSourceInput.activeFocus
@@ -1843,7 +1846,7 @@ Rectangle {
                 ActionButton {
                     objectName: "media-m7-clear-source"
                     width: 46
-                    height: 25
+                    height: stationDiscovery.compactOverviewReportsToolbar ? 22 : 25
                     label: "CLEAR"
                     labelPixelSize: 9
                     available: stationDiscovery.newsSourceQuery !== ""
@@ -1854,11 +1857,11 @@ Rectangle {
                 id: pinnedLanguageSearch
                 objectName: "media-m7-fixed-language-search"
                 width: (reportsSearchRail.width-reportsSearchRail.spacing)/2
-                height: 26
+                height: stationDiscovery.compactOverviewReportsToolbar ? 23 : 26
                 spacing: 3
                 Rectangle {
                     width: pinnedLanguageSearch.width - 49
-                    height: 25
+                    height: stationDiscovery.compactOverviewReportsToolbar ? 22 : 25
                     color: Colors.dark
                     border.width: 1
                     border.color: pinnedLanguageInput.activeFocus
@@ -1896,7 +1899,7 @@ Rectangle {
                 ActionButton {
                     objectName: "media-m7-clear-language"
                     width: 46
-                    height: 25
+                    height: stationDiscovery.compactOverviewReportsToolbar ? 22 : 25
                     label: "CLEAR"
                     labelPixelSize: 9
                     available: stationDiscovery.newsLanguageQuery !== ""
@@ -1913,6 +1916,7 @@ Rectangle {
             width: parent.width
             height: visible ? 24 : 0
             visible: stationDiscovery.newsGroupVisible("filters")
+                     && !stationDiscovery.compactOverviewReportsToolbar
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             flickableDirection: Flickable.HorizontalFlick
@@ -1948,6 +1952,7 @@ Rectangle {
             width: parent.width
             height: visible ? 24 : 0
             visible: stationDiscovery.newsGroupVisible("filters")
+                     && !stationDiscovery.compactOverviewReportsToolbar
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             flickableDirection: Flickable.HorizontalFlick
@@ -1983,6 +1988,7 @@ Rectangle {
             width: parent.width
             height: visible ? 24 : 0
             visible: stationDiscovery.newsGroupVisible("filters")
+                     && !stationDiscovery.compactOverviewReportsToolbar
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             flickableDirection: Flickable.HorizontalFlick
@@ -2003,6 +2009,99 @@ Rectangle {
                         selected: stationDiscovery.newsSourceRegion === modelData.id
                         labelText: modelData.label
                         labelFontSize: 9
+                        idlePrimaryColor: Colors.cyan
+                        selectedPrimaryColor: Colors.magenta
+                        perimeterGlowColor: Colors.orange
+                        onTriggered: stationDiscovery.selectNewsRegion(modelData.id)
+                    }
+                }
+            }
+        }
+
+        // In the 50/50 MEDIA OVERVIEW, the three full-width filter rails
+        // would consume the entire NEWS bay. Keep their original selectors
+        // in one horizontally scrollable, vertically pinned strip instead.
+        Flickable {
+            id: compactOverviewFilters
+            objectName: "media-m8-overview-fixed-filter-rail"
+            width: parent.width
+            height: visible ? 22 : 0
+            visible: stationDiscovery.compactOverviewReportsToolbar
+                     && stationDiscovery.newsGroupVisible("filters")
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.HorizontalFlick
+            contentWidth: compactFilterChoices.implicitWidth
+            contentHeight: height
+            Row {
+                id: compactFilterChoices
+                spacing: 3
+                QuietText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "TOPIC //"
+                    font.pixelSize: 8
+                    color: Colors.orange
+                }
+                Repeater {
+                    model: stationDiscovery.newsTopicOptions
+                    delegate: ModeButton {
+                        required property var modelData
+                        width: modelData.id === "weather" ? 94 : 79
+                        height: 21
+                        textOnly: true
+                        horizontalContent: true
+                        bordered: false
+                        selected: stationDiscovery.newsTopic === modelData.id
+                        labelText: modelData.label
+                        labelFontSize: 8
+                        idlePrimaryColor: Colors.cyan
+                        selectedPrimaryColor: Colors.magenta
+                        perimeterGlowColor: Colors.orange
+                        onTriggered: stationDiscovery.selectNewsTopic(modelData.id)
+                    }
+                }
+                QuietText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "| TIME //"
+                    font.pixelSize: 8
+                    color: Colors.orange
+                }
+                Repeater {
+                    model: stationDiscovery.newsTimeOptions
+                    delegate: ModeButton {
+                        required property var modelData
+                        width: modelData.hours === 0 ? 86 : 60
+                        height: 21
+                        textOnly: true
+                        horizontalContent: true
+                        bordered: false
+                        selected: stationDiscovery.newsMaxAgeHours === modelData.hours
+                        labelText: modelData.label
+                        labelFontSize: 8
+                        idlePrimaryColor: Colors.cyan
+                        selectedPrimaryColor: Colors.magenta
+                        perimeterGlowColor: Colors.orange
+                        onTriggered: stationDiscovery.selectNewsTime(modelData.hours)
+                    }
+                }
+                QuietText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "| REGION //"
+                    font.pixelSize: 8
+                    color: Colors.orange
+                }
+                Repeater {
+                    model: stationDiscovery.newsRegionOptions
+                    delegate: ModeButton {
+                        required property var modelData
+                        width: modelData.id === "" ? 82 : 92
+                        height: 21
+                        textOnly: true
+                        horizontalContent: true
+                        bordered: false
+                        selected: stationDiscovery.newsSourceRegion === modelData.id
+                        labelText: modelData.label
+                        labelFontSize: 8
                         idlePrimaryColor: Colors.cyan
                         selectedPrimaryColor: Colors.magenta
                         perimeterGlowColor: Colors.orange
@@ -2039,7 +2138,7 @@ Rectangle {
         Column {
             id: content
             x: 20
-            y: stationDiscovery.pinReportsToolbar ? 4 : 12
+            y: stationDiscovery.reportsToolbarActive ? 4 : 12
             width: Math.max(0, discoveryScroll.width - 40)
             spacing: 12
 
@@ -4088,7 +4187,7 @@ Rectangle {
                 width: parent.width
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
-                         && !stationDiscovery.pinReportsToolbar
+                         && !stationDiscovery.reportsToolbarActive
                 spacing: 12
                 ActionButton {
                     width: 102
@@ -4116,7 +4215,7 @@ Rectangle {
             StationPublisherFeeds {
                 id: publisherFeedsContent
                 objectName: "media-m6-reports-publisher-feeds"
-                pinnedRequests: stationDiscovery.pinReportsToolbar
+                pinnedRequests: stationDiscovery.reportsToolbarActive
                 width: parent.width
                 visible: stationDiscovery.domain === "news"
                          && stationDiscovery.newsGroupVisible("request")
@@ -4131,7 +4230,7 @@ Rectangle {
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
                          && stationDiscovery.newsGroupVisible("filters")
-                         && !stationDiscovery.pinReportsToolbar
+                         && !stationDiscovery.reportsToolbarActive
                 spacing: 7
 
                 Repeater {
@@ -4181,7 +4280,7 @@ Rectangle {
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
                          && stationDiscovery.newsGroupVisible("filters")
-                         && !stationDiscovery.pinReportsToolbar
+                         && !stationDiscovery.reportsToolbarActive
                 spacing: 8
 
                 Rectangle {
@@ -4257,7 +4356,7 @@ Rectangle {
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
                          && stationDiscovery.newsGroupVisible("filters")
-                         && !stationDiscovery.pinReportsToolbar
+                         && !stationDiscovery.reportsToolbarActive
                 spacing: 7
 
                 Repeater {
@@ -4304,7 +4403,7 @@ Rectangle {
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
                          && stationDiscovery.newsGroupVisible("filters")
-                         && !stationDiscovery.pinReportsToolbar
+                         && !stationDiscovery.reportsToolbarActive
                 spacing: 8
 
                 Rectangle {
@@ -4382,7 +4481,7 @@ Rectangle {
                 height: stationDiscovery.domain === "news" ? 42 : 0
                 visible: stationDiscovery.domain === "news"
                          && stationDiscovery.newsGroupVisible("filters")
-                         && !stationDiscovery.pinReportsToolbar
+                         && !stationDiscovery.reportsToolbarActive
                 spacing: 7
 
                 Repeater {

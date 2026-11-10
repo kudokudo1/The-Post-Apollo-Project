@@ -27,6 +27,10 @@ Item {
     property alias dossierScrollArea: dossierScroll
     property alias collectionScrollArea: collectionScroll
     property alias listScrollArea: listScroll
+    // Read-only visual test handles; scrollbar ownership remains internal.
+    property alias collectionScrollIndicator: collectionScrollTrack
+    property alias dossierScrollIndicator: dossierScrollTrack
+    property alias listScrollIndicator: listScrollTrack
     property alias collapseAllControl: collapseAllButton
     property alias searchQuery: favoritesSearchInput.text
     property alias collectionGroupItems: collectionGroupRepeater

@@ -138,7 +138,7 @@ test("weather and research copies have identical scoped Burn safety", ()=>{
 test("normal bordered button stays available before pointer relocation", ()=>{
     const start=qml.indexOf("id: confirmManagedResearchBurn");
     assert.notEqual(start,-1);
-    const end=qml.indexOf("id: researchBurnLoadBar",start);
+    const end=qml.indexOf("id: cancelManagedResearchBurn",start);
     const surface=qml.slice(start,end);
     assert.match(surface,/idleBorderWidth: 2/);
     assert.match(surface,/idleBorderColor: Colors.red/);

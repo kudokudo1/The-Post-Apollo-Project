@@ -18,6 +18,11 @@ button:hover, button:focus-visible { outline: 1px solid #c74ec7; color: #f2be4e;
 button:disabled { opacity: 0.55; cursor: default; }
 #status { min-height: 18px; margin: 9px 0; font-size: 11px; color: #55cfca; }
 #counts { font-size: 12px; color: #f2be4e; margin: 8px 0; }
+.tab-pattern { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 8px 0 3px; font-size: 12px; }
+.pattern-label { color: #55cfca; }
+.pattern-separator { color: #ffffff; }
+.pattern-number { color: #ed981a; }
+.pattern-note { color: #55cfca; font-size: 9px; margin: 2px 0 8px; }
 ol { margin: 0; padding: 0; list-style: none; max-height: 200px; overflow-y: auto; }
 li { padding: 9px 8px; border: 1px solid #55cfca; margin-bottom: 5px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; }
 li.current { border-color: #c74ec7; }

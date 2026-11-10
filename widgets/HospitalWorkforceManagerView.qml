@@ -1600,16 +1600,97 @@ Column {
                 border.width: 1
                 border.color: root.selectedStaffDoctorId
                     === String(modelData.id || "") ? Colors.magenta : Colors.blue
-                GohuText {
+                Row {
                     anchors.fill: parent
                     anchors.margins: 5
-                    text: String(modelData.name || modelData.id || "WORKER")
-                        + " // " + String(modelData.role || "NO ROLE")
-                        + " // " + String(modelData.status || "UNKNOWN")
-                    color: Colors.white
-                    font.pixelSize: 9
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
+                    spacing: 0
+                    clip: true
+                    GohuText {
+                        id: staffWorkerName
+                        text: String(modelData.name || modelData.id || "WORKER")
+                        width: Math.max(0, Math.min(implicitWidth,
+                            parent.width - staffSepOne.implicitWidth
+                                - staffRole.implicitWidth
+                                - staffSepTwo.implicitWidth
+                                - staffStatus.implicitWidth))
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: staffSepOne
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: staffRole
+                        text: String(modelData.role || "NO ROLE")
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: staffSepTwo
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: staffStatus
+                        text: String(modelData.status || "UNKNOWN")
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
                 }
                 MouseArea {
                     anchors.fill: parent

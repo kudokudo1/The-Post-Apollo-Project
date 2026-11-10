@@ -100,7 +100,7 @@ Rectangle {
 
     // Leaving Reception must stop capture even when Hospital stays open.
     onVisibleChanged: {
-        if (!visible && speechInputService.busy)
+        if (!visible && speechInputService && speechInputService.busy)
             speechInputService.cancel();
     }
 

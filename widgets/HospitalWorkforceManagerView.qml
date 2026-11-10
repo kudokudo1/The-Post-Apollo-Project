@@ -1,4 +1,6 @@
 import QtQuick
+import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
 import qs.components
 import "../services/hospital"
 import "../services/hospital/HospitalWorkforceManagerPolicy.js" as ManagementPolicy
@@ -323,11 +325,14 @@ Column {
         return true;
     }
     function applyRoomSuggestions() {
+        // The active Floor's GitHub origin takes priority over account login.
+        // Keep any explicit manual edits until the user chooses CURRENT REPO
+        // or successfully creates a Room and starts a new form.
         const proposed = GitHubOwnerPolicy.suggestion(root.suggestedRepository,
             githubOwner.login);
-        if (!root.roomOwnerManuallyEdited && proposed.owner)
+        if (!root.roomOwnerManuallyEdited)
             roomOwnerField.value = proposed.owner;
-        if (!root.roomRepositoryManuallyEdited && proposed.repository)
+        if (!root.roomRepositoryManuallyEdited)
             roomRepoField.value = proposed.repository;
     }
     function useOwnGitHub() {
@@ -354,15 +359,16 @@ Column {
     function useCurrentPatient() {
         const current = root.currentPatientRepository;
         if (!current.owner || !current.repository) {
-            root.outcome = "CURRENT PATIENT UNAVAILABLE // SELECT A GITHUB REPOSITORY";
+            root.outcome = "CURRENT FLOOR REPO UNAVAILABLE // SELECT A GITHUB REPOSITORY";
             return;
         }
-        roomOwnerField.value = current.owner;
-        roomRepoField.value = current.repository;
-        root.roomOwnerManuallyEdited = true;
-        root.roomRepositoryManuallyEdited = true;
+        // Re-enter automatic mode explicitly, including when the user was
+        // previously editing a repository owned by another GitHub account.
+        root.roomOwnerManuallyEdited = false;
+        root.roomRepositoryManuallyEdited = false;
+        root.applyRoomSuggestions();
         root.disarm();
-        root.outcome = "CURRENT PATIENT SELECTED // " + root.selectedGitHubRepository;
+        root.outcome = "CURRENT FLOOR REPO SELECTED // " + root.selectedGitHubRepository;
     }
     function selectMode(value) {
         if (mode === value) return;
@@ -673,6 +679,11 @@ Column {
             root.selectedRoomId = String((room || {}).id || "");
             root.roomId = root.makeId("room");
             roomNameField.value = "";
+            // Start the NEXT Room in this same Floor with a fresh auto-fill.
+            // Only reset after the previous Room is confirmed as created.
+            root.roomOwnerManuallyEdited = false;
+            root.roomRepositoryManuallyEdited = false;
+            root.applyRoomSuggestions();
             root.rosterRefreshRequested();
         }
     }
@@ -999,6 +1010,17 @@ Column {
         ManagerField {id:roomNameField; caption:"ROOM NAME"}
         GohuText {
             width: parent.width
+            text: "CURRENT FLOOR REPOSITORY // "
+                + (root.currentPatientRepository.owner
+                    ? root.suggestedRepository
+                    : "NOT DETECTED // SELECT OR ENTER MANUALLY")
+                + "\nOwner and project auto-fill together when available."
+            font.pixelSize: 9
+            color: root.currentPatientRepository.owner ? Colors.cyan : Colors.orange
+            wrapMode: Text.WrapAnywhere
+        }
+        GohuText {
+            width: parent.width
             text: "GITHUB OWNER = the account or organization hosting the repository. NOT the worker, Doctor or person assigned the job."
             font.pixelSize: 9
             color: Colors.cyan
@@ -1027,7 +1049,7 @@ Column {
             HospitalActionButton {
                 width: (parent.width - 6) / 2
                 height: 29
-                label: "USE PATIENT"
+                label: "USE CURRENT REPO"
                 accent: Colors.cyan
                 contentGlowEnabled: false
                 enabledAction: !!root.currentPatientRepository.owner
@@ -1768,15 +1790,8 @@ Column {
                 width: managerArea.voiceKey ? 64 : 0
                 height: 24
                 visible: !!managerArea.voiceKey
-                label: managerArea.voiceActive
-                    && root.speechInputService
-                    && root.speechInputService.recording
-                    ? "STOP"
-                    : managerArea.voiceActive && root.speechInputService
-                        && root.speechInputService.busy
-                    ? "WAIT..."
-                    : "MIC"
-                accent: managerArea.voiceActive ? Colors.magenta : Colors.cyan
+                label: "🗣︎"
+                accent: Colors.omnitrix
                 selectedAction: managerArea.voiceActive
                     && root.speechInputService
                     && root.speechInputService.recording

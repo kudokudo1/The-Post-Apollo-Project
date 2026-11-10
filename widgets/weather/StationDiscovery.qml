@@ -3815,8 +3815,18 @@ Rectangle {
                 }
             }
 
-            // Publisher RSS controls moved to MEDIA → SERVICES → FEEDS.
-            // NEWS/REPORTS keeps its original one GDELT article owner.
+            // M6 // Manual publisher RSS controls belong in NEWS → REPORTS.
+            // GDELT remains the single separate article/headline provider.
+            StationPublisherFeeds {
+                objectName: "media-m6-reports-publisher-feeds"
+                width: parent.width
+                visible: stationDiscovery.domain === "news"
+                         && stationDiscovery.newsGroupVisible("request")
+                stationOpen: stationDiscovery.stationOpen
+                onHeadlineSelected: function(row) {
+                    stationDiscovery.openRow(row);
+                }
+            }
             Row {
                 id: newsTopicRail
                 width: parent.width

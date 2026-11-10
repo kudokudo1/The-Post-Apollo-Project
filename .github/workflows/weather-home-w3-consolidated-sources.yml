@@ -6,6 +6,8 @@ on:
       - 'widgets/weather/StationHome.qml'
       - 'widgets/weather/StationWeatherSubjectPanelPolicy.js'
       - 'widgets/weather/StationWeatherSubjectPane.qml'
+      - 'widgets/weather/StationWeatherServicesPane.qml'
+      - 'tests/weather/test_weather_w5_canonical_services.js'
       - 'tests/weather/test_weather_w4_services_history.js'
       - 'tests/weather/fixtures/W4WeatherServicesNative.qml'
       - 'widgets/weather/StationHomeMetricCard.qml'
@@ -35,6 +37,7 @@ jobs:
         run: |
           node --test tests/weather/test_home_w3_sources_and_history_fit.js
           node --test tests/weather/test_weather_w4_services_history.js
+          node --test tests/weather/test_weather_w5_canonical_services.js
           node --test tests/weather/test_workspace_landing_w1.js
           node --test tests/weather/test_workspace_left_rail_w1r.js
           node --test tests/weather/test_home_deck_w2a.js
@@ -84,7 +87,7 @@ jobs:
             exit 1
           fi
 
-      - name: Native WEATHER SERVICES reuse of one SKY and one GROUND component
+      - name: Native WEATHER SERVICES W5 dark surface and rows-only scroll
         shell: bash
         run: |
           set -euo pipefail
@@ -106,7 +109,7 @@ jobs:
             > "$work/native.log" 2>&1 || rc=$?
           cat "$work/native.log"
           test "$rc" -eq 0
-          grep -F "W4_NATIVE_PASS // WEATHER_SERVICE_RACKS_MOUNTED" "$work/native.log"
-          if grep -E 'W4_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+          grep -F "W5_NATIVE_PASS // WEATHER_DARK_PINNED_SERVICES_AND_LIST_SCROLL" "$work/native.log"
+          if grep -E 'W5_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi

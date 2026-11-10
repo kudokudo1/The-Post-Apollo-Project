@@ -32,6 +32,12 @@ Column {
         GitHubOwnerPolicy.compose(roomOwnerField.value, roomRepoField.value)
     readonly property var currentPatientRepository:
         GitHubOwnerPolicy.splitRepository(root.suggestedRepository)
+    // Registered Room records supply owner suggestions, not extra credentials.
+    readonly property var otherKnownGitHubOwners:
+        GitHubOwnerPolicy.ownerOptions(root.rooms, root.suggestedRepository,
+            githubOwner.login).filter(function(entry) {
+                return entry.label === "USED IN HOSPITAL";
+            }).slice(0, 3)
     property string mode: "WORKER"
     property string workerRole: "INT"
     property string workerId: makeId("worker")
@@ -194,6 +200,16 @@ Column {
         root.disarm();
         root.outcome = "GITHUB OWNER // @" + githubOwner.login
             + " // REVIEW THE REPOSITORY NAME BEFORE SAVING";
+    }
+    function useKnownGitHubOwner(owner) {
+        const chosen = GitHubOwnerPolicy.part(owner);
+        if (!chosen) return false;
+        roomOwnerField.value = chosen;
+        root.roomOwnerManuallyEdited = true;
+        root.disarm();
+        root.outcome = "GITHUB OWNER // " + chosen
+            + " // OWNER KNOWN FROM ANOTHER ROOM, NOT AN AUTHENTICATED ACCOUNT";
+        return true;
     }
     function useCurrentPatient() {
         const current = root.currentPatientRepository;
@@ -759,6 +775,18 @@ Column {
             font.pixelSize: 8
             color: githubOwner.loaded ? Colors.cyan : Colors.orange
             wrapMode: Text.Wrap
+        }
+        Repeater {
+            model: root.otherKnownGitHubOwners
+            HospitalActionButton {
+                required property var modelData
+                width: root.width
+                height: 27
+                label: "RECENT GITHUB OWNER // " + modelData.owner
+                accent: Colors.blue
+                contentGlowEnabled: false
+                onTriggered: root.useKnownGitHubOwner(modelData.owner)
+            }
         }
         ManagerField {
             id: roomRepoField

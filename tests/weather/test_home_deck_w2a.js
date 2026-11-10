@@ -18,13 +18,13 @@ const env = vm.createContext({Math,Number,String,Array,Object,isFinite});
 vm.runInContext(policyText.replace(/^\.pragma library\s*$/m,""),env);
 const native = value => JSON.parse(JSON.stringify(value));
 
-test("W2a rotates only the six existing operational HOME panel routes",()=>{
+test("W3 rotates five HOME panels including the final SOURCES",()=>{
   const routes=native(env.ROTATABLE);
   assert.deepEqual(routes,[
     "home/auto","home/quick","home/snapshot",
-    "home/history","home/runtime","home/health"
+    "home/history","home/sources"
   ]);
-  assert.equal(new Set(routes).size,6);
+  assert.equal(new Set(routes).size,5);
   for(const r of routes) {
     assert.equal(env.isRotatable(r),true);
     assert.match(workspace,new RegExp(r.replace("/","\\/")));
@@ -37,12 +37,12 @@ test("W2a rotates only the six existing operational HOME panel routes",()=>{
 
 test("favorites use stable source-independent panel routes, not display indices",()=>{
   const dirty=["home/auto","home/auto","earth/overview","home/runtime",null,7];
-  assert.deepEqual(native(env.normalizedFavorites(dirty)),["home/auto","home/runtime"]);
+  assert.deepEqual(native(env.normalizedFavorites(dirty)),["home/auto","home/sources"]);
   const pinned=native(env.toggleFavorite(dirty,"home/quick"));
-  assert.deepEqual(pinned,["home/auto","home/runtime","home/quick"]);
+  assert.deepEqual(pinned,["home/auto","home/sources","home/quick"]);
   assert.equal(env.favorite(pinned,"home/quick"),true);
   assert.deepEqual(native(env.toggleFavorite(pinned,"home/auto")),
-                   ["home/runtime","home/quick"]);
+                   ["home/sources","home/quick"]);
   assert.deepEqual(native(env.toggleFavorite(pinned,"home/magick")),pinned);
 });
 
@@ -53,11 +53,11 @@ test("AUTO is random, MIXED weights favorites, PINNED never escapes its pins",()
   assert.equal(env.nextMode("pinned"),"mixed");
   assert.equal(env.normalizedMode("bad"),"mixed");
   assert.equal(env.nextRoute("home/auto",[],"auto",0),"home/quick");
-  assert.equal(env.nextRoute("home/auto",[],"auto",0.999999),"home/health");
+  assert.equal(env.nextRoute("home/auto",[],"auto",0.999999),"home/sources");
   const favorites=["home/history","home/health"];
   assert.equal(env.nextRoute("home/auto",favorites,"mixed",0.30),"home/history");
   assert.equal(env.nextRoute("home/auto",favorites,"pinned",0),"home/history");
-  assert.equal(env.nextRoute("home/auto",favorites,"pinned",0.999),"home/health");
+  assert.equal(env.nextRoute("home/auto",favorites,"pinned",0.999),"home/sources");
   assert.equal(env.nextRoute("home/history",["home/history"],"pinned",0.2),"");
   assert.equal(env.nextRoute("home/auto",[],"pinned",0.8),"");
   for (const sample of [0,0.2,0.6,0.9999,1,NaN,-1]) {
@@ -91,7 +91,7 @@ test("W2a is an opt-in HOME-only control rail with manual NEXT and reading hold"
   assert.match(surface,/onTriggered: surface\.advanceDeck\(\)/);
   assert.match(surface,/onCurrentPathChanged:[\s\S]*?deckTimer\.restart\(\)/);
   assert.match(surface,/HomeDeck\.nextRoute\([\s\S]*?Math\.random\(\)/);
-  // No hidden duplicate StationHome, no change to the eight existing tabs.
+  // No duplicate StationHome. W3 consolidates the two source tabs.
   assert.equal((surface.match(/StationHome\s*\{/g)||[]).length,1);
   assert.match(surface,/model: surface\.activeTabs/);
   assert.match(surface,/onTriggered: surface\.routeRequested\(modelData\.path\)/);

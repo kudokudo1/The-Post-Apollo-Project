@@ -357,5 +357,23 @@ umask 077
 
 
 
+    def test_32_capture_transition_logged_near_relay_without_record_bytes(self):
+        guest = GUEST.read_text()
+        self.assertIn("c4d_capture_initial=PRESENT", guest)
+        self.assertIn("c4d_capture_initial=EMPTY", guest)
+        self.assertIn("c4d_capture_at_relay=PRESENT", guest)
+        self.assertIn("c4d_capture_at_relay=EMPTY", guest)
+        marker = ('echo "C4D_PRODUCER_DIAG // capture_initial='
+                  '$c4d_capture_initial capture_at_relay=$c4d_capture_at_relay"')
+        self.assertEqual(guest.count(marker), 1)
+        self.assertLess(guest.index('echo "C4D_PRODUCER_DIAG // DIRECT_STDOUT_CAPTURE_PRESENT"'),
+                        guest.index("stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN"))
+        self.assertLess(guest.index("stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN"),
+                        guest.index(marker))
+        self.assertLess(guest.index(marker), guest.index("C4B_SINGLE_UART_RELAY"))
+        self.assertLess(guest.index(marker), guest.index("  rm -rf -- /opt/postapollo-c2o-venv"))
+        self.assertNotIn('C4D_PRODUCER_DIAG // " +', guest)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

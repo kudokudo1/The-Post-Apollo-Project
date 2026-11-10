@@ -465,5 +465,37 @@ umask 077
             self.assertFalse(path.exists())
 
 
+    def test_35_c3eu_exact_dict_return_source_contract_preserved(self):
+        # The independent C3e-U test extracts this actual producer AST.
+        # Keep the same one call to dict(...) under observe(), even though
+        # the private diagnostic file is now written outside the function.
+        import ast
+
+        guest = GUEST.read_text()
+        marker = "import grp, hashlib, json, os, pwd, re, stat, subprocess, sys\n"
+        self.assertEqual(guest.count(marker), 1)
+        source = marker + guest.split(marker, 1)[1].split(
+            "\nC4B_RUNNING_HOST_PROBE", 1)[0]
+        tree = ast.parse(source)
+        functions = [
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "observe"
+        ]
+        self.assertEqual(len(functions), 1)
+        receipts = [
+            node.value for node in ast.walk(functions[0])
+            if isinstance(node, ast.Return)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Name)
+            and node.value.func.id == "dict"
+        ]
+        self.assertEqual(len(receipts), 1)
+        actual_fields = {kw.arg for kw in receipts[0].keywords}
+        self.assertEqual(actual_fields, set(json.loads(report()[len(PREFIX):])))
+        self.assertIn('print("C4B_OBSERVED // " + json.dumps(observe()', guest)
+        self.assertIn("@lru_cache(maxsize=1)", source)
+        self.assertEqual(source.count("def observe():"), 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

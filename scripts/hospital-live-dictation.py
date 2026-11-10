@@ -184,14 +184,16 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
 
         def enqueue(raw):
             if not raw or not is_speech(raw):
-                return
+                return False
             try:
                 clips.put(raw, timeout=0.3)
+                return True
             except queue.Full:
                 stopping_error.set()
                 send("error", detail="LOCAL MODEL TOO SLOW // DICTATION STOPPED")
                 stopping.set()
                 halt_child()
+                return False
 
         try:
             while not stopping.is_set() and not cancelled.is_set():
@@ -219,9 +221,9 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                         speech_ms = 0
                 next_size = target if first_chunk_sent else first_target
                 if len(pending) >= next_size:
-                    enqueue(bytes(pending[:next_size]))
+                    sent = enqueue(bytes(pending[:next_size]))
                     del pending[:next_size]
-                    first_chunk_sent = True
+                    first_chunk_sent = first_chunk_sent or sent
                 if (vad and heard_speech and quiet_ms >= max(300, silence_ms)) \
                         or received >= limit:
                     stopping.set()

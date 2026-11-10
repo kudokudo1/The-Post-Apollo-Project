@@ -23,7 +23,12 @@ LOCK_NAME = "trashpp-research-copies-v1.lock"
 STORE_SCHEMA = "post-apollo.trash-managed-research.v1"
 CRAWL_PATH = ".local/share/post-apollo/finance-crawler/crawl-records.json"
 MAX_CRAWL_BYTES = 262144
-MAX_STORE_BYTES = 131072
+MAX_STORE_BYTES = 1048576
+MAX_WEATHER_ARCHIVE_BYTES = 8 * 1024 * 1024
+MAX_EVENT_COPY_BYTES = 65536
+WEATHER_EVENT_NAME = "weather-event-archive-v1.json"
+WEATHER_EVENT_SCHEMA = "post-apollo.weather-event-archive.v1"
+WEATHER_SOURCES = {"gdacs", "usgs", "eonet", "firms"}
 MAX_RECORDS = 64
 MAX_PAGES = 6
 MAX_DATA_DIR = 4096
@@ -96,7 +101,86 @@ def _page(raw):
 
 
 def _identity(page):
+    # Legacy v1 demo copies used this immutable hash as their actual ID.
     return hashlib.sha256((page["url"] + "\n" + page["observedAt"]).encode()).hexdigest()[:32]
+
+
+def _event_key(key):
+    if not isinstance(key, str) or len(key) > 240 or "|" not in key:
+        _fail("INVALID_EVENT_IDENTITY")
+    source, event_id = key.split("|", 1)
+    if source not in WEATHER_SOURCES or not event_id or len(event_id) > 180:
+        _fail("INVALID_EVENT_IDENTITY")
+    return source, event_id
+
+
+def _event_snapshot(raw, source, event_id):
+    if (not isinstance(raw, dict) or raw.get("sourceId") != source
+            or raw.get("eventId") != event_id
+            or raw.get("eventKey") != source + "|" + event_id
+            or type(raw.get("capturedAtMs")) is not int
+            or not 1 <= raw["capturedAtMs"] <= 9999999999999
+            or not isinstance(raw.get("payload"), dict)):
+        _fail("INVALID_WEATHER_EVENT")
+    return raw["capturedAtMs"]
+
+
+def _event(value):
+    """Validate the complete source-owned public event before copying bytes.
+
+    Original snapshots and payload are preserved in the immutable copy.
+    Nothing in this function writes back to the Weather archive.
+    """
+    if not isinstance(value, dict):
+        _fail("INVALID_WEATHER_EVENT")
+    source, event_id = _event_key(value.get("eventKey"))
+    if (value.get("sourceId") != source or value.get("eventId") != event_id
+            or not isinstance(value.get("title"), str)
+            or not isinstance(value.get("typeLabel"), str)
+            or type(value.get("firstCapturedAtMs")) is not int
+            or type(value.get("lastCapturedAtMs")) is not int):
+        _fail("INVALID_WEATHER_EVENT")
+    snaps = value.get("snapshots")
+    if not isinstance(snaps, list) or not 1 <= len(snaps) <= 32:
+        _fail("INVALID_WEATHER_EVENT")
+    times = [_event_snapshot(row, source, event_id) for row in snaps]
+    if (min(times) != value["firstCapturedAtMs"]
+            or max(times) != value["lastCapturedAtMs"]):
+        _fail("INVALID_WEATHER_EVENT")
+    try:
+        encoded = json.dumps(value, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    except (ValueError, TypeError, UnicodeError):
+        _fail("INVALID_WEATHER_EVENT")
+    if len(encoded) > MAX_EVENT_COPY_BYTES:
+        _fail("EVENT_COPY_TOO_LARGE")
+    return value
+
+
+def _source_event(key, stamp, data_dir):
+    source, event_id = _event_key(key)
+    doc = _regular_json(Path(data_dir) / WEATHER_EVENT_NAME,
+                        MAX_WEATHER_ARCHIVE_BYTES)
+    if (not isinstance(doc, dict) or doc.get("schema") != WEATHER_EVENT_SCHEMA
+            or doc.get("version") != 1 or not isinstance(doc.get("events"), dict)
+            or len(doc["events"]) > 256):
+        _fail("WEATHER_EVENT_SOURCE_UNAVAILABLE")
+    raw = doc["events"].get(key)
+    if raw is None:
+        _fail("STALE_WEATHER_EVENT_REFRESH")
+    event = _event(raw)
+    if (event["sourceId"] != source or event["eventId"] != event_id
+            or str(event["lastCapturedAtMs"]) != stamp):
+        _fail("STALE_WEATHER_EVENT_REFRESH")
+    return event
+
+
+def _record_origin(record):
+    # Duplicate protection applies only to active copies, NOT those sitting
+    # in Trash. Each new copy gets a fresh independent UUID.
+    if "event" in record:
+        event = record["event"]
+        return "weather:" + event["eventKey"] + ":" + str(event["lastCapturedAtMs"])
+    return "demo:" + _identity(record["page"])
 
 
 def _regular_json(path, max_bytes):
@@ -155,18 +239,30 @@ def _validate_store(value):
     seen = set()
     for r in value["records"]:
         if (not isinstance(r, dict)
-                or set(r) != {"id", "state", "archivedAtMs", "page"}
                 or r["state"] not in ("archived", "trashed")
-                or type(r["archivedAtMs"]) is not int
-                or not 1 <= r["archivedAtMs"] <= 9999999999999):
+                or type(r.get("archivedAtMs")) is not int
+                or not 1 <= r["archivedAtMs"] <= 9999999999999
+                or not isinstance(r.get("id"), str)
+                or len(r["id"]) != 32
+                or any(c not in "0123456789abcdef" for c in r["id"])
+                or r["id"] in seen):
             _fail("MANAGED_STORE_INVALID")
-        try:
-            normalized = _page(dict(r["page"], schemaVersion=1,
-                                    source="finance-demo-scrapy", readOnly=True))
-        except (LifecycleError, TypeError, ValueError):
-            _fail("MANAGED_STORE_INVALID")
-        if (r["page"] != normalized or not isinstance(r["id"], str)
-                or r["id"] != _identity(normalized) or r["id"] in seen):
+        if set(r) == {"id", "state", "archivedAtMs", "page"}:
+            try:
+                normalized = _page(dict(r["page"], schemaVersion=1,
+                                        source="finance-demo-scrapy", readOnly=True))
+            except (LifecycleError, TypeError, ValueError):
+                _fail("MANAGED_STORE_INVALID")
+            if r["page"] != normalized:
+                _fail("MANAGED_STORE_INVALID")
+            # Previously hashed IDs remain valid, and new copies use random
+            # 32-char IDs to avoid colliding with an item still in the bin.
+        elif set(r) == {"id", "state", "archivedAtMs", "event"}:
+            try:
+                _event(r["event"])
+            except (LifecycleError, TypeError, ValueError):
+                _fail("MANAGED_STORE_INVALID")
+        else:
             _fail("MANAGED_STORE_INVALID")
         seen.add(r["id"])
     return value
@@ -250,16 +346,27 @@ def _lock(dirfd):
 def _summary(document, result="INDEX"):
     items = []
     for record in document["records"]:
-        page = record["page"]
-        when = _ms(page["observedAt"])
+        if "event" in record:
+            event = record["event"]
+            when = event["lastCapturedAtMs"]
+            iso = datetime.fromtimestamp(when / 1000, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            kind, source = "SAVED EVENT", "WEATHER // EVENT COPY"
+            title, url = event["title"], ""
+            details = (event["sourceId"].upper() + " // " + event["eventId"]
+                       + " // " + str(len(event["snapshots"])) + " SNAPSHOTS")
+        else:
+            page = record["page"]
+            when = _ms(page["observedAt"])
+            iso = page["observedAt"]
+            kind, source = "SAVED RESEARCH", "RESEARCH // DEMO COPY"
+            title, url = page["title"], page["url"]
+            details = "SOURCE OWNED COPY // " + page["observedAt"]
         items.append({
-            "id": record["id"], "kind": "SAVED RESEARCH",
-            "source": "RESEARCH // DEMO COPY",
-            "title": page["title"], "url": page["url"],
-            "recordedAtMs": when, "recordedAt": page["observedAt"],
+            "id": record["id"], "kind": kind,
+            "source": source, "title": title, "url": url,
+            "recordedAtMs": when, "recordedAt": iso,
             "archivedAtMs": record["archivedAtMs"],
-            "state": record["state"],
-            "details": "SOURCE OWNED COPY // " + page["observedAt"],
+            "state": record["state"], "details": details,
             "capabilities": {
                 "archive": False,
                 "trash": record["state"] == "archived",
@@ -274,7 +381,7 @@ def _summary(document, result="INDEX"):
 
 def operate(action, data_dir, record_id="", expected_revision=None,
             confirmation="", when="", home_dir=None):
-    if action not in ("list", "archive", "trash", "restore", "burn"):
+    if action not in ("list", "archive", "archive-event", "trash", "restore", "burn"):
         _fail("ACTION_NOT_PERMITTED")
     if action == "burn" and confirmation != "BURN_SAVED_COPY_CONFIRMED":
         _fail("BURN_CONFIRMATION_REQUIRED")
@@ -291,17 +398,24 @@ def operate(action, data_dir, record_id="", expected_revision=None,
             _fail("STALE_MANAGED_REVISION")
         if document["revision"] >= MAX_REVISION:
             _fail("MANAGED_STORE_CAPACITY")
-        if action == "archive":
-            page = _source_page(record_id, when, home_dir or Path.home())
-            rid = _identity(page)
-            if any(r["id"] == rid for r in document["records"]):
+        if action in ("archive", "archive-event"):
+            if action == "archive":
+                content_key, content = "page", _source_page(
+                    record_id, when, home_dir or Path.home())
+            else:
+                content_key, content = "event", _source_event(
+                    record_id, when, data_dir)
+            candidate = {content_key: content}
+            if any(r["state"] == "archived"
+                   and _record_origin(r) == _record_origin(candidate)
+                   for r in document["records"]):
                 _fail("COPY_ALREADY_EXISTS")
             if len(document["records"]) >= MAX_RECORDS:
                 _fail("MANAGED_STORE_CAPACITY")
             document["records"].append({
-                "id": rid, "state": "archived",
+                "id": uuid4().hex, "state": "archived",
                 "archivedAtMs": int(datetime.now(timezone.utc).timestamp()*1000),
-                "page": page
+                content_key: content
             })
         else:
             if (not isinstance(record_id, str) or len(record_id) != 32
@@ -337,8 +451,8 @@ def main(argv):
     try:
         if len(argv) == 3 and argv[1] == "list":
             result = operate("list", argv[2])
-        elif len(argv) == 6 and argv[1] == "archive":
-            result = operate("archive", argv[2], argv[3], int(argv[5]),
+        elif len(argv) == 6 and argv[1] in ("archive", "archive-event"):
+            result = operate(argv[1], argv[2], argv[3], int(argv[5]),
                              when=argv[4])
         elif len(argv) == 5 and argv[1] in ("trash", "restore"):
             result = operate(argv[1], argv[2], argv[3], int(argv[4]))

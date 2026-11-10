@@ -39,3 +39,5 @@ jobs:
         run: python3 -m unittest discover -s tests/trash -p 'test_*.py' -v
       - name: Verify Camera Cleanup handoff preserves shared queue and authority
         run: node --test tests/trash/test_camera_cleanup_handoff.cjs
+      - name: Verify two-click Burn state machine never deletes on first click
+        run: node --test tests/trash/test_burn_copy_two_click.cjs

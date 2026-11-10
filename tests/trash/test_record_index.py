@@ -88,6 +88,9 @@ class RecordIndexTests(unittest.TestCase):
         rows = {x["kind"]: x for x in result["items"]}
         self.assertEqual(rows["EVENT HISTORY"]["title"], "Earthquake test marker")
         self.assertIn("2 SNAPSHOTS", rows["EVENT HISTORY"]["details"])
+        self.assertEqual(rows["EVENT HISTORY"]["sourceEventKey"], "usgs|quake-17")
+        self.assertEqual(rows["EVENT HISTORY"]["sourceLastCapturedAtMs"],
+                         1760001000000)
         self.assertEqual(rows["SAVED DOSSIER"]["title"], "storm-1")
         self.assertEqual(rows["WEB SCRAPE"]["title"], "Demo saved quote crawl")
         self.assertEqual(rows["WEB SCRAPE"]["sourceUrl"],

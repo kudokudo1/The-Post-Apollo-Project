@@ -46,6 +46,9 @@ PanelWindow {
     property string researchBurnTitle: ""
     property int researchBurnRevision: -1
     property bool researchBurnPointerRelocated: false
+    property bool researchBurnClickArmed: false
+    property bool researchBurnLoadComplete: false
+    property real researchBurnLoadProgress: 0
 
     readonly property var researchBinRows: researchRows.filter(function(row) {
         return row.state === "trashed";
@@ -55,9 +58,11 @@ PanelWindow {
         if (selected === "events" && row.kind !== "EVENT HISTORY") return false;
         if (selected === "dossiers" && row.kind !== "SAVED DOSSIER") return false;
         if (selected === "scrapes" && row.kind !== "WEB SCRAPE") return false;
-        if (selected === "copies" && (row.kind !== "SAVED RESEARCH"
+        if (selected === "copies" && ((row.kind !== "SAVED RESEARCH"
+                                      && row.kind !== "SAVED EVENT")
                                       || row.state !== "archived")) return false;
-        if (selected === "bin" && (row.kind !== "SAVED RESEARCH"
+        if (selected === "bin" && ((row.kind !== "SAVED RESEARCH"
+                                   && row.kind !== "SAVED EVENT")
                                    || row.state !== "trashed")) return false;
         const q = archiveSearchText.trim().toLowerCase();
         return !q || (String(row.title) + " " + String(row.source)
@@ -104,7 +109,7 @@ PanelWindow {
                 || (activeMode !== "archive" && activeMode !== "burn"
                     && !(activeMode === "trash" && action === "list")))
             return false;
-        if (["list", "archive", "trash", "restore", "burn"].indexOf(action) < 0)
+        if (["list", "archive", "archive-event", "trash", "restore", "burn"].indexOf(action) < 0)
             return false;
         researchBusy = true;
         researchPending = action;
@@ -161,30 +166,49 @@ PanelWindow {
         ]);
     }
 
+    function saveWeatherEventCopy(row) {
+        if (!row || row.kind !== "EVENT HISTORY"
+                || !row.sourceEventKey
+                || typeof row.sourceLastCapturedAtMs !== "number")
+            return false;
+        return runResearch("archive-event", [
+            String(row.sourceEventKey),
+            String(row.sourceLastCapturedAtMs),
+            String(researchRevision)
+        ]);
+    }
+
     function trashResearchCopy(row) {
-        if (!row || row.kind !== "SAVED RESEARCH"
+        if (!row || (row.kind !== "SAVED RESEARCH"
+                      && row.kind !== "SAVED EVENT")
                 || row.state !== "archived")
             return false;
         return runResearch("trash", [String(row.id), String(researchRevision)]);
     }
 
     function restoreResearchCopy(row) {
-        if (!row || row.kind !== "SAVED RESEARCH"
+        if (!row || (row.kind !== "SAVED RESEARCH"
+                      && row.kind !== "SAVED EVENT")
                 || row.state !== "trashed")
             return false;
         return runResearch("restore", [String(row.id), String(researchRevision)]);
     }
 
     function clearResearchBurn() {
+        researchBurnArmAnimation.stop();
         researchBurnId = "";
         researchBurnTitle = "";
         researchBurnRevision = -1;
         researchBurnPointerRelocated = false;
+        researchBurnClickArmed = false;
+        researchBurnLoadComplete = false;
+        researchBurnLoadProgress = 0;
     }
 
     function armResearchBurn(row) {
         if (!menuOpen || researchBusy || busy || confirmMode !== ""
-                || !row || row.kind !== "SAVED RESEARCH"
+                || !row || (row.kind !== "SAVED RESEARCH"
+                            && row.kind !== "SAVED EVENT")
                 || row.state !== "trashed"
                 || researchRows.findIndex(function(r) {
                        return r.id === row.id && r.state === "trashed";
@@ -194,11 +218,32 @@ PanelWindow {
         researchBurnTitle = String(row.title);
         researchBurnRevision = researchRevision;
         researchBurnPointerRelocated = false;
+        researchBurnClickArmed = false;
+        researchBurnLoadComplete = false;
+        researchBurnLoadProgress = 0;
         return true;
+    }
+
+    function advanceResearchBurn() {
+        if (!researchBurnId || !researchBurnPointerRelocated
+                || researchBurnRevision !== researchRevision
+                || researchBusy || busy)
+            return false;
+        if (!researchBurnClickArmed) {
+            researchBurnClickArmed = true;
+            researchBurnLoadComplete = false;
+            researchBurnLoadProgress = 0;
+            researchBurnArmAnimation.restart();
+            return true;
+        }
+        if (!researchBurnLoadComplete)
+            return false;
+        return confirmResearchBurn();
     }
 
     function confirmResearchBurn() {
         if (!researchBurnId || !researchBurnPointerRelocated
+                || !researchBurnClickArmed || !researchBurnLoadComplete
                 || researchBurnRevision !== researchRevision
                 || researchBusy || busy
                 || researchRows.findIndex(function(row) {
@@ -547,6 +592,22 @@ PanelWindow {
                     trashLauncher.archiveState = "STALE // INDEX PROCESS FAILED";
                 }
             });
+        }
+    }
+
+    // First remote click visibly loads before the destructive second click.
+    NumberAnimation {
+        id: researchBurnArmAnimation
+        target: trashLauncher
+        property: "researchBurnLoadProgress"
+        from: 0
+        to: 1
+        duration: 850
+        easing.type: Easing.Linear
+        onFinished: {
+            if (trashLauncher.researchBurnId !== ""
+                    && trashLauncher.researchBurnClickArmed)
+                trashLauncher.researchBurnLoadComplete = true;
         }
     }
 
@@ -1340,20 +1401,28 @@ PanelWindow {
                                             width: parent.width
                                             height: 30
                                             visible: modelData.kind === "WEB SCRAPE"
+                                                     || modelData.kind === "EVENT HISTORY"
                                                      || modelData.kind === "SAVED RESEARCH"
+                                                     || modelData.kind === "SAVED EVENT"
                                             label: modelData.kind === "WEB SCRAPE"
+                                                   || modelData.kind === "EVENT HISTORY"
                                                    ? "SAVE COPY"
                                                    : modelData.state === "trashed"
                                                    ? "RESTORE" : "TRASH COPY"
                                             labelPixelSize: 9
                                             accentColor: modelData.state === "trashed"
-                                                         ? Colors.green : Colors.cyan
+                                                         ? Colors.green
+                                                         : (modelData.kind === "SAVED RESEARCH"
+                                                            || modelData.kind === "SAVED EVENT")
+                                                         ? Colors.red : Colors.cyan
                                             available: !trashLauncher.researchBusy
                                                        && !trashLauncher.archiveBusy
                                                        && trashLauncher.researchBurnId === ""
                                             onLeftClicked: {
                                                 if (modelData.kind === "WEB SCRAPE")
                                                     trashLauncher.saveDemoCopy(modelData);
+                                                else if (modelData.kind === "EVENT HISTORY")
+                                                    trashLauncher.saveWeatherEventCopy(modelData);
                                                 else if (modelData.state === "trashed")
                                                     trashLauncher.restoreResearchCopy(modelData);
                                                 else
@@ -1364,7 +1433,8 @@ PanelWindow {
                                         ActionButton {
                                             width: parent.width
                                             height: 29
-                                            visible: modelData.kind === "SAVED RESEARCH"
+                                            visible: (modelData.kind === "SAVED RESEARCH"
+                                                      || modelData.kind === "SAVED EVENT")
                                                      && modelData.state === "trashed"
                                             label: "BURN COPY"
                                             labelPixelSize: 9
@@ -1407,7 +1477,7 @@ PanelWindow {
                             color: Colors.yellow
                             font.pixelSize: 9
                             wrapMode: Text.WordWrap
-                            text: "SOURCES READ-ONLY // SAVE COPY ENABLED FOR DEMO SCRAPES ONLY. BURN AFFECTS TRASH++ COPIES, NEVER ORIGINALS."
+                            text: "SAVE COPY // WEATHER EVENTS OR DEMO SCRAPES. TRASH / RESTORE / BURN AFFECT ONLY TRASH++ COPIES."
                         }
                     }
                 }
@@ -1436,7 +1506,7 @@ PanelWindow {
                             wrapMode: Text.WordWrap
                             font.pixelSize: 10
                             color: Colors.cyan
-                            text: "Only SYSTEM TRASH currently supports Burn. This separate section also permits explicit Burn of trashed, Trash++-owned DEMO RESEARCH COPIES. Originals, Hospital and Finance records are excluded."
+                            text: "Burn requires a separate confirmation. Only trashed, Trash++-owned Weather EVENT or DEMO RESEARCH copies appear here. Original Weather archives, Hospital and Finance records remain protected."
                         }
 
                         Item {
@@ -1708,7 +1778,7 @@ PanelWindow {
                     width: parent.width
                     font.pixelSize: 11
                     color: Colors.yellow
-                    text: "SCOPE // ONE TRASH++ DEMO RESEARCH COPY"
+                    text: "SCOPE // ONE TRASH++ MANAGED COPY"
                     wrapMode: Text.WordWrap
                 }
 
@@ -1725,7 +1795,7 @@ PanelWindow {
                     font.pixelSize: 11
                     color: Colors.cyan
                     wrapMode: Text.WordWrap
-                    text: "This permanently deletes only the managed copy from Trash++'s own record store. The original demo scrape, Hospital reports, Finance and Weather archives are NOT touched. The backend rechecks the record identity and revision."
+                    text: "This permanently deletes ONE saved copy from Trash++'s record store. Original Weather events, demo scrape exports, Hospital and Finance records remain untouched. The backend rechecks identity and revision."
                 }
 
                 GohuText {
@@ -1733,7 +1803,7 @@ PanelWindow {
                     font.pixelSize: 10
                     color: Colors.orange
                     wrapMode: Text.WordWrap
-                    text: "MOVE POINTER TO THE SEPARATE LEFT CONFIRM TARGET."
+                    text: "MOVE TO THE LEFT BUTTON, CLICK ONCE TO LOAD, THEN CLICK AGAIN TO BURN."
                 }
 
                 Row {
@@ -1757,17 +1827,42 @@ PanelWindow {
                         ActionButton {
                             id: confirmManagedResearchBurn
                             anchors.fill: parent
-                            label: trashLauncher.researchBurnPointerRelocated
-                                   ? "CONFIRM COPY BURN" : "MOVE HERE TO ARM"
+                            label: !trashLauncher.researchBurnPointerRelocated
+                                   ? "MOVE HERE TO ARM"
+                                   : !trashLauncher.researchBurnClickArmed
+                                   ? "CLICK TO ARM"
+                                   : !trashLauncher.researchBurnLoadComplete
+                                   ? "LOADING SAFETY..."
+                                   : "CLICK AGAIN // BURN"
                             labelPixelSize: 10
                             accentColor: Colors.red
                             destructive: true
+                            // Normal, visible, interactive button from first
+                            // render. Pointer relocation and the deliberate
+                            // second click are enforced by handler + backend.
+                            idleBorderWidth: 2
+                            idleBorderColor: Colors.red
+                            idleFillColor: Colors.black
+                            contentGlowIdleOpacity: 0.36
+                            softGlowIdleOpacity: 0.33
+                            wideGlowEnabled: true
+                            wideGlowIdleOpacity: 0.13
                             available: !trashLauncher.researchBusy
                                        && trashLauncher.researchBurnId !== ""
-                                       && trashLauncher.researchBurnPointerRelocated
                                        && trashLauncher.researchBurnRevision
                                           === trashLauncher.researchRevision
-                            onLeftClicked: trashLauncher.confirmResearchBurn()
+                            onLeftClicked: trashLauncher.advanceResearchBurn()
+                        }
+
+                        Rectangle {
+                            id: researchBurnLoadBar
+                            anchors.bottom: parent.bottom
+                            anchors.left: parent.left
+                            height: 4
+                            width: Math.max(0, parent.width - 4)
+                                   * trashLauncher.researchBurnLoadProgress
+                            color: Colors.orange
+                            visible: trashLauncher.researchBurnClickArmed
                         }
                     }
 

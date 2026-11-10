@@ -3522,7 +3522,7 @@ Rectangle {
                     visible: phonePane.stageWanted || phonePane.stageState === "UNAVAILABLE" || phonePane.stageState === "FINISHED"
                     text: phonePane.stageState === "ALIGNED"
                           ? (phonePane.stagePurpose === "OFONO"
-                             ? "OFONO INSTALL // TERMINAL BELOW"
+                             ? "CALLING SETUP // TERMINAL BELOW"
                              : "BLUEFERRY SETUP // TERMINAL BELOW")
                           : phonePane.stageState === "FINISHED"
                           ? "Terminal closed. Checking the latest provider and package status..."

@@ -568,6 +568,9 @@ PanelWindow {
     }
 
     function toggle() {
+        if (burnUiStage === "clicked" || burnUiStage === "working"
+                || burnUiStage === "result" || burnUiStage === "error")
+            return false;
         menuOpen = !menuOpen;
         clearConfirmation();
         clearResearchBurn();
@@ -590,6 +593,9 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!menuOpen) {
+            burnCommitDelay.stop();
+            burnUiStage = "";
+            clearConfirmation();
             clearResearchBurn();
             if (cameraCleanupController)
                 cameraCleanupController.suspendHostedCleanup();
@@ -630,14 +636,17 @@ PanelWindow {
         catch (error) {
             lastError = true;
             status = "TRASH // INVALID BACKEND RESPONSE";
+            if (action === "burn" || action === "burn-all")
+                failBurnReceipt(status);
             return;
         }
         if (!payload || payload.ok !== true) {
             lastError = true;
             status = "TRASH // " + String(payload && payload.error
                                               || "BACKEND_UNAVAILABLE");
-            // Keep the current queue for inspection; a failed operation never
-            // implies items were restored or permanently deleted.
+            // A failed operation never implies items were deleted.
+            if (action === "burn" || action === "burn-all")
+                failBurnReceipt(status);
             return;
         }
         if (action === "index" || action === "index-live") {
@@ -656,18 +665,20 @@ PanelWindow {
             if (action === "index" || changed)
                 status = receipt || ("TRASH // " + total + " ITEMS");
         } else {
-            receipt = action === "restore"
-                    ? "RESTORED // " + String(payload.name || "")
-                    : action === "burn"
-                    ? "BURNED // " + String(payload.name || "")
-                    : "BURN ALL // COMPLETE";
+            if (action === "burn" || action === "burn-all") {
+                const expected = action === "burn" ? 1 : confirmCount;
+                showBurnReceipt(payload, action === "burn"
+                                ? "SYSTEM TRASH // FILE" : "SYSTEM TRASH // ALL",
+                                expected);
+                receipt = burnReceiptMessage;
+            } else {
+                receipt = "RESTORED // " + String(payload.name || "");
+            }
             status = receipt;
-            clearConfirmation();
-            // One refresh after an explicit operation; never a background
-            // polling timer and never a second destructive action.
+            // Refresh inventory WITHOUT dismissing the confirmed result.
             Qt.callLater(function() {
                 if (trashLauncher.menuOpen && !trashLauncher.busy)
-                    trashLauncher.refresh();
+                    trashLauncher.refresh(false, true);
             });
         }
     }
@@ -679,38 +690,57 @@ PanelWindow {
     }
 
     function armBurn(item) {
-        if (busy || !item) return;
+        if (!menuOpen || busy || researchBusy || !item
+                || confirmMode !== "" || researchBurnId !== ""
+                || burnUiStage !== "")
+            return false;
         clearConfirmation();
+        clearResearchBurn();
         confirmMode = "item";
         confirmUri = String(item.uri);
         confirmOriginal = String(item.original);
         confirmName = String(item.name);
+        activeMode = "burn";
+        return true;
     }
 
     function armBurnAll() {
-        if (busy || total < 1 || revision.length !== 64) return;
+        if (!menuOpen || activeMode !== "burn" || burnFilter !== "files"
+                || busy || researchBusy || total < 1 || revision.length !== 64
+                || confirmMode !== "" || researchBurnId !== ""
+                || burnUiStage !== "")
+            return false;
         clearConfirmation();
+        clearResearchBurn();
         confirmMode = "all";
         confirmRevision = revision;
         confirmCount = total;
         burnAllPointerRelocated = false;
+        return true;
     }
 
     function confirmBurn() {
-        if (busy) return;
+        if (busy || researchBusy || burnUiStage !== "working"
+                || !researchBurnPointerRelocated
+                || !researchBurnClickArmed || !researchBurnLoadComplete)
+            return false;
         if (confirmMode === "item" && confirmUri) {
-            run("burn", ["burn", confirmUri, confirmOriginal, "BURN_CONFIRMED"]);
-        } else if (confirmMode === "all" && confirmCount > 0
-                   && burnAllPointerRelocated
-                   && activeMode === "trash"
-                   && confirmRevision === revision
-                   && confirmCount === total) {
-            // Pointer must arrive at the remote confirmation target. Backend
-            // independently revalidates the count/revision before emptying.
-            run("burn-all", ["burn-all", confirmRevision,
-                             String(confirmCount), "BURN_ALL_CONFIRMED"]);
+            return run("burn", ["burn", confirmUri, confirmOriginal,
+                                "BURN_CONFIRMED"]);
         }
+        if (confirmMode === "all" && confirmCount > 0
+                && activeMode === "burn"
+                && confirmRevision === revision
+                && confirmCount === total) {
+            // Same spatial/two-click modal as managed-copy Burn. GIO
+            // independently revalidates count and revision.
+            return run("burn-all", ["burn-all", confirmRevision,
+                                    String(confirmCount),
+                                    "BURN_ALL_CONFIRMED"]);
+        }
+        return false;
     }
+
 
     IpcHandler {
         target: "trash"
@@ -797,6 +827,24 @@ PanelWindow {
         }
     }
 
+    // The second click gets a visible magenta feedback pulse before the
+    // actual subprocess begins. Cancelling or closing never commits.
+    Timer {
+        id: burnCommitDelay
+        interval: 420
+        repeat: false
+        onTriggered: {
+            if (!trashLauncher.menuOpen || trashLauncher.burnUiStage !== "clicked")
+                return;
+            trashLauncher.burnUiStage = "working";
+            const accepted = trashLauncher.confirmMode !== ""
+                ? trashLauncher.confirmBurn()
+                : trashLauncher.confirmResearchBurn();
+            if (!accepted)
+                trashLauncher.failBurnReceipt("STALE OR UNAVAILABLE BURN TARGET");
+        }
+    }
+
     // Dedicated writer for ONLY Trash++'s managed demo research copies.
     // It never shares the GIO file-deletion process or Finance crawler writer.
     Process {
@@ -813,6 +861,8 @@ PanelWindow {
                     trashLauncher.researchBusy = false;
                     trashLauncher.researchPending = "";
                     trashLauncher.researchState = "STALE // RESEARCH PROCESS FAILED";
+                    if (action === "burn" || action === "burn-all")
+                        trashLauncher.failBurnReceipt(trashLauncher.researchState);
                 }
             });
         }
@@ -834,6 +884,8 @@ PanelWindow {
                     trashLauncher.busy = false;
                     trashLauncher.lastError = true;
                     trashLauncher.status = "TRASH // BACKEND PROCESS UNAVAILABLE";
+                    if (action === "burn" || action === "burn-all")
+                        trashLauncher.failBurnReceipt(trashLauncher.status);
                 }
             });
         }

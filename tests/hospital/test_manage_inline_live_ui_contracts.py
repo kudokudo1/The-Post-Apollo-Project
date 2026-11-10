@@ -57,7 +57,8 @@ check('function acceptLivePhrase(text)' in manager
       "Guard live text length and never auto submit")
 check('id: editorFrame' in manager
       and 'anchors.right: parent.right' in manager
-      and 'anchors.top: parent.top' in manager
+      and 'anchors.verticalCenter: parent.verticalCenter' in manager
+      and 'anchors.rightMargin: 2' in manager
       and 'id: micAction' in manager
       and 'label: "CANCEL"' in manager,
       "MIC/STOP and CANCEL live INSIDE each prompt rectangle")

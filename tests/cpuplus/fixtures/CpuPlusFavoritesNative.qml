@@ -580,13 +580,54 @@ ShellRoot {
                 root.fail("U9F_OPEN_ROW_PALETTE");return;
             }
             console.log("U9F_PASS // OPEN_YELLOW_MAGENTA_ROW");
-            root.ready=true;
-            // Click the LEFT TEXT AREA, far from the former VIEW button.
-            // This verifies the complete row now owns selection.
-            const pt=row.mapToItem(win.contentItem,
-                16,row.height/2);
-            console.log("U4_READY // x="+Math.round(pt.x)
-                +" y="+Math.round(pt.y));
+            // U9g // Recreate the actual hidden/shown selector lifecycle
+            // BEFORE the click script begins. This catches stale colored
+            // wash on inactive icon filters after menu re-entry.
+            const categoryRow=selector.categoryRowRepeater.itemAt(0);
+            if(!categoryRow || !categoryRow.categoryButtons.itemAt(0)
+                    || !categoryRow.categoryButtons.itemAt(2)) {
+                root.fail("U9G_FILTER_ROWS_MISSING");return;
+            }
+            selector.visible=false;
+            paintReopenTimer.start();
+        }
+    }
+    Timer {
+        id: paintReopenTimer
+        interval: 100
+        running: false
+        repeat: false
+        onTriggered: {
+            selector.visible=true;
+            Qt.callLater(function() {
+                const r=selector.favoriteRowRepeater.itemAt(0);
+                const categoryRow=selector.categoryRowRepeater.itemAt(0);
+                const idle=categoryRow ? categoryRow.categoryButtons.itemAt(0) : null;
+                const open=categoryRow ? categoryRow.categoryButtons.itemAt(2) : null;
+                function near(actual,expected) {
+                    return Math.abs(actual-expected/255)<0.015;
+                }
+                if(!r || !idle || !open
+                        || idle.filterOpen || !open.filterOpen
+                        || !near(idle.color.r,27)
+                        || !near(idle.color.g,6)
+                        || !near(idle.color.b,35)
+                        || !near(open.color.r,242)
+                        || !near(open.color.g,190)
+                        || !near(open.color.b,78)
+                        || idle.softGlowEnabled || open.softGlowEnabled
+                        || !r.isOpen || r.isHovered
+                        || !near(r.color.r,242)
+                        || !near(r.border.color.r,199)) {
+                    root.fail("U9G_REOPEN_PAINT_CHANGED");return;
+                }
+                console.log("U9G_PASS // REOPEN_IDLE_BLACK_OPEN_YELLOW_NO_FILLED_GLOW");
+                root.ready=true;
+                // Keep the original source/selection routing click test.
+                const pt=r.mapToItem(win.contentItem,16,r.height/2);
+                console.log("U4_READY // x="+Math.round(pt.x)
+                    +" y="+Math.round(pt.y));
+            });
         }
     }
     Timer {

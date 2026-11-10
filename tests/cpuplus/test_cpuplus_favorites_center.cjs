@@ -2354,3 +2354,115 @@ test("U9g native fixture actively hides and reopens the selector before pointer 
   // No event/writer privilege is added by the visual test seam.
   assert.doesNotMatch(pane,/execDetached\(|onClicked:\s*.+deleteCollection/);
 });
+
+
+test("CPU++ stage-1 Favorites++ scroll indicators cover both left lists and middle saved items",()=>{
+  const pane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
+  const filters=[
+    ["collectionScroll","collectionScrollTrack","overview"],
+    ["dossierScroll","dossierScrollTrack","overview"],
+    ["listScroll","listScrollTrack","selector"]
+  ];
+  assert.match(pane,/property alias collectionScrollArea: collectionScroll/);
+  assert.match(pane,/property alias dossierScrollArea: dossierScroll/);
+  assert.match(pane,/property alias listScrollArea: listScroll/);
+  for(const [viewport,indicator,area] of filters) {
+    const start=pane.indexOf("id: "+indicator);
+    assert.ok(start>=0,indicator);
+    const section=pane.slice(start,start+340);
+    assert.match(section,new RegExp("flickable: "+viewport));
+    assert.match(section,/mountingParent: pane/);
+    assert.match(section,new RegExp("geometryHost: "+viewport));
+    assert.match(section,/handleStyle: "bar"/);
+    assert.match(section,/maximumBarHandleHeight: 42/);
+    assert.match(section,new RegExp('pane\\.area==="'+area+'"'));
+    assert.match(section,/scrollable/);
+  }
+  for(const [name,viewport] of [
+    ["collectionRows","collectionScroll"],
+    ["dossierRows","dossierScroll"],
+    ["listRows","listScroll"]
+  ]) {
+    const section=pane.slice(pane.indexOf("id: "+name),
+                             pane.indexOf("id: "+name)+145);
+    assert.match(section,new RegExp(
+      "width: Math\\.max\\(0,"+viewport+"\\.width-24\\)"));
+  }
+  const start=pane.indexOf("id: collectionScrollTrack");
+  const end=pane.indexOf("id: details",start);
+  const bars=pane.slice(start,end);
+  assert.equal((bars.match(/NeonScrollBar \{/g)||[]).length,2,
+    "collection and dossier indicators share overview pane");
+  assert.ok(pane.indexOf("id: listScrollTrack")>start);
+  assert.ok(pane.indexOf("id: listScrollTrack")<end);
+  assert.match(pane,/onClicked: pane\.selectionRequested\(modelData\.key\)/);
+});
+
+test("CPU++ stage-1 Location panes use viewport-bound rounded bars and clear gutters",()=>{
+  const panes=[
+    ["widgets/cpuplus/CpuPlusSettingsLocationOverviewPane.qml",
+     "overviewScroll","locationOverview","locationBody"],
+    ["widgets/cpuplus/CpuPlusSettingsLocationSelectionPane.qml",
+     "selectedPlacesScroll","locationSelection","locationBody"],
+    ["widgets/cpuplus/CpuPlusSettingsLocationPane.qml",
+     "locationScroll","locationPane","body"],
+    ["widgets/cpuplus/CpuPlusPlaceSearchPanel.qml",
+     "matchesScroll","matchesViewport","resultCard"]
+  ];
+  for(const [file,scroll,host,body] of panes) {
+    const src=read(file);
+    const pos=src.indexOf("NeonScrollBar {");
+    assert.ok(pos>=0,file);
+    const bar=src.slice(pos,src.indexOf("}",pos)+1);
+    assert.match(bar,new RegExp("flickable: "+scroll));
+    assert.match(bar,new RegExp("mountingParent: "+host));
+    assert.match(bar,new RegExp("geometryHost: "+scroll));
+    assert.match(bar,/handleStyle: "bar"/);
+    assert.match(bar,/maximumBarHandleHeight: 42/);
+    assert.match(bar,/visible: .*scrollable/);
+    assert.doesNotMatch(bar,/^\s*(?:x:|y:|height:)/m,
+      "use shared box geometry rather than manual full-height track: "+file);
+    if(file.endsWith("CpuPlusPlaceSearchPanel.qml")) {
+      assert.match(src,/width: Math\.max\(0,matchesBody\.width-\(searchPanel\.compactPinned \? 24 : 0\)\)/);
+    } else {
+      const section=src.slice(src.indexOf("id: "+body),
+                              src.indexOf("id: "+body)+200);
+      assert.match(section,/-24/);
+    }
+  }
+  const selection=read("widgets/cpuplus/CpuPlusSettingsLocationSelectionPane.qml");
+  assert.match(selection,/anchors\.top: placeSearchPanel\.bottom/);
+  assert.match(selection,/id: selectedPlacesScroll/);
+  assert.match(selection,/onUseForHome: function\(candidate\)/);
+  assert.match(selection,/onUseForExplore: function\(candidate\)/);
+  const right=read("widgets/cpuplus/CpuPlusSettingsLocationPane.qml");
+  assert.match(right,/registry\.saveHome\(/);
+});
+
+test("CPU++ rounded scrollbar cap is opt-in and star migration remains a separate stage",()=>{
+  const code=read("components/NeonScrollBar.qml");
+  assert.match(code,/property int maximumBarHandleHeight: 0/);
+  assert.match(code,/maximumBarHandleHeight > 0/);
+  assert.match(code,/Math\.min\(normal, Math\.max\(minimumHandleHeight, maximumBarHandleHeight\)\)/);
+  assert.match(code,/function activeHandleExtent\(\)/);
+  assert.match(code,/starStyle \? starHandleSize : normalHandleHeight\(\)/);
+  const users=[
+    "widgets/cpuplus/CpuPlusFavoritesHubPane.qml",
+    "widgets/cpuplus/CpuPlusSettingsLocationOverviewPane.qml",
+    "widgets/cpuplus/CpuPlusSettingsLocationSelectionPane.qml",
+    "widgets/cpuplus/CpuPlusSettingsLocationPane.qml",
+    "widgets/cpuplus/CpuPlusPlaceSearchPanel.qml"
+  ];
+  for(const file of users) {
+    const source=read(file);
+    assert.match(source,/maximumBarHandleHeight: 42/);
+    const segments=source.split("NeonScrollBar {").slice(1);
+    for(const segment of segments)
+      assert.match(segment.split("}")[0],/handleStyle: "bar"/);
+    assert.doesNotMatch(source,/handleStyle: "star"/,
+      "no CPU++ shape migration until operator visually approves stage 1");
+  }
+  const runtime=read("tests/components/test_neon_scrollbar_qt_runtime.py");
+  assert.match(runtime,/bounded rounded thumb/);
+  assert.match(runtime,/legacy proportional thumb is opt-out/);
+});

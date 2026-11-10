@@ -70,6 +70,10 @@ check('function splitRepository' in policy
       and 'function ownerOptions' in policy
       and 'function compose' in policy,
       "Pure owner selection source supports current Patient and known owners")
+check('return {owner: patient.owner, repository: patient.repository,' in policy
+      and 'source: "CURRENT PATIENT"' in policy
+      and '...' not in policy,
+      "QML JavaScript must not use unsupported object spread in GitHub owner policy")
 if errors:
     print("HOSPITAL GITHUB ROOM OWNER // FAIL")
     for error in errors: print(" - " + error)

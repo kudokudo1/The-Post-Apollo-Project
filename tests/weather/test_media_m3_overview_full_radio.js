@@ -39,7 +39,7 @@ test("M3 OVERVIEW keeps the original NEWS bay first, with the full real RADIO be
     assert.doesNotMatch(media,/Flickable\\s*\\{\\s*id: overviewScroll/);
     assert.match(media,/id: reportsBay/);
     assert.match(media,/objectName: "media-m3-news-top-bay"/);
-    assert.ok(media.includes("height: Math.max(52,Math.min(110,mediaOverview.height - 158))"));
+    assert.ok(media.includes("height: Math.max(0,(mediaOverview.height - 6) / 2)"));
     assert.match(media,/id: overviewRadioBay/);
     assert.ok(media.includes("anchors.top: reportsBay.bottom"));
     assert.ok(media.includes("anchors.bottom: parent.bottom"));

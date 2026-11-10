@@ -43,7 +43,7 @@ Rectangle {
             mediaPane.routeRequested("media/news/full");
     }
     function selectServiceMode(mode) {
-        if (loadedServices && (mode==="runtime" || mode==="sources" || mode==="feeds"))
+        if (loadedServices && (mode==="runtime" || mode==="sources"))
             loadedServices.viewMode=mode;
     }
 
@@ -236,9 +236,10 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                // NEWS stays above RADIO, and its existing feed is intact.
-                // At the 520x300 shell, the RADIO dock reserves 160px.
-                height: Math.max(52,Math.min(110,mediaOverview.height - 158))
+                // M6 // NEWS and RADIO share the entire available height,
+                // minus the fixed six-pixel separation. RADIO compacts
+                // presentation only, never its controller or scrolling owner.
+                height: Math.max(0,(mediaOverview.height - 6) / 2)
                 clip: true
                 color: Colors.black
 

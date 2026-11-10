@@ -16,7 +16,7 @@ test("M4 overview has no outer Flickable; NEWS and RADIO bays are both anchored 
     assert.doesNotMatch(media,/objectName:\s*"media-m3-overview-scroll"/);
     assert.match(media,/objectName: "media-m3-news-top-bay"/);
     assert.match(media,/objectName: "media-m3-full-radio-bottom-bay"/);
-    assert.ok(media.includes("height: Math.max(52,Math.min(110,mediaOverview.height - 158))"));
+    assert.ok(media.includes("height: Math.max(0,(mediaOverview.height - 6) / 2)"));
     assert.ok(media.includes("anchors.top: reportsBay.bottom"));
     assert.ok(media.includes("anchors.bottom: parent.bottom"));
     assert.ok(media.includes('subjectRoute: "media/news/reports"'));
@@ -54,15 +54,15 @@ test("M4 RADIO uses its existing controller, not a second player or alternate so
 });
 
 test("M4 overview condenses only presentation; stand-alone RADIO retains original normal dimensions",()=>{
-    assert.ok(radio.includes("stationRadio.overviewDocked ? 24 : 30"));
+    assert.ok(radio.includes("stationRadio.overviewDocked ? 18 : 30"));
     assert.ok(radio.includes("stationRadio.overviewDocked ? 55 : 82"));
     assert.ok(radio.includes("stationRadio.overviewDocked ? 68 : 92"));
-    assert.ok(radio.includes("stationRadio.overviewDocked ? 36 : 88"));
-    assert.ok(radio.includes("stationRadio.overviewDocked ? 24 : 29"));
+    assert.ok(radio.includes("stationRadio.overviewDocked ? 28 : 88"));
+    assert.ok(radio.includes("stationRadio.overviewDocked ? 18 : 29"));
     assert.ok(radio.includes("stationRadio.overviewDocked ? 3 : 8"));
     assert.ok(radio.includes("&& !stationRadio.overviewDocked"));
     assert.ok(saved.includes("property bool compactDocked: false"));
-    assert.ok(saved.includes("height: compactDocked ? 36 : 88"));
+    assert.ok(saved.includes("height: compactDocked ? 28 : 88"));
     assert.ok(saved.includes("visible: !strips.compactDocked"));
     assert.ok(saved.includes("visible: strips.compactDocked"));
     assert.ok(saved.includes('objectName: "media-m4-pinned-saved-pair"'));

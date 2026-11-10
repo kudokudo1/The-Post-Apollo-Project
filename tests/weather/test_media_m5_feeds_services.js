@@ -11,35 +11,32 @@ const services=read("widgets/weather/StationMediaServicesPane.qml");
 const news=read("widgets/weather/StationNewsHub.qml");
 const discovery=read("widgets/weather/StationDiscovery.qml");
 const rss=read("widgets/weather/StationPublisherFeeds.qml");
+const radio=read("widgets/weather/StationRadio.qml");
+const saved=read("widgets/weather/StationRadioSavedStrips.qml");
 
-test("M5 separates manual RSS feeds from GDELT NEWS/REPORTS without duplicate publishers",()=>{
-    assert.ok(!discovery.includes("StationPublisherFeeds {"));
-    assert.ok(services.includes("StationPublisherFeeds {"));
-    assert.ok(services.includes('objectName: "media-m5-publisher-rss-owner"'));
-    assert.equal((services.match(/StationPublisherFeeds\s*\{/g)||[]).length,1);
-    assert.ok(services.includes('active: services.viewMode==="feeds"'));
-    assert.ok(services.includes('stationOpen: services.stationOpen'));
-    assert.ok(services.includes('onHeadlineSelected: function(row)'));
-    assert.ok(services.includes('services.selectedPublisherHeadline = row'));
-    assert.ok(services.includes('objectName: "media-m5-feed-inspector"'));
-    assert.ok(services.includes('RSS METADATA INSPECTOR // NO EXTERNAL BROWSER'));
+test("M6 restores manual BBC/Al Jazeera RSS controls to NEWS REPORTS, not SERVICES",()=>{
+    assert.equal((discovery.match(/StationPublisherFeeds\s*\{/g)||[]).length,1);
+    assert.ok(discovery.includes('objectName: "media-m6-reports-publisher-feeds"'));
+    assert.ok(discovery.includes('visible: stationDiscovery.domain === "news"'));
+    assert.ok(discovery.includes('&& stationDiscovery.newsGroupVisible("request")'));
+    assert.ok(discovery.includes('stationOpen: stationDiscovery.stationOpen'));
+    assert.ok(discovery.includes('stationDiscovery.openRow(row)'));
+    assert.ok(!services.includes("StationPublisherFeeds {"));
+    assert.ok(!services.includes("media-m5-publisher-feed-loader"));
+    assert.ok(!services.includes('viewMode==="feeds"'));
+    assert.ok(!header.includes('id:"feeds"'));
     assert.ok(rss.includes('feedId: "bbc-world"'));
     assert.ok(rss.includes('feedId: "al-jazeera-english"'));
     assert.ok(rss.includes('publisherSourceRow.backend.request()'));
     assert.ok(rss.includes('publisherFeeds.headlineSelected(modelData)'));
     assert.ok(rss.includes('active: publisherFeeds.stationOpen && publisherFeeds.visible'));
     assert.equal((news.match(/StationDiscovery\s*\{/g)||[]).length,1);
-    assert.ok(discovery.includes('domain === "news"'));
     assert.ok(discovery.includes('model: stationDiscovery.newsGroupVisible("list")'));
-    assert.ok(discovery.includes('stationDiscovery.visibleRows : []'));
 });
 
-test("M5 moves NEWS runtime and source rack presentation to SERVICES, never starts a second GDELT",()=>{
+test("M6 retains M5 last-observed NEWS runtime and source diagnostics in SERVICES",()=>{
     assert.ok(discovery.includes('property bool mediaNewsServicesSplit: false'));
     assert.ok(news.includes('mediaNewsServicesSplit: true'));
-    assert.ok(discovery.includes('stationDiscovery.mediaNewsServicesSplit'));
-    assert.ok(discovery.includes('objectName: "earth-e3-legacy-runtime-rack"'));
-    assert.ok(discovery.includes('objectName: "earth-e3-legacy-source-rack"'));
     assert.ok(news.includes('readonly property var newsSourceRows:'));
     assert.ok(news.includes('reportsLoader.item.plannedSources'));
     assert.ok(media.includes('property var lastNewsRuntimeRows: []'));
@@ -48,10 +45,6 @@ test("M5 moves NEWS runtime and source rack presentation to SERVICES, never star
     assert.ok(media.includes('if (!owner || !owner.isReports || !owner.stationOpen)'));
     assert.ok(media.includes('lastNewsRuntimeRows = runtime.map('));
     assert.ok(media.includes('lastNewsSourceRows = sources.map('));
-    assert.ok(media.includes('lastNewsFeedBadge = String(owner.feedBadge'));
-    assert.ok(media.includes('function onRuntimeRowsChanged()'));
-    assert.ok(media.includes('function onNewsSourceRowsChanged()'));
-    assert.ok(media.includes('function onFeedBadgeChanged()'));
     assert.ok(media.includes('newsObservedMs: mediaPane.lastNewsObservedMs'));
     assert.ok(services.includes('LAST OBSERVED RUNTIME'));
     assert.ok(services.includes('GDELT // SOURCE RACK // LAST OBSERVED'));
@@ -59,32 +52,36 @@ test("M5 moves NEWS runtime and source rack presentation to SERVICES, never star
     assert.ok(!services.includes('StationDiscovery {'));
     assert.ok(!services.includes('StationNewsHub {'));
     assert.ok(!services.includes('StationRadio {'));
-});
-
-test("M5 SERVICES has contextual FEEDS tab and unchanged runtime/sources access",()=>{
-    assert.ok(header.includes('{id:"feeds",label:"PUBLISHER FEEDS"}'));
     assert.ok(header.includes('{id:"sources",label:"SOURCE DIRECTORY"}'));
     assert.ok(header.includes('{id:"runtime",label:"RUNTIME // OWNERS"}'));
-    assert.ok(media.includes('mode==="runtime" || mode==="sources" || mode==="feeds"'));
-    assert.ok(media.includes('loadedServices.viewMode=mode'));
-    assert.ok(services.includes('property string viewMode: "runtime"'));
-    assert.ok(services.includes('property bool embeddedHeader: false'));
-    assert.ok(services.includes('model: services.serviceTabs'));
+    assert.ok(media.includes('mode==="runtime" || mode==="sources"'));
+    assert.ok(!media.includes('|| mode==="feeds"'));
     assert.ok(services.includes('media-m5-services-body-scroll'));
-    assert.ok(services.includes('color: Colors.magenta'));
 });
 
-test("M5 gives NEWS eight more pixels without outer OVERVIEW scrolling or RADIO owner changes",()=>{
-    assert.ok(media.includes('height: Math.max(52,Math.min(110,mediaOverview.height - 158))'));
+test("M6 OVERVIEW splits fixed NEWS and RADIO 50/50 with compact RADIO presentation only",()=>{
+    assert.ok(media.includes('height: Math.max(0,(mediaOverview.height - 6) / 2)'));
     assert.ok(media.includes('anchors.top: reportsBay.bottom'));
+    assert.ok(media.includes('anchors.topMargin: 6'));
     assert.ok(media.includes('anchors.bottom: parent.bottom'));
     assert.ok(!media.includes('id: overviewScroll'));
     assert.ok(media.includes('overviewDocked: true'));
     assert.ok(media.includes('subjectRoute: "media/radio/full"'));
     assert.ok(media.includes('subjectRoute: "media/news/reports"'));
-    const radio=read("widgets/weather/StationRadio.qml");
     assert.ok(radio.includes('objectName: "media-m1-radio-directory-scroll"'));
     assert.ok(radio.includes('objectName: "media-m1-radio-transport-fixed"'));
     assert.ok(radio.includes('property bool overviewDocked: false'));
+    assert.ok(radio.includes('stationRadio.overviewDocked ? 18 : 30'));
+    assert.ok(radio.includes('stationRadio.overviewDocked ? 18 : 29'));
+    assert.ok(radio.includes('stationRadio.overviewDocked ? 28 : 88'));
+    assert.ok(radio.includes('height: stationRadio.overviewDocked ? 27 : 54'));
+    assert.ok(radio.includes('&& !stationRadio.overviewDocked'));
+    assert.ok(saved.includes('height: compactDocked ? 28 : 88'));
+    assert.ok(saved.includes('visible: strips.compactDocked'));
     assert.ok(radio.includes('radioClient: "weather-radio"'));
+    for(const cmd of ['stationRadio.selectHighlighted()','stationRadio.loadSelection()',
+        'stationRadio.enterHighlighted()','stationRadio.playbackAction("play")',
+        'stationRadio.playbackAction("pause")','stationRadio.playbackAction("stop")',
+        'stationRadio.toggleHighlightedFavorite()'])
+        assert.ok(radio.includes(cmd),cmd);
 });

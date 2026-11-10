@@ -105,10 +105,10 @@ ShellRoot {
                     ||radio.compactOverview ||!radio.embeddedHeader
                     ||!radio.overviewDocked ||overviewScroll
                     ||news.y!==0
-                    ||news.height<52 ||news.height>110
+                    ||Math.abs(news.height-radioBay.height)>1
                     ||radioBay.y<news.y+news.height
                     ||radioBay.y+radioBay.height>overview.height+1
-                    ||radioBay.height<145
+                    ||radioBay.height<95
                     ||!fixedSearch.visible ||!saved.visible ||!transport.visible
                     ||directory.height<15 ||directory.y<saved.y+saved.height
                     ||directory.y+directory.height>transport.y+1)

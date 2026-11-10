@@ -16,9 +16,14 @@ Item {
 
     readonly property int gap: 2
     readonly property real tileWidth: Math.max(24,(width - 9*gap)/10)
-    height: compactDocked ? 36 : 88
+    height: compactDocked ? 28 : 88
     readonly property real dockWidth: Math.max(0,(width-6)/2)
-    readonly property real dockTileWidth: Math.max(17,(dockWidth-9*gap)/10)
+    // M6 // Compact square strips leave room for a real directory viewport
+    // inside a half-height RADIO, without modifying standalone RADIO tiles.
+    readonly property real dockTileWidth:
+        Math.max(15,Math.min(17,(dockWidth-9*gap)/10))
+    readonly property real dockSpacing:
+        Math.max(2,(dockWidth-10*dockTileWidth)/9)
 
     Column {
         anchors.fill: parent
@@ -210,12 +215,12 @@ Item {
                 flickableDirection: Flickable.HorizontalFlick
                 boundsBehavior: Flickable.StopAtBounds
                 contentWidth: Math.max(width,
-                    strips.favoriteItems.length * (strips.dockTileWidth + strips.gap)
-                    - strips.gap)
+                    strips.favoriteItems.length * (strips.dockTileWidth + strips.dockSpacing)
+                    - strips.dockSpacing)
                 contentHeight: height
                 interactive: contentWidth > width
                 Row {
-                    spacing: strips.gap
+                    spacing: strips.dockSpacing
                     Repeater {
                         model: strips.favoriteItems
                         delegate: Rectangle {
@@ -288,12 +293,12 @@ Item {
                 flickableDirection: Flickable.HorizontalFlick
                 boundsBehavior: Flickable.StopAtBounds
                 contentWidth: Math.max(width,
-                    strips.recentItems.length * (strips.dockTileWidth + strips.gap)
-                    - strips.gap)
+                    strips.recentItems.length * (strips.dockTileWidth + strips.dockSpacing)
+                    - strips.dockSpacing)
                 contentHeight: height
                 interactive: contentWidth > width
                 Row {
-                    spacing: strips.gap
+                    spacing: strips.dockSpacing
                     Repeater {
                         model: strips.recentItems
                         delegate: Rectangle {

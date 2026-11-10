@@ -4,9 +4,8 @@ import "StationNewsCatalogPolicy.js" as Catalog
 import "StationMediaSubjectPanelPolicy.js" as MediaPolicy
 import "StationSubjectHeaderGeometry.js" as HeaderGeometry
 
-// MEDIA M5 // Publisher RSS and NEWS source diagnostics belong in SERVICES.
-// GDELT articles still belong to the original NEWS owner. Inactive NEWS
-// health is explicitly a snapshot, not a live subscriber or second collector.
+// MEDIA M6 // SERVICES owns last-observed NEWS diagnostics only. Publisher
+// LOAD/REFRESH and VIEW return to NEWS → REPORTS. No background GDELT owner.
 Rectangle {
     id: services
     objectName: "media-m1-services"
@@ -19,7 +18,6 @@ Rectangle {
     property string newsFeedBadge: "NEWS NOT YET OBSERVED"
     property var newsRuntimeRows: []
     property var newsSourceRows: []
-    property var selectedPublisherHeadline: null
     readonly property var routeRows: [
         {name:"NEWS // GDELT",owner:"StationNewsHub / StationDiscovery",
          state:"NOT MOUNTED ON SERVICES",scope:"REPORTS // EXPLICIT REQUEST"},
@@ -42,8 +40,7 @@ Rectangle {
     ]
     readonly property var serviceTabs: [
         {id:"runtime",label:"RUNTIME // OWNERS"},
-        {id:"sources",label:"SOURCE DIRECTORY"},
-        {id:"feeds",label:"PUBLISHER FEEDS"}
+        {id:"sources",label:"SOURCE DIRECTORY"}
     ]
 
     Column {
@@ -61,7 +58,7 @@ Rectangle {
                 model: services.serviceTabs
                 delegate: ActionButton {
                     required property var modelData
-                    width: HeaderGeometry.buttonWidth(localTabs.width,3)
+                    width: HeaderGeometry.buttonWidth(localTabs.width,2)
                     height: localTabs.height
                     label: modelData.label
                     labelPixelSize: 9
@@ -75,18 +72,14 @@ Rectangle {
             width: parent.width
             title: services.viewMode==="runtime"
                 ? "MEDIA // SERVICES // RUNTIME BOUNDARY"
-                : services.viewMode==="sources"
-                ? "MEDIA // SERVICES // SOURCE OWNERSHIP"
-                : "MEDIA // SERVICES // PUBLISHER RSS"
+                : "MEDIA // SERVICES // SOURCE OWNERSHIP"
         }
         QuietText {
             width: parent.width
             font.pixelSize: 9
             color: Colors.orange
             wrapMode: Text.WordWrap
-            text: services.viewMode==="feeds"
-                ? "BBC WORLD + AL JAZEERA // MANUAL RSS // NO AUTOPLAY"
-                : "READ-ONLY STATUS // INACTIVE NEWS IS NEVER A LIVE HEALTH PROBE"
+            text: "READ-ONLY STATUS // INACTIVE NEWS IS NEVER A LIVE HEALTH PROBE"
         }
         Flickable {
             id: servicesScroll
@@ -276,92 +269,7 @@ Rectangle {
                     }
                 }
 
-                Loader {
-                    id: publisherFeedLoader
-                    objectName: "media-m5-publisher-feed-loader"
-                    width: body.width
-                    active: services.viewMode==="feeds"
-                    visible: active
-                    height: item ? item.implicitHeight : 0
-                    sourceComponent: Component {
-                        Column {
-                            width: publisherFeedLoader.width
-                            spacing: 8
-                            StationPublisherFeeds {
-                                objectName: "media-m5-publisher-rss-owner"
-                                width: parent.width
-                                stationOpen: services.stationOpen
-                                onHeadlineSelected: function(row) {
-                                    // Preserve the old INSPECT semantics:
-                                    // metadata stays in the station, not a browser.
-                                    services.selectedPublisherHeadline = row;
-                                }
-                            }
-                            Rectangle {
-                                objectName: "media-m5-feed-inspector"
-                                width: parent.width
-                                height: services.selectedPublisherHeadline ? 134 : 0
-                                visible: !!services.selectedPublisherHeadline
-                                color: Colors.dark
-                                border.color: Colors.magenta
-                                border.width: 1
-                                Column {
-                                    anchors.fill: parent
-                                    anchors.margins: 7
-                                    spacing: 5
-                                    Row {
-                                        width: parent.width
-                                        height: 27
-                                        spacing: 5
-                                        GohuText {
-                                            width: Math.max(0,parent.width-80)
-                                            text: services.selectedPublisherHeadline
-                                                ? String(services.selectedPublisherHeadline.title || "")
-                                                : ""
-                                            font.pixelSize: 11
-                                            elide: Text.ElideRight
-                                        }
-                                        ActionButton {
-                                            width: 74
-                                            height: 25
-                                            label: "CLOSE"
-                                            accentColor: Colors.red
-                                            destructive: true
-                                            onClicked: services.selectedPublisherHeadline = null
-                                        }
-                                    }
-                                    QuietText {
-                                        width: parent.width
-                                        text: services.selectedPublisherHeadline
-                                            ? String(services.selectedPublisherHeadline.source || "")
-                                              + " // "
-                                              + String(services.selectedPublisherHeadline.time || "")
-                                            : ""
-                                        font.pixelSize: 9
-                                        color: Colors.cyan
-                                        elide: Text.ElideRight
-                                    }
-                                    QuietText {
-                                        width: parent.width
-                                        text: services.selectedPublisherHeadline
-                                            ? String(services.selectedPublisherHeadline.summary
-                                                     || "HEADLINE ONLY // NO ARTICLE BODY")
-                                            : ""
-                                        font.pixelSize: 9
-                                        wrapMode: Text.WordWrap
-                                        maximumLineCount: 3
-                                    }
-                                    QuietText {
-                                        width: parent.width
-                                        text: "RSS METADATA INSPECTOR // NO EXTERNAL BROWSER"
-                                        font.pixelSize: 8
-                                        color: Colors.orange
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+
             }
         }
     }

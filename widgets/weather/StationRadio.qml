@@ -360,6 +360,8 @@ Rectangle {
 
     color: Colors.black
 
+    // M6 // Only the directory scrolls vertically. A half-height OVERVIEW
+    // uses tighter fixed controls while preserving the shared controller.
     // M1 // Only the directory/saved rows scroll. Original search actions
     // and MPD/select/load/enter/play controls retain their same callbacks.
     Column {
@@ -371,16 +373,22 @@ Rectangle {
         anchors.leftMargin: 8
         anchors.rightMargin: 8
         anchors.topMargin: 2
-        spacing: 3
+        spacing: stationRadio.overviewDocked ? 2 : 3
         visible: !stationRadio.compactOverview
         height: visible ? implicitHeight : 0
             GohuText {
                 objectName: "media-m4-fixed-radio-label"
                 visible: stationRadio.overviewDocked
                 width: parent.width
-                height: stationRadio.overviewDocked ? 11 : 0
-                text: "◉ RADIO // NEWS FIRST // "
-                    + stationRadio.headerStatus
+                height: stationRadio.overviewDocked ? 10 : 0
+                // The single fixed label also carries the status that
+                // previously used a second footer row in the compact dock.
+                text: "◉ RADIO // " + stationRadio.headerStatus
+                    + " // " + (controller.errorText !== ""
+                        ? controller.message
+                        : stationRadio.loadedMedia && stationRadio.loadedMedia.item
+                          ? "LOADED " + String(stationRadio.loadedMedia.item.title || "--")
+                          : stationRadio.notice)
                 color: Colors.cyan
                 font.pixelSize: 10
                 elide: Text.ElideRight
@@ -417,7 +425,7 @@ Rectangle {
                 id: queryRow
                 objectName: "media-m1-radio-query-rail"
                 width: parent.width
-                height: stationRadio.overviewDocked ? 24 : 30
+                height: stationRadio.overviewDocked ? 18 : 30
                 spacing: stationRadio.overviewDocked ? 3 : 8
 
                 ActionButton {
@@ -443,9 +451,9 @@ Rectangle {
                         anchors.fill: parent
                         anchors.leftMargin: 7
                         anchors.rightMargin: 7
-                        anchors.topMargin: 7
+                        anchors.topMargin: stationRadio.overviewDocked ? 3 : 7
                         text: "tag:news"
-                        font.pixelSize: 12
+                        font.pixelSize: stationRadio.overviewDocked ? 11 : 12
                         color: Colors.magenta
                         selectionColor: Colors.magenta
                         selectedTextColor: Colors.black
@@ -494,7 +502,7 @@ Rectangle {
         visible: !stationRadio.compactOverview
             && stationRadio.sectionVisible("saved")
         compactDocked: stationRadio.overviewDocked
-        height: visible ? (stationRadio.overviewDocked ? 36 : 88) : 0
+        height: visible ? (stationRadio.overviewDocked ? 28 : 88) : 0
         favoriteItems: stationRadio.favoriteItems
         recentItems: stationRadio.recentItems
         canRecall: stationRadio.canOperate
@@ -508,9 +516,11 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: savedStrips.bottom
-        anchors.topMargin: savedStrips.visible ? 3 : 0
+        anchors.topMargin: savedStrips.visible
+            ? (stationRadio.overviewDocked ? 1 : 3) : 0
         anchors.bottom: fixedTransport.top
-        anchors.bottomMargin: fixedTransport.visible ? 3 : 0
+        anchors.bottomMargin: fixedTransport.visible
+            ? (stationRadio.overviewDocked ? 1 : 3) : 0
         clip: true
         contentWidth: width
         contentHeight: content.implicitHeight + 12
@@ -519,9 +529,9 @@ Rectangle {
             id: content
             objectName: "media-m1-radio-results"
             x: 8
-            y: 3
+            y: stationRadio.overviewDocked ? 0 : 3
             width: Math.max(0,radioScroll.width-16)
-            spacing: 6
+            spacing: stationRadio.overviewDocked ? 1 : 6
             Row {
             visible: stationRadio.sectionVisible("header") && !stationRadio.embeddedHeader
                 width: parent.width
@@ -559,12 +569,14 @@ Rectangle {
 
             StationSectionDivider {
             visible: stationRadio.sectionVisible("directory")
+                && !stationRadio.overviewDocked
                 width: parent.width
                 title: "STATIONS // BROWSE + SELECT"
             }
 
             GohuText {
             visible: stationRadio.sectionVisible("directory")
+                && !stationRadio.overviewDocked
                 width: parent.width
                 text: "RESULTS " + stationRadio.browseItems.length
                       + " // " + (controller.browse
@@ -590,7 +602,7 @@ Rectangle {
                     required property var modelData
                     required property int index
                     width: content.width
-                    height: 54
+                    height: stationRadio.overviewDocked ? 27 : 54
                     color: stationRadio.browseIndex === index
                            ? Colors.dark : Colors.black
                     border.width: 1
@@ -599,33 +611,35 @@ Rectangle {
 
                     Row {
                         anchors.fill: parent
-                        anchors.leftMargin: 11
-                        anchors.rightMargin: 11
-                        spacing: 10
+                        anchors.leftMargin: stationRadio.overviewDocked ? 4 : 11
+                        anchors.rightMargin: stationRadio.overviewDocked ? 4 : 11
+                        spacing: stationRadio.overviewDocked ? 4 : 10
 
                         GohuText {
-                            width: 34
+                            width: stationRadio.overviewDocked ? 20 : 34
                             anchors.verticalCenter: parent.verticalCenter
-                            font.pixelSize: 13
+                            font.pixelSize: stationRadio.overviewDocked ? 10 : 13
                             text: String(index + 1)
                             color: stationRadio.browseIndex === index
                                    ? Colors.orange : Colors.cyan
                         }
 
                         Column {
-                            width: Math.max(80, parent.width - 282)
+                            width: Math.max(80, parent.width
+                                - (stationRadio.overviewDocked ? 75 : 282))
                             anchors.verticalCenter: parent.verticalCenter
-                            spacing: 5
+                            spacing: stationRadio.overviewDocked ? 1 : 5
 
                             GohuText {
                                 width: parent.width
                                 text: String(modelData.title || "UNTITLED")
                                 elide: Text.ElideRight
-                                font.pixelSize: 13
+                                font.pixelSize: stationRadio.overviewDocked ? 10 : 13
                                 color: Colors.white
                             }
 
                             QuietText {
+                                visible: !stationRadio.overviewDocked
                                 width: parent.width
                                 text: String(modelData.artist || "--")
                                       + " // " + String(modelData.genre || "UNTAGGED")
@@ -635,7 +649,7 @@ Rectangle {
                         }
 
                         GohuText {
-                            width: 24
+                            width: stationRadio.overviewDocked ? 14 : 24
                             anchors.verticalCenter: parent.verticalCenter
                             text: RadioMemory.isFavorite(
                                       radioMemoryAdapter.favoriteEntries,
@@ -647,16 +661,18 @@ Rectangle {
                         }
 
                         GohuText {
-                            width: 52
+                            width: stationRadio.overviewDocked ? 0 : 52
                             anchors.verticalCenter: parent.verticalCenter
-                            visible: stationRadio.broadcastTag(modelData) !== ""
+                            visible: !stationRadio.overviewDocked
+                                && stationRadio.broadcastTag(modelData) !== ""
                             text: stationRadio.broadcastTag(modelData)
                             font.pixelSize: 10
                             color: Colors.magenta
                         }
 
                         GohuText {
-                            width: 132
+                            width: stationRadio.overviewDocked ? 0 : 132
+                            visible: !stationRadio.overviewDocked
                             anchors.verticalCenter: parent.verticalCenter
                             text: String(modelData.codec || "--")
                                   + " // " + Number(modelData.bitrate || 0)
@@ -691,7 +707,7 @@ Rectangle {
         anchors.bottom: parent.bottom
         anchors.leftMargin: 8
         anchors.rightMargin: 8
-        anchors.bottomMargin: 3
+        anchors.bottomMargin: stationRadio.overviewDocked ? 2 : 3
         visible: !stationRadio.compactOverview
         height: visible ? implicitHeight : 0
         spacing: 2
@@ -705,7 +721,7 @@ Rectangle {
             Row {
                 id: transportRow
                 objectName: "media-m1-radio-transport-row"
-                height: stationRadio.overviewDocked ? 24 : 29
+                height: stationRadio.overviewDocked ? 18 : 29
             visible: stationRadio.sectionVisible("transport")
                 width: parent.width
                 spacing: stationRadio.overviewDocked ? 3 : 8
@@ -783,11 +799,18 @@ Rectangle {
 
             GohuText {
             visible: stationRadio.sectionVisible("status")
+                && !stationRadio.overviewDocked
                 width: parent.width
                 text: controller.errorText !== ""
-                      ? controller.message : stationRadio.notice
+                      ? controller.message
+                      : stationRadio.overviewDocked && stationRadio.loadedMedia
+                        && stationRadio.loadedMedia.item
+                        ? "LOADED // "
+                          + String(stationRadio.loadedMedia.item.title || "--")
+                        : stationRadio.notice
                 color: controller.errorText !== "" ? Colors.orange : Colors.cyan
                 font.pixelSize: 9
+                elide: Text.ElideRight
             }
 
             QuietText {
@@ -801,6 +824,7 @@ Rectangle {
 
             GohuText {
             visible: stationRadio.sectionVisible("status")
+                && !stationRadio.overviewDocked
                 width: parent.width
                 text: "LOADED // "
                       + (stationRadio.loadedMedia && stationRadio.loadedMedia.item

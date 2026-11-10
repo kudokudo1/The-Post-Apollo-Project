@@ -29,6 +29,7 @@ on:
       - 'tests/weather/fixtures/M3MediaOverviewNative.qml'
       - 'tests/weather/fixtures/M4MediaPinnedSavedNative.qml'
       - 'tests/weather/fixtures/M5MediaServicesFeedsNative.qml'
+      - 'tests/weather/fixtures/M6MediaBalancedReportsNative.qml'
       - '.github/workflows/weather-media-subject-panels-d1.yml'
   workflow_dispatch:
 
@@ -147,17 +148,17 @@ jobs:
             exit 1
           fi
 
-          cp "$root/tests/weather/fixtures/M5MediaServicesFeedsNative.qml" "$work/config/shell.qml"
+          cp "$root/tests/weather/fixtures/M6MediaBalancedReportsNative.qml" "$work/config/shell.qml"
           rc=0
           timeout --signal=TERM --kill-after=3s 40s \
             env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
             XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
             QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
             quickshell --no-color -p "$work/config/shell.qml" \
-            > "$work/m5-native.log" 2>&1 || rc=$?
-          cat "$work/m5-native.log"
+            > "$work/m6-native.log" 2>&1 || rc=$?
+          cat "$work/m6-native.log"
           test "$rc" -eq 0
-          grep -F "M5_NATIVE_PASS // SERVICES_RSS_ONLY_NEWS_PLUS8_FIXED_RADIO" "$work/m5-native.log"
-          if grep -E 'M5_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/m5-native.log"; then
+          grep -F "M6_NATIVE_PASS // RSS_REPORTS_DIAGNOSTIC_SERVICES_EQUAL_BAYS" "$work/m6-native.log"
+          if grep -E 'M6_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/m6-native.log"; then
             exit 1
           fi

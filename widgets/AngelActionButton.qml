@@ -2,7 +2,8 @@ import QtQuick
 import "../components"
 
 // ANGEL // STABLE COLOR WASH BY IDENTITY.
-// Every Angel button is always gently washed with its own accent color.
+// Angel observation rows keep their permanent category-color washes.
+// Small controls (favorite, note +, filters) may opt out of the wash.
 // Open/selected navigation uses yellow with magenta ink/glow instead.
 // A fully opaque blend prevents translucent compositing changes while scrolling.
 // The shared ActionButton's broad rectangular shadows remain disabled.
@@ -21,17 +22,19 @@ ActionButton {
     // Selected means OPEN only when this control explicitly opts in.
     // Stars and ERR markers use selected for their status, not navigation.
     property bool highlightWhenSelected: false
+    property bool washByDefault: true
+    readonly property color defaultFillColor:
+        washByDefault ? steadyWashColor : baseFillColor
 
-    idleFillColor: steadyWashColor
-    hoverFillColor: steadyWashColor
-    pressedFillColor: steadyWashColor
-    selectedFillColor: highlightWhenSelected ? activeFillColor : steadyWashColor
-    keyboardSelectedFillColor: steadyWashColor
+    idleFillColor: defaultFillColor
+    hoverFillColor: defaultFillColor
+    pressedFillColor: defaultFillColor
+    selectedFillColor: highlightWhenSelected ? activeFillColor : defaultFillColor
+    keyboardSelectedFillColor: defaultFillColor
 
-    // One deterministic color per control identity. Mouse/scroll/focus
-    // cannot turn a different or stale fill on. Selection alone overrides
-    // the default wash with solid yellow for opt-in navigation controls.
-    color: highlightWhenSelected && selected ? activeFillColor : steadyWashColor
+    // Static default for idle/hover/press/focus, never a transient wash.
+    // Yellow remains a deliberate OPEN/SELECT state only.
+    color: highlightWhenSelected && selected ? activeFillColor : defaultFillColor
 
     selectedForegroundColor: Colors.magenta
     selectedBorderColor: Colors.magenta

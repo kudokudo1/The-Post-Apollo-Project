@@ -2071,7 +2071,7 @@ Column {
             Rectangle {
                 id: micAction
                 anchors.right: parent.right
-                anchors.rightMargin: 2
+                anchors.rightMargin: 7
                 anchors.verticalCenter: parent.verticalCenter
                 readonly property bool canAct:
                     root.active && !!root.speechInputService

@@ -1937,8 +1937,10 @@ test("U9b sticky middle place search scrolls matches but never scrolls its query
   assert.match(middle,/height: implicitHeight/);
   assert.match(middle,/anchors\.top: placeSearchPanel\.bottom/);
   assert.match(middle,/id: selectedPlacesScroll/);
-  assert.match(middle,/y: selectedPlacesScroll\.y/);
-  assert.match(middle,/height: selectedPlacesScroll\.height/);
+  // Stage 1 uses the shared viewport-host geometry rather than duplicate
+  // y/height overrides. The saved-places track starts below FIND PLACE.
+  assert.match(middle,/geometryHost: selectedPlacesScroll/);
+  assert.match(middle,/mountingParent: locationSelection/);
   assert.match(middle,/onUseForHome: function\(candidate\)/);
   assert.match(middle,/onUseForExplore: function\(candidate\)/);
   assert.match(search,/property bool compactPinned: false/);
@@ -2427,7 +2429,7 @@ test("CPU++ stage-1 Location panes use viewport-bound rounded bars and clear gut
     } else {
       const section=src.slice(src.indexOf("id: "+body),
                               src.indexOf("id: "+body)+200);
-      assert.match(section,/-24/);
+      assert.match(section,/-\s*24/);
     }
   }
   const selection=read("widgets/cpuplus/CpuPlusSettingsLocationSelectionPane.qml");

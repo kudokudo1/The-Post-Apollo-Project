@@ -186,6 +186,13 @@ Rectangle {
                 submitRequested
             );
         }
+        function onLiveTextReady(text) {
+            root.acceptVoiceTranscript(text, false);
+        }
+        function onTranscriptionFinished(submitRequested) {
+            if (submitRequested)
+                root.sendCurrent();
+        }
     }
 
     onVisibleChanged: {

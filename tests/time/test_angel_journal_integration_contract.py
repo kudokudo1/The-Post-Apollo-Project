@@ -154,7 +154,9 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn('modelData.displayTime', PANE)
         self.assertIn('id: angelHistoryList', PANE)
         self.assertIn('new Date(pane.selectedObservation.observedAtMs)', PANE)
-        self.assertEqual(STORE.count('FileView {'), 1)
+        self.assertEqual(STORE.count('FileView {'), 2)
+        self.assertEqual(STORE.count('id: journalFile'), 1)
+        self.assertEqual(STORE.count('id: draftFile'), 1)
         self.assertIn('angel-observations-v1.json', STORE)
         self.assertIn('var VERSION = 1;', POLICY)
         self.assertNotIn('property string observationDate', STORE)
@@ -286,7 +288,7 @@ class AngelJournalContracts(unittest.TestCase):
         for content in (PANE, meaning):
             self.assertNotIn("FillColor:", content)
             self.assertIn("AngelActionButton {", content)
-        self.assertEqual(PANE.count("AngelActionButton {"), 13)
+        self.assertEqual(PANE.count("AngelActionButton {"), 16)
         self.assertEqual(meaning.count("AngelActionButton {"), 2)
         self.assertIn("x: 0", PANE.split("id: favoriteObservation", 1)[1]
                       .split("id: noteObservation", 1)[0])

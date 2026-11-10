@@ -134,7 +134,7 @@ ShellRoot {
                     ||!radioTransport.visible
                     ||!rss.pinnedRequests
                     ||rss.stationOpen ||rss.bbcBackend.active ||rss.alJazeeraBackend.active
-                    ||count(media,"media-m6-reports-publisher-feeds")!==1)
+                    ||count(offlineReportsProbe,"media-m6-reports-publisher-feeds")!==1)
                     return root.fail("OVERVIEW_COMPACT_LAYOUT // news="
                         +news.height+" radio="+radio.height+" toolbar="
                         +toolbar.height+" scroll="+scroll.height+" y="+scroll.y);

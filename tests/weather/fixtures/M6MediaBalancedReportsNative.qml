@@ -89,7 +89,7 @@ ShellRoot {
                     ||radio.y < news.y+news.height
                     ||radio.y+radio.height>overview.height+1
                     ||!search.visible||!saved.visible||!footer.visible
-                    ||saved.height!==28 ||directory.height<15
+                    ||saved.height!==28 ||directory.height<26
                     ||directory.y < saved.y+saved.height
                     ||directory.y+directory.height>footer.y+1) {
                     return root.fail("SPLIT_OR_CLIPPED_RADIO // overview="

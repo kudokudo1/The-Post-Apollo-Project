@@ -2561,9 +2561,10 @@ PanelWindow {
 
     // Dedicated local microphone buffer for multiline Surgery editors.
     // Reception and Intercom retain their existing isolated audio files.
-    HospitalSpeechInputService {
+    // Dedicated incremental local PipeWire + Whisper stream for the five
+    // Surgery Manage editors; Reception and Intercom remain unchanged.
+    HospitalLiveDictationService {
         id: workforceSpeechInputService
-        audioFileName: "hospital-workforce-dictation.wav"
     }
 
     HospitalRemoteWatcher {

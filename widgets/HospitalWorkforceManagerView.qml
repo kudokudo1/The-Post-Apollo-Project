@@ -23,6 +23,7 @@ Column {
     // One active microphone for long-form fields; no auto submit or save.
     property string dictationField: ""
     property string dictationMode: ""
+    property string dictationOriginalText: ""
     property string dictationFeedbackField: ""
     property string dictationFeedback: ""
     property var rooms: []
@@ -214,6 +215,9 @@ Column {
         }
         root.dictationField = key;
         root.dictationMode = root.mode;
+        // A live mic locks just this editor until STOP; CANCEL restores the
+        // exact pre-recording text without losing an unrelated form's values.
+        root.dictationOriginalText = field.value;
         root.dictationFeedbackField = key;
         root.dictationFeedback = "STARTING MICROPHONE // LOCAL TRANSCRIPTION";
         const started = svc.startRecording();
@@ -226,14 +230,51 @@ Column {
     }
     function cancelDictation() {
         const target = root.dictationField;
+        const field = root.voiceAreaForKey(target);
         if (root.speechInputService && root.speechInputService.busy)
             root.speechInputService.cancel();
+        if (field && root.speechInputService
+                && root.speechInputService.liveStreaming === true)
+            field.value = root.dictationOriginalText;
         root.dictationField = "";
         root.dictationMode = "";
+        root.dictationOriginalText = "";
         if (target) {
             root.dictationFeedbackField = target;
             root.dictationFeedback = "DICTATION CANCELLED // ORIGINAL TEXT PRESERVED";
         }
+    }
+    function acceptLivePhrase(text) {
+        const key = root.dictationField;
+        const field = root.voiceAreaForKey(key);
+        if (!root.active || !field || root.mode !== root.dictationMode
+                || (key === "intake" ? root.mode !== "SETUP" : root.mode !== "JOB"))
+            return false;
+        const result = DictationTextPolicy.appendTranscription(
+            field.value, text, field.voiceMaxLength);
+        root.dictationFeedbackField = key;
+        if (!result.accepted) {
+            if (result.reason.indexOf("TEXT LIMIT") >= 0
+                    && root.speechInputService.recording)
+                root.speechInputService.stopRecording(false);
+            root.dictationFeedback = result.reason;
+            return false;
+        }
+        field.value = result.text;
+        root.dictationFeedback = "LIVE TEXT // EDIT AFTER STOP // NEVER AUTO SUBMITTED";
+        return true;
+    }
+    function finishLiveDictation() {
+        if (!root.dictationField)
+            return;
+        const key = root.dictationField;
+        const field = root.voiceAreaForKey(key);
+        root.dictationField = "";
+        root.dictationMode = "";
+        root.dictationOriginalText = "";
+        root.dictationFeedbackField = key;
+        root.dictationFeedback = "LIVE TRANSCRIPT READY // REVIEW BEFORE SUBMIT";
+        if (field) field.focusEditorAtEnd();
     }
     function acceptDictation(text) {
         const key = root.dictationField;
@@ -627,19 +668,25 @@ Column {
     Connections {
         target: root.speechInputService
         function onTranscriptionReady(text, submitRequested) {
-            // Intentionally ignore submitRequested: dictation never submits.
-            root.acceptDictation(text);
+            // Legacy post-STOP recorder fallback, never a form submission.
+            if (!root.speechInputService
+                    || root.speechInputService.liveStreaming !== true)
+                root.acceptDictation(text);
+        }
+        function onLiveTextReady(text) {
+            root.acceptLivePhrase(text);
+        }
+        function onLiveFinished() {
+            root.finishLiveDictation();
         }
         function onVoiceError(message) {
             if (!root.dictationField)
                 return;
-            root.dictationFeedbackField = root.dictationField;
-            root.dictationFeedback = String(message || "LOCAL DICTATION FAILED").slice(0,180);
-            // Also discard any partially recorded local WAV on error.
-            if (root.speechInputService)
-                root.speechInputService.cancel();
-            root.dictationField = "";
-            root.dictationMode = "";
+            const messageText = String(message || "LOCAL DICTATION FAILED").slice(0,180);
+            const fieldKey = root.dictationField;
+            root.cancelDictation();
+            root.dictationFeedbackField = fieldKey;
+            root.dictationFeedback = messageText;
         }
     }
 
@@ -955,16 +1002,100 @@ Column {
                 border.width: 1
                 border.color: root.selectedDoctorId === String(modelData.id || "")
                     ? Colors.magenta : Colors.blue
-                GohuText {
+                Row {
                     anchors.fill: parent
                     anchors.margins: 5
-                    font.pixelSize: 9
-                    text: String(modelData.name || modelData.id || "")
-                        + " // " + String(modelData.role || "")
-                        + " // " + String(modelData.status || "")
-                    color: Colors.white
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
+                    spacing: 0
+                    clip: true
+
+                    // Worker display names and details are orange, while
+                    // slash dividers stay white with the SAME orange glow.
+                    GohuText {
+                        id: workerNameLabel
+                        text: String(modelData.name || modelData.id || "")
+                        font.pixelSize: 9
+                        color: Colors.orange
+                        width: Math.max(0, Math.min(implicitWidth,
+                            parent.width - workerSepOne.implicitWidth
+                                - workerRoleLabel.implicitWidth
+                                - workerSepTwo.implicitWidth
+                                - workerStatusLabel.implicitWidth))
+                        height: parent.height
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: workerSepOne
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: workerRoleLabel
+                        text: String(modelData.role || "")
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: workerSepTwo
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: workerStatusLabel
+                        text: String(modelData.status || "")
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
                 }
                 MouseArea {
                     anchors.fill: parent
@@ -1469,16 +1600,97 @@ Column {
                 border.width: 1
                 border.color: root.selectedStaffDoctorId
                     === String(modelData.id || "") ? Colors.magenta : Colors.blue
-                GohuText {
+                Row {
                     anchors.fill: parent
                     anchors.margins: 5
-                    text: String(modelData.name || modelData.id || "WORKER")
-                        + " // " + String(modelData.role || "NO ROLE")
-                        + " // " + String(modelData.status || "UNKNOWN")
-                    color: Colors.white
-                    font.pixelSize: 9
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
+                    spacing: 0
+                    clip: true
+                    GohuText {
+                        id: staffWorkerName
+                        text: String(modelData.name || modelData.id || "WORKER")
+                        width: Math.max(0, Math.min(implicitWidth,
+                            parent.width - staffSepOne.implicitWidth
+                                - staffRole.implicitWidth
+                                - staffSepTwo.implicitWidth
+                                - staffStatus.implicitWidth))
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: staffSepOne
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: staffRole
+                        text: String(modelData.role || "NO ROLE")
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: staffSepTwo
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: staffStatus
+                        text: String(modelData.status || "UNKNOWN")
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
                 }
                 MouseArea {
                     anchors.fill: parent
@@ -1717,10 +1929,8 @@ Column {
         width: root.width
         spacing: 3
         height: 43
-        GohuText {
-            text: managerField.caption
-            color: Colors.blue
-            font.pixelSize: 9
+        ManagerCaption {
+            caption: managerField.caption
             height: 12
             width: parent.width
         }
@@ -1753,8 +1963,44 @@ Column {
         }
     }
 
-    // Shared multi-line editor. Uses Hospital's existing local Whisper input,
-    // not a network recognizer. The same controls apply to every long prompt.
+    // Shared headers with slightly larger blue labels. Each "/" is normalized
+    // to a white "//" token with the SAME cyan glow as the blue label.
+    // The caption's existing height is retained so form gaps do not grow.
+    component ManagerCaption: Row {
+        id: managerCaption
+        property string caption: ""
+        readonly property var parts: String(caption || "")
+            .replace(/\s*\/+\s*/g, " // ")
+            .split(/( \/\/ )/)
+            .filter(function(part) { return part.length > 0; })
+        width: root.width
+        height: 12
+        spacing: 0
+        clip: true
+        Repeater {
+            model: managerCaption.parts
+            GohuText {
+                required property string modelData
+                text: modelData
+                width: implicitWidth
+                height: managerCaption.height
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: 10
+                color: modelData.indexOf("/") >= 0 ? Colors.white : Colors.blue
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    radius: 5
+                    samples: 9
+                    opacity: 0.55
+                    color: Colors.cyan
+                    transparentBorder: true
+                }
+            }
+        }
+    }
+
+    // Local live dictation appears inside its own input box, rather than in
+    // the label row. No separate popup, form submit or worker command.
     component ManagerArea: Column {
         id: managerArea
         property string caption: ""
@@ -1770,76 +2016,102 @@ Column {
         signal edited()
         width: root.width
         spacing: 3
-        height: editHeight + 33 + (showVoiceLine ? 15 : 0)
+        height: editHeight + 18 + (showVoiceLine ? 15 : 0)
 
         function focusEditorAtEnd() {
             edit.cursorPosition = edit.text.length;
             edit.forceActiveFocus();
         }
 
-        Row {
-            width: managerArea.width
-            height: 30
-            spacing: 5
-            GohuText {
-                width: Math.max(50, parent.width - micAction.width
-                    - cancelAction.width - parent.spacing * 2)
-                height: parent.height
-                verticalAlignment: Text.AlignVCenter
-                text: managerArea.caption
-                color: Colors.blue
-                font.pixelSize: 9
-                elide: Text.ElideRight
+        ManagerCaption {
+            caption: managerArea.caption
+            width: parent.width
+            height: 12
+        }
+
+        Rectangle {
+            id: editorFrame
+            width: parent.width
+            height: managerArea.editHeight
+            color: Colors.black
+            border.width: 1
+            border.color: Colors.orange
+
+            TextEdit {
+                id: edit
+                anchors.fill: parent
+                anchors.margins: 6
+                anchors.rightMargin: managerArea.voiceKey
+                    ? (managerArea.voiceActive && root.speechInputService
+                        && root.speechInputService.busy ? 100 : 42) : 6
+                color: Colors.magenta
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.black
+                cursorDelegate: Rectangle {
+                    width: 2
+                    color: Colors.orange
+                }
+                font.family: "GohuFont 11 Nerd Font Mono"
+                font.pixelSize: 10
+                wrapMode: TextEdit.Wrap
+                textFormat: TextEdit.PlainText
+                selectByMouse: true
+                // During live dictation the pending text is visible and
+                // recoverable by CANCEL. Editing resumes immediately at STOP.
+                readOnly: managerArea.voiceActive
+                    && root.speechInputService
+                    && root.speechInputService.liveStreaming === true
+                onTextChanged: managerArea.edited()
+                clip: true
             }
-            // Reception's talking-person microphone, scaled for the Manage
-            // editor header. Green Omnitrix at rest/recording, orange hover.
+
+            // Open rule: selected yellow fill, magenta icon/border/glow.
+            // Idle mirrors Reception: green talking-person with Omnitrix glow;
+            // hover follows the orange/selected interaction grammar.
             Rectangle {
                 id: micAction
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 4
                 readonly property bool canAct:
                     root.active && !!root.speechInputService
                     && (managerArea.voiceActive
                         && root.speechInputService.recording
                         || (!root.speechInputService.busy && !root.otherVoiceBusy))
-                width: managerArea.voiceKey ? 36 : 0
-                height: parent.height
+                width: managerArea.voiceKey ? 30 : 0
+                height: 28
                 visible: !!managerArea.voiceKey
-                color: micMouse.pressed ? Colors.black : Colors.dark
-                border.width: (managerArea.voiceActive || micMouse.containsMouse)
+                color: managerArea.voiceActive || micMouse.containsMouse
+                    ? Colors.yellow : Colors.dark
+                border.width: managerArea.voiceActive || micMouse.containsMouse
                     ? 2 : 1
-                border.color: managerArea.voiceActive && root.speechInputService
-                    && root.speechInputService.recording
-                    ? Colors.omnitrix
-                    : managerArea.voiceActive && root.speechInputService
-                        && root.speechInputService.busy
-                    ? Colors.orange
-                    : micMouse.containsMouse && canAct
-                    ? Colors.orange : Colors.omnitrix
-                opacity: canAct ? 1.0 : 0.48
+                border.color: managerArea.voiceActive || micMouse.containsMouse
+                    ? Colors.magenta : Colors.omnitrix
+                opacity: canAct || managerArea.voiceActive ? 1.0 : 0.45
 
                 RectangularShadow {
                     anchors.fill: parent
                     spread: 4
                     z: -1
-                    opacity: micMouse.containsMouse && micAction.canAct
-                        ? 0.48 : 0.34
-                    color: micMouse.containsMouse && micAction.canAct
-                        ? Colors.orange : Colors.omnitrix
+                    opacity: managerArea.voiceActive || micMouse.containsMouse
+                        ? 0.55 : 0.34
+                    color: managerArea.voiceActive || micMouse.containsMouse
+                        ? Colors.magenta : Colors.omnitrix
                 }
-
                 GohuText {
                     anchors.centerIn: parent
                     anchors.verticalCenterOffset: 1
                     text: "🗣︎"
-                    font.pixelSize: 22
-                    color: micMouse.containsMouse && micAction.canAct
-                        ? Colors.orange : Colors.omnitrix
+                    font.pixelSize: 20
+                    color: managerArea.voiceActive || micMouse.containsMouse
+                        ? Colors.magenta : Colors.omnitrix
                     layer.enabled: true
                     layer.effect: DropShadow {
-                        radius: 7
+                        radius: 6
                         samples: 9
-                        opacity: 0.54
-                        color: micMouse.containsMouse && micAction.canAct
-                            ? Colors.orange : Colors.omnitrix
+                        opacity: 0.60
+                        color: managerArea.voiceActive || micMouse.containsMouse
+                            ? Colors.magenta : Colors.omnitrix
                         transparentBorder: true
                     }
                 }
@@ -1854,58 +2126,38 @@ Column {
             }
             HospitalActionButton {
                 id: cancelAction
+                anchors.right: micAction.left
+                anchors.rightMargin: 4
+                anchors.top: parent.top
+                anchors.topMargin: 4
                 visible: managerArea.voiceActive && !!root.speechInputService
                     && root.speechInputService.busy
-                width: visible ? 62 : 0
-                height: 30
+                width: visible ? 58 : 0
+                height: 28
                 label: "CANCEL"
                 accent: Colors.red
                 contentGlowEnabled: false
                 onTriggered: root.cancelDictation()
             }
         }
-        Rectangle {
-            width: parent.width
-            height: managerArea.editHeight
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.orange
-            TextEdit {
-                id: edit
-                anchors.fill: parent
-                anchors.margins: 6
-                color: Colors.magenta
-                selectionColor: Colors.magenta
-                selectedTextColor: Colors.black
-                cursorDelegate: Rectangle {
-                    width: 2
-                    color: Colors.orange
-                }
-                font.family: "GohuFont 11 Nerd Font Mono"
-                font.pixelSize: 10
-                wrapMode: TextEdit.Wrap
-                textFormat: TextEdit.PlainText
-                selectByMouse: true
-                onTextChanged: managerArea.edited()
-                clip: true
-            }
-        }
+
         GohuText {
             width: parent.width
             height: managerArea.showVoiceLine ? 12 : 0
             visible: managerArea.showVoiceLine
             text: managerArea.voiceActive && root.speechInputService
                 && root.speechInputService.recording
-                ? "LISTENING " + root.speechInputService.recordingElapsedLabel
-                    + " // STOP TO INSERT TEXT, CANCEL TO DISCARD"
+                ? "LIVE " + root.speechInputService.recordingElapsedLabel
+                    + " // TALK TO FILL THIS BOX // PRESS MIC TO STOP"
                 : managerArea.voiceActive && root.speechInputService
                     && (root.speechInputService.stopping
                         || root.speechInputService.transcribing)
-                ? "LOCAL WHISPER // TRANSCRIBING // NO FORM SUBMISSION"
+                ? "LOCAL WHISPER // FINISHING LAST CHUNK // NO SUBMISSION"
                 : root.dictationFeedback
             color: managerArea.voiceActive ? Colors.magenta : Colors.orange
             font.pixelSize: 8
             elide: Text.ElideRight
         }
     }
+
 }

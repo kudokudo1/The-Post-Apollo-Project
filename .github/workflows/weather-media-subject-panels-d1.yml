@@ -22,6 +22,7 @@ on:
       - 'tests/weather/test_media_m4_stationary_overview.js'
       - 'tests/weather/test_media_m5_feeds_services.js'
       - 'tests/weather/test_media_m7_fixed_reports_controls.js'
+      - 'tests/weather/test_media_m8_overview_reports_toolbar.js'
       - 'widgets/weather/StationPublisherFeeds.qml'
       - 'tests/weather/test_workspace_landing_w1.js'
       - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
@@ -32,6 +33,7 @@ on:
       - 'tests/weather/fixtures/M5MediaServicesFeedsNative.qml'
       - 'tests/weather/fixtures/M6MediaBalancedReportsNative.qml'
       - 'tests/weather/fixtures/M7MediaFixedReportsNative.qml'
+      - 'tests/weather/fixtures/M8MediaOverviewPinnedReportsNative.qml'
       - '.github/workflows/weather-media-subject-panels-d1.yml'
   workflow_dispatch:
 
@@ -62,6 +64,7 @@ jobs:
           node --test tests/weather/test_media_m4_stationary_overview.js
           node --test tests/weather/test_media_m5_feeds_services.js
           node --test tests/weather/test_media_m7_fixed_reports_controls.js
+          node --test tests/weather/test_media_m8_overview_reports_toolbar.js
           node --test tests/weather/test_workspace_landing_w1.js
           node --test tests/weather/test_media_full_visual_parity_m28t.js
   native-fixed-radio:
@@ -178,5 +181,20 @@ jobs:
           test "$rc" -eq 0
           grep -F "M7_NATIVE_PASS // NEWS_RETRY_BBC_AJ_AND_SEARCH_FIXED_BODY_SCROLLS" "$work/m7-native.log"
           if grep -E 'M7_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/m7-native.log"; then
+            exit 1
+          fi
+
+          cp "$root/tests/weather/fixtures/M8MediaOverviewPinnedReportsNative.qml" "$work/config/shell.qml"
+          rc=0
+          timeout --signal=TERM --kill-after=3s 40s \
+            env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
+            XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            quickshell --no-color -p "$work/config/shell.qml" \
+            > "$work/m8-native.log" 2>&1 || rc=$?
+          cat "$work/m8-native.log"
+          test "$rc" -eq 0
+          grep -F "M8_NATIVE_PASS // OVERVIEW_STICKY_REPORTS_AND_RADIO_5050" "$work/m8-native.log"
+          if grep -E 'M8_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/m8-native.log"; then
             exit 1
           fi

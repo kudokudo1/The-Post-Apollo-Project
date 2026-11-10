@@ -264,6 +264,10 @@ Rectangle {
                 // anchored request/search/filter deck.
                 pinReportsToolbar: stationNewsHub.subjectRoute.indexOf("media/news/") === 0
                     && !stationNewsHub.overviewChannelFilters
+                // M8 // The 50/50 OVERVIEW needs the same fixed requests,
+                // but a three-row compact variant so RADIO does not move.
+                compactOverviewReportsToolbar: stationNewsHub.overviewChannelFilters
+                    && stationNewsHub.subjectRoute === "media/news/reports"
                 mediaNewsServicesSplit: true
                 runtimeNowMs: stationNewsHub.runtimeNowMs
                 onNewsMapRequested: function(payload) {

@@ -11,21 +11,25 @@ const hub=read("widgets/weather/StationNewsHub.qml");
 const services=read("widgets/weather/StationMediaServicesPane.qml");
 const media=read("widgets/weather/StationMediaSubjectPane.qml");
 
-test("M7 focuses sticky controls in NEWS full, not OVERVIEW or CLASSIC",()=>{
+test("M7 pins full NEWS; M8 adds a separately sized OVERVIEW toolbar without changing CLASSIC",()=>{
     assert.ok(discovery.includes("property bool pinReportsToolbar: false"));
     assert.ok(hub.includes('pinReportsToolbar: stationNewsHub.subjectRoute.indexOf("media/news/") === 0'));
     assert.ok(hub.includes('&& !stationNewsHub.overviewChannelFilters'));
     assert.ok(media.includes('overviewChannelFilters: true'));
+    assert.ok(hub.includes('compactOverviewReportsToolbar: stationNewsHub.overviewChannelFilters'));
+    assert.ok(discovery.includes('property bool compactOverviewReportsToolbar: false'));
+    assert.ok(discovery.includes('pinReportsToolbar || compactOverviewReportsToolbar'));
+    assert.ok(discovery.includes('&& stationDiscovery.reportsToolbarActive'));
     assert.ok(discovery.includes('id: reportsFixedToolbar'));
     assert.ok(discovery.includes('objectName: "media-m7-reports-pinned-toolbar"'));
     assert.ok(discovery.includes('visible: stationDiscovery.domain === "news"'));
-    assert.ok(discovery.includes('&& stationDiscovery.pinReportsToolbar'));
+    assert.ok(discovery.includes('&& stationDiscovery.reportsToolbarActive'));
     assert.ok(discovery.includes('id: discoveryScroll'));
     assert.ok(discovery.includes('anchors.top: reportsFixedToolbar.visible'));
     assert.ok(discovery.includes('? reportsFixedToolbar.bottom'));
     assert.ok(discovery.includes('anchors.topMargin: reportsFixedToolbar.visible ? 3'));
     assert.ok(discovery.includes('id: content'));
-    assert.ok(discovery.includes('y: stationDiscovery.pinReportsToolbar ? 4 : 12'));
+    assert.ok(discovery.includes('y: stationDiscovery.reportsToolbarActive ? 4 : 12'));
     assert.ok(discovery.includes('visible: !stationDiscovery.viewerOpen'));
     assert.ok(!media.includes('id: overviewScroll'));
 });
@@ -48,7 +52,7 @@ test("M7 pins RETRY NEWS, BBC and AL JAZEERA request controls on one action row"
     assert.ok(group.includes('LOAD AL JAZEERA'));
     assert.equal((discovery.match(/StationPublisherFeeds\s*\{/g)||[]).length,1);
     assert.ok(discovery.includes('id: publisherFeedsContent'));
-    assert.ok(discovery.includes('pinnedRequests: stationDiscovery.pinReportsToolbar'));
+    assert.ok(discovery.includes('pinnedRequests: stationDiscovery.reportsToolbarActive'));
 });
 
 test("M7 pinned source and language search, clear actions and all topic/time/region buttons",()=>{
@@ -71,8 +75,8 @@ test("M7 pinned source and language search, clear actions and all topic/time/reg
     assert.equal((discovery.match(/flickableDirection: Flickable.HorizontalFlick/g)||[]).length>=3,true);
     const legacy=discovery.slice(discovery.indexOf('id: newsTopicRail'),
         discovery.indexOf('// M28-B: MEDIA owns the full article feed.'));
-    assert.equal((legacy.match(/&& !stationDiscovery.pinReportsToolbar/g)||[]).length,5);
-    assert.ok(discovery.includes('&& !stationDiscovery.pinReportsToolbar\n                spacing: 12'));
+    assert.equal((legacy.match(/&& !stationDiscovery.reportsToolbarActive/g)||[]).length,5);
+    assert.ok(discovery.includes('&& !stationDiscovery.reportsToolbarActive\n                spacing: 12'));
 });
 
 test("M7 only exposes existing manual publisher RSS requests; expanded rows remain scrollable",()=>{

@@ -23,6 +23,7 @@ Scope {
     property bool wasCancelled: false
     property bool doneSeen: false
     property int packetCount: 0
+    property int maxPackets: 30
     readonly property bool recording: voiceState === "recording"
     readonly property bool stopping: voiceState === "stopping"
     readonly property bool transcribing: voiceState === "transcribing"
@@ -119,7 +120,7 @@ Scope {
             if (!sentence || /^\[\s*(?:BLANK_AUDIO|NO_SPEECH|SILENCE)\s*\]$/i.test(sentence))
                 return;
             packetCount++;
-            if (packetCount > 30) {
+            if (packetCount > maxPackets) {
                 lastError = "LIVE DICTATION LENGTH LIMIT // STOPPING";
                 voiceError(lastError);
                 cancel();

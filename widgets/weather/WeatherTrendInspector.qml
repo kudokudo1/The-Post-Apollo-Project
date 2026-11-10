@@ -62,17 +62,18 @@ Rectangle {
             spacing: 10
 
             GohuText {
-                width: Math.max(0, parent.width - 250)
+                width: inspector.compact ? Math.max(92,parent.width - 100)
+                      : Math.max(0, parent.width - 250)
                 text: inspector.title
-                font.pixelSize: 11
+                font.pixelSize: inspector.compact ? 9 : 11
                 color: Colors.magenta
                 elide: Text.ElideRight
             }
 
             GohuText {
-                width: 240
+                width: inspector.compact ? Math.max(0,parent.width - 105) : 240
                 text: inspector.summaryText
-                font.pixelSize: 9
+                font.pixelSize: inspector.compact ? 8 : 9
                 color: Colors.white
                 horizontalAlignment: Text.AlignRight
                 elide: Text.ElideRight
@@ -188,7 +189,8 @@ Rectangle {
             width: parent.width
             text: inspector.footerText
             font.pixelSize: inspector.compact ? 7 : 8
-            wrapMode: Text.WordWrap
+            wrapMode: inspector.compact ? Text.NoWrap : Text.WordWrap
+            elide: inspector.compact ? Text.ElideRight : Text.ElideNone
             color: Colors.orange
         }
     }

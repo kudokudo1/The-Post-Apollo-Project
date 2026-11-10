@@ -477,11 +477,76 @@ Item {
             elide: Text.ElideRight
         }
 
+        Column {
+            id: noteRecoveryControls
+            width: parent.width
+            height: visible ? 65 : 0
+            spacing: 4
+            visible: AngelObservationsStore.draftState === "ready"
+                     || (AngelObservationsStore.storageState === "stalled"
+                         && AngelObservationsStore.pendingKind === "note")
+
+            GohuText {
+                width: parent.width
+                font.pixelSize: 9
+                color: Colors.orange
+                text: "NOTE RECOVERY // "
+                      + AngelObservationsStore.noteDraftDisposition.toUpperCase()
+                      + (AngelObservationsStore.noteDraft
+                         ? " // " + AngelObservationsStore.noteDraft.id : "")
+            }
+            Row {
+                width: parent.width
+                height: 30
+                spacing: 4
+                AngelActionButton {
+                    width: Math.max(20, (parent.width - parent.spacing * 2) / 3)
+                    height: parent.height
+                    label: "CHECK DISK"
+                    labelPixelSize: 8
+                    accentColor: Colors.cyan
+                    available: AngelObservationsStore.writePhase === ""
+                               && AngelObservationsStore.draftState === "ready"
+                    onLeftClicked: AngelObservationsStore.checkRecoveryFromDisk()
+                }
+                AngelActionButton {
+                    width: Math.max(20, (parent.width - parent.spacing * 2) / 3)
+                    height: parent.height
+                    label: AngelObservationsStore.noteDraftDisposition === "already-saved"
+                           ? "CLEAR" : "RETRY"
+                    labelPixelSize: 8
+                    accentColor: Colors.orange
+                    available: AngelObservationsStore.writePhase === ""
+                               && AngelObservationsStore.recoveryDiskChecked
+                               && AngelObservationsStore.draftState === "ready"
+                               && (AngelObservationsStore.noteDraftDisposition === "recoverable"
+                                   || AngelObservationsStore.noteDraftDisposition === "already-saved")
+                    onLeftClicked: {
+                        if (AngelObservationsStore.noteDraftDisposition === "already-saved")
+                            AngelObservationsStore.clearVerifiedDraft();
+                        else
+                            pane.retryDraft();
+                    }
+                }
+                AngelActionButton {
+                    width: Math.max(20, (parent.width - parent.spacing * 2) / 3)
+                    height: parent.height
+                    label: "REVIEW"
+                    labelPixelSize: 8
+                    accentColor: Colors.magenta
+                    available: AngelObservationsStore.draftState === "ready"
+                    onLeftClicked: pane.reviewNoteDraft()
+                }
+            }
+        }
+
         Item {
             id: angelHistoryArea
             width: parent.width
-            height: Math.max(96, angelJournalView.height - 325
-                                 - (noteEditor.visible ? 40 : 0))
+            height: Math.max(72, angelJournalView.height - 325
+                                 - (noteEditor.visible ? 40 : 0)
+                                 - (noteRecoveryControls.visible ? 65 : 0)
+                                 - (pane.noteSaveFeedback !== "" ? 16 : 0))
 
             ListView {
                 id: angelHistoryList
@@ -754,69 +819,6 @@ Item {
                         pane.pendingDeleteId = "";
                         pane.selectedId = "";
                     }
-                }
-            }
-        }
-
-        Column {
-            id: noteRecoveryControls
-            width: parent.width
-            height: visible ? 65 : 0
-            spacing: 4
-            visible: AngelObservationsStore.draftState === "ready"
-                     || (AngelObservationsStore.storageState === "stalled"
-                         && AngelObservationsStore.pendingKind === "note")
-
-            GohuText {
-                width: parent.width
-                font.pixelSize: 9
-                color: Colors.orange
-                text: "NOTE RECOVERY // "
-                      + AngelObservationsStore.noteDraftDisposition.toUpperCase()
-                      + (AngelObservationsStore.noteDraft
-                         ? " // " + AngelObservationsStore.noteDraft.id : "")
-            }
-            Row {
-                width: parent.width
-                height: 30
-                spacing: 4
-                AngelActionButton {
-                    width: Math.max(20, (parent.width - parent.spacing * 2) / 3)
-                    height: parent.height
-                    label: "CHECK DISK"
-                    labelPixelSize: 8
-                    accentColor: Colors.cyan
-                    available: AngelObservationsStore.writePhase === ""
-                               && AngelObservationsStore.draftState === "ready"
-                    onLeftClicked: AngelObservationsStore.checkRecoveryFromDisk()
-                }
-                AngelActionButton {
-                    width: Math.max(20, (parent.width - parent.spacing * 2) / 3)
-                    height: parent.height
-                    label: AngelObservationsStore.noteDraftDisposition === "already-saved"
-                           ? "CLEAR" : "RETRY"
-                    labelPixelSize: 8
-                    accentColor: Colors.orange
-                    available: AngelObservationsStore.writePhase === ""
-                               && AngelObservationsStore.recoveryDiskChecked
-                               && AngelObservationsStore.draftState === "ready"
-                               && (AngelObservationsStore.noteDraftDisposition === "recoverable"
-                                   || AngelObservationsStore.noteDraftDisposition === "already-saved")
-                    onLeftClicked: {
-                        if (AngelObservationsStore.noteDraftDisposition === "already-saved")
-                            AngelObservationsStore.clearVerifiedDraft();
-                        else
-                            pane.retryDraft();
-                    }
-                }
-                AngelActionButton {
-                    width: Math.max(20, (parent.width - parent.spacing * 2) / 3)
-                    height: parent.height
-                    label: "REVIEW"
-                    labelPixelSize: 8
-                    accentColor: Colors.magenta
-                    available: AngelObservationsStore.draftState === "ready"
-                    onLeftClicked: pane.reviewNoteDraft()
                 }
             }
         }

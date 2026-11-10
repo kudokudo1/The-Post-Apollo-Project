@@ -179,6 +179,7 @@ Scope {
             liveEngine.vadSilenceMs = vadSilenceMs;
             liveEngine.vadMinimumSpeechMs = vadMinimumSpeechMs;
             if (!liveEngine.startRecording()) {
+                liveEngine.vadActive = false;
                 recordingClock.stop();
                 voiceState = "idle";
                 lastError = liveEngine.lastError || "LOCAL LIVE MICROPHONE REFUSED";

@@ -77,7 +77,7 @@ test("E8 all EARTH screens preserve their C44 header on the correct owner",()=>{
     assert.ok(water.includes("HeaderGeometry.tabHeight"));
     assert.ok(water.includes("HeaderGeometry.tabsToRule"));
     assert.ok(water.includes("HeaderGeometry.ruleToContent"));
-    assert.match(services,/StationServicesConsole\\s*\\{/);
+    assert.match(services,/StationServicesConsole\s*\{/);
     assert.match(services,/familyLabel: "EARTH"/);
     assert.match(parent,/StationEarthWaterPane\s*\{/);
     assert.match(parent,/StationEarthServicesPane\s*\{/);

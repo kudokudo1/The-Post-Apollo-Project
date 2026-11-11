@@ -58,6 +58,26 @@ jobs:
             --mount "type=bind,src=$PWD,dst=/src,readonly" \
             --mount "type=bind,src=$RUNNER_TEMP/identity-silverblue-rpm,dst=/input,readonly" \
             fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/verify_signed_identity_gateway.sh
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin cryptography for synthetic Ed25519 release-root checks
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Adversarial signed release-root, manifest completeness and replay floors
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_identity_release_manifest_ci.py
+      - name: Independent CI-controller synthetic release envelope (never RPM signer)
+        shell: bash
+        run: |
+          set -euo pipefail
+          rpm="$RUNNER_TEMP/identity-silverblue-rpm/identity-silverblue-ci.rpm"
+          evidence="$RUNNER_TEMP/identity-silverblue-release-envelope"
+          python3 -B tests/connections/identity_silverblue/release_manifest_ci.py create "$rpm" "$evidence"
+          test "$(find "$evidence" -maxdepth 1 -type f | wc -l)" -eq 4
+          python3 -B tests/connections/identity_silverblue/release_manifest_ci.py verify "$rpm" "$evidence"
+          echo "C4B_ID_PENDING // CONTROLLER_OWNED_CI_KEY_NOT_OPERATOR_ENROLLED_RELEASE_ROOT"
       - name: Deny production authority and require later real Silverblue lifecycle witness
         shell: bash
         run: |

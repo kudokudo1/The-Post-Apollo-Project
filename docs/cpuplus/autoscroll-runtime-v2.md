@@ -53,6 +53,22 @@ No recovery is needed while this branch stays unmerged/unexecuted. During an exp
 - `tests/cpuplus/test_autoscroll_evdev_backend.py`: fake device/uinput event path, restricted capabilities, single-seat focus, permission gate, deterministic teardown.
 - Existing CPU++ Mouse workflow: Sway/Kitty/Zellij contracts and native disposable Quickshell smoke.
 
+## Stage 3 // Private emergency stop + non-interactive anchor (source only)
+
+- `AutoscrollStopChannel.py` creates a **private AF_UNIX socket** inside the current user's verified `XDG_RUNTIME_DIR/post-apollo`. On a live *separately approved* experimental run, `AutoscrollEvdevBackend.py` refuses to grab any mouse unless the private socket has been established, and stops if the socket disappears or is replaced. The STOP request must come from a process with the same Linux UID via `SO_PEERCRED`; any other message is refused.
+- `AutoscrollStop.py --stop` sends the literal STOP command. Receipt is acknowledged, but **the ACK is not a claim that the process has fully exited**. The backend cancels and releases the grab in its cleanup. No service is started, no new permissions are installed, and no global keybinding is registered.
+- `AutoscrollAnchorOverlay.qml` is a non-focusable transparent `PanelWindow` with an **empty pointer-input mask** and no reserved screen space. Its indicator is not displayed without explicit authorization, runtime verification, finite anchor coordinates, a matching trusted output name and in-bounds position. The overlay is **not instantiated by the running CPU++ application**. A disposable native Quickshell test loads it and checks the hidden/revoked behavior.
+- **No actual pointer-position/target witness exists yet.** This stage does not inject unverified coordinates or claim that the anchor icon appears on the real desktop.
+- Escape is **not bound globally**. The STOP channel makes a limited, same-user cancellation path available for later compositor-approved Esc binding, but keyboard hooks and arbitrary device access remain forbidden. Termination via SIGTERM/Ctrl+C is also available in a manually approved foreground test.
+
+### Stage 3 tests
+
+- `tests/cpuplus/test_autoscroll_stop_channel.py`: socket ownership, permission boundary, exact STOP bytes, malformed requests, existing-path protection and socket removal.
+- `tests/cpuplus/test_autoscroll_overlay_stop_contract.py`: overlay click-through, no-focus, trusted origin/visibility, driver emergency-stop path.
+- `tests/cpuplus/fixtures/MouseScrollNative.qml`: disposable Quickshell loads the overlay, rejects premature activation, and checks output validation/revocation when a test screen is available.
+
+**Stage 3 is not a production-readiness or input-injection approval.**
+
 ## NEXT // Stage 3
 
 Obtain a compositor-approved pointer-origin and target identity path, implement non-focus-stealing anchor rendering and a global Esc/cancel contract, then undertake an independent security audit. Only after operator-approved real SwayFX testing should the CPU++ runtime activation gate be revisited. This work must not collide with the independent scrollbar workstream.

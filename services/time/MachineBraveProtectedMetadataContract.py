@@ -4,10 +4,10 @@
 There is intentionally NO executable server, socket listener, unit file,
 native host, authenticator, signer or production deployment path here.
 
-The only grant hook is named TEST-ONLY. It lets CI prove the read-only
-metadata grammar using synthetic records after a distinct kernel UID denies
-the browser direct filesystem access. Real C3e host/seat provenance and C5
-one-use consent are NOT available. Without that hook every request refuses.
+The default ingress has no grant hook. CI proves the read-only metadata
+reader independently under a protected service UID after kernel permissions
+deny the browser direct access. Real C3e host/seat provenance and C5 one-use
+consent are unavailable, so every broker request refuses.
 
 No ciphertext, tab URL, passphrase, export, write, delete, restore or window
 operation is ever returned. This module must never be wired into normal Brave
@@ -27,6 +27,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import MachineBraveSealedVault as vault
+import MachineBraveArchiveAdmissionIntent as admission
 
 REQUEST_KIND = "machine-protected-archive-metadata-request-v1"
 RESPONSE_KIND = "machine-protected-archive-metadata-response-v1"
@@ -190,53 +191,43 @@ def _send(connection, payload):
     connection.sendall(struct.pack("=I", len(serialized)) + serialized)
 
 
-def handle_once(connection, *, protected_root, test_only_grant=None):
-    """One bounded request. Runtime grants default to DENY, unconditionally.
+def handle_once(connection, *, protected_root):
+    """Metadata broker ingress is DENY ONLY without independent C3e+C5.
 
-    test_only_grant(peer, request, sha256) exists solely for isolated CI
-    fixtures. It is NOT host verification, C3e attestation or C5 consent.
-    A real broker must replace this seam with independently approved OS
-    process, seat, signed release and one-use authorization evidence.
+    This performs real socket parsing and exact request/peer binding but
+    it cannot grant or return metadata. The separate protected reader is
+    directly exercised by privileged, isolated source tests only.
     """
     response = dict(REFUSED)
     try:
         connection.settimeout(2.0)
         initial = peer_credentials(connection)
         raw, request = read_frame(connection)
-        # A same-UID socket wrapper cannot protect same-UID on-disk archives.
-        # The distinct non-root storage UID is a mandatory precondition.
         if os.geteuid() == 0 or initial.uid == os.geteuid():
             refuse()
-        if test_only_grant is None:
-            refuse()  # no production authorizer exists
-        digest = hashlib.sha256(raw).hexdigest()
-        if test_only_grant(initial, request, digest) is not True:
+        intent = admission.bind_request(
+            raw, peer_pid=initial.pid,
+            peer_uid=initial.uid, peer_gid=initial.gid)
+        if (intent.action != request["action"] or
+                intent.challenge != request["challenge"]):
             refuse()
         if peer_credentials(connection) != initial:
             refuse()
-        result = metadata_from_protected_root(protected_root, request)
-        if peer_credentials(connection) != initial:
-            refuse()
-        # CI-only positive result, never an authenticated production response.
-        response = {
-            "kind": RESPONSE_KIND,
-            "status": ("test_only_metadata_listed" if request["action"] == LIST
-                       else "test_only_metadata_inspected"),
-            "challenge": request["challenge"],
-            **result,
-            "client_authenticated": False,
-            "operator_consent_verified": False,
-            "restore_allowed": False,
-            "safe_actions": []
-        }
-    except (BrokerRefusal, vault.VaultError, OSError, ValueError,
-            TypeError, KeyError, struct.error, TimeoutError):
+        # Even forged 'signed' or 'consented' claims cannot grant entry.
+        # C3e-Y only has synthetic evidence and C5 has no approved
+        # independently verified one-use MACHINE authorization yet.
+        if admission.may_read_metadata(intent):
+            refuse()  # positive path is NOT implemented, even if monkeypatched
+        refuse()
+    except (BrokerRefusal, admission.IntentRefusal, vault.VaultError,
+            OSError, ValueError, TypeError, KeyError, struct.error,
+            TimeoutError):
         response = dict(REFUSED)
     try:
         _send(connection, response)
     except (OSError, BrokerRefusal):
         return False
-    return response.get("status", "") != "request_rejected"
+    return False
 
 
 if __name__ == "__main__":

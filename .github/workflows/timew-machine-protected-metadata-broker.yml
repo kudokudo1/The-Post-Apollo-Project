@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - "services/time/MachineBraveProtectedMetadataContract.py"
+      - "services/time/MachineBraveArchiveAdmissionIntent.py"
       - "tests/timew/test_machine_brave_protected_metadata_contract.py"
+      - "tests/timew/test_machine_brave_archive_admission_intent.py"
       - "docs/timew-machine-protected-metadata-broker.md"
       - ".github/workflows/timew-machine-protected-metadata-broker.yml"
   workflow_dispatch:
@@ -18,6 +20,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Bind exact socket request and kernel peer to intent, reject forged signed/consent claims
+        run: python3 -B -I tests/timew/test_machine_brave_archive_admission_intent.py
       - name: CI-only privileged distinct-UID kernel permission denial and metadata contract
         run: sudo -n python3 -B -I tests/timew/test_machine_brave_protected_metadata_contract.py
       - name: Existing offline archive, ciphertext and safety regressions

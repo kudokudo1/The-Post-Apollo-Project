@@ -153,7 +153,7 @@ Rectangle {
                                     ? (panel.currentReady
                                        ? panel.reading(panel.sky.humidityValue,"%") : "--")
                                     : (panel.currentReady
-                                       ? panel.reading(panel.sky.windMphValue," MPH") : "--")
+                                       ? panel.reading(panel.sky.windValue," MPH") : "--")
                         }
                         QuietText {
                             anchors.bottom: parent.bottom

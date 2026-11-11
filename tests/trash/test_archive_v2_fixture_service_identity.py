@@ -151,7 +151,8 @@ class ServiceIdentityV2qTests(unittest.TestCase):
             key.sign(canonical_service_grant(grant))).decode("ascii")}
 
     def send(self, *, service=None, signed_service_grant=None,
-             signed_service_release=None, service_release_history=None):
+             signed_service_release=None, service_release_history=None,
+             origin_policy=None, signed_checkpoint=None, checkpoint_root=None):
         if service is None:
             service = self.pinned
         elif service is False:
@@ -167,7 +168,10 @@ class ServiceIdentityV2qTests(unittest.TestCase):
                     service_files=service,
                     signed_service_grant=signed_service_grant,
                     signed_service_release=signed_service_release,
-                    service_release_history=service_release_history)
+                    service_release_history=service_release_history,
+                    origin_policy=origin_policy,
+                    signed_checkpoint=signed_checkpoint,
+                    checkpoint_root=checkpoint_root)
 
     def counts(self):
         return self.ledger.test_copy_status("demo-scrape")

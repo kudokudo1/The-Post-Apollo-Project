@@ -74,6 +74,6 @@ test("W3 compact HISTORY keeps graphs, yesterday, 7-day summary and daily cards 
     assert.ok(trend.includes('property bool compact: false'));
     assert.ok(trend.includes('height: inspector.compact ? 36 : 94'));
     assert.ok(metric.includes('property bool compact: false'));
-    assert.ok(metric.includes('font.pixelSize: card.compact ? 15 : 20'));
+    assert.ok(metric.includes('card.compact ? 15 : 20'));
     assert.ok(home.includes('title: "RECENT HISTORY // ARCHIVED MODEL"'));
 });

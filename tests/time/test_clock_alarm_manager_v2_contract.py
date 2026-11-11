@@ -129,6 +129,8 @@ class AlarmManagerV2Contracts(unittest.TestCase):
         self.assertIn('property var draftDays: [new Date().getDay()]', PANE)
         self.assertIn('draftDays = a.weekdays.slice()', PANE)
         self.assertIn('pane.draftDays.indexOf(index) >= 0', PANE)
+        self.assertIn('if (pane.draftDays.length === 0)', PANE)
+        self.assertIn('pane.draftDays = [new Date().getDay()]', PANE)
 
     def test_audio_remains_optional_and_ids_allowlisted(self):
         self.assertIn('active: false', OWNER)

@@ -13,13 +13,16 @@ class ClockRecoveryContracts(unittest.TestCase):
     def test_policy_persists_exact_arming_and_processed_due_cursors(self):
         for item in ("armedAtMs", "lastProcessedDueMs"):
             self.assertIn(item, POLICY)
-        self.assertIn("function latestMissedWeeklyDue(a, nowMs, pausedThroughDate)", POLICY)
+        self.assertIn("function latestUnprocessedWeeklyDue(a, nowMs, pausedThroughDate)", POLICY)
+        self.assertIn("a.lastFiredDay = dayKey(previous);", POLICY)
+        self.assertIn("nowMs - previous <= MAX_LATE_MS", POLICY)
+        self.assertIn("var yesterday = dateOffset(nowMs, -1);", POLICY)
         self.assertIn("var daysBack = 1; daysBack <= 7; daysBack++", POLICY)
         self.assertIn("a.lastProcessedDueMs = previous;", POLICY)
         self.assertIn('a.lastEventKind = "missed";', POLICY)
         self.assertIn("a.armedAtMs = nowMs;", POLICY)
         self.assertIn("const pausedThroughDate = a.pausedUntilDate;", POLICY)
-        self.assertIn("if (a.armedAtMs > nowMs) return;", POLICY)
+        self.assertIn("if (a.armedAtMs > nowMs && !a.ringing) return;", POLICY)
 
     def test_clock_samples_wall_time_during_file_restore_and_timer_callback(self):
         self.assertIn("const prior = lastSchedulerTickMs;", SERVICE)

@@ -59,6 +59,7 @@ class AlarmManagerV2Contracts(unittest.TestCase):
         self.assertIn('id: newAlarm', PANE)
         self.assertIn('id: duplicateAlarm', PANE)
         self.assertIn('id: emergencyStop', PANE)
+        self.assertIn('visible: AlarmManagerService.ringingCount > 0', PANE)
         self.assertIn('id: entryFields', PANE)
         self.assertIn('id: editorActions', PANE)
         self.assertIn('id: editTabs', PANE)

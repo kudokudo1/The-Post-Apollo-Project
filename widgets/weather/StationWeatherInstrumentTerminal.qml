@@ -341,14 +341,14 @@ Rectangle {
                 GohuText {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "NEXT 6 HOURS"
+                    text: "NEXT 6 FORECAST TIMES"
                     color: Colors.orange
                     font.pixelSize: 12
                 }
                 GohuText {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "RAIN CHANCE IN EACH FORECAST HOUR"
+                    text: "RAIN CHANCE // EACH LISTED PERIOD"
                     font.pixelSize: 9
                     color: Colors.cyan
                 }
@@ -503,7 +503,7 @@ Rectangle {
                 id: dailyTitle
                 anchors.left: parent.left
                 anchors.top: parent.top
-                text: "THREE-DAY OUTLOOK"
+                text: "THREE-DAY OUTLOOK // PEAK RAIN CHANCE"
                 color: Colors.magenta
                 font.pixelSize: 10
             }
@@ -571,7 +571,7 @@ Rectangle {
                             }
                             GohuText {
                                 text: terminal.rainChance(day.entry.chanceRain)
-                                      +" RAIN CHANCE"
+                                      +" PEAK RAIN CHANCE"
                                 font.pixelSize: 9
                                 color: Colors.cyan
                                 width: parent.width
@@ -609,7 +609,7 @@ Rectangle {
                                ? terminal.sky.inspectedHourMetrics[0].title+" "+
                                  terminal.sky.inspectedHourMetrics[0].value : "")
                     : terminal.currentReady
-                      ? "LIVE OBSERVATION // HOURLY & DAILY ARE FORECASTS"
+                      ? "CURRENT OBSERVATION // LISTED TIMES & DAYS ARE FORECASTS"
                       : "OBSERVATION WAITING // FORECAST SOURCE INDEPENDENT"
             }
         }

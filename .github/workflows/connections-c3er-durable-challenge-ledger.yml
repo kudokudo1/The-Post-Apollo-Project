@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "tests/connections/c3e_release_trust/C3eRDurableChallengeLedger.py"
+      - "tests/connections/c3e_release_trust/C3eQSignedGuestEvidence.py"
+      - "tests/connections/test_connections_c3eq_signed_guest_evidence.py"
       - "tests/connections/test_connections_c3er_durable_challenge_ledger.py"
       - ".github/workflows/connections-c3er-durable-challenge-ledger.yml"
       - "docs/connections-c3er-durable-challenge-ledger.md"

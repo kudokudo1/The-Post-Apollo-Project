@@ -260,8 +260,12 @@ class C3eYSignedHostChallengeTests(unittest.TestCase):
                           "InstalledIdentityCommandAdapterV1("):
             self.assertNotIn(forbidden,source)
         for name in ("externalIssuerCustodyVerified", "externalRollbackResistanceVerified",
-                     "independentHostOriginVerified",*Y.X.NEGATIVE):
+                     "independentHostOriginVerified"):
             self.assertIn('"'+name+'": False',source)
+        self.assertIn("**X.NEGATIVE",source)
+        for name,flag in Y.X.NEGATIVE.items():
+            with self.subTest(name=name):
+                self.assertIs(flag,False)
 
 
 if __name__=="__main__":

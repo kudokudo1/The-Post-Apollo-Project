@@ -135,16 +135,18 @@ Item {
 
                 Repeater {
                     model: [
+                        { label: "-1H", delta: -3600000 },
                         { label: "-1M", delta: -60000 },
                         { label: "-1S", delta: -1000 },
                         { label: "RESET", delta: 0, reset: true },
                         { label: "+1S", delta: 1000 },
-                        { label: "+1M", delta: 60000 }
+                        { label: "+1M", delta: 60000 },
+                        { label: "+1H", delta: 3600000 }
                     ]
                     TimeActionButton {
                         required property var modelData
                         actionRole: modelData.reset ? "cancel" : "time"
-                        width: (scroll.width - 8 - 16) / 5
+                        width: (parent.parent.width - 6 * parent.parent.spacing) / 7
                         height: 32
                         label: modelData.label
                         labelPixelSize: 9

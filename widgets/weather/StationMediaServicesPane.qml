@@ -1,7 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationNewsCatalogPolicy.js" as Catalog
-import "StationMediaSubjectPanelPolicy.js" as MediaPolicy"
+import "StationMediaSubjectPanelPolicy.js" as MediaPolicy
 
 // MEDIA M10 // One canonical SERVICES dashboard with RUNTIME and SOURCE
 // DIRECTORY in one scrollable dossier, not two duplicate screens.

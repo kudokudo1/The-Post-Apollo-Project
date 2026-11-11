@@ -459,20 +459,30 @@ PanelWindow {
                         delegate: Rectangle {
                             id: nativeActionButton
                             required property var modelData
+                            readonly property bool isClockStop:
+                                notificationCard.clockAlarmActions.length > 0
+                                && modelData.identifier === "stop"
+                            readonly property bool isClockSnooze:
+                                notificationCard.clockAlarmActions.length > 0
+                                && modelData.identifier === "snooze"
+                            readonly property color actionAccent:
+                                isClockStop ? Colors.red
+                                : isClockSnooze ? Colors.yellow : Colors.cyan
 
                             width: Math.min(106, Math.max(60, nativeActionLabel.implicitWidth + 16))
                             height: 25
                             radius: 2
-                            color: nativeActionMouse.containsMouse ? Colors.orange : Colors.black
+                            color: nativeActionMouse.containsMouse ? nativeActionButton.actionAccent : Colors.black
                             border.width: 1
-                            border.color: Colors.cyan
+                            border.color: nativeActionButton.actionAccent
 
                             GohuText {
                                 id: nativeActionLabel
                                 anchors.fill: parent
                                 anchors.margins: 3
                                 text: nativeActionButton.modelData.label
-                                color: nativeActionMouse.containsMouse ? Colors.black : Colors.cyan
+                                color: nativeActionMouse.containsMouse ? Colors.black
+                                    : nativeActionButton.actionAccent
                                 font.pixelSize: 10
                                 elide: Text.ElideRight
                                 horizontalAlignment: Text.AlignHCenter

@@ -222,7 +222,10 @@ Item {
             }
             ActionButton {
                 id: emergencyStop
-                width: 77
+                // This emergency action appears only when something is
+                // ringing, giving the pinned SEARCH input room otherwise.
+                visible: AlarmManagerService.ringingCount > 0
+                width: visible ? 77 : 0
                 height: parent.height
                 label: "STOP ALL"
                 labelPixelSize: 10

@@ -43,7 +43,7 @@ def _identity(value):
     return value
 
 
-def _private_file(path, allow_missing=False):
+def _private_file(path, allow_missing=False, require_private_mode=True):
     try:
         info = path.lstat()
     except FileNotFoundError:
@@ -52,7 +52,8 @@ def _private_file(path, allow_missing=False):
         raise ArchiveError("ARCHIVE_FILE_MISSING")
     _require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1
              and info.st_uid == os.geteuid()
-             and info.st_mode & 0o077 == 0, "ARCHIVE_FILE_UNSAFE")
+             and (not require_private_mode or info.st_mode & 0o077 == 0),
+             "ARCHIVE_FILE_UNSAFE")
 
 
 class ArchiveStore:
@@ -75,7 +76,11 @@ class ArchiveStore:
         self.path = self.root / DB_NAME
         self._check_root()
         _private_file(self.path, allow_missing=True)
-        _private_file(self.root / (DB_NAME + "-journal"), allow_missing=True)
+        # SQLite creates/removes its rollback journal while concurrent writers
+        # run. Keep its owner/type/link checks, but do not race SQLite's
+        # temporary file mode; the parent directory is already private 0700.
+        _private_file(self.root / (DB_NAME + "-journal"), allow_missing=True,
+                      require_private_mode=False)
         created = False
         if not self.path.exists():
             try:
@@ -111,7 +116,11 @@ class ArchiveStore:
     def _connect(self):
         self._check_root()
         _private_file(self.path)
-        _private_file(self.root / (DB_NAME + "-journal"), allow_missing=True)
+        # SQLite creates/removes its rollback journal while concurrent writers
+        # run. Keep its owner/type/link checks, but do not race SQLite's
+        # temporary file mode; the parent directory is already private 0700.
+        _private_file(self.root / (DB_NAME + "-journal"), allow_missing=True,
+                      require_private_mode=False)
         # This store uses rollback journals, not WAL. Refuse unexpected
         # sidecars before SQLite can open them, including dangling symlinks.
         for extension in ("-wal", "-shm"):

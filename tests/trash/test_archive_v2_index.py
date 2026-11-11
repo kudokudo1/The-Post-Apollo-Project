@@ -75,6 +75,77 @@ class ArchiveV2IndexTests(unittest.TestCase):
         self.assertEqual(store.path.read_bytes(), before)
         self.assertEqual(store.path.stat().st_mode, before_mode)
 
+    def test_global_search_across_all_pages_and_owners(self):
+        store = self.make_archive()
+        for i in range(80):
+            label = ("Alpha" if i % 2 == 0 else "Bravo") + f" report {i}"
+            owner = "demo-scrape" if i % 4 else "weather-events"
+            store.save(owner, "file-" + str(i), "rev" + str(i),
+                       b"PRIVATE PAYLOAD", label,
+                       captured_ms=1760000000000 + i)
+        seen, cursor = [], ""
+        while True:
+            result = indexer.index(str(self.root), cursor, "ALPHA")
+            self.assertEqual(result["total"], 40)
+            self.assertEqual(result["query"], "ALPHA")
+            self.assertNotIn("PRIVATE PAYLOAD", json.dumps(result))
+            self.assertLessEqual(len(result["items"]), indexer.PAGE_SIZE)
+            for row in result["items"]:
+                self.assertIn("alpha", row["title"].lower())
+                seen.append(row["id"])
+            if not result["hasMore"]:
+                break
+            cursor = result["nextCursor"]
+        self.assertEqual(len(seen), 40)
+        self.assertEqual(len(set(seen)), 40)
+        research_only = indexer.index(str(self.root), query="demo-scrape")
+        self.assertEqual(research_only["total"], 60)
+        self.assertEqual(len(research_only["items"]), 25)
+        by_id = indexer.index(str(self.root), query="file-79")
+        self.assertEqual(by_id["total"], 1)
+        self.assertEqual(by_id["items"][0]["resourceId"], "file-79")
+
+    def test_search_sql_wildcards_and_injection_are_literal(self):
+        store = self.make_archive()
+        store.save("demo-scrape", "p-a", "r1", b"a", "Budget_100%")
+        store.save("demo-scrape", "p-b", "r2", b"b", "Budget XX 100")
+        underscore = indexer.index(str(self.root), query="_100%")
+        self.assertEqual(underscore["total"], 1)
+        self.assertEqual(underscore["items"][0]["title"], "Budget_100%")
+        percent = indexer.index(str(self.root), query="%")
+        self.assertEqual(percent["total"], 1)
+        query = "' OR 1=1 --"
+        self.assertEqual(indexer.index(str(self.root), query=query)["total"], 0)
+        self.assertEqual(indexer.index(str(self.root), query="nonexistent")["items"], [])
+        self.assertEqual(store.verify()["items"], 2)
+
+    def test_invalid_search_query_fails_closed_without_source(self):
+        for query in (None, 9, [], "x" * (indexer.MAX_QUERY_LENGTH + 1),
+                      "row\\nother".replace("\\n", "\n"), "\x00", "\x1f"):
+            with self.assertRaisesRegex(indexer.ReadIndexError,
+                                        "INVALID_SEARCH_QUERY"):
+                indexer.index(str(self.root), query=query)
+        result = indexer.index(str(self.root), query="no matches")
+        self.assertEqual(result["state"], "NOT_INSTALLED")
+        self.assertEqual(result["query"], "no matches")
+        self.assertFalse((self.root / indexer.DB_NAME).exists())
+
+    def test_search_uses_pinned_read_only_database_state(self):
+        store = self.make_archive()
+        snap = store.save("demo-scrape", "record-1", "rev1", b"DATA", "Search me")
+        before = store.path.read_bytes()
+        out = io.StringIO()
+        with redirect_stdout(out):
+            code = indexer.main(["archive_v2_index.py", "index",
+                                 str(self.root), "", "search"])
+        self.assertEqual(code, 0)
+        result = json.loads(out.getvalue())
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(result["query"], "search")
+        self.assertFalse(result["items"][0]["capabilities"]["burn"])
+        self.assertEqual(store.path.read_bytes(), before)
+        self.assertEqual(store.read_verified(snap["id"]), b"DATA")
+
     def test_weather_owner_is_labeled_as_copy(self):
         store = self.make_archive()
         store.save("weather-events", "event-x", "rev-1", b"synthetic", "Test alert")
@@ -165,6 +236,20 @@ class ArchiveV2IndexTests(unittest.TestCase):
         with self.assertRaisesRegex(indexer.ReadIndexError,
                                     "ARCHIVE_INDEX_UNAVAILABLE"):
             self.index()
+
+    def test_sqlite_transient_journal_mode_is_private_root_scoped(self):
+        store = self.make_archive()
+        journal = self.root / (indexer.DB_NAME + "-journal")
+        journal.write_bytes(b"synthetic")
+        journal.chmod(0o644)
+        self.assertTrue(indexer._private_regular(
+            journal, require_private_mode=False))
+        with self.assertRaisesRegex(indexer.ReadIndexError,
+                                    "ARCHIVE_FILE_UNSAFE"):
+            indexer._private_regular(journal)
+        journal.unlink()
+        self.assertEqual(self.index()["total"], 0)
+        self.assertEqual(store.verify()["items"], 0)
 
     def test_only_read_only_index_cli_action(self):
         for verb in ("burn", "delete", "migrate", "save", "restore"):

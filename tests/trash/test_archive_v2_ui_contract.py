@@ -17,24 +17,35 @@ class V2ArchiveUiContractTests(unittest.TestCase):
                        'id: archiveEntriesList'):
             self.assertIn(marker, QML)
         self.assertIn('archiveRows.concat(researchRows)', QML)
-        self.assertIn('.concat(archiveV2Rows).filter(function(row)', QML)
+        self.assertIn('.concat(archiveV2QueryDirty ? [] : archiveV2Rows)', QML)
 
     def test_v2_is_page_scoped_and_explicitly_read_only(self):
         for marker in ('property var archiveV2Rows: []',
-                       'function refreshArchiveV2(targetPage, cursor)',
+                       'function refreshArchiveV2(targetPage, cursor, query)',
                        'function pageArchiveV2(direction)',
                        'function consumeArchiveV2(raw)',
                        'id: archiveV2Process',
                        'Quickshell.shellPath("scripts/trash/archive_v2_index.py")',
                        'onStreamFinished: trashLauncher.consumeArchiveV2(this.text)',
                        'id: archiveV2PageRail', 'label: "V2 PREV"',
-                       'label: "V2 NEXT"', 'SEARCH CURRENT PAGE ONLY',
+                       'label: "V2 NEXT"', 'MATCHES ACROSS ALL V2',
                        'item.copyOnly !== true',
                        'item.capabilities.burn !== false',
                        'item.capabilities.restore !== false',
-                       'item.capabilities.trash !== false'):
+                       'item.capabilities.trash !== false',
+                       'function pageArchiveV2(direction)',
+                       'archiveV2AppliedQuery',
+                       'archiveV2PendingQuery',
+                       'archiveV2QueryDirty'):
             self.assertIn(marker, QML)
         self.assertIn('row.kind === "V2 SNAPSHOT"', QML)
+        self.assertIn('label: "FIND V2"', QML)
+        self.assertIn('V2 SEARCH NOT APPLIED // PRESS FIND V2', QML)
+        self.assertIn('reply.query !== archiveV2PendingQuery', QML)
+        self.assertIn('String(row.ownerId || "")', QML)
+        self.assertIn('String(row.resourceId || "")', QML)
+        self.assertIn('onAccepted: trashLauncher.refreshArchiveV2(', QML)
+        self.assertIn('!trashLauncher.archiveV2QueryDirty', QML)
         self.assertIn('selected !== "all" && selected !== "copies"', QML)
         # The copy display is only a filtered model. Existing destructive
         # handlers receive the distinct legacy kind and state contracts.
@@ -46,6 +57,9 @@ class V2ArchiveUiContractTests(unittest.TestCase):
         self.assertIn('PRAGMA query_only=ON', INDEX)
         self.assertIn('READ_ONLY_INDEX_ONLY', INDEX)
         self.assertIn('PAGE_SIZE = 25', INDEX)
+        self.assertIn('MAX_QUERY_LENGTH = 80', INDEX)
+        self.assertIn('instr(lower(display_label), ?)', INDEX)
+        self.assertIn('db.execute("BEGIN")', INDEX)
         self.assertIn('NOT_INSTALLED', INDEX)
         self.assertNotIn('def save(', INDEX)
         self.assertNotIn('def burn(', INDEX)

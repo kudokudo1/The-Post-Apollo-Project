@@ -3,6 +3,8 @@ name: TimeW MACHINE cross-resource crash recovery matrix
 on:
   pull_request:
     paths:
+      - "services/time/MachineBraveCrossResourceRecoveryContract.py"
+      - "tests/timew/test_machine_cross_resource_recovery_contract.py"
       - "services/time/MachineBraveFixtureRecoveryJournal.py"
       - "tests/timew/test_machine_fixture_recovery_journal.py"
       - "tests/timew/test_machine_cross_resource_crash_matrix.py"
@@ -21,6 +23,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Root-only CI fixture tests actual Linux UID isolation and 8 process-crash boundaries
         run: sudo -n python3 -B -I tests/timew/test_machine_cross_resource_crash_matrix.py
+      - name: Validate fail-closed cross-resource classifier on eight metadata-only fixtures
+        run: python3 -B -I tests/timew/test_machine_cross_resource_recovery_contract.py
       - name: Rerun independent MACHINE transfer and recovery contract tests
         run: |
           sudo -n python3 -B -I tests/timew/test_machine_protected_destination_rollback.py

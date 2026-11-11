@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT / "tests/timew"))
 
 import MachineBraveOfflineTransferRecoveryContract as contract
 import MachineBraveFixtureRecoveryJournal as journal
+import MachineBraveCrossResourceRecoveryContract as recovery
 import test_machine_protected_destination_rollback as destination
 import MachineBraveSealedVault as vault
 
@@ -258,6 +259,27 @@ def observe(fixture):
     # In ANY incomplete case, do not advance or automatically clean up.
     status = ("synthetic_consistent_but_untrusted"
               if complete_fixture else "manual_reconciliation_required")
+    # Independent pure contract consumes actual parent-process observations
+    # from this disposable root-only fixture. Both a perfect synthetic end
+    # state and an incomplete one must keep all permissions DENIED.
+    artifact = {
+        "stage_file_count": len(temp),
+        "published_links": (
+            [{"record_id": SRC, "nlink": dest.lstat().st_nlink}]
+            if dest.exists() else []),
+    }
+    classification = recovery.classify(
+        fixture["plan"], fixture["before_source"],
+        fixture["before_target"], fixture["before_source"],
+        target_after, ledger_observation, artifact)
+    require(classification["status"] == status)
+    require(classification["automatic_retry_allowed"] is False)
+    require(classification["automatic_cleanup_allowed"] is False)
+    require(classification["delete_original_allowed"] is False)
+    require(classification["migration_authorized"] is False)
+    require(classification["restore_allowed"] is False)
+    require(classification["safe_actions"] == [])
+    require(classification["requires_independent_human_review"] is True)
     return status, ledger_observation, old_contract, dest, temp
 
 

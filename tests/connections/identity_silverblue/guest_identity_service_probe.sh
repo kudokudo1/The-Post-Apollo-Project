@@ -47,9 +47,12 @@ cleanup() {
 }
 trap cleanup EXIT
 fail() {
+  # The old stdout-only fail marker was hidden in the systemd journal.
+  # The host reads only the QEMU serial channel after failure.
+  printf 'C4B_ID_FAIL // IDENTITY_SERVICE_%s\n' "$1" >/dev/ttyS0 || true
   echo "C4B_ID_FAIL // IDENTITY_SERVICE_$1"
   journalctl -b -u "$unit" --no-pager -n 24 2>&1 |
-    sed -E 's/^/C4B_ID_SERVICE_JOURNAL \/\//g' | head -n 24 || true
+    sed -E 's/^/C4B_ID_SERVICE_JOURNAL \/\//g' | head -n 24 >/dev/ttyS0 || true
   exit 2
 }
 
@@ -94,11 +97,30 @@ if [[ "$policy_rc" != 0 ]]; then
   fail "COMPILED_SELINUX_MODULE_LOAD_REFUSED"
 fi
 policy_loaded=1
-semodule -l | grep -Eq '^postapollo_identity_ci([[:space:]]|$)' ||
+# Capture the actual module listing before evaluating the strict expected
+# installed identity module. No broadening of name/version acceptance.
+module_list=/var/tmp/c4b-id-selinux-module-list.log
+list_rc=0
+timeout --signal=TERM --kill-after=3s 25s semodule -l >"$module_list" 2>&1 ||
+  list_rc="$?"
+printf 'C4B_ID_SELINUX_STAGE // module_list_rc=%s\n' "$list_rc" >/dev/ttyS0
+if [[ "$list_rc" != 0 ]]; then
+  sed -n '1,20p' "$module_list" |
+    sed 's/^/C4B_ID_SELINUX_MODULE_DETAIL \/\/ /' >/dev/ttyS0 || true
+  fail "COMPILED_SELINUX_MODULE_LIST_REFUSED"
+fi
+if ! grep -Eq '^postapollo_identity_ci([[:space:]]|$)' "$module_list"; then
+  sed -n '1,20p' "$module_list" |
+    sed 's/^/C4B_ID_SELINUX_MODULE_DETAIL \/\/ /' >/dev/ttyS0 || true
   fail "COMPILED_SELINUX_MODULE_NOT_ACTIVE"
-[[ "$(getenforce)" == Enforcing ]] ||
+fi
+printf 'C4B_ID_SELINUX_STAGE // module_name_verified\n' >/dev/ttyS0
+enforcing_state="$(getenforce)" ||
+  fail "SELINUX_ENFORCING_READ_FAILED"
+printf 'C4B_ID_SELINUX_STAGE // enforcing_state=%.40s\n' "$enforcing_state" >/dev/ttyS0
+[[ "$enforcing_state" == Enforcing ]] ||
   fail "SELINUX_ENFORCING_LOST_AFTER_MODULE_INSTALL"
-echo "C4B_ID_PASS // DEDICATED_TEST_SELINUX_MODULE_LOADED_ENFORCING"
+echo "C4B_ID_PASS // DEDICATED_TEST_SELINUX_MODULE_LOADED_ENFORCING" >/dev/ttyS0
 
 # This fixture requires Fedora's system Python Ed25519 support. Never pip
 # install a mutable dependency into the offline guest or weaken import pins.

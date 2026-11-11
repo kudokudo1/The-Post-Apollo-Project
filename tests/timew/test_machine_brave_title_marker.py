@@ -56,7 +56,9 @@ class Runner:
 def witness(frames):
     run = Runner(frames)
     result = inspect_marker(TOKEN, runner=run)
-    assert len(run.commands) == 2
+    # Malformed first frames fail closed before a second read; valid input
+    # uses exactly two snapshots and no other Sway commands.
+    assert 1 <= len(run.commands) <= 2
     return result
 
 

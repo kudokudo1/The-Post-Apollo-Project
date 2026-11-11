@@ -74,23 +74,59 @@ def peer_credentials(connection):
     return Peer(pid, uid, gid)
 
 
-def _receive_exact(connection, count):
+def _receive_exact(connection, count, *, guard=None):
+    """Read an exact part without resetting the overall request deadline.
+
+    With a guard, every partial recv consumes the SAME monotonic budget,
+    also revalidating the kernel peer lease and Linux session context.
+    Reading the *first* frame may have pending bytes, so the socket's
+    trailing-byte/EOF poll remains a separate post-frame guard check.
+    """
     pieces = []
     while count:
-        part = connection.recv(count)
+        if guard is not None:
+            if not guard.receiving_valid():
+                refuse()
+            remaining = guard.remaining_ns()
+            if remaining <= 0:
+                refuse()
+            connection.settimeout(remaining / 1_000_000_000)
+        try:
+            part = connection.recv(count)
+        except (TimeoutError, socket.timeout):
+            if guard is not None:
+                guard.cancel()
+            refuse()
         if not part:
+            if guard is not None:
+                guard.cancel()
             refuse()
         pieces.append(part)
         count -= len(part)
+        if guard is not None and not guard.receiving_valid():
+            refuse()
     return b"".join(pieces)
 
 
-def read_frame(connection):
-    size = struct.unpack("=I", _receive_exact(connection, 4))[0]
-    if not 1 <= size <= MAX_REQUEST:
-        refuse()
-    raw = _receive_exact(connection, size)
-    return raw, parse_request(raw)
+def read_frame(connection, *, guard=None):
+    """One bounded native request, with optional absolute in-flight budget."""
+    previous_timeout = connection.gettimeout() if guard is not None else None
+    try:
+        size = struct.unpack("=I", _receive_exact(connection, 4, guard=guard))[0]
+        if not 1 <= size <= MAX_REQUEST:
+            refuse()
+        raw = _receive_exact(connection, size, guard=guard)
+        if guard is not None and not guard.receiving_valid():
+            refuse()
+        return raw, parse_request(raw)
+    finally:
+        if guard is not None:
+            # The caller owns the socket; restore its original timeout for
+            # the fixed refusal reply, even when a partial read times out.
+            try:
+                connection.settimeout(previous_timeout)
+            except OSError:
+                guard.cancel()
 
 
 def parse_request(raw):
@@ -213,7 +249,7 @@ def handle_once(connection, *, protected_root):
             # No positive rights even if it stays unchanged.
             guard = cancellation.begin(connection, lease)
             try:
-                raw, request = read_frame(connection)
+                raw, request = read_frame(connection, guard=guard)
                 if not guard.valid() or peer_credentials(connection) != initial:
                     refuse()
                 intent = admission.bind_request(

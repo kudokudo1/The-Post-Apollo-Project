@@ -92,7 +92,7 @@ for(const src of [open,marker]){
 }
 assert.deepEqual(manifest.permissions,[]);
 assert.deepEqual(manifest.host_permissions,[]);
-assert.deepEqual(manifest.optional_permissions,["nativeMessaging"]);
+assert.deepEqual(manifest.optional_permissions, ["nativeMessaging","tabs"]);
 assert.equal(manifest.incognito,"not_allowed");
 assert.equal(Object.hasOwn(manifest,"background"),false);
 

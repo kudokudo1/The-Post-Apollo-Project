@@ -56,7 +56,7 @@ assert "MachineBraveFocusWitness" not in legacy
 pilot_manifest = json.loads(pilot)
 assert pilot_manifest["permissions"] == []
 assert pilot_manifest["host_permissions"] == []
-assert pilot_manifest["optional_permissions"] == ["nativeMessaging"]
+assert pilot_manifest["optional_permissions"] == ["nativeMessaging", "tabs"]
 assert pilot_manifest["incognito"] == "not_allowed"
 assert "SCHEMA_VERSION = 1" in legacy
 assert qml.count("Process {") == 15

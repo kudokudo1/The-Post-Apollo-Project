@@ -12,12 +12,14 @@ let doc=policy.initialDocument();
 assert.deepEqual(JSON.parse(JSON.stringify(doc)),{version:1,devices:[]});
 for (const n of [0.25,0.5,1,1.25,1.5,2,3,4,5,6])
     assert.equal(policy.validFactor(n),true);
-for (const n of [-1,0,0.1,1.1,NaN,Infinity,100,"2"])
+for (const n of [-1,0,0.1,NaN,Infinity,100,"2"])
     assert.equal(policy.validFactor(n),false);
 doc=policy.withFactor(doc,"1234:5678:Mouse",2).document;
 assert.equal(policy.get(doc,"1234:5678:Mouse"),2);
 doc=policy.withFactor(doc,"1234:5678:Mouse",1).document;
 assert.equal(policy.get(doc,"1234:5678:Mouse"),1);
+doc=policy.withFactor(doc,"1234:5678:Mouse",1.337).document;
+assert.equal(policy.get(doc,"1234:5678:Mouse"),1.337);
 assert.equal(doc.devices.length,1);
 assert.equal(policy.withFactor(doc,"type:pointer;reload",2).ok,false);
 assert.equal(policy.parse(JSON.stringify(doc)).ok,true);

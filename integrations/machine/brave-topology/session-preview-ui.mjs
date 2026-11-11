@@ -170,7 +170,11 @@ window.addEventListener("pagehide", () => {
 window.addEventListener("blur", () => {
   epoch++;
   clearPreview();
-  // No active network operation can resume rendering after focus changed.
-  if (!closed) status.textContent = "PREVIEW CLEARED ON FOCUS LOSS";
+  // Invalidate any in-flight permission/preview response, but leave the
+  // popup controls usable should Brave keep the popup open after a prompt.
+  if (!closed) {
+    setBusy(false);
+    status.textContent = "PREVIEW CLEARED ON FOCUS LOSS";
+  }
 });
 refreshPermission();

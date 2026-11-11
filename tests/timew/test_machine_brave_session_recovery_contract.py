@@ -17,7 +17,7 @@ assert manifest["permissions"] == []
 assert manifest["optional_permissions"] == ["nativeMessaging", "tabs"]
 assert manifest["host_permissions"] == []
 assert manifest["incognito"] == "not_allowed"
-assert manifest["version"] == "0.4.0"
+assert manifest["version"] == "0.5.0"
 
 # The pure model is intentionally not imported from live browser/TimeW code.
 assert "session-recovery-plan" not in popup

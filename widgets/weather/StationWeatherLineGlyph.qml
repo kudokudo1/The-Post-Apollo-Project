@@ -64,7 +64,8 @@ Item {
         onPaint: {
             const c=getContext("2d");
             const w=Math.max(1,width), h=Math.max(1,height);
-            c.reset();
+            c.clearRect(0,0,w,h);
+            c.save();
             c.scale(w/100,h/100);
             c.lineWidth=3.6;
             c.lineCap="round";
@@ -149,6 +150,7 @@ Item {
                 else if(glyph.stormy) strokeStorm();
                 else if(glyph.foggy) strokeFog();
             }
+            c.restore();
         }
     }
     onModeChanged: drawing.requestPaint()

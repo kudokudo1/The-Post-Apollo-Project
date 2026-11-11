@@ -455,16 +455,31 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             'SELINUX_DOMAIN_ALLOWED_INET_SOCKET_CREATE'
         ):
             self.assertIn(needle, program)
-        self.assertIn('systemd-run --wait --pipe --collect', probe)
-        self.assertIn('"$launcher" -I -B "$denial"', probe)
         self.assertIn('REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE', host)
         self.assertIn('DEDICATED_SELINUX_MODULE_REMOVED_AFTER_SERVICE_STOP', host)
-        # A deny-only proof cannot rely on another OS sandbox blocking sockets.
-        transient = probe.split('systemd-run --wait --pipe --collect', 1)[1].split(
-            ' >"$negative_log"', 1)[0]
-        self.assertNotIn('RestrictAddressFamilies', transient)
-        self.assertNotIn('PrivateNetwork', transient)
-        self.assertNotIn('NetworkNamespace', transient)
+        self.assertNotIn('systemd-run --wait --pipe --collect \\\n', probe)
+        self.assertIn('negative_unit_file="/run/systemd/system/$negative_unit"', probe)
+        self.assertIn('Type=oneshot', probe)
+        self.assertIn('NoNewPrivileges=true', probe)
+        self.assertIn('StandardOutput=journal', probe)
+        self.assertIn('StandardError=journal', probe)
+        self.assertIn('journalctl -b -u "$negative_unit"', probe)
+        self.assertIn('systemctl start "$negative_unit"', probe)
+        self.assertIn('systemctl stop "$negative_unit"', probe)
+        self.assertIn('negative_result="$(systemctl show "$negative_unit" --property=Result --value)"', probe)
+        self.assertIn('"$negative_result" == success', probe)
+        self.assertIn('"$(grep -Fc \'C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE\' "$negative_journal")" == 1', probe)
+        self.assertIn('! grep -Fq \'C4B_ID_FAIL //\' "$negative_journal"', probe)
+        self.assertIn('[[ ! -e "$base" && ! -e "$dropindir" && ! -e "$negative_unit_file" ]]', probe)
+        # A deny-only proof cannot rely on any other network sandbox.
+        transient = probe.split("cat >\"$negative_unit_file\" <<'CI_ID_NEGATIVE_UNIT'\n", 1)[1].split(
+            "\nCI_ID_NEGATIVE_UNIT", 1)[0]
+        for forbidden in (
+            'RestrictAddressFamilies', 'PrivateNetwork', 'NetworkNamespace',
+            'SystemCallFilter', 'SocketBindAllow', 'IPAddressDeny'
+        ):
+            self.assertNotIn(forbidden, transient)
+        self.assertIn('ExecStart=/run/postapollo-identity-silverblue-ci-only/ci-python3', transient)
 
 
     def test_15_real_selinux_policy_load_is_bounded_and_diagnostic(self):

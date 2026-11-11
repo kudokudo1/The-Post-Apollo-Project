@@ -127,6 +127,16 @@ Scope {
             feedback = "INVALID RESUME DATE";
             return false;
         }
+        const a = findAlarm(id);
+        if (!a) return false;
+        if (resumeDate !== "" && resumeDate <= Policy.dayKey(Date.now())) {
+            feedback = "RESUME DATE MUST BE IN THE FUTURE";
+            return false;
+        }
+        if (resumeDate !== "" && a.mode === "once" && a.date < resumeDate) {
+            feedback = "ONE-TIME ALARM WOULD EXPIRE BEFORE RESUME";
+            return false;
+        }
         return saveAlarm(id, {pausedUntilDate: resumeDate});
     }
     function removeAlarm(id) {

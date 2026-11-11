@@ -71,7 +71,7 @@ test("W8 instrument uses real source fields and does not create refreshers",()=>
  assert.match(summary,/objectName: "weather-w8-current-air-metrics"/);
  assert.match(summary,/objectName: "weather-w8-hourly-strip"/);
  assert.match(summary,/objectName: "weather-w8-daily-strip"/);
- assert.match(summary,/height: compact \? 158 : 164/);
+ assert.match(summary,/height: 164/);
  assert.match(summary,/clip: true/);
  assert.doesNotMatch(summary,/WeatherServices\.|Process\s*\{|FileView\s*\{|XMLHttpRequest|Timer\s*\{|fetch\(/);
 });

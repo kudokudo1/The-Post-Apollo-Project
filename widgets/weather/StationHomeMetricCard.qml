@@ -43,12 +43,12 @@ Rectangle {
         id: standardCardContents
         visible: !card.servicesCompact
         anchors.fill: parent
-        anchors.margins: card.overviewDense ? 2 : (card.compact ? 4 : 10)
+        anchors.margins: card.overviewDense ? 1 : (card.compact ? 4 : 10)
         spacing: card.overviewDense ? 0 : (card.compact ? 1 : 5)
 
         GohuText {
             text: card.title
-            font.pixelSize: card.compact ? 9 : 10
+            font.pixelSize: card.overviewDense ? 8 : (card.compact ? 9 : 10)
             color: card.accentColor
             width: parent.width - (card.pinEnabled ? 32 : 0)
             elide: Text.ElideRight
@@ -56,7 +56,7 @@ Rectangle {
 
         GohuText {
             text: card.valueText
-            font.pixelSize: card.compact ? 15 : 20
+            font.pixelSize: card.overviewDense ? 13 : (card.compact ? 15 : 20)
             color: card.valueColor
             elide: Text.ElideRight
             width: parent.width
@@ -64,7 +64,7 @@ Rectangle {
 
         QuietText {
             text: card.detailText
-            font.pixelSize: card.compact ? 8 : 10
+            font.pixelSize: card.overviewDense ? 7 : (card.compact ? 8 : 10)
             elide: Text.ElideRight
             width: parent.width
             visible: text.length > 0
@@ -91,7 +91,7 @@ Rectangle {
 
         QuietText {
             text: card.footerText
-            font.pixelSize: card.compact ? 8 : 9
+            font.pixelSize: card.overviewDense ? 7 : (card.compact ? 8 : 9)
             elide: Text.ElideRight
             width: parent.width
             visible: text.length > 0

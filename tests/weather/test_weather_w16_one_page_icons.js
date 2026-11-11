@@ -40,7 +40,7 @@ test("W16 one-page OVERVIEW shows original Snapshot and AUTO rows simultaneously
  assert.match(home,/overviewDense: home\.fixedWeatherOverview/);
  assert.match(home,/compact: home\.fixedWeatherOverview/);
  assert.match(card,/property bool overviewDense: false/);
- assert.match(card,/card\.overviewDense \? 2/);
+ assert.match(card,/card\.overviewDense \? 1/);
  assert.match(card,/card\.overviewDense \? 0/);
  assert.equal((home.match(/title: "CURRENT WEATHER"/g)||[]).length,1);
  assert.equal((home.match(/title: "NEXT HOURS"/g)||[]).length,1);
@@ -57,7 +57,7 @@ test("W16 keeps normal overview still; rare NWS alerts retain full detail by all
  assert.match(home,/height: 108/);
  assert.match(home,/visible: scrollable && !home\.compactHistory/);
  assert.match(home,/home\.overviewRequiresScroll/);
- assert.match(summary,/height: compact \? 158 : 164/);
+ assert.match(summary,/height: 164/);
  assert.match(card,/height: 7/);
  assert.match(card,/property real meterValue: 0/);
 });

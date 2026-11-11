@@ -1030,9 +1030,10 @@ Rectangle {
             objectName: "weather-w8-overview-terminal-summary"
             visible: home.subjectRoute === "weather/overview"
             width: parent.width
-            height: visible ? 158 : 0
+            height: visible ? 164 : 0
             compact: true
             weatherService: home.weatherService
+            runtimeNowMs: home.runtimeNowMs
         }
 
         StationSectionDivider {

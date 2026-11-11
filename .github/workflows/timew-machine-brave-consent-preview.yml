@@ -1,0 +1,47 @@
+name: TimeW MACHINE optional Brave tab consent preview
+
+on:
+  pull_request:
+    paths:
+      - "integrations/machine/brave-topology/manifest.json"
+      - "integrations/machine/brave-topology/popup.html"
+      - "integrations/machine/brave-topology/popup.css"
+      - "integrations/machine/brave-topology/session-preview-ui.mjs"
+      - "tests/timew/test_machine_brave_consent_preview.mjs"
+      - "tests/timew/test_machine_brave_topology_contract.py"
+      - "tests/timew/test_machine_brave_tab_pattern_contract.py"
+      - "tests/timew/test_machine_brave_title_marker.mjs"
+      - "tests/timew/test_machine_brave_native_probe_contract.py"
+      - "tests/timew/test_machine_brave_native_focus_observe.mjs"
+      - "tests/timew/test_machine_brave_session_recovery_contract.py"
+      - "docs/timew-machine-brave-consent-preview.md"
+      - ".github/workflows/timew-machine-brave-consent-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  opt-in-preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Simulate grant, deny, one-window URL-redacted preview, revoke and focus race
+        run: node tests/timew/test_machine_brave_consent_preview.mjs
+      - name: Validate synthetic session recovery data gate
+        run: |
+          node tests/timew/test_machine_brave_session_recovery_plan.mjs
+          python3 -B -I tests/timew/test_machine_brave_session_recovery_contract.py
+      - name: Preserve original inventory and colored tab count contracts
+        run: |
+          node tests/timew/test_machine_brave_topology.mjs
+          python3 -B -I tests/timew/test_machine_brave_topology_contract.py
+          python3 -B -I tests/timew/test_machine_brave_tab_pattern_contract.py
+      - name: Preserve independent native consent and title-marker host boundaries
+        run: |
+          node tests/timew/test_machine_brave_native_focus_observe.mjs
+          node tests/timew/test_machine_brave_title_marker.mjs
+          python3 -B -I tests/timew/test_machine_brave_native_probe_contract.py
+          node tests/timew/test_machine_brave_marker_lifecycle.mjs
+          node tests/timew/test_machine_brave_marker_lifecycle_ui.mjs

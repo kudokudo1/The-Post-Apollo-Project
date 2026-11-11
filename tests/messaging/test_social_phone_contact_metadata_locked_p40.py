@@ -43,6 +43,7 @@ class LockedContactMetadataTests(unittest.TestCase):
         self.assertIn('label: "EDIT"', header)
         self.assertIn("width: Math.max(0, contactHeader.width - 84)", header)
         self.assertIn("interactive: false", header)
+        self.assertIn("available: false", header)
         self.assertIn("accentColor: Colors.orange", header)
 
     def test_call_message_facetime_email_are_four_actions(self):
@@ -54,6 +55,7 @@ class LockedContactMetadataTests(unittest.TestCase):
         self.assertIn("onTriggered: detail.messageRequested()", row)
         self.assertIn("interactive: false // No BlueFerry FaceTime transport.", row)
         self.assertIn("interactive: false // Email routing not connected.", row)
+        self.assertIn("available: false", row)
         self.assertIn("EMAIL remains unavailable", self.detail)
 
     def test_favorite_star_has_magenta_color_and_no_fake_toggle(self):
@@ -62,6 +64,7 @@ class LockedContactMetadataTests(unittest.TestCase):
         self.assertIn('label: "☆ FAVORITE"', favorite)
         self.assertIn("accentColor: Colors.magenta", favorite)
         self.assertIn("interactive: detail.personalMetadataWritable", favorite)
+        self.assertIn("available: detail.personalMetadataWritable", favorite)
         self.assertIn("detail.contact !== null", favorite)
         self.assertIn("NOT SAVED // UNAVAILABLE", favorite)
         self.assertIn("detail.personalMetadataStatus", favorite)
@@ -83,6 +86,7 @@ class LockedContactMetadataTests(unittest.TestCase):
             "The iPhone contact provider stays READ ONLY",
         ):
             self.assertIn(value, notes)
+        self.assertEqual(notes.count("available: false"), 2)
         self.assertNotIn("onTriggered:", notes)
         self.assertNotIn("TextInput {", notes)
         self.assertNotIn("TextEdit {", notes)

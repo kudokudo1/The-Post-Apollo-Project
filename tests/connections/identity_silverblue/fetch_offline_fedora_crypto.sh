@@ -29,32 +29,67 @@ curl --fail --location --retry 2 --connect-timeout 20 --max-time 240 \
 [[ -z "$(rpm -qp --scripts "$rpmfile")" &&
    -z "$(rpm -qp --triggers "$rpmfile")" ]] ||
   { echo "C4B_ID_BLOCKED // FEDORA_RUNTIME_HAS_UNEXPECTED_SCRIPTLETS"; exit 2; }
+
+# Fedora's cryptography runtime requires python3.14dist(cffi) >= 2.
+# Fedora 44 cffi in turn requires python3.14dist(pycparser). Keep this
+# explicit dependency closure signed, exact-versioned and offline.
+for dependency in \
+  'python3-cffi|2.0.0|3.fc44|x86_64' \
+  'python3-pycparser|2.22|8.fc44|noarch'; do
+  IFS='|' read -r name version release arch <<< "$dependency"
+  filename="$name-$version-$release.$arch.rpm"
+  depfile="$work/$filename"
+  url="https://download.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/os/Packages/p/$filename"
+  curl --fail --location --retry 2 --connect-timeout 20 --max-time 240 \
+    "$url" -o "$depfile" ||
+    { echo "C4B_ID_BLOCKED // SIGNED_FEDORA_DEPENDENCY_DOWNLOAD_REFUSED_$name"; exit 2; }
+  [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$depfile")" == \
+     "$name $version $release $arch" ]] ||
+    { echo "C4B_ID_BLOCKED // FEDORA_DEPENDENCY_ROLE_MISMATCH_$name"; exit 2; }
+  [[ -z "$(rpm -qp --scripts "$depfile")" &&
+     -z "$(rpm -qp --triggers "$depfile")" ]] ||
+    { echo "C4B_ID_BLOCKED // FEDORA_DEPENDENCY_HAS_AUTOEXEC_$name"; exit 2; }
+done
 db="$work/rpmdb"
 mkdir -m 0700 "$db"
 rpm --dbpath "$db" --initdb
-pretrust="$(rpmkeys --dbpath "$db" --checksig -v "$rpmfile" 2>&1 || true)"
-printf '%s\n' "$pretrust" | grep -Eiq 'NOKEY|NOTTRUSTED|MISSING' ||
-  { echo "C4B_ID_BLOCKED // FEDORA_SIGNER_PRETRUST_REFUSAL_MISSING"; exit 2; }
+for candidate in \
+    "$rpmfile" \
+    "$work/python3-cffi-2.0.0-3.fc44.x86_64.rpm" \
+    "$work/python3-pycparser-2.22-8.fc44.noarch.rpm"; do
+  pretrust="$(rpmkeys --dbpath "$db" --checksig -v "$candidate" 2>&1 || true)"
+  printf '%s\n' "$pretrust" | grep -Eiq 'NOKEY|NOTTRUSTED|MISSING' ||
+    { echo "C4B_ID_BLOCKED // FEDORA_SIGNER_PRETRUST_REFUSAL_MISSING"; exit 2; }
+done
 rpmkeys --dbpath "$db" --import "$key"
-posttrust="$(rpmkeys --dbpath "$db" --checksig -v "$rpmfile" 2>&1)" ||
-  { echo "C4B_ID_BLOCKED // FEDORA_SIGNED_RUNTIME_INVALID"; exit 2; }
-printf '%s\n' "$posttrust" | grep -Eiq 'Signature.*OK|RSA.*OK|PGP.*OK|Header.*OK' ||
-  { echo "C4B_ID_BLOCKED // FEDORA_RUNTIME_SIGNATURE_NOT_CONFIRMED"; exit 2; }
-if printf '%s\n' "$posttrust" | grep -Eiq 'NOKEY|NOTTRUSTED|NOT OK|MISSING|BAD'; then
-  echo "C4B_ID_BLOCKED // FEDORA_RUNTIME_SIGNATURE_NOT_TRUSTED"
-  exit 2
-fi
+for candidate in \
+    "$rpmfile" \
+    "$work/python3-cffi-2.0.0-3.fc44.x86_64.rpm" \
+    "$work/python3-pycparser-2.22-8.fc44.noarch.rpm"; do
+  posttrust="$(rpmkeys --dbpath "$db" --checksig -v "$candidate" 2>&1)" ||
+    { echo "C4B_ID_BLOCKED // FEDORA_SIGNED_RUNTIME_INVALID"; exit 2; }
+  printf '%s\n' "$posttrust" | grep -Eiq 'Signature.*OK|RSA.*OK|PGP.*OK|Header.*OK' ||
+    { echo "C4B_ID_BLOCKED // FEDORA_RUNTIME_SIGNATURE_NOT_CONFIRMED"; exit 2; }
+  if printf '%s\n' "$posttrust" | grep -Eiq 'NOKEY|NOTTRUSTED|NOT OK|MISSING|BAD'; then
+    echo "C4B_ID_BLOCKED // FEDORA_RUNTIME_SIGNATURE_NOT_TRUSTED"
+    exit 2
+  fi
+done
 [[ "$(find /out -maxdepth 1 -type f | wc -l)" == 0 ]] ||
   { echo "C4B_ID_BLOCKED // FEDORA_RUNTIME_OUTPUT_ALREADY_EXISTS"; exit 2; }
 install -m 0644 "$rpmfile" /out/identity-python3-cryptography-f44.rpm
+install -m 0644 "$work/python3-cffi-2.0.0-3.fc44.x86_64.rpm" /out/identity-python3-cffi-f44.rpm
+install -m 0644 "$work/python3-pycparser-2.22-8.fc44.noarch.rpm" /out/identity-python3-pycparser-f44.rpm
 install -m 0644 "$key" /out/identity-fedora44-runtime-public.asc
 (
   cd /out
   sha256sum identity-python3-cryptography-f44.rpm \
+    identity-python3-cffi-f44.rpm \
+    identity-python3-pycparser-f44.rpm \
     identity-fedora44-runtime-public.asc > identity-fedora44-runtime-manifest.sha256
 )
 chmod 0644 /out/identity-fedora44-runtime-manifest.sha256
-[[ "$(find /out -maxdepth 1 -type f | wc -l)" == 3 ]] ||
+[[ "$(find /out -maxdepth 1 -type f | wc -l)" == 5 ]] ||
   { echo "C4B_ID_BLOCKED // FEDORA_RUNTIME_OUTPUT_ROSTER_UNEXPECTED"; exit 2; }
 echo "C4B_ID_PASS // OFFICIAL_FEDORA44_ED25519_RUNTIME_RPM_INDEPENDENTLY_SIGNED_AND_PINNED"
 echo "C4B_ID_LIMITATION // DISPOSABLE_OFFLINE_TEST_DEPENDENCY_NOT_PRODUCTION_ADMISSION"

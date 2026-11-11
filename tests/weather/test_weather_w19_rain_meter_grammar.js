@@ -43,7 +43,7 @@ test("W19 current-condition meters are thicker and optically raised",()=>{
 });
 test("W19 emphasizes NOW without changing original glyph family or lower cards",()=>{
  assert.match(weather,/width: Math.max\(86,Math.min\(180,currentPanel.height\+8,/);
- assert.match(overview,/width: Math.min\(108,47 \+ panel.expansion \* 0.34,/);
+ assert.match(overview,/width: Math.min\(122,47 \+ panel.expansion \* 0.39,/);
  for(const f of [overview,weather]) {
    assert.match(f,/WeatherCelestialGlyph\s*\{/);
    assert.doesNotMatch(f,/Process\s*\{|FileView\s*\{|XMLHttpRequest|fetch\s*\(/);

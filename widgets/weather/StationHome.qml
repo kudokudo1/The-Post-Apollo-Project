@@ -922,9 +922,33 @@ Rectangle {
 
     color: Colors.black
 
+    // W6 // Final HOME SERVICES uses the same fixed terminal dashboard.
+    // The original HOME content stays intact for other workspaces and CLASSIC.
+    // The six source-health cards retain their original title/state/details.
+    StationServicesConsole {
+        id: homeServices
+        objectName: "home-w6-services-console"
+        anchors.fill: parent
+        visible: home.sourcesWorkspace
+        familyLabel: "HOME"
+        statusScope: "HOME // CORE SOURCES"
+        runtimeRows: home.runtimeRows
+        homeCards: true
+        customCards: home.sourceHealthRows.map(function(row) {
+            return {
+                label: row.title,
+                value: row.state,
+                detail: row.detail,
+                footer: row.footer,
+                color: home.healthAccent(row.accent)
+            };
+        })
+    }
+
     Flickable {
         id: homeScroll
         objectName: "home-w3-content-scroll"
+        visible: !home.sourcesWorkspace
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds

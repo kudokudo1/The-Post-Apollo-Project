@@ -545,6 +545,14 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         )
         self.assertIn('C4B_ID_(PASS|FAIL|STAGE|BLOCKED', host)
         self.assertIn('SELINUX_OBSERVED|SELINUX_STAGE', host)
+        for marker in (
+            'C4B_ID_PASS\\ //*) echo "$line" >/dev/ttyS0 ;;',
+            'C4B_ID_SERVICE_PROBE_RC // $probe_rc" >/dev/ttyS0',
+            'C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE" >/dev/ttyS0',
+            'C4B_ID_PASS // DEDICATED_SELINUX_MODULE_REMOVED_AFTER_SERVICE_STOP" >/dev/ttyS0',
+            'C4B_ID_PASS // REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP" >/dev/ttyS0',
+        ):
+            self.assertIn(marker, probe)
         # An observed label must precede the unchanged full-domain comparison.
         self.assertLess(probe.index('printf \'C4B_ID_SELINUX_OBSERVED'),
                         probe.index("system_u:system_r:postapollo_identity_ci_t:s0' &&"))

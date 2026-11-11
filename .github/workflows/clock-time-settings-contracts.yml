@@ -19,6 +19,7 @@ on:
       - "tests/time/test_clock_settings_submodes_contract.py"
       - "tests/time/test_clock_settings_compact_contract.py"
       - "tests/time/test_clock_auto_event_triggers_contract.py"
+      - "tests/time/test_clock_auto_check_dedup_contract.py"
       - "shell.qml"
       - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
@@ -40,6 +41,7 @@ on:
       - "tests/time/test_clock_settings_submodes_contract.py"
       - "tests/time/test_clock_settings_compact_contract.py"
       - "tests/time/test_clock_auto_event_triggers_contract.py"
+      - "tests/time/test_clock_auto_check_dedup_contract.py"
       - "shell.qml"
       - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
@@ -57,6 +59,7 @@ jobs:
           python3 -m unittest discover -s tests/time -p 'test_clock_settings_submodes_contract.py' -v
           python3 -m unittest discover -s tests/time -p 'test_clock_settings_compact_contract.py' -v
           python3 -m unittest discover -s tests/time -p 'test_clock_auto_event_triggers_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_auto_check_dedup_contract.py' -v
       - name: Check bounded visual calibration policy
         run: |
           node <<'JS'
@@ -134,4 +137,34 @@ jobs:
           assert.equal(p.parse(JSON.stringify({...legacy, checkOnReload: "on"})).ok, false);
           assert.equal(p.withTrigger(legacy, "unknown", true).ok, false);
           assert.equal(p.withTrigger(legacy, "checkOnReload", "yes").ok, false);
+          // A completed automatic or manual attempt quiets ALL automatic
+          // triggers, including failures. Explicit CHECK TIME remains manual.
+          const t = 1_700_000_000_000;
+          const hourly = p.withSchedule(first, true, 1).document;
+          assert.equal(p.MIN_AUTOMATIC_GAP_MS, 15*60*1000);
+          assert.equal(p.canStartAutomaticCheck(hourly, "reload", t, 0, 0), true);
+          assert.equal(p.canStartAutomaticCheck(hourly, "clock-open", t, 0, 0), true);
+          const afterReload = p.withAttempt(hourly, t).document;
+          for (const reason of ["reload", "clock-open", "interval"]) {
+            assert.equal(p.canStartAutomaticCheck(afterReload, reason, t+1, t, 0), false);
+            assert.equal(p.canStartAutomaticCheck(afterReload, reason, t+14*60*1000, 0, 0), false);
+          }
+          assert.equal(p.canStartAutomaticCheck(afterReload, "clock-open", t+15*60*1000, 0, 0), true);
+          assert.equal(p.canStartAutomaticCheck(afterReload, "interval", t+15*60*1000, 0, 0), false);
+          assert.equal(p.canStartAutomaticCheck(afterReload, "interval", t+60*60*1000, 0, 0), true);
+          // Even with no auto attempt, a recent manual CHECK TIME suppresses
+          // an immediate Clock-open, reload or scheduled duplicate.
+          assert.equal(p.canStartAutomaticCheck(hourly, "clock-open", t, 0, t-60*1000), false);
+          assert.equal(p.canStartAutomaticCheck(hourly, "reload", t, 0, t-60*1000), false);
+          assert.equal(p.canStartAutomaticCheck(hourly, "interval", t, 0, t-60*1000), false);
+          assert.equal(p.canStartAutomaticCheck(hourly, "clock-open", t, 0, t-15*60*1000), true);
+          // Restart uses the saved attempt time even when no in-memory offset
+          // is available. Failure does not wipe the durable cooldown.
+          assert.equal(p.canStartAutomaticCheck(afterReload, "reload", t+1000, 0, 0), false);
+          assert.equal(p.canStartAutomaticCheck(afterReload, "clock-open", t+1000, 0, 0), false);
+          assert.equal(p.canStartAutomaticCheck(hourly, "clock-open", t, t-1000, 0), false);
+          assert.equal(p.canStartAutomaticCheck(p.withSchedule(afterReload, false, 1).document,
+                                               "clock-open", t+2*60*60*1000, 0, 0), false);
+          assert.equal(p.canStartAutomaticCheck(afterReload, "invalid", t+2*60*60*1000, 0, 0), false);
+          assert.equal(p.canStartAutomaticCheck(hourly, "clock-open", NaN, 0, 0), false);
           JS

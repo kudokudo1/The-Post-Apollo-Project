@@ -27,7 +27,8 @@ class ClockAutoReferenceContracts(unittest.TestCase):
         schedule = SERVICE.split("function maybeAutoCheckTime(trigger) {", 1)[1].split(
             "function completeAutoReferenceIfReady()", 1
         )[0]
-        self.assertIn("AutoCheck.isDue(", schedule)
+        self.assertIn("AutoCheck.canStartAutomaticCheck(", schedule)
+        self.assertIn("referenceLastAttemptAtMs", schedule)
         self.assertIn("checkTimeAccuracy()", schedule)
         self.assertIn("autoLastStartedAtMs = now", schedule)
         self.assertNotIn("requestResync(", schedule)
@@ -135,7 +136,8 @@ class ClockAutoReferenceContracts(unittest.TestCase):
         self.assertIn('"AUTO CHECK ON" : "AUTO CHECK OFF"', PANE)
         self.assertIn("One-shot RESYNC still requires confirmation and Polkit.", PANE)
         self.assertIn("They may see your IP.", PANE)
-        self.assertIn("OUT OF SYNC // CONFIRM RESYNC MANUALLY", SERVICE)
+        self.assertIn("OUT OF SYNC // OFFSET ", SERVICE)
+        self.assertIn("UNCERTAINTY ", SERVICE)
 
 
 if __name__ == "__main__":

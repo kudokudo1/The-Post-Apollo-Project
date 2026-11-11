@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Post-Apollo MACHINE // Brave Window Inventory (Read-Only Pilot)",
-  "version": "0.3.1",
-  "description": "Normal Brave counts and opt-in temporary title-marker checks, with in-memory expiry on focus loss. No URLs, persistent identity or restore.",
+  "version": "0.4.0",
+  "description": "Read-only Brave inventory and explicit current-window tab eligibility preview; no tab addresses saved, no background capture or restore.",
   "minimum_chrome_version": "110",
   "incognito": "not_allowed",
   "permissions": [],
@@ -12,6 +12,7 @@
     "default_popup": "popup.html"
   },
   "optional_permissions": [
-    "nativeMessaging"
+    "nativeMessaging",
+    "tabs"
   ]
 }

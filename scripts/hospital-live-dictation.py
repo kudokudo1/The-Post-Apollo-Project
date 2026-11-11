@@ -263,7 +263,6 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
         # The follow-up trial restores incremental text while retaining a
         # ceiling on total model launches, capture duration and queue depth.
         live_chunk_ceiling = max(0, min(8, int(pilot_live_chunks)))
-        pilot = pilot_one_chunk or live_chunk_ceiling > 0
         limit = RATE * FRAME_BYTES * (
             6 if pilot_one_chunk else 25 if live_chunk_ceiling else MAX_SECONDS)
         heard_speech = False
@@ -341,10 +340,15 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                     halt_child()
                     break
         finally:
-            # Short spoken endings used to disappear (<1s was discarded).
-            # Gate on speech first, then pad a final subsecond clip to 1s so
-            # Whisper can recognize it after an explicit STOP.
-            if not pilot and not cancelled.is_set() and is_speech(bytes(pending)):
+            # Short spoken endings must not disappear when the operator
+            # presses STOP before the next 1.4/2s chunk threshold.
+            # Preserve the one-chunk legacy pilot's strict no-tail behavior.
+            # Bounded streaming may consume its *remaining* model budget.
+            if (not pilot_one_chunk
+                    and (not live_chunk_ceiling
+                         or accepted_chunks < live_chunk_ceiling)
+                    and not cancelled.is_set()
+                    and is_speech(bytes(pending))):
                 tail = bytes(pending)
                 minimum = RATE * FRAME_BYTES * MIN_TAIL_SECONDS
                 if len(tail) < minimum:

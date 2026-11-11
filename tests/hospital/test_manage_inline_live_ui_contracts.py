@@ -224,7 +224,8 @@ check('parser.add_argument("--pilot-one-chunk"' in script
       and 'pilot_live_chunks=args.pilot_live_chunks' in script
       and 'live_chunk_ceiling = max(0, min(8, int(pilot_live_chunks)))' in script
       and 'if live_chunk_ceiling and accepted_chunks >= live_chunk_ceiling:' in script
-      and 'if not pilot and not cancelled.is_set()' in script,
+      and 'accepted_chunks < live_chunk_ceiling' in script
+      and 'not pilot_one_chunk' in script,
       "Live trial limits model launches and no tail inference exceeds budget")
 check('send("stage", detail="CAPTURE_STOPPED")' in script
       and 'send("stage", detail="MODEL_BACKPRESSURE")' in script

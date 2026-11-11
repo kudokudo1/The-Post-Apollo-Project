@@ -935,10 +935,25 @@ Item {
         GohuText {
             width: parent.width
             height: 17
+            // Avoid the verbose "Eastern Standard Time" browser locale:
+            // it previously pushed AUDIO out of the compact panel.
             text: "TICK // " + (AlarmManagerService.lastSchedulerTickMs > 0
-                ? new Date(AlarmManagerService.lastSchedulerTickMs).toLocaleTimeString()
+                ? Qt.formatDateTime(
+                    new Date(AlarmManagerService.lastSchedulerTickMs),
+                    "h:mm:ss AP")
                 : "WAITING") + "  AUDIO // " + AlarmManagerService.audioState
             color: Colors.white
+            font.pixelSize: 9
+            elide: Text.ElideRight
+        }
+        GohuText {
+            width: parent.width
+            height: 17
+            visible: AlarmManagerService.lastFiredAlarmId > 0
+            text: "RING #" + AlarmManagerService.lastFiredAlarmId
+                + " // NTFY " + AlarmManagerService.notificationOutcome
+            color: AlarmManagerService.notificationOutcome === "POPUP QUEUED"
+                ? Colors.cyan : Colors.orange
             font.pixelSize: 9
             elide: Text.ElideRight
         }

@@ -332,6 +332,11 @@ check('PAUSE_MIN_BYTES = RATE * FRAME_BYTES * 6 // 5' in script
       and 'def quiet_pcm_frame(pcm: bytes' in script
       and 'persistent_model_ready = threading.Event()' in script
       and 'persistent_model_ready.set()' in script
+      and 'recognition_idle = threading.Event()' in script
+      and 'recognition_idle.is_set()' in script
+      and 'clips.empty()' in script
+      and 'recognition_idle.clear()' in script
+      and 'recognition_idle.set()' in script
       and 'quiet_run_ms >= pause_gap_ms' in script
       and 'not full_chunk and first_chunk_sent' in script
       and 'speech_pause_ms: int = 0' in script

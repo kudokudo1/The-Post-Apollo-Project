@@ -170,7 +170,7 @@ check('property bool safetyHold: true' in live
       and 'if (safetyHold)' in live
       and 'VOICE SAFETY HOLD' in live
       and 'svc.lastError || "MIC UNAVAILABLE' in manager,
-      "All microphones remain disabled pending actual host crash clearance")
+      "Standalone microphones remain held unless owning Hospital host opts in")
 check('MODEL_GUARD = Path(__file__).with_name' in script
       and 'str(MODEL_GUARD)' in script
       and 'os.killpg(process.pid, signal.SIGKILL)' in script
@@ -209,19 +209,31 @@ check('send("stage", detail="RECORDER_STARTED")' in script
 
 check('property bool safetyHold: true' in live
       and 'safetyHold: false' in host
-      and 'pilotOneChunk: true' in host
-      and 'property bool pilotOneChunk: false' in live
-      and 'command.push("--pilot-one-chunk")' in live
+      and 'pilotOneChunk: false' in host
+      and 'pilotLiveChunks: 6' in host
+      and 'property bool pilotLiveChunks' not in live
+      and 'property int pilotLiveChunks: 0' in live
+      and 'command.push("--pilot-live-chunks"' in live
       and 'pilotWatchdog.restart()' in live
       and 'id: pilotWatchdog' in live
-      and 'interval: 20000' in live,
-      "Operator-approved live trial is enabled only in HospitalW and bounded")
+      and 'interval: root.pilotLiveChunks > 0 ? 45000 : 20000' in live,
+      "Bounded incremental mic is opt-in only through HospitalW")
 check('parser.add_argument("--pilot-one-chunk"' in script
+      and 'parser.add_argument("--pilot-live-chunks"' in script
       and 'pilot_one_chunk=args.pilot_one_chunk' in script
-      and 'if pilot_one_chunk and sent:' in script
-      and 'limit = RATE * FRAME_BYTES * (6 if pilot_one_chunk else MAX_SECONDS)' in script
-      and 'if not pilot_one_chunk and not cancelled.is_set()' in script,
-      "Pilot captures at most one guarded Whisper chunk, no tail rerun, or endless silence")
+      and 'pilot_live_chunks=args.pilot_live_chunks' in script
+      and 'live_chunk_ceiling = max(0, min(8, int(pilot_live_chunks)))' in script
+      and 'if live_chunk_ceiling and accepted_chunks >= live_chunk_ceiling:' in script
+      and 'if not pilot and not cancelled.is_set()' in script,
+      "Live trial limits model launches and no tail inference exceeds budget")
+check('send("stage", detail="CAPTURE_STOPPED")' in script
+      and 'send("stage", detail="MODEL_BACKPRESSURE")' in script
+      and 'signal captureStopped()' in live
+      and 'captureStopped();' in live
+      and 'function onCaptureStopped()' in
+          (root / "services/hospital/HospitalSpeechInputService.qml").read_text()
+      and 'voiceState = "transcribing";' in live,
+      "Auto-closed mic is visible as processing while buffered partials continue")
 
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")

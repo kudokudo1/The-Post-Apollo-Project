@@ -16,6 +16,9 @@ Scope {
     // Only HospitalW may opt into the operator-approved one-chunk trial.
     // The standalone engine remains held unless an owning host enables it.
     property bool pilotOneChunk: false
+    // Off by default: only the owning Hospital menu opts into a bounded
+    // multi-chunk trial, never unguarded continuous transcription.
+    property int pilotLiveChunks: 0
     property string lastError: ""
     property string lastTranscript: ""
     // Short lifecycle code only, never spoken words or audio. A few stage
@@ -52,6 +55,7 @@ Scope {
         Quickshell.shellPath("scripts/hospital-reception-stt.sh")
 
     signal liveTextReady(string text)
+    signal captureStopped()
     signal liveFinished()
     signal voiceError(string message)
 
@@ -94,6 +98,8 @@ Scope {
                 Math.min(chunkSeconds * 1000, firstChunkMs)))];
         if (pilotOneChunk)
             command.push("--pilot-one-chunk");
+        else if (pilotLiveChunks > 0)
+            command.push("--pilot-live-chunks", String(Math.max(1, Math.min(8, pilotLiveChunks))));
         if (vadActive) {
             command.push("--vad", "--threshold", String(vadSpeechThreshold),
                 "--silence-ms", String(vadSilenceMs),
@@ -101,7 +107,7 @@ Scope {
         }
         liveProcess.exec(command);
         clock.restart();
-        if (pilotOneChunk)
+        if (pilotOneChunk || pilotLiveChunks > 0)
             pilotWatchdog.restart();
         return true;
     }
@@ -146,11 +152,18 @@ Scope {
             // Python emits fixed low-cardinality lifecycle codes. The
             // allowlist prevents untrusted child output reaching the journal.
             const code = String(data.detail || "");
-            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|RECORDING_COMPLETED)$/.test(code))
+            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|MODEL_BACKPRESSURE|CAPTURE_STOPPED|RECORDING_COMPLETED)$/.test(code))
                 return;
             if (lastStage !== code) {
                 lastStage = code;
                 console.warn("HOSPITAL_VOICE_STAGE // " + code);
+            }
+            if (code === "CAPTURE_STOPPED" && recording) {
+                // Auto-ended capture still has at most one guarded model
+                // processing queued chunks. Do not imply mic remains open.
+                voiceState = "transcribing";
+                clock.stop();
+                captureStopped();
             }
             return;
         }
@@ -199,7 +212,7 @@ Scope {
     }
     Timer {
         id: pilotWatchdog
-        interval: 20000
+        interval: root.pilotLiveChunks > 0 ? 45000 : 20000
         repeat: false
         onTriggered: {
             if (root.busy) {

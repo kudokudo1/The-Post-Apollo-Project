@@ -250,7 +250,7 @@ class RecordIndexTests(unittest.TestCase):
         for edit in (
             lambda d: d.update(version=44),
             lambda d: d["notes"][0].update(id="n999"),
-            lambda d: d["notes"][0].update(body="broken\\x00control"),
+            lambda d: d["notes"][0].update(body="broken" + chr(0) + "control"),
             lambda d: d["notes"].append(dict(d["notes"][0])),
         ):
             doc = hub_notes_doc()

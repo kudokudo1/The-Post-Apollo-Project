@@ -175,7 +175,10 @@ ShellRoot {
                 if(contentHeight>c.contentItem.height+2)
                     return "DENSE_CARD_TEXT_OVERFLOW "+contentHeight
                        +" / "+c.contentItem.height;
-                if(window.height>=500 && c.contentItem.spacing<2)
+                // W20 // Reduced support rows intentionally have 1px
+                // spacing at 68px. Their actual text bounds are checked
+                // immediately above; old W18 >=2px spacing was tied to 88px.
+                if(window.height>=500 && c.contentItem.spacing<1)
                     return "TALL_CARD_TEXT_STILL_TINY";
             }
         }

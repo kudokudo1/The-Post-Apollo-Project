@@ -257,7 +257,8 @@ PanelWindow {
     }
 
     function refreshArchiveV2(targetPage, cursor, query) {
-        if (!menuOpen || activeMode !== "archive" || archiveV2Busy)
+        if (!menuOpen || activeMode !== "archive"
+                || archiveV2Busy || archiveChainBusy)
             return false;
         // The index may have changed since the last full audit.
         archiveChainReport = null;
@@ -317,7 +318,7 @@ PanelWindow {
                 || reply.readOnly !== true || reply.payloadVerified !== false
                 || reply.authentication !== "UNSIGNED_LOCAL"
                 || reply.completeness !== "DATABASE_LOCAL_ONLY"
-                || ["NOT_INSTALLED", "LEGACY_ONLY", "CHAIN_CONSISTENT"]
+                || ["NOT_INSTALLED", "EMPTY", "LEGACY_ONLY", "CHAIN_CONSISTENT"]
                     .indexOf(reply.state) < 0
                 || !Number.isInteger(reply.snapshotCount) || reply.snapshotCount < 0
                 || !Number.isInteger(reply.receiptCount) || reply.receiptCount < 0
@@ -326,7 +327,9 @@ PanelWindow {
                 || reply.snapshotCount !== reply.receiptCount + reply.legacyCount
                 || reply.sourceCount > reply.snapshotCount
                 || (reply.state === "NOT_INSTALLED" && reply.snapshotCount !== 0)
-                || (reply.state === "LEGACY_ONLY" && reply.receiptCount !== 0)
+                || (reply.state === "EMPTY" && reply.snapshotCount !== 0)
+                || (reply.state === "LEGACY_ONLY"
+                    && (reply.receiptCount !== 0 || reply.snapshotCount === 0))
                 || (reply.state === "CHAIN_CONSISTENT" && reply.receiptCount === 0)) {
             archiveChainReport = null;
             const code = reply && typeof reply.error === "string"
@@ -340,6 +343,7 @@ PanelWindow {
             ? "LOCAL CHAIN CONSISTENT // UNSIGNED"
             : reply.state === "LEGACY_ONLY"
             ? "LEGACY ONLY // NO RECEIPTS"
+            : reply.state === "EMPTY" ? "EMPTY ARCHIVE // NO RECEIPTS"
             : "NO ARCHIVE DATABASE";
     }
 
@@ -543,7 +547,8 @@ PanelWindow {
 
     function requestSnapshot(row) {
         if (!menuOpen || activeMode !== "archive" || snapshotBusy
-                || busy || researchBusy || archiveBusy || confirmMode !== ""
+                || busy || researchBusy || archiveBusy || archiveChainBusy
+                || confirmMode !== ""
                 || researchBurnId !== "" || burnUiStage !== "")
             return false;
         const source = snapshotSource(row);
@@ -2049,6 +2054,7 @@ PanelWindow {
                                 labelPixelSize: 10
                                 accentColor: Colors.green
                                 available: !trashLauncher.archiveBusy
+                                           && !trashLauncher.archiveChainBusy
                                 onLeftClicked: {
                                     trashLauncher.refreshArchive();
                                     trashLauncher.refreshResearch();

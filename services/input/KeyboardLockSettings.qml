@@ -173,6 +173,64 @@ Scope {
         }
     }
 
+    // Only stable LED transitions AFTER the observer established a baseline
+    // may reach this method. Initial startup samples never call it.
+    function rememberLedTransition(lockName, value) {
+        if ((lockName !== "num" && lockName !== "caps")
+                || (value !== "on" && value !== "off")
+                || hostStatus !== "installed" || rememberSuspended
+                || !canEdit || confirmRequired || applying)
+            return false;
+        if (lockName === "num") {
+            if (numMode !== "remember" || !hostRememberNum)
+                return false;
+            queuedRememberNum = value;
+        } else {
+            if (capsMode !== "remember" || !hostRememberCaps)
+                return false;
+            queuedRememberCaps = value;
+        }
+        launchRememberSync();
+        return true;
+    }
+
+    function launchRememberSync() {
+        if (rememberSyncing || applying || inspecting
+                || rememberSuspended || hostStatus !== "installed")
+            return;
+        let lockName = "";
+        let value = "";
+        let previous = "";
+        if (queuedRememberNum !== "" && numMode === "remember"
+                && hostRememberNum) {
+            lockName = "num";
+            value = queuedRememberNum;
+            previous = installedNum;
+            queuedRememberNum = "";
+        } else if (queuedRememberCaps !== "" && capsMode === "remember"
+                && hostRememberCaps) {
+            lockName = "caps";
+            value = queuedRememberCaps;
+            previous = installedCaps;
+            queuedRememberCaps = "";
+        }
+        if (!lockName || value === previous)
+            return;
+        if (previous !== "on" && previous !== "off") {
+            rememberSuspended = true;
+            hostError = "UNSAFE_PREVIOUS_STATE";
+            return;
+        }
+        rememberSyncing = true;
+        rememberSyncReturned = false;
+        runningRememberLock = lockName;
+        rememberSyncProcess.exec([
+            "python3", "-B", "-I",
+            Quickshell.shellPath("services/input/SwayKeyboardStartup.py"),
+            "sync-remember", lockName, value, previous
+        ]);
+    }
+
     FileView {
         id: profileFile
         path: settings.storagePath

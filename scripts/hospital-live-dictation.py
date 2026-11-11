@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local chunked live dictation for Hospital Manage, never a form submit.
+"""Shared local Hospital live dictation, never a form submit.
 
 PipeWire raw 16 kHz PCM is captured continuously while a separate thread runs
 the already installed whisper-cli helper against short, isolated WAV chunks.
@@ -32,6 +32,7 @@ CHUNK_SECONDS = 4
 MAX_SECONDS = 90
 MIN_TAIL_SECONDS = 1
 MAX_QUEUE = 2
+MODEL_GUARD = Path(__file__).with_name("hospital-whisper-sandbox.py")
 PLACEHOLDER = re.compile(
     r"\[\s*(?:BLANK_AUDIO|NO_SPEECH|SILENCE|MUSIC|NO_AUDIO)\s*\]",
     re.IGNORECASE,
@@ -96,8 +97,11 @@ def transcribe_chunk(stt_helper: str, audio: bytes, *,
             dest.setsampwidth(FRAME_BYTES)
             dest.setframerate(RATE)
             dest.writeframes(audio)
+        # The recorder has active threads: never use Popen(preexec_fn=...).
+        # A dedicated Python child applies per-model Linux limits *before*
+        # exec. On guard failure inference refuses rather than running raw.
         process = subprocess.Popen(
-            ["bash", stt_helper, str(wav)],
+            [sys.executable, str(MODEL_GUARD), stt_helper, str(wav)],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             start_new_session=True)
         try:
@@ -105,7 +109,12 @@ def transcribe_chunk(stt_helper: str, audio: bytes, *,
                 on_start(process)
             output, _ = process.communicate(timeout=15)
         except subprocess.TimeoutExpired:
-            process.kill()
+            # Kill the whole model process group, not just its entry-point.
+            # This also covers future helper scripts that fork children.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
             process.communicate()
             raise
         finally:

@@ -224,7 +224,9 @@ Column {
         if (!started) {
             root.dictationField = "";
             root.dictationMode = "";
-            root.dictationFeedback = "MIC UNAVAILABLE // CHECK LOCAL WHISPER AND PIPEWIRE";
+            root.dictationFeedback = String(
+                svc.lastError || "MIC UNAVAILABLE // CHECK LOCAL WHISPER AND PIPEWIRE"
+            ).slice(0, 180);
         }
         return started;
     }

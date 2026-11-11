@@ -96,7 +96,14 @@ if [[ -z "$model" ]]; then
     exit 2
 fi
 
-exec "$backend" \
+# Limit Whisper CPU worker threads and avoid GPU driver paths for the
+# incident-isolated live microphone process. The guard sets this flag.
+safe_args=()
+if [[ "${POST_APOLLO_STT_SAFE_MODE:-}" == "1" ]]; then
+    safe_args=(-ng -t 2)
+fi
+
+exec "$backend" "${safe_args[@]}" \
     -m "$model" \
     -f "$audio" \
     -l en \

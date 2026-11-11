@@ -57,11 +57,86 @@ class LiveDictationTests(unittest.TestCase):
             self.assertEqual(live.transcribe_chunk("local-stt.sh", pcm(1300, 4)),
                              "Work on Finance.")
             command = popen.call_args.args[0]
-            self.assertEqual(command[:2], ["bash", "local-stt.sh"])
+            self.assertEqual(command[:2], [sys.executable, str(live.MODEL_GUARD)])
+            self.assertEqual(command[2], "local-stt.sh")
             self.assertEqual(child.communicate.call_args.kwargs["timeout"], 15)
             self.assertTrue(popen.call_args.kwargs["start_new_session"])
-            self.assertFalse(Path(command[2]).exists(),
+            self.assertFalse(Path(command[3]).exists(),
                              "Temporary WAV must be removed at completion")
+
+
+    def test_model_guard_caps_cpu_address_space_priority_and_affinity(self):
+        # Uses a harmless Python observer, not actual Whisper or microphone.
+        with tempfile.TemporaryDirectory(prefix="hospital-model-guard-") as folder:
+            folder_path = Path(folder)
+            audio = folder_path / "audio.wav"
+            audio.write_bytes(b"not-real-audio")
+            fake = folder_path / "limits.sh"
+            fake.write_text(
+                "#!/usr/bin/env bash\n"
+                "python3 - <<'PY'\n"
+                "import json,os,resource\n"
+                "print(json.dumps({'address':resource.getrlimit(resource.RLIMIT_AS)[0],"
+                "'cpu':resource.getrlimit(resource.RLIMIT_CPU)[0],"
+                "'core':resource.getrlimit(resource.RLIMIT_CORE)[0],"
+                "'affinity':len(os.sched_getaffinity(0)),"
+                "'nice':os.nice(0),"
+                "'safe':os.environ.get('POST_APOLLO_STT_SAFE_MODE'),"
+                "'omp':os.environ.get('OMP_NUM_THREADS')}))\n"
+                "PY\n"
+            )
+            result = subprocess.run(
+                [sys.executable, str(live.MODEL_GUARD), str(fake), str(audio)],
+                capture_output=True, text=True, timeout=6)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            data = json.loads(result.stdout)
+            self.assertGreater(data["address"], 0)
+            self.assertLessEqual(data["address"], 3 * 1024**3)
+            self.assertLessEqual(data["cpu"], 12)
+            self.assertEqual(data["core"], 0)
+            self.assertLessEqual(data["affinity"], 2)
+            self.assertGreaterEqual(data["nice"], 10)
+            self.assertEqual(data["safe"], "1")
+            self.assertEqual(data["omp"], "2")
+
+    def test_model_guard_fails_closed_on_missing_helper(self):
+        with tempfile.TemporaryDirectory(prefix="hospital-guard-refusal-") as folder:
+            wav = Path(folder) / "sound.wav"
+            wav.write_bytes(b"not-real-audio")
+            result = subprocess.run(
+                [sys.executable, str(live.MODEL_GUARD),
+                 str(Path(folder) / "missing-helper.sh"), str(wav)],
+                capture_output=True, text=True, timeout=6)
+            self.assertEqual(result.returncode, 66)
+
+    def test_safe_mode_whisper_args_are_opt_in_to_guarded_live_calls(self):
+        # The legacy single-file STT call must not silently inherit live flags.
+        with tempfile.TemporaryDirectory(prefix="hospital-safe-args-") as folder:
+            root = Path(folder)
+            wav = root / "speech.wav"
+            wav.write_bytes(b"test")
+            model = root / "tiny-model.bin"
+            model.write_bytes(b"test")
+            backend = root / "fake-whisper-cli"
+            backend.write_text("#!/usr/bin/env bash\nprintf '%s\\n' \"$@\"\n")
+            backend.chmod(0o700)
+            helper = ROOT / "scripts" / "hospital-reception-stt.sh"
+            env = dict(os.environ, POST_APOLLO_STT_MODEL=str(model),
+                       POST_APOLLO_STT_BIN=str(backend))
+            legacy = subprocess.run(
+                ["bash", str(helper), str(wav)], env=env,
+                capture_output=True, text=True, timeout=6)
+            self.assertEqual(legacy.returncode, 0, legacy.stderr)
+            self.assertNotIn("-ng", legacy.stdout.splitlines())
+            live_call = subprocess.run(
+                [sys.executable, str(live.MODEL_GUARD),
+                 str(helper), str(wav)], env=env,
+                capture_output=True, text=True, timeout=6)
+            self.assertEqual(live_call.returncode, 0, live_call.stderr)
+            args = live_call.stdout.splitlines()
+            self.assertIn("-ng", args)
+            self.assertIn("-t", args)
+            self.assertEqual(args[args.index("-t") + 1], "2")
 
     def test_protocol_no_submit_or_permissions(self):
         result = json.loads(live.packet("partial", text="new spoken words"))

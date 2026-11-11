@@ -313,6 +313,12 @@ ShellRoot {
                       > combined.currentItem.height*1.34)
                     return root.fail("W21_HERO_PAINTED_GLYPH_ESCAPES_BAND");
                 const mainIcon=combined.currentItem.mainGlyph;
+                const gapFromRight=mainIcon.parent.width-
+                    (mainIcon.x+mainIcon.width);
+                if(mainIcon.width>159 || gapFromRight<15 ||
+                   combined.currentItem.mainArtwork.font.pixelSize>173)
+                    return root.fail("W22_NOW_ICON_NOT_REDUCED_AND_LEFT_SHIFTED // "
+                         + mainIcon.width+"/"+gapFromRight);
                 const temp=combined.currentItem.mainTemperature;
                 const iconLeft=mainIcon.mapToItem(combined.currentItem,0,0).x;
                 const tempRight=temp.mapToItem(

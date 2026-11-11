@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
-import QtQuick.Dialogs
 import qs.services.time
 import qs.services.sounds
 import "../components"
@@ -253,6 +252,15 @@ Item {
         libraryDeleteConfirmId = "";
         return true;
     }
+    function openFilePicker() {
+        if (!soundImportLoader.active) {
+            soundImportLoader.active = true;
+        } else if (soundImportLoader.item) {
+            soundImportLoader.item.openChooser();
+        } else {
+            SoundLibraryService.feedback = "FILE PICKER UNAVAILABLE";
+        }
+    }
     function openLibrary() {
         soundLibraryOpen = true;
         SoundLibraryService.refresh();
@@ -351,14 +359,21 @@ Item {
             }
         }
     }
-    FileDialog {
-        id: soundImportDialog
-        title: "IMPORT WAV INTO POST-APOLLO SOUND LIBRARY"
-        fileMode: FileDialog.OpenFile
-        nameFilters: ["PCM WAV audio (*.wav)"]
-        onAccepted: {
-            SoundLibraryService.importWav(
-                selectedFile.toString(), pane.importNameFromUrl(selectedFile));
+    Loader {
+        id: soundImportLoader
+        active: false
+        source: "AlarmWavImportDialog.qml"
+        onLoaded: {
+            // The optional picker is created ONLY by user click.
+            item.fileSelected.connect(function(url) {
+                SoundLibraryService.importWav(
+                    url, pane.importNameFromUrl(url));
+            });
+            item.openChooser();
+        }
+        onStatusChanged: {
+            if (status === Loader.Error)
+                SoundLibraryService.feedback = "FILE PICKER UNAVAILABLE";
         }
     }
     Connections {
@@ -929,7 +944,7 @@ Item {
                         accentColor: Colors.magenta
                         available: !SoundLibraryService.busy
                             && SoundLibraryService.tones.length < SoundLibraryService.maxTones
-                        onLeftClicked: soundImportDialog.open()
+                        onLeftClicked: pane.openFilePicker()
                     }
                     ActionButton {
                         width: (libraryTools.width - 2 * libraryTools.spacing) / 3

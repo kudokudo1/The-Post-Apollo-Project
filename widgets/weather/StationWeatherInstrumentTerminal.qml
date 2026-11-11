@@ -253,7 +253,7 @@ Rectangle {
                         Row {
                             anchors.left: parent.left
                             anchors.top: parent.top
-                            anchors.topMargin: 14
+                            anchors.topMargin: 11
                             spacing: 2
                             GohuText {
                                 objectName: "weather-w14-wind-bearing-arrow"
@@ -283,7 +283,7 @@ Rectangle {
                                       : (metric.valid && terminal.sky.pressureValue>=0
                                          ? terminal.read(terminal.sky.pressureValue," hPa")
                                          : "--")
-                                font.pixelSize: metric.modelData.key==="pressure" ? 11 : 16
+                                font.pixelSize: metric.modelData.key==="pressure" ? 11 : 14
                                 color: Colors.white
                             }
                         }
@@ -293,7 +293,7 @@ Rectangle {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
-                            anchors.bottomMargin: 3
+                            anchors.bottomMargin: 0
                             height: visible ? 5 : 0
                             color: Colors.black
                             border.width: 1

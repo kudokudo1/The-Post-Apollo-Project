@@ -10,20 +10,55 @@ import "ClockAlarmNotificationPolicy.js" as AlarmNotice
 Scope {
     id: producer
 
+    function containsId(model, eventId) {
+        for (let i = 0; i < model.count; i++) {
+            if (String(model.get(i).id || "") === eventId)
+                return true;
+        }
+        return false;
+    }
     function deliver(alarmId, startedMs) {
         const alarm = AlarmManagerService.findAlarm(alarmId);
         const event = AlarmNotice.payload(alarm, startedMs);
-        if (!event)
+        if (!event) {
+            AlarmManagerService.reportNotificationOutcome(
+                alarmId, startedMs, "INVALID EVENT PAYLOAD");
             return;
-
-        // A persisted ring can be re-observed after a Quickshell restart.
-        // Same event ID means no second saved card or repeated popup.
-        const history = NotificationsService.notifications;
-        for (let i = 0; i < history.count; i++) {
-            if (String(history.get(i).id || "") === event.id)
-                return;
         }
-        NotificationsService.pushRich(event);
+
+        // The receipt shows what the *existing* Notifications service did:
+        // blocked-before-history, retained-only, or actively queued popup.
+        // It must never bypass DND, BLOCK, ZZ or other shared policy.
+        try {
+            const history = NotificationsService.notifications;
+            if (containsId(history, event.id)) {
+                AlarmManagerService.reportNotificationOutcome(
+                    alarmId, startedMs, "ALREADY IN HISTORY");
+                return;
+            }
+
+            NotificationsService.pushRich(event);
+            const recorded = containsId(history, event.id);
+            const active = containsId(
+                NotificationsService.activeNotifications, event.id);
+            let result = "NO HISTORY // NOT ACCEPTED";
+            if (recorded)
+                result = active ? "POPUP QUEUED" : "HISTORY ONLY";
+            else if (!NotificationsService.policyReady)
+                result = "POLICY STILL LOADING";
+            else if (NotificationsService.policyStatus === "parse-error"
+                    || NotificationsService.policyStatus === "load-error")
+                result = "NOTIFICATION POLICY ERROR";
+            else if (NotificationsService.shouldBlockNotification(event))
+                result = "BLOCKED BY NOTIFICATION POLICY";
+
+            AlarmManagerService.reportNotificationOutcome(
+                alarmId, startedMs, result);
+        } catch (error) {
+            AlarmManagerService.reportNotificationOutcome(
+                alarmId, startedMs, "NOTIFICATION BRIDGE ERROR");
+            console.warn("Clock alarm: notification delivery failed");
+        }
     }
 
     Connections {

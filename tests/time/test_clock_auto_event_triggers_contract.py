@@ -36,8 +36,10 @@ class ClockEventTriggersContracts(unittest.TestCase):
             "function completeAutoReferenceIfReady()", 1
         )[0]
         self.assertIn("AutoCheck.withTrigger(", portion)
-        self.assertIn("AutoCheck.triggerEnabled(active, reason)", portion)
-        self.assertIn("AutoCheck.isDue(active, now, autoLastStartedAtMs)", portion)
+        self.assertIn("AutoCheck.canStartAutomaticCheck(active, reason, now,", portion)
+        self.assertIn("referenceLastAttemptAtMs)", portion)
+        self.assertIn("AutoCheck.isDue(doc, nowMs, lastAutoStartedAtMs)", POLICY)
+        self.assertIn("MIN_AUTOMATIC_GAP_MS", POLICY)
         self.assertIn("checkTimeAccuracy()", portion)
         self.assertIn('"measure"', SERVICE)
         for forbidden in ("resyncProcess.exec(", "prepareResync(",

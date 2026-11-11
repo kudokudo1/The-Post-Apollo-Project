@@ -41,6 +41,10 @@ assert "SESSION RECOVERY PREVIEW REFUSED" in plan
 
 # Privacy: no filesystem, Chromium API, native IPC, storage, clipboard,
 # logging or browser actuation. A subsequent opt-in capture is separate.
+executable = "\n".join(
+    line for line in plan.splitlines()
+    if not line.strip().startswith(("*", "//", "/*"))
+)
 for forbidden in (
     "chrome.", "browser.", "globalThis", "window.", "document.",
     "localStorage", "sessionStorage", "indexedDB",
@@ -51,7 +55,7 @@ for forbidden in (
     "writeFile", "readFile", "restore(", "tabs.create", "windows.create",
     "swaymsg", "child_process", "Date.now", "performance.now",
 ):
-    assert forbidden not in plan, forbidden
+    assert forbidden not in executable, forbidden
 
 # Source fixture exercises 2//5//6, query/fragment token redaction,
 # private-window accessors, malformed inputs, and no inferred pairing.

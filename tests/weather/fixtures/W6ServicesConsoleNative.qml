@@ -89,11 +89,11 @@ ShellRoot {
         onTriggered: {
             root.ticks++;
             if(root.ticks>40) return root.fail("TIMEOUT");
-            const top=root.find(stationConsole,"services-console-fixed-header");
-            const cards=root.find(console,"services-console-summary-cards");
-            const dossier=root.find(console,"services-console-detail-scroll");
-            const report=root.find(console,"services-console-selected-report");
-            const directory=root.find(console,"services-console-directory-heading");
+            const top=stationConsole.headerItem;
+            const cards=stationConsole.metricsItem;
+            const dossier=stationConsole.detailItem;
+            const report=stationConsole.reportItem;
+            const directory=stationConsole.directoryHeadingItem;
             if(!top || !cards || !dossier || !report || !directory) {
                 if(root.ticks>10) return root.fail("CONSOLE_NODES H="+!!top+" C="+!!cards+" S="+!!dossier+" R="+!!report+" D="+!!directory);
                 return;

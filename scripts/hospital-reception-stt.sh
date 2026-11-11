@@ -126,7 +126,7 @@ fi
 if [[ "${1:-}" == "--session" ]]; then
     socket_path="${2:-}"
     [[ "${POST_APOLLO_STT_SAFE_MODE:-}" == "1" ]] || exit 70
-    [[ -n "$model" && -n "$server" ]] || exit 2
+    private_server_compatible || exit 3
     [[ "$socket_path" == /*.sock ]] || exit 64
     [[ -d "$(dirname "$socket_path")" ]] || exit 66
     # Local-only server, GPU disabled, one server process/worker. No ffmpeg

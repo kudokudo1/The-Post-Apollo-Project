@@ -1,0 +1,131 @@
+name: Clock alarm restart and resume recovery
+
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmManagerPolicy.js"
+      - "services/time/AlarmManagerService.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "tests/time/test_clock_alarm_restart_resume_recovery_contract.py"
+      - ".github/workflows/clock-alarm-restart-resume.yml"
+  push:
+    paths:
+      - "services/time/AlarmManagerPolicy.js"
+      - "services/time/AlarmManagerService.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "tests/time/test_clock_alarm_restart_resume_recovery_contract.py"
+      - ".github/workflows/clock-alarm-restart-resume.yml"
+
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify recovery source boundaries and no new daemon
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_alarm_restart_resume_recovery_contract.py' -v
+      - name: Simulate real Quickshell restart, sleep gap and persisted outcomes
+        run: |
+          node <<'JS'
+          const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+          const p={}; vm.runInNewContext(fs.readFileSync('services/time/AlarmManagerPolicy.js','utf8')
+            .replace(/^\.pragma library\s*/,''),p);
+          const at=(day,h,m,s=0)=>new Date(2026,10,day,h,m,s).getTime();
+          function armed(before, days=[3], hour=6, minute=40){
+            const start=p.create(p.initialDocument(),before).document;
+            const updated=p.update(start,1,{hour,minute,weekdays:days,enabled:true},before);
+            assert.equal(updated.ok,true);
+            return updated.document;
+          }
+          function restarted(d){
+            const r=p.parse(JSON.stringify(d));
+            assert.equal(r.ok,true);
+            return r.document;
+          }
+          const wed=at(11,6,40);
+          const before=at(11,6,39,30);
+          // Reopening shell inside grace starts an honest live ring, once.
+          let one=armed(before);
+          assert.equal(one.alarms[0].armedAtMs,before);
+          assert.equal(p.nextOccurrenceMs(one.alarms[0],before),wed);
+          let wake=p.tick(restarted(one),at(11,6,41));
+          assert.deepEqual(Array.from(wake.started),[1]);
+          assert.equal(wake.document.alarms[0].lastProcessedDueMs,wed);
+          assert.equal(wake.document.alarms[0].lastEventKind,'fired');
+          assert.equal(p.tick(restarted(wake.document),at(11,6,41,1)).started.length,0);
+          let stop=p.stop(wake.document,1,at(11,6,41,2)).document;
+          assert.equal(p.tick(restarted(stop),at(11,6,41,3)).started.length,0);
+          // The same schedule waking after grace is MISSED, not a late siren.
+          let expired=p.tick(restarted(one),at(11,6,43));
+          assert.deepEqual(Array.from(expired.missed),[1]);
+          assert.equal(expired.started.length,0);
+          assert.equal(expired.document.alarms[0].lastExpectedAtMs,wed);
+          assert.equal(p.tick(restarted(expired.document),at(11,6,43,1)).missed.length,0);
+          // A Thursday restart can recover Wednesday without changing next Wednesday.
+          let thursday=p.tick(restarted(one),at(12,7,10));
+          assert.deepEqual(Array.from(thursday.missed),[1]);
+          assert.equal(thursday.document.alarms[0].lastMissedAtMs,at(12,7,10));
+          assert.equal(thursday.document.alarms[0].lastExpectedAtMs,wed);
+          assert.equal(thursday.document.alarms[0].lastProcessedDueMs,wed);
+          assert.equal(thursday.document.alarms[0].lastEventKind,'missed');
+          assert.equal(p.tick(restarted(thursday.document),at(12,7,11)).missed.length,0);
+          assert.equal(p.nextOccurrenceMs(thursday.document.alarms[0],at(12,7,10)),
+            at(18,6,40));
+          // Once a Wednesday fired, a later Thursday must NOT declare it missed.
+          let fired=p.tick(one,at(11,6,40,1));
+          assert.deepEqual(Array.from(fired.started),[1]);
+          let stopped=p.stop(fired.document,1,at(11,6,41)).document;
+          assert.equal(p.tick(restarted(stopped),at(12,7,10)).missed.length,0);
+          // Only the latest missed weekday is recovered after multi-week downtime.
+          let weeks=p.tick(restarted(one),at(26,7));
+          assert.deepEqual(Array.from(weeks.missed),[1]);
+          assert.equal(weeks.document.alarms[0].lastExpectedAtMs,at(25,6,40));
+          assert.equal(p.tick(restarted(weeks.document),at(26,7,0,1)).missed.length,0);
+          // Disabled alarms never generate retrospective missed events.
+          const disabled=p.update(one,1,{enabled:false},at(11,6,39,40));
+          assert.equal(disabled.ok,true);
+          assert.equal(p.tick(restarted(disabled.document),at(12,7,10)).missed.length,0);
+          // Paused until next Wednesday: no phantom missed event for prior Wednesday.
+          const paused=p.update(one,1,{pausedUntilDate:'2026-11-18'},before);
+          assert.equal(paused.ok,true);
+          let resumed=p.tick(restarted(paused.document),at(18,6,39,20));
+          assert.equal(resumed.missed.length,0);
+          assert.equal(resumed.document.alarms[0].pausedUntilDate,'');
+          assert.equal(p.nextOccurrenceMs(resumed.document.alarms[0],at(18,6,39,20)),
+            at(18,6,40));
+          // Snoozed alarms still ring once after restart within snooze grace.
+          const snoozed=p.snooze(fired.document,1,at(11,6,41)).document;
+          let snoozeWake=p.tick(restarted(snoozed),at(11,6,46,30));
+          assert.deepEqual(Array.from(snoozeWake.started),[1]);
+          assert.equal(p.tick(restarted(snoozeWake.document),at(11,6,46,31)).started.length,0);
+          const lateSnooze=p.tick(restarted(snoozed),at(11,6,49));
+          assert.deepEqual(Array.from(lateSnooze.missed),[1]);
+          assert.equal(lateSnooze.started.length,0);
+          // One-time alarm already overdue yesterday is completed, not replayed.
+          const onceStart=p.create(p.initialDocument(),before).document;
+          const once=p.update(onceStart,1,{mode:'once',date:'2026-11-11',
+            hour:6,minute:40,weekdays:[],enabled:true},before).document;
+          assert.equal(p.nextOccurrenceMs(once.alarms[0],at(11,6,40,30)),wed);
+          const onceMissed=p.tick(restarted(once),at(12,6,41));
+          assert.deepEqual(Array.from(onceMissed.missed),[1]);
+          assert.equal(onceMissed.document.alarms[0].completed,true);
+          assert.equal(p.tick(restarted(onceMissed.document),at(12,6,42)).missed.length,0);
+          // Legacy V2 files without arming anchors get a safe baseline,
+          // never backfilled with an imaginary prior-day missed occurrence.
+          const legacy=JSON.parse(JSON.stringify(one));
+          delete legacy.alarms[0].armedAtMs;
+          delete legacy.alarms[0].lastProcessedDueMs;
+          let read=p.parse(JSON.stringify(legacy));
+          assert.equal(read.ok,true);
+          assert.equal(read.document.alarms[0].armedAtMs,0);
+          const initialize=p.tick(read.document,at(12,6,39));
+          assert.equal(initialize.changed,true);
+          assert.equal(initialize.missed.length,0);
+          assert.equal(initialize.document.alarms[0].armedAtMs,at(12,6,39));
+          // Backward system-clock correction cannot replay an old alarm.
+          const backward=p.tick(restarted(one),at(11,6,38));
+          assert.equal(backward.started.length,0);
+          assert.equal(backward.missed.length,0);
+          console.log('Clock startup and resume across grace, day, pause, multiple weeks, legacy and snooze: PASS');
+          JS

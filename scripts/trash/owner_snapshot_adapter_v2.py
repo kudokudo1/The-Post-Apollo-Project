@@ -44,12 +44,15 @@ def _bytes(value):
 def _prepared(owner, identifier, label, captured, record):
     payload = _bytes(record)
     revision = hashlib.sha256(payload).hexdigest()
+    # ArchiveStore labels are at most 120 printable characters. The Weather
+    # owner permits longer titles; sanitize *display only*, not source bytes.
+    visible_label = "".join(c for c in label if c.isprintable())[:120]
     return {
         "ownerId": owner,
         "resourceId": identifier,
         "sourceRevision": revision,
         "capturedAtMs": captured,
-        "displayLabel": label,
+        "displayLabel": visible_label,
         "_payload": payload,
     }
 
@@ -81,17 +84,32 @@ class PilotSnapshotAdapter:
             observed_ms = source._ms(page["observedAt"])
         except source.LifecycleError as exc:
             raise AdapterError(str(exc)) from exc
+        except (UnicodeError, TypeError, ValueError) as exc:
+            raise AdapterError("SOURCE_VALIDATION_FAILED") from exc
         record_id = "page-" + hashlib.sha256(page["url"].encode("utf-8")).hexdigest()[:32]
         return _prepared("demo-scrape", record_id, page["title"], observed_ms, page)
 
     def _weather(self, event_key, last_captured_ms):
+        if (type(last_captured_ms) is int
+                and 1 <= last_captured_ms <= 9999999999999):
+            stamp = str(last_captured_ms)
+        elif (isinstance(last_captured_ms, str)
+              and last_captured_ms.isascii()
+              and last_captured_ms.isdecimal()
+              and 1 <= len(last_captured_ms) <= 13
+              and 1 <= int(last_captured_ms) <= 9999999999999):
+            stamp = str(int(last_captured_ms))
+        else:
+            raise AdapterError("INVALID_EVENT_TIMESTAMP")
         # The legacy V1 owner reader requires the exact event key and latest
         # snapshot timestamp; the full-content witness below catches a rewrite
         # that retains the same timestamp.
         try:
-            event = source._source_event(event_key, last_captured_ms, self.data_dir)
+            event = source._source_event(event_key, stamp, self.data_dir)
         except source.LifecycleError as exc:
             raise AdapterError(str(exc)) from exc
+        except (UnicodeError, TypeError, ValueError) as exc:
+            raise AdapterError("SOURCE_VALIDATION_FAILED") from exc
         record_id = ("event-" +
                      hashlib.sha256(event["eventKey"].encode("utf-8")).hexdigest()[:32])
         return _prepared("weather-events", record_id, event["title"],

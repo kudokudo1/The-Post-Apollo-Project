@@ -8,6 +8,7 @@ const glyph=read("StationWeatherLineGlyph.qml");
 const overview=read("StationWeatherTerminalSummary.qml");
 const host=read("StationWeatherSubjectPane.qml");
 const sky=read("StationSky.qml");
+const dataParser=fs.readFileSync("services/weather/WeatherDataPolicy.js","utf8");
 
 test("W14 WEATHER uses three differentiated instruments rather than the W13 tile grid",()=>{
  assert.match(host,/StationWeatherInstrumentTerminal\s*\{/);
@@ -82,4 +83,15 @@ test("W14 decorative view introduces no live fetcher or persistence",()=>{
  assert.match(terminal,/sky.iconColor\(/);
  assert.match(terminal,/sky.windAngle\(/);
  assert.match(sky,/readonly property bool weatherReady/);
+});
+
+test("W14 precipitation labels reflect wttr sample time and daily peak, not arbitrary one-hour or whole-day odds",()=>{
+ assert.match(dataParser,/timeLabel: hourLabel\(entry.time\)/);
+ assert.match(dataParser,/chanceRain: maxChance\(hourly, "chanceofrain"\)/);
+ assert.match(terminal,/NEXT 6 FORECAST TIMES/);
+ assert.match(terminal,/RAIN CHANCE \/\/ EACH LISTED PERIOD/);
+ assert.match(terminal,/PEAK RAIN CHANCE/);
+ assert.match(overview,/RAIN CHANCE FOR EACH LISTED PERIOD/);
+ assert.doesNotMatch(terminal,/NEXT 6 HOURS|EACH FORECAST HOUR/);
+ assert.doesNotMatch(overview,/PRECIPITATION CHANCE DURING EACH HOUR/);
 });

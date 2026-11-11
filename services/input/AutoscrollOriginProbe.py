@@ -93,7 +93,12 @@ def parse_protocols(text):
     # wayland-info is an *inventory* utility: no app protocol is bound here.
     if not isinstance(text, str) or len(text) > MAX_REPLY:
         raise ProbeError("INVALID_WAYLAND_INFO")
-    return {name: name in text for name in CAPABILITIES}
+    # Read actual wayland-info registry declarations, not mere mentions in
+    # descriptions or unrelated logs.
+    advertised = set(re.findall(
+        r"^\\s*interface:\\s*'([A-Za-z0-9_]+)'(?=\\s|,|$)",
+        text, flags=re.MULTILINE))
+    return {name: name in advertised for name in CAPABILITIES}
 
 
 def stop_socket_available():

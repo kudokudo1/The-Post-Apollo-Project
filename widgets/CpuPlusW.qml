@@ -331,8 +331,23 @@ PanelWindow {
     readonly property var settingsSubModes: [
         { name: "LOCATION", key: "LOCATION", symbol: "⌖" },
         { name: "TIME", key: "TIME", symbol: "🕰" },
-        { name: "CONNECTIONS", key: "CONNECTIONS", symbol: "⛓" }
+        { name: "CONNECTIONS", key: "CONNECTIONS", symbol: "⛓" },
+        // Stage 0: navigation only. No input device or lighting writes.
+        { name: "KEYBOARD", key: "KEYBOARD", symbol: "⌨" },
+        { name: "MOUSE", key: "MOUSE", symbol: "🖱" },
+        { name: "ACCESSIBILITY", key: "ACCESSIBILITY", symbol: "♿" },
+        { name: "LIGHTING", key: "LIGHTING", symbol: "✦" }
     ]
+    readonly property bool settingsInputPreviewSelected:
+        settingsSubMode === "KEYBOARD"
+        || settingsSubMode === "MOUSE"
+        || settingsSubMode === "ACCESSIBILITY"
+        || settingsSubMode === "LIGHTING"
+    readonly property string settingsInputPreviewTitle:
+        settingsSubMode === "MOUSE" ? "MOUSE & TOUCHPAD"
+        : settingsSubMode === "LIGHTING" ? "LIGHTING / RGB"
+        : settingsSubMode === "ACCESSIBILITY" ? "ACCESSIBILITY"
+        : "KEYBOARD"
 
     // Rail-face animation state, matching AppControl's FAVORITES behavior.
     property bool favoritesFaceClickPulse: false
@@ -1412,8 +1427,10 @@ PanelWindow {
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? "SYSTEM MONITOR"
                 : cpuPlusWindow.selectedModeIndex === 6
-                ? (cpuPlusWindow.settingsSubMode === "TIME"
-                   ? "TIME // BASIC CONTROLS"
+                ? (cpuPlusWindow.settingsInputPreviewSelected
+                   ? cpuPlusWindow.settingsInputPreviewTitle + " // OVERVIEW"
+                   : cpuPlusWindow.settingsSubMode === "TIME"
+                     ? "TIME // BASIC CONTROLS"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                      ? "CONNECTIONS // OVERVIEW"
                      : "SHARED CONTEXT // "
@@ -1749,8 +1766,10 @@ PanelWindow {
                     : cpuPlusWindow.selectedModeIndex === 3
                     ? "SYSTEM STATE"
                     : cpuPlusWindow.selectedModeIndex === 6
-                    ? (cpuPlusWindow.settingsSubMode === "TIME"
-                       ? "CLOCK // CONTROL"
+                    ? (cpuPlusWindow.settingsInputPreviewSelected
+                       ? cpuPlusWindow.settingsInputPreviewTitle + " // STATUS"
+                       : cpuPlusWindow.settingsSubMode === "TIME"
+                         ? "CLOCK // CONTROL"
                        : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                          ? "SHARED // STATUS" : "LOCATION // EXPLORE")
                     : cpuPlusWindow.selectedModeIndex === 4
@@ -1827,6 +1846,8 @@ PanelWindow {
                            || cpuPlusWindow.settingsSubMode === "LOCATION"))
                      && cpuPlusWindow.selectedModeIndex !== 5
                      && cpuPlusWindow.selectedModeIndex !== 4
+                     && !(cpuPlusWindow.selectedModeIndex === 6
+                          && cpuPlusWindow.settingsInputPreviewSelected)
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom
@@ -2064,8 +2085,10 @@ PanelWindow {
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? "SYSTEM TARGET"
                 : cpuPlusWindow.selectedModeIndex === 6
-                ? (cpuPlusWindow.settingsSubMode === "TIME"
-                   ? "TIME // ACTIVE"
+                ? (cpuPlusWindow.settingsInputPreviewSelected
+                   ? cpuPlusWindow.settingsInputPreviewTitle + " // SELECT"
+                   : cpuPlusWindow.settingsSubMode === "TIME"
+                     ? "TIME // ACTIVE"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                      ? "CONNECTIONS // SOURCES" : "LOCATION // SAVED")
                 : cpuPlusWindow.selectedModeIndex === 4
@@ -2122,7 +2145,7 @@ PanelWindow {
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? 92
                 : cpuPlusWindow.selectedModeIndex === 6
-                ? 52 : 0
+                ? 168 : 0
 
             visible:
                 cpuPlusWindow.selectedModeIndex === 2
@@ -2167,7 +2190,7 @@ PanelWindow {
                             cpuPlusWindow.selectedModeIndex === 2
                             ? (targetSubModeStrip.width - 4) / 2
                             : cpuPlusWindow.selectedModeIndex === 6
-                             ? (targetSubModeStrip.width - 8) / 3
+                             ? (targetSubModeStrip.width - 4) / 2
                             : (targetSubModeStrip.width - 8) / 3
 
                         height:
@@ -2342,6 +2365,29 @@ PanelWindow {
                     }
                 }
             }
+        }
+
+        // Stage 0 only: visible route selection without writing input config.
+        GohuText {
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsInputPreviewSelected
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: targetSubModeStrip.bottom
+            anchors.topMargin: 27
+            font.pixelSize: 11
+            color: Colors.cyan
+            text: "SECTION RESERVED"
+        }
+
+        GohuText {
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsInputPreviewSelected
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: targetSubModeStrip.bottom
+            anchors.topMargin: 50
+            font.pixelSize: 9
+            color: Colors.white
+            text: "NO DEVICE CHANGES"
         }
 
         CpuPlusSettingsLocationSelectionPane {
@@ -2880,8 +2926,10 @@ PanelWindow {
             anchors.topMargin: 16
 
             text: cpuPlusWindow.selectedModeIndex === 6
-                  ? (cpuPlusWindow.settingsSubMode === "TIME"
-                     ? "TIME // ADVANCED"
+                  ? (cpuPlusWindow.settingsInputPreviewSelected
+                     ? cpuPlusWindow.settingsInputPreviewTitle + " // CONTROL"
+                     : cpuPlusWindow.settingsSubMode === "TIME"
+                       ? "TIME // ADVANCED"
                      : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                        ? "CONNECTIONS // ACCESS" : "LOCATION // EDIT HOME")
                   : cpuPlusWindow.selectedModeIndex === 4

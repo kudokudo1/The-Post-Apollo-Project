@@ -159,7 +159,14 @@ def test_actual_session_change():
                     assert peer.pid==process.pid
                     with lifecycle.capture_socket_peer(connection,peer=peer) as lease:
                         guard=cancel.begin(connection,lease)
-                        assert guard.valid() is True
+                        if not guard.valid():
+                            print("CI session guard pre-change: ",
+                                  "lease",lease.valid(),
+                                  "socket",cancel._socket_still_waiting(connection),
+                                  "context_equal",cancel._session_context(peer.pid)==guard._initial,
+                                  "age_ns",time.monotonic_ns()-guard._born_ns,
+                                  file=sys.stderr,flush=True)
+                            raise AssertionError("pre-change session guard refused")
                         sid_before=guard._initial.session_id
                         connection.sendall(b"S")
                         assert connection.recv(7)==b"CHANGED"

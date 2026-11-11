@@ -1005,6 +1005,18 @@ Rectangle {
             }
         }
 
+        // W8 // The WEATHER overview starts with a live read-only version of
+        // the exact instrument leading its combined WEATHER terminal.
+        // HOME/OVERVIEW and CLASSIC HOME never gain this extra weather bay.
+        StationWeatherTerminalSummary {
+            objectName: "weather-w8-overview-terminal-summary"
+            visible: home.subjectRoute === "weather/overview"
+            width: parent.width
+            height: visible ? 158 : 0
+            compact: true
+            weatherService: home.weatherService
+        }
+
         StationSectionDivider {
             objectName: "home-w3-sources-title"
             visible: home.sourcesWorkspace

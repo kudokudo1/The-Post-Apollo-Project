@@ -49,6 +49,9 @@ PanelWindow {
     property string archiveV2State: "NOT_SCANNED"
     property bool archiveV2Busy: false
     property int archiveV2Total: 0
+    // V2h reports real file footprint and the fixed copy budget, never a
+    // deletion permission or an estimate from payload length alone.
+    property var archiveCapacity: null
     property bool archiveV2HasMore: false
     property string archiveV2NextCursor: ""
     property int archiveV2Page: 0
@@ -286,6 +289,7 @@ PanelWindow {
         try { reply = JSON.parse(String(raw || "").trim()); }
         catch (error) {
             archiveV2Rows = [];
+            archiveCapacity = null;
             archiveV2State = "STALE // INVALID COPY INDEX RESPONSE";
             return;
         }
@@ -297,8 +301,19 @@ PanelWindow {
                 || !Number.isInteger(reply.total) || reply.total < 0
                 || typeof reply.hasMore !== "boolean"
                 || (reply.hasMore && (typeof reply.nextCursor !== "string"
-                                      || reply.nextCursor.length > 64))) {
+                                      || reply.nextCursor.length > 64))
+                || (reply.capacity !== null
+                    && (!reply.capacity
+                        || !Number.isInteger(reply.capacity.chargedBytes)
+                        || reply.capacity.chargedBytes < 0
+                        || !Number.isInteger(reply.capacity.diskQuotaBytes)
+                        || reply.capacity.diskQuotaBytes < 1
+                        || !Number.isInteger(reply.capacity.remainingBytes)
+                        || reply.capacity.remainingBytes < 0
+                        || ["READY", "FULL"].indexOf(
+                            reply.capacity.capacityState) < 0))) {
             archiveV2Rows = [];
+            archiveCapacity = null;
             archiveV2State = "STALE // " + String(reply && reply.error
                                                   || "COPY INDEX UNAVAILABLE");
             return;
@@ -312,6 +327,7 @@ PanelWindow {
                     || item.capabilities.restore !== false
                     || item.capabilities.burn !== false) {
                 archiveV2Rows = [];
+                archiveCapacity = null;
                 archiveV2State = "STALE // COPY PERMISSIONS INVALID";
                 return;
             }
@@ -329,6 +345,7 @@ PanelWindow {
         archiveV2AppliedQuery = archiveV2PendingQuery;
         archiveV2PendingQuery = "";
         archiveV2Rows = reply.items;
+        archiveCapacity = reply.capacity;
         archiveV2Total = reply.total;
         archiveV2HasMore = reply.hasMore;
         archiveV2NextCursor = reply.nextCursor || "";
@@ -1124,6 +1141,7 @@ PanelWindow {
                 if (trashLauncher.archiveV2Busy) {
                     trashLauncher.archiveV2Busy = false;
                     trashLauncher.archiveV2Rows = [];
+                    trashLauncher.archiveCapacity = null;
                     trashLauncher.archiveV2State = "STALE // COPY INDEX PROCESS FAILED";
                 }
             });
@@ -2012,7 +2030,7 @@ PanelWindow {
                             id: archiveEntriesBox
                             width: parent.width
                             height: Math.max(65, archiveRecordsView.height
-                                - (trashLauncher.snapshotStatus === "IDLE" ? 222 : 239))
+                                - (trashLauncher.snapshotStatus === "IDLE" ? 241 : 258))
                             ListView {
                                 id: archiveEntriesList
                                 width: parent.width - 17
@@ -2241,6 +2259,31 @@ PanelWindow {
                                            && trashLauncher.archiveV2HasMore
                                 onLeftClicked: trashLauncher.pageArchiveV2(1)
                             }
+                        }
+
+                        // Bounded capacity telemetry is read from the private
+                        // SQLite store; no extra V2-specific control button.
+                        GohuText {
+                            id: archiveCapacityLine
+                            width: parent.width
+                            height: 13
+                            font.pixelSize: 9
+                            color: trashLauncher.archiveCapacity
+                                   && trashLauncher.archiveCapacity.capacityState === "FULL"
+                                   ? Colors.orange : Colors.cyan
+                            elide: Text.ElideRight
+                            text: !trashLauncher.archiveCapacity
+                                ? "ARCHIVE STORAGE // NO DISK INVENTORY"
+                                : "ARCHIVE STORAGE // "
+                                  + (trashLauncher.archiveCapacity.chargedBytes
+                                     / 1048576).toFixed(1)
+                                  + " / "
+                                  + (trashLauncher.archiveCapacity.diskQuotaBytes
+                                     / 1048576).toFixed(0)
+                                  + " MiB // "
+                                  + (trashLauncher.archiveCapacity.remainingBytes
+                                     / 1048576).toFixed(1)
+                                  + " MiB REMAINING"
                         }
 
                         GohuText {

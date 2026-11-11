@@ -16,6 +16,11 @@ import sqlite3
 import stat
 from uuid import uuid4
 
+from scripts.trash.archive_v2_capacity import (
+    CapacityError, DEFAULT_DISK_QUOTA, MAX_DISK_QUOTA,
+    MIN_DISK_QUOTA, capacity,
+)
+
 DB_NAME = "trashpp-archive-v2.sqlite3"
 SCHEMA = "post-apollo.trash-archive.v2a"
 # Only disposable, independently supplied copies may use this pilot API.
@@ -63,16 +68,20 @@ class ArchiveStore:
     a source writer must independently authorize and verify its own revisions.
     """
 
-    def __init__(self, directory, payload_quota=DEFAULT_PAYLOAD_QUOTA):
+    def __init__(self, directory, payload_quota=DEFAULT_PAYLOAD_QUOTA,
+                 disk_quota=DEFAULT_DISK_QUOTA):
         _require(isinstance(directory, (str, Path)), "INVALID_ARCHIVE_ROOT")
         self.root = Path(directory)
         _require(self.root.is_absolute()
                  and len(str(self.root)) <= 4096
                  and isinstance(payload_quota, int)
                  and not isinstance(payload_quota, bool)
-                 and MAX_ITEM_BYTES <= payload_quota <= 2**40,
+                 and MAX_ITEM_BYTES <= payload_quota <= 2**40
+                 and type(disk_quota) is int
+                 and MIN_DISK_QUOTA <= disk_quota <= MAX_DISK_QUOTA,
                  "INVALID_ARCHIVE_CONFIG")
         self.payload_quota = payload_quota
+        self.disk_quota = disk_quota
         self.path = self.root / DB_NAME
         self._check_root()
         _private_file(self.path, allow_missing=True)
@@ -173,6 +182,12 @@ class ArchiveStore:
             except sqlite3.DatabaseError as exc:
                 raise ArchiveError("ARCHIVE_SCHEMA_UNAVAILABLE") from exc
 
+    def _capacity(self):
+        try:
+            return capacity(self.root, self.disk_quota)
+        except CapacityError as exc:
+            raise ArchiveError(str(exc)) from exc
+
     def save(self, owner_id, resource_id, source_revision, payload,
              display_label="", captured_ms=None):
         """Store a validated, source-provided copy; never read the source file."""
@@ -194,7 +209,26 @@ class ArchiveStore:
         sid = uuid4().hex
         with closing(self._connect()) as db:
             try:
+                # Per-connection SQLite max_page_count caps the main DB even
+                # before our total DB+journal footprint check. Read-only
+                # operations do not change this connection-level setting.
+                page_size = db.execute("PRAGMA page_size").fetchone()[0]
+                limit_pages = self.disk_quota // page_size
+                if db.execute("PRAGMA page_count").fetchone()[0] > limit_pages:
+                    raise ArchiveError("ARCHIVE_DISK_QUOTA")
+                max_pages = db.execute(
+                    "PRAGMA max_page_count=" + str(limit_pages)).fetchone()[0]
+                _require(max_pages <= limit_pages, "ARCHIVE_DISK_QUOTA")
                 db.execute("BEGIN IMMEDIATE")
+                before = self._capacity()
+                _require(before["chargedBytes"] < self.disk_quota,
+                         "ARCHIVE_DISK_QUOTA")
+                # Do not use the final bytes available to the whole host.
+                # These are conservative preflight figures, not a reserved
+                # filesystem quota against unrelated writers.
+                _require(before["filesystemAvailableBytes"] >=
+                         max(16 * 1024 * 1024, len(payload) * 2),
+                         "ARCHIVE_FILESYSTEM_SPACE")
                 bytes_now = db.execute(
                     "SELECT payload_bytes FROM archive_meta WHERE id=1"
                 ).fetchone()
@@ -210,12 +244,21 @@ class ArchiveStore:
                 db.execute("""UPDATE archive_meta
                     SET revision=revision+1,payload_bytes=payload_bytes+?
                     WHERE id=1""", (len(payload),))
+                # Accounting includes the currently present rollback journal,
+                # not just payload length. Refuse and roll back before commit
+                # if this transaction has exceeded our logical/allocated
+                # footprint budget.
+                _require(self._capacity()["chargedBytes"] <= self.disk_quota,
+                         "ARCHIVE_DISK_QUOTA")
                 db.commit()
             except sqlite3.IntegrityError as exc:
                 db.rollback()
                 raise ArchiveError("SNAPSHOT_ALREADY_EXISTS") from exc
             except sqlite3.DatabaseError as exc:
                 db.rollback()
+                code = getattr(exc, "sqlite_errorcode", None)
+                if code == sqlite3.SQLITE_FULL:
+                    raise ArchiveError("ARCHIVE_DISK_QUOTA") from exc
                 raise ArchiveError("ARCHIVE_WRITE_FAILED") from exc
             except BaseException:
                 db.rollback()
@@ -231,7 +274,8 @@ class ArchiveStore:
             ).fetchone()
             count = db.execute("SELECT count(*) FROM snapshots").fetchone()[0]
             return {"schema": SCHEMA, "revision": revision, "total": count,
-                    "payloadBytes": size, "payloadQuota": self.payload_quota}
+                    "payloadBytes": size, "payloadQuota": self.payload_quota,
+                    "capacity": self._capacity()}
 
     def list_page(self, limit=50, cursor=None):
         _require(type(limit) is int and 1 <= limit <= MAX_PAGE_SIZE,

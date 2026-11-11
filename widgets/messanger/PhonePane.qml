@@ -2386,6 +2386,7 @@ Rectangle {
         conversations: phonePane.selectedSection === "MESSAGES"
                        ? phoneReadAdapter.conversations : []
         keyboardFocused: false
+        phonePreviewMode: true // Scope two-line SMS excerpts to Social PHONE only.
         onContactClicked: {
             if (selectedConversation && phonePane.selectedSection === "MESSAGES")
                 phoneReadAdapter.loadMessages(String(selectedConversation.id));

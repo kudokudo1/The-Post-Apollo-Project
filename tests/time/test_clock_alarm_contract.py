@@ -22,6 +22,8 @@ class ClockAlarmContracts(unittest.TestCase):
         self.assertNotIn('import QtMultimedia', TIMEW)
         self.assertNotIn('import QtMultimedia', OWNER)
         self.assertIn('import qs.services.time', PANE)
+        self.assertIn('!alarmPlaceholderPane.editingActive', TIMEW)
+        self.assertIn('readonly property bool editingActive:', PANE)
 
     def test_actual_time_is_not_visual_calibration(self):
         self.assertIn('AlarmPolicy.tick(document, nowMs)', OWNER)
@@ -42,7 +44,7 @@ class ClockAlarmContracts(unittest.TestCase):
         self.assertIn('MAX_LATE_MS = 2 * 60 * 1000', POLICY)
         self.assertIn('MAX_RING_MS = 15 * 60 * 1000', POLICY)
         self.assertIn('!/[\\x00-\\x1f\\x7f]/.test(value)', POLICY)
-        self.assertIn('INVALID_ALARM FILE // NOT OVERWRITTEN', OWNER)
+        self.assertIn('INVALID ALARM FILE // NOT OVERWRITTEN', OWNER)
 
     def test_bounded_explicit_actions_and_emergency_silence(self):
         for action in ('arm(', 'disarm()', 'stopRinging()', 'snoozeRinging()',

@@ -7,6 +7,7 @@ ShellRoot {
     id: root
     property bool done: false
     property int tick: 0
+    property int phase: 0
     FloatingWindow {
         id: window
         visible: true
@@ -67,6 +68,19 @@ ShellRoot {
             if (SwayScrollSettings.applying || SwayScrollSettings.confirmationRequired) {
                 root.fail("UNAUTHORIZED_APPLY");return;
             }
+            if (root.phase === 1) {
+                if (KittyScrollSettings.busy)
+                    return;
+                if (!KittyScrollSettings.terminalMode
+                        || !KittyScrollSettings.stage("wheel", 8.0)
+                        || !KittyScrollSettings.stage("touch", 2.0)
+                        || KittyScrollSettings.confirmAction !== "") {
+                    root.fail("KITTY_STAGING_OR_APPROVAL"); return;
+                }
+                root.done = true;
+                console.log("KITTY_NATIVE_PASS // TWO_FACTORS_STAGED_NO_CONFIG_WRITE");
+                return;
+            }
             // Test only: inject synthetic Sway discovery into the in-memory
             // QML view. No Sway IPC or config file is touched.
             SwayScrollSettings.devices = [
@@ -85,8 +99,11 @@ ShellRoot {
             if (SwayScrollSettings.applying || SwayScrollSettings.confirmationRequired) {
                 root.fail("CANCEL_REFUSED");return;
             }
-            root.done = true;
             console.log("MOUSE_NATIVE_PASS // THREE_BAYS_STAGED_NO_HOST_MUTATION");
+            root.phase = 1;
+            if (!KittyScrollSettings.chooseMode(true)) {
+                root.fail("KITTY_MODE_UNAVAILABLE"); return;
+            }
         }
     }
     Timer {

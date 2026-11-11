@@ -43,13 +43,14 @@ class KittyScrollUiContract(unittest.TestCase):
         self.assertNotIn("onPanelVisibleChanged: KittyScrollSettings.confirm()",KITTY)
         self.assertNotIn("subprocess",HELPER)
         self.assertNotIn("swaymsg",HELPER)
-        self.assertIn("NO CONFIG WRITE", "NO CONFIG WRITE") # explicit no-op
+        self.assertNotIn("os.system", HELPER)
+        self.assertIn("No Kitty/Sway process", HELPER)
         self.assertIn("KITTY_NATIVE_PASS // TWO_FACTORS_STAGED_NO_CONFIG_WRITE",FIXTURE)
 
     def test_no_fullscreen_tui_claim(self):
         self.assertIn("ZELLIJ AND OTHER FULL-SCREEN TERMINAL PROGRAMS",KITTY)
         self.assertIn("NOT PROOF OF LIVE KITTY EFFECT",KITTY)
-        self.assertIn("Ctrl", "Ctrl") # no dependency on actual key injection
+        self.assertIn("SCROLL EVENTS THEMSELVES", KITTY)
 
 
 if __name__=="__main__":

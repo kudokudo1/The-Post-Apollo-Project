@@ -84,6 +84,9 @@ Scope {
     property double referenceUncertaintyMs: 0
     property string referenceSource: "NONE"
     property double referenceCheckedAtMs: 0
+    // Tracks manual checks and post-RESYNC verification as well as AUTO.
+    // This is session-only; automatic attempts also have a durable timestamp.
+    property double referenceLastAttemptAtMs: 0
     property bool postResyncVerificationPending: false
     readonly property int referenceMaxAgeMs: 15 * 60 * 1000
     readonly property int referenceWarningThresholdMs: 1000
@@ -206,6 +209,7 @@ Scope {
         referenceCheckedAtMs = 0;
         referenceUncertaintyMs = 0;
         referenceSource = "NONE";
+        referenceLastAttemptAtMs = Date.now();
         referenceProcess.exec([
             "python3", "-B", "-I",
             Quickshell.shellPath("services/time/TimeHostControl.py"), "measure"
@@ -281,8 +285,9 @@ Scope {
                 || resyncAuthPending || resyncProcess.running)
             return false;
         const now = Date.now();
-        if (reason === "interval"
-                && !AutoCheck.isDue(active, now, autoLastStartedAtMs))
+        if (!AutoCheck.canStartAutomaticCheck(active, reason, now,
+                                              autoLastStartedAtMs,
+                                              referenceLastAttemptAtMs))
             return false;
         if (!checkTimeAccuracy())
             return false;
@@ -305,12 +310,19 @@ Scope {
             return;
         autoResultDeadline.stop();
         autoCheckInFlight = false;
+        // Keep the measured deviation and its uncertainty visible instead
+        // of repeating an uninformative OUT OF SYNC label on every open.
+        // No second Chrony request is made to format a cached result.
+        const offset = (referenceOffsetMs / 1000).toFixed(3) + "S";
+        const uncertainty = (referenceUncertaintyMs / 1000).toFixed(3) + "S";
         autoCheckResult = !autoCheckExitOk
                           || referenceStatus !== "measured"
-                          ? "REFERENCE UNAVAILABLE // NO HOST CORRECTION"
+                          ? "UNAVAILABLE // " + referenceMessage
                           : referenceIsOutOfSync(Date.now())
-                          ? "OUT OF SYNC // CONFIRM RESYNC MANUALLY"
-                          : "MEASURED // WITHIN 1S THRESHOLD";
+                          ? "OUT OF SYNC // OFFSET " + offset
+                            + " // UNCERTAINTY " + uncertainty
+                          : "MEASURED // OFFSET " + offset
+                            + " // UNCERTAINTY " + uncertainty;
     }
 
     Timer {

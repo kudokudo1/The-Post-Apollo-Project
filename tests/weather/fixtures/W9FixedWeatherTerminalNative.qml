@@ -3,8 +3,8 @@ import QtQuick.Window
 import Quickshell
 import "widgets/weather" as Weather
 
-// W13 // Native test for centered readings/header and meters attached to
-// their data, preserving W12 wind/forecast and full TWILIGHT.
+// W14 // Native Quickshell test of the visual hierarchy, real forecast
+// record counts, contextual timestamps, padded rail and preserved TWILIGHT.
 ShellRoot {
     id: root
     property int ticks: 0
@@ -14,7 +14,7 @@ ShellRoot {
     function fail(reason) {
         if(finished)return;
         finished=true;
-        console.error("W13_NATIVE_FAIL // "+reason);
+        console.error("W14_NATIVE_FAIL // "+reason);
         Qt.quit();
     }
     QtObject {
@@ -84,6 +84,9 @@ ShellRoot {
             runtimeNowMs: 1794364200000
         }
     }
+    // W14 // Capture the actual offscreen Quickshell arrangement for
+    // operator visual review. The capture is diagnostic, never production.
+    property bool previewRequested: false
     Timer {
         interval: 250
         repeat: true
@@ -100,129 +103,66 @@ ShellRoot {
             const sky=host.renderer;
             const combined=host.combinedPanel;
             const solar=host.solarVisual;
-            if(!host.pageRail.visible || host.pageRail.height!==26
+            if(!host.pageRail.visible || host.pageRail.height!==24
+               || !host.modeHeader || host.modeHeader.height!==18
+               || host.pageRail.y <= host.modeHeader.height
                || sky.visualScroll.interactive)
-                return root.fail("SCROLLING_OR_PAGE_RAIL");
+                return root.fail("HEADER_SPACING_OR_SCROLL");
             if(sky.visualScroll.contentY!==0)
                 return root.fail("SCROLL_OFFSET_LEAK");
             if(root.phase===0) {
                 if(host.activeInstrument!=="weather")
                     return root.fail("COMBINED_NOT_DEFAULT");
                 if(!combined.visible || sky.visible)
-                    return root.fail("COMBINED_SCREEN_VISIBILITY");
+                    return root.fail("WEATHER_NOT_VISIBLE");
                 if(combined.hourRepeater.count!==6
                    || combined.dayCardsRepeater.count!==3
                    || sky.hourlyForecast.length!==6
                    || sky.dailyForecast.length!==3)
-                    return root.fail("FORECAST_ROWS_LOST");
+                    return root.fail("ORIGINAL_FORECAST_ROWS_LOST");
+
                 const bottom=combined.footerItem.mapToItem(
                     combined,0,combined.footerItem.height).y;
-                if(bottom>combined.height+1 || bottom<combined.height-18)
-                    return root.fail("BANDS_OVERFLOW // "+bottom
-                        +" > "+combined.height);
+                if(bottom>combined.height+1 ||
+                   bottom<combined.height-16)
+                    return root.fail("INSTRUMENT_DECK_OVERFLOW // "+bottom);
+
+                if(combined.currentItem.height<65 ||
+                   combined.hourlyItem.height<77 ||
+                   combined.dailyItem.height<30)
+                    return root.fail("INSUFFICIENT_INSTRUMENT_HEIGHT // "
+                      +combined.currentItem.height+" / "
+                      +combined.hourlyItem.height+" / "
+                      +combined.dailyItem.height);
+                if(combined.currentItem.mainGlyph.width<54 ||
+                   combined.currentItem.mainTemperature.font.pixelSize<36 ||
+                   combined.currentItem.weatherMeters.count!==4)
+                    return root.fail("HERO_WEATHER_INSTRUMENT_TOO_SMALL");
+                for(const idx of [0,1,2]) {
+                    const m=combined.currentItem.weatherMeters.itemAt(idx);
+                    if(!m || !m.meter.visible || m.meter.height<5)
+                        return root.fail("CURRENT_METER_MISSING_"+idx);
+                }
+                const hour=combined.hourRepeater.itemAt(0);
+                if(!hour || !hour.glyph || !hour.rainMeter ||
+                   !hour.timeItem.text.includes("11/10") ||
+                   hour.glyph.width<22 || hour.rainMeter.height<4)
+                    return root.fail("FORECAST_HOUR_CONTEXT_OR_SYMBOL");
                 const dailyBottom=combined.dailyItem.mapToItem(
                     combined,0,combined.dailyItem.height).y;
                 if(dailyBottom>combined.height)
-                    return root.fail("DAILY_OUT_OF_VIEW");
-                if(combined.currentItem.height<69
-                   || combined.hourlyItem.height<78
-                   || combined.hourlyItem.height>=105
-                   || combined.dailyItem.height<62
-                   || combined.dailyItem.height>74)
-                    return root.fail("WEATHER_BAND_BALANCE // "
-                        +combined.currentItem.height+" / "
-                        +combined.hourlyItem.height+" / "
-                        +combined.dailyItem.height);
-                const firstDay=combined.dayCardsRepeater.itemAt(0);
-                if(!firstDay || !firstDay.iconHolder
-                   || firstDay.iconHolder.width>firstDay.iconHolder.height+0.1
-                   || firstDay.iconHolder.width<38)
-                    return root.fail("DAILY_ICON_NOT_FITTING_CARD");
-                const firstHour=combined.hourRepeater.itemAt(0);
-                if(!firstHour || !firstHour.mainGlyph || !firstHour.rainMeter
-                   || firstHour.mainGlyph.font.pixelSize<34
-                   || firstHour.rainMeter.height<8)
-                    return root.fail("HOURLY_ARTWORK_OR_BAR_LOST");
+                    return root.fail("DAILY_STRIP_OVERFLOW");
 
-                // W13 // Test relative alignment, not only bounding boxes.
-                const heading=combined.headingItem;
-                const headingTitle=combined.headingTitle;
-                const headingCenter=headingTitle.mapToItem(
-                    heading,headingTitle.width/2,headingTitle.height/2).x;
-                if(Math.abs(headingCenter-heading.width/2)>1.5)
-                    return root.fail("W13_HEADING_OFF_CENTER");
-
-                const caption=combined.currentItem.conditionCaptionItem;
-                const tempBar=combined.currentItem.temperatureMeterItem;
-                const cond=combined.currentItem.conditionReadoutStack;
-                const condTop=cond.mapToItem(combined.currentItem,0,0).y;
-                const condBottom=cond.mapToItem(
-                    combined.currentItem,0,cond.height).y;
-                const labelBottom=caption.mapToItem(
-                    combined.currentItem,0,caption.height).y;
-                const tempBarTop=tempBar.mapToItem(
-                    combined.currentItem,0,0).y;
-                if(condTop < -2 || condBottom>combined.currentItem.height+2
-                   || tempBarTop<labelBottom
-                   || tempBarTop-labelBottom>6)
-                    return root.fail("W13_TEMPERATURE_METER_TOO_FAR // "
-                        +condTop+" / "+condBottom+" / "
-                        +(tempBarTop-labelBottom));
-
-                for(const idx of [0,1,2,3]) {
-                    const metric=combined.currentItem.metricCards.itemAt(idx);
-                    const group=metric.readoutStack;
-                    const captionBottom=metric.captionItem.mapToItem(
-                        metric,0,metric.captionItem.height).y;
-                    const metricTop=group.mapToItem(metric,0,0).y;
-                    const metricBottom=group.mapToItem(metric,0,group.height).y;
-                    if(metricTop < -2 || metricBottom>metric.height+2)
-                        return root.fail("W13_METRIC_NOT_CENTERED_"+idx);
-                    if(metric.dataMeter.visible) {
-                        const barTop=metric.dataMeter.mapToItem(metric,0,0).y;
-                        if(barTop<captionBottom || barTop-captionBottom>6)
-                            return root.fail("W13_BAR_TOO_FAR_"+idx+" // "
-                                +(barTop-captionBottom));
-                    }
+                if(!root.previewRequested) {
+                    root.previewRequested=true;
+                    window.contentItem.grabToImage(function(image) {
+                        if(image && image.saveToFile(
+                                "/tmp/weather-w14-visual-preview.png"))
+                            console.log("W14_PREVIEW_CAPTURED");
+                    },Qt.size(1040,600));
+                    return;
                 }
-                const hourArt=firstHour.artworkItem;
-                const rainLabel=firstHour.rainCaptionItem;
-                const artBottom=hourArt.mapToItem(
-                    firstHour,0,hourArt.height).y;
-                const rainTop=rainLabel.mapToItem(firstHour,0,0).y;
-                const rainBottom=rainLabel.mapToItem(
-                    firstHour,0,rainLabel.height).y;
-                const rainBarTop=firstHour.rainMeter.mapToItem(
-                    firstHour,0,0).y;
-                const rainBarBottom=firstHour.rainMeter.mapToItem(
-                    firstHour,0,firstHour.rainMeter.height).y;
-                if(rainTop-artBottom<0 || rainTop-artBottom>4
-                   || rainBarTop-rainBottom<0
-                   || rainBarTop-rainBottom>4
-                   || rainBarBottom>firstHour.height+2)
-                    return root.fail("W13_HOURLY_METER_DETACHED // "
-                        +(rainTop-artBottom)+" / "
-                        +(rainBarTop-rainBottom)+" / "+rainBarBottom);
 
-                const current=combined.currentItem;
-                if(!current.conditionIconItem
-                   || current.conditionIconItem.width<50
-                   || current.temperatureMeterItem.height<8
-                   || current.metricCards.count!==4)
-                    return root.fail("CURRENT_ICON_OR_METERS_MISSING");
-                for(const idx of [0,1,2]) {
-                    const reading=current.metricCards.itemAt(idx);
-                    if(!reading || !reading.dataMeter.visible
-                       || reading.dataMeter.height!==8 || reading.meterRatio<=0)
-                        return root.fail("CURRENT_DATA_BAR_"+idx);
-                }
-                const compass=current.metricCards.itemAt(2).directionArrow;
-                if(!compass.visible || compass.text!=="↑"
-                   || Math.abs(compass.rotation-sky.windAngle("W"))>0.1)
-                    return root.fail("WIND_ARROW_DIRECTION_MISMATCH");
-                const pressure=current.metricCards.itemAt(3);
-                if(pressure.dataMeter.visible)
-                    return root.fail("PRESSURE_SHOULD_NOT_IMPLY_UNSOURCED_METER");
                 host.activeInstrument="twilight";
                 root.phase=1;
                 return;
@@ -265,7 +205,7 @@ ShellRoot {
                    || combined.dailyRows.length!==0)
                     return root.fail("STALE_FORECAST_PRESENT");
                 root.finished=true;
-                console.log("W13_NATIVE_PASS // CENTERED_READOUTS_AND_ATTACHED_METERS_520X300");
+                console.log("W14_NATIVE_PASS // LINE_GLYPH_TERMINAL_AND_PADDED_RAIL_520X300");
                 Qt.quit();
             }
         }

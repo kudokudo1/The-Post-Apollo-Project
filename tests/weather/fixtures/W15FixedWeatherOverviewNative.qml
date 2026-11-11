@@ -14,6 +14,8 @@ ShellRoot {
     property bool capturedCompact: false
     property bool capturedWide: false
     property bool capturedTall: false
+    property bool checkedWeatherRailRoute: false
+    property string weatherRouteRequested: ""
     function fail(message) {
         if(finished)return;
         finished=true;
@@ -74,6 +76,9 @@ ShellRoot {
             subjectRoute: "weather/overview"
             weatherService: observation
             runtimeNowMs: 1794397200000
+            onRouteRequested: function(path) {
+                root.weatherRouteRequested=path;
+            }
         }
     }
     function checkFit() {
@@ -115,6 +120,12 @@ ShellRoot {
             if(!button || button.width<rail.width/3-6
                 || button.height!==25)
                 return "W21_RAIL_BUTTON_NOT_FULL_WIDTH_"+i;
+        }
+        if(!root.checkedWeatherRailRoute) {
+            rail.buttonRepeater.itemAt(1).clicked(null);
+            if(root.weatherRouteRequested!=="weather/forecasts/hourly")
+                return "W21_WEATHER_ROUTE_BUTTON_NOT_ROUTED";
+            root.checkedWeatherRailRoute=true;
         }
         if(Math.abs(summary.height+rail.height+snap.height
                     +autoCards.height-scroll.height)>2)

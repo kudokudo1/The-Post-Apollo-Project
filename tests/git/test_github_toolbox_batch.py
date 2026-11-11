@@ -99,6 +99,7 @@ class BatchTests(unittest.TestCase):
         work = WORK.read_text(encoding="utf-8")
         attention = ATTENTION.read_text(encoding="utf-8")
         widget = WIDGET.read_text(encoding="utf-8")
+        service = (ROOT / "services/github/GitHubService.qml").read_text(encoding="utf-8")
         self.assertIn('grep -Fxq', source)
         self.assertIn('GitHubBatch.wrap(', work)
         self.assertIn('GitHubBatch.wrap(', attention)
@@ -106,7 +107,9 @@ class BatchTests(unittest.TestCase):
         self.assertNotIn('jobs -rp | wc -l)" -ge 8', work)
         self.assertIn('commits/$sha/check-runs?per_page=100', work)
         self.assertIn('pulls/$number/reviews?per_page=100', work)
-        self.assertIn('gitService', widget)
+        self.assertIn('&& root.githubView === "control"', widget)
+        self.assertIn('root.ensureGithubSnapshot();', widget)
+        self.assertRegex(service, r'if \(refreshing\)\s+return;\s+refreshPxRuntime\(\);')
 
 
 if __name__ == "__main__":

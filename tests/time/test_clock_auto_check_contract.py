@@ -24,7 +24,7 @@ class ClockAutoReferenceContracts(unittest.TestCase):
         self.assertIn("var MIN_HOURS = 1;", POLICY)
 
     def test_background_only_measurement_no_privileged_actuation(self):
-        schedule = SERVICE.split("function maybeAutoCheckTime() {", 1)[1].split(
+        schedule = SERVICE.split("function maybeAutoCheckTime(trigger) {", 1)[1].split(
             "function completeAutoReferenceIfReady()", 1
         )[0]
         self.assertIn("AutoCheck.isDue(", schedule)

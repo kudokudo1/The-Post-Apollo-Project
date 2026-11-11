@@ -475,7 +475,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             'C4B_ID_BLOCKED // REAL_ENFORCING_SELINUX_POLICY_LOAD_STALLED',
             'selinux_load_started=0',
             'SECONDS - selinux_load_started > 205',
-            'SELINUX_STAGE|SELINUX_LOAD_DETAIL|SELINUX_UNLOAD_DETAIL',
+            'SELINUX_STAGE|SELINUX_MODULE_DETAIL|SELINUX_LOAD_DETAIL|SELINUX_UNLOAD_DETAIL',
         ):
             self.assertIn(marker, host)
         self.assertNotIn('setenforce 0', probe)

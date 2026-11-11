@@ -52,6 +52,17 @@ PanelWindow {
     // V2h reports real file footprint and the fixed copy budget, never a
     // deletion permission or an estimate from payload length alone.
     property var archiveCapacity: null
+    // Only confirmed read-only SQLite capacity measurements drive the bar.
+    // This is real charged DB + journal usage, not an illustrative progress.
+    readonly property real archiveCapacityRatio: archiveCapacity && archiveCapacity.diskQuotaBytes > 0 ? Math.min(1, Math.max(0, archiveCapacity.chargedBytes / archiveCapacity.diskQuotaBytes)) : 0
+    readonly property real archiveCapacityPercent: archiveCapacityRatio * 100
+    readonly property color archiveCapacityColor: !archiveCapacity ? Colors.cyan
+        : archiveCapacityRatio >= 1 ? Colors.red
+        : archiveCapacityRatio >= 0.80 ? Colors.orange : Colors.cyan
+    readonly property string archiveCapacityUsedText: !archiveCapacity ? "UNKNOWN"
+        : archiveCapacity.chargedBytes < 1048576
+        ? (archiveCapacity.chargedBytes / 1024).toFixed(1) + " KiB"
+        : (archiveCapacity.chargedBytes / 1048576).toFixed(2) + " MiB"
     property bool archiveV2HasMore: false
     property string archiveV2NextCursor: ""
     property int archiveV2Page: 0
@@ -1948,6 +1959,111 @@ PanelWindow {
                             }
                         }
 
+                        // V2h capacity display: actual charged SQLite DB +
+                        // rollback-journal footprint, never a fake time/step
+                        // animation. No mutation, buttons or deletion controls.
+                        Item {
+                            id: archiveCapacityGauge
+                            width: parent.width
+                            height: trashLauncher.chassisSize === "compact" ? 52 : 66
+
+                            Row {
+                                id: archiveCapacityHeader
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                height: trashLauncher.chassisSize === "compact" ? 16 : 20
+                                spacing: 6
+
+                                GohuText {
+                                    width: Math.max(95, parent.width * 0.39)
+                                    height: parent.height
+                                    font.pixelSize: trashLauncher.chassisSize === "compact" ? 11 : 14
+                                    color: Colors.yellow
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                    text: "ARCHIVE // CAPACITY"
+                                }
+                                GohuText {
+                                    width: Math.max(0, parent.width
+                                        - archiveCapacityHeader.spacing
+                                        - archiveCapacityHeader.children[0].width)
+                                    height: parent.height
+                                    font.pixelSize: trashLauncher.chassisSize === "compact" ? 10 : 13
+                                    color: trashLauncher.archiveCapacityColor
+                                    horizontalAlignment: Text.AlignRight
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                    text: !trashLauncher.archiveCapacity
+                                        ? "NOT MEASURED"
+                                        : trashLauncher.archiveCapacityUsedText
+                                          + " / "
+                                          + (trashLauncher.archiveCapacity.diskQuotaBytes
+                                             / 1048576).toFixed(0) + " MiB"
+                                }
+                            }
+
+                            Rectangle {
+                                id: archiveCapacityTrack
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: archiveCapacityHeader.bottom
+                                anchors.topMargin: 4
+                                height: trashLauncher.chassisSize === "compact" ? 15 : 20
+                                radius: 0
+                                color: Colors.dark
+                                border.width: 1
+                                border.color: trashLauncher.archiveCapacityColor
+                                clip: true
+
+                                Rectangle {
+                                    id: archiveCapacityFill
+                                    x: 1
+                                    y: 1
+                                    height: Math.max(0, parent.height - 2)
+                                    // Zero means zero. Real usage drives every
+                                    // pixel; no artificial minimum fill width.
+                                    width: Math.max(0, (parent.width - 2) * trashLauncher.archiveCapacityRatio)
+                                    color: trashLauncher.archiveCapacityColor
+                                    radius: 0
+                                }
+                            }
+
+                            Row {
+                                id: archiveCapacityFooter
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: archiveCapacityTrack.bottom
+                                anchors.topMargin: 3
+                                height: trashLauncher.chassisSize === "compact" ? 13 : 17
+                                spacing: 4
+
+                                GohuText {
+                                    width: parent.width * 0.64
+                                    height: parent.height
+                                    color: trashLauncher.archiveCapacityColor
+                                    font.pixelSize: trashLauncher.chassisSize === "compact" ? 10 : 12
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                    text: !trashLauncher.archiveCapacity
+                                        ? "NO DISK INVENTORY"
+                                        : (trashLauncher.archiveCapacity.remainingBytes
+                                           / 1048576).toFixed(2) + " MiB REMAINING"
+                                }
+                                GohuText {
+                                    width: parent.width - archiveCapacityFooter.children[0].width
+                                           - archiveCapacityFooter.spacing
+                                    height: parent.height
+                                    color: trashLauncher.archiveCapacityColor
+                                    font.pixelSize: trashLauncher.chassisSize === "compact" ? 10 : 12
+                                    horizontalAlignment: Text.AlignRight
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: !trashLauncher.archiveCapacity ? "UNAVAILABLE"
+                                        : trashLauncher.archiveCapacityPercent.toFixed(2) + "% USED"
+                                }
+                            }
+                        }
+
                         GohuText {
                             width: parent.width
                             height: 17
@@ -2029,8 +2145,12 @@ PanelWindow {
                         Item {
                             id: archiveEntriesBox
                             width: parent.width
+                            // The live capacity gauge occupies the top rail,
+                            // so reduce only the scrollable records area.
+                            // Compact hides its redundant old bottom disclaimer.
                             height: Math.max(65, archiveRecordsView.height
-                                - (trashLauncher.snapshotStatus === "IDLE" ? 241 : 258))
+                                - (trashLauncher.snapshotStatus === "IDLE" ? 241 : 258)
+                                - (trashLauncher.chassisSize === "compact" ? 3 : 51))
                             ListView {
                                 id: archiveEntriesList
                                 width: parent.width - 17
@@ -2261,32 +2381,8 @@ PanelWindow {
                             }
                         }
 
-                        // Bounded capacity telemetry is read from the private
-                        // SQLite store; no extra V2-specific control button.
                         GohuText {
-                            id: archiveCapacityLine
-                            width: parent.width
-                            height: 13
-                            font.pixelSize: 9
-                            color: trashLauncher.archiveCapacity
-                                   && trashLauncher.archiveCapacity.capacityState === "FULL"
-                                   ? Colors.orange : Colors.cyan
-                            elide: Text.ElideRight
-                            text: !trashLauncher.archiveCapacity
-                                ? "ARCHIVE STORAGE // NO DISK INVENTORY"
-                                : "ARCHIVE STORAGE // "
-                                  + (trashLauncher.archiveCapacity.chargedBytes
-                                     / 1048576).toFixed(1)
-                                  + " / "
-                                  + (trashLauncher.archiveCapacity.diskQuotaBytes
-                                     / 1048576).toFixed(0)
-                                  + " MiB // "
-                                  + (trashLauncher.archiveCapacity.remainingBytes
-                                     / 1048576).toFixed(1)
-                                  + " MiB REMAINING"
-                        }
-
-                        GohuText {
+                            visible: trashLauncher.chassisSize !== "compact"
                             width: parent.width
                             height: 24
                             color: Colors.yellow

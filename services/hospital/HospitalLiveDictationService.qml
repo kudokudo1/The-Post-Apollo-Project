@@ -2,8 +2,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Scope: Surgery Manage long-form fields ONLY.
-// Different transport from Reception; supports local chunked partial text.
+// Shared local live dictation engine for Surgery Manage, Reception and Intercom.
+// One host-owned recorder; source-level hold remains until crash clearance.
 // No form submit, cloud request or durable audio.
 Scope {
     id: root
@@ -18,7 +18,7 @@ Scope {
     property int recordingElapsedSeconds: 0
     property double recordingStartedAt: 0
     property bool liveStreaming: true
-    // Reception and Intercom use shorter chunks; Manage keeps its stable default.
+    // Legacy standalone default; HospitalW sets 2-second chunks for all menus.
     property int chunkSeconds: 4
     property int firstChunkMs: 1400
     property bool vadActive: false

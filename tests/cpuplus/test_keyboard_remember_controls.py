@@ -56,7 +56,7 @@ class RememberUiContract(unittest.TestCase):
     def test_no_fake_live_restore_claim(self):
         self.assertIn("LED PROXY // NOT VERIFIED XKB STATE", PANE)
         self.assertIn("NO SWAY RELOAD OR KEY INJECTION", PANE)
-        self.assertIn("NEXT SWAY START", PANE)
+        self.assertIn("NEXT FULL SWAY START", PANE)
 
 
 if __name__ == "__main__":

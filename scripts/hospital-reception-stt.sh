@@ -109,7 +109,8 @@ if [[ "${1:-}" == "--session-check" ]]; then
     # Do not attempt to start an unknown server version without Unix socket
     # support. --help neither initializes a model nor opens a listener.
     help_text="$("$server" --help 2>&1 || true)"
-    [[ "$help_text" == *"--host"* && "$help_text" == *"socket"* ]] || exit 3
+    [[ "$help_text" == *"--host"* && "$help_text" == *"socket"*
+       && "$help_text" == *"--no-gpu"* && "$help_text" == *"--no-context"* ]] || exit 3
     exit 0
 fi
 
@@ -122,7 +123,7 @@ if [[ "${1:-}" == "--session" ]]; then
     # Local-only server, GPU disabled, one server process/worker. No ffmpeg
     # conversion and no network-facing TCP listener, even on localhost.
     exec "$server" -m "$model" --host "$socket_path" \
-        -ng -t 2 -p 1 -l en -nt -np -nc
+        -ng -t 2 -p 1 -l en -nt -nc
 fi
 
 if [[ "${1:-}" == "--check" ]]; then

@@ -14,6 +14,7 @@ const button=id=>{
   return item;
 };
 const status=button("status");
+status.textContent="READY // NO OBSERVATION YET"; // Initial HTML text, before module load
 const verify=button("verify-marker");
 const close=button("close-marker");
 

@@ -40,7 +40,7 @@ test("W16 one-page OVERVIEW shows original Snapshot and AUTO rows simultaneously
  assert.match(home,/overviewDense: home\.fixedWeatherOverview/);
  assert.match(home,/compact: home\.fixedWeatherOverview/);
  assert.match(card,/property bool overviewDense: false/);
- assert.match(card,/card\.overviewDense \? 2/);
+ assert.match(card,/card\.overviewDense \? 1/);
  assert.match(card,/card\.overviewDense \? 0/);
  assert.equal((home.match(/title: "CURRENT WEATHER"/g)||[]).length,1);
  assert.equal((home.match(/title: "NEXT HOURS"/g)||[]).length,1);

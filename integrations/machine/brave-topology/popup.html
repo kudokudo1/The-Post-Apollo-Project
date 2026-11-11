@@ -10,7 +10,7 @@
   <main>
     <header>
       <strong>MACHINE // BRAVE</strong>
-      <span>READ ONLY</span>
+      <span>OPT-IN PILOT</span>
     </header>
     <div class="separator" aria-hidden="true"></div>
     <h1>Window inventory</h1>
@@ -63,10 +63,20 @@
       preview, not a restorable snapshot. REVOKE removes active access,
       although Brave may remember an earlier grant.</p>
     </section>
+    <section class="local-link" aria-label="Explicit encrypted selected-tab save review">
+      <h2>SEALED SESSION // DISPOSABLE SAVE</h2>
+      <p>After granting both optional TAB and LOCAL permissions above, open
+      a full review page for THIS normal Brave window. Every tab starts unchecked.
+      Choose tabs, enter a passphrase, and click ENCRYPT AND SAVE only when ready.
+      Plaintext never goes to the native host. A separate disposable host
+      registration is required. No restore or monitor movement.</p>
+      <button type="button" id="open-save-review">OPEN SEALED SAVE REVIEW</button>
+      <p id="save-review-open-status" role="status" aria-live="polite">NO SAVE REVIEW OPENED</p>
+    </section>
     <section class="limits" aria-label="Recovery limitations">
-      <p>Window numbers last only for this browser run. They are not Sway window IDs.</p>
+      <p>Window numbers last only for this browser run. They are not Sway window IDs. Saved sessions have no trusted monitor mapping yet.</p>
       <p>Basic inventory ignores addresses and titles. The separately clicked tab preview reads current-window addresses only after optional permission, shows redacted classifications and never saves data. The marker test reads only its own random title.</p>
-      <p>NO SESSION LINK // NO RESTORE ACTIONS</p>
+      <p>SEALED SAVE IS EXPLICIT AND DISPOSABLE ONLY // NO RESTORE ACTIONS</p>
     </section>
   </main>
   <script type="module" src="popup.mjs"></script>
@@ -74,5 +84,6 @@
   <script type="module" src="focus-observe-ui.mjs"></script>
   <script type="module" src="open-marker-ui.mjs"></script>
   <script type="module" src="session-preview-ui.mjs"></script>
+  <script type="module" src="open-save-review.mjs"></script>
 </body>
 </html>

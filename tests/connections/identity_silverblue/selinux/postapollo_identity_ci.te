@@ -1,0 +1,31 @@
+policy_module(postapollo_identity_ci, 1.0.0)
+
+# Disposable test-only prototype. Not production sign-in authorization.
+# This defines a distinct daemon type and runtime object type, NOT an
+# unconfined domain. It must be compiled and independently reviewed before
+# any isolated guest load or installed service can claim confinement.
+
+type postapollo_identity_ci_t;
+type postapollo_identity_ci_exec_t;
+init_daemon_domain(postapollo_identity_ci_t, postapollo_identity_ci_exec_t)
+
+type postapollo_identity_ci_run_t;
+files_pid_file(postapollo_identity_ci_run_t)
+
+# Only the service-owned AF_UNIX command channel in its disposable /run tree.
+allow postapollo_identity_ci_t self:unix_stream_socket create_stream_socket_perms;
+allow postapollo_identity_ci_t self:process { fork sigchld };
+manage_dirs_pattern(postapollo_identity_ci_t, postapollo_identity_ci_run_t, postapollo_identity_ci_run_t)
+manage_files_pattern(postapollo_identity_ci_t, postapollo_identity_ci_run_t, postapollo_identity_ci_run_t)
+manage_sock_files_pattern(postapollo_identity_ci_t, postapollo_identity_ci_run_t, postapollo_identity_ci_run_t)
+
+# Python interpreter and signed installed modules require ordinary shared
+# library, config, entropy, localization and /usr read access. No network
+# socket creation, privileged ports, home access or blanket unconfined rules.
+libs_use_ld_so(postapollo_identity_ci_t)
+libs_use_shared_libs(postapollo_identity_ci_t)
+files_read_usr_files(postapollo_identity_ci_t)
+files_read_etc_files(postapollo_identity_ci_t)
+dev_read_urand(postapollo_identity_ci_t)
+miscfiles_read_localization(postapollo_identity_ci_t)
+kernel_read_system_state(postapollo_identity_ci_t)

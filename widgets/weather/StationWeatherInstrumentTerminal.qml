@@ -408,6 +408,10 @@ Rectangle {
                         readonly property alias glyph: hourGlyph
                         readonly property alias rainMeter: hourRain
                         readonly property alias timeItem: forecastTime
+                        readonly property alias instrumentRegion: hourInstrumentRegion
+                        readonly property alias readingStack: hourInstrumentStack
+                        readonly property alias temperatureItem: hourTemperature
+                        readonly property alias chanceItem: hourChance
                         width: (hourTimeline.width-5)/6
                         height: hourTimeline.height
 

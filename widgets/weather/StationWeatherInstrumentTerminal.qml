@@ -22,11 +22,11 @@ Rectangle {
         ? sky.dailyForecast : []
     readonly property real budget: Math.max(1,height-19-12-8)
     // W20 // Give the primary current condition a real HERO-sized area.
-    // Keep at least 84px for the hourly readings and 32px for the daily
-    // summary at compact size. The actual artwork still uses StationSky.
+    // Keep at least 84px for the hourly readings and 41px for the daily
+    // panel (including date, rain bar and peak chance). Artwork stays SKY.
     readonly property real hourlyHeight: Math.max(84,Math.round(budget*0.33))
     readonly property real currentHeight: Math.max(1,Math.min(
-        Math.round(budget*0.57),budget-hourlyHeight-24))
+        Math.round(budget*0.57),budget-hourlyHeight-33))
     // W19 // Existing inter-band padding occupied eight precious pixels in
     // compact WEATHER. Each band has its own divider, so reclaim that space
     // for the three-day rain bar without reducing NOW or hourly instruments.

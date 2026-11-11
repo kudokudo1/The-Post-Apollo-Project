@@ -2148,6 +2148,12 @@ Column {
         property int voiceMaxLength: 4000
         readonly property bool voiceActive:
             !!voiceKey && root.dictationField === voiceKey
+        // The microphone can close while the guarded recognizer finishes.
+        // Retain explicit stop feedback until the owned child exits.
+        readonly property bool stopInProgress: voiceActive
+            && !!root.speechInputService
+            && (root.speechInputService.stopping
+                || root.speechInputService.transcribing)
         readonly property bool showVoiceLine:
             !!voiceKey && (voiceActive
                 || root.dictationFeedbackField === voiceKey)
@@ -2223,33 +2229,38 @@ Column {
                     ? Colors.yellow : Colors.dark
                 border.width: managerArea.voiceActive || micMouse.containsMouse
                     ? 2 : 1
-                border.color: managerArea.voiceActive || micMouse.containsMouse
-                    ? Colors.magenta : Colors.omnitrix
+                border.color: managerArea.stopInProgress ? Colors.red
+                    : managerArea.voiceActive || micMouse.containsMouse
+                      ? Colors.magenta : Colors.omnitrix
                 opacity: canAct || managerArea.voiceActive ? 1.0 : 0.45
 
                 RectangularShadow {
                     anchors.fill: parent
-                    spread: 4
+                    spread: managerArea.stopInProgress ? 5 : 4
                     z: -1
-                    opacity: managerArea.voiceActive || micMouse.containsMouse
-                        ? 0.55 : 0.34
-                    color: managerArea.voiceActive || micMouse.containsMouse
-                        ? Colors.magenta : Colors.omnitrix
+                    opacity: managerArea.stopInProgress ? 0.70
+                        : managerArea.voiceActive || micMouse.containsMouse
+                          ? 0.55 : 0.34
+                    color: managerArea.stopInProgress ? Colors.red
+                        : managerArea.voiceActive || micMouse.containsMouse
+                          ? Colors.magenta : Colors.omnitrix
                 }
                 GohuText {
                     anchors.centerIn: parent
                     anchors.verticalCenterOffset: 1
                     text: "🗣︎"
                     font.pixelSize: 20
-                    color: managerArea.voiceActive || micMouse.containsMouse
-                        ? Colors.magenta : Colors.omnitrix
+                    color: managerArea.stopInProgress ? Colors.red
+                        : managerArea.voiceActive || micMouse.containsMouse
+                          ? Colors.magenta : Colors.omnitrix
                     layer.enabled: true
                     layer.effect: DropShadow {
                         radius: 6
                         samples: 9
                         opacity: 0.60
-                        color: managerArea.voiceActive || micMouse.containsMouse
-                            ? Colors.magenta : Colors.omnitrix
+                        color: managerArea.stopInProgress ? Colors.red
+                            : managerArea.voiceActive || micMouse.containsMouse
+                              ? Colors.magenta : Colors.omnitrix
                         transparentBorder: true
                     }
                 }
@@ -2291,13 +2302,15 @@ Column {
                       : "LIVE " + root.speechInputService.recordingElapsedLabel
                           + " // PRESS MIC TO STOP")
                 : managerArea.voiceActive && root.speechInputService
-                    && (root.speechInputService.stopping
-                        || root.speechInputService.transcribing)
+                    && root.speechInputService.stopping
+                ? "STOPPING // FINALIZING DICTATION // NO SUBMISSION"
+                : managerArea.voiceActive && root.speechInputService
+                    && root.speechInputService.transcribing
                 ? (root.speechInputService.captureStopReason === "CAPTURE_CHUNK_LIMIT"
                     ? "SAFETY AUTO-STOP // FINISHING LAST CHUNK"
                     : root.speechInputService.audioDropped
                       ? "MODEL BEHIND // SOME AUDIO WAS SKIPPED"
-                      : "LOCAL WHISPER // FINISHING // NO SUBMISSION")
+                      : "MIC CLOSED // TRANSCRIBING // NO SUBMISSION")
                 : (managerArea.voiceActive && root.speechInputService
                     && root.dictationFeedback === "LIVE TRANSCRIPT READY // REVIEW BEFORE SUBMIT"
                     && root.speechInputService.timingSummary.length > 0

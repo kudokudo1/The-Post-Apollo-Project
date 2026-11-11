@@ -356,7 +356,7 @@ test("M30-E returns Moon and solar details to the non-scrolling lower viewport",
 
 test("M30-F ASTROLOGY is an independent, non-scrolling, source-owned instrument", () => {
   assert.match(pane,/readonly property bool standaloneAstrology:\s*subjectRoute === "magick\/astrology\/charts"/);
-  assert.match(pane,/readonly property bool independentScreen:\s*standaloneAstrology \|\| lensesLanding/);
+  assert.match(pane,/readonly property bool independentScreen:\s*servicesRoute \|\| standaloneAstrology \|\| lensesLanding/);
   assert.match(pane,/sourceComponent: magickPane\.standaloneAstrology\s*\? standaloneAstrologyReference/);
   assert.match(pane,/id: standaloneAstrologyReference[\s\S]*StationMagickAstrologyPane\s*\{/);
   assert.match(pane,/visible: !magickPane\.independentScreen/);
@@ -393,9 +393,9 @@ test("M30-F ASTROLOGY is an independent, non-scrolling, source-owned instrument"
 test("M30-F replaces PLANETARY bottom category with source-honest LENSES", () => {
   vm.runInContext(workspacePolicy.replace(/^\.pragma library\s*$/m,""),wnav);
   const modes=JSON.parse(JSON.stringify(wnav.GROUPS.magick));
-  assert.equal(modes.length,6);
+  assert.equal(modes.length,7);
   assert.deepEqual(modes.map(m=>m.label),
-    ["OVERVIEW","LUNAR + SOLAR","LENSES","ASTROLOGY","DIVINATION","GRIMOIRE"]);
+    ["OVERVIEW","LUNAR + SOLAR","LENSES","ASTROLOGY","DIVINATION","GRIMOIRE","SERVICES"]);
   assert.equal(modes[2].path,"magick/planetary/correspondences");
   assert.equal(modes[2].key,"lenses");
   assert.equal(wnav.selectedGroup("magick/planetary/hours"),"lenses");

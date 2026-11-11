@@ -294,6 +294,50 @@ if [[ -e "$runtime/identity-display-v0.sock" ]]; then
   fail "UNAPPROVED_BROWSER_HOST_SOCKET_EXISTS"
 fi
 
+# Independently start a short-lived process under the same dedicated
+# SELinux entrypoint to prove a *kernel* AF_INET socket-create denial.
+# This transient unit has NO systemd RestrictAddressFamilies, network
+# namespace, or PrivateNetwork restriction that could fake SELinux denial.
+denial="$base/deny-network.py"
+cat >"$denial" <<'PY'
+import errno, socket
+from pathlib import Path
+expected=b"system_u:system_r:postapollo_identity_ci_t:s0"
+label=Path("/proc/self/attr/current").read_bytes()
+if label.endswith(b"\x00"):
+    label=label[:-1]
+if label!=expected:
+    raise SystemExit("C4B_ID_FAIL // SELINUX_NEGATIVE_PROBE_WRONG_DOMAIN")
+try:
+    conn=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+except OSError as exc:
+    if exc.errno not in (errno.EACCES,errno.EPERM):
+        raise SystemExit("C4B_ID_FAIL // SELINUX_NEGATIVE_PROBE_OTHER_ERROR")
+    print("C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE",flush=True)
+else:
+    conn.close()
+    raise SystemExit("C4B_ID_FAIL // SELINUX_DOMAIN_ALLOWED_INET_SOCKET_CREATE")
+PY
+chmod 0444 "$denial"
+chcon -t postapollo_identity_ci_run_t "$denial" ||
+  fail "SELINUX_NEGATIVE_HELPER_LABEL_REFUSED"
+negative_unit=postapollo-identity-ci-net-denial
+negative_log=/var/tmp/c4b-id-selinux-negative.log
+negative_rc=0
+timeout --signal=TERM --kill-after=4s 35s systemd-run --wait --pipe --collect \
+  --unit="$negative_unit" \
+  --property="User=$name" --property="Group=$name" \
+  "$launcher" -I -B "$denial" >"$negative_log" 2>&1 ||
+    negative_rc="$?"
+sed -n '1,30p' "$negative_log" |
+  sed 's/^/C4B_ID_SELINUX_NEGATIVE_DETAIL \/\/ /' >/dev/ttyS0 || true
+[[ "$negative_rc" == 0 ]] &&
+  grep -Fq 'C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE' "$negative_log" ||
+  fail "REAL_ENFORCING_SELINUX_NETWORK_DENIAL_NOT_PROVEN"
+echo "C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE"
+systemctl reset-failed "$negative_unit.service" >/dev/null 2>&1 || true
+rm -f -- "$denial"
+
 # Verify teardown of the *running* service before rpm-ostree rollback.
 systemctl stop "$unit" || fail "SERVICE_STOP_REFUSED"
 for i in $(seq 1 30); do

@@ -218,7 +218,8 @@ def main():
     shutil.copyfile(original,TEST_SCRIPT_PATH)
     for name in ("MachineBraveProtectedMetadataContract.py",
                  "MachineBraveSealedVault.py",
-                 "MachineBraveArchiveAdmissionIntent.py"):
+                 "MachineBraveArchiveAdmissionIntent.py",
+                 "MachineBraveProcessLease.py"):
         shutil.copyfile(ROOT/"services"/"time"/name,fixture_modules/name)
     for path in (TEST_SCRIPT_PATH,*fixture_modules.iterdir()):
         path.chmod(0o644)

@@ -13,9 +13,17 @@ set -Eeuo pipefail
 command -v xorriso >/dev/null && command -v genisoimage >/dev/null &&
   command -v qemu-system-x86_64 >/dev/null && command -v qemu-img >/dev/null ||
   { echo "C4B_ID_BLOCKED // MISSING_EPHEMERAL_QEMU_TOOLS"; exit 2; }
-[[ $# == 1 ]] || { echo "C4B_ID_BLOCKED // SIGNED_RPM_DIRECTORY_ARGUMENT_REQUIRED"; exit 2; }
+[[ $# == 2 ]] || { echo "C4B_ID_BLOCKED // SIGNED_RPM_AND_FEDORA_RUNTIME_DIRECTORIES_REQUIRED"; exit 2; }
 repo="$(cd "$(dirname "$0")/../../.." && pwd)"
 artifact_dir="$1"
+runtime_dir="$2"
+[[ -f "$runtime_dir/identity-python3-cryptography-f44.rpm" &&
+   -r "$runtime_dir/identity-fedora44-runtime-public.asc" &&
+   -r "$runtime_dir/identity-fedora44-runtime-manifest.sha256" ]] ||
+  { echo "C4B_ID_BLOCKED // VERIFIED_OFFLINE_CRYPTO_RUNTIME_MISSING"; exit 2; }
+(cd "$runtime_dir" &&
+ sha256sum --check --status identity-fedora44-runtime-manifest.sha256) ||
+  { echo "C4B_ID_BLOCKED // OFFLINE_CRYPTO_RUNTIME_DIGEST_REFUSED"; exit 2; }
 [[ -d "$artifact_dir" && -r "$artifact_dir/identity-silverblue-ci.rpm" &&
    -r "$artifact_dir/identity-artifact-manifest.sha256" ]] ||
   { echo "C4B_ID_BLOCKED // SIGNED_IDENTITY_RPM_MISSING"; exit 2; }
@@ -50,6 +58,10 @@ xorriso -osirrox on -indev "$tmp/$iso" \
 for file in identity-silverblue-ci.rpm identity-disposable-rpm-public.asc \
     identity-disposable-rpm-fingerprint.txt identity-artifact-manifest.sha256; do
   install -m 0644 "$artifact_dir/$file" "$tmp/seed/$file"
+done
+for file in identity-python3-cryptography-f44.rpm identity-fedora44-runtime-public.asc \
+    identity-fedora44-runtime-manifest.sha256; do
+  install -m 0644 "$runtime_dir/$file" "$tmp/seed/$file"
 done
 payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh")"
 helper_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/verify_booted_rpm_mtime_only.py")"

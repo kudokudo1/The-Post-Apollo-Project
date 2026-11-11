@@ -334,7 +334,7 @@ Rectangle {
                     Canvas {
                         id: solarCanvas
                         anchors.fill: parent
-                        anchors.margins: 8
+                        anchors.margins: visual.fullBleedSolar ? 3 : 8
 
                         onPaint: {
                             const ctx=getContext("2d");

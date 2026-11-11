@@ -11,6 +11,7 @@ ShellRoot {
     property int phase: 0
     property int ticks: 0
     property bool done: false
+    property bool overviewPreviewRequested: false
     function fail(reason) {
         if(done) return;
         done=true;
@@ -33,9 +34,9 @@ ShellRoot {
         property double aqi: 60
         property double pm25: 10.2
         property var hourlyForecast: [
-            {timeLabel:"09 PM",tempF:56,weatherCode:0,condition:"Clear",chanceRain:5},
-            {timeLabel:"10 PM",tempF:53,weatherCode:3,condition:"Cloudy",chanceRain:15},
-            {timeLabel:"11 PM",tempF:51,weatherCode:61,condition:"Rain",chanceRain:25}
+            {date:"2026-11-10",time:"2100",timeLabel:"09 PM",tempF:56,weatherCode:0,condition:"Clear",chanceRain:5},
+            {date:"2026-11-11",time:"0000",timeLabel:"12 AM",tempF:53,weatherCode:3,condition:"Cloudy",chanceRain:15},
+            {date:"2026-11-11",time:"0300",timeLabel:"03 AM",tempF:51,weatherCode:61,condition:"Rain",chanceRain:25}
         ]
         property var dailyForecast: [
             {date:"2026-11-10",maxTempF:64,minTempF:45,
@@ -97,6 +98,14 @@ ShellRoot {
             if(root.phase===1) {
                 if(weatherTerminal.height!==158)
                     return root.fail("OVERVIEW_HEIGHT");
+                if(!root.overviewPreviewRequested) {
+                    root.overviewPreviewRequested=true;
+                    weatherTerminal.grabToImage(function(image){
+                        if(image && image.saveToFile("/tmp/weather-w14-overview-preview.png"))
+                            console.log("W14_OVERVIEW_PREVIEW_CAPTURED");
+                    },Qt.size(1024,316));
+                    return;
+                }
                 observations.forecastReady=false;
                 root.phase=2;
                 return;

@@ -53,8 +53,8 @@ test("W17 carries same visible icon and meter relationships",()=>{
 });
 
 test("W17 slightly shrinks the lower cards but keeps their original data and no normal scrolling",()=>{
- assert.match(home,/weatherOverviewSummary\.height/);
- assert.match(home,/weatherSnapshotRow\.height/);
+ assert.match(home,/overviewInstrumentHeight/);
+ assert.match(home,/overviewCardRowHeight/);
  assert.match(home,/compact: home\.fixedWeatherOverview/);
  assert.match(home,/overviewDense: home\.fixedWeatherOverview/);
  assert.match(home,/id: weatherSnapshotRow/);

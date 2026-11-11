@@ -78,8 +78,8 @@ ShellRoot {
                 root.phase=1;return;
             }
             if(root.phase===1) {
-                if(!sources.visible||!runtime.visible||!health.visible
-                    ||charts.visible||archive.visible||!scroll.interactive)
+                if(!services.visible || scroll.visible || charts.visible || archive.visible
+                    ||services.width<=0 || services.height<=0)
                     return root.fail("SOURCES_VISIBILITY_OR_OWNER");
                 home.workspaceSection="overview";
                 root.phase=2;return;

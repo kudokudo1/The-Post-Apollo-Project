@@ -32,6 +32,24 @@ Scope {
     property string captureStopReason: ""
     property bool audioDropped: false
     property bool safetyLimitSoon: false
+    // In-memory, non-content performance measures. -1 = not yet measured.
+    property int audioReadyMs: -1
+    property int modelStartupMs: -1
+    property int firstTextMs: -1
+    property int lastInferenceMs: -1
+    property int peakInferenceMs: -1
+    property int peakQueueWaitMs: -1
+    readonly property string timingSummary: {
+        if (firstTextMs < 0)
+            return "";
+        const seconds = function(ms) {
+            return ms < 0 ? "N/A" : (ms / 1000).toFixed(1) + "s";
+        };
+        return "FIRST " + seconds(firstTextMs)
+            + " // LOAD " + seconds(modelStartupMs)
+            + " // INFER " + seconds(lastInferenceMs)
+            + " // QUEUE MAX " + seconds(peakQueueWaitMs);
+    }
     property int recordingElapsedSeconds: 0
     property double recordingStartedAt: 0
     property bool liveStreaming: true
@@ -100,6 +118,12 @@ Scope {
         captureStopReason = "";
         audioDropped = false;
         safetyLimitSoon = false;
+        audioReadyMs = -1;
+        modelStartupMs = -1;
+        firstTextMs = -1;
+        lastInferenceMs = -1;
+        peakInferenceMs = -1;
+        peakQueueWaitMs = -1;
         recordingStartedAt = Date.now();
         recordingElapsedSeconds = 0;
         voiceState = "recording";
@@ -161,6 +185,32 @@ Scope {
         catch (error) { return; }
         if (!data || typeof data.kind !== "string")
             return;
+        if (data.kind === "timing") {
+            // Only bounded integer timings in named slots. No transcript,
+            // raw timestamp, device name or network address is accepted.
+            const metric = String(data.detail || "");
+            const ms = data.ms;
+            if (!/^(AUDIO_READY|MODEL_STARTUP|QUEUE_WAIT|INFERENCE|FIRST_TEXT)$/.test(metric)
+                    || typeof ms !== "number" || !Number.isInteger(ms)
+                    || ms < 0 || ms > 45000)
+                return;
+            if (metric === "AUDIO_READY")
+                audioReadyMs = ms;
+            else if (metric === "MODEL_STARTUP")
+                modelStartupMs = ms;
+            else if (metric === "FIRST_TEXT")
+                firstTextMs = ms;
+            else if (metric === "QUEUE_WAIT")
+                peakQueueWaitMs = Math.max(peakQueueWaitMs, ms);
+            else if (metric === "INFERENCE") {
+                lastInferenceMs = ms;
+                peakInferenceMs = Math.max(peakInferenceMs, ms);
+            }
+            // Retain one bounded numeric receipt per event in local logs,
+            // never the speaker's text. Matches existing stage logging.
+            console.warn("HOSPITAL_VOICE_TIMING // " + metric + " // " + ms + "ms");
+            return;
+        }
         if (data.kind === "stage") {
             // Python emits fixed low-cardinality lifecycle codes. The
             // allowlist prevents untrusted child output reaching the journal.

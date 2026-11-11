@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MACHINE // Encrypted snapshot read-only review</title>
+<style>
+:root{color-scheme:dark;font:13px monospace;background:#1b0623;color:#dcf3fa}
+*{box-sizing:border-box}main{max-width:850px;margin:28px auto;padding:22px;border:1px solid #55cfca}
+h1{color:#ed981a}h2{color:#c74ec7;font-size:14px}
+label{display:block;margin:12px 0;color:#55cfca}
+input{background:#10031a;color:#dcf3fa;border:1px solid #55cfca;padding:10px;
+font:inherit;width:100%;max-width:600px;display:block;margin-top:4px}
+button{color:#ed981a;background:#10031a;border:1px solid #ed981a;
+font:inherit;padding:12px;margin:12px 10px 12px 0;cursor:pointer}
+button:disabled{opacity:.4}button:focus-visible{outline:2px solid #c74ec7}
+p{line-height:1.55}ol{list-style:none;padding:0;max-height:300px;overflow-y:auto}
+li{border:1px solid #55cfca;margin:5px 0;padding:9px}
+#read-status{color:#55cfca}#read-summary{color:#ed981a}
+section{border-top:1px solid #c74ec7;margin-top:15px;padding-top:12px}
+</style></head><body><main>
+<h1>MACHINE // ENCRYPTED SNAPSHOT REVIEW</h1>
+<p>DISPOSABLE BRAVE TEST ONLY. Enter the opaque saved record ID and its
+passphrase. The native host supplies only encrypted data. Decryption is
+authenticated inside this extension page. You will see hostnames and tab
+positions, never full URLs, and **nothing will be restored or opened**.</p>
+<section>
+<h2>1 // AUTHORIZE ONE READ</h2>
+<label for="read-record-id">SAVED RECORD ID // UUID</label>
+<input id="read-record-id" type="text" spellcheck="false" autocomplete="off" maxlength="36">
+<label for="read-passphrase">ENCRYPTION PASSPHRASE</label>
+<input id="read-passphrase" type="password" autocomplete="new-password" spellcheck="false">
+<button type="button" id="decrypt-read-once">DECRYPT AND REVIEW ONCE</button>
+<p id="read-status" role="status" aria-live="polite">NO SNAPSHOT READ</p>
+</section>
+<section>
+<h2>2 // REDACTED RESULT</h2>
+<p id="read-summary" aria-label="Authenticated snapshot counts"></p>
+<ol id="read-tab-list" aria-label="Read-only recovered tab positions"></ol>
+<button type="button" id="forget-read">FORGET THIS PREVIEW</button>
+<button type="button" id="close-read-review">CLOSE REVIEW TAB</button>
+<p>No URLs are opened, written into the browser, copied, or sent to TimeW.
+The test vault can disappear after a system restart. This review proves
+decryption, not durable recovery or trusted window-to-monitor identity.</p>
+</section>
+</main><script type="module" src="read-review.mjs"></script></body></html>

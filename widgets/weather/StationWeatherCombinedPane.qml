@@ -21,7 +21,7 @@ Rectangle {
     // W12: all three bands fit the fixed viewport. Daily receives enough
     // room for actual glyphs while current/hourly retain readable symbols.
     readonly property real bandBudget: Math.max(1,height - 14 - 11 - 4*2)
-    readonly property real dailyHeight: Math.max(56,Math.min(70,bandBudget*0.28))
+    readonly property real dailyHeight: Math.max(62,Math.min(74,bandBudget*0.30))
     readonly property real currentHeight: Math.max(69,Math.round((bandBudget-dailyHeight)*0.47))
     readonly property real hourlyHeight: Math.max(1,bandBudget-dailyHeight-currentHeight)
 
@@ -516,18 +516,18 @@ Rectangle {
                             anchors.margins: 2
                             spacing: 3
                             Item {
-                                width: 44
+                                width: Math.min(44,parent.height)
                                 height: parent.height
                                 Text {
                                     anchors.centerIn: parent
                                     text: dayCell.weatherState.icon
-                                    font.pixelSize: 44
+                                    font.pixelSize: Math.min(44,parent.height)
                                     color: panel.colorFor(dayCell.weatherState)
                                     visible: dayCell.artwork==="weather"
                                 }
                                 WeatherCelestialGlyph {
                                     anchors.centerIn: parent
-                                    width: 44
+                                    width: Math.min(44,parent.height)
                                     height: width
                                     mode: dayCell.artwork
                                     solar: dayCell.solarCycle.solar

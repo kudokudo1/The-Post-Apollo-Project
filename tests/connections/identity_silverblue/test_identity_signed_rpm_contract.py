@@ -121,5 +121,68 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertNotIn("productionAuthority: true", src)
 
 
+    def test_07_official_silverblue_host_is_separate_and_networkless(self):
+        script = (AREA / "run_official_silverblue_identity.sh").read_text()
+        c2v = (ROOT / "tests/connections/c2v_silverblue/boot_official_silverblue.sh").read_text()
+        for line in (
+            "iso=Fedora-Silverblue-ostree-x86_64-44-1.7.iso",
+            "iso_sha=9ccec9b075a0a4358a7209b2667156aaeeec3a6a3c8d71cada45b57fca9b4682",
+            "inst.repo=cdrom inst.ks=hd:LABEL=ID4BCI:/ks.cfg inst.cmdline rd.neednet=0",
+            "ostreesetup --osname=fedora --remote=fedora",
+            "C4B_ID_PASS // REAL_OFFICIAL_SILVERBLUE_SIGNED_IDENTITY_RPM_TWO_REBOOTS_AND_ROLLBACK",
+            "identity-silverblue-ci.rpm",
+            "guest_identity_ostree_cycle.sh",
+        ):
+            self.assertIn(line, script)
+        self.assertIn("iso_sha=9ccec9b075a0a4358a7209b2667156aaeeec3a6a3c8d71cada45b57fca9b4682", c2v)
+        self.assertEqual(script.count("-nic none"), 2, "Installer AND actual persistent boot must remain offline")
+        self.assertIn("test -c /dev/kvm", (ROOT / ".github/workflows/connections-identity-silverblue-real-boot.yml").read_text())
+        self.assertNotIn("/tests/connections/c2v_silverblue/", script)
+        self.assertNotIn("source " + str(ROOT / "tests/connections/c2v_silverblue"), script)
+        for forbidden in ("rpm-ostree install --apply-live", "rpm-ostree reset", "systemctl enable post-apollo-identity-silverblue-ci.service"):
+            self.assertNotIn(forbidden, script)
+
+    def test_08_real_guest_has_signed_gate_and_phase_fencing(self):
+        script = (AREA / "guest_identity_ostree_cycle.sh").read_text()
+        for required in (
+            'case "$phase" in',
+            "initial)",
+            "installing)",
+            "layer_pending)",
+            "rollback_pending)",
+            "C4B_ID_FAIL //",
+            "REAL_ENFORCING_OSTREE_REQUIRED",
+            "OFFLINE_NO_NETWORK_REQUIRED",
+            "SIGNED_RPM_PRETRUST_MUST_FAIL",
+            "ISOLATED_SIGNED_RPM_VERIFICATION_FAILED",
+            'rpm-ostree install --cache-only /var/lib/postapollo-id-ci-assets/identity-silverblue-ci.rpm',
+            "C4B_ID_PENDING_EXACT_IDENTITY_DEPLOYMENT",
+            "REAL_SILVERBLUE_BOOTED_SIGNED_IDENTITY_RPM_INERT",
+            "REAL_SILVERBLUE_IDENTITY_RPM_LAYER_REMOVED",
+            "TEST_KEYRING_REMOVED_AND_PRODUCTION_DISABLED",
+            '[[ "$enabled_state" == static || "$enabled_state" == disabled ]]',
+            'rpm-ostree rollback --reboot',
+        ):
+            self.assertIn(required, script)
+        self.assertLess(script.index("SIGNED_IDENTITY_RPM_VERIFIED_OFFLINE_BEFORE_LAYER"),
+                        script.index("rpm-ostree install --cache-only"))
+        self.assertLess(script.index('echo rollback_pending > "$stage"'),
+                        script.index("rpm-ostree rollback --reboot"))
+        self.assertNotIn('systemctl start "$unit"', script)
+        self.assertNotIn("canBeginSignIn=true", script)
+
+    def test_09_real_boot_ci_is_strict_and_never_deploys_to_workstation(self):
+        path = ROOT / ".github/workflows/connections-identity-silverblue-real-boot.yml"
+        workflow = path.read_text()
+        self.assertIn("runs-on: ubuntu-latest", workflow)
+        self.assertIn("timeout-minutes: 75", workflow)
+        self.assertIn("POST_APOLLO_ID_SILVERBLUE_CI_ONLY: '1'", workflow)
+        self.assertIn("fedora:44", workflow)
+        self.assertIn("run_official_silverblue_identity.sh", workflow)
+        self.assertIn("Confirm test did not activate sign-in or production authority", workflow)
+        self.assertNotIn("sudo rpm-ostree install", workflow)
+        self.assertNotIn("ssh ", workflow)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

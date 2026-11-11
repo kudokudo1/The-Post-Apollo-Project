@@ -1,14 +1,18 @@
-name: Weather Station W13 centered instrument and attached telemetry meters
+name: Weather Station W14 instrument hierarchy and monochrome weather glyphs
 
 on:
   pull_request:
     paths:
       - 'widgets/weather/StationWeatherSubjectPane.qml'
       - 'widgets/weather/StationWeatherCombinedPane.qml'
+      - 'widgets/weather/StationWeatherInstrumentTerminal.qml'
+      - 'widgets/weather/StationWeatherLineGlyph.qml'
+      - 'widgets/weather/StationWeatherTerminalSummary.qml'
       - 'widgets/weather/StationWeatherTwilightGrid.qml'
       - 'tests/weather/test_weather_w11_prominence.js'
       - 'tests/weather/test_weather_w12_current_meters.js'
       - 'tests/weather/test_weather_w13_centered_meters.js'
+      - 'tests/weather/test_weather_w14_instrument_visual.js'
       - 'tests/weather/test_weather_w10_three_band_solar.js'
       - 'widgets/weather/StationSky.qml'
       - 'tests/weather/test_weather_w9_fixed_paged_terminal.js'
@@ -28,7 +32,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: W13 source and layout continuity
+      - name: W14 icon grammar, forecast context and source continuity
         shell: bash
         run: |
           set -euo pipefail
@@ -37,6 +41,7 @@ jobs:
           node --test tests/weather/test_weather_w11_prominence.js
           node --test tests/weather/test_weather_w12_current_meters.js
           node --test tests/weather/test_weather_w13_centered_meters.js
+          node --test tests/weather/test_weather_w14_instrument_visual.js
           node --test tests/weather/test_weather_w8_unified_terminal.js
           node --test tests/weather/test_weather_subject_panels_m2a.js
           node --test tests/weather/test_weather_subject_panels_m2b.js
@@ -58,7 +63,7 @@ jobs:
             qml6-module-qtquick-effects qml6-module-qtquick-dialogs \
             qml6-module-qt5compat-graphicaleffects coreutils findutils
       - uses: actions/checkout@v4
-      - name: Native aligned headings, readings and meters at 520x300
+      - name: Native W14 line-art, timeline and standard WEATHER menu spacing at 520x300
         shell: bash
         run: |
           set -euo pipefail
@@ -81,7 +86,15 @@ jobs:
             > "$work/native.log" 2>&1 || rc=$?
           cat "$work/native.log"
           test "$rc" -eq 0
-          grep -F "W13_NATIVE_PASS // CENTERED_READOUTS_AND_ATTACHED_METERS_520X300" "$work/native.log"
-          if grep -E 'W13_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+          grep -F "W14_NATIVE_PASS // LINE_GLYPH_TERMINAL_AND_PADDED_RAIL_520X300" "$work/native.log"
+          if grep -E 'W14_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi
+      - name: Upload optional native WEATHER visual preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-w14-visual-preview
+          path: /tmp/weather-w14-visual-preview.png
+          if-no-files-found: warn
+          retention-days: 14

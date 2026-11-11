@@ -935,6 +935,19 @@ Item {
         GohuText {
             width: parent.width
             height: 17
+            visible: pane.selectedAlarm !== null
+                && pane.selectedAlarm.lastEventKind !== undefined
+                && pane.selectedAlarm.lastEventKind !== "none"
+            text: "LAST // " + AlarmManagerService.lastEventText(pane.selectedId)
+            color: pane.selectedAlarm
+                && pane.selectedAlarm.lastEventKind === "missed"
+                ? Colors.orange : Colors.cyan
+            font.pixelSize: 9
+            elide: Text.ElideRight
+        }
+        GohuText {
+            width: parent.width
+            height: 17
             // Avoid the verbose "Eastern Standard Time" browser locale:
             // it previously pushed AUDIO out of the compact panel.
             text: "TICK // " + (AlarmManagerService.lastSchedulerTickMs > 0

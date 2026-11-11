@@ -1,0 +1,50 @@
+name: Clock BG1-B1 synthetic broker and source revision fence
+
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmOwnershipBroker.py"
+      - "services/time/BG1-ALARM-BROKER.md"
+      - "tests/time/test_clock_bg1_broker_protocol.py"
+      - ".github/workflows/clock-bg1-broker-b1.yml"
+  push:
+    paths:
+      - "services/time/AlarmOwnershipBroker.py"
+      - "services/time/BG1-ALARM-BROKER.md"
+      - "tests/time/test_clock_bg1_broker_protocol.py"
+      - ".github/workflows/clock-bg1-broker-b1.yml"
+
+jobs:
+  synthetic-local-broker:
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compile broker and both bundled source dependencies
+        run: |
+          python3 -I -B -c 'import ast,pathlib; [ast.parse(pathlib.Path(p).read_text()) for p in ["services/time/AlarmOwnershipBroker.py","services/time/AlarmOwnershipGate.py","services/time/AlarmBackgroundObserver.py"]]'
+      - name: Exercise real Unix socket clients, source revision and occurrence receipts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_broker_protocol.py' -v
+      - name: Preserve BG1-A owner fencing and concurrent process regression
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_owner_fencing_contract.py' -v
+      - name: Ensure this B1 slice changes no live Clock, observer or systemd unit
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output([
+              'git','diff','--name-only',
+              'origin/main...HEAD'],
+              text=True).splitlines())
+          allowed={
+              'services/time/AlarmOwnershipBroker.py',
+              'services/time/BG1-ALARM-BROKER.md',
+              'tests/time/test_clock_bg1_broker_protocol.py',
+              '.github/workflows/clock-bg1-broker-b1.yml',
+          }
+          assert changed <= allowed, f"Out-of-lane files changed: {changed-allowed}"
+          assert changed == allowed, f"Expected four isolated files, got {changed}"
+          print('Broker only; no live alarm/sound/notifications/observer modifications: PASS')
+          PY

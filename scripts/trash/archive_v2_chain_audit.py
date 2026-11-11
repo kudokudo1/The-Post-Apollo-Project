@@ -163,8 +163,9 @@ def audit(directory):
                          "ARCHIVE_AUDIT_INCOMPLETE")
             return {"ok": True, "kind": "archive-v2-chain-audit",
                     "readOnly": True,
-                    "state": ("CHAIN_CONSISTENT" if receipt_count
-                              else "LEGACY_ONLY"),
+                    "state": ("EMPTY" if scanned == 0 else
+                              "CHAIN_CONSISTENT" if receipt_count else
+                              "LEGACY_ONLY"),
                     "snapshotCount": scanned,
                     "receiptCount": receipt_count,
                     "legacyCount": legacy_count,

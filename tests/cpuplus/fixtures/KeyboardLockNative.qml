@@ -6,6 +6,7 @@ import "widgets/cpuplus"
 ShellRoot {
     id: root
     property bool started: false
+    property int phase: 0
     property bool done: false
     property int ticks: 0
 
@@ -80,16 +81,32 @@ ShellRoot {
             }
             if (KeyboardLockSettings.storageState !== "ready")
                 return;
-            if (KeyboardLockSettings.numMode !== "on"
-                    || KeyboardLockSettings.capsMode !== "off") {
-                root.fail("STATE_MISMATCH");return;
+            if (root.phase === 0) {
+                if (KeyboardLockSettings.numMode !== "on"
+                        || KeyboardLockSettings.capsMode !== "off") {
+                    root.fail("STATE_MISMATCH");return;
+                }
+                if (KeyboardLockSettings.confirmRequired
+                        || KeyboardLockSettings.profileInstalled) {
+                    root.fail("UNAUTHORIZED_HOST_APPLY");return;
+                }
+                console.log("KB_NATIVE_PASS // TWO_LOCKS_SAVED_NO_HOST_INSTALL");
+                root.phase = 1;
+                if (!KeyboardLockSettings.choose("num", "remember")) {
+                    root.fail("REMEMBER_SELECT_REFUSED");return;
+                }
+                return;
             }
-            if (KeyboardLockSettings.confirmRequired
-                    || KeyboardLockSettings.profileInstalled) {
-                root.fail("UNAUTHORIZED_HOST_APPLY");return;
+            if (KeyboardLockSettings.numMode !== "remember"
+                    || KeyboardLockSettings.capsMode !== "off") {
+                root.fail("REMEMBER_STATE_MISMATCH");return;
+            }
+            if (KeyboardLockSettings.prepareApply("unknown", "unknown", false)
+                    || KeyboardLockSettings.confirmRequired) {
+                root.fail("REMEMBER_ARMED_WITHOUT_FRESH_LED");return;
             }
             root.done = true;
-            console.log("KB_NATIVE_PASS // TWO_LOCKS_SAVED_NO_HOST_INSTALL");
+            console.log("KB_REMEMBER_NATIVE_PASS // REFUSED_STALE_LED_NO_HOST_WRITE");
         }
     }
     Timer {

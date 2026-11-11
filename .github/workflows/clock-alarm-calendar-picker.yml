@@ -29,7 +29,7 @@ jobs:
           const fs = require('fs'), vm = require('vm'), assert = require('node:assert/strict');
           const ui = fs.readFileSync('widgets/AlarmCalendarPicker.qml','utf8');
           const policySource = fs.readFileSync('services/time/AlarmManagerPolicy.js','utf8')
-            .replace(/^\\.pragma library\\s*/, '');
+            .replace('.pragma library', '');
           const Policy = {};
           vm.runInNewContext(policySource, Policy);
           const cellsMatch = /readonly property var calendarCells: \{([\s\S]*?)\n    \}\n    readonly property int dayHeight/.exec(ui);

@@ -442,7 +442,11 @@ Scope {
         // its trigger even while its atomic save is still in flight.
         const active = autoCheckQueuedDocument || autoCheckPendingDocument
                        || autoCheckDocument;
-        if (!autoCheckCanEdit || !AutoCheck.triggerEnabled(active, reason)
+        // Malformed/unreadable evidence storage must not permit repeated
+        // automatic probes across rapid shell reloads. Manual CHECK TIME
+        // remains available to the operator.
+        if (!referenceRestoreHandled || referenceStorageState === "error"
+                || !autoCheckCanEdit || !AutoCheck.triggerEnabled(active, reason)
                 || autoCheckInFlight || referenceChecking || authSessionActive
                 || resyncAuthPending || resyncProcess.running)
             return false;

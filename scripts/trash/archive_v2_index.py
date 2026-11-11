@@ -20,6 +20,7 @@ from urllib.parse import quote
 # location policy, not the Archive writer or source mutation modules.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.trash.archive_v2_location import ArchiveRootError, archive_directory
+from scripts.trash.archive_v2_capacity import CapacityError, capacity
 
 DB_NAME = "trashpp-archive-v2.sqlite3"
 STORE_SCHEMA = "post-apollo.trash-archive.v2a"
@@ -90,11 +91,13 @@ def _query(value):
     return value.strip()
 
 
-def _response(items, count, next_cursor=None, state="READY", query=""):
+def _response(items, count, next_cursor=None, state="READY", query="",
+              storage=None):
     return {"ok": True, "kind": "archive-v2-index", "readOnly": True,
             "schema": STORE_SCHEMA, "state": state, "total": count,
             "items": items, "hasMore": next_cursor is not None,
-            "nextCursor": next_cursor, "pageSize": PAGE_SIZE, "query": query}
+            "nextCursor": next_cursor, "pageSize": PAGE_SIZE, "query": query,
+            "capacity": storage}
 
 
 def _row(raw):
@@ -152,6 +155,10 @@ def index(directory, cursor="", query=""):
     # Parent root is private; check journal type/owner/link but avoid
     # racing SQLite's transient rollback-journal file permissions.
     _private_regular(root / (DB_NAME + "-journal"), require_private_mode=False)
+    try:
+        storage = capacity(root)
+    except CapacityError as exc:
+        raise ReadIndexError(str(exc)) from exc
     # SQLite URI mode=ro prevents creation or modification of this database.
     # A hot rollback journal that requires write recovery fails closed.
     uri = "file:" + quote(str(database), safe="/") + "?mode=ro&cache=private"
@@ -202,7 +209,8 @@ def index(directory, cursor="", query=""):
             last = selected[-1] if has_more else None
             next_cursor = (str(last["recordedAtMs"]) + ":" + last["id"]
                            if last else None)
-            return _response(selected, total, next_cursor, query=needle)
+            return _response(selected, total, next_cursor, query=needle,
+                             storage=storage)
     except sqlite3.Error as exc:
         raise ReadIndexError("ARCHIVE_INDEX_UNAVAILABLE") from exc
 

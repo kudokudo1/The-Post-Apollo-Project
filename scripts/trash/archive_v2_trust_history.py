@@ -6,11 +6,13 @@ This is not a runtime authority service, does not handle production trust
 roots, and cannot authorize ArchiveStore, Restore or Burn.
 """
 from contextlib import closing
+import hashlib
 import os
 from pathlib import Path
 import re
 import sqlite3
 import stat
+from uuid import uuid4
 
 FILE_NAME = "trashpp-v2l-test-trust.sqlite3"
 ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -84,6 +86,7 @@ class TestOwnerTrustHistory:
             db.execute("PRAGMA journal_mode=DELETE")
             db.execute("PRAGMA synchronous=FULL")
             db.execute("PRAGMA busy_timeout=5000")
+            db.execute("PRAGMA foreign_keys=ON")
             return db
         except sqlite3.DatabaseError as exc:
             raise TrustHistoryError("SOURCE_TRUST_UNAVAILABLE") from exc
@@ -113,6 +116,24 @@ class TestOwnerTrustHistory:
                         authority_sha256 TEXT NOT NULL,
                         PRIMARY KEY(owner_id,key_id,nonce),
                         UNIQUE(proof_sha256)
+                    )""")
+                    # V2m fixture admission puts nonce + test payload
+                    # in ONE private SQLite transaction.
+                    db.execute("""CREATE TABLE IF NOT EXISTS test_copies (
+                        snapshot_id TEXT PRIMARY KEY,
+                        owner_id TEXT NOT NULL,
+                        key_id TEXT NOT NULL,
+                        nonce TEXT NOT NULL,
+                        proof_sha256 TEXT NOT NULL UNIQUE,
+                        authority_sha256 TEXT NOT NULL,
+                        resource_id TEXT NOT NULL,
+                        source_revision TEXT NOT NULL,
+                        source_captured_ms INTEGER NOT NULL,
+                        payload_sha256 TEXT NOT NULL,
+                        payload BLOB NOT NULL,
+                        UNIQUE(owner_id,key_id,nonce),
+                        FOREIGN KEY(owner_id,key_id,nonce)
+                            REFERENCES consumed(owner_id,key_id,nonce)
                     )""")
             except sqlite3.DatabaseError as exc:
                 raise TrustHistoryError("SOURCE_TRUST_INIT_FAILED") from exc
@@ -239,6 +260,111 @@ class TestOwnerTrustHistory:
                 db.rollback()
                 raise TrustHistoryError("SOURCE_TRUST_WRITE_FAILED") from exc
         return {"state":"TEST_AUTHORIZED_NONCE_CONSUMED_DENY_ONLY",
+                "productionAllowed": False}
+
+    def admit_test_copy(self, authority, proof, payload, *,
+                        resource_id, source_revision, source_captured_ms,
+                        payload_sha256, on_stage=None):
+        """Atomically consume a fixture nonce and insert a synthetic copy.
+
+        on_stage supports injected exception and abrupt-process-exit tests.
+        This never writes ArchiveStore, original sources or Quickshell data.
+        Signature verification is required by the test-only caller.
+        """
+        _check(type(authority) is dict and type(proof) is dict
+               and proof.get("state") == "TEST_SIGNATURE_VALID_DENY_ONLY"
+               and proof.get("signatureVerified") is True
+               and proof.get("captureAllowed") is False
+               and authority.get("revoked") is False,
+               "SOURCE_TRUST_EVIDENCE_INVALID")
+        owner, key = authority.get("ownerId"), authority.get("keyId")
+        digest, nonce = proof.get("proofSha256"), proof.get("nonce")
+        _check(type(owner) is str and ID.fullmatch(owner)
+               and type(key) is str and ID.fullmatch(key)
+               and proof.get("ownerId") == owner
+               and proof.get("keyId") == key
+               and type(nonce) is str and NONCE.fullmatch(nonce)
+               and type(digest) is str and SHA.fullmatch(digest)
+               and type(authority.get("manifestSha256")) is str
+               and SHA.fullmatch(authority["manifestSha256"])
+               and type(authority.get("rootFingerprint")) is str
+               and SHA.fullmatch(authority["rootFingerprint"])
+               and type(authority.get("generation")) is int
+               and authority["generation"] >= 1
+               and type(resource_id) is str and ID.fullmatch(resource_id)
+               and proof.get("resourceId") == resource_id
+               and type(source_revision) is str and SHA.fullmatch(source_revision)
+               and type(payload_sha256) is str and SHA.fullmatch(payload_sha256)
+               and type(source_captured_ms) is int and source_captured_ms > 0
+               and type(payload) is bytes and 0 < len(payload) <= 8 * 1024 * 1024
+               and hashlib.sha256(payload).hexdigest() == payload_sha256,
+               "TEST_COPY_SOURCE_INVALID")
+        _check(on_stage is None or callable(on_stage),
+               "TEST_CRASH_HOOK_INVALID")
+        sid = uuid4().hex
+        with closing(self._connect()) as db:
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                head = db.execute("""SELECT generation,manifest_sha256,
+                    root_sha256,key_id,revoked FROM authority_heads
+                    WHERE owner_id=?""", (owner,)).fetchone()
+                _check(head is not None, "SOURCE_TRUST_NOT_ENROLLED")
+                _check(head == (
+                    authority["generation"], authority["manifestSha256"],
+                    authority["rootFingerprint"], key, 0),
+                    "SOURCE_AUTHORITY_STALE_OR_REVOKED")
+                retired = db.execute("""SELECT 1 FROM revoked_keys
+                    WHERE owner_id=? AND key_id=?""", (owner,key)).fetchone()
+                _check(retired is None, "SOURCE_AUTHORITY_REVOKED_KEY_REUSED")
+                db.execute("""INSERT INTO consumed
+                    (owner_id,key_id,nonce,proof_sha256,authority_sha256)
+                    VALUES(?,?,?,?,?)""",
+                    (owner,key,nonce,digest,authority["manifestSha256"]))
+                if on_stage is not None:
+                    on_stage("after_nonce")
+                db.execute("""INSERT INTO test_copies
+                    (snapshot_id,owner_id,key_id,nonce,proof_sha256,
+                     authority_sha256,resource_id,source_revision,
+                     source_captured_ms,payload_sha256,payload)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                    (sid,owner,key,nonce,digest,authority["manifestSha256"],
+                     resource_id,source_revision,source_captured_ms,
+                     payload_sha256,payload))
+                if on_stage is not None:
+                    on_stage("after_copy")
+                db.commit()
+            except TrustHistoryError:
+                db.rollback()
+                raise
+            except sqlite3.IntegrityError as exc:
+                db.rollback()
+                raise TrustHistoryError("SOURCE_NONCE_ALREADY_CONSUMED") from exc
+            except sqlite3.DatabaseError as exc:
+                db.rollback()
+                raise TrustHistoryError("TEST_COPY_WRITE_FAILED") from exc
+            except BaseException:
+                db.rollback()
+                raise
+        return {"state": "TEST_ATOMIC_COPY_COMMITTED_DENY_ONLY",
+                "snapshotId": sid, "ownerId": owner, "resourceId": resource_id,
+                "payloadSha256": payload_sha256,
+                "proofSha256": digest, "nonce": nonce,
+                "authoritySha256": authority["manifestSha256"],
+                "captureAllowed": False, "productionAllowed": False,
+                "restoreAllowed": False, "burnAllowed": False}
+
+    def test_copy_status(self, owner):
+        """Read-only counts, never return even synthetic payload."""
+        _check(type(owner) is str and ID.fullmatch(owner),
+               "SOURCE_TRUST_OWNER_INVALID")
+        with closing(self._connect()) as db:
+            counts = db.execute("""SELECT
+                (SELECT count(*) FROM test_copies WHERE owner_id=?),
+                (SELECT count(*) FROM consumed WHERE owner_id=?)
+                """, (owner,owner)).fetchone()
+            _check(counts[0] <= counts[1],
+                   "TEST_ADMISSION_INTEGRITY_INVALID")
+        return {"testCopies": counts[0], "consumedNonces": counts[1],
                 "productionAllowed": False}
 
     def status(self, owner):

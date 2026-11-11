@@ -189,7 +189,7 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
             if service_files is not None:
                 _require(type(service_files) is PinnedFixtureServiceFiles,
                          "BROKER_SERVICE_FIXTURE_REQUIRED")
-                service_evidence = service_files.require_unchanged()
+                service_evidence = service_files.check_connection(connection)
                 _require(service_evidence["ownerId"] == packet["ownerId"],
                          "BROKER_SERVICE_OWNER_MISMATCH")
                 service_digest = service_evidence["serviceWitnessSha256"]
@@ -200,7 +200,7 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
                 def before_fixture_commit():
                     lifetime.require_alive()
                     if service_files is not None:
-                        latest = service_files.require_unchanged()
+                        latest = service_files.check_connection(connection)
                         _require(latest["serviceWitnessSha256"] == service_digest,
                                  "BROKER_SERVICE_WITNESS_CHANGED")
                 admitted = admit_peer_bound_fixture(

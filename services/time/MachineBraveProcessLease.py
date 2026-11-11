@@ -119,8 +119,8 @@ def _identity(pid: int, uid: int, gid: int) -> Identity:
             found[key] = numbers
     # SO_PEERCRED represents effective credentials; the other three
     # /proc slots may legitimately differ. Pin all four to detect changes.
-    uids = found.get(b"Uid:")
-    gids = found.get(b"Gid:")
+    uids = found.get(b"Uid")
+    gids = found.get(b"Gid")
     if uids is None or gids is None or uids[1] != uid or gids[1] != gid:
         refuse()
     try:

@@ -302,6 +302,31 @@ Scope {
         }
     }
     Process {
+        id: rememberSyncProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                settings.rememberSyncReturned = true;
+                settings.acceptHostReply(this.text);
+            }
+        }
+        onExited: function(code, exitStatus) {
+            settings.rememberSyncing = false;
+            settings.runningRememberLock = "";
+            if (code !== 0 || !settings.rememberSyncReturned
+                    || settings.hostStatus !== "installed") {
+                settings.rememberSuspended = true;
+                settings.queuedRememberNum = "";
+                settings.queuedRememberCaps = "";
+                settings.hostError = settings.hostError || "REMEMBER_SYNC_FAILED";
+                settings.feedback = "REMEMBER SYNC SUSPENDED // CHECK STATUS";
+            } else {
+                settings.feedback = "LAST LED CHANGE SAVED // NEXT SWAY START";
+                settings.launchRememberSync();
+            }
+        }
+    }
+    Process {
         id: applyProcess
         running: false
         stdout: StdioCollector {

@@ -1976,6 +1976,7 @@ PanelWindow {
                                 spacing: 6
 
                                 GohuText {
+                                    id: archiveCapacityTitle
                                     width: Math.max(95, parent.width * 0.39)
                                     height: parent.height
                                     font.pixelSize: trashLauncher.chassisSize === "compact" ? 11 : 14
@@ -1987,7 +1988,7 @@ PanelWindow {
                                 GohuText {
                                     width: Math.max(0, parent.width
                                         - archiveCapacityHeader.spacing
-                                        - archiveCapacityHeader.children[0].width)
+                                        - archiveCapacityTitle.width)
                                     height: parent.height
                                     font.pixelSize: trashLauncher.chassisSize === "compact" ? 10 : 13
                                     color: trashLauncher.archiveCapacityColor
@@ -2039,6 +2040,7 @@ PanelWindow {
                                 spacing: 4
 
                                 GohuText {
+                                    id: archiveCapacityRemaining
                                     width: parent.width * 0.64
                                     height: parent.height
                                     color: trashLauncher.archiveCapacityColor
@@ -2051,7 +2053,7 @@ PanelWindow {
                                            / 1048576).toFixed(2) + " MiB REMAINING"
                                 }
                                 GohuText {
-                                    width: parent.width - archiveCapacityFooter.children[0].width
+                                    width: parent.width - archiveCapacityRemaining.width
                                            - archiveCapacityFooter.spacing
                                     height: parent.height
                                     color: trashLauncher.archiveCapacityColor
@@ -2148,9 +2150,10 @@ PanelWindow {
                             // The live capacity gauge occupies the top rail,
                             // so reduce only the scrollable records area.
                             // Compact hides its redundant old bottom disclaimer.
-                            height: Math.max(65, archiveRecordsView.height
+                            height: Math.max(trashLauncher.chassisSize === "compact"
+                                ? 50 : 65, archiveRecordsView.height
                                 - (trashLauncher.snapshotStatus === "IDLE" ? 241 : 258)
-                                - (trashLauncher.chassisSize === "compact" ? 3 : 51))
+                                - (trashLauncher.chassisSize === "compact" ? 9 : 51))
                             ListView {
                                 id: archiveEntriesList
                                 width: parent.width - 17

@@ -310,8 +310,10 @@ Rectangle {
 
             Column {
                 anchors.fill: parent
-                anchors.margins: visual.compactMode ? 5 : 9
-                spacing: visual.compactMode ? 3 : 6
+                anchors.margins: visual.fullBleedSolar ? 4
+                    : (visual.compactMode ? 5 : 9)
+                spacing: visual.fullBleedSolar ? 2
+                    : (visual.compactMode ? 3 : 6)
 
                 GohuText {
                     text: "SUN // 24H ALTITUDE MODEL"
@@ -323,7 +325,7 @@ Rectangle {
                 Rectangle {
                     width: parent.width
                     height: visual.fullBleedSolar
-                        ? Math.max(45,solarBay.height - (visual.compactMode ? 95 : 146))
+                        ? Math.max(45,solarBay.height - (visual.compactMode ? 85 : 146))
                         : (visual.compactMode ? 75 : 119)
                     color: Colors.black
                     border.width: 1
@@ -442,7 +444,8 @@ Rectangle {
                 Row {
                     id: solarPresetRow
                     width: parent.width
-                    height: visual.compactMode ? 23 : 27
+                    height: visual.fullBleedSolar ? 19
+                            : (visual.compactMode ? 23 : 27)
                     spacing: 4
 
                     Repeater {
@@ -457,7 +460,8 @@ Rectangle {
                             required property var modelData
                             width: Math.max(1,(solarPresetRow.width
                                              -solarPresetRow.spacing*4)/5)
-                            height: visual.compactMode ? 22 : 26
+                            height: visual.fullBleedSolar ? 18
+                                    : (visual.compactMode ? 22 : 26)
                             contentPadding: visual.compactMode ? 1 : 2
                             label: modelData.label
                             labelPixelSize: visual.compactMode ? 9 : 10
@@ -482,7 +486,8 @@ Rectangle {
 
                 Row {
                     width: parent.width
-                    height: visual.compactMode ? 22 : 25
+                    height: visual.fullBleedSolar ? 18
+                        : (visual.compactMode ? 22 : 25)
                     spacing: visual.compactMode ? 4 : 8
                     GohuText {
                         width: Math.max(0,parent.width-
@@ -501,7 +506,8 @@ Rectangle {
                     }
                     ActionButton {
                         width: visual.compactMode ? 68 : 95
-                        height: visual.compactMode ? 21 : 24
+                        height: visual.fullBleedSolar ? 17
+                                : (visual.compactMode ? 21 : 24)
                         label: "UNLOCK"
                         labelPixelSize: visual.compactMode ? 9 : 10
                         accentColor: Colors.cyan

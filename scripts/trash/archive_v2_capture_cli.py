@@ -17,6 +17,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts.trash.archive_store_v2 import ArchiveError, ArchiveStore
+from scripts.trash.archive_v2_location import ArchiveRootError, archive_directory
 from scripts.trash.owner_snapshot_adapter_v2 import (
     AdapterError, PilotSnapshotReader, PilotSnapshotAdapter,
 )
@@ -64,8 +65,12 @@ def execute(action, directory, source_kind, identity, timestamp,
     # Preview of a missing database must never create an empty SQLite file.
     if not hmac.compare_digest(metadata["sourceRevision"], witness):
         raise CaptureCliError("STALE_SOURCE_REFRESH_REQUIRED")
+    # Quickshell.dataDir is a shared owner root (often 0755), not the
+    # private SQLite root. Create only a dedicated 0700 child, after the
+    # explicit confirmation and matching source witness.
+    private_root = archive_directory(directory, create=True)
     writer = PilotSnapshotAdapter(
-        ArchiveStore(directory), data_dir=directory,
+        ArchiveStore(private_root), data_dir=directory,
         home_dir=home_dir if home_dir is not None else Path.home())
     # Re-read the original source again inside capture. The adapter checks
     # the content witness and the store enforces per-owner uniqueness.
@@ -88,7 +93,8 @@ def main(argv):
             raise CaptureCliError("PREVIEW_OR_CAPTURE_ONLY")
         reply = execute(argv[1], argv[2], argv[3], argv[4], argv[5],
                         argv[6] if len(argv) == 7 else None)
-    except (CaptureCliError, AdapterError, ArchiveError) as exc:
+    except (CaptureCliError, AdapterError, ArchiveError,
+            ArchiveRootError) as exc:
         reply = {"ok": False, "error": str(exc)}
     except Exception:
         # Fail closed with no user content, paths or a traceback on stdout.

@@ -17,6 +17,8 @@ SPEC = importlib.util.spec_from_file_location("v2_capture_cli", SCRIPT)
 cli = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(cli)
 from scripts.trash.archive_store_v2 import ArchiveStore, ArchiveError, DB_NAME
+from scripts.trash.archive_v2_location import archive_directory, PRIVATE_SUBDIR
+from scripts.trash.archive_v2_index import index as read_index
 from scripts.trash import research_records as source
 
 
@@ -84,12 +86,38 @@ class CaptureCliTests(unittest.TestCase):
         self.assertEqual(receipt["kind"], "snapshot-captured-v2")
         self.assertTrue(receipt["copyOnly"])
         self.assertEqual(receipt["receipt"]["ownerId"], "demo-scrape")
-        store = ArchiveStore(self.data)
+        store = ArchiveStore(archive_directory(self.data))
         self.assertEqual(store.status()["total"], 1)
         self.assertEqual(json.loads(store.read_verified(receipt["receipt"]["id"]))["title"],
                          d["title"])
         self.assertEqual(self.crawl.read_bytes(), source_bytes)
         self.assertEqual(store.verify()["items"], 1)
+
+    def test_shared_quickshell_parent_keeps_mode_and_private_snapshot(self):
+        # Actual failure: an owned, non-writable 0755 Quickshell.dataDir
+        # is not an appropriate SQLite root but can host a 0700 child.
+        os.chmod(self.data, 0o755)
+        d = page()
+        before = self.crawl.read_bytes()
+        before_weather = self.weather.read_bytes()
+        initial = set(self.data.iterdir())
+        self.assertEqual(read_index(str(self.data))["state"], "NOT_INSTALLED")
+        self.assertEqual(set(self.data.iterdir()), initial)
+        preview = self.request("preview", "demo", d["url"], d["observedAt"])
+        self.assertEqual(set(self.data.iterdir()), initial)
+        receipt = self.request("capture", "demo", d["url"], d["observedAt"],
+                               preview["preview"]["sourceRevision"])
+        self.assertEqual(receipt["receipt"]["ownerId"], "demo-scrape")
+        self.assertFalse((self.data / DB_NAME).exists())
+        protected = self.data / PRIVATE_SUBDIR
+        self.assertEqual(protected.stat().st_mode & 0o777, 0o700)
+        self.assertEqual((self.data.stat().st_mode & 0o777), 0o755)
+        self.assertTrue((protected / DB_NAME).exists())
+        listed = read_index(str(self.data))
+        self.assertEqual(listed["total"], 1)
+        self.assertEqual(listed["items"][0]["id"], receipt["receipt"]["id"])
+        self.assertEqual(self.crawl.read_bytes(), before)
+        self.assertEqual(self.weather.read_bytes(), before_weather)
 
     def test_weather_preview_and_capture_without_owner_mutation(self):
         before = self.weather.read_bytes()
@@ -101,7 +129,7 @@ class CaptureCliTests(unittest.TestCase):
                                "1760001000000",
                                witness["preview"]["sourceRevision"])
         self.assertEqual(receipt["receipt"]["ownerId"], "weather-events")
-        saved = ArchiveStore(self.data).read_verified(receipt["receipt"]["id"])
+        saved = ArchiveStore(archive_directory(self.data)).read_verified(receipt["receipt"]["id"])
         self.assertEqual(json.loads(saved), event())
         self.assertEqual(self.weather.read_bytes(), before)
 
@@ -139,7 +167,7 @@ class CaptureCliTests(unittest.TestCase):
         self.request("capture", "demo", d["url"], d["observedAt"], witness)
         with self.assertRaisesRegex(ArchiveError, "SNAPSHOT_ALREADY_EXISTS"):
             self.request("capture", "demo", d["url"], d["observedAt"], witness)
-        self.assertEqual(ArchiveStore(self.data).status()["total"], 1)
+        self.assertEqual(ArchiveStore(archive_directory(self.data)).status()["total"], 1)
 
     def test_wrong_owner_arbitrary_path_and_unsafe_link_refused(self):
         with self.assertRaisesRegex(cli.CaptureCliError,

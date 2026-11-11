@@ -323,7 +323,9 @@ class PersistentWhisperTests(unittest.TestCase):
                 process.stdin.write("STOP\n")
                 process.stdin.flush()
                 process.stdin.close()
-                output, errors = process.communicate(timeout=8)
+                process.wait(timeout=8)
+                output = process.stdout.read()
+                errors = process.stderr.read()
                 self.assertEqual(process.returncode, 0, errors)
                 stages = [r["detail"] for r in
                           (json.loads(line) for line in output.splitlines())

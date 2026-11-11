@@ -116,9 +116,14 @@ def read_devices():
         identifier = dev.get("identifier")
         if not isinstance(identifier, str) or not DEVICE.fullmatch(identifier):
             continue
-        mode, lock, button = (dev.get("scroll_method"),
-                              dev.get("scroll_button_lock"),
-                              dev.get("scroll_button"))
+        # Sway GET_INPUTS places scroll configuration in libinput,
+        # not at the device's outer level (unlike scroll_factor).
+        lib = dev.get("libinput")
+        if not isinstance(lib, dict):
+            continue
+        mode, lock, button = (lib.get("scroll_method"),
+                              lib.get("scroll_button_lock"),
+                              lib.get("scroll_button"))
         if (mode not in MODES or lock not in LOCKS
                 or not isinstance(button, int) or isinstance(button, bool)
                 or button < 0 or button > 767):

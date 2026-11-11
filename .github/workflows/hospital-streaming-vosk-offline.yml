@@ -1,0 +1,24 @@
+name: Hospital Offline Streaming Proof
+
+on:
+  pull_request:
+    paths:
+      - "scripts/hospital_streaming_vosk_probe.py"
+      - "tests/hospital/test_streaming_vosk_offline_contract.py"
+      - "MODEL/contracts/hospital-streaming-vosk-offline-proof.md"
+      - ".github/workflows/hospital-streaming-vosk-offline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-streaming-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Syntax and offline synthetic partial/final contracts
+        run: |
+          python3 -m py_compile scripts/hospital_streaming_vosk_probe.py tests/hospital/test_streaming_vosk_offline_contract.py
+          python3 tests/hospital/test_streaming_vosk_offline_contract.py

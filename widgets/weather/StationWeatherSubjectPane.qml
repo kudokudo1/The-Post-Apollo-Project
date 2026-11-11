@@ -43,6 +43,9 @@ Rectangle {
         id: homePanel
         StationHome {
             subjectRoute: weatherPane.subjectRoute
+            onRouteRequested: function(path) {
+                weatherPane.routeRequested(path)
+            }
             weatherService: weatherPane.weatherService
             // No cross-domain solar/Kp data is presented as WEATHER.
             spaceService: null

@@ -9,9 +9,9 @@ const native=fs.readFileSync("tests/weather/fixtures/W15FixedWeatherOverviewNati
 
 // Match the actual QML height budget, including the minimum W17 instrument.
 function heights(viewport) {
- const row=Math.max(55,Math.min(68,Math.floor(viewport*0.18),
-                            Math.floor(Math.max(0,viewport-164)/2)));
- return {summary:viewport-2*row,row};
+ const row=Math.max(viewport<286?46:55,Math.min(60,Math.floor(viewport*0.18),
+                            Math.floor(Math.max(0,viewport-195)/2)));
+ return {summary:viewport-31-2*row,row};
 }
 test("W18 gives tall Overview space to WEATHER rather than empty cards",()=>{
  assert.match(home,/readonly property real overviewCardRowHeight:/);
@@ -20,11 +20,11 @@ test("W18 gives tall Overview space to WEATHER rather than empty cards",()=>{
  assert.equal((home.match(/\? home\.overviewCardRowHeight : 118/g)||[]).length,2);
  for(const viewport of [275,300,500,650]) {
    const {summary,row}=heights(viewport);
-   assert.equal(summary+2*row,viewport);
-   assert.ok(summary>=164);
-   assert.ok(row<=68);
+   assert.equal(summary+31+2*row,viewport);
+   assert.ok(summary>=152);
+   assert.ok(row<=60);
  }
- assert.ok(heights(500).summary>=300);
+ assert.ok(heights(500).summary>=340);
  assert.ok(heights(500).row<heights(300).summary/2);
 });
 test("W18 expands existing icons, forecast sections, not replacing artwork or bars",()=>{

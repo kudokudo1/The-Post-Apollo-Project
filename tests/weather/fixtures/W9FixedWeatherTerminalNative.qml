@@ -299,10 +299,19 @@ ShellRoot {
             if(root.phase===4) {
                 if(combined.width<519 || combined.width>521)
                     return root.fail("W20_TALL_WIDTH_NOT_APPLIED");
-                if(combined.currentItem.mainGlyph.width<150 ||
+                if(combined.currentItem.mainGlyph.width<130 ||
+                   combined.currentItem.mainArtwork.font.pixelSize<170 ||
                    combined.currentItem.mainTemperature.font.pixelSize<43)
                     return root.fail("W20_HERO_ICON_NOT_DRAMATIC // "
                         +combined.currentItem.mainGlyph.width);
+                if(combined.hourlyItem.height<100 ||
+                   combined.currentItem.height>=combined.hourlyItem.height*1.5)
+                    return root.fail("W21_HOURLY_BLOCK_NOT_TALLER // "
+                      +combined.currentItem.height+"/"
+                      +combined.hourlyItem.height);
+                if(combined.currentItem.mainArtwork.font.pixelSize
+                      > combined.currentItem.height*1.34)
+                    return root.fail("W21_HERO_PAINTED_GLYPH_ESCAPES_BAND");
                 const mainIcon=combined.currentItem.mainGlyph;
                 const temp=combined.currentItem.mainTemperature;
                 const iconLeft=mainIcon.mapToItem(combined.currentItem,0,0).x;

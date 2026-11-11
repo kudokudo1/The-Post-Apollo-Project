@@ -116,6 +116,9 @@ Rectangle {
     // W20 // Hold NOW and three-day bands at their W19 tall-view sizes;
     // spend any newly available Overview height on the six-hour forecast.
     readonly property real anchoredExpansion: Math.min(160, expansion)
+    // W21 // The new overview rail costs 31px. Only the tightest viewport
+    // compresses existing band content, preserving the daily rain labels.
+    readonly property real compactDeficit: Math.max(0,164-height)
     height: 164
     color: Colors.dark
     // Parent StationWeatherTerminalSummary already draws the outer frame.
@@ -157,6 +160,7 @@ Rectangle {
             objectName: "weather-w17-current-instrument"
             width: parent.width
             height: 52 + panel.anchoredExpansion * 0.50
+                    - Math.min(8,panel.compactDeficit)
             Rectangle {
                 width: 3
                 height: parent.height-2
@@ -166,7 +170,7 @@ Rectangle {
             Item {
                 id: mainReadout
                 x: 5
-                width: parent.width*0.44-6
+                width: parent.width*0.49-6
                 height: parent.height
                 GohuText {
                     anchors.top: parent.top
@@ -191,15 +195,15 @@ Rectangle {
                     id: currentIcon
                     objectName: "weather-w17-original-main-glyph"
                     anchors.right: parent.right
-                    anchors.rightMargin: 1
+                    anchors.rightMargin: 12
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(108,47 + panel.expansion * 0.34,
-                                    Math.max(47,parent.width * 0.49))
+                    width: Math.min(122,47 + panel.expansion * 0.39,
+                                    Math.max(47,parent.width * 0.58))
                     height: width
                     GohuText {
                         anchors.centerIn: parent
                         text: panel.iconText(panel.currentState)
-                        font.pixelSize: Math.min(114,currentIcon.width + 6)
+                        font.pixelSize: Math.min(171,currentIcon.width * 1.42)
                         color: panel.ink(panel.currentState.color)
                         visible: panel.currentArt==="weather"
                     }
@@ -207,6 +211,7 @@ Rectangle {
                         anchors.centerIn: parent
                         width: parent.width
                         height: parent.height
+                        scale: 1.32
                         mode: panel.currentArt
                         solar: panel.observationCycle.solar
                         moonPhase: panel.observationCycle.moonPhase
@@ -219,15 +224,20 @@ Rectangle {
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 1
                     width: parent.width
+                    // W21 // At compact size, visibility moves next to
+                    // FEELS rather than colliding with the pressure value.
                     text: panel.currentReady
                         ? "FEELS "+panel.reading(panel.weatherService.feelsLikeF,"°F")
+                          +(nowBand.height<65
+                            ? " // VIS "+panel.reading(panel.weatherService.visibilityMiles," MI")
+                            : "")
                         : "FEELS --"
                     font.pixelSize: 9
                     color: Colors.yellow
                 }
             }
             Rectangle {
-                x: parent.width*0.44
+                x: parent.width*0.49
                 width: 1
                 y: 3
                 height: parent.height-6
@@ -236,8 +246,8 @@ Rectangle {
             }
             Grid {
                 id: telemetryGrid
-                x: parent.width*0.44+5
-                width: parent.width*0.56-7
+                x: parent.width*0.49+5
+                width: parent.width*0.51-7
                 height: parent.height
                 columns: 2
                 rowSpacing: 2
@@ -257,19 +267,20 @@ Rectangle {
                             anchors.top: parent.top
                             text: metric.modelData.label
                             color: metric.modelData.color
-                            font.pixelSize: 8
+                            font.pixelSize: metric.height<26 ? 7 : 8
                         }
                         Row {
                             id: metricReadoutRow
                             anchors.left: parent.left
                             anchors.top: parent.top
-                            anchors.topMargin: (metric.modelData.key==="pressure" ? 7 : 9)
-                                               + Math.min(24,panel.expansion * 0.10)
+                            anchors.topMargin: metric.height<26 ? 8
+                                : (metric.modelData.key==="pressure" ? 7 : 9)
+                                  + Math.min(24,panel.expansion * 0.10)
                             spacing: 1
                             GohuText {
                                 visible: metric.modelData.key==="wind"
                                 text: "↑"
-                                font.pixelSize: 11
+                                font.pixelSize: metric.height<26 ? 8 : 11
                                 width: visible ? 10 : 0
                                 color: Colors.yellow
                                 rotation: panel.currentReady
@@ -277,8 +288,9 @@ Rectangle {
                             }
                             GohuText {
                                 text: metric.modelData.value
-                                font.pixelSize: (metric.modelData.key==="pressure" ? 8 : 11)
-                                                + Math.min(3,panel.expansion * 0.02)
+                                font.pixelSize: metric.height<26 ? 8
+                                    : (metric.modelData.key==="pressure" ? 8 : 11)
+                                      + Math.min(3,panel.expansion * 0.02)
                                 color: Colors.white
                             }
                         }
@@ -310,6 +322,7 @@ Rectangle {
                         }
                         GohuText {
                             visible: metric.modelData.key==="pressure"
+                                     && metric.height>=26
                             anchors.bottom: parent.bottom
                             text: panel.currentReady
                                 ? "VIS "+panel.reading(panel.weatherService.visibilityMiles," MI")
@@ -351,6 +364,7 @@ Rectangle {
             objectName: "weather-w17-six-hour-timeline"
             width: parent.width
             height: 45 + panel.expansion - panel.anchoredExpansion * 0.67
+                    - Math.max(0,panel.compactDeficit-8)
             spacing: 1
             Repeater {
                 id: hourRepeater
@@ -390,13 +404,15 @@ Rectangle {
                         id: hourReadingStack
                         objectName: "weather-w19-hourly-reading-stack"
                         width: parent.width
-                        y: Math.max(8,8 + (hour.height-8-implicitHeight)/2)
+                        y: hour.height<45 ? 7
+                           : Math.max(8,8 + (hour.height-8-implicitHeight)/2)
                         spacing: hour.height>65 ? 2 : 0
                         Item {
                             id: hourIcon
                             objectName: "weather-w17-original-hourly-glyph"
                             anchors.horizontalCenter: parent.horizontalCenter
-                            width: Math.min(50,13 + Math.max(0,hour.height-45)*0.55)
+                            width: Math.min(50,(hour.height<45 ? 12 : 13)
+                                  + Math.max(0,hour.height-45)*0.55)
                             height: width
                             GohuText {
                                 anchors.centerIn: parent
@@ -420,7 +436,7 @@ Rectangle {
                         GohuText {
                             id: hourTemperature
                             width: parent.width
-                            height: hour.height>65 ? 13 : 10
+                            height: hour.height>65 ? 13 : (hour.height<45 ? 9 : 10)
                             horizontalAlignment: Text.AlignHCenter
                             text: panel.reading(hour.entry.tempF,"°F")
                             font.pixelSize: hour.height>65 ? 11 : 9
@@ -514,12 +530,12 @@ Rectangle {
                         anchors.left: parent.left
                         anchors.leftMargin: 3
                         anchors.verticalCenter: parent.verticalCenter
-                        width: Math.min(50,20 + (dayStrip.height - 24) * 0.83)
+                        width: Math.min(35,20 + (dayStrip.height - 24) * 0.54)
                         height: width
                         GohuText {
                             anchors.centerIn: parent
                             text: panel.iconText(day.state)
-                            font.pixelSize: Math.min(54,22 + panel.expansion * 0.17)
+                            font.pixelSize: Math.min(40,22 + panel.expansion * 0.11)
                             color: panel.ink(day.state.color)
                             visible: day.art==="weather"
                         }

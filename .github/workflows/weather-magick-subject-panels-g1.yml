@@ -8,6 +8,8 @@ on:
       - 'widgets/weather/StationSubjectNavigator.qml'
       - 'widgets/weather/WeatherStationW.qml'
       - 'tests/weather/test_magick_subject_panels_g1.js'
+      - 'widgets/weather/StationSubjectOverviewRail.qml'
+      - 'tests/weather/test_weather_w21_rails_and_forecast_hierarchy.js'
       - '.github/workflows/weather-magick-subject-panels-g1.yml'
   workflow_dispatch:
 
@@ -33,3 +35,4 @@ jobs:
           node --test tests/weather/test_earth_subject_panels_e1.js
           node --test tests/weather/test_media_subject_panels_d1.js
           node --test tests/weather/test_magick_subject_panels_g1.js
+          node --test tests/weather/test_weather_w21_rails_and_forecast_hierarchy.js

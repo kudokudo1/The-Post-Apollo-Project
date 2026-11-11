@@ -47,10 +47,11 @@ def build_fake_runtime(root: Path):
         #!/usr/bin/env python3
         import sys, time
         sample=(1700).to_bytes(2, "little", signed=True)
+        interval = float(os.environ.get("TEST_RECORDER_STEP_DELAY", "0.025"))
         for _ in range(125):
             sys.stdout.buffer.write(sample * 1600)
             sys.stdout.buffer.flush()
-            time.sleep(0.025)
+            time.sleep(interval)
         time.sleep(12)
     """).lstrip())
     recorder.chmod(0o700)

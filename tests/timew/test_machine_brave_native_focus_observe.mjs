@@ -96,7 +96,7 @@ for (const forbidden of [
 ]) assert.equal(ui.includes(forbidden), false, forbidden);
 assert.deepEqual(manifest.permissions, []);
 assert.deepEqual(manifest.host_permissions, []);
-assert.deepEqual(manifest.optional_permissions, ["nativeMessaging"]);
+assert.deepEqual(manifest.optional_permissions, ["nativeMessaging","tabs"]);
 assert.equal(manifest.incognito, "not_allowed");
 
 console.log("MACHINE Brave one-click co-observation protocol + no-authority UI PASS");

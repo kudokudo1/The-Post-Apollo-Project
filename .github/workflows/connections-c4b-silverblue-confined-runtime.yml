@@ -5,6 +5,8 @@ on:
     paths:
       - "tests/connections/c4b_silverblue/**"
       - "tests/connections/test_connections_c4b_silverblue_contract.py"
+      - "tests/connections/test_connections_c4d_guest_observation_export.py"
+      - "tests/connections/test_connections_c4d_uart_relay_review.py"
       - "tests/connections/c2v_silverblue/**"
       - ".github/workflows/connections-c4b-silverblue-confined-runtime.yml"
       - "docs/connections-c4b-silverblue-confined-runtime.md"
@@ -34,6 +36,8 @@ jobs:
           bash -n tests/connections/c3d_provenance/build_signed_ci_status.sh
           bash -n tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
           python3 -B tests/connections/test_connections_c4b_silverblue_contract.py
+          python3 -B tests/connections/test_connections_c4d_guest_observation_export.py
+          python3 -B tests/connections/test_connections_c4d_uart_relay_review.py
           python3 -B tests/connections/test_connections_c4a_silverblue_contract.py
           python3 -B tests/connections/test_connections_c3b_origin.py
           python3 -B tests/connections/test_connections_c3d_provenance_contract.py
@@ -124,9 +128,80 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # C4d-only side observer: C2v owns QEMU, both real reboots and the
+          # original authoritative serial acceptance. This reads, never
+          # modifies, the temporary first-boot UART file while C2v runs.
+          evidence="$RUNNER_TEMP/c4d-guest-evidence"
+          mkdir -m 0700 "$evidence"
+          # Explicit fail-closed preflight BEFORE either process starts. Do not
+          # delete or accept an unexpected boot directory from another run.
+          if compgen -G "$RUNNER_TEMP/c2v-silverblue-*" >/dev/null; then
+            echo "C4D_BLOCKED // PREEXISTING_C2V_BOOT_DIRECTORY"
+            exit 2
+          fi
+          python3 -B tests/connections/c4b_silverblue/capture_guest_observation.py \
+            --runner-temp "$RUNNER_TEMP" \
+            --complete "$evidence/original-c2v-result" \
+            --output "$evidence/C4B_OBSERVED.txt" \
+            --ready "$evidence/observer-ready" &
+          observer_pid="$!"
+          # No C2v boot until the observer has passed its OWN safety preflight.
+          # This prevents C2v's freshly created directory being called stale.
+          observer_ready=0
+          for attempt in $(seq 1 200); do
+            if [[ -e "$evidence/observer-ready" || -L "$evidence/observer-ready" ]]; then
+              [[ ! -L "$evidence/observer-ready" && -f "$evidence/observer-ready" ]] ||
+                { echo "C4D_BLOCKED // OBSERVER_READY_FILE_UNSAFE"; exit 2; }
+              [[ "$(stat -c '%u:%g:%a:%h' "$evidence/observer-ready")" == "$(id -u):$(id -g):600:1" &&
+                 "$(cat "$evidence/observer-ready")" == READY ]] ||
+                { echo "C4D_BLOCKED // OBSERVER_READY_CONTENT_OR_OWNERSHIP_REFUSED"; exit 2; }
+              kill -0 "$observer_pid" 2>/dev/null ||
+                { echo "C4D_BLOCKED // OBSERVER_EXITED_AFTER_READY"; wait "$observer_pid" || :; exit 2; }
+              observer_ready=1
+              break
+            fi
+            if ! kill -0 "$observer_pid" 2>/dev/null; then
+              echo "C4D_BLOCKED // OBSERVER_EXITED_BEFORE_READY"
+              wait "$observer_pid" || :
+              exit 2
+            fi
+            sleep 0.1
+          done
+          if [[ "$observer_ready" != 1 ]]; then
+            echo "C4D_BLOCKED // OBSERVER_STARTUP_READY_TIMEOUT"
+            kill "$observer_pid" 2>/dev/null || :
+            wait "$observer_pid" || :
+            exit 2
+          fi
+          echo "C4D_PASS // OBSERVER_READY_BEFORE_C2V_BOOT"
+          vm_rc=0
           C4A_SERVICE_RPM_DIR="$RUNNER_TEMP/c4b-status-rpm" \
             C4B_RUNTIME_ASSETS_DIR="$RUNNER_TEMP/c4b-assets" \
-            timeout 3550s bash tests/connections/c2v_silverblue/boot_official_silverblue.sh
+            timeout 3550s bash tests/connections/c2v_silverblue/boot_official_silverblue.sh || vm_rc="$?"
+          if [[ "$vm_rc" == 0 ]]; then
+            printf '%s\n' PASS > "$evidence/original-c2v-result"
+          else
+            printf '%s\n' FAIL > "$evidence/original-c2v-result"
+          fi
+          observer_rc=0
+          wait "$observer_pid" || observer_rc="$?"
+          [[ "$vm_rc" == 0 ]] || {
+            echo "C4D_BLOCKED // ORIGINAL_GENUINE_C2V_C4B_BOOT_OR_ROLLBACK_FAILED"
+            exit "$vm_rc"
+          }
+          [[ "$observer_rc" == 0 && -s "$evidence/C4B_OBSERVED.txt" ]] || {
+            echo "C4D_BLOCKED // ONE_VALID_SAME_SERVICE_GUEST_OBSERVATION_NOT_EXPORTED"
+            exit 2
+          }
+          echo "C4D_PASS // SIGNED_SILVERBLUE_TWO_BOOT_AND_ONE_OBSERVATION_GATE"
+
+      - name: Upload only one deny-only guest observation after full real rollback
+        uses: actions/upload-artifact@v4
+        with:
+          name: c4d-one-guest-observation
+          path: ${{ runner.temp }}/c4d-guest-evidence/C4B_OBSERVED.txt
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Confirm no production Connections authority was enabled
         shell: bash

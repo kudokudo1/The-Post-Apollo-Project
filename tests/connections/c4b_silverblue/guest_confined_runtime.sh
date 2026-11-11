@@ -301,12 +301,36 @@ C4B_C3B_DIR_DIAG
   # verifies it. Reverify its signature and signed file digests HERE, while
   # the exact C3b-verified systemd/D-Bus service is alive. No new signer,
   # transport, witness authority or production grant is created.
-  GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1 \
+  #
+  # C4d: capture the REAL producer's exact stdout in a single disposable
+  # root-only file at generation time. The later diagnostic relay no longer
+  # relies on searching a shared runtime log that omitted the original
+  # C4B_OBSERVED record during genuine two-boot CI.
+  c4d_record_dir=/run/postapollo-c4d-observation
+  [[ ! -e "$c4d_record_dir" && ! -L "$c4d_record_dir" ]] ||
+    fail "C4D_PRODUCER_RECORD_DIRECTORY_PREEXISTS"
+  install -d -m 0700 "$c4d_record_dir" ||
+    fail "C4D_PRODUCER_PRIVATE_DIRECTORY_FAILED"
+  [[ "$(stat -c '%u:%g:%a:%h' "$c4d_record_dir")" == "0:0:700:2" ||
+     "$(stat -c '%u:%g:%a' "$c4d_record_dir")" == "0:0:700" ]] ||
+    fail "C4D_PRODUCER_DIRECTORY_UNSAFE"
+  c4d_record="$c4d_record_dir/observation.txt"
+  umask 077
+  # The same verifier writes the one bounded report using exclusive,
+  # nofollow creation in a root-only directory. Actual Silverblue tests
+  # showed the previous successful verifier's shell stdout capture was
+  # EMPTY immediately, so that transport cannot be relied upon.
+  [[ ! -e "$c4d_record" && ! -L "$c4d_record" ]] ||
+    fail "C4D_PRODUCER_RECORD_PREEXISTS"
+  # The heredoc payload must start immediately on the next line. Placing an
+  # "|| fail" command here previously injected it as Python's line 1 and
+  # incorrectly let the shell report signed-observation success.
+  if GITHUB_ACTIONS=true POST_APOLLO_C4B_TEST_GUEST=1 \
     timeout --signal=TERM --kill-after=5s 60s "$python" -I -B - \
-      "$pid" "$assets/c3d-status.rpm" <<'C4B_RUNNING_HOST_PROBE' ||
-    fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"
+      "$pid" "$assets/c3d-status.rpm" "$c4d_record" <<'C4B_RUNNING_HOST_PROBE'
 import grp, hashlib, json, os, pwd, re, stat, subprocess, sys
 from pathlib import Path
+from functools import lru_cache
 
 HOST = "/usr/libexec/post-apollo/connections-status-host"
 UNIT = "postapollo-connections-status.service"
@@ -329,6 +353,19 @@ def command(*args):
         refuse("OBSERVATION_COMMAND_UNAVAILABLE")
     if p.returncode or len(p.stdout) + len(p.stderr) > 32768:
         refuse("OBSERVATION_COMMAND_REFUSED")
+    if args[0] == "rpm":
+        # The guest prelayer already verified this SAME signed RPM's identity
+        # using rpm's stdout. The normal system rpmdb may not trust the
+        # disposable key and can emit a harmless NOKEY warning on stderr.
+        # The separate rpmkeys --dbpath KEYDB --checksig check above remains
+        # mandatory for signature authority. Never concatenate diagnostic
+        # stderr into exact package/member identity or ownership results.
+        diagnostics = p.stderr.decode("utf-8", "strict").strip()
+        if diagnostics and not all(
+                re.fullmatch(r"warning: .*\bNOKEY\b", line)
+                for line in diagnostics.splitlines()):
+            refuse("RPM_METADATA_DIAGNOSTIC_REFUSED")
+        return p.stdout.decode("utf-8", "strict").strip()
     return (p.stdout + p.stderr).decode("utf-8", "strict").strip()
 
 def start(pid):
@@ -369,12 +406,51 @@ def hash_root_file(path, expected_mode, limit):
     finally:
         if fd is not None: os.close(fd)
 
+def write_private_report(path, record):
+    # No second observer or grant: only the original signed-process probe.
+    # Enforce exact root-only directory and single regular report inode.
+    parent = "/run/postapollo-c4d-observation"
+    if os.geteuid() != 0 or path != parent + "/observation.txt":
+        refuse("C4D_REPORT_PATH_REFUSED")
+    pst = os.lstat(parent)
+    if (not stat.S_ISDIR(pst.st_mode) or pst.st_uid != 0 or pst.st_gid != 0
+            or stat.S_IMODE(pst.st_mode) != 0o700):
+        refuse("C4D_REPORT_DIRECTORY_REFUSED")
+    raw = (record + "\n").encode("ascii", "strict")
+    if (not raw.startswith(b"C4B_OBSERVED // {")
+            or len(raw) > 2048 or raw.count(b"\n") != 1):
+        refuse("C4D_REPORT_BOUND_REFUSED")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                 os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    try:
+        before = os.fstat(fd)
+        if (not stat.S_ISREG(before.st_mode) or before.st_uid != 0
+                or before.st_gid != 0 or before.st_nlink != 1
+                or stat.S_IMODE(before.st_mode) != 0o600
+                or before.st_size != 0):
+            refuse("C4D_REPORT_FILE_REFUSED")
+        written = 0
+        while written < len(raw):
+            count = os.write(fd, raw[written:])
+            if count <= 0:
+                refuse("C4D_REPORT_WRITE_REFUSED")
+            written += count
+        os.fsync(fd)
+        after = os.fstat(fd)
+        if ((before.st_dev, before.st_ino) != (after.st_dev, after.st_ino)
+                or after.st_size != len(raw)
+                or after.st_nlink != 1):
+            refuse("C4D_REPORT_WRITE_INTEGRITY_REFUSED")
+    finally:
+        os.close(fd)
+
+@lru_cache(maxsize=1)
 def observe():
     if (os.geteuid() != 0 or os.environ.get("GITHUB_ACTIONS") != "true"
             or os.environ.get("POST_APOLLO_C4B_TEST_GUEST") != "1"
             or not Path("/run/ostree-booted").exists()):
         refuse("DISPOSABLE_SILVERBLUE_SCOPE_REFUSED")
-    if len(sys.argv) != 3 or not sys.argv[1].isdecimal():
+    if len(sys.argv) != 4 or not sys.argv[1].isdecimal():
         refuse("PROCESS_ID_ARGUMENT_REFUSED")
     pid = int(sys.argv[1])
     rpm = sys.argv[2]
@@ -475,6 +551,13 @@ def observe():
                 productionAuthority=False)
 
 try:
+    # First call performs all original running-service checks. Cache only this
+    # in-process, unchanged report so the original C4c stdout contract can
+    # emit precisely the same bytes after the exclusive private persistence.
+    measured = observe()
+    write_private_report(
+        sys.argv[3], "C4B_OBSERVED // " +
+        json.dumps(measured, sort_keys=True, separators=(",", ":")))
     print("C4B_OBSERVED // " + json.dumps(observe(), sort_keys=True, separators=(",", ":")),
           flush=True)
 except (Refused, OSError, KeyError, ValueError, UnicodeError) as exc:
@@ -482,6 +565,22 @@ except (Refused, OSError, KeyError, ValueError, UnicodeError) as exc:
           (str(exc) if isinstance(exc, Refused) else type(exc).__name__), flush=True)
     sys.exit(2)
 C4B_RUNNING_HOST_PROBE
+  then
+    : # The verifier completed and created its own exclusive report file.
+  else
+    fail "SIGNED_C3D_RUNNING_HOST_MEASUREMENT_REFUSED"
+  fi
+  [[ -s "$c4d_record" ]] ||
+    fail "C4D_PRODUCER_RECORD_EMPTY_AFTER_VERIFIER"
+  # Status-only diagnostics, never echo the producer's unvalidated bytes.
+  # Distinguish a genuinely empty stdout capture from later file replacement.
+  if [[ -s "$c4d_record" ]]; then
+    c4d_capture_initial=PRESENT
+    echo "C4D_PRODUCER_DIAG // DIRECT_STDOUT_CAPTURE_PRESENT"
+  else
+    c4d_capture_initial=EMPTY
+    echo "C4D_PRODUCER_DIAG // DIRECT_STDOUT_CAPTURE_EMPTY"
+  fi
   echo "C4B_PASS // SAME_C3B_SERVICE_SIGNED_RPM_SCRIPT_AND_INTERPRETER_OBSERVED"
 
   stage EXPLICIT_SIGNED_SERVICE_STOP_BEGIN
@@ -493,6 +592,183 @@ C4B_RUNNING_HOST_PROBE
   rmdir /opt/c4b || fail "CLIENT_DIRECTORY_CLEANUP_FAILED"
   [[ -d /opt/postapollo-c2o-venv ]] ||
     fail "OFFLINE_VENV_MISSING_AT_CLEANUP"
+  # C4d test-only export bridge: the signed-process observer's exact stdout
+  # was captured into a root-only /run file at generation time. The runtime
+  # log can be incomplete; a missing/unsafe producer capture must be REFUSED.
+  # Emit one validated diagnostic line into the runtime log before the isolated
+  # Python is deleted; the unchanged controller relays its final log tail.
+  # Serial I/O is strictly best effort and must NEVER grant host authority or
+  # change the signed service's acceptance/rollback lifecycle.
+  # Keep a fixed, non-sensitive copy of the creation-time vs relay-time
+  # capture state in the existing final guest-log tail. These are size-only
+  # diagnostics, NOT proof of report origin, contents, signer, or consent.
+  # The later nofollow/inode/schema checks remain authoritative.
+  if [[ -s "$c4d_record" ]]; then
+    c4d_capture_at_relay=PRESENT
+  else
+    c4d_capture_at_relay=EMPTY
+  fi
+  echo "C4D_PRODUCER_DIAG // capture_initial=$c4d_capture_initial capture_at_relay=$c4d_capture_at_relay"
+  if [[ -c /dev/ttyS0 ]]; then
+    timeout --signal=TERM --kill-after=1s 6s "$python" -I -B - \
+      "$c4d_record" /dev/ttyS0 <<'C4B_SINGLE_UART_RELAY' || true
+import json, os, re, select, stat, sys, time
+
+PREFIX = b"C4B_OBSERVED // "
+SCHEMA = "postapollo.connections.c4b-booted-signed-host-observation.v1"
+FIELDS = frozenset((
+    "schema", "signed_rpm_sha256", "signed_script_sha256",
+    "running_script_sha256", "interpreter_sha256", "service_pid",
+    "dbus_owner_pid", "process_start_ticks", "service_uid", "service_gid",
+    "systemd_unit", "selinux_enforcing", "signedGuestOriginAuthenticated",
+    "evidenceCryptographicallyAttested", "hostAuthenticated", "canApprove",
+    "credentialActionsEnabled", "productionAuthority",
+))
+FALSE = ("signedGuestOriginAuthenticated", "evidenceCryptographicallyAttested",
+         "hostAuthenticated", "canApprove", "credentialActionsEnabled",
+         "productionAuthority")
+
+def unique(pairs):
+    obj = {}
+    for k, v in pairs:
+        if k in obj:
+            raise ValueError("GUEST_OBSERVATION_DUPLICATE_KEY")
+        obj[k] = v
+    return obj
+
+def selected_line(path):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        st = os.fstat(fd)
+        # Report only symbolic predicate failures. Never dump process IDs,
+        # UID values, file bytes, filenames or digests to the host console.
+        if not stat.S_ISREG(st.st_mode):
+            raise ValueError("GUEST_RECORD_NOT_REGULAR")
+        if st.st_uid != os.geteuid():
+            raise ValueError("GUEST_RECORD_OWNER_MISMATCH")
+        if st.st_nlink != 1:
+            raise ValueError("GUEST_RECORD_LINK_COUNT_INVALID")
+        if st.st_size <= 0:
+            raise ValueError("GUEST_RECORD_EMPTY")
+        if st.st_size > 2 * 1024 * 1024:
+            raise ValueError("GUEST_RECORD_OVERSIZE")
+        # The original signed-service record may be farther back than the
+        # last 16 KiB after teardown. Read the whole bounded, verified inode
+        # instead of silently discarding a valid earlier observation.
+        log = os.read(fd, st.st_size + 1)
+        after = os.fstat(fd)
+        if (len(log) != st.st_size or
+                (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+                != (after.st_dev, after.st_ino, after.st_size,
+                    after.st_mtime_ns, after.st_ctime_ns)):
+            raise ValueError("GUEST_LOG_CHANGED")
+    finally:
+        os.close(fd)
+    matched = [x.rstrip(b"\r") for x in log.split(b"\n")
+               if x.startswith(PREFIX)]
+    if not matched:
+        raise ValueError("GUEST_OBSERVATION_MISSING")
+    if len(matched) != 1:
+        raise ValueError("GUEST_OBSERVATION_DUPLICATE")
+    if len(matched[0]) > 2048:
+        raise ValueError("GUEST_OBSERVATION_OVERSIZE")
+    line = matched[0]
+    try:
+        doc = json.loads(line[len(PREFIX):].decode("utf-8"), object_pairs_hook=unique)
+    except json.JSONDecodeError:
+        raise ValueError("GUEST_OBSERVATION_JSON_INVALID") from None
+    if (type(doc) is not dict or set(doc) != FIELDS or doc["schema"] != SCHEMA
+            or doc["systemd_unit"] != "postapollo-connections-status.service"
+            or doc["selinux_enforcing"] is not True
+            or any(doc[k] is not False for k in FALSE)
+            or doc["signed_script_sha256"] != doc["running_script_sha256"]):
+        raise ValueError("GUEST_OBSERVATION_SCHEMA_INVALID")
+    for k in ("signed_rpm_sha256", "signed_script_sha256",
+              "running_script_sha256", "interpreter_sha256"):
+        if type(doc[k]) is not str or re.fullmatch("[0-9a-f]{64}", doc[k]) is None:
+            raise ValueError("GUEST_OBSERVATION_DIGEST_INVALID")
+    for k in ("service_pid", "dbus_owner_pid", "service_uid", "service_gid"):
+        if type(doc[k]) is not int or not 0 < doc[k] < 2147483648:
+            raise ValueError("GUEST_OBSERVATION_PROCESS_INVALID")
+    if doc["service_pid"] != doc["dbus_owner_pid"]:
+        raise ValueError("GUEST_OBSERVATION_DBUS_PID_MISMATCH")
+    ticks = doc["process_start_ticks"]
+    if (type(ticks) is not str or not 1 <= len(ticks) <= 24
+            or not ticks.isascii() or not ticks.isdecimal()
+            or int(ticks) < 1 or str(int(ticks)) != ticks):
+        raise ValueError("GUEST_OBSERVATION_START_INVALID")
+    return line
+
+def write_all_serial(fd, payload):
+    # A real UART opened O_NONBLOCK can accept only part of an observation.
+    # Never confuse a short write with a complete validated host record.
+    deadline = time.monotonic() + 4.0
+    sent = 0
+    while sent < len(payload):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or not select.select([], [fd], [], remaining)[1]:
+            raise ValueError("UART_WRITE_TIMEOUT")
+        try:
+            written = os.write(fd, payload[sent:sent + 128])
+        except BlockingIOError:
+            continue
+        if written <= 0:
+            raise ValueError("UART_WRITE_ZERO")
+        sent += written
+    return sent
+
+phase = "LOG_PREP"
+try:
+    payload = selected_line(sys.argv[1]) + b"\n"
+    # C2v already safely forwards the last 110 runtime-log lines after the
+    # whole first-boot C4b phase. Mirror ONE validated self-observation at
+    # that point; its separate guest serial is diagnostic only, never authority.
+    print(payload.decode("ascii").rstrip("\n"), flush=True)
+    phase = "UART_OPEN"
+    fd = os.open(sys.argv[2], os.O_WRONLY | os.O_NOCTTY | os.O_NONBLOCK |
+                 os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        if not stat.S_ISCHR(os.fstat(fd).st_mode):
+            raise ValueError("UART_NOT_CHARACTER_DEVICE")
+        phase = "UART_WRITE"
+        if write_all_serial(fd, payload) != len(payload):
+            raise ValueError("UART_WRITE_INCOMPLETE")
+        print("C4D_UART_DIAG // ONE_VALID_RECORD_WRITTEN_TO_UART", flush=True)
+    finally:
+        os.close(fd)
+except (OSError, ValueError, UnicodeError, KeyError, TypeError) as exc:
+    # Only source-defined symbolic statuses cross the diagnostic UART.
+    # Arbitrary OS / JSON exceptions or guest log bytes are NEVER printed.
+    # These statuses are hints, not acceptance evidence or authorization.
+    allowed = frozenset((
+        "GUEST_OBSERVATION_DUPLICATE_KEY",
+        "GUEST_RECORD_NOT_REGULAR", "GUEST_RECORD_OWNER_MISMATCH",
+        "GUEST_RECORD_LINK_COUNT_INVALID", "GUEST_RECORD_EMPTY",
+        "GUEST_RECORD_OVERSIZE", "GUEST_LOG_CHANGED",
+        "GUEST_OBSERVATION_MISSING", "GUEST_OBSERVATION_DUPLICATE",
+        "GUEST_OBSERVATION_OVERSIZE", "GUEST_OBSERVATION_JSON_INVALID",
+        "GUEST_OBSERVATION_SCHEMA_INVALID",
+        "GUEST_OBSERVATION_DIGEST_INVALID",
+        "GUEST_OBSERVATION_PROCESS_INVALID",
+        "GUEST_OBSERVATION_DBUS_PID_MISMATCH",
+        "GUEST_OBSERVATION_START_INVALID",
+        "UART_NOT_CHARACTER_DEVICE", "UART_WRITE_TIMEOUT",
+        "UART_WRITE_ZERO", "UART_WRITE_INCOMPLETE",
+    ))
+    reason = str(exc) if type(exc) is ValueError else ""
+    if reason not in allowed:
+        reason = phase + "_REFUSED"
+    print("C4D_UART_DIAG // " + reason, flush=True)
+C4B_SINGLE_UART_RELAY
+  fi
+  # The only first-boot record is now consumed. Check its inode before
+  # deletion; no artifacts persist into the second boot or production host.
+  [[ -f "$c4d_record" && ! -L "$c4d_record" &&
+     "$(stat -c '%u:%g:%a:%h' "$c4d_record")" == "0:0:600:1" ]] ||
+    fail "C4D_PRODUCER_CAPTURE_UNSAFE_AT_CLEANUP"
+  rm -f -- "$c4d_record"
+  rmdir -- "$c4d_record_dir" ||
+    fail "C4D_PRODUCER_PRIVATE_DIRECTORY_CLEANUP_FAILED"
   rm -rf -- /opt/postapollo-c2o-venv
   userdel c4b-reader && userdel c4b-outsider &&
     userdel postapollo-connections || fail "TEST_USER_REMOVAL_FAILED"

@@ -41,7 +41,9 @@ like "why do" -> "why did" leave duplicate or incorrect irreversible words.
   4000 characters, update events to 300, and subprocess model execution is
   guarded on Linux before import by RLIMIT_AS 2 GiB, RLIMIT_CPU 12 seconds,
   RLIMIT_CORE 0, nice +10, and affinity restricted to two already allowed
-  CPUs. These are prototype guards, **not a certified production sandbox**.
+  CPUs. A separate 45-second SIGALRM hard cutoff terminates even when
+  blocked on PCM input or in native model code. These are prototype guards,
+  **not a certified production sandbox**.
 - Synthetic tests use an in-memory fake decoder and fake PCM. They verify
   successive provisional corrections, final commits, duration limits, strict
   JSON shapes and refusal without explicit opt-in.

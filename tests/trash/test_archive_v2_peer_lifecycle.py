@@ -195,14 +195,17 @@ class PeerLifetimeV2pTests(unittest.TestCase):
             "import socket,sys,time\n"
             "s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)\n"
             "s.connect(sys.argv[1]);s.sendall(sys.stdin.buffer.read())\n"
+            "sys.stdout.write('sent\\n');sys.stdout.flush()\n"
             "time.sleep(60)\n"
         )
         child = subprocess.Popen(
             [sys.executable, "-I", "-B", "-c", code, self.socket_path],
-            stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
         try:
             child.stdin.write(encode_fixture_frame(self.packet()))
             child.stdin.close()
+            self.assertEqual(child.stdout.readline().strip(), b"sent")
             with self.listener.accept()[0] as server:
                 child.kill()
                 child.wait(timeout=10)
@@ -224,6 +227,7 @@ class PeerLifetimeV2pTests(unittest.TestCase):
                 child.kill()
                 child.wait(timeout=10)
             child.stderr.close()
+            child.stdout.close()
 
     def test_commit_boundary_guard_failure_rolls_back_both_records(self):
         # The same-UID test client remains alive, but a simulated pidfd

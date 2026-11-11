@@ -102,8 +102,10 @@ private_server_compatible() {
     [[ -n "$model" && -n "$server" ]] || return 1
     local help_text
     help_text="$("$server" --help 2>&1 || true)"
+    # whisper-server defaults no_context=true and does NOT expose -nc.
+    # Require supported controls only; never accept a TCP-only binary.
     [[ "$help_text" == *"--host"* && "$help_text" == *"socket"*
-       && "$help_text" == *"--no-gpu"* && "$help_text" == *"--no-context"* ]]
+       && "$help_text" == *"--no-gpu"* ]]
 }
 
 # Read-only capability/model profile; never starts a model or microphone.
@@ -132,7 +134,7 @@ if [[ "${1:-}" == "--session" ]]; then
     # Local-only server, GPU disabled, one server process/worker. No ffmpeg
     # conversion and no network-facing TCP listener, even on localhost.
     exec "$server" -m "$model" --host "$socket_path" \
-        -ng -t 2 -p 1 -l en -nt -nc
+        -ng -t 2 -p 1 -l en -nt
 fi
 
 if [[ "${1:-}" == "--check" ]]; then

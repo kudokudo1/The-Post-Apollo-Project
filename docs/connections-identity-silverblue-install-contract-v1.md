@@ -5,7 +5,7 @@
 **STAFF ROLE //** external Hospital-compatible DOC implementation, live registration unverified  
 **ASSIGNMENT //** independently inspectable signed Identity **RPM**, supervised Silverblue service origin, SELinux/seat/process and rollback proof  
 **AUTHORITY //** operator expressly authorized this separate assignment November 10, 2026, without merging, workstation installation or production activation  
-**STATUS //** Phase 1: signed RPM fixture and separate signer pretrust check; real official Silverblue two-boot/systemd/SELinux integration still unverified  
+**STATUS //** Phase 1 signed package and ephemeral manifest tests verified; real Silverblue installation, RPM layering and first reboot observed; strict installed-file verification and second rollback boot pending; running systemd/SELinux Identity gateway unverified  
 **OWNERSHIP //** `tests/connections/identity_silverblue/**`, its new workflow, this document. Identity DOC retains `services/identity/**`, `tests/identity/**`; protected C3e retains the trust reviewer/importer; C5 retains consent.
 
 ## IMPLEMENTATION
@@ -19,6 +19,8 @@ This **does not reuse C4d's fake Connections status host**. It packages the *act
 - `test_identity_signed_rpm_contract.py`: exact source roster, service start-gate and negative release/authority contracts. The CI workflow checks these and builds/verifies the RPM. No package is installed on the operator's Fedora machine.
 - `release_manifest_ci.py` + `test_identity_release_manifest_ci.py`: separate ephemeral **Ed25519 release root** in the GitHub controller signs canonical purpose/role-scoped RPM SHA-256, the complete eight-module **plus systemd unit** SHA-256 roster, release epoch/sequence test floors, and a *distinct* disposable receipt-signing public-key fingerprint. Root and receipt private keys exist only in process memory; the RPM builder never receives them. The verifier rejects duplicate/noncanonical JSON, missing/extra module, wrong root, mismatched receipt key, modified package bytes and old floors. All returned authority flags are false. The public test root is **not operator-enrolled production custody**; a successful test proves only release-envelope mechanics.
 
+
+**Booted-RPM integrity policy (test-only):** The signed package contains eight exact Identity modules (0555) and one inert unit (0644). Real OSTree composition changes modification timestamps. The guest's dedicated `verify_booted_rpm_mtime_only.py` parser accepts only RPM `.......T.` records for one of nine signed package paths, without duplicates or unexplained exit codes. Separate `rpm -V --nomtime` must be strictly clean, and per-file root ownership, permission mode, nonsymlink type and package ownership are still mandatory. This is not an installed-host identity or production-release admission decision.
 
 The existing `installed_gateway_witness_v1.py` is **Ubuntu dpkg-specific** and cannot authenticate this RPM. Identity DOC must not route this test witness into `InstalledIdentityCommandAdapterV1` or enable sign-in merely because an RPM signature is valid.
 
@@ -41,7 +43,7 @@ GitHub Actions only: open the dedicated C4b Identity Silverblue draft PR and ins
 
 **Phase 1 acceptance:** exact-head source/adversarial contracts PASS, real Fedora 44 RPM build with original eight modules and inert unit, OpenPGP signature untrusted-before/imported-after in separate RPM DB, separate synthetic Ed25519 release-root signature over exact RPM+module+receipt-key public fingerprint with negative signature/key/floor/roster tests, no pre/post scripts or new credentials, no private signing key exported.
 
-**Not tested yet:** official Silverblue installation, protected signed release root and receipt-key custody, actual service socket/SELinux/process/seat identity, two reboots, rollback and absence, signed negative receipts with all peer/seat/intent callbacks denied. These remain Phase 2+ requirements.
+**Verified in prior official Silverblue CI:** disposable offline Fedora Silverblue 44 installer, independently checked signed Identity RPM, real rpm-ostree layering, and first boot into the installed package. [Guest run #42947183789](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42947183789) revealed **nine timestamp-only `T` mismatches** in `rpm -V` output. That run failed closed before rollback. The correction permits timestamps only on the exact nine allowlisted files, while requiring clean `rpm -V --nomtime`, full verified digests/modes/owners, and all deny-only service gates. **Not yet verified:** second rollback reboot, complete teardown, independently enrolled release root/receipt-key custody, running Identity process/socket/SELinux/seat identity, or signed negative receipts. These remain Phase 2+ requirements.
 
 ## WATCH OUT FOR
 
@@ -51,7 +53,7 @@ The Identity gateway fixture currently refuses all real login, peer, seat and op
 
 - [x] Separate operator authorization / owner-scoped GitHub branch
 - [x] Existing Identity DOC gateway, witness, adapter and Ubuntu fixture inspected
-- [ ] Exact-head signed CI RPM/source/signature test PASS
+- [x] Signed RPM/source/signature and synthetic release-root tests PASS on previous exact head (must retest on new source commits)
 - [ ] Identity-specific signed release manifest with separate authority and revocation floors (reviewed)
 - [ ] Real offline official Silverblue RPM-OSTree install, second boot, supervisor/SELinux evidence, deny-only IPC
 - [ ] Real rollback and complete absence of guest package/keys/policy/runtime
@@ -61,7 +63,7 @@ The Identity gateway fixture currently refuses all real login, peer, seat and op
 
 ## NEXT
 
-Run Phase 1 CI and correct any bounded test failures. Then extend the **separate C4b Identity** fixture to an actual installed offline Silverblue guest with full observation/rollback, without changing `c2v_silverblue/**` or the existing C4d branch. Coordinate external pins and immutable module set with Identity DOC and protected C3e; escalate any desired shared-controller changes before editing.
+Finish official Silverblue installed-RPM integrity and real rollback verification, then add actual Identity running-service and SELinux evidence without changing `c2v_silverblue/**` or the existing C4d branch. Coordinate external pins and immutable module set with Identity DOC and protected C3e; escalate any desired shared-controller changes before editing.
 
 ## DECISIONS
 

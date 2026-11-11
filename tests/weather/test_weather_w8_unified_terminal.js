@@ -17,7 +17,7 @@ const surface=read("widgets/weather/StationWeatherSubjectPane.qml");
 
 test("W8 has one combined WEATHER button and retains original deep-link routes",()=>{
  const modes=nav.GROUPS.weather;
- assert.deepEqual(modes.map(x=>x.label),
+ assert.deepEqual(JSON.parse(JSON.stringify(modes.map(x=>x.label))),
    ["OVERVIEW","WEATHER","HAZARDS","HISTORY","SERVICES"]);
  assert.equal(modes[1].key,"conditions");
  assert.equal(modes[1].path,"weather/conditions/current");

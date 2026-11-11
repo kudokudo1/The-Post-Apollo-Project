@@ -218,9 +218,14 @@ class PersistentWhisperTests(unittest.TestCase):
                 self.assertNotIn("MODEL_SESSION_UNAVAILABLE", seen)
                 self.assertNotIn("PAUSE_CHUNK_READY", seen,
                                  "Continuous speech must keep fixed cadence")
+                self.assertNotIn("SILENT_OVERLAP_SKIPPED", seen,
+                                 "Never remove overlap across continuous speech")
                 self.assertNotIn("CAPTURE_STOPPED", seen)
                 self.assertEqual(starts.read_text().splitlines(), ["start"])
-                self.assertGreaterEqual(len(requests.read_text().splitlines()), 2)
+                sizes = [int(n) for n in requests.read_text().splitlines()]
+                self.assertGreaterEqual(len(sizes), 2)
+                self.assertGreater(sizes[1], sizes[0] + 18000,
+                                   "Continuous chunk retains its 750ms overlap")
                 self.assertFalse(cli_calls.exists(),
                                  "One model session must replace repeated CLI")
 

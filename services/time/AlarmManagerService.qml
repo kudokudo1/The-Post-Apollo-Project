@@ -117,8 +117,9 @@ Scope {
     // A real one-time test alarm is scheduled 61..120 seconds from now.
     // It traverses the exact same durable tick -> audio -> notification path.
     // Creating a separate alarm avoids altering any existing recurring alarm.
-    function createShortTestAlarm() {
+    function createShortTestAlarm(templateId) {
         if (!canEdit) { feedback = "STORAGE UNAVAILABLE"; return 0; }
+        const template = findAlarm(templateId);
         const now = Date.now();
         const dueMs = Policy.shortTestDueMs(now);
         const at = new Date(dueMs);
@@ -129,7 +130,9 @@ Scope {
             mode: "once", weekdays: [],
             date: Policy.dayKey(dueMs),
             enabled: true, keepSaved: false,
-            soundEnabled: true, soundId: "chime", volumePercent: 65
+            soundEnabled: true,
+            soundId: template ? template.soundId : "chime",
+            volumePercent: template ? Math.max(35, template.volumePercent) : 65
         }, now);
         if (!edited.ok || !saveDocument(edited.document)) {
             feedback = edited.error || "TEST ALARM SAVE FAILED";

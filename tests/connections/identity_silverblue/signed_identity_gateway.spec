@@ -5,6 +5,11 @@ Summary:        Disposable deny-only Identity command gateway for Silverblue CI
 License:        LicenseRef-PostApollo-Test-Only
 BuildArch:      noarch
 AutoReqProv:    no
+# These are the byte-exact Identity DOC files measured by the separate
+# release manifest. Fedora BRP normally rewrites the entrypoint shebang
+# and strips executable mode from Python modules without a shebang.
+# Refuse that mutation; builder separately checks all nine exact bytes/modes.
+%undefine __brp_mangle_shebangs
 
 %description
 CI-only exact Identity command gateway with deny-only human/seat/peer callbacks.

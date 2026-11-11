@@ -96,8 +96,10 @@ ROOM // Clock Background Alarm BG1 ownership
 STAFF ROLE // External Hospital-compatible DOC, not live registered  
 ASSIGNMENT // BG1-B1 synthetic socket peer protocol and source witnesses
 
-Branch is stacked on BG1-A PR #1890. Review/merge BG1-A first, then
-retarget this branch to `main` if appropriate after rechecking the diff.
+BG1-A PR #1890 has merged into `main`. BG1-B1 PR #1892 was merged
+into BG1-A's *feature branch*, which did not populate `main`.
+The main-bound reconciliation PR copies only the four previously verified
+BG1-B1 files. There is still no live Clock integration or alarm actuation.
 This slice adds new broker, docs, tests and CI only; no production
 Quickshell file, B0 observer, systemd unit or live desktop is modified.
 Discarding the unmerged branch leaves current Clock behavior unchanged.

@@ -4,6 +4,7 @@
 The operator's ~/.config/sway/config is often a symlink to a Git checkout.
 Treat the config and its resolved source as READ-ONLY; never rewrite or
 replace either. Require its approved include before writing only our fragment.
+Only an explicit apply action writes the managed fragment.
 No Sway reload, key injection, shell, polling or privileged operations.
 """
 from __future__ import annotations

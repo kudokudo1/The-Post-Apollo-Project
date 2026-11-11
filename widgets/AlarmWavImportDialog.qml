@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Dialogs
 
-// Loaded only after explicit IMPORT WAV. If the optional dialog module is
+// Loaded only after explicit WAV/MP3 import. If the optional dialog module is
 // missing, Clock and the alarm timer must still be able to start.
 Item {
     id: pickerHost
@@ -9,9 +9,9 @@ Item {
     function openChooser() { wavPicker.open(); }
     FileDialog {
         id: wavPicker
-        title: "IMPORT WAV INTO POST-APOLLO SOUND LIBRARY"
+        title: "IMPORT WAV OR MP3 INTO POST-APOLLO SOUND LIBRARY"
         fileMode: FileDialog.OpenFile
-        nameFilters: ["PCM WAV audio (*.wav)"]
+        nameFilters: ["Sound files (*.wav *.mp3)", "WAV audio (*.wav)", "MP3 audio (*.mp3)"]
         onAccepted: pickerHost.fileSelected(selectedFile.toString())
     }
 }

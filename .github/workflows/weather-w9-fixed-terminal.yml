@@ -1,4 +1,4 @@
-name: Weather Station W12 current-condition meters and balanced forecasts
+name: Weather Station W13 centered instrument and attached telemetry meters
 
 on:
   pull_request:
@@ -8,6 +8,7 @@ on:
       - 'widgets/weather/StationWeatherTwilightGrid.qml'
       - 'tests/weather/test_weather_w11_prominence.js'
       - 'tests/weather/test_weather_w12_current_meters.js'
+      - 'tests/weather/test_weather_w13_centered_meters.js'
       - 'tests/weather/test_weather_w10_three_band_solar.js'
       - 'widgets/weather/StationSky.qml'
       - 'tests/weather/test_weather_w9_fixed_paged_terminal.js'
@@ -27,7 +28,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: W12 source, wind and route continuity
+      - name: W13 source and layout continuity
         shell: bash
         run: |
           set -euo pipefail
@@ -35,6 +36,7 @@ jobs:
           node --test tests/weather/test_weather_w10_three_band_solar.js
           node --test tests/weather/test_weather_w11_prominence.js
           node --test tests/weather/test_weather_w12_current_meters.js
+          node --test tests/weather/test_weather_w13_centered_meters.js
           node --test tests/weather/test_weather_w8_unified_terminal.js
           node --test tests/weather/test_weather_subject_panels_m2a.js
           node --test tests/weather/test_weather_subject_panels_m2b.js
@@ -56,7 +58,7 @@ jobs:
             qml6-module-qtquick-effects qml6-module-qtquick-dialogs \
             qml6-module-qt5compat-graphicaleffects coreutils findutils
       - uses: actions/checkout@v4
-      - name: Native current glyph/meters and balanced forecasts at 520x300
+      - name: Native aligned headings, readings and meters at 520x300
         shell: bash
         run: |
           set -euo pipefail
@@ -79,7 +81,7 @@ jobs:
             > "$work/native.log" 2>&1 || rc=$?
           cat "$work/native.log"
           test "$rc" -eq 0
-          grep -F "W12_NATIVE_PASS // CURRENT_METERS_WIND_AND_BALANCED_FORECAST_520X300" "$work/native.log"
-          if grep -E 'W12_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+          grep -F "W13_NATIVE_PASS // CENTERED_READOUTS_AND_ATTACHED_METERS_520X300" "$work/native.log"
+          if grep -E 'W13_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi

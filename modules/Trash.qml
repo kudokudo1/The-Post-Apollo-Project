@@ -55,6 +55,10 @@ PanelWindow {
     property var archiveV2Cursors: [""]
     property int archiveV2PendingPage: -1
     property string archiveV2PendingCursor: ""
+    property string archiveV2AppliedQuery: ""
+    property string archiveV2PendingQuery: ""
+    readonly property bool archiveV2QueryDirty:
+        archiveSearchText.trim() !== archiveV2AppliedQuery
 
     // Trash++-owned local research copies are separate from source records.
     // Finance's original DEMO crawl stays read-only, and Hospital/Weather are
@@ -159,7 +163,7 @@ PanelWindow {
         return row.state === "trashed";
     })
     readonly property var archiveFilteredRows: archiveRows.concat(researchRows)
-        .concat(archiveV2Rows).filter(function(row) {
+        .concat(archiveV2QueryDirty ? [] : archiveV2Rows).filter(function(row) {
         const selected = archiveFilter;
         // V2 copies appear only in ALL and COPIES. Old BIN actions never see them.
         if (row.kind === "V2 SNAPSHOT"
@@ -216,37 +220,47 @@ PanelWindow {
         archiveState = "READY";
     }
 
-    function refreshArchiveV2(targetPage, cursor) {
+    function refreshArchiveV2(targetPage, cursor, query) {
         if (!menuOpen || activeMode !== "archive" || archiveV2Busy)
             return false;
         const requested = Number(targetPage);
         const token = String(cursor || "");
+        const needle = typeof query === "string"
+            ? query.trim() : archiveV2AppliedQuery;
         if (!Number.isInteger(requested) || requested < 0
-                || requested > 9999 || token.length > 64)
+                || requested > 9999 || token.length > 64
+                || needle.length > 80 || /[\u0000-\u001f\u007f]/.test(needle)) {
+            archiveV2State = "INVALID V2 SEARCH // MAX 80 CHARACTERS";
             return false;
+        }
         archiveV2Busy = true;
-        archiveV2State = "SCANNING // READ ONLY";
+        archiveV2State = "SEARCHING // READ ONLY";
         archiveV2PendingPage = requested;
         archiveV2PendingCursor = token;
-        const args = ["python3", "-I", "-B",
-                      Quickshell.shellPath("scripts/trash/archive_v2_index.py"),
-                      "index", Quickshell.dataDir];
-        if (token !== "")
-            args.push(token);
-        archiveV2Process.exec(args);
+        archiveV2PendingQuery = needle;
+        // The final argument is a parameterized search string, never SQL or
+        // an arbitrary path. Blank cursor and query are explicit arguments.
+        archiveV2Process.exec([
+            "python3", "-I", "-B",
+            Quickshell.shellPath("scripts/trash/archive_v2_index.py"),
+            "index", Quickshell.dataDir, token, needle
+        ]);
         return true;
     }
 
     function pageArchiveV2(direction) {
-        if (archiveV2Busy || !menuOpen || activeMode !== "archive"
+        if (archiveV2Busy || archiveV2QueryDirty
+                || !menuOpen || activeMode !== "archive"
                 || (direction !== 1 && direction !== -1))
             return false;
         if (direction === 1 && archiveV2HasMore
                 && archiveV2NextCursor !== "")
-            return refreshArchiveV2(archiveV2Page + 1, archiveV2NextCursor);
+            return refreshArchiveV2(archiveV2Page + 1, archiveV2NextCursor,
+                                    archiveV2AppliedQuery);
         if (direction === -1 && archiveV2Page > 0)
             return refreshArchiveV2(archiveV2Page - 1,
-                                    archiveV2Cursors[archiveV2Page - 1]);
+                                    archiveV2Cursors[archiveV2Page - 1],
+                                    archiveV2AppliedQuery);
         return false;
     }
 
@@ -262,7 +276,9 @@ PanelWindow {
             return;
         }
         if (!reply || reply.ok !== true || reply.kind !== "archive-v2-index"
-                || reply.readOnly !== true || !Array.isArray(reply.items)
+                || reply.readOnly !== true
+                || reply.query !== archiveV2PendingQuery
+                || !Array.isArray(reply.items)
                 || reply.items.length > 25 || typeof reply.total !== "number"
                 || !Number.isInteger(reply.total) || reply.total < 0
                 || typeof reply.hasMore !== "boolean"
@@ -296,12 +312,16 @@ PanelWindow {
         archiveV2Page = archiveV2PendingPage;
         archiveV2PendingPage = -1;
         archiveV2PendingCursor = "";
+        archiveV2AppliedQuery = archiveV2PendingQuery;
+        archiveV2PendingQuery = "";
         archiveV2Rows = reply.items;
         archiveV2Total = reply.total;
         archiveV2HasMore = reply.hasMore;
         archiveV2NextCursor = reply.nextCursor || "";
         archiveV2State = reply.state === "NOT_INSTALLED"
-            ? "NOT INSTALLED // NO V2 COPIES" : "READY // V2 READ ONLY";
+            ? "NOT INSTALLED // NO V2 COPIES"
+            : archiveV2AppliedQuery !== ""
+            ? "READY // SEARCHED ALL V2 COPIES" : "READY // V2 READ ONLY";
     }
 
     function runResearch(action, args) {
@@ -570,7 +590,8 @@ PanelWindow {
                 if (trashLauncher.activeMode === "archive") {
                     trashLauncher.refreshArchive();
                     trashLauncher.refreshResearch();
-                    trashLauncher.refreshArchiveV2(0, "");
+                    trashLauncher.refreshArchiveV2(0, "",
+                                                   trashLauncher.archiveSearchText.trim());
                 } else if (trashLauncher.activeMode === "burn"
                            || trashLauncher.activeMode === "trash")
                     trashLauncher.refreshResearch();
@@ -704,7 +725,8 @@ PanelWindow {
                 Qt.callLater(function() {
                     trashLauncher.refreshArchive();
                     trashLauncher.refreshResearch();
-                    trashLauncher.refreshArchiveV2(0, "");
+                    trashLauncher.refreshArchiveV2(0, "",
+                                                   trashLauncher.archiveSearchText.trim());
                 });
             else if (activeMode === "burn" || activeMode === "trash")
                 Qt.callLater(function() { trashLauncher.refreshResearch(); });
@@ -1705,7 +1727,7 @@ PanelWindow {
                             height: 28
                             spacing: 8
                             GohuText {
-                                width: parent.width - 100
+                                width: parent.width - 174
                                 height: parent.height
                                 color: Colors.yellow
                                 font.pixelSize: 12
@@ -1714,6 +1736,16 @@ PanelWindow {
                                       + (trashLauncher.archiveRows.length
                                          + trashLauncher.researchRows.length
                                          + trashLauncher.archiveV2Rows.length)
+                            }
+                            ActionButton {
+                                width: 66
+                                height: 27
+                                label: "FIND V2"
+                                labelPixelSize: 9
+                                accentColor: Colors.magenta
+                                available: !trashLauncher.archiveV2Busy
+                                onLeftClicked: trashLauncher.refreshArchiveV2(
+                                    0, "", trashLauncher.archiveSearchText.trim())
                             }
                             ActionButton {
                                 width: 92
@@ -1726,7 +1758,8 @@ PanelWindow {
                                 onLeftClicked: {
                                     trashLauncher.refreshArchive();
                                     trashLauncher.refreshResearch();
-                                    trashLauncher.refreshArchiveV2(0, "");
+                                    trashLauncher.refreshArchiveV2(0, "",
+                                                   trashLauncher.archiveSearchText.trim());
                                 }
                             }
                         }
@@ -1756,6 +1789,8 @@ PanelWindow {
                             placeholderText: "FIND RECORDS // SAVED COPIES // BIN"
                             text: trashLauncher.archiveSearchText
                             onTextChanged: trashLauncher.archiveSearchText = text
+                            onAccepted: trashLauncher.refreshArchiveV2(
+                                0, "", trashLauncher.archiveSearchText.trim())
                             background: Rectangle {
                                 color: Colors.dark
                                 border.width: 1
@@ -1955,6 +1990,7 @@ PanelWindow {
                                 labelPixelSize: 9
                                 accentColor: Colors.cyan
                                 available: !trashLauncher.archiveV2Busy
+                                           && !trashLauncher.archiveV2QueryDirty
                                            && trashLauncher.archiveV2Page > 0
                                 onLeftClicked: trashLauncher.pageArchiveV2(-1)
                             }
@@ -1967,10 +2003,12 @@ PanelWindow {
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 elide: Text.ElideRight
-                                text: "V2 COPIES // PAGE "
-                                    + (trashLauncher.archiveV2Page + 1)
-                                    + " // " + trashLauncher.archiveV2Total
-                                    + " TOTAL // SEARCH CURRENT PAGE ONLY"
+                                text: trashLauncher.archiveV2QueryDirty
+                                    ? "V2 SEARCH NOT APPLIED // PRESS FIND V2"
+                                    : "V2 PAGE " + (trashLauncher.archiveV2Page + 1)
+                                      + " // " + trashLauncher.archiveV2Total
+                                      + (trashLauncher.archiveV2AppliedQuery === ""
+                                         ? " TOTAL" : " MATCHES ACROSS ALL V2")
                             }
 
                             ActionButton {
@@ -1980,6 +2018,7 @@ PanelWindow {
                                 labelPixelSize: 9
                                 accentColor: Colors.cyan
                                 available: !trashLauncher.archiveV2Busy
+                                           && !trashLauncher.archiveV2QueryDirty
                                            && trashLauncher.archiveV2HasMore
                                 onLeftClicked: trashLauncher.pageArchiveV2(1)
                             }

@@ -87,6 +87,7 @@ ShellRoot {
     // W14 // Capture the actual offscreen Quickshell arrangement for
     // operator visual review. The capture is diagnostic, never production.
     property bool previewRequested: false
+    property bool narrowPreviewRequested: false
     Timer {
         interval: 250
         repeat: true
@@ -204,8 +205,44 @@ ShellRoot {
                 if(combined.hourlyRows.length!==0
                    || combined.dailyRows.length!==0)
                     return root.fail("STALE_FORECAST_PRESENT");
+                sampleWeather.forecastReady=true;
+                window.width=440;
+                window.height=275;
+                root.phase=3;
+                return;
+            }
+            if(root.phase===3) {
+                if(combined.hourRepeater.count!==6 ||
+                   combined.dayCardsRepeater.count!==3)
+                    return;
+                if(combined.width<439 || combined.width>441)
+                    return root.fail("NARROW_WIDTH_NOT_APPLIED");
+                const first=combined.hourRepeater.itemAt(0);
+                const rainEnd=first.rainMeter.mapToItem(
+                    first,0,first.rainMeter.height).y;
+                const lastDailyEdge=combined.dailyItem.mapToItem(
+                    combined,0,combined.dailyItem.height).y;
+                const footerEdge=combined.footerItem.mapToItem(
+                    combined,0,combined.footerItem.height).y;
+                if(rainEnd>first.height+2 ||
+                   lastDailyEdge>combined.height+1 ||
+                   footerEdge>combined.height+1 ||
+                   combined.currentItem.mainGlyph.width<54 ||
+                   first.glyph.width<28)
+                    return root.fail("NARROW_CONTENT_OVERFLOW // "
+                        +rainEnd+" / "+first.height+" // "
+                        +lastDailyEdge+" / "+combined.height);
+                if(!root.narrowPreviewRequested) {
+                    root.narrowPreviewRequested=true;
+                    window.contentItem.grabToImage(function(image){
+                        if(image && image.saveToFile(
+                                "/tmp/weather-w14-compact-preview.png"))
+                            console.log("W14_NARROW_PREVIEW_CAPTURED");
+                    },Qt.size(880,550));
+                    return;
+                }
                 root.finished=true;
-                console.log("W14_NATIVE_PASS // LINE_GLYPH_TERMINAL_AND_PADDED_RAIL_520X300");
+                console.log("W14_NATIVE_PASS // TWO_SIZE_LINE_GLYPH_INSTRUMENT_520_440");
                 Qt.quit();
             }
         }

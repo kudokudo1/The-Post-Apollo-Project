@@ -59,7 +59,7 @@ ShellRoot {
             const health=find(home,"home-w3-sources-health");
             const services=find(home,"home-w6-services-console");
             if(!scroll||!content||!charts||!archive||!summaries
-                ||!days||!sources||!runtime||!health) {
+                ||!days||!sources||!runtime||!health||!services) {
                 if(root.ticks>7)return root.fail("HOME_W3_NODES_MISSING");
                 return;
             }

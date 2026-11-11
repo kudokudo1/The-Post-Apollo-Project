@@ -55,6 +55,16 @@ fail() {
     sed -E 's/^/C4B_ID_SERVICE_JOURNAL \/\//g' | head -n 24 >/dev/ttyS0 || true
   exit 2
 }
+on_unhandled_error() {
+  local rc="$1" source_line="$2"
+  trap - ERR
+  # Only a numeric line and status go to the durable UART. Never leak any
+  # private signing seed, runtime environment or command-line key material.
+  printf 'C4B_ID_FAIL // IDENTITY_SERVICE_UNHANDLED_SHELL_ERROR line=%s rc=%s\n' \
+    "$source_line" "$rc" >/dev/ttyS0 || true
+  exit 2
+}
+trap 'on_unhandled_error "$?" "$LINENO"' ERR
 
 [[ "$(rpm -q --qf '%{NAME}' "$pkg")" == "$pkg" &&
     ! -e "$base" && ! -S "$socket" ]] ||
@@ -121,6 +131,7 @@ printf 'C4B_ID_SELINUX_STAGE // enforcing_state=%.40s\n' "$enforcing_state" >/de
 [[ "$enforcing_state" == Enforcing ]] ||
   fail "SELINUX_ENFORCING_LOST_AFTER_MODULE_INSTALL"
 echo "C4B_ID_PASS // DEDICATED_TEST_SELINUX_MODULE_LOADED_ENFORCING" >/dev/ttyS0
+printf 'C4B_ID_SELINUX_STAGE // before_nonroot_runtime_preparation\n' >/dev/ttyS0
 
 # This fixture requires Fedora's system Python Ed25519 support. Never pip
 # install a mutable dependency into the offline guest or weaken import pins.
@@ -134,6 +145,7 @@ uid="$(id -u "$name")"
 gid="$(id -g "$name")"
 [[ "$uid" =~ ^[1-9][0-9]*$ && "$gid" =~ ^[1-9][0-9]*$ ]] ||
   fail "NONROOT_SERVICE_IDENTITY_INVALID"
+printf 'C4B_ID_SELINUX_STAGE // nonroot_user_prepared\n' >/dev/ttyS0
 
 mkdir -m 0711 "$base"
 mkdir -m 0700 "$runtime"
@@ -159,6 +171,7 @@ printf '%s\n' 'CI-ONLY-SUPERVISED-NATIVE-IDENTITY-GATE' >"$base/authorized-test.
 chmod 0444 "$base/authorized-test.marker"
 chown root:root "$base" "$base/runtime.env" "$base/authorized-test.marker"
 chmod 0711 "$base"
+printf 'C4B_ID_SELINUX_STAGE // runtime_and_signer_prepared\n' >/dev/ttyS0
 # The original /usr RPM files stay immutable. A byte-identical copy of the
 # Fedora-provided Python executable is a temporary test-specific transition
 # entrypoint. It is NOT a production Python or policy installation.
@@ -182,7 +195,8 @@ ExecStart=/run/postapollo-identity-silverblue-ci-only/ci-python3 -I -B /usr/libe
 CI_ID_SELINUX_UNIT
 chmod 0644 "$dropindir/10-disposable-selinux.conf"
 systemctl daemon-reload || fail "CI_ONLY_DAEMON_RELOAD_WITH_CUSTOM_ENTRYPOINT_FAILED"
-echo "C4B_ID_PASS // SEPARATE_LABELED_IDENTITY_EXECUTABLE_AND_EPHEMERAL_SYSTEMD_OVERRIDE"
+echo "C4B_ID_PASS // SEPARATE_LABELED_IDENTITY_EXECUTABLE_AND_EPHEMERAL_SYSTEMD_OVERRIDE" >/dev/ttyS0
+printf 'C4B_ID_SELINUX_STAGE // before_confined_systemd_start\n' >/dev/ttyS0
 
 systemctl reset-failed "$unit" >/dev/null 2>&1 || true
 timeout --signal=TERM --kill-after=2s 12s systemctl start "$unit" ||

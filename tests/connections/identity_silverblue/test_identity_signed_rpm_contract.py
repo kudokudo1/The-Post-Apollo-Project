@@ -558,27 +558,40 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
                         probe.index("system_u:system_r:postapollo_identity_ci_t:s0' &&"))
 
 
-    def test_19_runner_apt_fallback_uses_only_official_signed_https_sources(self):
+    def test_19_fedora44_kvm_container_survives_unavailable_ubuntu_mirror(self):
         workflow = (ROOT / ".github/workflows/connections-identity-silverblue-real-boot.yml").read_text()
-        for required in (
-            'C4B_ID_PASS // RUNNER_APT_DEFAULT_MIRROR_READY',
-            'C4B_ID_PASS // RUNNER_APT_OFFICIAL_SIGNED_HTTPS_FALLBACK_READY',
-            'OFFICIAL_UBUNTU_ARCHIVE_KEYRING_ABSENT',
-            'https://archive.ubuntu.com/ubuntu/',
-            'https://security.ubuntu.com/ubuntu/',
-            'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg',
-            'Dir::Etc::sourcelist=$fallback_sources',
-            'Dir::Etc::sourceparts=-',
-            'OFFICIAL_SIGNED_HTTPS_RUNNER_APT_UPDATE',
-            'qemu-system-x86 qemu-utils xorriso genisoimage',
+        guest = (AREA / "run_official_silverblue_identity.sh").read_text()
+        for token in (
+            'Real official offline Silverblue VM in disposable Fedora 44 KVM container',
+            'test "$GITHUB_ACTIONS" = true',
+            'test "$RUNNER_ENVIRONMENT" = github-hosted',
+            'test "$GITHUB_ACTOR" = kudokudo1',
+            'test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm',
+            '--device=/dev/kvm',
+            '--env RUNNER_TEMP=/tmp',
+            '--env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1',
+            '--mount "type=bind,src=$PWD,dst=/src,readonly"',
+            'dst=/evidence/rpm,readonly',
+            'dst=/evidence/crypto,readonly',
+            'dst=/evidence/selinux,readonly',
+            'fedora:44 /usr/bin/bash -c',
+            'dnf -y --setopt=install_weak_deps=False --setopt=gpgcheck=1 install',
+            'curl qemu-system-x86 qemu-img xorriso genisoimage',
+            'C4B_ID_PASS // FEDORA44_SIGNED_QEMU_TOOLING_READY',
+            '/src/tests/connections/identity_silverblue/run_official_silverblue_identity.sh',
+            '/evidence/rpm /evidence/crypto /evidence/selinux',
         ):
-            self.assertIn(required, workflow)
-        self.assertNotIn('Acquire::AllowInsecureRepositories=true', workflow)
-        self.assertNotIn('AllowUnauthenticated=true', workflow)
-        self.assertNotIn('Verify-Peer=false', workflow)
-        self.assertNotIn('apt-get install --allow-unauthenticated', workflow)
-        self.assertLess(workflow.index('RUNNER_APT_OFFICIAL_SIGNED_HTTPS_FALLBACK_READY'),
-                        workflow.index('qemu-system-x86 qemu-utils xorriso genisoimage'))
+            self.assertIn(token, workflow)
+        for forbidden in (
+            'apt-get', '--privileged', '--network=host', '--network host',
+            'AllowUnauthenticated', 'Verify-Peer=false', 'setenforce 0',
+            '--security-opt seccomp=unconfined'
+        ):
+            self.assertNotIn(forbidden, workflow)
+        self.assertIn('-nic none', guest)
+        self.assertIn('[[ -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]]', guest)
+        self.assertLess(workflow.index('FEDORA44_SIGNED_QEMU_TOOLING_READY'),
+                        workflow.index('/src/tests/connections/identity_silverblue/run_official_silverblue_identity.sh'))
 
 
 if __name__ == "__main__":

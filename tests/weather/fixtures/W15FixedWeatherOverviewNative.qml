@@ -121,6 +121,8 @@ ShellRoot {
                 if(contentHeight>c.contentItem.height+2)
                     return "DENSE_CARD_TEXT_OVERFLOW "+contentHeight
                        +" / "+c.contentItem.height;
+                if(window.height>=500 && c.contentItem.spacing<2)
+                    return "TALL_CARD_TEXT_STILL_TINY";
             }
         }
         return "";

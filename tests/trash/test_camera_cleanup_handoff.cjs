@@ -134,6 +134,61 @@ test("Cleanup UI physically moved: Camera no longer renders or links its Cleanup
     assert.doesNotMatch(trashSource,/signal cleanupRequested/);
 });
 
+test("compact Cleanup fits via scroll instead of clipping or changing Camera data",()=>{
+    // The compact frame has 450px height with a 314px lifecycle panel.
+    // Pinning a 29px scroll rail leaves a 285px interactive viewport.
+    const compactFrameHeight=450, compactFrameWidth=420;
+    const lifecycleHeight=Math.max(145,compactFrameHeight-136);
+    const viewportHeight=lifecycleHeight-29;
+    const batchCanvasHeight=Math.max(viewportHeight,650);
+    const otherCanvasHeight=Math.max(viewportHeight,525);
+    assert.equal(viewportHeight,285);
+    assert.equal(batchCanvasHeight-viewportHeight,365);
+    assert.equal(otherCanvasHeight-viewportHeight,240);
+    assert.match(trashSource,/readonly property bool cleanupScrollRailVisible:/);
+    assert.match(trashSource,/anchors\.bottomMargin: trashLauncher\.cleanupScrollRailVisible \? 29 : 0/);
+    assert.match(trashSource,/id: cleanupPageViewport/);
+    assert.match(trashSource,/contentHeight: Math\.max\(height,/);
+    assert.match(trashSource,/\? 650 : 525\)/);
+    assert.match(trashSource,/id: cleanupCompactScrollRail/);
+    assert.match(trashSource,/visible: trashLauncher\.cleanupScrollRailVisible/);
+    assert.match(trashSource,/cleanupPageViewport\.contentY \+ 170/);
+    assert.match(trashSource,/cleanupPageViewport\.contentY - 170/);
+    assert.match(trashSource,/flickable: cleanupPageViewport/);
+    assert.ok(compactFrameWidth<=450);
+});
+
+test("compact Batch stacks list above preview while wide layout stays side by side",()=>{
+    assert.match(cleanupSource,/readonly property bool compactHosted: width <= 450/);
+    assert.match(cleanupSource,/id: cleanupBatchView/);
+    assert.match(cleanupSource,/id: cleanupBatchListPane/);
+    assert.match(cleanupSource,/id: cleanupBatchPreviewPane/);
+    assert.match(cleanupSource,/height: Math\.max\(75, cleanupBatchListPane\.height - 101\)/);
+    assert.match(cleanupSource,/height: Math\.max\(65, cleanupBatchPreviewPane\.height - 88\)/);
+    assert.match(cleanupSource,/x: cleanupPage\.compactHosted\s*\? 0 : cleanupBatchListPane\.width \+ 9/);
+    assert.match(cleanupSource,/y: cleanupPage\.compactHosted\s*\? cleanupBatchListPane\.height \+ 9 : 0/);
+    // For 420px compact and 650px page content, both panels remain
+    // inside the work area rather than laying out at negative/zero widths.
+    const contentHeight=650, workHeight=Math.max(145,contentHeight-216);
+    const left=Math.floor((workHeight-9)*0.57), preview=workHeight-left-9;
+    assert.ok(left>=200 && preview>=150);
+    assert.ok(left-101>=75 && preview-88>=65);
+});
+
+test("Hunt and Swipe keep their gestures but get independent scroll controls",()=>{
+    assert.match(trashSource,/cleanupTechnique\s*!== "swipe"/);
+    assert.match(trashSource,/cleanupTechnique\s*!== "hunt"/);
+    assert.match(trashSource,/frameHeight < 661/);
+    assert.match(trashSource,/label: "↑ UP"/);
+    assert.match(trashSource,/label: "↓ DOWN"/);
+    assert.match(trashSource,/cleanupPageViewport\.contentHeight/);
+    assert.match(cleanupSource,/id: swipeDeck/);
+    assert.match(cleanupSource,/id: huntArena/);
+    assert.match(cleanupSource,/camera\.selectCleanupTechnique\(modelData\.id\)/);
+    assert.match(cleanupSource,/camera\.trashQueuedNow\(\)/);
+    assert.match(cleanupSource,/id: cleanupQueuedList/);
+});
+
 test("Camera remains single backend; hosted mode never opens Camera panel",()=>{
     const ctx=cameraHarness();
     const oldQueue=ctx.batchPaths.slice();

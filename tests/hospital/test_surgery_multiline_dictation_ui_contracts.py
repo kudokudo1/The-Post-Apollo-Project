@@ -44,10 +44,12 @@ check('component ManagerArea: Column {' in manager
       and 'label: "CANCEL"' in manager
       and 'onClicked: root.toggleDictation(managerArea.voiceKey)' in manager,
       "Share Reception talking-person MIC/STOP toggle and CANCEL across multiline fields")
-check('svc.startRecording()' in manager
+check('svc.startRecording(root.decoderMode)' in manager
+      and 'function selectDecoderMode(value)' in manager
       and 'svc.stopRecording(false)' in manager
-      and 'root.speechInputService.cancel()' in manager,
-      "Recording requires explicit action, stop never sends")
+      and 'root.speechInputService.cancel()' in manager
+      and 'onClicked: root.toggleDictation(managerArea.voiceKey)' in manager,
+      "Recording requires explicit mic action, one-session mode and stop never sends")
 check('onTranscriptionReady(text, submitRequested)' in manager
       and 'root.acceptDictation(text);' in manager
       and 'submitRequested' in manager

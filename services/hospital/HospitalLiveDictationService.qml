@@ -25,6 +25,10 @@ Scope {
     // Optional pause-aware chunks. Disabled by default for standalone
     // engine, unguarded sessions, and nonpersistent CLI fallback.
     property int speechPauseMs: 0
+    // A/B choice is supplied to startRecording() for one session only.
+    // Other Hospital microphone clients call startRecording() with no
+    // argument, which always retains Standard. No persistent setting.
+    property string decoderModeUsed: "STANDARD"
     property string lastError: ""
     property string lastTranscript: ""
     // Short lifecycle code only, never spoken words or audio. A few stage
@@ -48,7 +52,7 @@ Scope {
         const seconds = function(ms) {
             return ms < 0 ? "N/A" : (ms / 1000).toFixed(1) + "s";
         };
-        return "AUDIO " + seconds(audioReadyMs)
+        return decoderModeUsed + " // AUDIO " + seconds(audioReadyMs)
             + " // LOAD " + seconds(modelStartupMs)
             + " // FIRST TEXT " + seconds(firstTextMs)
             + " // INFER MAX " + seconds(peakInferenceMs)
@@ -99,7 +103,7 @@ Scope {
         return true;
     }
 
-    function startRecording() {
+    function startRecording(requestedDecoderMode) {
         if (safetyHold) {
             lastStage = "SAFETY_HOLD";
             lastError = "VOICE SAFETY HOLD // HOST CRASH NOT YET CLEARED";
@@ -113,6 +117,11 @@ Scope {
             voiceError(lastError);
             return false;
         }
+        const fastRequested = requestedDecoderMode === "FAST"
+            && preferPersistentModel && pilotLiveChunks > 0 && !pilotOneChunk;
+        // Never allow a stale FAST choice to carry over from Surgery into
+        // Reception or Intercom, which call this without a mode argument.
+        decoderModeUsed = fastRequested ? "FAST PENDING" : "STANDARD";
         wasCancelled = false;
         doneSeen = false;
         packetCount = 0;
@@ -141,6 +150,8 @@ Scope {
             command.push("--pilot-live-chunks", String(Math.max(1, Math.min(8, pilotLiveChunks))));
         if (preferPersistentModel && pilotLiveChunks > 0) {
             command.push("--prefer-persistent");
+            if (fastRequested)
+                command.push("--decoder-trial", "fast");
             if (speechPauseMs > 0)
                 command.push("--speech-pause-ms",
                     String(Math.max(400, Math.min(650, speechPauseMs))));
@@ -223,12 +234,16 @@ Scope {
             // Python emits fixed low-cardinality lifecycle codes. The
             // allowlist prevents untrusted child output reaching the journal.
             const code = String(data.detail || "");
-            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|MODEL_BACKPRESSURE|CAPTURE_STOPPED|CAPTURE_LIMIT_NEAR|CAPTURE_CHUNK_LIMIT|CAPTURE_DURATION_LIMIT|CAPTURE_SILENCE_LIMIT|CAPTURE_SOURCE_ENDED|CAPTURE_USER_STOP|MODEL_EARLY_START|MODEL_SESSION_STARTING|MODEL_SESSION_READY|MODEL_SESSION_UNAVAILABLE|PAUSE_CHUNK_READY|SILENT_OVERLAP_SKIPPED|RECORDING_COMPLETED)$/.test(code))
+            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|MODEL_BACKPRESSURE|CAPTURE_STOPPED|CAPTURE_LIMIT_NEAR|CAPTURE_CHUNK_LIMIT|CAPTURE_DURATION_LIMIT|CAPTURE_SILENCE_LIMIT|CAPTURE_SOURCE_ENDED|CAPTURE_USER_STOP|MODEL_EARLY_START|MODEL_SESSION_STARTING|MODEL_SESSION_READY|MODEL_SESSION_UNAVAILABLE|DECODER_FAST_ACTIVE|DECODER_FAST_FALLBACK|PAUSE_CHUNK_READY|SILENT_OVERLAP_SKIPPED|RECORDING_COMPLETED)$/.test(code))
                 return;
             if (lastStage !== code) {
                 lastStage = code;
                 console.warn("HOSPITAL_VOICE_STAGE // " + code);
             }
+            if (code === "DECODER_FAST_ACTIVE")
+                decoderModeUsed = "FAST";
+            if (code === "DECODER_FAST_FALLBACK")
+                decoderModeUsed = "STANDARD FALLBACK";
             if (code === "MODEL_BACKPRESSURE")
                 audioDropped = true;
             if (code === "CAPTURE_LIMIT_NEAR")

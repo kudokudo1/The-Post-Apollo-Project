@@ -26,6 +26,9 @@ RATE = 16000
 MODEL_GUARD = Path(__file__).with_name("hospital-whisper-sandbox.py")
 MAX_RESPONSE_BYTES = 65536
 MAX_PROMPT_CHARS = 160
+# Keep Standard identical to the existing whisper-server default: best_of=2.
+# Fast explicitly selects one greedy candidate for one request, not a new model.
+DECODER_MODES = frozenset(("STANDARD", "FAST"))
 
 
 class SessionUnavailable(RuntimeError):
@@ -69,7 +72,10 @@ def wav_bytes(pcm: bytes) -> bytes:
     return out.getvalue()
 
 
-def multipart_audio(pcm: bytes, prompt: str) -> tuple[bytes, str]:
+def multipart_audio(pcm: bytes, prompt: str, *,
+                    decoder_mode: str = "STANDARD") -> tuple[bytes, str]:
+    if decoder_mode not in DECODER_MODES:
+        raise ValueError("INVALID WHISPER DECODER MODE")
     boundary = "hospital-" + uuid.uuid4().hex
     data = wav_bytes(pcm)
     # Form-data is assembled in memory; bytes never reach persistent storage.
@@ -78,6 +84,11 @@ def multipart_audio(pcm: bytes, prompt: str) -> tuple[bytes, str]:
         ("language", "en"),
         ("temperature", "0.0"),
     ]
+    if decoder_mode == "FAST":
+        # Pinned upstream whisper-server accepts form field best_of and
+        # uses it as its greedy candidate count. Standard sends nothing and
+        # retains the original server default (two candidates).
+        fields.append(("best_of", "1"))
     if prompt:
         fields.append(("prompt", prompt[-MAX_PROMPT_CHARS:]))
     body = bytearray()
@@ -135,10 +146,12 @@ class WhisperSession:
             self.close()
             raise
 
-    def transcribe(self, pcm: bytes, *, prompt: str = "", timeout: float = 13.0) -> str:
+    def transcribe(self, pcm: bytes, *, prompt: str = "",
+                   decoder_mode: str = "STANDARD", timeout: float = 13.0) -> str:
         if self.process is None or self.process.poll() is not None:
             raise RuntimeError("WHISPER SERVER NOT RUNNING")
-        payload, content_type = multipart_audio(pcm, prompt)
+        payload, content_type = multipart_audio(
+            pcm, prompt, decoder_mode=decoder_mode)
         conn = _UnixConnection(self.path, timeout=timeout)
         try:
             conn.request("POST", "/inference", body=payload, headers={

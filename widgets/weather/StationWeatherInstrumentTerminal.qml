@@ -23,7 +23,10 @@ Rectangle {
     readonly property real budget: Math.max(1,height-19-12-8)
     readonly property real currentHeight: Math.max(1,Math.round(budget*0.37))
     readonly property real hourlyHeight: Math.max(1,Math.round(budget*0.45))
-    readonly property real dailyHeight: Math.max(1,budget-currentHeight-hourlyHeight)
+    // W19 // Existing inter-band padding occupied eight precious pixels in
+    // compact WEATHER. Each band has its own divider, so reclaim that space
+    // for the three-day rain bar without reducing NOW or hourly instruments.
+    readonly property real dailyHeight: Math.max(1,budget-currentHeight-hourlyHeight+8)
     readonly property alias currentItem: currentPanel
     readonly property alias hourlyItem: hourlyPanel
     readonly property alias dailyItem: dailyPanel
@@ -69,7 +72,7 @@ Rectangle {
     Column {
         id: deck
         anchors.fill: parent
-        spacing: 2
+        spacing: 0
 
         Item {
             id: heading

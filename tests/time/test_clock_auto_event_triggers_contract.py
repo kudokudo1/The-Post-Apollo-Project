@@ -13,8 +13,10 @@ ACTION = (ROOT / "widgets/TimeActionButton.qml").read_text(encoding="utf-8")
 class ClockEventTriggersContracts(unittest.TestCase):
     def test_reload_runs_once_after_durable_preferences_load(self):
         self.assertIn("property bool autoCheckReloadHandled: false", SERVICE)
-        self.assertIn("if (!timeSettings.autoCheckReloadHandled)", SERVICE)
-        self.assertIn("timeSettings.autoCheckReloadHandled = true;", SERVICE)
+        self.assertIn("function maybeBeginStartupAutoChecks() {", SERVICE)
+        self.assertIn("autoCheckReloadHandled = true;", SERVICE)
+        self.assertIn("!referenceRestoreHandled", SERVICE)
+        self.assertIn("timeSettings.maybeBeginStartupAutoChecks();", SERVICE)
         self.assertIn('timeSettings.maybeAutoCheckTime("reload")', SERVICE)
         self.assertIn("timeSettings.maybeAutoCheckTime();", SERVICE)
         self.assertIn("Qt.callLater(function() {", SERVICE)
@@ -37,7 +39,9 @@ class ClockEventTriggersContracts(unittest.TestCase):
         )[0]
         self.assertIn("AutoCheck.withTrigger(", portion)
         self.assertIn("AutoCheck.canStartAutomaticCheck(active, reason, now,", portion)
-        self.assertIn("referenceLastAttemptAtMs)", portion)
+        self.assertIn("referenceLastAttemptAtMs,", portion)
+        self.assertIn("hasMeasurement: estimate.available", portion)
+        self.assertIn("lastFailureAtMs: referenceFailureAtMs", portion)
         self.assertIn("!isDue(doc, nowMs, lastAutoStartedAtMs)", POLICY)
         self.assertIn("MIN_AUTOMATIC_GAP_MS", POLICY)
         self.assertIn("checkTimeAccuracy()", portion)

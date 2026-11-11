@@ -95,6 +95,8 @@ function validAlarm(a) {
         && (a.lastEventKind === undefined || EVENT_KINDS.indexOf(a.lastEventKind) >= 0)
         && (a.lastEventAtMs === undefined || timestamp(a.lastEventAtMs))
         && (a.lastExpectedAtMs === undefined || timestamp(a.lastExpectedAtMs))
+        && (a.lastFiredAtMs === undefined || timestamp(a.lastFiredAtMs))
+        && (a.lastMissedAtMs === undefined || timestamp(a.lastMissedAtMs))
         && integer(a.hour, 0, 23) && integer(a.minute, 0, 59)
         && (a.mode === "once" || a.mode === "weekly")
         && weekdaysValid(a.weekdays)
@@ -143,7 +145,8 @@ function cloneDocument(doc) {
             alarms: doc.alarms.map(function(a) { return Object.assign(
                 {favorite: false, note: "",
                  lastEventKind: "none", lastEventAtMs: 0,
-                 lastExpectedAtMs: 0}, a,
+                 lastExpectedAtMs: 0, lastFiredAtMs: 0,
+                 lastMissedAtMs: 0}, a,
                 {weekdays: a.weekdays.slice()}); })};
 }
 function byId(doc, id) {
@@ -164,7 +167,7 @@ function freshAlarm(id, nowMs) {
             lastFiredDay: "", ringing: false, ringStartedAtMs: 0,
             snoozeUntilMs: 0, completed: false,
             lastEventKind: "none", lastEventAtMs: 0,
-            lastExpectedAtMs: 0};
+            lastExpectedAtMs: 0, lastFiredAtMs: 0, lastMissedAtMs: 0};
 }
 function create(doc, nowMs) {
     if (!validDocument(doc) || doc.alarms.length >= MAX_ALARMS
@@ -194,7 +197,8 @@ function duplicate(doc, id) {
         favorite: false,
         lastFiredDay: "", ringing: false, ringStartedAtMs: 0,
         snoozeUntilMs: 0, lastEventKind: "none",
-        lastEventAtMs: 0, lastExpectedAtMs: 0
+        lastEventAtMs: 0, lastExpectedAtMs: 0,
+        lastFiredAtMs: 0, lastMissedAtMs: 0
     });
     next.nextId += 1;
     next.alarms.push(copy);
@@ -216,7 +220,8 @@ function update(doc, id, patch, nowMs) {
                 && allowed.indexOf(key) < 0)
             return {ok: false, error: "INVALID_EDIT_FIELD"};
     var target = Object.assign({favorite: false, note: "",
-        lastEventKind: "none", lastEventAtMs: 0, lastExpectedAtMs: 0}, old, patch);
+        lastEventKind: "none", lastEventAtMs: 0, lastExpectedAtMs: 0,
+        lastFiredAtMs: 0, lastMissedAtMs: 0}, old, patch);
     // A schedule edit means a new future occurrence, without surprising
     // immediate playback when the chosen minute already happened today.
     var scheduleChanged = target.hour !== old.hour || target.minute !== old.minute
@@ -334,11 +339,13 @@ function tick(doc, nowMs) {
                 if (a.mode === "once") finishOnce(a);
                 a.lastEventKind = "missed";
                 a.lastEventAtMs = nowMs;
+                a.lastMissedAtMs = nowMs;
                 missed.push(a.id); return;
             }
             a.ringing = true; a.ringStartedAtMs = nowMs;
             a.lastEventKind = "fired";
             a.lastEventAtMs = nowMs;
+            a.lastFiredAtMs = nowMs;
             a.lastExpectedAtMs = nowMs - lateSnooze;
             started.push(a.id); return;
         }
@@ -350,6 +357,7 @@ function tick(doc, nowMs) {
             finishOnce(a);
             a.lastEventKind = "missed";
             a.lastEventAtMs = nowMs;
+            a.lastMissedAtMs = nowMs;
             a.lastExpectedAtMs = dayAt(a.date, a.hour, a.minute);
             missed.push(a.id); changed = true; return;
         }
@@ -364,6 +372,7 @@ function tick(doc, nowMs) {
             a.lastFiredDay = due;
             a.lastEventKind = "missed";
             a.lastEventAtMs = nowMs;
+            a.lastMissedAtMs = nowMs;
             a.lastExpectedAtMs = dayAt(today, a.hour, a.minute);
             missed.push(a.id); changed = true;
             return;
@@ -373,6 +382,7 @@ function tick(doc, nowMs) {
         a.ringStartedAtMs = nowMs;
         a.lastEventKind = "fired";
         a.lastEventAtMs = nowMs;
+        a.lastFiredAtMs = nowMs;
         a.lastExpectedAtMs = dayAt(today, a.hour, a.minute);
         started.push(a.id); changed = true;
     });

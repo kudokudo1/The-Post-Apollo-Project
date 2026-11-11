@@ -247,6 +247,10 @@ class LiveDictationTests(unittest.TestCase):
                 self.assertEqual([row["text"] for row in rows
                                   if row["kind"] == "partial"],
                                  ["Short final phrase."])
+                stages = [row["detail"] for row in rows
+                          if row["kind"] == "stage"]
+                self.assertIn("CAPTURE_USER_STOP", stages)
+                self.assertNotIn("CAPTURE_CHUNK_LIMIT", stages)
                 self.assertEqual(count.read_text().splitlines(), ["run"])
             finally:
                 if process.poll() is None:
@@ -291,8 +295,14 @@ class LiveDictationTests(unittest.TestCase):
             self.assertEqual(run.returncode, 0, run.stderr)
             rows = [json.loads(line) for line in run.stdout.splitlines()]
             stages = [p["detail"] for p in rows if p["kind"] == "stage"]
+            self.assertIn("CAPTURE_LIMIT_NEAR", stages)
+            self.assertIn("CAPTURE_CHUNK_LIMIT", stages)
             self.assertIn("CAPTURE_STOPPED", stages)
             self.assertIn("RECORDING_COMPLETED", stages)
+            self.assertNotIn("CAPTURE_USER_STOP", stages)
+            self.assertLess(stages.index("CAPTURE_CHUNK_LIMIT"),
+                            stages.index("CAPTURE_STOPPED"),
+                            "Mic must report WHY it auto-stopped before closure")
             self.assertEqual(sum(p["kind"] == "partial" for p in rows), 6)
             self.assertEqual(counter.read_text().splitlines(), ["run"] * 6,
                              "No model launch beyond six permitted chunks")

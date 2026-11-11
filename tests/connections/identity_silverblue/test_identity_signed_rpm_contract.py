@@ -161,6 +161,11 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             "REAL_SILVERBLUE_IDENTITY_RPM_LAYER_REMOVED",
             "TEST_KEYRING_REMOVED_AND_PRODUCTION_DISABLED",
             '[[ "$enabled_state" == static || "$enabled_state" == disabled ]]',
+            'verify_output="$(rpm -V "$pkg" 2>&1)"',
+            "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_DIFFERENCE",
+            "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_REFUSED",
+            '[[ "$observed" =~ ^0:0:555:[1-9][0-9]*$ ]]',
+            "C4B_ID_INSTALLED_FILE_OBSERVED",
             'rpm-ostree rollback --reboot',
         ):
             self.assertIn(required, script)
@@ -168,6 +173,8 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
                         script.index("rpm-ostree install --cache-only"))
         self.assertLess(script.index('echo rollback_pending > "$stage"'),
                         script.index("rpm-ostree rollback --reboot"))
+        self.assertNotIn('"0:0:555:1"', script)
+        self.assertIn("SIGNED_INSTALLED_IDENTITY_RPM_FILE_DIGESTS_AND_MODES", script)
         self.assertNotIn('systemctl start "$unit"', script)
         self.assertNotIn("canBeginSignIn=true", script)
 

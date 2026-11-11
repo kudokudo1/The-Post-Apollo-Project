@@ -30,6 +30,7 @@ BROWSER_UID=24101
 SERVICE_UID=24102
 FOREIGN_UID=24103
 RECORD_ID="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+TEST_SCRIPT_PATH=None  # CI fixture path for demoted process
 LIST_REQ={"kind":broker.REQUEST_KIND,"action":broker.LIST,
           "challenge":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"}
 INSPECT_REQ={"kind":broker.REQUEST_KIND,"action":broker.INSPECT,
@@ -133,14 +134,14 @@ def _child_command(args,uid=None,timeout=12):
     def demote():
         if uid is not None:_as_uid(uid)
     return subprocess.run(
-        [sys.executable,"-B","-I",str(Path(__file__).resolve()),*args],
+        [sys.executable,"-B","-I",str(TEST_SCRIPT_PATH or Path(__file__).resolve()),*args],
         capture_output=True,text=True,timeout=timeout,
         preexec_fn=demote if uid is not None else None)
 
 
 def _ask_server(root,archive,mode,payload,uid=BROWSER_UID):
     sockpath=root/"metadata.sock"
-    args=[sys.executable,"-B","-I",str(Path(__file__).resolve()),
+    args=[sys.executable,"-B","-I",str(TEST_SCRIPT_PATH or Path(__file__).resolve()),
           "--server",str(sockpath),str(archive),mode]
     server=subprocess.Popen(
         args,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
@@ -205,6 +206,21 @@ def main():
     assert test_root.parent==Path("/tmp")
     os.chown(test_root,SERVICE_UID,SERVICE_UID)
     test_root.chmod(0o755)  # service can create CI socket; browser can only traverse
+    # The runner checkout is private to its owner, so demoted fixture UIDs
+    # need disposable read-only copies of just the test and dependencies.
+    global TEST_SCRIPT_PATH
+    fixture_tests=test_root/"tests"/"timew"
+    fixture_modules=test_root/"services"/"time"
+    fixture_tests.mkdir(parents=True,mode=0o755)
+    fixture_modules.mkdir(parents=True,mode=0o755)
+    original=Path(__file__).resolve()
+    TEST_SCRIPT_PATH=fixture_tests/original.name
+    shutil.copyfile(original,TEST_SCRIPT_PATH)
+    for name in ("MachineBraveProtectedMetadataContract.py",
+                 "MachineBraveSealedVault.py"):
+        shutil.copyfile(ROOT/"services"/"time"/name,fixture_modules/name)
+    for path in (TEST_SCRIPT_PATH,*fixture_modules.iterdir()):
+        path.chmod(0o644)
     try:
         archive,path=_setup_archive(test_root)
         before=path.read_bytes()

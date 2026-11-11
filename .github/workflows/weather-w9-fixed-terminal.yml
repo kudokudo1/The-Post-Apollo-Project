@@ -1,4 +1,4 @@
-name: Weather Station W16 one-page overview, larger original weather glyphs and ⚡︎
+name: Weather Station W17 compact OVERVIEW mirrors full WEATHER instruments
 
 on:
   pull_request:
@@ -8,6 +8,7 @@ on:
       - 'widgets/weather/StationWeatherInstrumentTerminal.qml'
       - 'widgets/weather/StationWeatherLineGlyph.qml'
       - 'widgets/weather/StationWeatherTerminalSummary.qml'
+      - 'widgets/weather/StationWeatherOverviewCompactInstrument.qml'
       - 'widgets/weather/StationHome.qml'
       - 'widgets/weather/StationHomeMetricCard.qml'
       - 'widgets/weather/StationWeatherTwilightGrid.qml'
@@ -17,6 +18,7 @@ on:
       - 'tests/weather/test_weather_w14_instrument_visual.js'
       - 'tests/weather/test_weather_w15_original_icons_fixed_overview.js'
       - 'tests/weather/test_weather_w16_one_page_icons.js'
+      - 'tests/weather/test_weather_w17_overview_mirror.js'
       - 'tests/weather/test_weather_w10_three_band_solar.js'
       - 'widgets/weather/StationSky.qml'
       - 'tests/weather/test_weather_w9_fixed_paged_terminal.js'
@@ -49,6 +51,7 @@ jobs:
           node --test tests/weather/test_weather_w14_instrument_visual.js
           node --test tests/weather/test_weather_w15_original_icons_fixed_overview.js
           node --test tests/weather/test_weather_w16_one_page_icons.js
+          node --test tests/weather/test_weather_w17_overview_mirror.js
           node --test tests/weather/test_weather_w8_unified_terminal.js
           node --test tests/weather/test_weather_subject_panels_m2a.js
           node --test tests/weather/test_weather_subject_panels_m2b.js
@@ -97,7 +100,7 @@ jobs:
           if grep -E 'W14_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi
-      - name: Native W16 both Snapshot and AUTO card groups in one fixed overview
+      - name: Native W17 mirrored WEATHER and both lower card rows fit without scrolling
         shell: bash
         run: |
           set -euo pipefail
@@ -144,9 +147,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: weather-w16-one-page-overview
+          name: weather-w17-mirrored-overview
           path: |
-            /tmp/weather-w16-overview-compact.png
-            /tmp/weather-w16-overview-wide.png
+            /tmp/weather-w17-overview-compact.png
+            /tmp/weather-w17-overview-wide.png
           if-no-files-found: warn
           retention-days: 14

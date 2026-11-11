@@ -230,6 +230,15 @@ ID_MONITOR
         fail "INSTALLED_IDENTITY_MODULE_PACKAGE_OWNER_WRONG"
     done
     echo "C4B_ID_PASS // REAL_SILVERBLUE_BOOTED_SIGNED_IDENTITY_RPM_INERT"
+    # A separate opt-in CI-only, deny-all running-service probe must be
+    # completed and fully torn down BEFORE any rollback is considered.
+    service_probe=/usr/local/libexec/postapollo-id-ci-service-probe.sh
+    [[ -f "$service_probe" && ! -L "$service_probe" &&
+       "$(stat -c '%u:%g:%a' "$service_probe")" == '0:0:700' ]] ||
+      fail "CI_ONLY_REAL_IDENTITY_SERVICE_PROBE_MISSING"
+    /usr/bin/bash "$service_probe" ||
+      fail "REAL_SYSTEMD_DENY_ONLY_IDENTITY_SERVICE_PROBE_REFUSED"
+    echo "C4B_ID_PASS // REAL_IDENTITY_SERVICE_PROBE_FINISHED_BEFORE_ROLLBACK"
     echo rollback_pending > "$stage"
     rpm-ostree rollback --reboot || fail "REAL_IDENTITY_ROLLBACK_COMMAND_FAILED"
     ;;
@@ -249,6 +258,11 @@ ID_MONITOR
     done
     [[ "$(getenforce)" == Enforcing && ! -e "$marker" ]] ||
       fail "POSTROLLBACK_SELINUX_OR_MARKER_FAILED"
+    [[ ! -e /run/postapollo-identity-silverblue-ci-only ]] ||
+      fail "POSTROLLBACK_TEST_PRIVATE_KEY_OR_RUNTIME_LEFTOVER"
+    if getent passwd postapollo-identity-ci >/dev/null; then
+      fail "POSTROLLBACK_DISPOSABLE_TEST_USER_LEFTOVER"
+    fi
     # Remove separately staged test keyring, local RPM and repo modifications.
     for original in "$store"/original-repos/*.repo; do
       [[ -f "$original" ]] || continue

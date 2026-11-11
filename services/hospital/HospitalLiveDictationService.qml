@@ -9,6 +9,10 @@ Scope {
     id: root
     property string voiceState: "checking"
     property bool backendReady: false
+    // Incident hold: operator reported a full PC crash from Surgery Manage
+    // live dictation. Do not enable real microphones merely because CI passes.
+    // Explicit operator + host verification is required before setting false.
+    property bool safetyHold: true
     property string lastError: ""
     property string lastTranscript: ""
     property int recordingElapsedSeconds: 0
@@ -56,6 +60,11 @@ Scope {
     }
 
     function startRecording() {
+        if (safetyHold) {
+            lastError = "VOICE SAFETY HOLD // HOST CRASH NOT YET CLEARED";
+            voiceError(lastError);
+            return false;
+        }
         if (busy || liveProcess.running)
             return false;
         if (!backendReady) {

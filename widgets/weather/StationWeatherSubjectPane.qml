@@ -114,29 +114,31 @@ Rectangle {
         }
     }
 
-    // W9 // The five bottom WEATHER modes remain unchanged. Inside the
-    // combined WEATHER mode, a pinned four-button rail swaps original
-    // instruments without a tall scroll column or duplicate source owner.
-    // Historical INDEX routes still render the original unmodified SKY.
+    // W10 // Same one SKY renderer and source lifetime, with two compact
+    // internal screens. WEATHER combines original data/artwork across three
+    // fixed bands; TWILIGHT reuses SKY's complete calculations plus the
+    // existing COSMOS 24h solar altitude instrument. No new collectors.
     Component {
         id: skyPanel
         Item {
             id: skyHost
-            objectName: "weather-w9-fixed-terminal-host"
+            objectName: "weather-w10-terminal-host"
             readonly property bool combined:
                 weatherPane.subjectRoute === "weather/conditions/current"
-            property string activeInstrument: "now"
+            property string activeInstrument: "weather"
             onCombinedChanged: {
-                if (combined) activeInstrument = "now";
+                if (combined) activeInstrument = "weather";
             }
             readonly property var runtimeRows: originalSky.runtimeRows
             readonly property alias renderer: originalSky
             readonly property alias viewport: instrumentViewport
             readonly property alias pageRail: instrumentRail
+            readonly property alias combinedPanel: combinedDisplay
+            readonly property alias solarVisual: solarChart
 
             Row {
                 id: instrumentRail
-                objectName: "weather-w9-fixed-page-rail"
+                objectName: "weather-w10-two-page-rail"
                 visible: skyHost.combined
                 anchors.top: parent.top
                 anchors.left: parent.left
@@ -145,14 +147,12 @@ Rectangle {
                 spacing: 4
                 Repeater {
                     model: [
-                        {label:"NOW + AIR",focus:"now"},
-                        {label:"HOURLY",focus:"hourly"},
-                        {label:"DAILY",focus:"daily"},
-                        {label:"TWILIGHT",focus:"twilight"}
+                        {label:"WEATHER // CURRENT + FORECAST",focus:"weather"},
+                        {label:"TWILIGHT // SOLAR",focus:"twilight"}
                     ]
                     delegate: ActionButton {
                         required property var modelData
-                        width: Math.max(1,(instrumentRail.width-12)/4)
+                        width: Math.max(1,(instrumentRail.width-4)/2)
                         height: 24
                         label: modelData.label
                         labelPixelSize: 10
@@ -165,7 +165,7 @@ Rectangle {
 
             Item {
                 id: instrumentViewport
-                objectName: "weather-w9-fixed-instrument-viewport"
+                objectName: "weather-w10-fixed-instrument-viewport"
                 anchors.top: instrumentRail.bottom
                 anchors.topMargin: skyHost.combined ? 3 : 0
                 anchors.left: parent.left
@@ -173,36 +173,98 @@ Rectangle {
                 anchors.bottom: parent.bottom
                 clip: true
 
-                // Uniformly scale the EXISTING graphics, preserving text,
-                // icons, hourly selection, forecast artwork and meters.
-                // No internal scroll or synthetic replacement visuals.
+                // Original SKY is still the sole calculation/forecast renderer
+                // and remains loaded for source state and hour inspection.
+                // Its old full visual remains untouched for INDEX deep links.
                 StationSky {
                     id: originalSky
-                    objectName: "weather-w9-original-sky"
+                    objectName: "weather-w10-original-sky"
                     subjectRoute: weatherPane.subjectRoute
-                    weatherFocus: skyHost.combined ? skyHost.activeInstrument : ""
+                    weatherFocus: skyHost.combined
+                        ? (skyHost.activeInstrument === "twilight"
+                           ? "twilight" : "dashboard") : ""
                     weatherService: weatherPane.weatherService
                     runtimeNowMs: weatherPane.runtimeNowMs
-                    width: skyHost.combined
-                           ? (skyHost.activeInstrument === "now" ? 860
-                              : skyHost.activeInstrument === "hourly" ? 790
-                              : skyHost.activeInstrument === "daily" ? 750 : 800)
-                           : instrumentViewport.width
+                    visible: !skyHost.combined
+                        || skyHost.activeInstrument === "twilight"
+                    width: skyHost.combined ? 800 : instrumentViewport.width
                     height: skyHost.combined ? 800 : instrumentViewport.height
                     transformOrigin: Item.TopLeft
                     scale: skyHost.combined
-                           ? Math.min(1,
-                               instrumentViewport.width / Math.max(1,width),
-                               instrumentViewport.height
-                                   / Math.max(1,focusedContentHeight))
-                           : 1
+                        ? Math.min(1,
+                            instrumentViewport.width/Math.max(1,width),
+                            twilightTextArea.height
+                                / Math.max(1,focusedContentHeight))
+                        : 1
                     x: skyHost.combined
-                       ? Math.max(0,(instrumentViewport.width-width*scale)/2)
-                       : 0
-                    y: skyHost.combined
-                       ? Math.max(0,(instrumentViewport.height
-                                     -focusedContentHeight*scale)/2)
-                       : 0
+                        ? Math.max(0,(instrumentViewport.width-width*scale)/2)
+                        : 0
+                    // TWILIGHT stays at the TOP, never vertically centered.
+                    y: 0
+                }
+
+                StationWeatherCombinedPane {
+                    id: combinedDisplay
+                    objectName: "weather-w10-combined-display"
+                    anchors.fill: parent
+                    visible: skyHost.combined
+                        && skyHost.activeInstrument === "weather"
+                    sky: originalSky
+                }
+
+                Item {
+                    id: twilightTextArea
+                    objectName: "weather-w10-twilight-text-area"
+                    visible: skyHost.combined
+                        && skyHost.activeInstrument === "twilight"
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: visible ? Math.max(90,
+                          instrumentViewport.height*0.50) : 0
+                }
+
+                Item {
+                    id: solarGraphArea
+                    objectName: "weather-w10-solar-graph-area"
+                    visible: skyHost.combined
+                        && skyHost.activeInstrument === "twilight"
+                    anchors.top: twilightTextArea.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    clip: true
+
+                    // Existing interactive solar-altitude curve. It samples
+                    // the calibrated TwilightPolicy model, not a new feed.
+                    StationCosmosVisualInstruments {
+                        id: solarChart
+                        objectName: "weather-w10-existing-solar-graph"
+                        width: 680
+                        height: 204
+                        compactMode: true
+                        showMoon: false
+                        showSun: true
+                        moonReady: false
+                        moonEphemeris: null
+                        astronomySummary: originalSky.astronomySummary
+                        twilightSummary: originalSky.twilightSummary
+                        currentSolarPosition: originalSky.currentSolarPosition
+                        providerLocalMinute: originalSky.providerLocalMinute
+                        solarDate: originalSky.astronomySummary.date
+                        solarCivilOffsetMinutes: originalSky.moonCivilOffsetMinutes
+                        solarOffsetSource: originalSky.moonCivilOffsetSource
+                        latitude: weatherPane.weatherService
+                            ? weatherPane.weatherService.latitude : ""
+                        longitude: weatherPane.weatherService
+                            ? weatherPane.weatherService.longitude : ""
+                        transformOrigin: Item.TopLeft
+                        scale: Math.min(1,
+                            solarGraphArea.width/Math.max(1,width),
+                            solarGraphArea.height/Math.max(1,height))
+                        x: Math.max(0,(solarGraphArea.width-width*scale)/2)
+                        y: 0
+                    }
                 }
             }
         }

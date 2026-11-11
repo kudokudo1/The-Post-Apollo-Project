@@ -14,7 +14,7 @@ The new guard is created *after* the socket's kernel peer pidfd is captured, but
 
 After the framed request is consumed and again after its intent is bound, the guard rechecks:
 - The short-lived process lease is still valid and the task hasn't exited or changed its recorded executable/credentials.
-- The connected Unix socket has no FIN, half-close, POLLERR/POLLHUP/POLLRDHUP, or trailing second request. A nonblocking MSG_PEEK distinguishes no queued bytes from EOF and unexpected pipelined bytes without consuming data.
+- The connected Unix socket has no FIN, half-close, POLLERR/POLLHUP/POLLRDHUP, or trailing second request. An immediate poll(0), after the exact frame has been consumed, refuses any POLLIN, POLLRDHUP, HUP, ERR or NVAL event. No recv call or wait is involved, avoiding Python socket timeouts and extra input consumption.
 - Current Linux SID, cgroup contents and namespace IDs equal the initial snapshot.
 - Its separate monotonic two-second limit has not passed, and time has not gone backwards.
 

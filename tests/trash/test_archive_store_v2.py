@@ -147,6 +147,18 @@ class ArchiveV2Tests(unittest.TestCase):
         journal.unlink()
         self.assertEqual(mod.ArchiveStore(self.root).verify()["items"], 0)
 
+    def test_private_root_allows_sqlite_transient_journal_mode_only(self):
+        journal = self.root / (mod.DB_NAME + "-journal")
+        journal.write_bytes(b"synthetic transient marker")
+        journal.chmod(0o644)
+        # Database files still require 0600. SQLite's journal may have a
+        # transient mode while the 0700 parent keeps it inaccessible.
+        mod._private_file(journal, require_private_mode=False)
+        with self.assertRaisesRegex(mod.ArchiveError, "ARCHIVE_FILE_UNSAFE"):
+            mod._private_file(journal)
+        journal.unlink()
+        self.assertEqual(self.store.verify()["items"], 0)
+
     def test_unsafe_permissions_refused(self):
         os.chmod(self.root, 0o777)
         with self.assertRaisesRegex(mod.ArchiveError, "ARCHIVE_ROOT_UNSAFE"):

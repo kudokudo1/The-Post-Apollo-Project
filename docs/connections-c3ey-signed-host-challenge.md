@@ -11,12 +11,14 @@ PRODUCTION // HOLD
 
 C3e-X #1846 is independently reviewed and merged on main. It checks four genuine Ed25519 UNAVAILABLE receipts against four sets of caller-provided synthetic kernel/process snapshots. The existing Identity receipts cryptographically cover command/action/nonce/state but **do not sign the full runtime snapshots**. C3e-X also refuses duplicate nonces only within one bundle.
 
-C3e-Y is a bounded separate CI-only composition with FOUR new owned files: C3eYSignedHostChallenge.py, twenty adversarial tests, a dedicated workflow and this contract. It does not change C3e-X, C3e-Q/R/U/V/W, C4b/Identity/C5 sources, Quickshell or production settings.
+C3e-Y is a bounded separate CI-only composition with FOUR new owned files: C3eYSignedHostChallenge.py, twenty-one adversarial tests, a dedicated workflow and this contract. It does not change C3e-X, C3e-Q/R/U/V/W, C4b/Identity/C5 sources, Quickshell or production settings.
 
 1. The disposable GitHub runner explicitly creates a root-owned mode-0700 directory directly under /run, with a mode-0600 SQLite file. The independent CI issuer (not the simulated guest signer) creates 32 random challenge bytes, records only their SHA-256 as ISSUED along with fixed purpose/audience and test release epoch/sequence, and commits to disk BEFORE exposing the challenge. Receiver calls must never bootstrap missing ledger state.
 2. The simulated witness signs a canonical bounded JSON *statement* using a **distinct Ed25519 witness key**, domain-separated and purpose-bound to the exact deny-only Identity role/audience and fixed release test epoch and sequence. The statement binds the SHA-256 of the **complete canonical C3e-X four-snapshot evidence bytes**, all four signed Identity receipt-frame SHA-256 values in exact order, caller-expected snapshot bytes digest, independently supplied receipt public key hash, and SHA-256 of the preissued challenge. The evidence/receipt content is not merely a textual name; altering even one byte changes a signed hash.
 3. The verifier requires a caller-pinned witness public key that differs from the separately caller-pinned Identity receipt key. It verifies the full-record signature and EVERY hash/action/audience/epoch/sequence/challenge binding. Then it calls the unchanged C3e-X checker, which verifies the existing four **real Ed25519-signed** UNAVAILABLE denial receipts and the consistency of all PID/start/UID/GID, process/exe/RPM digests, exact unit, cgroup, socket peer, proposed SELinux CI label and bundle nonces. Any mismatch REFUSES before challenge consumption.
-4. Only after all checks pass does the root-private test ledger conditionally and atomically transition the challenge from ISSUED to CONSUMED and retain the digest of the verified signed statement. The update checks challenge, audience, epoch, sequence and prior state; duplicate threads and new verifier instances cannot consume it again. A failed signature or false process snapshot preserves ISSUED state for a valid retry.
+4. Before C3e-X rechecks the evidence, the receiver freezes the caller's mutable receipt list into an immutable tuple and copies the caller-supplied expected pins. A caller cannot substitute a different valid-looking frame or kernel snapshot between signed-digest validation and denial consistency checking. Both validated byte sets remain synthetic CI inputs.
+
+Only after all checks pass does the root-private test ledger conditionally and atomically transition the challenge from ISSUED to CONSUMED and retain the digest of the verified signed statement. The update checks challenge, audience, epoch, sequence and prior state; duplicate threads and new verifier instances cannot consume it again. A failed signature or false process snapshot preserves ISSUED state for a valid retry.
 5. The only three positive outputs are explicitly suffixed InCI or RootLocalCI. All external issuer custody, rollback resistance, independent host origin, signed guest admission, C5 consent, sign-in, credential, approval and production fields remain **false**.
 
 ## HOW TO USE
@@ -27,7 +29,7 @@ This is a **synthetic, deny-only** witness-protocol test, not a native daemon. D
 
 ## VERIFY
 
-- [ ] Exact-head C3e-Y 20 adversarial tests PASS on disposable CI root.
+- [ ] Exact-head C3e-Y 21 adversarial tests PASS on disposable CI root.
 - [ ] Existing C3e-X 15/15 and C2n regression PASS.
 - [ ] GitHub Grammar and any triggered existing root/release/signed RPM workflows PASS.
 - [ ] Independent Nurse 2 exact-head security review before authorized owner merge.
@@ -46,7 +48,7 @@ The actual signed host witness needs a separate independently protected producer
 
 - [x] Recheck AGENTS, Hospital protocols, current C3e-X merge, main and ownership.
 - [x] Add a new DOC-owned purpose-specific complete-record signed witness receiver with root-local preissued challenge.
-- [x] Add 20 root-isolated adversarial tests and dedicated workflow.
+- [x] Add 21 root-isolated adversarial tests and dedicated workflow.
 - [ ] Verify exact-head CI, any requested changes and Nurse 2 independent security review.
 - [ ] Owner merge after all review gates under existing authorization; final operator acceptance separate.
 - [ ] C4b independently authenticated real release/source/process/seat witness and C3e external challenge custody.

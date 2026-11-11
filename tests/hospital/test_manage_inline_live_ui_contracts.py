@@ -261,6 +261,13 @@ check('OVERLAP_BYTES = RATE * FRAME_BYTES * 3 // 4' in script
       and 'phrase = transcribe_chunk(stt_helper, chunk' in script,
       "Bounded overlapping windows and de-duplication preserve guarded CLI fallback")
 
+check('help_text" == *"--no-gpu"*' in stt
+      and 'help_text" == *"--no-context"*' not in stt
+      and ' -ng -t 2 -p 1 -l en -nt' in stt
+      and ' -nt -nc' not in stt
+      and 'private_server_compatible || exit 3' in stt,
+      "Private whisper-server launch accepts documented upstream flags, never unsupported -nc")
+
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")
     for issue in issues: print(" - " + issue)

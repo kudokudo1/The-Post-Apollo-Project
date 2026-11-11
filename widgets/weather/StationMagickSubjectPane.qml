@@ -16,6 +16,7 @@ Rectangle {
     property var celestialSource: null
     readonly property bool servicesRoute:
         subjectRoute === "magick/services/health"
+    readonly property alias servicesView: magickServicesView
     readonly property bool showCelestial:
         MagickPolicy.visualForRoute(subjectRoute)
     readonly property bool standaloneAstrology:
@@ -148,6 +149,7 @@ Rectangle {
     }
 
     StationMagickServicesPane {
+        id: magickServicesView
         objectName: "magick-w7-services-host"
         anchors.fill: parent
         visible: magickPane.servicesRoute

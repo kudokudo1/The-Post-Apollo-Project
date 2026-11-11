@@ -16,6 +16,11 @@ import stat
 import sys
 from urllib.parse import quote
 
+# Python -I omits the script directory. Import only the installed app-root
+# location policy, not the Archive writer or source mutation modules.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.trash.archive_v2_location import ArchiveRootError, archive_directory
+
 DB_NAME = "trashpp-archive-v2.sqlite3"
 STORE_SCHEMA = "post-apollo.trash-archive.v2a"
 PAGE_SIZE = 25
@@ -126,7 +131,13 @@ def _row(raw):
 def index(directory, cursor="", query=""):
     page_after = _cursor(cursor)
     needle = _query(query)
-    root = _dir(directory)
+    try:
+        selected = archive_directory(directory, create=False)
+    except ArchiveRootError as exc:
+        raise ReadIndexError(str(exc)) from exc
+    if selected is None:
+        return _response([], 0, state="NOT_INSTALLED", query=needle)
+    root = _dir(str(selected))
     database = root / DB_NAME
     if not _private_regular(database):
         return _response([], 0, state="NOT_INSTALLED", query=needle)

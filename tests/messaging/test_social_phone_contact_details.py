@@ -34,7 +34,7 @@ class PhoneContactDetailsTests(unittest.TestCase):
         for value in (
             "selectedPhoneContactId", "required property var modelData", "MouseArea {",
             "onClicked:", 'personalReadStatus === "LOCAL_SNAPSHOT"',
-            "!phonePane.personalNeedsExplicitReload", "String(modelData.id)",
+            "!phonePane.personalNeedsExplicitReload", "String(addressBookRow.card.id)",
             "maximumLineCount: 1", "clip: true",
             "Colors.orange", "Colors.cyan",
         ):

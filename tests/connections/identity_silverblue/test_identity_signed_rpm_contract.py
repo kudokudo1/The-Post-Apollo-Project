@@ -227,7 +227,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             self.assertIn(f"INSTALLED_SIGNED_UNAVAILABLE_{action}", host)
         for needle in (
             '[[ "$(id -u)" == 0 && -e /run/ostree-booted',
-            '[[ "$(getenforce)" == Enforcing',
+            '"$(getenforce)" == Enforcing',
             'post-apollo-identity-silverblue-ci.service',
             'REAL_SYSTEMD_UNIT_REFUSED_WITHOUT_MARKER',
             'systemctl show "$unit" --property=MainPID',

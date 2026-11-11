@@ -65,7 +65,7 @@ ShellRoot {
         color: "black"
         visible: true
         Weather.StationServicesConsole {
-            id: console
+            id: stationConsole
             anchors.fill: parent
             familyLabel: root.phase===0 ? "EARTH" : root.phase===1 ? "HOME":"MEDIA"
             statusScope: familyLabel
@@ -83,7 +83,7 @@ ShellRoot {
         onTriggered: {
             root.ticks++;
             if(root.ticks>40) return root.fail("TIMEOUT");
-            const top=root.find(console,"services-console-fixed-header");
+            const top=root.find(stationConsole,"services-console-fixed-header");
             const cards=root.find(console,"services-console-summary-cards");
             const dossier=root.find(console,"services-console-detail-scroll");
             const report=root.find(console,"services-console-selected-report");
@@ -92,7 +92,7 @@ ShellRoot {
                 if(root.ticks>10) return root.fail("CONSOLE_NODES");
                 return;
             }
-            if(String(console.color).toLowerCase()==="#ffffff")
+            if(String(stationConsole.color).toLowerCase()==="#ffffff")
                 return root.fail("WHITE_BACKGROUND");
             if(cards.height !== (root.phase===1 ? 99 : 65))
                 return root.fail("COMPACT_CARD_HEIGHT");

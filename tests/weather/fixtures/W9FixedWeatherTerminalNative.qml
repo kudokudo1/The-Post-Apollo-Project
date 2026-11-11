@@ -127,12 +127,17 @@ ShellRoot {
                 if(combined.currentItem.height<69
                    || combined.hourlyItem.height<78
                    || combined.hourlyItem.height>=105
-                   || combined.dailyItem.height<56
-                   || combined.dailyItem.height>70)
+                   || combined.dailyItem.height<62
+                   || combined.dailyItem.height>74)
                     return root.fail("WEATHER_BAND_BALANCE // "
                         +combined.currentItem.height+" / "
                         +combined.hourlyItem.height+" / "
                         +combined.dailyItem.height);
+                const firstDay=combined.dayCardsRepeater.itemAt(0);
+                if(!firstDay || !firstDay.iconHolder
+                   || firstDay.iconHolder.width>firstDay.iconHolder.height+0.1
+                   || firstDay.iconHolder.width<38)
+                    return root.fail("DAILY_ICON_NOT_FITTING_CARD");
                 const firstHour=combined.hourRepeater.itemAt(0);
                 if(!firstHour || !firstHour.mainGlyph || !firstHour.rainMeter
                    || firstHour.mainGlyph.font.pixelSize<34

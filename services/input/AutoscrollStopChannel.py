@@ -50,8 +50,8 @@ def private_directory():
     return root
 
 
-def socket_path():
-    return private_directory() / SOCKET_NAME
+def socket_path(create=False):
+    return (private_directory() if create else parent_path()) / SOCKET_NAME
 
 
 def inspect_socket(path):
@@ -72,13 +72,17 @@ class StopServer:
         self.inode = None
 
     def __enter__(self):
-        self.path = socket_path()
+        self.path = socket_path(create=True)
         if self.path.exists() or self.path.is_symlink():
             raise StopChannelError("STOP_ENDPOINT_ALREADY_EXISTS")
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock = sock
         try:
-            sock.bind(str(self.path))
+            old_umask = os.umask(0o177)
+            try:
+                sock.bind(str(self.path))
+            finally:
+                os.umask(old_umask)
             os.chmod(self.path, 0o600)
             self.inode = os.lstat(self.path).st_ino
             sock.listen(3)

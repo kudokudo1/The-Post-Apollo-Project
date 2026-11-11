@@ -2,3 +2,4 @@ module qs.services.input
 singleton KeyboardLockSettings 1.0 KeyboardLockSettings.qml
 singleton KeyboardLedObservation 1.0 KeyboardLedObservation.qml
 singleton SwayScrollSettings 1.0 SwayScrollSettings.qml
+singleton KittyScrollSettings 1.0 KittyScrollSettings.qml

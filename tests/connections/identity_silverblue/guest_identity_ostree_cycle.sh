@@ -162,9 +162,12 @@ ID_MONITOR
     if systemctl is-active --quiet "$unit"; then
       fail "DENY_ONLY_IDENTITY_UNIT_UNEXPECTEDLY_ACTIVE"
     fi
-    if systemctl is-enabled --quiet "$unit"; then
-      fail "IDENTITY_UNIT_WAS_AUTOENABLED"
-    fi
+    # A unit with no [Install] section is "static"; systemctl is-enabled
+    # may return success for that legitimate inert state. Inspect the actual
+    # state rather than treating exit code zero as auto-enablement.
+    enabled_state="$(systemctl is-enabled "$unit" 2>/dev/null || true)"
+    [[ "$enabled_state" == static || "$enabled_state" == disabled ]] ||
+      fail "IDENTITY_UNIT_WAS_AUTOENABLED_OR_MASKED"
     [[ ! -e "$marker" ]] || fail "SERVICE_MARKER_UNEXPECTEDLY_PRESENT"
     count="$(rpm -ql "$pkg" | grep -E '^/usr/lib(exec)?/' | wc -l)"
     [[ "$count" == 9 ]] || fail "IDENTITY_BOOTED_PAYLOAD_NOT_NINE_FILES"

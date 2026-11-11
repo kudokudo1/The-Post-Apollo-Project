@@ -333,7 +333,7 @@ function dueKey(a, nowMs) {
 // local day. This avoids replay storms after a long shutdown or sleep.
 // Without a durable arming timestamp, we cannot infer whether a legacy
 // alarm was armed on previous days: initialize that baseline on first tick.
-function latestMissedWeeklyDue(a, nowMs) {
+function latestMissedWeeklyDue(a, nowMs, pausedThroughDate) {
     if (a.mode !== "weekly" || !a.enabled || a.completed
             || !timestamp(a.armedAtMs) || a.armedAtMs === 0
             || a.armedAtMs > nowMs)
@@ -342,7 +342,7 @@ function latestMissedWeeklyDue(a, nowMs) {
         var key = dateOffset(nowMs, -daysBack);
         var due = dayAt(key, a.hour, a.minute);
         if (a.weekdays.indexOf(new Date(due).getDay()) < 0
-                || (a.pausedUntilDate !== "" && key < a.pausedUntilDate)
+                || (pausedThroughDate !== "" && key < pausedThroughDate)
                 || due <= a.lastProcessedDueMs
                 || key === a.lastFiredDay
                 || due + MAX_LATE_MS < a.armedAtMs)
@@ -367,6 +367,9 @@ function tick(doc, nowMs) {
             a.armedAtMs = nowMs;
             changed = true;
         }
+        // Host clock may move backwards during resync. Never replay a
+        // supposedly armed occurrence before the arm operation happened.
+        if (a.armedAtMs > nowMs) return;
         if (a.ringing) {
             if (nowMs >= a.ringStartedAtMs
                     && nowMs - a.ringStartedAtMs < MAX_RING_MS) return;
@@ -400,8 +403,9 @@ function tick(doc, nowMs) {
                 a.lastProcessedDueMs, nowMs - lateSnooze);
             started.push(a.id); return;
         }
-        if (a.pausedUntilDate !== "" && today < a.pausedUntilDate) return;
-        if (a.pausedUntilDate !== "") {
+        const pausedThroughDate = a.pausedUntilDate;
+        if (pausedThroughDate !== "" && today < pausedThroughDate) return;
+        if (pausedThroughDate !== "") {
             a.pausedUntilDate = ""; changed = true;
         }
         if (a.mode === "once" && a.date < today) {
@@ -416,7 +420,7 @@ function tick(doc, nowMs) {
         var due = dueKey(a, nowMs);
         if (due === "" || a.lastFiredDay === due
                 || nowMs < dayAt(today, a.hour, a.minute)) {
-            var previous = latestMissedWeeklyDue(a, nowMs);
+            var previous = latestMissedWeeklyDue(a, nowMs, pausedThroughDate);
             if (previous > 0) {
                 a.lastProcessedDueMs = previous;
                 a.lastEventKind = "missed";
@@ -468,8 +472,11 @@ function nextOccurrenceMs(a, nowMs) {
     if (a.ringing) return a.ringStartedAtMs;
     if (a.mode === "once") {
         var due = dayAt(a.date, a.hour, a.minute);
-        return due > nowMs && (a.pausedUntilDate === ""
-            || a.date >= a.pausedUntilDate) ? due : 0;
+        return (due > nowMs || (due <= nowMs
+                && nowMs - due <= MAX_LATE_MS
+                && a.lastProcessedDueMs !== due))
+            && (a.pausedUntilDate === ""
+                || a.date >= a.pausedUntilDate) ? due : 0;
     }
     var start = nowMs;
     if (a.pausedUntilDate !== "" && a.pausedUntilDate > dayKey(nowMs))

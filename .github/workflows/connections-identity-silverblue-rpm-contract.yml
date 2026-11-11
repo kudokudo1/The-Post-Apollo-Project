@@ -32,6 +32,7 @@ jobs:
           bash -n tests/connections/identity_silverblue/build_signed_identity_gateway.sh
           bash -n tests/connections/identity_silverblue/verify_signed_identity_gateway.sh
           python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
+          python3 -B tests/connections/identity_silverblue/test_identity_booted_rpm_mtime_only.py
       - name: Build EXACT installed Identity command gateway as disposable signed RPM
         shell: bash
         run: |

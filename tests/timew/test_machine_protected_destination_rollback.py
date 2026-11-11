@@ -31,7 +31,6 @@ SERVICE_UID = 24212
 FOREIGN_UID = 24213
 SOURCE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 SENTINEL_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
-LATE_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 DIRECT_ACTIONS = ("read", "list", "write", "unlink", "chmod", "create")
 NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 DIRECTORY = getattr(os, "O_DIRECTORY", 0)
@@ -209,7 +208,7 @@ def fixture_transfer(source, protected, identifier, expected_digest, *,
         os.close(srcfd)
 
 
-ATTACK = String.raw if False else r'''
+ATTACK = r'''
 import json, os, pathlib, sys
 mode,folder,name=sys.argv[1:]
 directory=pathlib.Path(folder)
@@ -342,6 +341,17 @@ def main():
         expect_refusal(fixture_transfer, source, protected, SOURCE_ID,
                        original_digest)
         alias.unlink()
+        # A symlink offered under the expected UUID must not follow the
+        # replacement path even if it points to otherwise valid ciphertext.
+        backup = source / "saved-real-record"
+        srcpath.rename(backup)
+        srcpath.symlink_to(backup.name)
+        expect_refusal(fixture_transfer, source, protected, SOURCE_ID,
+                       original_digest)
+        assert srcpath.is_symlink()
+        srcpath.unlink()
+        backup.rename(srcpath)
+        assert srcpath.read_bytes() == primary
         srcpath.chmod(0o644)
         expect_refusal(fixture_transfer, source, protected, SOURCE_ID,
                        original_digest)

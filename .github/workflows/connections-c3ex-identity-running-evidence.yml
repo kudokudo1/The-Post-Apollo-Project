@@ -1,0 +1,61 @@
+name: Connections C3e-X Identity running denial evidence receiver (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eXIdentityRunningEvidence.py"
+      - "tests/connections/test_connections_c3ex_identity_running_evidence.py"
+      - "services/identity/signed_command_receipt_v0.py"
+      - ".github/workflows/connections-c3ex-identity-running-evidence.yml"
+      - "docs/connections-c3ex-identity-running-evidence.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-ci-only-identity-denial:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned public-key verification dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Run protected C3e-X signed denial and kernel-snapshot adversarial tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eXIdentityRunningEvidence.py \
+            tests/connections/test_connections_c3ex_identity_running_evidence.py
+          python3 -B tests/connections/test_connections_c3ex_identity_running_evidence.py
+          echo "C3EX_PASS // FOUR_SIGNED_DENIALS_WITH_FOUR_STABLE_KERNEL_SNAPSHOTS_IN_CI"
+      - name: Verify hard-negative authority and no broker promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path("tests/connections/c3e_release_trust/C3eXIdentityRunningEvidence.py").read_text()
+          broker = Path("services/connections/ConnectionsBroker.qml").read_text()
+          request = Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          for key in ("externalIssuerCustodyVerified", "externalRollbackResistanceVerified",
+                      "signedGuestOriginAuthenticated", "hostAuthenticated",
+                      "c5HumanConsentVerified", "canBeginSignIn", "canApprove",
+                      "credentialActionsEnabled", "productionAuthority"):
+              assert '"' + key + '": False' in src
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "readonly property bool hostAuthenticated: false" in request
+          assert "not independently authenticated" in Path(
+              "docs/connections-c3ex-identity-running-evidence.md").read_text()
+          print("C3EX_LIMITATION // CI_RECEIPT_CONSISTENCY_IS_NOT_HOST_OR_HUMAN_AUTHORITY")
+          PY

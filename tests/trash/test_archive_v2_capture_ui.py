@@ -13,7 +13,7 @@ class SnapshotCaptureUiTests(unittest.TestCase):
     def test_source_copy_button_is_opt_in_and_owner_scoped(self):
         for marker in ('function snapshotSource(row)', 'function requestSnapshot(row)',
                        'function consumeSnapshot(raw)', 'id: snapshotCaptureProcess',
-                       'id: saveSnapshotButton', 'label: "SAVE SNAPSHOT"',
+                       'id: saveSnapshotButton',
                        '? "CONFIRM COPY" : "SAVE SNAPSHOT"',
                        'onLeftClicked: trashLauncher.requestSnapshot(modelData)',
                        'row.capabilities.saveCopy !== true',

@@ -29,7 +29,10 @@ function validAlarm(alarm) {
     return !!alarm && typeof alarm === "object" && !Array.isArray(alarm)
         && Number.isInteger(alarm.hour) && alarm.hour >= 0 && alarm.hour <= 23
         && Number.isInteger(alarm.minute) && alarm.minute >= 0 && alarm.minute <= 59
-        && validName(alarm.label) && typeof alarm.enabled === "boolean"
+        && validName(alarm.label)
+        && Number.isInteger(alarm.volumePercent)
+        && alarm.volumePercent >= 0 && alarm.volumePercent <= 100
+        && typeof alarm.enabled === "boolean"
         && typeof alarm.soundEnabled === "boolean"
         && validDay(alarm.lastFiredDay)
         && timestamp(alarm.snoozeUntilMs)
@@ -41,7 +44,8 @@ function validAlarm(alarm) {
 function initialDocument() {
     return { version: VERSION, alarm: {
         hour: 7, minute: 0, label: "ALARM", enabled: false,
-        soundEnabled: true, lastFiredDay: "", snoozeUntilMs: 0,
+        soundEnabled: true, volumePercent: 60,
+        lastFiredDay: "", snoozeUntilMs: 0,
         ringing: false, ringStartedAtMs: 0
     }};
 }
@@ -51,6 +55,7 @@ function copy(alarm) {
         hour: alarm.hour, minute: alarm.minute,
         label: alarm.label, enabled: alarm.enabled,
         soundEnabled: alarm.soundEnabled,
+        volumePercent: alarm.volumePercent,
         lastFiredDay: alarm.lastFiredDay,
         snoozeUntilMs: alarm.snoozeUntilMs,
         ringing: alarm.ringing, ringStartedAtMs: alarm.ringStartedAtMs
@@ -121,6 +126,15 @@ function withSound(doc, enabled) {
         return { ok: false, reason: "INVALID_SOUND_STATE" };
     var alarm = copy(doc.alarm);
     alarm.soundEnabled = enabled;
+    return { ok: true, document: { version: VERSION, alarm: alarm } };
+}
+
+function withVolume(doc, value) {
+    if (!doc || !validAlarm(doc.alarm) || !Number.isInteger(value)
+            || value < 0 || value > 100)
+        return { ok: false, reason: "INVALID_VOLUME" };
+    var alarm = copy(doc.alarm);
+    alarm.volumePercent = value;
     return { ok: true, document: { version: VERSION, alarm: alarm } };
 }
 

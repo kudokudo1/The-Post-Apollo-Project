@@ -61,7 +61,8 @@ for file in identity-silverblue-ci.rpm identity-disposable-rpm-public.asc \
     identity-disposable-rpm-fingerprint.txt identity-artifact-manifest.sha256; do
   install -m 0644 "$artifact_dir/$file" "$tmp/seed/$file"
 done
-for file in identity-python3-cryptography-f44.rpm identity-fedora44-runtime-public.asc \
+for file in identity-python3-cryptography-f44.rpm identity-python3-cffi-f44.rpm \
+    identity-python3-pycparser-f44.rpm identity-fedora44-runtime-public.asc \
     identity-fedora44-runtime-manifest.sha256; do
   install -m 0644 "$runtime_dir/$file" "$tmp/seed/$file"
 done

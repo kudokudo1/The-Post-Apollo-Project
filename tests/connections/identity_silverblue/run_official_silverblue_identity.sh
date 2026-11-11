@@ -53,6 +53,7 @@ for file in identity-silverblue-ci.rpm identity-disposable-rpm-public.asc \
 done
 payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh")"
 helper_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/verify_booted_rpm_mtime_only.py")"
+service_probe_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/guest_identity_service_probe.sh")"
 cat >"$tmp/seed/ks.cfg" <<EOF
 # CI-only disposable offline Silverblue for C4b Identity gateway package.
 cmdline
@@ -84,6 +85,10 @@ base64 -d >/usr/local/libexec/postapollo-id-ci-verify-rpm.py <<'C4B_ID_VERIFIER'
 $helper_payload
 C4B_ID_VERIFIER
 chmod 0444 /usr/local/libexec/postapollo-id-ci-verify-rpm.py
+base64 -d >/usr/local/libexec/postapollo-id-ci-service-probe.sh <<'C4B_ID_SERVICE_PROBE'
+$service_probe_payload
+C4B_ID_SERVICE_PROBE
+chmod 0700 /usr/local/libexec/postapollo-id-ci-service-probe.sh
 cat > /etc/systemd/system/postapollo-id-ci-cycle.service <<'C4B_ID_BOOT_UNIT'
 [Unit]
 Description=Disposable C4b Identity Silverblue RPM/rollback lifecycle

@@ -26,7 +26,9 @@ MAX_SECONDS = 30
 CONVERSION_TIMEOUT_SECONDS = 20
 NAME_MAX = 40
 ID = re.compile(r"^user-[0-9a-f]{64}$")
-ALLOWED_RATES = (24000, 48000)
+# Preserve commonly downloaded 44.1 kHz PCM WAV (e.g. stereo Mixkit SFX)
+# without transcoding, while retaining the existing bounded 16-bit format.
+ALLOWED_RATES = (24000, 44100, 48000)
 
 
 class Refused(Exception):

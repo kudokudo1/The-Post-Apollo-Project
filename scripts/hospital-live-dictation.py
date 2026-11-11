@@ -25,6 +25,11 @@ import threading
 import wave
 from pathlib import Path
 
+# The script is both directly executable and imported by offline test fixtures.
+# Keep its sibling session module importable in either context.
+SCRIPT_DIR = str(Path(__file__).resolve().parent)
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
 import hospital_whisper_session
 
 RATE = 16000
@@ -36,7 +41,7 @@ MIN_TAIL_SECONDS = 1
 MAX_QUEUE = 2
 MODEL_GUARD = Path(__file__).with_name("hospital-whisper-sandbox.py")
 OVERLAP_BYTES = RATE * FRAME_BYTES * 3 // 4  # 750 ms of preceding speech
-TOKENS = re.compile(r"[^\\W_]+(?:['’][^\\W_]+)*", re.UNICODE)
+TOKENS = re.compile(r"[^\W_]+(?:['’][^\W_]+)*", re.UNICODE)
 PLACEHOLDER = re.compile(
     r"\[\s*(?:BLANK_AUDIO|NO_SPEECH|SILENCE|MUSIC|NO_AUDIO)\s*\]",
     re.IGNORECASE,
@@ -385,39 +390,82 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
 
     def recognize():
         nonlocal first_text_ready
-        while not cancelled.is_set():
-            try:
-                chunk = clips.get(timeout=0.2)
-            except queue.Empty:
-                if capture_done.is_set():
+        session = None
+        attempted_session = False
+        previous_text = ""
+        previous_pcm_tail = b""
+        try:
+            while not cancelled.is_set():
+                try:
+                    chunk = clips.get(timeout=0.2)
+                except queue.Empty:
+                    if capture_done.is_set():
+                        break
+                    continue
+                if chunk is None:
                     break
-                continue
-            if chunk is None:
-                break
-            try:
-                phrase = transcribe_chunk(stt_helper, chunk,
-                                          on_start=model_started,
-                                          on_end=model_ended)
-            except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:
-                # Distinguish slow/stalled inference from other model failures
-                # without exposing stderr, audio, identifiers or recognized text.
-                send("stage", detail=(
-                    "MODEL_TIMEOUT" if isinstance(error, subprocess.TimeoutExpired)
-                    else "MODEL_FAILURE"))
-                stopping_error.set()
-                send("error", detail="LOCAL WHISPER CHUNK FAILED")
-                stopping.set()
-                halt_child()
-                break
-            if phrase:
-                if not first_text_ready:
-                    first_text_ready = True
-                    send("stage", detail="FIRST_TEXT_READY")
-                send("partial", text=phrase)
-        recognition_done.set()
-        if not cancelled.is_set() and not stopping_error.is_set():
-            send("stage", detail="RECORDING_COMPLETED")
-            send("done")
+                if prefer_persistent and not attempted_session:
+                    attempted_session = True
+                    # Fail closed to the previous guarded CLI if no compatible
+                    # Unix-domain socket binary is installed. Never open TCP.
+                    if hospital_whisper_session.server_available(stt_helper):
+                        send("stage", detail="MODEL_SESSION_STARTING")
+                        candidate = hospital_whisper_session.WhisperSession(stt_helper)
+                        try:
+                            candidate.start(cancelled=cancelled)
+                            session = candidate
+                            model_started(session.process)
+                            send("stage", detail="MODEL_SESSION_READY")
+                        except (OSError, ValueError, RuntimeError,
+                                subprocess.SubprocessError):
+                            candidate.close()
+                            send("stage", detail="MODEL_SESSION_UNAVAILABLE")
+                    else:
+                        send("stage", detail="MODEL_SESSION_UNAVAILABLE")
+                if cancelled.is_set():
+                    break
+                try:
+                    if session is None:
+                        phrase = transcribe_chunk(stt_helper, chunk,
+                                                  on_start=model_started,
+                                                  on_end=model_ended)
+                    else:
+                        # A 750-ms overlap gives the decoder continuity at
+                        # word boundaries. Prior recognized text is sent only
+                        # to the private model over its AF_UNIX socket.
+                        raw = session.transcribe(previous_pcm_tail + chunk,
+                                                 prompt=previous_text[-160:])
+                        cleaned = clean_transcript(raw)
+                        phrase = trim_repeated_prefix(previous_text, cleaned)
+                        previous_pcm_tail = chunk[-OVERLAP_BYTES:]
+                        if phrase:
+                            previous_text = (previous_text + " " + phrase)[-300:]
+                except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:
+                    # No fallback after a server request fails: that could
+                    # introduce a *second* model during a stressed session.
+                    send("stage", detail=(
+                        "MODEL_TIMEOUT" if isinstance(error, subprocess.TimeoutExpired)
+                        else "MODEL_FAILURE"))
+                    stopping_error.set()
+                    send("error", detail="LOCAL WHISPER CHUNK FAILED")
+                    stopping.set()
+                    halt_child()
+                    break
+                if phrase:
+                    if not first_text_ready:
+                        first_text_ready = True
+                        send("stage", detail="FIRST_TEXT_READY")
+                    send("partial", text=phrase)
+        finally:
+            if session is not None:
+                tracked = session.process
+                session.close()
+                if tracked is not None:
+                    model_ended(tracked)
+            recognition_done.set()
+            if not cancelled.is_set() and not stopping_error.is_set():
+                send("stage", detail="RECORDING_COMPLETED")
+                send("done")
 
     command_thread = threading.Thread(target=read_commands, daemon=True)
     capture_thread = threading.Thread(target=capture, daemon=True)
@@ -448,6 +496,8 @@ def main():
                         help="capture only the first speech chunk and run Whisper once")
     parser.add_argument("--pilot-live-chunks", type=int, default=0,
                         help="bounded incremental trial: max 1-8 model chunks")
+    parser.add_argument("--prefer-persistent", action="store_true",
+                        help="prefer one private AF_UNIX Whisper model session")
     parser.add_argument("--vad", action="store_true")
     parser.add_argument("--threshold", type=int, default=600)
     parser.add_argument("--silence-ms", type=int, default=2200)
@@ -457,7 +507,8 @@ def main():
                 first_chunk_ms=args.first_chunk_ms, vad=args.vad, threshold=args.threshold,
                 silence_ms=args.silence_ms, min_speech_ms=args.min_speech_ms,
                 pilot_one_chunk=args.pilot_one_chunk,
-                pilot_live_chunks=args.pilot_live_chunks)
+                pilot_live_chunks=args.pilot_live_chunks,
+                prefer_persistent=args.prefer_persistent)
 
 
 if __name__ == "__main__":

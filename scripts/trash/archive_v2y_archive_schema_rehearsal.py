@@ -55,7 +55,7 @@ def _require(ok, code):
 
 
 def _fixture_marker(root):
-    _require(type(root) is Path and root.is_absolute()
+    _require(isinstance(root, Path) and root.is_absolute()
              and root.name.startswith("trashpp-v2y-fixture-")
              and ".." not in root.parts and len(str(root)) < 4096,
              "V2Y_FIXTURE_ROOT_REQUIRED")

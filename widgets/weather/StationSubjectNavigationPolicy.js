@@ -145,7 +145,9 @@ var SUBJECTS = [
     {id:"divination",label:"DIVINATION",children:[
       {id:"tarot",label:"TAROT"}, {id:"symbolism",label:"SYMBOLISM"}]},
     {id:"grimoire",label:"GRIMOIRE",children:[
-      {id:"references",label:"REFERENCES"}, {id:"journal",label:"JOURNAL"}]}
+      {id:"references",label:"REFERENCES"}, {id:"journal",label:"JOURNAL"}]},
+    {id:"services",label:"SERVICES",children:[
+      {id:"health",label:"SOURCE AND INSTRUMENT DOSSIER"}]}
   ]},
   {id:"tools",label:"TOOLS",sections:[
     {id:"overview",label:"OVERVIEW"},

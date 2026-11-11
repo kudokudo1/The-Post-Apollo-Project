@@ -61,9 +61,7 @@ class PhoneFixedSearchSections(unittest.TestCase):
         self.assertIn("conversations: phonePane.selectedSection", self.pane)
         self.assertIn("? phonePane.filteredPhoneConversations : []", self.pane)
         self.assertIn("model: phonePane.contactDirectoryRows", self.pane)
-        self.assertIn("No global search claim".lower(), self.pane.lower()
-                      if "No global search claim".lower() in self.pane.lower()
-                      else ("No global search claim" if False else self.pane.lower()))
+        self.assertIn("no global search claim", self.pane.lower())
 
     def test_alphabet_headers_have_magenta_letters_and_divider(self):
         section = self.pane.split("id: phoneAddressBook", 1)[1].split(

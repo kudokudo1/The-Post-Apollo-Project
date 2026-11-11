@@ -92,7 +92,10 @@ class LegacyContactProjectionTest(unittest.TestCase):
         self.assertFalse(first["hasPhoto"])
         self.assertNotIn("conversations", result)
         self.assertNotIn("messages", result)
-        self.assertNotIn("phoneNumbers", first)  # No raw address list stored.
+        self.assertTrue(first["hasAddressDetails"])
+        self.assertEqual(first["phoneNumbers"], ["+15550001001", "+15550001002"])
+        self.assertEqual(first["emailAddresses"], ["fake@example.invalid"])
+        self.assertNotIn("phoneLabels", first)  # BlueFerry 0.9.1 has no labels.
         self.assertNotIn("sendEnabled", first)
 
     def test_new_read_epoch_makes_all_legacy_ids_ephemeral(self):

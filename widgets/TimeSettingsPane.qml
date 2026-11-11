@@ -129,6 +129,7 @@ Item {
             }
 
             Row {
+                id: fullOffsetControls
                 width: parent.width
                 height: 33
                 spacing: 4
@@ -146,7 +147,7 @@ Item {
                     TimeActionButton {
                         required property var modelData
                         actionRole: modelData.reset ? "cancel" : "time"
-                        width: (parent.parent.width - 6 * parent.parent.spacing) / 7
+                        width: (fullOffsetControls.width - 6 * fullOffsetControls.spacing) / 7
                         height: 32
                         label: modelData.label
                         labelPixelSize: 9

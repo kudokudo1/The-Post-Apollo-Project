@@ -580,6 +580,23 @@ Rectangle {
         stageProcess.running = true;
     }
 
+    // A tab change already refreshes Personal content below. Clicking the
+    // currently selected MESSAGES tab should also request a fresh one-shot
+    // authorized snapshot. Never prompt for new consent, unlock storage,
+    // re-pair, or start concurrent reads just because a tab was clicked.
+    function refreshMessagesTabOnRepeat() {
+        if (!visible || !personalReadUiReady
+                || selectedSection !== "MESSAGES"
+                || personalPermissionOpen || personalRevokeProcess.running)
+            return;
+        if (personalReadProcess.running || personalStatusProcess.running)
+            return; // An in-flight one-shot is already the latest attempt.
+        if (personalApproved && !personalNeedsExplicitReload)
+            loadPersonalSnapshot();
+        else
+            checkPersonalApproval(!personalNeedsExplicitReload, false);
+    }
+
     onSelectedSectionChanged: {
         if (!personalReadUiReady) return;
         if (selectedSection !== "DEVICE") closeStagedSetup();
@@ -2182,7 +2199,13 @@ Rectangle {
                     labelMinimumPixelSize: 8
                     accentColor: Colors.cyan
                     selected: phonePane.selectedSection === modelData
-                    onTriggered: phonePane.selectedSection = modelData
+                    onTriggered: {
+                        if (modelData === "MESSAGES"
+                                && phonePane.selectedSection === "MESSAGES")
+                            phonePane.refreshMessagesTabOnRepeat();
+                        else
+                            phonePane.selectedSection = modelData;
+                    }
                 }
             }
         }
@@ -2415,7 +2438,7 @@ Rectangle {
                     width: parent.width
                     text: modelData.displayNameInProfile || "Unnamed contact"
                     textFormat: Text.PlainText
-                    color: Colors.white
+                    color: Colors.orange
                     font.pixelSize: 11
                     elide: Text.ElideRight
                 }

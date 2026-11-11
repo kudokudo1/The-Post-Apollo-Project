@@ -19,7 +19,10 @@ PanelWindow {
 
     readonly property bool safeToShow:
         authorized && coordinateVerified && runtimeVerified
-        && anchorOutput.length > 0 && anchorOutput === verifiedOutput
+        && overlay.screen !== null && overlay.screen !== undefined
+        && String(overlay.screen.name).length > 0
+        && anchorOutput === String(overlay.screen.name)
+        && verifiedOutput === String(overlay.screen.name)
         && Number.isFinite(anchorX) && Number.isFinite(anchorY)
         && anchorX >= 24 && anchorY >= 24
         && anchorX <= width - 24 && anchorY <= height - 24

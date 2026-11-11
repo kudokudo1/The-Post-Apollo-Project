@@ -33,7 +33,15 @@ cleanup() {
     userdel "$name" >/dev/null 2>&1 || true
   fi
   if [[ "$policy_loaded" == 1 ]]; then
-    timeout --signal=TERM --kill-after=4s 150s semodule -r postapollo_identity_ci >/var/tmp/c4b-id-selinux-unload.log 2>&1 || true
+    echo "C4B_ID_SELINUX_STAGE // before_module_unload" >/dev/ttyS0
+    unload_rc=0
+    timeout --signal=TERM --kill-after=4s 150s semodule -r postapollo_identity_ci >/var/tmp/c4b-id-selinux-unload.log 2>&1 ||
+      unload_rc="$?"
+    printf 'C4B_ID_SELINUX_STAGE // after_module_unload rc=%s\n' "$unload_rc" >/dev/ttyS0
+    if [[ "$unload_rc" != 0 ]]; then
+      sed -n '1,24p' /var/tmp/c4b-id-selinux-unload.log |
+        sed 's/^/C4B_ID_SELINUX_UNLOAD_DETAIL \/\/ /' >/dev/ttyS0 || true
+    fi
   fi
   systemctl reset-failed "$unit" >/dev/null 2>&1 || true
 }
@@ -72,9 +80,14 @@ command -v semodule >/dev/null 2>&1 && command -v chcon >/dev/null 2>&1 ||
 if semodule -l | grep -Eq '^postapollo_identity_ci([[:space:]]|$)'; then
   fail "IDENTITY_SELINUX_MODULE_ALREADY_LOADED"
 fi
+# Mark the potentially expensive kernel policy transition BEFORE invoking
+# semodule. The QEMU host has an independent bounded stall detector to avoid
+# repeatedly waiting for a hung kernel policy reload.
+printf 'C4B_ID_SELINUX_STAGE // before_module_install\n' >/dev/ttyS0
 policy_rc=0
 timeout --signal=TERM --kill-after=4s 150s semodule -i "$policyfile" >/var/tmp/c4b-id-selinux-load.log 2>&1 ||
   policy_rc="$?"
+printf 'C4B_ID_SELINUX_STAGE // after_module_install rc=%s\n' "$policy_rc" >/dev/ttyS0
 if [[ "$policy_rc" != 0 ]]; then
   sed -n '1,24p' /var/tmp/c4b-id-selinux-load.log |
     sed 's/^/C4B_ID_SELINUX_LOAD_DETAIL \/\/ /' >/dev/ttyS0 || true

@@ -32,7 +32,7 @@ Rectangle {
         && typeof weatherService.dailyForecast.length === "number"
         ? weatherService.dailyForecast : []
 
-    height: compact ? 158 : 164
+    height: 164
     color: Colors.dark
     border.width: 1
     border.color: Colors.cyan

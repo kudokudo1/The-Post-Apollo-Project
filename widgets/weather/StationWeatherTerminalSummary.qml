@@ -20,10 +20,12 @@ Rectangle {
     readonly property bool airReady:
         !!weatherService && weatherService.aqiReady === true
     readonly property var hourlySamples:
-        forecastReady && Array.isArray(weatherService.hourlyForecast)
+        forecastReady && weatherService.hourlyForecast
+        && typeof weatherService.hourlyForecast.length === "number"
         ? weatherService.hourlyForecast : []
     readonly property var dailySamples:
-        forecastReady && Array.isArray(weatherService.dailyForecast)
+        forecastReady && weatherService.dailyForecast
+        && typeof weatherService.dailyForecast.length === "number"
         ? weatherService.dailyForecast : []
 
     height: compact ? 158 : 164

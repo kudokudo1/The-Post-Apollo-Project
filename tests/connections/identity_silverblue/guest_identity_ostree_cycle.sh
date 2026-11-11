@@ -185,14 +185,33 @@ ID_MONITOR
       verify_rc="$?"
     if [[ "$verify_rc" != 0 || -s "$verify_file" ]]; then
       printf 'C4B_ID_RPM_VERIFY_RC // %s\n' "$verify_rc" >/dev/ttyS0
-      # Prefix each nonempty rpm -V line so the host's bounded marker
-      # extraction retains the actual discrepancy through QEMU shutdown.
+      # Preserve every bounded diagnostic record through the host collector.
       sed -n '1,24p' "$verify_file" |
         sed -E 's/^/C4B_ID_RPM_VERIFY_DETAIL \/\/ /' >/dev/ttyS0 || true
       if [[ ! -s "$verify_file" ]]; then
         echo "C4B_ID_RPM_VERIFY_DETAIL // NO_STDOUT_OR_STDERR" >/dev/ttyS0
       fi
+    fi
+    # Full signed-rpmdb verification above must show ONLY timestamp changes
+    # on exact allowlisted file paths. Invalid flags, unknown or duplicate
+    # paths and unexplained nonzero errors still fail closed. This is not
+    # permission to suppress payload digest, owner, mode or path checks.
+    helper=/usr/local/libexec/postapollo-id-ci-verify-rpm.py
+    [[ -f "$helper" && ! -L "$helper" && "$(stat -c '%u:%g:%a' "$helper")" == '0:0:444' ]] ||
+      fail "GUEST_RPM_VERIFIER_HELPER_MISSING_OR_MODIFIED_MODE"
+    python3 -I -B "$helper" "$verify_file" "$verify_rc" ||
       fail "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_REFUSED"
+    # Secondary RPM verifier must return strictly clean when mtime-only
+    # comparison is excluded; never override a rejection above.
+    nomtime_file=/var/tmp/id-ci-booted-rpm-nomtime.log
+    nomtime_rc=0
+    timeout --signal=TERM --kill-after=3s 35s rpm -V --nomtime "$pkg" >"$nomtime_file" 2>&1 ||
+      nomtime_rc="$?"
+    if [[ "$nomtime_rc" != 0 || -s "$nomtime_file" ]]; then
+      echo "C4B_ID_RPM_NOMTIME_RC // $nomtime_rc" >/dev/ttyS0
+      sed -n '1,24p' "$nomtime_file" |
+        sed -E 's/^/C4B_ID_RPM_NOMTIME_DETAIL \/\/ /' >/dev/ttyS0 || true
+      fail "SIGNED_IDENTITY_BOOTED_RPM_NON_TIMESTAMP_DISCREPANCY"
     fi
     echo "C4B_ID_PASS // SIGNED_INSTALLED_IDENTITY_RPM_FILE_DIGESTS_AND_MODES"
     for name in identity-gateway-ci desktop_command_gateway_v0.py \

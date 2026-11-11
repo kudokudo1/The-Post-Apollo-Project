@@ -535,7 +535,9 @@ Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 0
                         GohuText {
+                            id: dayTemperature
                             width: parent.width
+                            height: dayStrip.height>36 ? 13 : 10
                             text: panel.date(day.entry.date)+"  "+
                                   panel.reading(day.entry.maxTempF,"°")+"/"+
                                   panel.reading(day.entry.minTempF,"°F")
@@ -543,8 +545,30 @@ Rectangle {
                             color: Colors.white
                             elide: Text.ElideRight
                         }
+                        // W19 // A daily peak uses the same orange-on-cyan
+                        // probability bar as the six hourly periods.
+                        Rectangle {
+                            id: dayRainMeter
+                            objectName: "weather-w19-daily-rain-meter"
+                            width: Math.max(0,parent.width-6)
+                            height: dayStrip.height>36 ? 6 : 5
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            color: Colors.black
+                            border.width: 1
+                            border.color: Colors.cyan
+                            Rectangle {
+                                x: 1
+                                y: 1
+                                height: Math.max(0,parent.height-2)
+                                width: Math.max(0,(parent.width-2)*
+                                      panel.ratio(day.entry.chanceRain,100))
+                                color: Colors.orange
+                            }
+                        }
                         GohuText {
+                            id: dayChance
                             width: parent.width
+                            height: dayStrip.height>36 ? 10 : 8
                             text: panel.percent(day.entry.chanceRain)+" PEAK RAIN"
                             font.pixelSize: 7
                             color: Colors.cyan

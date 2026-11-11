@@ -42,6 +42,8 @@ class V2ArchiveUiContractTests(unittest.TestCase):
         self.assertIn('label: "FIND V2"', QML)
         self.assertIn('V2 SEARCH NOT APPLIED // PRESS FIND V2', QML)
         self.assertIn('reply.query !== archiveV2PendingQuery', QML)
+        self.assertIn('String(row.ownerId || "")', QML)
+        self.assertIn('String(row.resourceId || "")', QML)
         self.assertIn('onAccepted: trashLauncher.refreshArchiveV2(', QML)
         self.assertIn('!trashLauncher.archiveV2QueryDirty', QML)
         self.assertIn('selected !== "all" && selected !== "copies"', QML)

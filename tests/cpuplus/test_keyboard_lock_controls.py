@@ -38,12 +38,12 @@ class KeyboardLockControls(unittest.TestCase):
         self.assertIn("queuedDocument", SERVICE)
         self.assertIn("profileInstalled", SERVICE)
         self.assertIn("LED PROXY // NOT VERIFIED XKB STATE", PANE)
-        self.assertIn("LAST-USED KEY STATE // NOT IMPLEMENTED", PANE)
+        self.assertIn("REMEMBER = SAVE OBSERVED CHANGES", PANE)
         self.assertIn("NEXT_SWAY_START", HOST)
         self.assertIn("runtime_changed", HOST)
 
     def test_opt_in_no_sway_reload_and_explicit_confirm(self):
-        self.assertIn("function prepareApply()", SERVICE)
+        self.assertIn("function prepareApply(savedNum, savedCaps)", SERVICE)
         self.assertIn("function requestApply()", SERVICE)
         self.assertIn("if (!confirmRequired || !canApply)", SERVICE)
         self.assertIn('label: "CONFIRM INSTALL"', PANE)

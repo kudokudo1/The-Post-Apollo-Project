@@ -40,7 +40,7 @@ function context(override={}) {
         snapshotRecordId:"",snapshotSourceKind:"",
         snapshotIdentifier:"",snapshotTimestamp:"",
         snapshotWitness:"",snapshotStatus:"IDLE",
-        researchBusy:false,archiveBusy:false,busy:false,
+        researchBusy:false,archiveBusy:false,archiveChainBusy:false,busy:false,
         confirmMode:"",researchBurnId:"",burnUiStage:"",
         archiveRows:[r],
         archiveSearchText:"",

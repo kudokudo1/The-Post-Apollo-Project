@@ -43,6 +43,8 @@ jobs:
         run: node --test tests/trash/test_archive_snapshot_state.cjs
       - name: Verify capacity bar tracks actual read-only SQLite storage measurements
         run: node --test tests/trash/test_archive_capacity_bar.cjs
+      - name: Verify on-demand provenance chain audit UI and unsigned result safety
+        run: node --test tests/trash/test_archive_chain_state.cjs
       - name: Verify two-click Burn state machine never deletes on first click
         run: node --test tests/trash/test_burn_copy_two_click.cjs
       - name: Verify managed-bin-only Burn All and unified Trash filters

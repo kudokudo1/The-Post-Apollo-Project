@@ -74,6 +74,11 @@ PanelWindow {
     property string archiveV2PendingCursor: ""
     property string archiveV2AppliedQuery: ""
     property string archiveV2PendingQuery: ""
+    // V2j: intentionally on-demand. A complete metadata-chain audit can be
+    // expensive; it must never be mislabeled as payload or signed verification.
+    property bool archiveChainBusy: false
+    property var archiveChainReport: null
+    property string archiveChainState: "NOT AUDITED"
 
     // Only the two allowlisted source-row pilots can make a V2 snapshot.
     // Preview reads the owner and returns a witness; the second explicit
@@ -252,8 +257,12 @@ PanelWindow {
     }
 
     function refreshArchiveV2(targetPage, cursor, query) {
-        if (!menuOpen || activeMode !== "archive" || archiveV2Busy)
+        if (!menuOpen || activeMode !== "archive"
+                || archiveV2Busy || archiveChainBusy)
             return false;
+        // The index may have changed since the last full audit.
+        archiveChainReport = null;
+        archiveChainState = "NOT AUDITED";
         const requested = Number(targetPage);
         const token = String(cursor || "");
         const needle = typeof query === "string"
@@ -277,6 +286,65 @@ PanelWindow {
             "index", Quickshell.dataDir, token, needle
         ]);
         return true;
+    }
+
+    function auditArchiveChain() {
+        if (!menuOpen || activeMode !== "archive" || archiveChainBusy
+                || snapshotBusy || archiveV2Busy || researchBusy || busy)
+            return false;
+        archiveChainBusy = true;
+        archiveChainReport = null;
+        archiveChainState = "AUDITING // READ ONLY";
+        archiveChainProcess.exec([
+            "python3", "-I", "-B",
+            Quickshell.shellPath("scripts/trash/archive_v2_chain_audit.py"),
+            "audit", Quickshell.dataDir
+        ]);
+        return true;
+    }
+
+    function consumeArchiveChain(raw) {
+        if (!archiveChainBusy)
+            return;
+        archiveChainBusy = false;
+        let reply = null;
+        try { reply = JSON.parse(String(raw || "").trim()); }
+        catch (error) {
+            archiveChainReport = null;
+            archiveChainState = "FAILED // INVALID AUDIT RESPONSE";
+            return;
+        }
+        if (!reply || reply.ok !== true || reply.kind !== "archive-v2-chain-audit"
+                || reply.readOnly !== true || reply.payloadVerified !== false
+                || reply.authentication !== "UNSIGNED_LOCAL"
+                || reply.completeness !== "DATABASE_LOCAL_ONLY"
+                || ["NOT_INSTALLED", "EMPTY", "LEGACY_ONLY", "CHAIN_CONSISTENT"]
+                    .indexOf(reply.state) < 0
+                || !Number.isInteger(reply.snapshotCount) || reply.snapshotCount < 0
+                || !Number.isInteger(reply.receiptCount) || reply.receiptCount < 0
+                || !Number.isInteger(reply.legacyCount) || reply.legacyCount < 0
+                || !Number.isInteger(reply.sourceCount) || reply.sourceCount < 0
+                || reply.snapshotCount !== reply.receiptCount + reply.legacyCount
+                || reply.sourceCount > reply.snapshotCount
+                || (reply.state === "NOT_INSTALLED" && reply.snapshotCount !== 0)
+                || (reply.state === "EMPTY" && reply.snapshotCount !== 0)
+                || (reply.state === "LEGACY_ONLY"
+                    && (reply.receiptCount !== 0 || reply.snapshotCount === 0))
+                || (reply.state === "CHAIN_CONSISTENT" && reply.receiptCount === 0)) {
+            archiveChainReport = null;
+            const code = reply && typeof reply.error === "string"
+                && /^[A-Z0-9_]{1,80}$/.test(reply.error)
+                ? reply.error : "CHAIN_AUDIT_REFUSED";
+            archiveChainState = "FAILED // " + code;
+            return;
+        }
+        archiveChainReport = reply;
+        archiveChainState = reply.state === "CHAIN_CONSISTENT"
+            ? "LOCAL CHAIN CONSISTENT // UNSIGNED"
+            : reply.state === "LEGACY_ONLY"
+            ? "LEGACY ONLY // NO RECEIPTS"
+            : reply.state === "EMPTY" ? "EMPTY ARCHIVE // NO RECEIPTS"
+            : "NO ARCHIVE DATABASE";
     }
 
     function pageArchiveV2(direction) {
@@ -479,7 +547,8 @@ PanelWindow {
 
     function requestSnapshot(row) {
         if (!menuOpen || activeMode !== "archive" || snapshotBusy
-                || busy || researchBusy || archiveBusy || confirmMode !== ""
+                || busy || researchBusy || archiveBusy || archiveChainBusy
+                || confirmMode !== ""
                 || researchBurnId !== "" || burnUiStage !== "")
             return false;
         const source = snapshotSource(row);
@@ -1157,6 +1226,25 @@ PanelWindow {
                     trashLauncher.archiveV2Rows = [];
                     trashLauncher.archiveCapacity = null;
                     trashLauncher.archiveV2State = "STALE // COPY INDEX PROCESS FAILED";
+                }
+            });
+        }
+    }
+
+    // V2j: separate metadata-only global audit, no payload or write verbs.
+    Process {
+        id: archiveChainProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: trashLauncher.consumeArchiveChain(this.text)
+        }
+        onExited: function(code, status) {
+            Qt.callLater(function() {
+                if (trashLauncher.archiveChainBusy) {
+                    trashLauncher.archiveChainBusy = false;
+                    trashLauncher.archiveChainReport = null;
+                    trashLauncher.archiveChainState =
+                        "FAILED // CHAIN AUDIT PROCESS";
                 }
             });
         }
@@ -1937,13 +2025,26 @@ PanelWindow {
                             height: 28
                             spacing: 8
                             GohuText {
-                                width: parent.width - 100
+                                width: Math.max(80, parent.width - 200)
                                 height: parent.height
                                 color: Colors.yellow
                                 font.pixelSize: 12
                                 verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
                                 text: "ARCHIVE // " + trashLauncher.archiveFilteredRows.length
                                       + " VISIBLE"
+                            }
+                            ActionButton {
+                                width: 90
+                                height: 27
+                                label: trashLauncher.archiveChainBusy
+                                       ? "AUDITING" : "VERIFY CHAIN"
+                                labelPixelSize: 9
+                                accentColor: Colors.magenta
+                                available: !trashLauncher.archiveChainBusy
+                                           && !trashLauncher.archiveV2Busy
+                                           && !trashLauncher.snapshotBusy
+                                onLeftClicked: trashLauncher.auditArchiveChain()
                             }
                             ActionButton {
                                 width: 92
@@ -1953,6 +2054,7 @@ PanelWindow {
                                 labelPixelSize: 10
                                 accentColor: Colors.green
                                 available: !trashLauncher.archiveBusy
+                                           && !trashLauncher.archiveChainBusy
                                 onLeftClicked: {
                                     trashLauncher.refreshArchive();
                                     trashLauncher.refreshResearch();
@@ -2070,6 +2172,30 @@ PanelWindow {
                         }
 
                         GohuText {
+                            id: archiveChainAuditStatus
+                            width: parent.width
+                            height: 23
+                            font.pixelSize: trashLauncher.chassisSize === "compact" ? 10 : 12
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                            color: trashLauncher.archiveChainState.indexOf("FAILED") === 0
+                                   ? Colors.red
+                                   : trashLauncher.archiveChainReport
+                                     && trashLauncher.archiveChainReport.state
+                                        === "CHAIN_CONSISTENT"
+                                   ? Colors.green : Colors.orange
+                            text: "CHAIN // " + trashLauncher.archiveChainState
+                                  + (trashLauncher.archiveChainReport
+                                     ? " // " + trashLauncher.archiveChainReport.receiptCount
+                                       + " RECEIPTS // "
+                                       + trashLauncher.archiveChainReport.legacyCount
+                                       + " LEGACY // "
+                                       + trashLauncher.archiveChainReport.sourceCount
+                                       + " SOURCES // PAYLOAD NOT CHECKED"
+                                     : "")
+                        }
+
+                        GohuText {
                             width: parent.width
                             height: 17
                             font.pixelSize: 9
@@ -2156,7 +2282,7 @@ PanelWindow {
                             height: Math.max(trashLauncher.chassisSize === "compact"
                                 ? 50 : 65, archiveRecordsView.height
                                 - (trashLauncher.snapshotStatus === "IDLE" ? 241 : 258)
-                                - (trashLauncher.chassisSize === "compact" ? 9 : 51))
+                                - (trashLauncher.chassisSize === "compact" ? 34 : 76))
                             ListView {
                                 id: archiveEntriesList
                                 width: parent.width - 17

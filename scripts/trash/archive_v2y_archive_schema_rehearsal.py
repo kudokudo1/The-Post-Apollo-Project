@@ -90,9 +90,32 @@ def _fixture_marker(root):
     _require(data == MARKER_CONTENT, "V2Y_FIXTURE_MARKER_INVALID")
 
 
-def _schema_columns(db):
-    return tuple(row[1] for row in db.execute(
-        "PRAGMA table_info(fixture_signed_admissions)"))
+def _valid_admission_schema(db):
+    """Refuse lookalike tables missing the nonce uniqueness or snapshot FK."""
+    columns = db.execute(
+        "PRAGMA table_info(fixture_signed_admissions)").fetchall()
+    if (tuple(row[1] for row in columns) != EXPECTED_ADMISSION_COLUMNS
+            or columns[0][5] != 1
+            or any(row[3] != 1 for row in columns[1:])):
+        return False
+    foreign_keys = db.execute(
+        "PRAGMA foreign_key_list(fixture_signed_admissions)").fetchall()
+    if not any(row[2] == "snapshots"
+               and row[3] == "snapshot_id" and row[4] == "id"
+               for row in foreign_keys):
+        return False
+    indices = db.execute(
+        "PRAGMA index_list(fixture_signed_admissions)").fetchall()
+    for index in indices:
+        if index[2] != 1:
+            continue
+        # SQLite does not accept bound parameters for PRAGMA index_info.
+        identifier = index[1].replace('"', '""')
+        fields = db.execute(
+            'PRAGMA index_info("' + identifier + '")').fetchall()
+        if tuple(row[2] for row in fields) == ("owner_id","key_id","nonce"):
+            return True
+    return False
 
 
 class TestArchiveStoreAdmissionV2y:
@@ -130,7 +153,7 @@ class TestArchiveStoreAdmissionV2y:
                     signature_b64 TEXT NOT NULL,
                     UNIQUE(owner_id,key_id,nonce)
                 )""")
-                _require(_schema_columns(db) == EXPECTED_ADMISSION_COLUMNS,
+                _require(_valid_admission_schema(db),
                          "V2Y_ADMISSION_SCHEMA_UNSUPPORTED")
                 db.execute("""CREATE TABLE IF NOT EXISTS fixture_admission_meta(
                     id INTEGER PRIMARY KEY CHECK(id=1),

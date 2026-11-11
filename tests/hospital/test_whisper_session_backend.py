@@ -160,9 +160,9 @@ class PersistentWhisperTests(unittest.TestCase):
         fast, fast_type = backend.multipart_audio(
             fake_pcm, "fake context", decoder_mode="FAST")
         self.assertNotIn(b'name="best_of"', standard)
-        self.assertIn(b'name="best_of"\\r\\n\\r\\n1\\r\\n', fast)
-        self.assertIn(b'name="prompt"\\r\\n\\r\\nfake context', standard)
-        self.assertIn(b'name="prompt"\\r\\n\\r\\nfake context', fast)
+        self.assertIn(b'name="best_of"\r\n\r\n1\r\n', fast)
+        self.assertIn(b'name="prompt"\r\n\r\nfake context', standard)
+        self.assertIn(b'name="prompt"\r\n\r\nfake context', fast)
         self.assertIn("multipart/form-data", standard_type)
         self.assertIn("multipart/form-data", fast_type)
         with self.assertRaises(ValueError):

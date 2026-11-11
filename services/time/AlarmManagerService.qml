@@ -32,6 +32,7 @@ Scope {
     property double lastRecoveryAtMs: 0
     property double lastRecoveryGapMs: 0
     property string lastRecoveryText: "NOT CHECKED"
+    property bool recoveryNoteworthy: false
     // SoundEffect.playing only describes the Qt backend, not the speakers.
     // An IDLE value must be restored after previews, stops and unloading.
     property string audioState: "IDLE"
@@ -377,6 +378,8 @@ Scope {
         if (restarting || resumedAfterGap) {
             lastRecoveryAtMs = manager.nowMs;
             lastRecoveryGapMs = resumedAfterGap ? gapMs : 0;
+            recoveryNoteworthy = resumedAfterGap
+                || r.started.length > 0 || r.missed.length > 0;
             lastRecoveryText = (restarting ? "RESTART" : "TIMER GAP")
                 + " // " + r.started.length + " RANG"
                 + " // " + r.missed.length + " MISSED";

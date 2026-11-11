@@ -86,6 +86,7 @@ test("rejected or fabricated response cannot mark Archive verified",()=>{
         {...clean,snapshotCount:999},
         {...clean,receiptCount:0},
         {...clean,state:"AUDIT_PARTIAL"},
+        {...clean,state:"EMPTY"},
         {...clean,sourceCount:999},
         {...clean,completeness:"EXTERNAL_AUTHORITY"}
     ]) {
@@ -117,6 +118,10 @@ test("legacy-only and not-installed states remain explicitly unsigned and limite
     complete(ctx,{...clean,state:"NOT_INSTALLED",snapshotCount:0,
         receiptCount:0,legacyCount:0,sourceCount:0});
     assert.equal(ctx.archiveChainState,"NO ARCHIVE DATABASE");
+    vm.runInContext("auditArchiveChain()",ctx);
+    complete(ctx,{...clean,state:"EMPTY",snapshotCount:0,
+        receiptCount:0,legacyCount:0,sourceCount:0});
+    assert.equal(ctx.archiveChainState,"EMPTY ARCHIVE // NO RECEIPTS");
 });
 
 test("visible status and button are embedded in Archive without an extra window",()=>{

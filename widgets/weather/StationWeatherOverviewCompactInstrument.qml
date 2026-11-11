@@ -111,8 +111,8 @@ Rectangle {
 
     height: 164
     color: Colors.dark
-    border.width: 1
-    border.color: Colors.cyan
+    // Parent StationWeatherTerminalSummary already draws the outer frame.
+    border.width: 0
     clip: true
 
     Column {

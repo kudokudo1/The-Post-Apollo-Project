@@ -69,8 +69,11 @@ def build_fake_runtime(root: Path):
         import json, os, pathlib, socketserver, sys
         from http.server import BaseHTTPRequestHandler
         if "--help" in sys.argv:
-            print("--host unix socket path ending .sock --no-gpu --no-context")
+            print("--host unix socket path ending .sock --no-gpu")
             sys.exit(0)
+        # Match upstream whisper-server, which does not accept "-nc".
+        assert "-nc" not in sys.argv, "unsupported option -nc"
+        assert "-ng" in sys.argv and "-t" in sys.argv
         path = sys.argv[sys.argv.index("--host") + 1]
         assert path.startswith("/") and path.endswith(".sock")
         with open(os.environ["TEST_SERVER_STARTS"], "a") as file:
@@ -235,6 +238,8 @@ class PersistentWhisperTests(unittest.TestCase):
         self.assertIn("not os.path.lexists(resource_path)", guard)
         self.assertIn('exec "$server" -m "$model" --host "$socket_path"', helper)
         self.assertIn("-ng -t 2 -p 1", helper)
+        self.assertNotIn(" -nt -nc", helper)
+        self.assertNotIn('&& "$help_text" == *"--no-context"*', helper)
         self.assertIn("property bool safetyHold: true", qml)
         self.assertIn("preferPersistentModel: true", host)
         self.assertIn("pilotLiveChunks: 6", host)

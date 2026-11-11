@@ -13,6 +13,9 @@ Scope {
     // live dictation. Do not enable real microphones merely because CI passes.
     // Explicit operator + host verification is required before setting false.
     property bool safetyHold: true
+    // Only HospitalW may opt into the operator-approved one-chunk trial.
+    // The standalone engine remains held unless an owning host enables it.
+    property bool pilotOneChunk: false
     property string lastError: ""
     property string lastTranscript: ""
     // Short lifecycle code only, never spoken words or audio. A few stage
@@ -89,6 +92,8 @@ Scope {
             "--chunk-seconds", String(Math.max(2, Math.min(4, chunkSeconds))),
             "--first-chunk-ms", String(Math.max(1000,
                 Math.min(chunkSeconds * 1000, firstChunkMs)))];
+        if (pilotOneChunk)
+            command.push("--pilot-one-chunk");
         if (vadActive) {
             command.push("--vad", "--threshold", String(vadSpeechThreshold),
                 "--silence-ms", String(vadSilenceMs),
@@ -96,6 +101,8 @@ Scope {
         }
         liveProcess.exec(command);
         clock.restart();
+        if (pilotOneChunk)
+            pilotWatchdog.restart();
         return true;
     }
 
@@ -110,6 +117,7 @@ Scope {
     }
 
     function cancel() {
+        pilotWatchdog.stop();
         wasCancelled = true;
         doneSeen = false;
         clock.stop();
@@ -190,6 +198,18 @@ Scope {
         }
     }
     Timer {
+        id: pilotWatchdog
+        interval: 20000
+        repeat: false
+        onTriggered: {
+            if (root.busy) {
+                root.lastError = "LIVE MICROPHONE PILOT TIME LIMIT // CANCELLED";
+                root.cancel();
+                root.voiceError(root.lastError);
+            }
+        }
+    }
+    Timer {
         id: cancelWatchdog
         interval: 1800
         repeat: false
@@ -220,6 +240,7 @@ Scope {
         }
         onExited: function(code, status) {
             cancelWatchdog.stop();
+            pilotWatchdog.stop();
             if (root.wasCancelled)
                 return;
             root.recordingStartedAt = 0;

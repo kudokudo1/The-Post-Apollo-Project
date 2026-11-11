@@ -59,6 +59,7 @@ class ArchiveCapacityTests(unittest.TestCase):
             capacity(self.root)
         db.unlink()
         db.write_bytes(b"synthetic")
+        db.chmod(0o644)
         with self.assertRaisesRegex(CapacityError, "ARCHIVE_FILE_UNSAFE"):
             capacity(self.root)
         db.chmod(0o600)

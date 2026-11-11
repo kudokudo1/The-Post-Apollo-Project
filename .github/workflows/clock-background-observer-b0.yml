@@ -55,7 +55,13 @@ jobs:
             // B0 does not make a backward claim about when a legacy alarm
             // was armed. A future BG-1 handoff will supply this exact cursor.
             assert.equal(observe(doc,now),'FUTURE');
-            assert.equal(observe(doc,due+1000),'UNKNOWN_ARM_TIME');
+            // Fresh V2 alarms now have durable arming timestamps because
+            // restart/recovery PR #1868 merged into main. Legacy V2 docs
+            // without those optional fields still remain uncertain.
+            const legacy=JSON.parse(JSON.stringify(doc));
+            delete legacy.alarms[0].armedAtMs;
+            delete legacy.alarms[0].lastProcessedDueMs;
+            assert.equal(observe(legacy,due+1000),'UNKNOWN_ARM_TIME');
             const fenced=JSON.parse(JSON.stringify(doc));
             fenced.alarms[0].armedAtMs=now;
             assert.equal(observe(fenced,due+1000),'ELIGIBLE_IF_OWNED');

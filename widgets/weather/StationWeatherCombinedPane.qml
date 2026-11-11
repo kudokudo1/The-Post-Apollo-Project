@@ -13,7 +13,7 @@ Rectangle {
     readonly property alias hourlyItem: hourlyBand
     readonly property alias dailyItem: dailyBand
     readonly property alias hourRepeater: hourlyRepeater
-    readonly property alias dayRepeater: dayRepeater
+    readonly property alias dayCardsRepeater: dayRepeater
     readonly property alias footerItem: statusFooter
     color: Colors.black
     clip: true

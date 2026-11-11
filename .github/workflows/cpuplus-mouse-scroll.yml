@@ -46,6 +46,11 @@ on:
       - "tests/cpuplus/fixtures/MouseScrollNative.qml"
       - "scripts/cpuplus/verify_mouse_scroll_native.sh"
       - ".github/workflows/cpuplus-mouse-scroll.yml"
+  # Recheck isolated autoscroll branches even when dependent PR checks
+  # are delayed or skipped by the GitHub Actions PR event scheduler.
+  push:
+    branches:
+      - "cpuplus/autoscroll-*"
   workflow_dispatch:
 
 permissions:

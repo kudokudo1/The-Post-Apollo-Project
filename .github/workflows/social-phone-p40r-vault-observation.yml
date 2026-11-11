@@ -1,0 +1,40 @@
+name: Social PHONE P40R Read-Only Vault Observation (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhonePersonalVaultRecoveryP40R.py'
+      - 'tests/phone/test_phone_personal_vault_recovery_p40r.py'
+      - 'MODEL/contracts/social-phone-p40r-vault-recovery-observation-v0.md'
+      - '.github/workflows/social-phone-p40r-vault-observation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhonePersonalVaultRecoveryP40R.py'
+      - 'tests/phone/test_phone_personal_vault_recovery_p40r.py'
+      - 'MODEL/contracts/social-phone-p40r-vault-recovery-observation-v0.md'
+      - '.github/workflows/social-phone-p40r-vault-observation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-read-only-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: CI-only crypto dependency
+        run: python -m pip install cryptography==50.0.2
+      - name: Compile dormant PHONE observer and sealed vault
+        run: |
+          python -m py_compile services/phone/PhonePersonalVaultRecoveryP40R.py
+          python -m py_compile services/phone/PhonePersonalContactVault.py
+      - name: Synthetic uncertain-ack and refusal tests
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_vault_recovery_p40r.py' -v
+      - name: Existing P35 encrypted-store regression
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_contact_vault.py' -v

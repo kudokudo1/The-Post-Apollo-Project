@@ -243,6 +243,11 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             'userdel "$name"',
             'REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP',
             'NO_PRODUCTION_RELEASE_ENROLLMENT_OR_C5_OPERATOR_CONSENT',
+            'socket.SO_PEERCRED',
+            'pinned_start=start_ticks()',
+            'check_origin(f"before {action}")',
+            'check_origin(f"after {action}")',
+            'KERNEL_PEER_PID_START_AND_SUPERVISOR_RECHECKED_FOR_FOUR_SIGNED_DENIALS',
         ):
             self.assertIn(needle, probe)
         self.assertNotIn("https://", probe)

@@ -9,12 +9,14 @@ on:
       - "services/time/MachineBraveRequestCancellation.py"
       - "services/time/MachineBraveProtectedArchivePreflight.py"
       - "tests/timew/test_machine_brave_protected_metadata_contract.py"
+      - "tests/timew/test_machine_protected_destination_rollback.py"
       - "tests/timew/test_machine_brave_archive_admission_intent.py"
       - "tests/timew/test_machine_brave_process_lease.py"
       - "tests/timew/test_machine_brave_request_cancellation.py"
       - "tests/timew/test_machine_brave_absolute_frame_deadline.py"
       - "tests/timew/test_machine_brave_protected_archive_preflight.py"
       - "docs/timew-machine-protected-metadata-broker.md"
+      - "docs/timew-machine-protected-destination-rollback.md"
       - "docs/timew-machine-process-lifecycle.md"
       - "docs/timew-machine-request-cancellation.md"
       - "docs/timew-machine-absolute-frame-deadline.md"
@@ -43,6 +45,8 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_brave_protected_archive_preflight.py
       - name: CI-only privileged distinct-UID kernel permission denial and metadata contract
         run: sudo -n python3 -B -I tests/timew/test_machine_brave_protected_metadata_contract.py
+      - name: CI-only separate-UID protected destination and injected ciphertext staging rollback
+        run: sudo -n python3 -B -I tests/timew/test_machine_protected_destination_rollback.py
       - name: Existing offline archive, ciphertext and safety regressions
         run: |
           python3 -B -I tests/timew/test_machine_brave_offline_archive_manager.py

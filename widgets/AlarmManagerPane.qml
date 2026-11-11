@@ -87,7 +87,9 @@ Item {
         return true;
     }
     function openNote(id) {
-        if (!choose(id)) return;
+        // The note button for the already-selected row must not reset
+        // unsaved time/name/day edits; switching rows still checks drafts.
+        if (id !== selectedId && !choose(id)) return;
         settingsTab = "note";
         alarmNote.forceActiveFocus();
     }
@@ -209,8 +211,8 @@ Item {
         if (idx < 0)
             idx = delta > 0 ? -1 : rows.length;
         idx = Math.max(0, Math.min(rows.length - 1, idx + delta));
-        choose(rows[idx].id);
-        alarmList.positionViewAtIndex(idx, ListView.Contain);
+        if (choose(rows[idx].id))
+            alarmList.positionViewAtIndex(idx, ListView.Contain);
     }
     function removeById(id) {
         if (!AlarmManagerService.canEdit) return;

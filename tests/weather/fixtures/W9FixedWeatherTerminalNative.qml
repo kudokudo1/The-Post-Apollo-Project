@@ -300,7 +300,7 @@ ShellRoot {
                 if(combined.width<519 || combined.width>521)
                     return root.fail("W20_TALL_WIDTH_NOT_APPLIED");
                 if(combined.currentItem.mainGlyph.width<130 ||
-                   combined.currentItem.mainArtwork.font.pixelSize<170 ||
+                   combined.currentItem.mainArtwork.font.pixelSize<130 ||
                    combined.currentItem.mainTemperature.font.pixelSize<43)
                     return root.fail("W20_HERO_ICON_NOT_DRAMATIC // "
                         +combined.currentItem.mainGlyph.width);

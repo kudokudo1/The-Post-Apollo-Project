@@ -181,11 +181,17 @@ class LiveDictationTests(unittest.TestCase):
             try:
                 selector.register(process.stdout, selectors.EVENT_READ)
                 partial = None
+                stage_codes = []
                 deadline = time.monotonic() + 8
                 while time.monotonic() < deadline:
                     if not selector.select(timeout=0.5):
                         continue
                     event = json.loads(process.stdout.readline())
+                    if event["kind"] == "stage":
+                        self.assertEqual(event["text"], "")
+                        self.assertRegex(event["detail"], r"^[A-Z_]+$")
+                        stage_codes.append(event["detail"])
+                        continue
                     if event["kind"] == "partial":
                         partial = event["text"]
                         self.assertIsNone(process.poll(), "Mic must remain open")
@@ -193,6 +199,11 @@ class LiveDictationTests(unittest.TestCase):
                     if event["kind"] == "error":
                         self.fail(str(event))
                 self.assertEqual(partial, "First words while listening.")
+                self.assertTrue({
+                    "RECORDER_STARTED", "FIRST_AUDIO_QUEUED",
+                    "FIRST_MODEL_STARTED", "FIRST_MODEL_ENDED",
+                    "FIRST_TEXT_READY",
+                }.issubset(set(stage_codes)), stage_codes)
                 process.stdin.write("STOP\n")
                 process.stdin.flush()
                 process.stdin.close()

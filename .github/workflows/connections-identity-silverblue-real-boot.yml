@@ -99,51 +99,52 @@ jobs:
             --mount "type=bind,src=$PWD,dst=/src,readonly" \
             --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-boot-rpm,dst=/input,readonly" \
             fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/verify_signed_identity_gateway.sh
-      - name: Install ephemeral QEMU and official Silverblue installer prerequisites
+      - name: Real official offline Silverblue VM in disposable Fedora 44 KVM container
         shell: bash
         run: |
           set -euo pipefail
-          # GitHub's transient Ubuntu Azure HTTP mirror can become unreachable.
-          # Retry only with Canonical's official HTTPS Ubuntu repositories,
-          # retaining archive-keyring signature verification. Never disable
-          # APT certificate checks or trust unsigned packages.
-          apt_opts=(-o Acquire::Retries=2 -o Acquire::http::Timeout=25 -o Acquire::https::Timeout=25)
-          if timeout 150s sudo apt-get "${apt_opts[@]}" update; then
-            echo "C4B_ID_PASS // RUNNER_APT_DEFAULT_MIRROR_READY"
-          else
-            test -f /usr/share/keyrings/ubuntu-archive-keyring.gpg ||
-              { echo "C4B_ID_BLOCKED // OFFICIAL_UBUNTU_ARCHIVE_KEYRING_ABSENT"; exit 2; }
-            fallback_sources="$RUNNER_TEMP/c4b-identity-ubuntu-https.sources"
-            cat >"$fallback_sources" <<'C4B_UBUNTU_SIGNED_HTTPS'
-          Types: deb
-          URIs: https://archive.ubuntu.com/ubuntu/
-          Suites: noble noble-updates noble-backports
-          Components: main restricted universe multiverse
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-
-          Types: deb
-          URIs: https://security.ubuntu.com/ubuntu/
-          Suites: noble-security
-          Components: main restricted universe multiverse
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-          C4B_UBUNTU_SIGNED_HTTPS
-            apt_opts+=(-o "Dir::Etc::sourcelist=$fallback_sources" -o "Dir::Etc::sourceparts=-" -o APT::Get::List-Cleanup=0)
-            timeout 200s sudo apt-get "${apt_opts[@]}" update ||
-              { echo "C4B_ID_BLOCKED // OFFICIAL_SIGNED_HTTPS_RUNNER_APT_UPDATE"; exit 2; }
-            echo "C4B_ID_PASS // RUNNER_APT_OFFICIAL_SIGNED_HTTPS_FALLBACK_READY"
-          fi
-          timeout 360s sudo apt-get "${apt_opts[@]}" install \
-            -y --no-install-recommends qemu-system-x86 qemu-utils xorriso genisoimage ||
-            { echo "C4B_ID_BLOCKED // RUNNER_APT_INSTALL"; exit 2; }
-      - name: Real official Silverblue boot signed Identity RPM layer and rollback
-        shell: bash
-        run: |
-          set -euo pipefail
+          # The GitHub Ubuntu host's APT DNS was unavailable even on official
+          # signed HTTPS fallback. Fedora 44 package installation already
+          # succeeds in our isolated build steps, so isolate QEMU there too.
+          # Host /dev/kvm is the ONLY additional passed-through device.
+          # The Silverblue *guest* still receives -nic none (no network).
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_ACTOR" = kudokudo1
+          test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm ||
+            { echo "C4B_ID_BLOCKED // HOST_KVM_NOT_AVAILABLE_FOR_CONTAINER"; exit 2; }
           timeout --signal=TERM --kill-after=20s 4200s \
-            /usr/bin/bash tests/connections/identity_silverblue/run_official_silverblue_identity.sh \
-              "$RUNNER_TEMP/c4b-identity-boot-rpm" \
-              "$RUNNER_TEMP/c4b-identity-fedora-crypto" \
-              "$RUNNER_TEMP/c4b-identity-selinux-policy"
+            docker run --rm \
+              --device=/dev/kvm \
+              --env GITHUB_ACTIONS=true \
+              --env RUNNER_ENVIRONMENT=github-hosted \
+              --env GITHUB_ACTOR="$GITHUB_ACTOR" \
+              --env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1 \
+              --env RUNNER_TEMP=/tmp \
+              --mount "type=bind,src=$PWD,dst=/src,readonly" \
+              --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-boot-rpm,dst=/evidence/rpm,readonly" \
+              --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-fedora-crypto,dst=/evidence/crypto,readonly" \
+              --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-selinux-policy,dst=/evidence/selinux,readonly" \
+              --workdir /src \
+              fedora:44 /usr/bin/bash -c '
+                set -euo pipefail
+                test "$GITHUB_ACTIONS" = true
+                test "$RUNNER_ENVIRONMENT" = github-hosted
+                test "$GITHUB_ACTOR" = kudokudo1
+                test "$POST_APOLLO_ID_SILVERBLUE_CI_ONLY" = 1
+                test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm ||
+                  { echo "C4B_ID_BLOCKED // FEDORA_CONTAINER_KVM_NOT_ACCESSIBLE"; exit 2; }
+                dnf -y --setopt=install_weak_deps=False --setopt=gpgcheck=1 install \
+                  curl qemu-system-x86 qemu-img xorriso genisoimage ||
+                  { echo "C4B_ID_BLOCKED // FEDORA_SIGNED_QEMU_TOOLING_UNAVAILABLE"; exit 2; }
+                for required in curl qemu-system-x86_64 qemu-img xorriso genisoimage; do
+                  command -v "$required" >/dev/null ||
+                    { echo "C4B_ID_BLOCKED // FEDORA_QEMU_TOOLING_INCOMPLETE"; exit 2; }
+                done
+                echo "C4B_ID_PASS // FEDORA44_SIGNED_QEMU_TOOLING_READY"
+                /usr/bin/bash /src/tests/connections/identity_silverblue/run_official_silverblue_identity.sh \
+                  /evidence/rpm /evidence/crypto /evidence/selinux
+              '
       - name: Confirm test did not activate sign-in or production authority
         shell: bash
         run: |

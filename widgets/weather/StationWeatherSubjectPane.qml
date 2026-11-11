@@ -133,6 +133,7 @@ Rectangle {
             readonly property alias renderer: originalSky
             readonly property alias viewport: instrumentViewport
             readonly property alias pageRail: instrumentRail
+            readonly property alias modeHeader: weatherModeHeader
             readonly property alias combinedPanel: combinedDisplay
             readonly property alias solarVisual: solarChart
             readonly property alias twilightGrid: twilightTimingGrid

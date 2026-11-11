@@ -17,7 +17,7 @@ function run(args,options={}){
     cwd:repo,timeout:30000,encoding:"utf8",...options
   });
   assert.equal(p.error,undefined);
-  assert.equal(p.stderr,"");
+  assert.equal(String(p.stderr),"");
   return p;
 }
 const le=endianness()==="LE";

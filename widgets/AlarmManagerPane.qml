@@ -389,7 +389,14 @@ Item {
                         labelPixelSize: 10
                         selected: pane.draftMode === "weekly"
                         accentColor: Colors.cyan
-                        onLeftClicked: pane.draftMode = "weekly"
+                        onLeftClicked: {
+                            pane.draftMode = "weekly";
+                            // A saved one-time alarm can have no weekday set.
+                            // Opening weekly mode should still start with
+                            // today selected, never seven defaults at once.
+                            if (pane.draftDays.length === 0)
+                                pane.draftDays = [new Date().getDay()];
+                        }
                     }
                 }
                 Row {

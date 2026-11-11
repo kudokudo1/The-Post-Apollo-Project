@@ -60,7 +60,8 @@ var GROUPS = {
         {label:"LENSES",path:"magick/planetary/correspondences",key:"lenses"},
         {label:"ASTROLOGY",path:"magick/astrology/charts",key:"astrology"},
         {label:"DIVINATION",path:"magick/divination/tarot",key:"divination"},
-        {label:"GRIMOIRE",path:"magick/grimoire/references",key:"grimoire"}
+        {label:"GRIMOIRE",path:"magick/grimoire/references",key:"grimoire"},
+        {label:"SERVICES",path:"magick/services/health",key:"services"}
     ],
     tools:[
         {label:"OVERVIEW",path:"tools/overview",key:"overview"},

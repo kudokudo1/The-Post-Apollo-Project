@@ -16,6 +16,9 @@ Rectangle {
     property bool embeddedHeader: false
     property string statusScope: familyLabel
     property string headerStatus: ""
+    // Optional descriptors for families that contain instruments but no feed.
+    property string primaryStripLabel: ""
+    property string secondaryStripLabel: ""
     property var runtimeRows: []
     // Directory entries are source inventories, NOT live runtime reports.
     property var directoryRows: []
@@ -122,7 +125,9 @@ Rectangle {
                 GohuText {
                     anchors.centerIn: parent
                     width: Math.max(1,parent.width-8)
-                    text: "LIVE FEED // " + services.statusScope
+                    text: services.primaryStripLabel !== ""
+                          ? services.primaryStripLabel
+                          : "LIVE FEED // " + services.statusScope
                     color: Colors.cyan
                     font.pixelSize: 9
                     horizontalAlignment: Text.AlignHCenter
@@ -138,8 +143,10 @@ Rectangle {
                 GohuText {
                     anchors.centerIn: parent
                     width: Math.max(1,parent.width-8)
-                    text: "SOURCE DIRECTORY // "
-                          + (services.summary.total + services.directoryRows.length)
+                    text: services.secondaryStripLabel !== ""
+                          ? services.secondaryStripLabel
+                          : "SOURCE DIRECTORY // "
+                            + (services.summary.total + services.directoryRows.length)
                     color: Colors.magenta
                     font.pixelSize: 9
                     horizontalAlignment: Text.AlignHCenter
@@ -210,6 +217,7 @@ Rectangle {
                         anchors.fill: parent
                         visible: services.homeCards
                         compact: true
+                        servicesCompact: services.homeCards
                         title: metricEntry.modelData.label || ""
                         valueText: metricEntry.modelData.value || "--"
                         detailText: metricEntry.modelData.detail || ""

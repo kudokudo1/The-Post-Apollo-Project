@@ -6,6 +6,10 @@
 // No astrology ephemeris, ritual clock, saved journal or tarot generator.
 var FORMAT = "post-apollo.weather.magick-reference.g1.v1";
 var ROUTES = {
+  "magick/services/health": {
+    title:"MAGICK // SERVICES",
+    note:"READ-ONLY CAPABILITY AND DEPENDENCY INVENTORY. ON-DEMAND CALCULATIONS, LOCAL REFERENCE INDEXES AND SESSION-ONLY TOOLS ARE NOT BACKGROUND LIVE FEEDS."
+  },
   "magick/overview": {
     title:"MAGICK // OBSERVATION AND INTERPRETATION",
     source:"cosmos/moon/ephemeris",

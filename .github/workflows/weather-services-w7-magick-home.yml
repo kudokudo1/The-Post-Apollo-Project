@@ -1,0 +1,83 @@
+name: Weather Station W7 MAGICK Services and HOME Footer
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationHomeMetricCard.qml'
+      - 'widgets/weather/StationServicesConsole.qml'
+      - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
+      - 'widgets/weather/StationSubjectNavigationPolicy.js'
+      - 'widgets/weather/StationMagickSubjectPanelPolicy.js'
+      - 'widgets/weather/StationMagickServicesPane.qml'
+      - 'widgets/weather/StationMagickSubjectPane.qml'
+      - 'tests/weather/test_services_w7_magick_home_footer.js'
+      - 'tests/weather/test_magick_subject_panels_g1.js'
+      - 'tests/weather/fixtures/W7MagickServicesHomeFooterNative.qml'
+      - '.github/workflows/weather-services-w7-magick-home.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  source-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: W7 service inventory and preserved Weather Station contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/weather/test_services_w7_magick_home_footer.js
+          node --test tests/weather/test_magick_subject_panels_g1.js
+          node --test tests/weather/test_services_w6_canonical_rollout.js
+          node --test tests/weather/test_home_w3_sources_and_history_fit.js
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_left_rail_w1r.js
+
+  native-layout:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:unstable
+    timeout-minutes: 12
+    steps:
+      - name: Install disposable Quickshell
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git quickshell qt6-qpa-plugins \
+            qml6-module-qtquick-effects qml6-module-qtquick-dialogs \
+            qml6-module-qt5compat-graphicaleffects \
+            coreutils findutils
+      - uses: actions/checkout@v4
+      - name: Native MAGICK route, real inventory, HOME bounded footer
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(pwd)"
+          work="$(mktemp -d /tmp/weather-w7.XXXXXXXX)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -m 700 "$work/home" "$work/runtime" "$work/cache" "$work/config"
+          mkdir -p "$work/config/widgets"
+          cp -a "$root/components" "$work/config/components"
+          cp -a "$root/widgets/weather" "$work/config/widgets/weather"
+          cp -a "$root/widgets/tasks" "$work/config/widgets/tasks"
+          cp -a "$root/services" "$work/config/services"
+          cp "$root/tests/weather/fixtures/W7MagickServicesHomeFooterNative.qml" "$work/config/shell.qml"
+          rc=0
+          timeout --signal=TERM --kill-after=3s 40s \
+            env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
+            XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            quickshell --no-color -p "$work/config/shell.qml" \
+            > "$work/native.log" 2>&1 || rc=$?
+          cat "$work/native.log"
+          test "$rc" -eq 0
+          grep -F "W7_NATIVE_PASS // MAGICK_SERVICE_INVENTORY_AND_HOME_FOOTER_520X300" "$work/native.log"
+          if grep -E 'W7_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+            exit 1
+          fi

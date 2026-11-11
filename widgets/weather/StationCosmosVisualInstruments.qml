@@ -17,6 +17,11 @@ Rectangle {
     // M30-D // Existing full COSMOS V2 visual remains unchanged by default.
     // MAGICK lunar/solar explicitly chooses the fixed-viewport presentation.
     property bool compactMode: false
+    // W11 opt-in WEATHER-only full-bleed solar graph. The established COSMOS
+    // and MAGICK chart dimensions stay unchanged by default.
+    property bool fullBleedSolar: false
+    readonly property alias solarCanvasItem: solarCanvas
+    readonly property alias solarBayItem: solarBay
     // Opt-in C21 presentation used only by COSMOS > MOON > OVERVIEW.
     // Other MAGICK/COSMOS instruments keep their original 73px compact disk.
     property bool prominentMoon: false
@@ -317,7 +322,9 @@ Rectangle {
 
                 Rectangle {
                     width: parent.width
-                    height: visual.compactMode ? 75 : 119
+                    height: visual.fullBleedSolar
+                        ? Math.max(45,solarBay.height - (visual.compactMode ? 95 : 146))
+                        : (visual.compactMode ? 75 : 119)
                     color: Colors.black
                     border.width: 1
                     border.color: Colors.blue

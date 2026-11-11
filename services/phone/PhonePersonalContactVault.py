@@ -260,6 +260,22 @@ def _read_file(dfd: int, name: str) -> bytes | None:
         os.close(fd)
 
 
+def _require_single_profile_file(dfd: int, expected: str) -> None:
+    """One encrypted phone profile per trusted-host-selected directory.
+
+    A wrong/lost key has a different opaque filename. Never silently report
+    EMPTY and create a second vault alongside previously sealed user notes.
+    Unexpected files or leftover temp writes demand explicit manual recovery.
+    """
+    try:
+        names = os.listdir(dfd)
+    except OSError:
+        _refuse()
+    for name in names:
+        if name != expected and name != LOCK_NAME:
+            _refuse()
+
+
 @contextmanager
 def _write_lock(dfd: int) -> Iterator[None]:
     """Cooperating same-UID writers serialize CAS under a private inode."""
@@ -290,7 +306,9 @@ def read(master_key: bytes, profile: str, root: Path) -> dict[str, object]:
         return Identity.empty_document()
     dfd = _dirfd(safe_root)
     try:
-        raw = _read_file(dfd, _filename(master_key, profile))
+        name = _filename(master_key, profile)
+        _require_single_profile_file(dfd, name)
+        raw = _read_file(dfd, name)
     finally:
         os.close(dfd)
     return (Identity.empty_document() if raw is None
@@ -346,6 +364,7 @@ def commit(master_key: bytes, profile: str, root: Path,
     try:
         with _write_lock(dfd):
             name = _filename(master_key, profile)
+            _require_single_profile_file(dfd, name)
             current_raw = _read_file(dfd, name)
             current = (Identity.empty_document() if current_raw is None
                        else unseal(master_key, profile, current_raw))
@@ -371,6 +390,7 @@ def erase(master_key: bytes, profile: str, root: Path, *,
     try:
         with _write_lock(dfd):
             name = _filename(master_key, profile)
+            _require_single_profile_file(dfd, name)
             raw = _read_file(dfd, name)
             if raw is None or unseal(master_key, profile, raw)["revision"] != expected_revision:
                 _refuse()

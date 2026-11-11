@@ -206,6 +206,8 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
     capture_done = threading.Event()
     model_warmup_requested = threading.Event()
     persistent_model_ready = threading.Event()
+    recognition_idle = threading.Event()
+    recognition_idle.set()  # no extra requests while the model is occupied
     recognition_done = threading.Event()
     stopping_error = threading.Event()
     # Single owner-reason receipt for STOP vs internal safety shutdown.
@@ -427,6 +429,8 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 pause_chunk = (not full_chunk and first_chunk_sent
                                and persistent_model_ready.is_set()
                                and pause_gap_ms > 0
+                               and recognition_idle.is_set()
+                               and clips.empty()
                                and len(pending) >= PAUSE_MIN_BYTES
                                and quiet_run_ms >= pause_gap_ms)
                 if full_chunk or pause_chunk:
@@ -534,6 +538,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 if cancelled.is_set():
                     break
                 try:
+                    recognition_idle.clear()
                     decoding_at = time.monotonic()
                     if session is None:
                         phrase = transcribe_chunk(stt_helper, chunk,
@@ -562,6 +567,8 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                     stopping.set()
                     halt_child()
                     break
+                finally:
+                    recognition_idle.set()
                 if phrase:
                     if not first_text_ready:
                         first_text_ready = True

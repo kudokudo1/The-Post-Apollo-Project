@@ -49,9 +49,8 @@ def parse_factor(raw: Any, *, user_choice: bool) -> float:
         raise ScrollControlError("INVALID_FACTOR") from exc
     if not math.isfinite(value) or value < MIN_FACTOR or value > MAX_FACTOR:
         raise ScrollControlError("FACTOR_OUT_OF_RANGE")
-    # UI choices are quarter-step values. Accept arbitrary previous factors.
-    if user_choice and abs(value * 4 - round(value * 4)) > EPSILON:
-        raise ScrollControlError("FACTOR_NOT_SUPPORTED")
+    # The UI exposes presets, but restoring an observed custom factor must
+    # preserve its numeric value instead of rounding to a different preset.
     return value
 
 
@@ -110,7 +109,7 @@ def apply(identifier: str, new_factor: str, expected: str) -> dict[str, Any]:
         return {"status": "unchanged", "identifier": identifier,
                 "before": previous, "factor": previous,
                 "scope": "live_sway_only"}
-    raw = run_sway(["input", identifier, "scroll_factor", f"{desired:.2f}"])
+    raw = run_sway(["input", identifier, "scroll_factor", f"{desired:.6f}"])
     try:
         outcome = json.loads(raw)
     except ValueError as exc:

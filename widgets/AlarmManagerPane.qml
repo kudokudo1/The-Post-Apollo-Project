@@ -45,6 +45,7 @@ Item {
         || alarmHour.activeFocus || alarmMinute.activeFocus
         || alarmDate.activeFocus || alarmResumeDate.activeFocus
         || alarmNote.activeFocus || libraryRename.activeFocus
+        || alarmCalendarPicker.visible
 
     readonly property var visibleAlarms: {
         const term = alarmSearch.text.toLowerCase().trim();
@@ -78,6 +79,7 @@ Item {
         const a = AlarmManagerService.findAlarm(id);
         if (!a || !canLeaveNote(id)) return false;
         loadingSelection = true;
+        alarmCalendarPicker.dismiss();
         selectedId = id;
         settingsTab = "schedule";
         deleteConfirmId = 0;
@@ -344,6 +346,10 @@ Item {
     }
     onSettingsTabChanged: {
         if (settingsTab !== "sound") soundLibraryOpen = false;
+        if (alarmCalendarPicker.visible
+                && ((alarmCalendarPicker.target === "once" && settingsTab !== "schedule")
+                    || (alarmCalendarPicker.target === "pause" && settingsTab !== "pause")))
+            alarmCalendarPicker.dismiss();
     }
     onSelectedAlarmChanged: {
         if (!selectedAlarm && AlarmManagerService.count > 0)
@@ -730,7 +736,7 @@ Item {
                         id: alarmDate
                         onTextEdited: pane.onceDateExplicit = true
                         width: Math.max(0, onceDateRow.width - 126
-                                        - 2 * onceDateRow.spacing)
+                                        - 42 - 3 * onceDateRow.spacing)
                         height: parent.height
                         maximumLength: 10
                         placeholderText: "YYYY-MM-DD"
@@ -743,6 +749,17 @@ Item {
                             border.color: alarmDate.activeFocus
                                 ? Colors.magenta : Colors.cyan
                         }
+                    }
+                    ActionButton {
+                        id: onceCalendarButton
+                        width: 42
+                        height: parent.height
+                        label: "CAL"
+                        labelPixelSize: 9
+                        accentColor: Colors.magenta
+                        onLeftClicked: alarmCalendarPicker.openFor(
+                            "once", alarmDate.text.trim(),
+                            Number(alarmHour.text), Number(alarmMinute.text))
                     }
                     ActionButton {
                         width: 63
@@ -806,7 +823,7 @@ Item {
                     TextField {
                         id: alarmResumeDate
                         width: Math.max(0, pauseRow.width - 85 - 84
-                                        - 2 * pauseRow.spacing)
+                                        - 42 - 3 * pauseRow.spacing)
                         height: parent.height
                         placeholderText: "YYYY-MM-DD"
                         placeholderTextColor: Colors.cyan
@@ -819,6 +836,16 @@ Item {
                             border.color: alarmResumeDate.activeFocus
                                 ? Colors.magenta : Colors.cyan
                         }
+                    }
+                    ActionButton {
+                        id: pauseCalendarButton
+                        width: 42
+                        height: parent.height
+                        label: "CAL"
+                        labelPixelSize: 9
+                        accentColor: Colors.magenta
+                        onLeftClicked: alarmCalendarPicker.openFor(
+                            "pause", alarmResumeDate.text.trim(), 0, 0)
                     }
                     ActionButton {
                         width: 84
@@ -1408,4 +1435,19 @@ Item {
             color: Colors.cyan
         }
     }
+    // Calendar is an in-panel overlay: selected date remains an unsaved editor value.
+    AlarmCalendarPicker {
+        id: alarmCalendarPicker
+        anchors.fill: parent
+        z: 100
+        onDateChosen: function(target, dateKey) {
+            if (target === "once") {
+                alarmDate.text = dateKey;
+                pane.onceDateExplicit = true;
+            } else if (target === "pause") {
+                alarmResumeDate.text = dateKey;
+            }
+        }
+    }
+
 }

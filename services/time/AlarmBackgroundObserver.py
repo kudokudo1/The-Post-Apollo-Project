@@ -195,6 +195,15 @@ def evaluate_alarm(a, now_ms):
         future = next_weekly_due(a, now_ms)
     result["dueAtMs"] = due
     result["nextDueMs"] = future
+    # For recurring alarms, last week's occurrence is not evidence that
+    # a newly armed alarm missed anything. Today's upcoming time wins.
+    armed = a.get("armedAtMs", 0)
+    if a["mode"] == "weekly" and future > now_ms and (
+            (armed > 0 and due > 0 and due + MAX_LATE_MS < armed)
+            or datetime.fromtimestamp(future / 1000).date() == today):
+        result["phase"] = "FUTURE"
+        result["dueAtMs"] = 0
+        return result
     if a["mode"] == "once" and due > now_ms:
         result["phase"] = "FUTURE"
         result["nextDueMs"] = due
@@ -206,7 +215,6 @@ def evaluate_alarm(a, now_ms):
             or due <= a.get("lastProcessedDueMs", 0)):
         result["phase"] = "ALREADY_PROCESSED"
         return result
-    armed = a.get("armedAtMs", 0)
     if not armed:
         result["phase"] = "UNKNOWN_ARM_TIME"
     elif armed > now_ms or due + MAX_LATE_MS < armed:

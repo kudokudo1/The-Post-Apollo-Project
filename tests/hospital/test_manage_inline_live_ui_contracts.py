@@ -72,7 +72,15 @@ check('id: editorFrame' in manager
 check('managerArea.voiceActive || micMouse.containsMouse' in manager
       and '? Colors.yellow : Colors.dark' in manager
       and '? Colors.magenta : Colors.omnitrix' in manager,
-      "Mic uses open-state yellow fill, magenta border/icon/glow")
+      "Mic preserves open-state yellow fill and magenta active styling")
+check('readonly property bool stopInProgress: voiceActive' in manager
+      and 'root.speechInputService.stopping' in manager
+      and 'root.speechInputService.transcribing' in manager
+      and manager.count('managerArea.stopInProgress ? Colors.red') >= 3
+      and 'spread: managerArea.stopInProgress ? 5 : 4' in manager
+      and 'STOPPING // FINALIZING DICTATION // NO SUBMISSION' in manager
+      and 'MIC CLOSED // TRANSCRIBING // NO SUBMISSION' in manager,
+      "Manual STOP and auto-stop show a yellow-red finishing state until child exit")
 check('component ManagerCaption: Row {' in manager
       and '.replace(/\\s*\\/+\\s*/g, " // ")' in manager
       and 'font.pixelSize: 10' in manager

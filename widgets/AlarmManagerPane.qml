@@ -1176,6 +1176,16 @@ Item {
         GohuText {
             width: parent.width
             height: 17
+            visible: AlarmManagerService.recoveryNoteworthy
+            text: "RECOVERY // " + AlarmManagerService.lastRecoveryText
+            color: AlarmManagerService.lastRecoveryText.indexOf("0 MISSED") >= 0
+                ? Colors.cyan : Colors.orange
+            font.pixelSize: 9
+            elide: Text.ElideRight
+        }
+        GohuText {
+            width: parent.width
+            height: 17
             visible: AlarmManagerService.lastFiredAlarmId > 0
             text: "RING #" + AlarmManagerService.lastFiredAlarmId
                 + " // NTFY " + AlarmManagerService.notificationOutcome

@@ -36,7 +36,7 @@ def _require(condition, code):
         raise ReadIndexError(code)
 
 
-def _private_regular(path):
+def _private_regular(path, require_private_mode=True):
     try:
         entry = path.lstat()
     except FileNotFoundError:
@@ -46,7 +46,8 @@ def _private_regular(path):
     _require(stat.S_ISREG(entry.st_mode)
              and entry.st_uid == os.geteuid()
              and entry.st_nlink == 1
-             and entry.st_mode & 0o077 == 0, "ARCHIVE_FILE_UNSAFE")
+             and (not require_private_mode or entry.st_mode & 0o077 == 0),
+             "ARCHIVE_FILE_UNSAFE")
     return True
 
 
@@ -136,7 +137,9 @@ def index(directory, cursor="", query=""):
         except FileNotFoundError:
             continue
         raise ReadIndexError("ARCHIVE_UNEXPECTED_SIDECAR")
-    _private_regular(root / (DB_NAME + "-journal"))
+    # Parent root is private; check journal type/owner/link but avoid
+    # racing SQLite's transient rollback-journal file permissions.
+    _private_regular(root / (DB_NAME + "-journal"), require_private_mode=False)
     # SQLite URI mode=ro prevents creation or modification of this database.
     # A hot rollback journal that requires write recovery fails closed.
     uri = "file:" + quote(str(database), safe="/") + "?mode=ro&cache=private"

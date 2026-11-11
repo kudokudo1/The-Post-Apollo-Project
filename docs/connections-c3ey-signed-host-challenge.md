@@ -11,9 +11,11 @@ PRODUCTION // HOLD
 
 C3e-X #1846 is independently reviewed and merged on main. It checks four genuine Ed25519 UNAVAILABLE receipts against four sets of caller-provided synthetic kernel/process snapshots. The existing Identity receipts cryptographically cover command/action/nonce/state but **do not sign the full runtime snapshots**. C3e-X also refuses duplicate nonces only within one bundle.
 
-C3e-Y is a bounded separate CI-only composition with FOUR new owned files: C3eYSignedHostChallenge.py, twenty-one adversarial tests, a dedicated workflow and this contract. It does not change C3e-X, C3e-Q/R/U/V/W, C4b/Identity/C5 sources, Quickshell or production settings.
+C3e-Y is a bounded separate CI-only composition with FOUR new owned files: C3eYSignedHostChallenge.py, twenty-seven adversarial tests, a dedicated workflow and this contract. It does not change C3e-X, C3e-Q/R/U/V/W, C4b/Identity/C5 sources, Quickshell or production settings.
 
 1. The disposable GitHub runner explicitly creates a root-owned mode-0700 directory directly under /run, with a mode-0600 SQLite file. The independent CI issuer (not the simulated guest signer) creates 32 random challenge bytes, records only their SHA-256 as ISSUED along with fixed purpose/audience and test release epoch/sequence, and commits to disk BEFORE exposing the challenge. Receiver calls must never bootstrap missing ledger state.
+**C3e-AA hardening after C3e-Y merge:** The root-local issuer now stores a monotonic lexicographic `(releaseEpoch, releaseSequence)` floor in the same SQLite transaction as each newly issued challenge. An older release cannot receive another challenge, and a previously issued challenge is refused if a newer release became current before consumption. The conditional consume transaction rechecks the floor to close the issuance/verification race. A new CI-only ledger schema v2 deliberately refuses v1 fixtures rather than silently migrating or creating state. Higher epochs may begin with a lower sequence; no version downgrade within the same root-local ledger is allowed. This is not an external anti-rollback authority because an administrator may restore an older entire database or replace the issuer itself.
+
 2. The simulated witness signs a canonical bounded JSON *statement* using a **distinct Ed25519 witness key**, domain-separated and purpose-bound to the exact deny-only Identity role/audience and fixed release test epoch and sequence. The statement binds the SHA-256 of the **complete canonical C3e-X four-snapshot evidence bytes**, all four signed Identity receipt-frame SHA-256 values in exact order, caller-expected snapshot bytes digest, independently supplied receipt public key hash, and SHA-256 of the preissued challenge. The evidence/receipt content is not merely a textual name; altering even one byte changes a signed hash.
 3. The verifier requires a caller-pinned witness public key that differs from the separately caller-pinned Identity receipt key. It verifies the full-record signature and EVERY hash/action/audience/epoch/sequence/challenge binding. Then it calls the unchanged C3e-X checker, which verifies the existing four **real Ed25519-signed** UNAVAILABLE denial receipts and the consistency of all PID/start/UID/GID, process/exe/RPM digests, exact unit, cgroup, socket peer, proposed SELinux CI label and bundle nonces. Any mismatch REFUSES before challenge consumption.
 4. Before C3e-X rechecks the evidence, the receiver freezes the caller's mutable receipt list into an immutable tuple and copies the caller-supplied expected pins. A caller cannot substitute a different valid-looking frame or kernel snapshot between signed-digest validation and denial consistency checking. Both validated byte sets remain synthetic CI inputs.
@@ -29,12 +31,12 @@ This is a **synthetic, deny-only** witness-protocol test, not a native daemon. D
 
 ## VERIFY
 
-- [ ] Exact-head C3e-Y 21 adversarial tests PASS on disposable CI root.
+- [ ] Exact-head C3e-Y 27 adversarial tests PASS on disposable CI root.
 - [ ] Existing C3e-X 15/15 and C2n regression PASS.
 - [ ] GitHub Grammar and any triggered existing root/release/signed RPM workflows PASS.
 - [ ] Independent Nurse 2 exact-head security review before authorized owner merge.
 
-Adversarial coverage: unknown/replayed externally issued test challenge, incorrect witness/receipt key, identical key roles, tampered unsigned snapshot before/after signing, reconstructed signature over a forged snapshot still refused by C3e-X, wrong action/receipt or replaced signing instance, changed audience/purpose/release floor, wrong statement hashes, noncanonical/duplicate JSON, changed command nonce, concurrent single-use consumption, absent/unsafe/symlinked ledger, malformed epoch types and disabled host/credential authority.
+Adversarial coverage: monotonic release-floor downgrade and race refusal, superseded outstanding challenges, missing/tampered floor metadata, unknown/replayed externally issued test challenge, incorrect witness/receipt key, identical key roles, tampered unsigned snapshot before/after signing, reconstructed signature over a forged snapshot still refused by C3e-X, wrong action/receipt or replaced signing instance, changed audience/purpose/release floor, wrong statement hashes, noncanonical/duplicate JSON, changed command nonce, concurrent single-use consumption, absent/unsafe/symlinked ledger, malformed epoch types and disabled host/credential authority.
 
 ## WATCH OUT FOR
 

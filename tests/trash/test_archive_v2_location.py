@@ -33,7 +33,7 @@ class PrivateArchiveLocationTests(unittest.TestCase):
         self.assertEqual(place, self.data / PRIVATE_SUBDIR)
         self.assertEqual(place.stat().st_mode & 0o777, 0o700)
         self.assertEqual(self.data.stat().st_mode & 0o777, mode)
-        self.assertIs(archive_directory(self.data, create=False), place)
+        self.assertEqual(archive_directory(self.data, create=False), place)
         store = ArchiveStore(place)
         saved = store.save("demo-scrape", "fixture-1", "r1", b"synthetic")
         items = read_index(str(self.data))["items"]

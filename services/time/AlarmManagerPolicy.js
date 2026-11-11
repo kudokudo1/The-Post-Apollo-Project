@@ -101,6 +101,9 @@ function validAlarm(a) {
         && (a.lastExpectedAtMs === undefined || timestamp(a.lastExpectedAtMs))
         && (a.lastFiredAtMs === undefined || timestamp(a.lastFiredAtMs))
         && (a.lastMissedAtMs === undefined || timestamp(a.lastMissedAtMs))
+        // New optional recovery anchors preserve legacy V2 reads.
+        && (a.armedAtMs === undefined || timestamp(a.armedAtMs))
+        && (a.lastProcessedDueMs === undefined || timestamp(a.lastProcessedDueMs))
         && integer(a.hour, 0, 23) && integer(a.minute, 0, 59)
         && (a.mode === "once" || a.mode === "weekly")
         && weekdaysValid(a.weekdays)
@@ -150,7 +153,8 @@ function cloneDocument(doc) {
                 {favorite: false, note: "",
                  lastEventKind: "none", lastEventAtMs: 0,
                  lastExpectedAtMs: 0, lastFiredAtMs: 0,
-                 lastMissedAtMs: 0}, a,
+                 lastMissedAtMs: 0, armedAtMs: 0,
+                 lastProcessedDueMs: 0}, a,
                 {weekdays: a.weekdays.slice()}); })};
 }
 function byId(doc, id) {
@@ -171,7 +175,8 @@ function freshAlarm(id, nowMs) {
             lastFiredDay: "", ringing: false, ringStartedAtMs: 0,
             snoozeUntilMs: 0, completed: false,
             lastEventKind: "none", lastEventAtMs: 0,
-            lastExpectedAtMs: 0, lastFiredAtMs: 0, lastMissedAtMs: 0};
+            lastExpectedAtMs: 0, lastFiredAtMs: 0, lastMissedAtMs: 0,
+            armedAtMs: 0, lastProcessedDueMs: 0};
 }
 function create(doc, nowMs) {
     if (!validDocument(doc) || doc.alarms.length >= MAX_ALARMS
@@ -202,7 +207,8 @@ function duplicate(doc, id) {
         lastFiredDay: "", ringing: false, ringStartedAtMs: 0,
         snoozeUntilMs: 0, lastEventKind: "none",
         lastEventAtMs: 0, lastExpectedAtMs: 0,
-        lastFiredAtMs: 0, lastMissedAtMs: 0
+        lastFiredAtMs: 0, lastMissedAtMs: 0,
+        armedAtMs: 0, lastProcessedDueMs: 0
     });
     next.nextId += 1;
     next.alarms.push(copy);
@@ -225,7 +231,8 @@ function update(doc, id, patch, nowMs) {
             return {ok: false, error: "INVALID_EDIT_FIELD"};
     var target = Object.assign({favorite: false, note: "",
         lastEventKind: "none", lastEventAtMs: 0, lastExpectedAtMs: 0,
-        lastFiredAtMs: 0, lastMissedAtMs: 0}, old, patch);
+        lastFiredAtMs: 0, lastMissedAtMs: 0,
+        armedAtMs: 0, lastProcessedDueMs: 0}, old, patch);
     // A schedule edit means a new future occurrence, without surprising
     // immediate playback when the chosen minute already happened today.
     var scheduleChanged = target.hour !== old.hour || target.minute !== old.minute
@@ -240,6 +247,11 @@ function update(doc, id, patch, nowMs) {
     if (target.mode === "once" && target.completed && target.enabled)
         target.completed = false;
     if (scheduleChanged || (patch.enabled === true && !old.enabled)) {
+        // New schedule ownership begins at the actual edit, not at a
+        // guessed machine-start time. This bounds offline replay to when
+        // the alarm was truly armed.
+        target.armedAtMs = nowMs;
+        target.lastProcessedDueMs = 0;
         target.completed = false;
         target.lastFiredDay = "";
         target.ringing = false;
@@ -316,6 +328,31 @@ function dueKey(a, nowMs) {
         return a.date === today ? today : "";
     return a.weekdays.indexOf(new Date(nowMs).getDay()) >= 0 ? today : "";
 }
+
+// Select at most the latest unprocessed weekly occurrence from a previous
+// local day. This avoids replay storms after a long shutdown or sleep.
+// Without a durable arming timestamp, we cannot infer whether a legacy
+// alarm was armed on previous days: initialize that baseline on first tick.
+function latestMissedWeeklyDue(a, nowMs) {
+    if (a.mode !== "weekly" || !a.enabled || a.completed
+            || !timestamp(a.armedAtMs) || a.armedAtMs === 0
+            || a.armedAtMs > nowMs)
+        return 0;
+    for (var daysBack = 1; daysBack <= 7; daysBack++) {
+        var key = dateOffset(nowMs, -daysBack);
+        var due = dayAt(key, a.hour, a.minute);
+        if (a.weekdays.indexOf(new Date(due).getDay()) < 0
+                || (a.pausedUntilDate !== "" && key < a.pausedUntilDate)
+                || due <= a.lastProcessedDueMs
+                || key === a.lastFiredDay
+                || due + MAX_LATE_MS < a.armedAtMs)
+            continue;
+        // This is already past the two-minute grace window, so it MUST
+        // be a MISSED receipt, never a delayed sound or new alarm popup.
+        return due;
+    }
+    return 0;
+}
 function tick(doc, nowMs) {
     if (!validDocument(doc) || !timestamp(nowMs) || !nowMs)
         return {changed: false, document: doc, started: [], expired: [], missed: []};
@@ -324,6 +361,12 @@ function tick(doc, nowMs) {
     var changed = false, today = dayKey(nowMs);
     next.alarms.forEach(function(a) {
         if (!a.enabled) return;
+        if (a.mode === "weekly" && a.armedAtMs === 0) {
+            // One-time safe migration for older saved V2 alarms. Do not
+            // invent historical missed rings before this observation.
+            a.armedAtMs = nowMs;
+            changed = true;
+        }
         if (a.ringing) {
             if (nowMs >= a.ringStartedAtMs
                     && nowMs - a.ringStartedAtMs < MAX_RING_MS) return;
@@ -344,6 +387,8 @@ function tick(doc, nowMs) {
                 a.lastEventKind = "missed";
                 a.lastEventAtMs = nowMs;
                 a.lastMissedAtMs = nowMs;
+                a.lastProcessedDueMs = Math.max(
+                    a.lastProcessedDueMs, nowMs - lateSnooze);
                 missed.push(a.id); return;
             }
             a.ringing = true; a.ringStartedAtMs = nowMs;
@@ -351,6 +396,8 @@ function tick(doc, nowMs) {
             a.lastEventAtMs = nowMs;
             a.lastFiredAtMs = nowMs;
             a.lastExpectedAtMs = nowMs - lateSnooze;
+            a.lastProcessedDueMs = Math.max(
+                a.lastProcessedDueMs, nowMs - lateSnooze);
             started.push(a.id); return;
         }
         if (a.pausedUntilDate !== "" && today < a.pausedUntilDate) return;
@@ -363,12 +410,26 @@ function tick(doc, nowMs) {
             a.lastEventAtMs = nowMs;
             a.lastMissedAtMs = nowMs;
             a.lastExpectedAtMs = dayAt(a.date, a.hour, a.minute);
+            a.lastProcessedDueMs = a.lastExpectedAtMs;
             missed.push(a.id); changed = true; return;
         }
         var due = dueKey(a, nowMs);
-        if (due === "" || a.lastFiredDay === due) return;
+        if (due === "" || a.lastFiredDay === due
+                || nowMs < dayAt(today, a.hour, a.minute)) {
+            var previous = latestMissedWeeklyDue(a, nowMs);
+            if (previous > 0) {
+                a.lastProcessedDueMs = previous;
+                a.lastEventKind = "missed";
+                a.lastEventAtMs = nowMs;
+                a.lastMissedAtMs = nowMs;
+                a.lastExpectedAtMs = previous;
+                missed.push(a.id); changed = true;
+            }
+            return;
+        }
         var late = nowMs - dayAt(today, a.hour, a.minute);
-        if (late < 0) return;
+        // The current day is always handled before older backlog; the
+        // latest missed occurrence wins when several days were skipped.
         if (late > MAX_LATE_MS) {
             // Persist this missed occurrence for weekly AND one-time alarms.
             // Otherwise a weekly failure silently disappears into next week.
@@ -378,6 +439,7 @@ function tick(doc, nowMs) {
             a.lastEventAtMs = nowMs;
             a.lastMissedAtMs = nowMs;
             a.lastExpectedAtMs = dayAt(today, a.hour, a.minute);
+            a.lastProcessedDueMs = a.lastExpectedAtMs;
             missed.push(a.id); changed = true;
             return;
         }
@@ -388,6 +450,7 @@ function tick(doc, nowMs) {
         a.lastEventAtMs = nowMs;
         a.lastFiredAtMs = nowMs;
         a.lastExpectedAtMs = dayAt(today, a.hour, a.minute);
+        a.lastProcessedDueMs = a.lastExpectedAtMs;
         started.push(a.id); changed = true;
     });
     if (removedAfterExpiry.length) {

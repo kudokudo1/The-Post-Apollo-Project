@@ -4,7 +4,7 @@
 # %h/.config/post-apollo/alarm-observer.env as:
 # POST_APOLLO_ALARM_FILE=/absolute/path/to/time-alarms-v2.json
 # Without the value, the process refuses to start. This unit is intentionally
-# missing [Install]; automatic activation and owner handoff are not authorized.
+# intentionally has no auto-enable section; activation is not authorized.
 [Unit]
 Description=Post-Apollo Clock B0 alarm observer (read-only, no actuation)
 Documentation=https://github.com/kudokudo1/The-Post-Apollo-Project/blob/main/services/time/BACKGROUND-ALARM-B0.md
@@ -27,4 +27,4 @@ PrivateTmp=true
 RestrictAddressFamilies=AF_UNIX
 LockPersonality=true
 
-# INTENTIONALLY NO [Install] SECTION. Nothing is enabled or auto-started.
+# INTENTIONALLY NO AUTO-ENABLE SECTION. Nothing starts automatically.

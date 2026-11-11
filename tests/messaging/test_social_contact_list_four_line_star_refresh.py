@@ -55,6 +55,12 @@ class ContactListFourLineStarRefreshTests(unittest.TestCase):
         self.assertIn('property string handleStyle: "bar"', self.scroll)
         self.assertIn('String(root.handleStyle || "").toLowerCase() === "star"', self.scroll)
         self.assertIn("visible: conversationList.visible && scrollable", self.contact)
+        address_book = self.phone.split("id: phoneAddressBook", 1)[1].split(
+            "id: emptyPhoneContacts", 1)[0]
+        self.assertIn('flickable: phoneAddressBook', address_book)
+        self.assertIn('geometryMode: "viewport"', address_book)
+        self.assertIn('handleStyle: "star"', address_book)
+        self.assertIn("accountForContentOrigin: true", address_book)
 
     def test_messages_tab_first_open_switch_and_repeat_click_are_covered(self):
         tabs = self.phone.split('id: sectionTabs', 1)[1].split(

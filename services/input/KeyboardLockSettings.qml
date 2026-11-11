@@ -17,6 +17,16 @@ Scope {
     property var pendingDocument: null
     property var queuedDocument: null
     property bool confirmRequired: false
+    property string confirmedSnapshotNum: "unknown"
+    property string confirmedSnapshotCaps: "unknown"
+    property bool hostRememberNum: false
+    property bool hostRememberCaps: false
+    property bool rememberSyncing: false
+    property bool rememberSyncReturned: false
+    property bool rememberSuspended: false
+    property string queuedRememberNum: ""
+    property string queuedRememberCaps: ""
+    property string runningRememberLock: ""
 
     readonly property bool canEdit:
         storageState === "ready" || storageState === "empty"
@@ -24,6 +34,7 @@ Scope {
     readonly property bool canApply:
         storageState === "ready" && pendingDocument === null
         && queuedDocument === null && !applying && !inspecting
+        && !rememberSyncing
     readonly property var effectiveDocument:
         queuedDocument !== null ? queuedDocument
         : pendingDocument !== null ? pendingDocument : document
@@ -39,7 +50,10 @@ Scope {
     property string feedback: "STARTUP POLICY NOT YET INSPECTED"
     readonly property bool profileInstalled:
         hostStatus === "installed"
-        && installedNum === numMode && installedCaps === capsMode
+        && (numMode === "remember"
+            ? hostRememberNum : !hostRememberNum && installedNum === numMode)
+        && (capsMode === "remember"
+            ? hostRememberCaps : !hostRememberCaps && installedCaps === capsMode)
 
     function beginWrite(next) {
         pendingDocument = next;
@@ -57,6 +71,10 @@ Scope {
             return false;
         }
         confirmRequired = false;
+        if (lockName === "num")
+            queuedRememberNum = "";
+        else
+            queuedRememberCaps = "";
         if (pendingDocument !== null)
             queuedDocument = choice.document;
         else
@@ -65,11 +83,28 @@ Scope {
         return true;
     }
 
-    function prepareApply() {
+    function prepareApply(savedNum, savedCaps, sampleFresh) {
         if (!canApply)
             return false;
+        if ((document.num === "remember" || document.caps === "remember")
+                && sampleFresh !== true) {
+            feedback = "REMEMBER NEEDS A FRESH STABLE LED READING";
+            return false;
+        }
+        if (document.num === "remember"
+                && savedNum !== "on" && savedNum !== "off") {
+            feedback = "NUM REMEMBER REQUIRES A SAVED LED OBSERVATION";
+            return false;
+        }
+        if (document.caps === "remember"
+                && savedCaps !== "on" && savedCaps !== "off") {
+            feedback = "CAPS REMEMBER REQUIRES A SAVED LED OBSERVATION";
+            return false;
+        }
+        confirmedSnapshotNum = String(savedNum || "unknown");
+        confirmedSnapshotCaps = String(savedCaps || "unknown");
         confirmRequired = true;
-        feedback = "CONFIRM USER SWAY STARTUP CONFIG CHANGE";
+        feedback = "CONFIRM STARTUP POLICY // NO LIVE KEY CHANGES";
         return true;
     }
     function cancelApply() {
@@ -81,17 +116,21 @@ Scope {
             return false;
         confirmRequired = false;
         applying = true;
+        rememberSuspended = false;
+        queuedRememberNum = "";
+        queuedRememberCaps = "";
         hostError = "";
-        feedback = "WRITING USER SWAY STARTUP FILES";
+        feedback = "WRITING MANAGED SWAY STARTUP FRAGMENT";
         applyProcess.exec([
             "python3", "-B", "-I",
             Quickshell.shellPath("services/input/SwayKeyboardStartup.py"),
-            "apply", document.num, document.caps
+            "apply-policy", document.num, document.caps,
+            confirmedSnapshotNum, confirmedSnapshotCaps
         ]);
         return true;
     }
     function inspectHost() {
-        if (inspecting || applying)
+        if (inspecting || applying || rememberSyncing)
             return false;
         inspecting = true;
         hostError = "";
@@ -110,18 +149,25 @@ Scope {
                 hostStatus = "installed";
                 installedNum = String(reply.num || "");
                 installedCaps = String(reply.caps || "");
+                hostRememberNum = reply.remember_num === true;
+                hostRememberCaps = reply.remember_caps === true;
                 hostError = "";
+                rememberSuspended = false;
                 feedback = "SWAY FILE INSTALLED // EFFECTIVE NEXT SWAY START";
             } else if (status === "not_installed") {
                 hostStatus = "not_installed";
                 installedNum = "";
                 installedCaps = "";
+                hostRememberNum = false;
+                hostRememberCaps = false;
                 hostError = "";
                 feedback = "SWAY FILE NOT YET INSTALLED";
             } else {
                 hostStatus = "unavailable";
                 installedNum = "";
                 installedCaps = "";
+                hostRememberNum = false;
+                hostRememberCaps = false;
                 hostError = String(reply.code || "HOST_UNAVAILABLE");
                 feedback = "SWAY STARTUP FILE UNAVAILABLE";
             }
@@ -130,6 +176,69 @@ Scope {
             hostError = "INVALID_HOST_REPLY";
             feedback = "SWAY HELPER RESPONSE INVALID";
         }
+    }
+
+    // Only stable LED transitions AFTER the observer established a baseline
+    // may reach this method. Initial startup samples never call it.
+    function rememberLedTransition(lockName, value) {
+        if ((lockName !== "num" && lockName !== "caps")
+                || (value !== "on" && value !== "off")
+                || hostStatus !== "installed" || rememberSuspended
+                || !canEdit || confirmRequired || applying)
+            return false;
+        if (lockName === "num") {
+            if (numMode !== "remember" || !hostRememberNum)
+                return false;
+            queuedRememberNum = value;
+        } else {
+            if (capsMode !== "remember" || !hostRememberCaps)
+                return false;
+            queuedRememberCaps = value;
+        }
+        launchRememberSync();
+        return true;
+    }
+
+    function launchRememberSync() {
+        if (rememberSyncing || applying || inspecting
+                || rememberSuspended || hostStatus !== "installed")
+            return;
+        let lockName = "";
+        let value = "";
+        let previous = "";
+        if (queuedRememberNum !== "" && numMode === "remember"
+                && hostRememberNum) {
+            lockName = "num";
+            value = queuedRememberNum;
+            previous = installedNum;
+            queuedRememberNum = "";
+        } else if (queuedRememberCaps !== "" && capsMode === "remember"
+                && hostRememberCaps) {
+            lockName = "caps";
+            value = queuedRememberCaps;
+            previous = installedCaps;
+            queuedRememberCaps = "";
+        }
+        if (!lockName)
+            return;
+        if (value === previous) {
+            // A redundant Num update must not strand a queued Caps update.
+            launchRememberSync();
+            return;
+        }
+        if (previous !== "on" && previous !== "off") {
+            rememberSuspended = true;
+            hostError = "UNSAFE_PREVIOUS_STATE";
+            return;
+        }
+        rememberSyncing = true;
+        rememberSyncReturned = false;
+        runningRememberLock = lockName;
+        rememberSyncProcess.exec([
+            "python3", "-B", "-I",
+            Quickshell.shellPath("services/input/SwayKeyboardStartup.py"),
+            "sync-remember", lockName, value, previous
+        ]);
     }
 
     FileView {
@@ -199,6 +308,31 @@ Scope {
             if (code !== 0 && settings.hostStatus !== "unavailable") {
                 settings.hostStatus = "unavailable";
                 settings.hostError = "HOST_INSPECT_FAILED";
+            }
+        }
+    }
+    Process {
+        id: rememberSyncProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                settings.rememberSyncReturned = true;
+                settings.acceptHostReply(this.text);
+            }
+        }
+        onExited: function(code, exitStatus) {
+            settings.rememberSyncing = false;
+            settings.runningRememberLock = "";
+            if (code !== 0 || !settings.rememberSyncReturned
+                    || settings.hostStatus !== "installed") {
+                settings.rememberSuspended = true;
+                settings.queuedRememberNum = "";
+                settings.queuedRememberCaps = "";
+                settings.hostError = settings.hostError || "REMEMBER_SYNC_FAILED";
+                settings.feedback = "REMEMBER SYNC SUSPENDED // CHECK STATUS";
+            } else {
+                settings.feedback = "LAST LED CHANGE SAVED // NEXT SWAY START";
+                settings.launchRememberSync();
             }
         }
     }

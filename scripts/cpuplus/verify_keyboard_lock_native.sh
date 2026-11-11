@@ -38,6 +38,9 @@ cat "$log"
 if [ "$rc" -ne 0 ] || ! grep -q "KB_NATIVE_PASS // TWO_LOCKS_SAVED_NO_HOST_INSTALL" "$log"; then
   echo "KB_NATIVE_FAIL // no verified save / QML smoke";exit 1
 fi
+if ! grep -q 'KB_REMEMBER_NATIVE_PASS // REFUSED_STALE_LED_NO_HOST_WRITE' "$log"; then
+  echo "KB_NATIVE_FAIL // Remember approval gate not exercised"; exit 1
+fi
 if grep -q 'KB_NATIVE_FAIL' "$log"; then exit 1; fi
 if find "$work/config-home" -name 'post-apollo-keyboard-locks.conf' | grep -q .; then
   echo "KB_NATIVE_FAIL // unexpected Sway config writer";exit 1

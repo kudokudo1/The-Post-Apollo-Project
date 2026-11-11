@@ -47,17 +47,25 @@ Item {
                         model: [
                             {label:"SYSTEM",mode:"system"},
                             {label:"ON",mode:"on"},
-                            {label:"OFF",mode:"off"}
+                            {label:"OFF",mode:"off"},
+                            {label:"REMEMBER",mode:"remember"}
                         ]
                         ActionButton {
                             required property var modelData
-                            width: (numChoices.width - 2 * numChoices.spacing) / 3
+                            width: (numChoices.width - 3 * numChoices.spacing) / 4
                             height: 34
                             label: modelData.label
-                            labelPixelSize: 10
+                            labelPixelSize: 9
                             selected: KeyboardLockSettings.numMode === modelData.mode
                             available: KeyboardLockSettings.canEdit
-                            onLeftClicked: KeyboardLockSettings.choose("num", modelData.mode)
+                                       && (modelData.mode !== "remember"
+                                           || KeyboardLedObservation.canEdit)
+                            onLeftClicked: {
+                                if (modelData.mode === "remember"
+                                        && !KeyboardLedObservation.monitoringEnabled)
+                                    KeyboardLedObservation.setMonitoringEnabled(true);
+                                KeyboardLockSettings.choose("num", modelData.mode);
+                            }
                         }
                     }
                 }
@@ -74,17 +82,25 @@ Item {
                         model: [
                             {label:"SYSTEM",mode:"system"},
                             {label:"ON",mode:"on"},
-                            {label:"OFF",mode:"off"}
+                            {label:"OFF",mode:"off"},
+                            {label:"REMEMBER",mode:"remember"}
                         ]
                         ActionButton {
                             required property var modelData
-                            width: (capsChoices.width - 2 * capsChoices.spacing) / 3
+                            width: (capsChoices.width - 3 * capsChoices.spacing) / 4
                             height: 34
                             label: modelData.label
-                            labelPixelSize: 10
+                            labelPixelSize: 9
                             selected: KeyboardLockSettings.capsMode === modelData.mode
                             available: KeyboardLockSettings.canEdit
-                            onLeftClicked: KeyboardLockSettings.choose("caps", modelData.mode)
+                                       && (modelData.mode !== "remember"
+                                           || KeyboardLedObservation.canEdit)
+                            onLeftClicked: {
+                                if (modelData.mode === "remember"
+                                        && !KeyboardLedObservation.monitoringEnabled)
+                                    KeyboardLedObservation.setMonitoringEnabled(true);
+                                KeyboardLockSettings.choose("caps", modelData.mode);
+                            }
                         }
                     }
                 }
@@ -104,7 +120,7 @@ Item {
                 }
                 GohuText {
                     width: parent.width
-                    text: "LAST-USED KEY STATE // NOT IMPLEMENTED"
+                    text: "REMEMBER = SAVE OBSERVED CHANGES FOR NEXT SWAY START."
                     color: Colors.orange
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap
@@ -144,9 +160,47 @@ Item {
                 GohuText {
                     width: parent.width
                     text: KeyboardLockSettings.profileInstalled
-                          ? "SAVED PROFILE MATCHES STARTUP FILE"
+                          ? "STARTUP POLICY CONFIRMED IN MANAGED FRAGMENT"
                           : "PREFERENCES NOT CONFIRMED IN SWAY FILE"
                     color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "REMEMBER NUM // "
+                          + (KeyboardLockSettings.hostRememberNum
+                             && KeyboardLockSettings.numMode === "remember"
+                             ? (KeyboardLockSettings.rememberSuspended
+                                ? "SUSPENDED"
+                                : KeyboardLedObservation.monitoringEnabled
+                                  ? "ARMED" : "PAUSED // MONITOR OFF")
+                             : "NOT ARMED")
+                    color: KeyboardLockSettings.hostRememberNum
+                           ? Colors.cyan : Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "REMEMBER CAPS // "
+                          + (KeyboardLockSettings.hostRememberCaps
+                             && KeyboardLockSettings.capsMode === "remember"
+                             ? (KeyboardLockSettings.rememberSuspended
+                                ? "SUSPENDED"
+                                : KeyboardLedObservation.monitoringEnabled
+                                  ? "ARMED" : "PAUSED // MONITOR OFF")
+                             : "NOT ARMED")
+                    color: KeyboardLockSettings.hostRememberCaps
+                           ? Colors.cyan : Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    visible: KeyboardLockSettings.rememberSyncing
+                    text: "REMEMBER // SAVING STABLE CHANGE"
+                    color: Colors.orange
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap
                 }
@@ -260,7 +314,7 @@ Item {
                 }
                 GohuText {
                     width: parent.width
-                    text: "NO SWAY RELOAD OR KEY INJECTION. EFFECTIVE ON NEXT FULL SWAY START."
+                    text: "NO SWAY RELOAD OR KEY INJECTION. CHANGES TAKE EFFECT AT NEXT FULL SWAY START."
                     color: Colors.orange
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap
@@ -296,7 +350,11 @@ Item {
                     labelPixelSize: 10
                     available: KeyboardLockSettings.canApply
                     selected: KeyboardLockSettings.confirmRequired
-                    onLeftClicked: KeyboardLockSettings.prepareApply()
+                    onLeftClicked: KeyboardLockSettings.prepareApply(
+                        KeyboardLedObservation.currentNum,
+                        KeyboardLedObservation.currentCaps,
+                        KeyboardLedObservation.fresh
+                    )
                 }
                 ActionButton {
                     visible: KeyboardLockSettings.confirmRequired
@@ -316,6 +374,15 @@ Item {
                     labelPixelSize: 10
                     accentColor: Colors.red
                     onLeftClicked: KeyboardLockSettings.cancelApply()
+                }
+                GohuText {
+                    width: parent.width
+                    text: "REMEMBER IS ARMED ONLY AFTER CONFIRM INSTALL. "
+                          + "FIRST LED SAMPLE SETS A BASELINE; LATER STABLE "
+                          + "TOGGLES UPDATE ONLY THE MANAGED STARTUP FILE."
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
                 }
                 GohuText {
                     width: parent.width

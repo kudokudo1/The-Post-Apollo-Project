@@ -1,9 +1,10 @@
 .pragma library
 
-// One explicit startup preference per lock. "system" deliberately means
-// no Post-Apollo override, NOT "remember the last physical keypress".
+// One explicit startup preference per lock. "system" means no Post-Apollo
+// override; "remember" opts in to observed-state startup following only
+// after a separate CONFIRM INSTALL authorizes the managed Sway fragment.
 var VERSION = 1;
-var MODES = ["system", "on", "off"];
+var MODES = ["system", "on", "off", "remember"];
 
 function validMode(mode) {
     return typeof mode === "string" && MODES.indexOf(mode) !== -1;

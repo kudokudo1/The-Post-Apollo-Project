@@ -35,6 +35,10 @@ Scope {
     property string candidateCaps: "unknown"
     property int stableNum: 0
     property int stableCaps: 0
+    // First stable value only establishes a baseline after startup.
+    // We never rewrite Remember startup rules from the initial sample.
+    property string witnessNum: "unknown"
+    property string witnessCaps: "unknown"
     property double lastSampleAtMs: 0
     property double nowMs: Date.now()
     readonly property string currentNum:
@@ -79,6 +83,8 @@ Scope {
         candidateCaps = "unknown";
         stableNum = 0;
         stableCaps = 0;
+        witnessNum = "unknown";
+        witnessCaps = "unknown";
         lastSampleAtMs = 0;
     }
     function setMonitoringEnabled(enabled) {
@@ -89,6 +95,8 @@ Scope {
             return false;
         if (!enabled)
             clearLive();
+        else
+            KeyboardLockSettings.inspectHost();
         return persist(updated.document);
     }
     function sampleOnce() {
@@ -117,6 +125,19 @@ Scope {
             return {status:"unreadable", value:"unknown"};
         return {status:"observed", value:reply.value};
     }
+    function witnessStableTransition(lock, value) {
+        if (!monitoringEnabled || !canEdit
+                || (value !== "on" && value !== "off"))
+            return;
+        const previous = lock === "num" ? witnessNum : witnessCaps;
+        if (lock === "num")
+            witnessNum = value;
+        else
+            witnessCaps = value;
+        if (previous !== "unknown" && previous !== value)
+            KeyboardLockSettings.rememberLedTransition(lock, value);
+    }
+
     function recordStable(lock, value, atMs) {
         if (!monitoringEnabled || !canEdit || value === "unknown")
             return;
@@ -127,6 +148,13 @@ Scope {
     function receiveSample(raw) {
         sampleReturned = true;
         nowMs = Date.now();
+        const previousSampleAtMs = lastSampleAtMs;
+        if (previousSampleAtMs > 0
+                && nowMs - previousSampleAtMs > 6000) {
+            // A gap means we did not witness the intervening key changes.
+            witnessNum = "unknown";
+            witnessCaps = "unknown";
+        }
         let reply;
         try { reply = JSON.parse(String(raw)); }
         catch (_) {
@@ -154,6 +182,7 @@ Scope {
         } else {
             candidateNum = "unknown";
             stableNum = 0;
+            witnessNum = "unknown";
         }
         if (caps.status === "observed") {
             stableCaps = candidateCaps === caps.value
@@ -162,11 +191,16 @@ Scope {
         } else {
             candidateCaps = "unknown";
             stableCaps = 0;
+            witnessCaps = "unknown";
         }
-        if (stableNum >= 2)
+        if (stableNum >= 2) {
             recordStable("num", candidateNum, nowMs);
-        if (stableCaps >= 2)
+            witnessStableTransition("num", candidateNum);
+        }
+        if (stableCaps >= 2) {
             recordStable("caps", candidateCaps, nowMs);
+            witnessStableTransition("caps", candidateCaps);
+        }
     }
     function copyObservedToStartup() {
         // Independent explicit UI action: this never edits Sway files.
@@ -221,6 +255,8 @@ Scope {
             }
             ledMonitor.document = parsed.document;
             ledMonitor.storageState = "ready";
+            if (parsed.document.enabled)
+                KeyboardLockSettings.inspectHost();
         }
         onLoadFailed: function(error) {
             if (ledMonitor.storageState === "saving")

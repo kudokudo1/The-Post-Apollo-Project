@@ -31,7 +31,10 @@ for forbidden in (
     "scripting", "debugger", "activeTab", "background", "content_scripts",
     "externally_connectable", "webRequest", "<all_urls>",
 ):
-    assert forbidden not in json.dumps({\n        key: value for key, value in manifest.items()\n        if key != "optional_permissions"\n    }), forbidden
+    assert forbidden not in json.dumps({
+        key: value for key, value in manifest.items()
+        if key != "optional_permissions"
+    }), forbidden
 
 assert '<script type="module" src="popup.mjs"></script>' in html
 assert '<link rel="stylesheet" href="popup.css">' in html

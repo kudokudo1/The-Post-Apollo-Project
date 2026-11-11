@@ -2979,7 +2979,7 @@ Rectangle {
                                              || modelData.state === "waiting"
                                     label: "ANSWER"
                                     labelPixelSize: 10
-                                    accentColor: Colors.magenta
+                                    accentColor: Colors.green
                                     interactive: !phoneCallsActionProcess.running
                                     onTriggered: phonePane.requestCallAction("answer", modelData.id)
                                 }
@@ -3072,7 +3072,7 @@ Rectangle {
                     height: 35
                     label: "REVIEW OUTGOING CALL"
                     labelPixelSize: 9
-                    accentColor: Colors.magenta
+                    accentColor: Colors.green
                     interactive: phonePane.callsWorkspaceState === "READY"
                                  && !phoneCallsActionProcess.running
                     onTriggered: phonePane.preparePhoneDial()
@@ -3103,7 +3103,7 @@ Rectangle {
                                 height: 34
                                 label: "CONFIRM CALL"
                                 labelPixelSize: 10
-                                accentColor: Colors.magenta
+                                accentColor: Colors.green
                                 onTriggered: phonePane.requestCallAction(
                                     "dial", phonePane.callsPendingDial)
                             }
@@ -3144,7 +3144,7 @@ Rectangle {
                     visible: phonePane.canHoldAnswer()
                     label: "HOLD AND ANSWER"
                     labelPixelSize: 9
-                    accentColor: Colors.magenta
+                    accentColor: Colors.green
                     interactive: !phoneCallsActionProcess.running
                     onTriggered: phonePane.requestCallAction("hold-answer", "")
                 }

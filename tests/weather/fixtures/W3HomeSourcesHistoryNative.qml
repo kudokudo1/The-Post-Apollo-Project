@@ -94,7 +94,7 @@ ShellRoot {
                 root.phase=3;return;
             }
             if(root.phase===3) {
-                if(!runtime.visible||!health.visible
+                if(!services.visible || scroll.visible
                     ||charts.visible||archive.visible)
                     return root.fail("LEGACY_HEALTH_BOOKMARK_NOT_SOURCES");
                 root.done=true;

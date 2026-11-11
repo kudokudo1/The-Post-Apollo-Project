@@ -47,7 +47,8 @@ class AlarmManagerV2Contracts(unittest.TestCase):
                    "stopAlarm(id)", "stopAll()", "snoozeAlarm(id)",
                    "previewSound(soundId, volumePercent)"]:
             self.assertIn("function " + fn, OWNER)
-        self.assertIn("Policy.tick(document, nowMs)", OWNER)
+        self.assertIn("Policy.tick(document, manager.nowMs)", OWNER)
+        self.assertIn("manager.nowMs = Date.now();", OWNER)
         self.assertIn("manager.nowMs = Date.now()", OWNER)
         self.assertIn("interval: 1000", OWNER)
 

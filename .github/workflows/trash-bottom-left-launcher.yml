@@ -39,6 +39,8 @@ jobs:
         run: python3 -m unittest discover -s tests/trash -p 'test_*.py' -v
       - name: Verify Camera Cleanup handoff preserves shared queue and authority
         run: node --test tests/trash/test_camera_cleanup_handoff.cjs
+      - name: Verify V2 pilot snapshots require preview, confirmation and owner scope
+        run: node --test tests/trash/test_archive_snapshot_state.cjs
       - name: Verify two-click Burn state machine never deletes on first click
         run: node --test tests/trash/test_burn_copy_two_click.cjs
       - name: Verify managed-bin-only Burn All and unified Trash filters

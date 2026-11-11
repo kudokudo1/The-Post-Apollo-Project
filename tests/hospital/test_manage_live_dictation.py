@@ -49,6 +49,95 @@ def next_json_packet(process, selector, pending: bytearray, *, timeout: float):
 
 
 class LiveDictationTests(unittest.TestCase):
+    def test_pilot_live_one_chunk_and_no_second_whisper_launch(self):
+        # The authorized live trial is simulated with fake pw-record + model.
+        # No host mic, actual Whisper, auth credentials or desktop processes.
+        with tempfile.TemporaryDirectory(prefix="hospital-pilot-once-") as folder:
+            root = Path(folder)
+            fakebin = root / "bin"
+            fakebin.mkdir()
+            recorder = fakebin / "pw-record"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys,time\n"
+                "speech=(1500).to_bytes(2,'little',signed=True)\n"
+                "for _ in range(80):\n"
+                " sys.stdout.buffer.write(speech*1600)\n"
+                " sys.stdout.buffer.flush()\n"
+                " time.sleep(0.004)\n"
+                "time.sleep(15)\n"
+            )
+            recorder.chmod(0o700)
+            count_path = root / "model-calls"
+            helper = root / "whisper.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ \"$1\" == '--check' ]]; then exit 0; fi\n"
+                "printf 'run\\n' >> \"$HOSPITAL_PILOT_MODEL_CALLS\"\n"
+                "printf 'One guarded phrase.\\n'\n"
+            )
+            helper.chmod(0o700)
+            env = dict(os.environ,
+                       PATH=str(fakebin) + ":" + os.environ["PATH"],
+                       HOSPITAL_PILOT_MODEL_CALLS=str(count_path))
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(helper),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-one-chunk"],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                env=env, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packets = [json.loads(line) for line in result.stdout.splitlines()]
+            self.assertEqual([p["text"] for p in packets
+                              if p["kind"] == "partial"],
+                             ["One guarded phrase."])
+            stages = [p["detail"] for p in packets if p["kind"] == "stage"]
+            for code in ("RECORDER_STARTED", "FIRST_AUDIO_QUEUED",
+                         "FIRST_MODEL_STARTED", "FIRST_MODEL_ENDED",
+                         "FIRST_TEXT_READY", "RECORDING_COMPLETED"):
+                self.assertIn(code, stages)
+            self.assertEqual(sum(p["kind"] == "done" for p in packets), 1)
+            self.assertEqual(count_path.read_text().splitlines(), ["run"],
+                             "Pilot must NEVER start a second model process")
+
+    def test_pilot_silence_auto_stops_without_loading_model(self):
+        with tempfile.TemporaryDirectory(prefix="hospital-pilot-silence-") as folder:
+            root = Path(folder)
+            fakebin = root / "bin"
+            fakebin.mkdir()
+            recorder = fakebin / "pw-record"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys,time\n"
+                "for _ in range(80):\n"
+                " sys.stdout.buffer.write(b'\\x00'*3200)\n"
+                " sys.stdout.buffer.flush()\n"
+                " time.sleep(0.004)\n"
+                "time.sleep(15)\n"
+            )
+            recorder.chmod(0o700)
+            count_path = root / "model-calls"
+            helper = root / "whisper.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ \"$1\" == '--check' ]]; then exit 0; fi\n"
+                "printf 'run\\n' >> \"$HOSPITAL_PILOT_MODEL_CALLS\"\n"
+            )
+            helper.chmod(0o700)
+            env = dict(os.environ,
+                       PATH=str(fakebin) + ":" + os.environ["PATH"],
+                       HOSPITAL_PILOT_MODEL_CALLS=str(count_path))
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(helper),
+                 "--first-chunk-ms", "1400", "--pilot-one-chunk"],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                env=env, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packets = [json.loads(line) for line in result.stdout.splitlines()]
+            self.assertFalse(any(p["kind"] == "partial" for p in packets))
+            self.assertEqual(sum(p["kind"] == "done" for p in packets), 1)
+            self.assertFalse(count_path.exists(), "Silence must never load Whisper")
+
     def test_no_audio_no_model_inference(self):
         self.assertFalse(live.is_speech(pcm(0, 5)))
         self.assertFalse(live.is_speech(pcm(25, 5)))

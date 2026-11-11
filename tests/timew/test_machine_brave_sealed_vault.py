@@ -126,6 +126,16 @@ with tempfile.TemporaryDirectory(prefix="machine-sealed-vault-test-") as t:
     refused(vault.read,another["record_id"])
     hard.unlink()
     assert vault.read(another["record_id"])["record"]["kind"]==vault.RECORD_KIND
+
+    # Valid-looking record ID must never follow a symlink to another record.
+    symlink_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    symlink_path=target/(symlink_id+".json")
+    symlink_path.symlink_to(second.name)
+    refused(vault.read,symlink_id)
+    refused(vault.listing)
+    symlink_path.unlink()
+    refused(vault.strict_json,b'{"kind":"a","kind":"b"}')
+
     os.chmod(target,0o755)
     refused(vault.read,another["record_id"])
     os.chmod(target,0o700)

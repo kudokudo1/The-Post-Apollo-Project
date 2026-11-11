@@ -412,18 +412,32 @@ Rectangle {
                         border.width: 1
                         border.color: panel.sky && panel.sky.inspectedHourIndex===index
                             ? Colors.magenta : Colors.blue
+                        // W13 // The time, glyph, rain label and meter travel
+                        // together. The meter must never drift to card bottom.
+                        readonly property real artHeight:
+                            Math.max(24,Math.min(56,hourCell.height-35))
+                        readonly property real instrumentHeight:
+                            11 + artHeight + 10 + 8 + 6
                         GohuText {
+                            id: hourTime
+                            objectName: "weather-w13-hour-centered-label"
                             anchors.top: parent.top
+                            anchors.topMargin: Math.max(0,
+                                (hourCell.height-hourCell.instrumentHeight)/2)
                             anchors.horizontalCenter: parent.horizontalCenter
+                            height: 11
                             text: String(hourCell.entry.timeLabel||"--") + " "
                                   +panel.reading(hourCell.entry.tempF,"°F")
                             color: Colors.white
                             font.pixelSize: 9
                         }
                         Item {
+                            id: hourArtwork
+                            objectName: "weather-w13-hour-glyph"
                             width: parent.width
-                            height: Math.max(34,Math.min(62,hourCell.height-34))
-                            anchors.verticalCenter: parent.verticalCenter
+                            height: hourCell.artHeight
+                            anchors.top: hourTime.bottom
+                            anchors.topMargin: 2
                             Text {
                                 anchors.centerIn: parent
                                 id: hourlyWeatherGlyph
@@ -434,7 +448,7 @@ Rectangle {
                             }
                             WeatherCelestialGlyph {
                                 anchors.centerIn: parent
-                                width: Math.max(34,Math.min(58,parent.height-2))
+                                width: Math.max(30,Math.min(58,parent.height-2))
                                 height: width
                                 mode: hourCell.artwork
                                 weatherKind: WeatherCyclePolicy.nightKind(hourCell.weatherState)
@@ -445,21 +459,26 @@ Rectangle {
                             }
                         }
                         QuietText {
-                            anchors.left: parent.left
-                            anchors.bottom: parent.bottom
-                            anchors.bottomMargin: 14
+                            id: hourlyRainReading
+                            objectName: "weather-w13-hour-rain-caption"
+                            anchors.top: hourArtwork.bottom
+                            anchors.topMargin: 1
                             width: parent.width
+                            height: 10
                             text: panel.rainLabel(hourCell.entry.chanceRain)
                             horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
                             font.pixelSize: 9
                             color: Colors.cyan
                         }
                         Rectangle {
                             id: hourlyRainMeter
+                            anchors.top: hourlyRainReading.bottom
+                            anchors.topMargin: 2
                             anchors.left: parent.left
                             anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            anchors.margins: 3
+                            anchors.leftMargin: 3
+                            anchors.rightMargin: 3
                             height: 8
                             color: Colors.black
                             border.width: 1

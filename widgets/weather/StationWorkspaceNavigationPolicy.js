@@ -37,7 +37,7 @@ var GROUPS = {
         // Observatory only: terrestrial weather belongs to WEATHER.
         {label:"ASTRONOMY",path:"cosmos/planets-stars/celestial-fix",key:"sky"},
         {label:"EVENTS",path:"cosmos/events/overview",key:"events"},
-        {label:"SPACE",path:"cosmos/space-weather/overview",key:"space-weather"}
+        {label:"SERVICES",path:"cosmos/space-weather/overview",key:"space-weather"}
     ],
     earth:[
         {label:"OVERVIEW",path:"earth/overview",key:"overview"},

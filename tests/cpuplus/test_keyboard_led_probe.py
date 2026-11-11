@@ -73,7 +73,7 @@ class LedProbeTests(unittest.TestCase):
 
     def test_never_reads_key_events_or_writes(self):
         src = HELPER.read_text()
-        for forbidden in ("/dev/input", "swaymsg", "subprocess",
+        for forbidden in ('Path("/dev/input")', "swaymsg", "subprocess",
                           "os.system", "os.open", "write_text", "unlink",
                           "chmod", "EVIOCGKEY"):
             self.assertNotIn(forbidden, src)

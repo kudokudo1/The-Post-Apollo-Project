@@ -120,6 +120,7 @@ Rectangle {
             width: parent.width
             height: terminal.currentHeight
             readonly property alias mainGlyph: mainWeatherIcon
+            readonly property alias mainArtwork: originalConditionGlyph
             readonly property alias mainTemperature: temperature
             readonly property alias weatherMeters: metricRepeater
 

@@ -332,7 +332,8 @@ PanelWindow {
         { name: "LOCATION", key: "LOCATION", symbol: "⌖" },
         { name: "TIME", key: "TIME", symbol: "🕰" },
         { name: "CONNECTIONS", key: "CONNECTIONS", symbol: "⛓" },
-        // Stage 0: navigation only. No input device or lighting writes.
+        // Navigation modes. KEYBOARD now owns startup-policy controls;
+        // MOUSE, ACCESSIBILITY and LIGHTING remain read-only placeholders.
         { name: "KEYBOARD", key: "KEYBOARD", symbol: "⌨" },
         { name: "MOUSE", key: "MOUSE", symbol: "🖱" },
         { name: "ACCESSIBILITY", key: "ACCESSIBILITY", symbol: "♿" },

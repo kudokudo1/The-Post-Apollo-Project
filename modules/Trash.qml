@@ -57,6 +57,18 @@ PanelWindow {
     property string archiveV2PendingCursor: ""
     property string archiveV2AppliedQuery: ""
     property string archiveV2PendingQuery: ""
+
+    // Only the two allowlisted source-row pilots can make a V2 snapshot.
+    // Preview reads the owner and returns a witness; the second explicit
+    // click revalidates that witness and writes only an independent copy.
+    property bool snapshotBusy: false
+    property string snapshotPendingAction: ""
+    property string snapshotRecordId: ""
+    property string snapshotSourceKind: ""
+    property string snapshotIdentifier: ""
+    property string snapshotTimestamp: ""
+    property string snapshotWitness: ""
+    property string snapshotStatus: "IDLE"
     readonly property bool archiveV2QueryDirty:
         archiveSearchText.trim() !== archiveV2AppliedQuery
 
@@ -399,6 +411,142 @@ PanelWindow {
         }
     }
 
+    function snapshotSource(row) {
+        if (!row || !row.id || !row.capabilities
+                || row.capabilities.saveCopy !== true)
+            return null;
+        const found = archiveRows.find(function(item) {
+            return item.id === row.id && item.kind === row.kind
+                   && item.ownerId === row.ownerId;
+        });
+        if (!found)
+            return null;
+        if (row.kind === "WEB SCRAPE" && found.ownerId === "demo-scrape"
+                && row.sourceUrl === found.sourceUrl
+                && row.sourceObservedAt === found.sourceObservedAt
+                && typeof row.sourceUrl === "string"
+                && typeof row.sourceObservedAt === "string")
+            return {kind:"demo", id:String(row.sourceUrl),
+                    stamp:String(row.sourceObservedAt)};
+        if (row.kind === "EVENT HISTORY" && found.ownerId === "weather-events"
+                && row.sourceEventKey === found.sourceEventKey
+                && row.sourceLastCapturedAtMs === found.sourceLastCapturedAtMs
+                && typeof row.sourceEventKey === "string"
+                && typeof row.sourceLastCapturedAtMs === "number")
+            return {kind:"weather", id:String(row.sourceEventKey),
+                    stamp:String(row.sourceLastCapturedAtMs)};
+        return null;
+    }
+
+    function clearSnapshotArm() {
+        snapshotRecordId = "";
+        snapshotSourceKind = "";
+        snapshotIdentifier = "";
+        snapshotTimestamp = "";
+        snapshotWitness = "";
+    }
+
+    function requestSnapshot(row) {
+        if (!menuOpen || activeMode !== "archive" || snapshotBusy
+                || busy || researchBusy || archiveBusy || confirmMode !== ""
+                || researchBurnId !== "" || burnUiStage !== "")
+            return false;
+        const source = snapshotSource(row);
+        if (!source)
+            return false;
+        const confirming = snapshotRecordId === String(row.id)
+                           && snapshotSourceKind === source.kind
+                           && snapshotIdentifier === source.id
+                           && snapshotTimestamp === source.stamp
+                           && /^[0-9a-f]{64}$/.test(snapshotWitness);
+        if (!confirming) {
+            clearSnapshotArm();
+            snapshotRecordId = String(row.id);
+            snapshotSourceKind = source.kind;
+            snapshotIdentifier = source.id;
+            snapshotTimestamp = source.stamp;
+        }
+        snapshotBusy = true;
+        snapshotPendingAction = confirming ? "capture" : "preview";
+        snapshotStatus = confirming ? "SAVING // IMMUTABLE COPY"
+                                    : "CHECKING // SOURCE REVISION";
+        const args = ["python3", "-I", "-B",
+            Quickshell.shellPath("scripts/trash/archive_v2_capture_cli.py"),
+            snapshotPendingAction, Quickshell.dataDir, source.kind,
+            source.id, source.stamp];
+        if (confirming)
+            args.push(snapshotWitness);
+        snapshotCaptureProcess.exec(args);
+        return true;
+    }
+
+    function consumeSnapshot(raw) {
+        if (!snapshotBusy)
+            return;
+        const action = snapshotPendingAction;
+        snapshotBusy = false;
+        snapshotPendingAction = "";
+        let reply = null;
+        try { reply = JSON.parse(String(raw || "").trim()); }
+        catch (error) {
+            snapshotStatus = "STALE // INVALID SNAPSHOT RECEIPT";
+            clearSnapshotArm();
+            return;
+        }
+        if (!reply || reply.ok !== true || reply.sourceKind !== snapshotSourceKind) {
+            snapshotStatus = "COPY REFUSED // " + String(reply && reply.error
+                                                       || "SOURCE UNAVAILABLE");
+            clearSnapshotArm();
+            return;
+        }
+        if (action === "preview") {
+            const preview = reply.preview;
+            if (reply.kind !== "snapshot-preview-v2" || reply.readOnly !== true
+                    || !preview || !/^[0-9a-f]{64}$/.test(preview.sourceRevision)
+                    || preview.ownerId !== (snapshotSourceKind === "demo"
+                                           ? "demo-scrape" : "weather-events")) {
+                snapshotStatus = "STALE // INVALID SOURCE PREVIEW";
+                clearSnapshotArm();
+                return;
+            }
+            // Navigating away or closing the panel revokes the preview.
+            if (!menuOpen || activeMode !== "archive"
+                    || archiveRows.findIndex(function(r) {
+                        return r.id === snapshotRecordId
+                               && snapshotSource(r) !== null;
+                    }) < 0) {
+                snapshotStatus = "IDLE";
+                clearSnapshotArm();
+                return;
+            }
+            snapshotWitness = preview.sourceRevision;
+            snapshotStatus = "SOURCE CHECKED // CLICK CONFIRM COPY";
+            return;
+        }
+        const receipt = reply.receipt;
+        if (action !== "capture" || reply.kind !== "snapshot-captured-v2"
+                || reply.copyOnly !== true || !receipt
+                || !/^[0-9a-f]{32}$/.test(receipt.id)
+                || receipt.sourceRevision !== snapshotWitness
+                || receipt.ownerId !== (snapshotSourceKind === "demo"
+                                       ? "demo-scrape" : "weather-events")
+                || !/^[0-9a-f]{64}$/.test(receipt.sha256)
+                || typeof receipt.size !== "number" || receipt.size < 1) {
+            snapshotStatus = "STALE // INVALID COPY RECEIPT";
+            clearSnapshotArm();
+            return;
+        }
+        snapshotStatus = "SAVED // INDEPENDENT READ-ONLY COPY";
+        clearSnapshotArm();
+        if (menuOpen && activeMode === "archive")
+            Qt.callLater(function() {
+                if (trashLauncher.menuOpen
+                        && trashLauncher.activeMode === "archive")
+                    trashLauncher.refreshArchiveV2(
+                        0, "", trashLauncher.archiveSearchText.trim());
+            });
+    }
+
     function saveDemoCopy(row) {
         if (!row || row.kind !== "WEB SCRAPE" || !row.sourceUrl
                 || !row.sourceObservedAt)
@@ -572,7 +720,7 @@ PanelWindow {
 
     function setMode(nextMode) {
         const requested = String(nextMode || "");
-        if (busy || researchBusy || confirmMode !== ""
+        if (busy || researchBusy || snapshotBusy || confirmMode !== ""
                 || researchBurnId !== "" || burnUiStage !== ""
                 || lifecycleModes.indexOf(requested) < 0)
             return false;
@@ -586,6 +734,10 @@ PanelWindow {
         if (activeMode === "cleanup" && requested !== "cleanup"
                 && cameraCleanupController)
             cameraCleanupController.suspendHostedCleanup();
+        if (requested !== "archive") {
+            clearSnapshotArm();
+            snapshotStatus = "IDLE";
+        }
         activeMode = requested;
         if (menuOpen)
             Qt.callLater(function() {
@@ -737,6 +889,10 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!menuOpen) {
+            // A committed capture must complete even if the user closes
+            // the panel; only previews can be silently discarded.
+            if (!snapshotBusy || snapshotPendingAction !== "capture")
+                clearSnapshotArm();
             burnCommitDelay.stop();
             burnUiStage = "";
             clearConfirmation();
@@ -969,6 +1125,26 @@ PanelWindow {
                     trashLauncher.archiveV2Busy = false;
                     trashLauncher.archiveV2Rows = [];
                     trashLauncher.archiveV2State = "STALE // COPY INDEX PROCESS FAILED";
+                }
+            });
+        }
+    }
+
+    // Separate allowlisted copy-only process. It cannot invoke GIO Trash,
+    // managed V1 Burn, or source deletion. Preview is a read-only verb.
+    Process {
+        id: snapshotCaptureProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: trashLauncher.consumeSnapshot(this.text)
+        }
+        onExited: function(code, status) {
+            Qt.callLater(function() {
+                if (trashLauncher.snapshotBusy) {
+                    trashLauncher.snapshotBusy = false;
+                    trashLauncher.snapshotPendingAction = "";
+                    trashLauncher.clearSnapshotArm();
+                    trashLauncher.snapshotStatus = "STALE // COPY PROCESS FAILED";
                 }
             });
         }
@@ -1769,6 +1945,19 @@ PanelWindow {
                                 }).join(" // ")
                         }
 
+                        GohuText {
+                            id: snapshotCopyStatus
+                            width: parent.width
+                            height: 17
+                            visible: trashLauncher.snapshotStatus !== "IDLE"
+                            font.pixelSize: 9
+                            color: trashLauncher.snapshotStatus.indexOf("REFUSED") >= 0
+                                   || trashLauncher.snapshotStatus.indexOf("STALE") === 0
+                                   ? Colors.red : Colors.green
+                            elide: Text.ElideRight
+                            text: "SNAPSHOT // " + trashLauncher.snapshotStatus
+                        }
+
                         TextField {
                             id: archiveSearch
                             width: parent.width
@@ -1822,7 +2011,8 @@ PanelWindow {
                         Item {
                             id: archiveEntriesBox
                             width: parent.width
-                            height: Math.max(65, archiveRecordsView.height - 222)
+                            height: Math.max(65, archiveRecordsView.height
+                                - (trashLauncher.snapshotStatus === "IDLE" ? 222 : 239))
                             ListView {
                                 id: archiveEntriesList
                                 width: parent.width - 17
@@ -1931,6 +2121,32 @@ PanelWindow {
                                                 else
                                                     trashLauncher.trashResearchCopy(modelData);
                                             }
+                                        }
+
+                                        ActionButton {
+                                            id: saveSnapshotButton
+                                            width: parent.width
+                                            height: 28
+                                            visible: (modelData.kind === "WEB SCRAPE"
+                                                      || modelData.kind === "EVENT HISTORY")
+                                                     && modelData.capabilities
+                                                     && modelData.capabilities.saveCopy === true
+                                            label: trashLauncher.snapshotRecordId
+                                                   === String(modelData.id)
+                                                   && trashLauncher.snapshotWitness !== ""
+                                                   ? "CONFIRM COPY" : "SAVE SNAPSHOT"
+                                            labelPixelSize: 9
+                                            accentColor: trashLauncher.snapshotRecordId
+                                                         === String(modelData.id)
+                                                         && trashLauncher.snapshotWitness !== ""
+                                                         ? Colors.green : Colors.magenta
+                                            available: !trashLauncher.snapshotBusy
+                                                       && !trashLauncher.researchBusy
+                                                       && !trashLauncher.archiveBusy
+                                                       && !trashLauncher.busy
+                                                       && trashLauncher.confirmMode === ""
+                                                       && trashLauncher.burnUiStage === ""
+                                            onLeftClicked: trashLauncher.requestSnapshot(modelData)
                                         }
 
                                         ActionButton {

@@ -63,18 +63,14 @@ def _preview(prepared):
             if key != "_payload"}
 
 
-class PilotSnapshotAdapter:
-    """Manual, opt-in disposable source copying; not a source owner writer.
+class PilotSnapshotReader:
+    """Read-only source preview: does not initialize or create an Archive DB.
 
-    The caller supplies the expected SHA-256 witness from preview. Capture
-    *re-reads and validates* the selected owner item using V1's trusted,
-    fixed-path source reader, and refuses stale/mismatched bytes.
+    The CLI can preview a source without creating an empty SQLite archive.
+    Source identity, normalization and witnesses are shared with capture.
     """
 
-    def __init__(self, archive, *, data_dir, home_dir):
-        if not isinstance(archive, ArchiveStore):
-            raise AdapterError("INVALID_ARCHIVE_STORE")
-        self.archive = archive
+    def __init__(self, *, data_dir, home_dir):
         self.data_dir = _root(data_dir)
         self.home_dir = _root(home_dir)
 
@@ -120,6 +116,15 @@ class PilotSnapshotAdapter:
 
     def preview_weather(self, event_key, last_captured_ms):
         return _preview(self._weather(event_key, last_captured_ms))
+
+class PilotSnapshotAdapter(PilotSnapshotReader):
+    """Owner-aware, explicit copy with a preflight source revision witness."""
+
+    def __init__(self, archive, *, data_dir, home_dir):
+        if not isinstance(archive, ArchiveStore):
+            raise AdapterError("INVALID_ARCHIVE_STORE")
+        super().__init__(data_dir=data_dir, home_dir=home_dir)
+        self.archive = archive
 
     def _capture(self, prepared, expected_revision):
         if (not isinstance(expected_revision, str)

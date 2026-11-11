@@ -3,18 +3,18 @@ import QtQuick.Window
 import Quickshell
 import "widgets/weather" as Weather
 
-// W9 // Disposable native Quickshell test. No live providers/desktop writes.
-// Check the actual original SKY renderer and all four fixed-sized views.
+// W10 // Disposable native test for 3-in-1 WEATHER and top-aligned TWILIGHT
+// with the reused solar curve. No live providers or desktop writes.
 ShellRoot {
     id: root
     property int ticks: 0
     property int phase: 0
     property bool finished: false
-    readonly property var pages: ["now","hourly","daily","twilight"]
+    readonly property var pages: ["weather","twilight"]
     function fail(reason) {
         if(finished)return;
         finished=true;
-        console.error("W9_NATIVE_FAIL // "+reason);
+        console.error("W10_NATIVE_FAIL // "+reason);
         Qt.quit();
     }
     QtObject {
@@ -90,37 +90,69 @@ ShellRoot {
         running: !root.finished
         onTriggered: {
             root.ticks++;
-            if(root.ticks>35) return root.fail("TIMEOUT");
+            if(root.ticks>40)return root.fail("TIMEOUT");
             const host=weather.activePanelLoader.item;
-            if(!host || !host.renderer || !host.viewport || !host.pageRail) {
+            if(!host || !host.renderer || !host.viewport
+                || !host.pageRail || !host.combinedPanel || !host.solarVisual) {
                 if(root.ticks>12)return root.fail("COMBINED_HOST_MISSING");
                 return;
             }
             const sky=host.renderer;
-            const target=root.pages[root.phase];
-            if(host.activeInstrument !== target) host.activeInstrument=target;
-            if(sky.weatherFocus!==target)return;
+            const combined=host.combinedPanel;
+            const solar=host.solarVisual;
             if(!host.pageRail.visible || host.pageRail.height!==26
-                    || sky.visualScroll.interactive)
-                return root.fail("SCROLLING_OR_PAGE_RAIL // "+target);
+               || sky.visualScroll.interactive)
+                return root.fail("SCROLLING_OR_PAGE_RAIL");
             if(sky.visualScroll.contentY!==0)
-                return root.fail("SCROLL_OFFSET_LEAK // "+target);
-            const drawnWidth=sky.width*sky.scale;
-            const drawnHeight=sky.focusedContentHeight*sky.scale;
-            if(!isFinite(drawnHeight)||drawnHeight<=0
-                ||drawnHeight>host.viewport.height+1
-                ||drawnWidth>host.viewport.width+1)
-                return root.fail("CLIPPED_"+target+" // "
-                    +drawnWidth+"x"+drawnHeight+" in "
-                    +host.viewport.width+"x"+host.viewport.height);
-            if(root.phase===1 && sky.hourlyForecast.length!==6)
-                return root.fail("HOURLY_MODEL_LOST");
-            if(root.phase===2 && sky.dailyForecast.length!==3)
-                return root.fail("DAILY_MODEL_LOST");
-            root.phase++;
-            if(root.phase===root.pages.length) {
+                return root.fail("SCROLL_OFFSET_LEAK");
+            if(root.phase===0) {
+                if(host.activeInstrument!=="weather")
+                    return root.fail("COMBINED_NOT_DEFAULT");
+                if(!combined.visible || sky.visible)
+                    return root.fail("COMBINED_SCREEN_VISIBILITY");
+                if(combined.hourRepeater.count!==6
+                   || combined.dayCardsRepeater.count!==3
+                   || sky.hourlyForecast.length!==6
+                   || sky.dailyForecast.length!==3)
+                    return root.fail("FORECAST_ROWS_LOST");
+                const bottom=combined.footerItem.mapToItem(
+                    combined,0,combined.footerItem.height).y;
+                if(bottom>combined.height+1 || bottom<combined.height-18)
+                    return root.fail("BANDS_OVERFLOW // "+bottom
+                        +" > "+combined.height);
+                const dailyBottom=combined.dailyItem.mapToItem(
+                    combined,0,combined.dailyItem.height).y;
+                if(dailyBottom>combined.height)
+                    return root.fail("DAILY_OUT_OF_VIEW");
+                host.activeInstrument="twilight";
+                root.phase=1;
+                return;
+            }
+            if(root.phase===1) {
+                if(host.activeInstrument!=="twilight" || !sky.visible)
+                    return;
+                if(sky.weatherFocus!=="twilight")
+                    return root.fail("TWILIGHT_ROUTE");
+                if(sky.y!==0)
+                    return root.fail("TWILIGHT_CENTERED_VERTICALLY");
+                const upper=host.viewport.height*0.50;
+                if(sky.focusedContentHeight*sky.scale > upper+2)
+                    return root.fail("TWILIGHT_TOP_OVERFLOW");
+                if(!solar.showSun || solar.showMoon
+                   || solar.height*solar.scale>host.viewport.height-upper+2
+                   || solar.scale<=0)
+                    return root.fail("SOLAR_CURVE_NOT_FITTING");
+                host.activeInstrument="weather";
+                sampleWeather.forecastReady=false;
+                root.phase=2;
+                return;
+            }
+            if(root.phase===2) {
+                if(combined.hourlyRows.length!==0
+                   || combined.dailyRows.length!==0)
+                    return root.fail("STALE_FORECAST_PRESENT");
                 root.finished=true;
-                console.log("W9_NATIVE_PASS // FIXED_WEATHER_FOUR_PAGES_520X300_NO_SCROLL");
+                console.log("W10_NATIVE_PASS // THREE_BANDS_PLUS_TOP_TWILIGHT_SOLAR_520X300");
                 Qt.quit();
             }
         }

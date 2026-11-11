@@ -31,7 +31,7 @@ READ_BYTES = RATE * FRAME_BYTES // 10
 CHUNK_SECONDS = 4
 MAX_SECONDS = 90
 MIN_TAIL_SECONDS = 1
-MAX_QUEUE = 8
+MAX_QUEUE = 2
 PLACEHOLDER = re.compile(
     r"\[\s*(?:BLANK_AUDIO|NO_SPEECH|SILENCE|MUSIC|NO_AUDIO)\s*\]",
     re.IGNORECASE,
@@ -83,10 +83,12 @@ def packet(kind: str, *, text: str = "", detail: str = "") -> str:
                       ensure_ascii=False, separators=(",", ":"))
 
 
-def transcribe_chunk(stt_helper: str, audio: bytes) -> str:
+def transcribe_chunk(stt_helper: str, audio: bytes, *,
+                     on_start=None, on_end=None) -> str:
     if not is_speech(audio):
         return ""
-    # A bounded, private, automatically deleted WAV. No persistent recording.
+    # Keep a handle to the actual Whisper process: a cancelled voice session
+    # must not leave a model consuming memory/CPU after Python stops.
     with tempfile.TemporaryDirectory(prefix="hospital-live-chunk-") as folder:
         wav = Path(folder) / "speech.wav"
         with wave.open(str(wav), "wb") as dest:
@@ -94,12 +96,24 @@ def transcribe_chunk(stt_helper: str, audio: bytes) -> str:
             dest.setsampwidth(FRAME_BYTES)
             dest.setframerate(RATE)
             dest.writeframes(audio)
-        command = ["bash", stt_helper, str(wav)]
-        result = subprocess.run(command, capture_output=True, text=True,
-                                timeout=25, check=False)
-    if result.returncode != 0:
+        process = subprocess.Popen(
+            ["bash", stt_helper, str(wav)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            start_new_session=True)
+        try:
+            if on_start is not None:
+                on_start(process)
+            output, _ = process.communicate(timeout=15)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+            raise
+        finally:
+            if on_end is not None:
+                on_end(process)
+    if process.returncode != 0:
         raise RuntimeError("LOCAL WHISPER CHUNK FAILED")
-    return clean_transcript(result.stdout)
+    return clean_transcript(output)
 
 
 def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
@@ -125,6 +139,41 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
     recognition_done = threading.Event()
     stopping_error = threading.Event()
     recorder = None
+    model_lock = threading.Lock()
+    active_model = None
+
+    def halt_model():
+        with model_lock:
+            current = active_model
+        if current is not None and current.poll() is None:
+            try:
+                # The bash helper execs whisper-cli; session leadership also
+                # protects against future helper subprocesses.
+                os.killpg(current.pid, signal.SIGTERM)
+            except (ProcessLookupError, OSError):
+                pass
+            # A model ignoring SIGTERM must not outlive its dictation
+            # session and keep consuming the user's PC resources.
+            def force_stop():
+                if current.poll() is None:
+                    try:
+                        os.killpg(current.pid, signal.SIGKILL)
+                    except (ProcessLookupError, OSError):
+                        pass
+            threading.Timer(1.0, force_stop).start()
+
+    def model_started(process):
+        nonlocal active_model
+        with model_lock:
+            active_model = process
+        if cancelled.is_set():
+            halt_model()
+
+    def model_ended(process):
+        nonlocal active_model
+        with model_lock:
+            if active_model is process:
+                active_model = None
 
     def send(kind, text="", detail=""):
         if cancelled.is_set():
@@ -142,6 +191,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
     def sigterm(*_unused):
         cancelled.set()
         stopping.set()
+        halt_model()
         halt_child()
 
     signal.signal(signal.SIGTERM, sigterm)
@@ -159,7 +209,14 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
     def read_commands():
         try:
             for line in sys.stdin:
-                if line.strip().upper() == "STOP":
+                command = line.strip().upper()
+                if command == "CANCEL":
+                    cancelled.set()
+                    stopping.set()
+                    halt_model()
+                    halt_child()
+                    break
+                if command == "STOP":
                     stopping.set()
                     halt_child()
                     break
@@ -183,10 +240,10 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
         quiet_ms = 0
 
         def enqueue(raw):
-            if not raw or not is_speech(raw):
+            if not raw or not is_speech(raw) or stopping_error.is_set():
                 return False
             try:
-                clips.put(raw, timeout=0.3)
+                clips.put(raw, timeout=0.1)
                 return True
             except queue.Full:
                 stopping_error.set()
@@ -230,8 +287,15 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                     halt_child()
                     break
         finally:
-            if not cancelled.is_set() and len(pending) >= RATE * FRAME_BYTES * MIN_TAIL_SECONDS:
-                enqueue(bytes(pending))
+            # Short spoken endings used to disappear (<1s was discarded).
+            # Gate on speech first, then pad a final subsecond clip to 1s so
+            # Whisper can recognize it after an explicit STOP.
+            if not cancelled.is_set() and is_speech(bytes(pending)):
+                tail = bytes(pending)
+                minimum = RATE * FRAME_BYTES * MIN_TAIL_SECONDS
+                if len(tail) < minimum:
+                    tail += bytes(minimum - len(tail))
+                enqueue(tail)
             capture_done.set()
             # Sentinel eventually enters after the finite queued chunks.
             while not cancelled.is_set() and not recognition_done.is_set():
@@ -252,7 +316,9 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
             if chunk is None:
                 break
             try:
-                phrase = transcribe_chunk(stt_helper, chunk)
+                phrase = transcribe_chunk(stt_helper, chunk,
+                                          on_start=model_started,
+                                          on_end=model_ended)
             except (RuntimeError, OSError, subprocess.TimeoutExpired):
                 stopping_error.set()
                 send("error", detail="LOCAL WHISPER CHUNK FAILED")
@@ -274,6 +340,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
     send("ready")
     recognition_thread.join()
     stopping.set()
+    halt_model()
     halt_child()
     capture_thread.join(timeout=3)
     try:

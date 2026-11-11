@@ -103,8 +103,12 @@ Scope {
         recordingElapsedSeconds = 0;
         lastTranscript = "";
         voiceState = backendReady ? "idle" : "unavailable";
-        if (liveProcess.running)
-            liveProcess.running = false; // kills and reaps owned Python/PipeWire child
+        if (liveProcess.running) {
+            // Give Python a chance to terminate *both* its PipeWire recorder
+            // and the currently running Whisper process before hard teardown.
+            liveProcess.write("CANCEL\n");
+            cancelWatchdog.restart();
+        }
         return true;
     }
 
@@ -159,6 +163,16 @@ Scope {
                 Math.floor((Date.now() - root.recordingStartedAt) / 1000));
         }
     }
+    Timer {
+        id: cancelWatchdog
+        interval: 1800
+        repeat: false
+        onTriggered: {
+            // Emergency fallback if a child refuses graceful cancellation.
+            if (liveProcess.running)
+                liveProcess.running = false;
+        }
+    }
     Process {
         id: probeProcess
         onExited: function(code, status) {
@@ -179,6 +193,7 @@ Scope {
             // Do not echo raw model/process diagnostics or audio content.
         }
         onExited: function(code, status) {
+            cancelWatchdog.stop();
             if (root.wasCancelled)
                 return;
             root.recordingStartedAt = 0;

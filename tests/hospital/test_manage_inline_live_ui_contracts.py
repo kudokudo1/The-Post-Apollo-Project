@@ -14,7 +14,7 @@ def check(ok, label):
 check('HospitalLiveDictationService {' in host
       and 'id: workforceSpeechInputService' in host
       and host.count('HospitalSpeechInputService {') >= 2,
-      "Only Manage uses live stream, Reception and Intercom retain their recorder")
+      "All three menus use a single host-owned live dictation engine")
 check('stdout: SplitParser {' in live
       and 'onRead: function(data)' in live
       and 'signal liveTextReady(string text)' in live
@@ -23,16 +23,19 @@ check('stdout: SplitParser {' in live
 check('stdinEnabled: true' in live
       and 'liveProcess.write("STOP\\n")' in live
       and 'scriptPath, whisperHelper' in live
+      and 'liveProcess.write("CANCEL\\n")' in live
+      and 'cancelWatchdog.restart()' in live
       and 'liveProcess.running = false' in live,
       "Own and stop the local Python/PipeWire child without UI submission")
 check('pw-record' in script and 'whisper-cli' in script
       and 'subprocess.Popen(' in script
-      and 'subprocess.run(command' in script
+      and 'start_new_session=True' in script
+      and 'on_start=model_started' in script
       and 'print(packet(kind' in script,
       "A real local stream and short Whisper chunks, not a fake animation")
 check('"partial"' in script and '"done"' in script
       and 'CHUNK_SECONDS = 4' in script
-      and 'MAX_QUEUE = 8' in script
+      and 'MAX_QUEUE = 2' in script
       and 'MAX_SECONDS = 90' in script,
       "Partial/final protocol has bounded audio, inference and queue")
 check('BLANK_AUDIO' in script and 'if not is_speech(raw):' not in script
@@ -98,13 +101,19 @@ check(host.count('liveStreaming: true') == 2
       and 'otherVoiceBusy: intercomSpeechInputService.busy' in host
       and 'otherVoiceBusy: speechInputService.busy' in host,
       "Reception and Intercom opt in to live speech with mutual microphone exclusion")
-check('HospitalLiveDictationService {' in frontdesk
-      and 'liveSpeech.startRecording()' in frontdesk
-      and 'liveSpeech.stopRecording(false)' in frontdesk
+check('property var liveEngine: null' in frontdesk
+      and 'liveEngine.startRecording()' in frontdesk
+      and 'liveEngine.stopRecording(false)' in frontdesk
+      and 'target: root.liveEngine' in frontdesk
+      and 'liveEngine: workforceSpeechInputService' in host
+      and host.count('liveEngine: workforceSpeechInputService') == 2
       and 'signal liveTextReady(string text)' in frontdesk
       and 'signal transcriptionFinished(bool submitRequested)' in frontdesk,
-      "Front desk bypasses legacy WAV recording and sends partial text before STOP")
-check('maxPackets: 48' in frontdesk and 'chunkSeconds: 2' in frontdesk
+      "Front desks forward live text from the same Manage worker, no nested mic")
+check('liveEngine.vadActive = vadActive' in frontdesk
+      and frontdesk.count('liveEngine.vadActive = false') >= 3,
+      "Front-desk VAD applies only to its own capture, not the next Manage job")
+check('maxPackets: 48' in host and 'chunkSeconds: 2' in host
       and 'property int maxPackets: 30' in live
       and 'packetCount > maxPackets' in live,
       "Shorter 2-second chunks retain the 90-second front-desk bound")
@@ -136,12 +145,17 @@ check('parser.add_argument("--vad"' in script
       and 'if vad:' in script and 'heard_speech' in script,
       "Local stream retains optional silence auto-stop and configurable 2-second chunks")
 
-check('firstChunkMs: 1400' in frontdesk
-      and 'firstChunkMs: 1400' in host
+check('firstChunkMs: 1400' in host
       and 'first_chunk_ms' in script
       and 'first_target' in script
       and 'first_chunk_sent = first_chunk_sent or sent' in script,
       "All Hospital microphones queue the opening speech segment earlier")
+check('def model_started(process)' in script
+      and 'def halt_model()' in script
+      and 'os.killpg(current.pid, signal.SIGTERM)' in script
+      and 'if command == "CANCEL":' in script
+      and 'tail += bytes(minimum - len(tail))' in script,
+      "Model teardown and subsecond speech tail remain bounded under cancellation")
 check('voiceSelected: root.speechInputService.busy' in reception
       and 'color: micButton.voiceSelected ? Colors.yellow' in reception
       and 'color: micButton.voiceSelected ? Colors.magenta' in reception

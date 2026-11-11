@@ -129,21 +129,7 @@ def same_process_checks():
         assert actual.pid==os.getpid()
         assert actual.uid==os.getuid()
         assert actual.gid==os.getgid()
-        try:
-            lifecycle_probe = lifecycle.capture_socket_peer(a,peer=actual)
-        except lifecycle.LifecycleRefusal:
-            # CI-only nonsecret numeric kernel credentials to distinguish
-            # real vs effective UID/GID behavior on the runner.
-            status=Path(f"/proc/{os.getpid()}/status").read_text()
-            values=[line.strip() for line in status.splitlines()
-                    if line.startswith(("Uid:","Gid:"))]
-            print("CI process credential mismatch:",
-                  "socket",actual.uid,actual.gid,
-                  "process",os.getuid(),os.geteuid(),
-                  os.getgid(),os.getegid(),"proc",values,
-                  file=sys.stderr,flush=True)
-            raise
-        with lifecycle_probe as lease:
+        with lifecycle.capture_socket_peer(a,peer=actual) as lease:
             assert lease.valid() is True
             first=lease.identity
             assert first.pid==os.getpid()

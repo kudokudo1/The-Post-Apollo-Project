@@ -120,7 +120,7 @@ def test_expiry_and_revocation():
         with patch.object(cancel,"_socket_still_waiting",return_value=False):
             assert guard.valid() is False
         guard=cancel.begin(a,lease)
-        with patch.object(lease,"valid",return_value=False):
+        with patch.object(lifecycle.ProcessLease,"valid",return_value=False):
             assert guard.valid() is False
     finally:
         close_all(a,b,lease,guard)

@@ -380,6 +380,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             'postapollo_identity_ci_t',
             'postapollo_identity_ci_exec_t',
             'init_daemon_domain(postapollo_identity_ci_t, postapollo_identity_ci_exec_t)',
+            'init_nnp_daemon_domain(postapollo_identity_ci_t)',
             'manage_sock_files_pattern(postapollo_identity_ci_t',
         ):
             self.assertIn(required, policy)
@@ -429,6 +430,14 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertLess(probe.index('semodule -i "$policyfile"'),
                         probe.index('systemctl start "$unit" ||\n  fail "ACTUAL_SIGNED_INSTALLED_SERVICE_START_REFUSED"'))
         self.assertNotIn('setenforce 0', probe)
+        signed_unit = (AREA / "post-apollo-identity-silverblue-ci.service").read_text()
+        self.assertIn('NoNewPrivileges=true', signed_unit)
+        self.assertNotIn('NoNewPrivileges=false', signed_unit)
+        self.assertNotIn('NoNewPrivileges=false', probe)
+        self.assertNotIn('SELinuxContext=-', probe)
+        self.assertNotIn('allow postapollo_identity_ci_t self:tcp_socket', policy)
+        self.assertIn('init_nnp_daemon_domain(postapollo_identity_ci_t)', policy)
+        self.assertIn('[[ "$selinux" == \'system_u:system_r:postapollo_identity_ci_t:s0\' &&', probe)
         self.assertNotIn('semodule -DB', probe)
         self.assertNotIn('permissive ', probe)
 

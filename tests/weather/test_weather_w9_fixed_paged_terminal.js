@@ -22,21 +22,22 @@ test("W9 keeps one original StationSky renderer and the source-owner wiring",()=
    assert.ok(!pane.includes(denied),"unexpected provider "+denied);
 });
 
-test("W9 combined WEATHER navigation is four fixed internal instrument pages",()=>{
+test("W10 preserves W9 fixed-no-scroll behavior in two focused screens",()=>{
  assert.match(pane,/weatherPane\.subjectRoute === "weather\/conditions\/current"/);
  assert.match(pane,/id: instrumentRail/);
  assert.match(pane,/id: instrumentViewport/);
  assert.match(pane,/clip: true/);
  assert.match(pane,/selected: skyHost\.activeInstrument === modelData\.focus/);
  for(const [label,focus] of [
-   ["NOW + AIR","now"],["HOURLY","hourly"],
-   ["DAILY","daily"],["TWILIGHT","twilight"]])
+   ["WEATHER // CURRENT + FORECAST","weather"],
+   ["TWILIGHT // SOLAR","twilight"]])
    assert.ok(pane.includes('label:"'+label+'",focus:"'+focus+'"'));
  assert.match(pane,/onClicked: skyHost\.activeInstrument = modelData\.focus/);
- assert.match(pane,/weatherFocus: skyHost\.combined \? skyHost\.activeInstrument : ""/);
- assert.match(pane,/scale: skyHost\.combined/);
- assert.match(pane,/instrumentViewport\.height/);
- assert.match(pane,/focusedContentHeight/);
+ assert.match(pane,/StationWeatherCombinedPane\s*\{/);
+ assert.match(pane,/StationCosmosVisualInstruments\s*\{/);
+ assert.match(pane,/solarDate: originalSky\.astronomySummary\.date/);
+ assert.match(pane,/solarCivilOffsetMinutes: originalSky\.moonCivilOffsetMinutes/);
+ assert.match(pane,/twilightTextArea\.height/);
 });
 
 test("W9 only the unified WEATHER view paginates original sections",()=>{

@@ -256,7 +256,8 @@ check('socket.AF_UNIX' in session
       "One private local CPU-only guarded model is reused, never a TCP listener")
 check('OVERLAP_BYTES = RATE * FRAME_BYTES * 3 // 4' in script
       and 'trim_repeated_prefix(' in script
-      and 'session.transcribe(previous_pcm_tail + chunk,' in script
+      and 'overlap = previous_pcm_tail' in script
+      and 'session.transcribe(overlap + chunk,' in script
       and 'prompt=previous_text[-160:]' in script
       and 'phrase = transcribe_chunk(stt_helper, chunk' in script,
       "Bounded overlapping windows and de-duplication preserve guarded CLI fallback")

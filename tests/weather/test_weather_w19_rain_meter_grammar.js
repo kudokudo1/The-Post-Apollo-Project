@@ -42,7 +42,7 @@ test("W19 current-condition meters are thicker and optically raised",()=>{
  assert.match(nativeOverview,/TOP_METERS_NOT_CENTERED/);
 });
 test("W19 emphasizes NOW without changing original glyph family or lower cards",()=>{
- assert.match(weather,/width: Math.max\(75,Math.min\(104,currentPanel.height\+16,/);
+ assert.match(weather,/width: Math.max\(86,Math.min\(180,currentPanel.height\+8,/);
  assert.match(overview,/width: Math.min\(108,47 \+ panel.expansion \* 0.34,/);
  for(const f of [overview,weather]) {
    assert.match(f,/WeatherCelestialGlyph\s*\{/);

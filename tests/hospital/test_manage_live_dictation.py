@@ -36,14 +36,14 @@ def next_json_packet(process, selector, pending: bytearray, *, timeout: float):
     Selecting on the file descriptor before every TextIO.readline() would
     hide already buffered complete lines and produce false timeouts.
     """
-    while b"\\n" not in pending:
+    while b"\n" not in pending:
         if not selector.select(timeout=timeout):
             return None
         part = os.read(process.stdout.fileno(), 65536)
         if not part:
             return None
         pending.extend(part)
-    raw, _, remaining = pending.partition(b"\\n")
+    raw, _, remaining = pending.partition(b"\n")
     pending[:] = remaining
     return json.loads(raw.decode("utf-8"))
 

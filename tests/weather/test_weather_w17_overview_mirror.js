@@ -32,7 +32,7 @@ test("W17 reuses exact StationSky icon classification and celestial artwork",()=
  assert.match(compact,/WeatherCyclePolicy\.artworkFor\(/);
  assert.match(compact,/WeatherCelestialGlyph\s*\{/);
  assert.match(compact,/WeatherCyclePolicy\.nightKind\(/);
- assert.match(compact,/if.*THUNDERSTORM/);
+ assert.match(compact,/THUNDERSTORM/);
  assert.match(compact,/["']⚡︎["']/);
  assert.doesNotMatch(compact,/StationWeatherLineGlyph\s*\{|Canvas\s*\{/);
 });

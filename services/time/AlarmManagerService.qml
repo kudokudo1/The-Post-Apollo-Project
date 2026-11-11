@@ -105,7 +105,7 @@ Scope {
 
     function createAlarm() {
         if (!canEdit) { feedback = "STORAGE UNAVAILABLE"; return 0; }
-        const r = Policy.create(document);
+        const r = Policy.create(document, Date.now());
         if (!r.ok) { feedback = r.error; return 0; }
         if (!saveDocument(r.document)) return 0;
         feedback = "ALARM CREATED // EDIT AND ENABLE TO ARM";

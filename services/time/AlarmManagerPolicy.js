@@ -115,19 +115,22 @@ function byId(doc, id) {
         if (doc.alarms[i].id === id) return doc.alarms[i];
     return null;
 }
-function freshAlarm(id) {
+function freshAlarm(id, nowMs) {
+    // Only the current local weekday is selected for a new alarm.
+    // The caller supplies nowMs so the default is deterministic in tests.
+    var instant = timestamp(nowMs) && nowMs > 0 ? nowMs : Date.now();
     return {id: id, name: "NEW ALARM", hour: 7, minute: 0,
-            mode: "weekly", weekdays: [0, 1, 2, 3, 4, 5, 6], date: "",
+            mode: "weekly", weekdays: [new Date(instant).getDay()], date: "",
             keepSaved: true, enabled: false, pausedUntilDate: "",
             soundId: "chime", soundEnabled: true, volumePercent: 60,
             lastFiredDay: "", ringing: false, ringStartedAtMs: 0,
             snoozeUntilMs: 0, completed: false};
 }
-function create(doc) {
+function create(doc, nowMs) {
     if (!validDocument(doc) || doc.alarms.length >= MAX_ALARMS
             || doc.nextId >= Number.MAX_SAFE_INTEGER - 1)
         return {ok: false, error: "MAX_ALARMS_OR_INVALID_STORE"};
-    var next = cloneDocument(doc), alarm = freshAlarm(next.nextId);
+    var next = cloneDocument(doc), alarm = freshAlarm(next.nextId, nowMs);
     next.nextId += 1;
     next.alarms.push(alarm);
     return {ok: true, document: next, id: alarm.id};
@@ -339,7 +342,9 @@ function migrateLegacy(raw, nowMs) {
             || !timestamp(old.alarm.ringStartedAtMs)
             || typeof old.alarm.ringing !== "boolean")
         return {ok: false, error: "INVALID_LEGACY"};
-    var a = freshAlarm(1), v = old.alarm;
+    var a = freshAlarm(1, nowMs), v = old.alarm;
+    // V1 was daily: migration must never silently narrow recurrence.
+    a.weekdays = [0, 1, 2, 3, 4, 5, 6];
     a.name = v.label.trim() || "ALARM";
     a.hour = v.hour; a.minute = v.minute;
     a.enabled = v.enabled;

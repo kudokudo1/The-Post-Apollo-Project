@@ -4531,8 +4531,10 @@ PanelWindow {
                         // Same bounded content budget as the other TIMEW
                         // secondary screens. Never size the pane from its
                         // full editor/list content.
+                        // Reserve space for PREVIOUS/NEXT in the shared
+                        // bottom TimeW footer, outside the alarm list.
                         height: Math.max(0, 505 - toolsSubModeStrip.height
-                                        - parent.spacing)
+                                        - parent.spacing - 24)
                     }
 
                     Column {
@@ -7002,6 +7004,43 @@ PanelWindow {
                         currentEpochMs: localClock.date.getTime()
                     }
 
+                    Row {
+                        id: alarmFooterNavigation
+                        visible: timew.selectedMode === "tools"
+                                 && timew.toolsView === "alarm"
+                        width: parent.width
+                        height: 28
+                        spacing: 6
+                        ActionButton {
+                            width: 102
+                            height: parent.height
+                            label: "◀ PREVIOUS"
+                            labelPixelSize: 10
+                            accentColor: Colors.white
+                            available: alarmPlaceholderPane.canStepSelection
+                            onLeftClicked: alarmPlaceholderPane.stepSelection(-1)
+                        }
+                        GohuText {
+                            width: Math.max(0, alarmFooterNavigation.width
+                                            - 204 - 2 * alarmFooterNavigation.spacing)
+                            height: parent.height
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            text: "ALARMS // " + alarmPlaceholderPane.selectionLabel
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                        }
+                        ActionButton {
+                            width: 102
+                            height: parent.height
+                            label: "NEXT ▶"
+                            labelPixelSize: 10
+                            accentColor: Colors.white
+                            available: alarmPlaceholderPane.canStepSelection
+                            onLeftClicked: alarmPlaceholderPane.stepSelection(1)
+                        }
+                    }
+
                     GohuText {
                         // The floating result sheet owns this space while it
                         // is open; the footer must not overlap its entries.
@@ -7009,6 +7048,8 @@ PanelWindow {
                                    && timew.worldSearchPopupOpen)
                                  && !(timew.selectedMode === "calc"
                                       && timew.activeConverterDropdown !== "")
+                                 && !(timew.selectedMode === "tools"
+                                      && timew.toolsView === "alarm")
                         text: timew.selectedMode === "clock"
                               ? "LOCAL + WORLD // LIVE // CALC HAS CONVERTER"
                               : timew.selectedMode === "calc"
@@ -7019,8 +7060,7 @@ PanelWindow {
                               ? (timew.settingsView === "sync" ? "SETTINGS // REFERENCE + RESYNC"
                                  : "SETTINGS // VISUAL TIME + TIMEZONE")
                               : timew.selectedMode === "tools"
-                              ? (timew.toolsView === "alarm" ? "TOOLS // ALARMS // SAVED + SCHEDULED"
-                                 : "TOOLS // STOPWATCH + COUNTDOWN // MONOTONIC")
+                              ? "TOOLS // STOPWATCH + COUNTDOWN // MONOTONIC"
                               : "ANGEL // EXPLICIT JOURNAL // LOCAL ONLY"
                         color: Colors.white
                         font.pixelSize: 11

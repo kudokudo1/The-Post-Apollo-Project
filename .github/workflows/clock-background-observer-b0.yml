@@ -1,0 +1,78 @@
+name: Clock B0 background observer only
+
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmBackgroundObserver.py"
+      - "services/time/BACKGROUND-ALARM-B0.md"
+      - "ops/systemd/user/post-apollo-alarm-observer.service"
+      - "tests/time/test_clock_background_observer_b0.py"
+      - ".github/workflows/clock-background-observer-b0.yml"
+  push:
+    paths:
+      - "services/time/AlarmBackgroundObserver.py"
+      - "services/time/BACKGROUND-ALARM-B0.md"
+      - "ops/systemd/user/post-apollo-alarm-observer.service"
+      - "tests/time/test_clock_background_observer_b0.py"
+      - ".github/workflows/clock-background-observer-b0.yml"
+
+jobs:
+  observer-read-only:
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python compile and bounded observer unit tests
+        run: |
+          python3 -I -B -c 'import ast,pathlib; ast.parse(pathlib.Path("services/time/AlarmBackgroundObserver.py").read_text())'
+          python3 -m unittest discover -s tests/time -p 'test_clock_background_observer_b0.py' -v
+      - name: Cross-check observed candidates against real Clock JS scheduler
+        run: |
+          node <<'JS'
+          const fs=require('fs'),vm=require('vm'),cp=require('child_process');
+          const os=require('os'),path=require('path'),assert=require('node:assert/strict');
+          const p={};vm.runInNewContext(fs.readFileSync('services/time/AlarmManagerPolicy.js','utf8')
+            .replace(/^\.pragma library\s*/,''),p);
+          const at=(h,m,s=0)=>new Date(2026,10,11,h,m,s).getTime();
+          const now=at(6,39,30),due=at(6,40),late=at(6,43);
+          let doc=p.create(p.initialDocument(),now).document;
+          doc=p.update(doc,1,{enabled:true,weekdays:[3],hour:6,minute:40},now).document;
+          assert.equal(p.validDocument(doc),true);
+          const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'post-apollo-observe-'));
+          const alarmPath=path.join(tmp,'time-alarms-v2.json');
+          function observe(document,clock){
+            fs.writeFileSync(alarmPath,JSON.stringify(document));
+            const raw=cp.execFileSync('python3',['-I','-B',
+                'services/time/AlarmBackgroundObserver.py',
+                '--once','--alarm-file',alarmPath,'--at-ms',String(clock)],{encoding:'utf8'});
+            const out=JSON.parse(raw);
+            assert.equal(out.actuationEnabled,false);
+            assert.equal(out.ownsAlarmFile,false);
+            return out.alarms[0].phase;
+          }
+          try {
+            // B0 does not make a backward claim about when a legacy alarm
+            // was armed. A future BG-1 handoff will supply this exact cursor.
+            assert.equal(observe(doc,now),'FUTURE');
+            // Fresh V2 alarms now have durable arming timestamps because
+            // restart/recovery PR #1868 merged into main. Legacy V2 docs
+            // without those optional fields still remain uncertain.
+            const legacy=JSON.parse(JSON.stringify(doc));
+            delete legacy.alarms[0].armedAtMs;
+            delete legacy.alarms[0].lastProcessedDueMs;
+            assert.equal(observe(legacy,due+1000),'UNKNOWN_ARM_TIME');
+            const fenced=JSON.parse(JSON.stringify(doc));
+            fenced.alarms[0].armedAtMs=now;
+            assert.equal(observe(fenced,due+1000),'ELIGIBLE_IF_OWNED');
+            assert.deepEqual(Array.from(p.tick(fenced,due+1000).started),[1]);
+            assert.equal(observe(fenced,late),'MISSED_CANDIDATE');
+            assert.deepEqual(Array.from(p.tick(fenced,late).missed),[1]);
+            const fired=p.tick(fenced,due+1000).document;
+            const stopped=p.stop(fired,1,due+5000).document;
+            assert.equal(observe(stopped,late),'ALREADY_PROCESSED');
+            console.log('Observer agrees with JS Clock scheduling, never actuates: PASS');
+          } finally {
+            fs.rmSync(tmp,{recursive:true,force:true});
+          }
+          JS

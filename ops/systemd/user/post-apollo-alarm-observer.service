@@ -1,0 +1,30 @@
+# SOURCE-ONLY DESIGN TEMPLATE // DO NOT ENABLE
+# B0 is a READ-ONLY observer. It never plays a tone, writes alarms or sends notifications.
+# An explicit absolute Quickshell.dataDir path must be configured in
+# %h/.config/post-apollo/alarm-observer.env as:
+# POST_APOLLO_ALARM_FILE=/absolute/path/to/time-alarms-v2.json
+# Without the value, the process refuses to start. This unit is intentionally
+# intentionally has no auto-enable section; activation is not authorized.
+[Unit]
+Description=Post-Apollo Clock B0 alarm observer (read-only, no actuation)
+Documentation=https://github.com/kudokudo1/The-Post-Apollo-Project/blob/main/services/time/BACKGROUND-ALARM-B0.md
+ConditionPathExists=%h/.config/quickshell/services/time/AlarmBackgroundObserver.py
+
+[Service]
+Type=simple
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-%h/.config/post-apollo/alarm-observer.env
+ExecStart=/usr/bin/python3 -I -B %h/.config/quickshell/services/time/AlarmBackgroundObserver.py --watch --alarm-file ${POST_APOLLO_ALARM_FILE}
+WorkingDirectory=%h/.config/quickshell
+RuntimeDirectory=post-apollo-alarm-observer
+RuntimeDirectoryMode=0700
+UMask=0077
+Restart=no
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=true
+
+# INTENTIONALLY NO AUTO-ENABLE SECTION. Nothing starts automatically.

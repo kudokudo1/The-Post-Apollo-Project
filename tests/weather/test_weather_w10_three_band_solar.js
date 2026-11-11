@@ -38,7 +38,7 @@ test("W10 current + air, all six hour samples, three days and inspector fit one 
  assert.match(combined,/model: Math\.min\(3,panel\.dailyRows\.length\)/);
  assert.match(combined,/sky\.conditionState\.icon/);
  assert.match(combined,/panel\.sky\.windValue/);
- assert.match(combined,/panel\.sky\.aqiReady/);
+ assert.match(combined,/Boolean\(sky && sky\.aqiReady\)/);
  assert.match(combined,/WeatherCyclePolicy\.forecast\(/);
  assert.match(combined,/WeatherCyclePolicy\.atLocal\(/);
  assert.match(combined,/WeatherCyclePolicy\.artworkFor\(/);

@@ -11,6 +11,9 @@ on:
       - "widgets/TimeW.qml"
       - "shell.qml"
       - "tests/notifications/test_clock_alarm_notification_contract.py"
+      - "tests/time/test_clock_alarm_truthful_diagnostics_contract.py"
+      - "services/time/AlarmAudioV2.qml"
+      - "widgets/AlarmManagerPane.qml"
       - ".github/workflows/clock-alarm-notifications.yml"
   push:
     paths:
@@ -22,6 +25,9 @@ on:
       - "widgets/TimeW.qml"
       - "shell.qml"
       - "tests/notifications/test_clock_alarm_notification_contract.py"
+      - "tests/time/test_clock_alarm_truthful_diagnostics_contract.py"
+      - "services/time/AlarmAudioV2.qml"
+      - "widgets/AlarmManagerPane.qml"
       - ".github/workflows/clock-alarm-notifications.yml"
 
 jobs:
@@ -31,6 +37,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Source boundary and no-focus contracts
         run: python3 -m unittest discover -s tests/notifications -p 'test_clock_alarm_notification_contract.py' -v
+      - name: Truthful audio/notification diagnostic regression
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_alarm_truthful_diagnostics_contract.py' -v
       - name: Per-alarm resource DND, BLOCK, event identity and navigation tests
         run: |
           node <<'JS'

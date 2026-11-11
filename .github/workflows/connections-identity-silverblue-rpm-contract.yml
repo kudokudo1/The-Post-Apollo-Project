@@ -1,0 +1,67 @@
+name: C4b Identity Silverblue signed RPM contract (disposable CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/**'
+      - '.github/workflows/connections-identity-silverblue-rpm-contract.yml'
+      - 'docs/connections-identity-silverblue-install-contract-v1.md'
+  push:
+    branches: [main, 'feat/c4b-identity-silverblue-ci-*']
+    paths:
+      - 'tests/connections/identity_silverblue/**'
+      - '.github/workflows/connections-identity-silverblue-rpm-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  signed-identity-test-rpm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      POST_APOLLO_ID_SILVERBLUE_CI_ONLY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exact source, roster, no-scriptlet and non-enabled unit contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          bash -n tests/connections/identity_silverblue/build_signed_identity_gateway.sh
+          bash -n tests/connections/identity_silverblue/verify_signed_identity_gateway.sh
+          python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
+      - name: Build EXACT installed Identity command gateway as disposable signed RPM
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/identity-silverblue-rpm"
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/identity-silverblue-rpm,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/build_signed_identity_gateway.sh
+          (cd "$RUNNER_TEMP/identity-silverblue-rpm" &&
+           sha256sum --check --status identity-artifact-manifest.sha256)
+          test "$(find "$RUNNER_TEMP/identity-silverblue-rpm" -maxdepth 1 -type f | wc -l)" -eq 4
+      - name: Verify independently untrusted before key import and RPM signature afterward
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/identity-silverblue-rpm,dst=/input,readonly" \
+            fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/verify_signed_identity_gateway.sh
+      - name: Deny production authority and require later real Silverblue lifecycle witness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
+          echo "C4B_ID_PASS // TEST_ONLY_SIGNED_RPM_SOURCE_AND_SIGNATURE_CONTRACT"
+          echo "C4B_ID_PENDING // REAL_OSTREE_SYSTEMD_SELINUX_AND_ROLLBACK_NOT_YET_TESTED"

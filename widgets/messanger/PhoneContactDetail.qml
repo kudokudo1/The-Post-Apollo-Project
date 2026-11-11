@@ -8,6 +8,11 @@ Rectangle {
     id: detail
     property var contact: null
     property bool canPrepareCall: false
+    // P40: no installed signed host, C5 consent or authenticated encrypted
+    // save response is available to QML. A read preference is not write grant.
+    readonly property bool personalMetadataWritable: false
+    readonly property string personalMetadataStatus:
+        "UNAVAILABLE // VERIFIED CONTACT SAVE HOST REQUIRED"
     signal callRequested()
     signal messageRequested()
     signal callNumberRequested(string number)
@@ -43,14 +48,27 @@ Rectangle {
             width: Math.max(0, detailScroll.width - 8)
             spacing: 12
 
-            Text {
+            Row {
+                id: contactHeader
                 width: parent.width
-                text: "IPHONE CONTACT // PERSONAL // READ ONLY"
-                color: Colors.cyan
-                textFormat: Text.PlainText
-                font.pixelSize: 11
-                font.bold: true
-                wrapMode: Text.WordWrap
+                spacing: 8
+                Text {
+                    width: Math.max(0, contactHeader.width - 84)
+                    text: "IPHONE CONTACT // PERSONAL // READ ONLY"
+                    color: Colors.cyan
+                    textFormat: Text.PlainText
+                    font.pixelSize: 11
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: 76
+                    height: 28
+                    label: "EDIT"
+                    labelPixelSize: 10
+                    accentColor: Colors.orange
+                    interactive: false // No authenticated local contact editor.
+                }
             }
             Text {
                 width: parent.width
@@ -144,7 +162,7 @@ Rectangle {
                 width: parent.width
                 spacing: 6
                 ActionButton {
-                    width: Math.max(0, (contactActions.width - 12) / 3)
+                    width: Math.max(0, (contactActions.width - 18) / 4)
                     height: 34
                     label: "CALL"
                     labelPixelSize: 10
@@ -154,7 +172,7 @@ Rectangle {
                     onTriggered: detail.callRequested()
                 }
                 ActionButton {
-                    width: Math.max(0, (contactActions.width - 12) / 3)
+                    width: Math.max(0, (contactActions.width - 18) / 4)
                     height: 34
                     label: "MESSAGE"
                     labelPixelSize: 10
@@ -164,7 +182,7 @@ Rectangle {
                     onTriggered: detail.messageRequested()
                 }
                 ActionButton {
-                    width: Math.max(0, (contactActions.width - 12) / 3)
+                    width: Math.max(0, (contactActions.width - 18) / 4)
                     height: 34
                     label: "FACETIME"
                     labelPixelSize: 9
@@ -172,6 +190,117 @@ Rectangle {
                     accentColor: Colors.orange
                     interactive: false // No BlueFerry FaceTime transport.
                 }
+                ActionButton {
+                    width: Math.max(0, (contactActions.width - 18) / 4)
+                    height: 34
+                    label: "EMAIL"
+                    labelPixelSize: 9
+                    labelMinimumPixelSize: 8
+                    accentColor: Colors.magenta
+                    interactive: false // Email routing not connected.
+                }
+            }
+            Text {
+                width: parent.width
+                text: "PERSONAL // FAVORITE"
+                color: Colors.orange
+                font.pixelSize: 12
+                font.bold: true
+            }
+            Row {
+                id: favoriteActions
+                width: parent.width
+                spacing: 8
+                ActionButton {
+                    width: Math.min(146, favoriteActions.width)
+                    height: 34
+                    label: "☆ FAVORITE"
+                    labelPixelSize: 11
+                    labelMinimumPixelSize: 9
+                    accentColor: Colors.magenta
+                    interactive: detail.personalMetadataWritable
+                                 && detail.contact !== null
+                    // Deliberately no onTriggered or invented saved state.
+                }
+                Text {
+                    width: Math.max(0, favoriteActions.width - 154)
+                    height: 34
+                    verticalAlignment: Text.AlignVCenter
+                    text: "NOT SAVED // UNAVAILABLE"
+                    color: Colors.orange
+                    textFormat: Text.PlainText
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+            }
+            Text {
+                width: parent.width
+                text: detail.personalMetadataStatus
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+            Text {
+                width: parent.width
+                text: "PERSONAL // NOTES"
+                color: Colors.orange
+                font.pixelSize: 12
+                font.bold: true
+            }
+            Rectangle {
+                id: localNotesPlaceholder
+                width: parent.width
+                height: 88
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.magenta
+                clip: true
+                Text {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    text: "NOTES UNAVAILABLE // Notes will appear only after the verified encrypted Personal save host is connected."
+                    color: Colors.cyan
+                    textFormat: Text.PlainText
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+            }
+            Row {
+                id: personalNotesActions
+                width: parent.width
+                spacing: 8
+                ActionButton {
+                    width: Math.max(0, (personalNotesActions.width - 8) / 2)
+                    height: 32
+                    label: "EDIT NOTE"
+                    labelPixelSize: 10
+                    accentColor: Colors.magenta
+                    interactive: false // No note editor or verified save authority.
+                }
+                ActionButton {
+                    width: Math.max(0, (personalNotesActions.width - 8) / 2)
+                    height: 32
+                    label: "DELETE NOTE"
+                    labelPixelSize: 10
+                    accentColor: Colors.red
+                    destructive: true
+                    interactive: false // No trusted vault deletion response.
+                }
+            }
+            Text {
+                width: parent.width
+                text: "Favorites and notes have not been read or saved. The iPhone contact provider stays READ ONLY."
+                color: Colors.white
+                opacity: 0.75
+                textFormat: Text.PlainText
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Colors.magenta
             }
             Text {
                 width: parent.width
@@ -333,7 +462,7 @@ Rectangle {
             }
             Text {
                 width: parent.width
-                text: "FACETIME unavailable: the Linux BlueFerry HFP calling path does not provide FaceTime."
+                text: "FACETIME unavailable: Linux BlueFerry HFP does not provide FaceTime. EMAIL remains unavailable until a verified route exists."
                 color: Colors.orange
                 textFormat: Text.PlainText
                 font.pixelSize: 10

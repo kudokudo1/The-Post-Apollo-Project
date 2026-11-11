@@ -11,6 +11,7 @@ Item {
     property bool panelVisible: visible
     Flickable {
         id: scroll
+        visible: !ZellijScrollSettings.active
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -38,6 +39,14 @@ Item {
                     label: "BACK TO SWAY DEVICE CONTROLS"
                     labelPixelSize: 9
                     onLeftClicked: KittyScrollSettings.chooseMode(false)
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 34
+                    label: "ZELLIJ // PANE SCROLL"
+                    labelPixelSize: 10
+                    available: !KittyScrollSettings.busy
+                    onLeftClicked: ZellijScrollSettings.open()
                 }
                 GohuText {
                     width: parent.width
@@ -283,8 +292,14 @@ Item {
             }
         }
     }
+    CpuPlusSettingsZellijScrollPane {
+        anchors.fill: parent
+        area: kittyPane.area
+        visible: ZellijScrollSettings.active
+    }
     NeonScrollBar {
         flickable: scroll
-        visible: kittyPane.panelVisible && scrollable
+        visible: kittyPane.panelVisible
+                 && !ZellijScrollSettings.active && scrollable
     }
 }

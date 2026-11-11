@@ -68,6 +68,21 @@ ShellRoot {
             if (SwayScrollSettings.applying || SwayScrollSettings.confirmationRequired) {
                 root.fail("UNAUTHORIZED_APPLY");return;
             }
+            if (root.phase === 2) {
+                if (ZellijScrollSettings.busy)
+                    return;
+                if (!ZellijScrollSettings.active
+                        || !ZellijScrollSettings.stage("mouse", "false")
+                        || !ZellijScrollSettings.stage("resize", "false")
+                        || !ZellijScrollSettings.stage("sync", "false")
+                        || !ZellijScrollSettings.stage("buffer", 20000)
+                        || ZellijScrollSettings.confirmRequired) {
+                    root.fail("ZELLIJ_STAGE_OR_PERMISSION"); return;
+                }
+                root.done = true;
+                console.log("ZELLIJ_NATIVE_PASS // STAGED_NO_CONFIG_WRITE");
+                return;
+            }
             if (root.phase === 1) {
                 if (KittyScrollSettings.busy)
                     return;
@@ -77,8 +92,11 @@ ShellRoot {
                         || KittyScrollSettings.confirmAction !== "") {
                     root.fail("KITTY_STAGING_OR_APPROVAL"); return;
                 }
-                root.done = true;
                 console.log("KITTY_NATIVE_PASS // TWO_FACTORS_STAGED_NO_CONFIG_WRITE");
+                root.phase = 2;
+                if (!ZellijScrollSettings.open()) {
+                    root.fail("ZELLIJ_ROUTE_REFUSED"); return;
+                }
                 return;
             }
             // Test only: inject synthetic Sway discovery into the in-memory

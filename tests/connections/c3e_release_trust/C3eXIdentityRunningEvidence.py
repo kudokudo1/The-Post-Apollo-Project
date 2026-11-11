@@ -154,7 +154,9 @@ def inspect_running_denials(*, evidence_line: bytes, signed_receipts,
             snap = record[name]
             if type(snap) is not dict or set(snap) != SNAPSHOT:
                 _deny("KERNEL_SNAPSHOT_FIELDS_REFUSED")
-            if snap != independently_measured:
+            if (any(type(snap[key]) is not type(independently_measured[key])
+                    for key in SNAPSHOT)
+                    or snap != independently_measured):
                 _deny("KERNEL_SNAPSHOT_DIFFERS_FROM_INDEPENDENT_PINS")
         peer = record["peer"]
         if (type(peer) is not dict or set(peer) != {"pid", "uid", "gid"}

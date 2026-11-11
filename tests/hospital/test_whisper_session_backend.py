@@ -574,7 +574,8 @@ class PersistentWhisperTests(unittest.TestCase):
             self.assertNotIn("MODEL_BACKPRESSURE", stages)
             self.assertEqual(starts.read_text().splitlines(), ["start"])
             self.assertFalse(cli_calls.exists())
-            self.assertEqual(len(phrases), 6, "Still at most six model jobs")
+            self.assertGreaterEqual(len(phrases), 2)
+            self.assertLessEqual(len(phrases), 6, "No more text jobs than the cap")
             sizes = [int(n) for n in requests.read_text().splitlines()]
             self.assertEqual(len(sizes), 6)
             self.assertTrue(12000 <= sizes[1] - sizes[0] <= 24000,

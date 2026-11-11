@@ -138,14 +138,47 @@ Rectangle {
             readonly property alias twilightGrid: twilightTimingGrid
             readonly property alias solarGraphViewport: solarGraphArea
 
-            Row {
-                id: instrumentRail
-                objectName: "weather-w10-two-page-rail"
+            // W14 // Restore the WEATHER chassis/header spacing. Menus
+            // never begin with buttons touching the global top divider.
+            Item {
+                id: weatherModeHeader
+                objectName: "weather-w14-padded-mode-header"
                 visible: skyHost.combined
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
-                height: visible ? 26 : 0
+                height: visible ? 18 : 0
+                GohuText {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "WEATHER // METEOROLOGICAL INSTRUMENTS"
+                    font.pixelSize: 10
+                    color: Colors.orange
+                }
+                GohuText {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: weatherPane.weatherService &&
+                          weatherPane.weatherService.ready
+                          ? "CURRENT // LIVE" : "CURRENT // WAITING"
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                }
+            }
+
+            Row {
+                id: instrumentRail
+                objectName: "weather-w10-two-page-rail"
+                visible: skyHost.combined
+                anchors.top: weatherModeHeader.bottom
+                anchors.topMargin: skyHost.combined ? 5 : 0
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: skyHost.combined ? 8 : 0
+                anchors.rightMargin: skyHost.combined ? 8 : 0
+                height: visible ? 24 : 0
                 spacing: 4
                 Repeater {
                     model: [
@@ -155,7 +188,7 @@ Rectangle {
                     delegate: ActionButton {
                         required property var modelData
                         width: Math.max(1,(instrumentRail.width-4)/2)
-                        height: 24
+                        height: 22
                         label: modelData.label
                         labelPixelSize: 10
                         accentColor: Colors.cyan
@@ -196,7 +229,7 @@ Rectangle {
                     y: 0
                 }
 
-                StationWeatherCombinedPane {
+                StationWeatherInstrumentTerminal {
                     id: combinedDisplay
                     objectName: "weather-w10-combined-display"
                     anchors.fill: parent

@@ -32,5 +32,15 @@ make -f /usr/share/selinux/devel/Makefile postapollo_identity_ci.pp
 [[ -s postapollo_identity_ci.pp ]] ||
   { echo "C4B_ID_BLOCKED // SELINUX_MODULE_NOT_BUILT"; exit 2; }
 sha256sum postapollo_identity_ci.pp
+# Optional strictly disposable delivery into the offline KVM read-only ISO.
+# Without /out, preserve the existing compile-only discarded-output behavior.
+if [[ -d /out ]]; then
+  [[ -w /out && "$(find /out -mindepth 1 -maxdepth 1 | wc -l)" == 0 ]] ||
+    { echo "C4B_ID_BLOCKED // SELINUX_POLICY_OUTPUT_NOT_EMPTY"; exit 2; }
+  install -m 0644 postapollo_identity_ci.pp /out/postapollo_identity_ci.pp
+  ( cd /out && sha256sum postapollo_identity_ci.pp > postapollo_identity_ci.sha256 )
+  chmod 0644 /out/postapollo_identity_ci.sha256
+  echo "C4B_ID_SELINUX_PASS // EXACT_COMPILED_POLICY_STAGED_FOR_READONLY_OFFLINE_GUEST"
+fi
 echo "C4B_ID_SELINUX_PASS // FEDORA44_CUSTOM_DOMAIN_MODULE_COMPILED_UNLOADED"
 echo "C4B_ID_SELINUX_LIMITATION // NO_KERNEL_POLICY_LOAD_OR_CONFINE_CLAIM"

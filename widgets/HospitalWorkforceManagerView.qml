@@ -27,6 +27,9 @@ Column {
     property string dictationOriginalText: ""
     property string dictationFeedbackField: ""
     property string dictationFeedback: ""
+    // Manual A/B choice for Surgery SETUP/JOB only. The active engine receives
+    // a mode for a single recording; other clients always use Standard.
+    property string decoderMode: "STANDARD"
     property var rooms: []
     property var sessions: []
     property var knownBeds: []
@@ -196,6 +199,16 @@ Column {
         if (key === "checklist") return jobChecklistField;
         return null;
     }
+    function selectDecoderMode(value) {
+        const svc = root.speechInputService;
+        if (value !== "STANDARD" && value !== "FAST")
+            return false;
+        if (!root.active || !svc || svc.busy || root.otherVoiceBusy
+                || (root.mode !== "SETUP" && root.mode !== "JOB"))
+            return false;
+        root.decoderMode = value;
+        return true;
+    }
     function toggleDictation(key) {
         const svc = root.speechInputService;
         const field = root.voiceAreaForKey(key);
@@ -222,7 +235,7 @@ Column {
         root.dictationOriginalText = field.value;
         root.dictationFeedbackField = key;
         root.dictationFeedback = "STARTING MICROPHONE // LOCAL TRANSCRIPTION";
-        const started = svc.startRecording();
+        const started = svc.startRecording(root.decoderMode);
         if (!started) {
             root.dictationField = "";
             root.dictationMode = "";
@@ -891,6 +904,44 @@ Column {
                 onTriggered: root.selectMode(modelData.code)
             }
         }
+    }
+
+    // Explicit, reversible local Whisper A/B mode. Not a provider choice.
+    // Disabled while any shared Hospital microphone is active.
+    Row {
+        width: parent.width
+        spacing: 6
+        visible: root.mode === "SETUP" || root.mode === "JOB"
+        HospitalActionButton {
+            width: (parent.width - 6) / 2
+            height: 28
+            label: "VOICE // STANDARD"
+            accent: root.decoderMode === "STANDARD" ? Colors.magenta : Colors.cyan
+            selectedAction: root.decoderMode === "STANDARD"
+            contentGlowEnabled: false
+            enabledAction: root.active && !!root.speechInputService
+                && !root.speechInputService.busy && !root.otherVoiceBusy
+            onTriggered: root.selectDecoderMode("STANDARD")
+        }
+        HospitalActionButton {
+            width: (parent.width - 6) / 2
+            height: 28
+            label: "VOICE // FAST TRIAL"
+            accent: root.decoderMode === "FAST" ? Colors.magenta : Colors.cyan
+            selectedAction: root.decoderMode === "FAST"
+            contentGlowEnabled: false
+            enabledAction: root.active && !!root.speechInputService
+                && !root.speechInputService.busy && !root.otherVoiceBusy
+            onTriggered: root.selectDecoderMode("FAST")
+        }
+    }
+    GohuText {
+        width: parent.width
+        visible: root.mode === "SETUP" || root.mode === "JOB"
+        text: "STANDARD // CURRENT ACCURACY  |  FAST // ONE DECODER CANDIDATE. Compare words and timing; same CPU/RAM limits."
+        font.pixelSize: 8
+        color: Colors.cyan
+        wrapMode: Text.Wrap
     }
 
     // SETUP: conversation-style intake that only pre-fills existing editors.

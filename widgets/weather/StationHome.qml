@@ -11,6 +11,7 @@ import "WeatherRelationshipPolicy.js" as RelationshipPolicy
 
 Rectangle {
     id: home
+    signal routeRequested(string path)
 
     // Empty route preserves original CLASSIC HOME.
     property string subjectRoute: ""
@@ -30,11 +31,15 @@ Rectangle {
     // W20 // Shorten only the two supporting card rows; do not touch
     // their existing internals or meter heights. Freed space goes to
     // the six-period forecast in the upper WEATHER instrument.
-    readonly property real overviewCardRowHeight: Math.max(55, Math.min(
-        68, Math.floor(homeScroll.height * 0.18),
-        Math.floor(Math.max(0, homeScroll.height - 164) / 2)))
+    // W21 // A real 31px navigation rail fits above the same one-page
+    // content. Only sub-286px viewports use the denser 46px card rows.
+    readonly property real overviewCardRowHeight: Math.max(
+        homeScroll.height < 286 ? 46 : 55, Math.min(
+        60, Math.floor(homeScroll.height * 0.18),
+        Math.floor(Math.max(0, homeScroll.height - 195) / 2)))
     readonly property real overviewInstrumentHeight: Math.max(
-        0, homeScroll.height - 2 * overviewCardRowHeight)
+        0, homeScroll.height - weatherOverviewRail.height
+           - 2 * overviewCardRowHeight)
     readonly property alias overviewViewportItem: homeScroll
     readonly property alias overviewContentItem: homeContent
     readonly property alias overviewSummaryItem: weatherOverviewSummary
@@ -1029,6 +1034,23 @@ Rectangle {
                       : home.sourcesWorkspace ? "SOURCE DIRECTORY" : "AUTO SNAPSHOT"
                 font.pixelSize: 12
                 color: Colors.orange
+            }
+        }
+
+        // W21 // C44-style long, real route buttons with a cyan divider.
+        // Its height participates in the fixed one-page layout budget.
+        StationSubjectOverviewRail {
+            id: weatherOverviewRail
+            objectName: "weather-w21-overview-top-rail"
+            visible: home.fixedWeatherOverview
+            width: parent.width
+            routes: [
+                {label:"CURRENT",path:"weather/conditions/current"},
+                {label:"FORECAST",path:"weather/forecasts/hourly"},
+                {label:"HAZARDS",path:"weather/hazards/alerts"}
+            ]
+            onRouteRequested: function(path) {
+                home.routeRequested(path)
             }
         }
 

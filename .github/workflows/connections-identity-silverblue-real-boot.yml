@@ -71,7 +71,7 @@ jobs:
             fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/fetch_offline_fedora_crypto.sh
           (cd "$RUNNER_TEMP/c4b-identity-fedora-crypto" &&
            sha256sum --check --status identity-fedora44-runtime-manifest.sha256)
-          test "$(find "$RUNNER_TEMP/c4b-identity-fedora-crypto" -maxdepth 1 -type f | wc -l)" -eq 3
+          test "$(find "$RUNNER_TEMP/c4b-identity-fedora-crypto" -maxdepth 1 -type f | wc -l)" -eq 5
       - name: Independently verify disposable RPM signer is untrusted before isolated import
         shell: bash
         run: |

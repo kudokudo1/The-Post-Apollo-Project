@@ -32,16 +32,16 @@ test("W14 WEATHER uses three differentiated instruments rather than the W13 tile
 test("W14 communicates real date, hourly probability and observed versus forecast",()=>{
  assert.match(terminal,/dateLabel\(hour.entry.date\)/);
  assert.match(terminal,/hour.entry.timeLabel/);
- assert.match(terminal,/RAIN CHANCE IN EACH FORECAST HOUR/);
+ assert.match(terminal,/RAIN CHANCE \/\/ EACH LISTED PERIOD/);
  assert.match(terminal,/terminal.rainChance\(hour.entry.chanceRain\)/);
- assert.match(terminal,/THREE-DAY OUTLOOK/);
+ assert.match(terminal,/THREE-DAY OUTLOOK \/\/ PEAK RAIN CHANCE/);
  assert.match(terminal,/RAIN CHANCE/);
- assert.match(terminal,/LIVE OBSERVATION \/\/ HOURLY & DAILY ARE FORECASTS/);
+ assert.match(terminal,/CURRENT OBSERVATION \/\/ LISTED TIMES & DAYS ARE FORECASTS/);
  assert.match(terminal,/inspectedHourIndex=index/);
  assert.match(terminal,/inspectedHourMetrics/);
  assert.match(terminal,/forecastReady && sky.hourlyForecast/);
  assert.match(terminal,/forecastReady && sky.dailyForecast/);
- assert.match(overview,/PRECIPITATION CHANCE DURING EACH HOUR/);
+ assert.match(overview,/RAIN CHANCE FOR EACH LISTED PERIOD/);
  assert.match(overview,/RAIN CHANCE/);
 });
 

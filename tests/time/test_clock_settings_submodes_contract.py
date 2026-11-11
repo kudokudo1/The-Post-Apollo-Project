@@ -87,23 +87,25 @@ class ClockSettingsSubmodesContracts(unittest.TestCase):
         self.assertIn('id: resyncDialButton', dial)
         self.assertIn('"AUTO CHECK ON" : "AUTO CHECK OFF"', PANE)
 
-    def test_tools_alarm_is_label_only_not_a_scheduling_service(self):
+    def test_tools_alarm_uses_isolated_owner_not_inline_processes(self):
         self.assertIn('id: toolsSubModeStrip', TIMEW)
         self.assertIn('labelText: "STOPWATCH"', TIMEW)
         self.assertIn('labelText: "COUNTDOWN"', TIMEW)
         self.assertIn('labelText: "ALARM"', TIMEW)
         self.assertIn('onTriggered: timew.toolsView = "alarm"', TIMEW)
+        self.assertIn('AlarmPane {', TIMEW)
         alarm = TIMEW.split('id: alarmPlaceholderPane', 1)[1].split(
             'id: stopwatchPane', 1)[0]
-        self.assertIn('ALARM // PLANNED', alarm)
-        self.assertIn('ALARM CONTROLS // NOT IMPLEMENTED', alarm)
+        self.assertNotIn('ALARM // PLANNED', alarm)
+        self.assertNotIn('ALARM CONTROLS // NOT IMPLEMENTED', alarm)
         self.assertNotIn('Timer {', alarm)
         self.assertNotIn('Process {', alarm)
-        self.assertNotIn('onTriggered:', alarm)
-        self.assertNotIn('onLeftClicked:', alarm)
         self.assertNotIn('notify-send', alarm)
         self.assertIn('height: 34', TIMEW.split('id: toolsSubModeStrip', 1)[1].split(
             'id: alarmPlaceholderPane', 1)[0])
+        service = (ROOT / 'services/time/AlarmService.qml').read_text()
+        self.assertIn('AlarmPolicy.tick(document, nowMs)', service)
+        self.assertNotIn('pkexec', service)
 
 
 if __name__ == "__main__":

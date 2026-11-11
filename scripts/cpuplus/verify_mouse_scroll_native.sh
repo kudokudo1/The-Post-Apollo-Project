@@ -36,6 +36,9 @@ cat "$log"
 if [ "$rc" -ne 0 ] || ! grep -q 'MOUSE_NATIVE_PASS // THREE_BAYS_STAGED_NO_HOST_MUTATION' "$log"; then
   echo "MOUSE_NATIVE_FAIL // QML stage or confirmation failed";exit 1
 fi
+if ! grep -q 'KITTY_NATIVE_PASS // TWO_FACTORS_STAGED_NO_CONFIG_WRITE' "$log"; then
+  echo "MOUSE_NATIVE_FAIL // Kitty mode not exercised";exit 1
+fi
 if grep -q 'MOUSE_NATIVE_FAIL' "$log"; then exit 1; fi
 if find "$work/config-home" -name 'post-apollo-*scroll*.conf' | grep -q .; then
   echo "MOUSE_NATIVE_FAIL // unexpected compositor config write";exit 1

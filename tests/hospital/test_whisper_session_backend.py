@@ -176,7 +176,8 @@ class PersistentWhisperTests(unittest.TestCase):
             process = subprocess.Popen(
                 [sys.executable, str(SCRIPT), str(HELPER),
                  "--chunk-seconds", "2", "--first-chunk-ms", "1400",
-                 "--pilot-live-chunks", "6", "--prefer-persistent"],
+                 "--pilot-live-chunks", "6", "--prefer-persistent",
+                 "--speech-pause-ms", "450"],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
             pending = bytearray()
@@ -215,6 +216,8 @@ class PersistentWhisperTests(unittest.TestCase):
                 self.assertGreaterEqual(codes.count("INFERENCE"), 2)
                 self.assertGreaterEqual(codes.count("QUEUE_WAIT"), 2)
                 self.assertNotIn("MODEL_SESSION_UNAVAILABLE", seen)
+                self.assertNotIn("PAUSE_CHUNK_READY", seen,
+                                 "Continuous speech must keep fixed cadence")
                 self.assertNotIn("CAPTURE_STOPPED", seen)
                 self.assertEqual(starts.read_text().splitlines(), ["start"])
                 self.assertGreaterEqual(len(requests.read_text().splitlines()), 2)
@@ -295,6 +298,80 @@ class PersistentWhisperTests(unittest.TestCase):
                     if stream is not None and not stream.closed:
                         stream.close()
 
+    def test_pause_aware_second_chunk_arrives_before_fixed_two_seconds(self):
+        # The opening chunk stays at 1.4s. After that, 0.7s speech
+        # followed by 0.5s quiet should trigger a 1.2s phrase window
+        # ONLY with the private model already loaded. No actual microphone.
+        with tempfile.TemporaryDirectory(prefix="hospital-pause-flush-") as tmp:
+            root = Path(tmp)
+            env, starts, requests, _pid, cli_calls = build_fake_runtime(root)
+            recorder = root / "bin" / "pw-record"
+            recorder.write_text(textwrap.dedent(r"""
+                #!/usr/bin/env python3
+                import sys, time
+                voice = (1700).to_bytes(2, "little", signed=True)
+                silence = bytes(2)
+                for chunk, frames in ((voice, 14), (voice, 7),
+                                      (silence, 5), (silence, 10)):
+                    for _ in range(frames):
+                        sys.stdout.buffer.write(chunk * 1600)
+                        sys.stdout.buffer.flush()
+                        time.sleep(0.065)
+                time.sleep(12)
+            """).lstrip())
+            recorder.chmod(0o700)
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), str(HELPER),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-live-chunks", "6", "--prefer-persistent",
+                 "--speech-pause-ms", "450"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+            pending = bytearray()
+            selector = selectors.DefaultSelector()
+            try:
+                selector.register(process.stdout, selectors.EVENT_READ)
+                stages = []
+                phrases = []
+                deadline = time.monotonic() + 9
+                while time.monotonic() < deadline and not (
+                        len(phrases) >= 2 and "PAUSE_CHUNK_READY" in stages):
+                    entry = packet_from_pipe(process, selector, pending)
+                    if entry is None:
+                        continue
+                    if entry["kind"] == "stage":
+                        stages.append(entry["detail"])
+                    elif entry["kind"] == "partial":
+                        phrases.append(entry["text"])
+                    elif entry["kind"] == "error":
+                        self.fail(str(entry))
+                self.assertEqual(phrases[:2],
+                                 ["Turn left at the", "next light"])
+                self.assertIn("PAUSE_CHUNK_READY", stages)
+                self.assertIn("MODEL_SESSION_READY", stages)
+                self.assertNotIn("CAPTURE_STOPPED", stages)
+                self.assertIsNone(process.poll())
+                self.assertEqual(starts.read_text().splitlines(), ["start"])
+                self.assertFalse(cli_calls.exists())
+                payload_sizes = [int(v) for v in requests.read_text().splitlines()]
+                self.assertGreaterEqual(len(payload_sizes), 2)
+                # Second request includes 750ms overlap plus ~1.2s audio,
+                # rather than 750ms overlap plus an entire 2s fixed window.
+                self.assertLess(payload_sizes[1], 75000)
+                process.stdin.write("STOP\n")
+                process.stdin.flush()
+                process.stdin.close()
+                process.wait(timeout=9)
+                self.assertEqual(process.returncode, 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=3)
+                selector.close()
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    if stream is not None and not stream.closed:
+                        stream.close()
+
     def test_silent_recording_never_prewarms_persistent_model(self):
         # Silence must never launch a model merely because the mic is open.
         # Capture always remains finite and uses no actual PipeWire device.
@@ -314,7 +391,8 @@ class PersistentWhisperTests(unittest.TestCase):
             process = subprocess.Popen(
                 [sys.executable, str(SCRIPT), str(HELPER),
                  "--chunk-seconds", "2", "--first-chunk-ms", "1400",
-                 "--pilot-live-chunks", "6", "--prefer-persistent"],
+                 "--pilot-live-chunks", "6", "--prefer-persistent",
+                 "--speech-pause-ms", "450"],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
             try:
@@ -332,6 +410,7 @@ class PersistentWhisperTests(unittest.TestCase):
                           if r["kind"] == "stage"]
                 self.assertIn("CAPTURE_USER_STOP", stages)
                 self.assertNotIn("MODEL_EARLY_START", stages)
+                self.assertNotIn("PAUSE_CHUNK_READY", stages)
                 self.assertFalse(starts.exists(), "No model on silence")
                 self.assertFalse(cli_calls.exists(), "No CLI on silence")
             finally:

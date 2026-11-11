@@ -37,7 +37,7 @@ class KeyboardLockControls(unittest.TestCase):
         self.assertIn("pendingDocument", SERVICE)
         self.assertIn("queuedDocument", SERVICE)
         self.assertIn("profileInstalled", SERVICE)
-        self.assertIn("PHYSICAL LOCK STATE // NOT SAMPLED", PANE)
+        self.assertIn("LED PROXY // NOT VERIFIED XKB STATE", PANE)
         self.assertIn("LAST-USED KEY STATE // NOT IMPLEMENTED", PANE)
         self.assertIn("NEXT_SWAY_START", HOST)
         self.assertIn("runtime_changed", HOST)

@@ -38,23 +38,23 @@ test("W15 timestamp stays top while the original icon, temperature, rain value a
  assert.match(terminal,/terminal\.fraction\(hour\.entry\.chanceRain\)/);
 });
 
-test("W15 removes weather OVERVIEW vertical pan without clipping or deleting its sources",()=>{
+test("W16 supersedes W15 header split with one fixed OVERVIEW",()=>{
  assert.match(home,/subjectRoute === "weather\/overview"/);
- assert.match(home,/interactive: !home\.compactHistory && !home\.fixedWeatherOverview/);
- assert.match(home,/contentHeight: home\.fixedWeatherOverview \? height : Math\.max/);
- assert.match(home,/visible: scrollable && !home\.compactHistory\s+&& !home\.fixedWeatherOverview/);
+ assert.match(home,/readonly property bool overviewRequiresScroll:/);
+ assert.match(home,/fixedWeatherOverview && officialAlertSummary\.available/);
+ assert.match(home,/interactive: !home\.compactHistory/);
+ assert.match(home,/!home\.overviewRequiresScroll/);
  assert.match(home,/spacing: home\.fixedWeatherOverview \? 0/);
- assert.match(home,/weatherSnapshotRow/);
- assert.match(home,/weatherRelevantRow/);
- assert.match(home,/overviewPage==="alerts"/);
- assert.match(home,/overviewPage==="snapshot"/);
- assert.match(home,/overviewPage==="relevant"/);
- assert.match(home,/onOverviewSelectionRequested/);
- assert.match(summary,/objectName: "weather-w15-overview-header-selector"/);
- assert.match(summary,/modelData\.key!=="alerts" \|\|/);
- assert.match(summary,/overviewSelectionRequested/);
+ assert.match(home,/id: weatherSnapshotRow/);
+ assert.match(home,/id: weatherRelevantRow/);
+ assert.match(home,/visible: home\.sectionVisible\("snapshot"\)/);
+ assert.match(home,/visible: home\.sectionVisible\("relevant"\)/);
+ assert.match(home,/overviewDense: home\.fixedWeatherOverview/);
  assert.match(summary,/height: compact \? 158 : 164/);
+ assert.doesNotMatch(home,/overviewPage===|onOverviewSelectionRequested/);
+ assert.doesNotMatch(summary,/overviewHeaderPages|overviewSelectionRequested/);
 });
+
 
 test("W15 changes no shared card internals, meters or data collectors",()=>{
  assert.match(card,/property bool compact: false/);

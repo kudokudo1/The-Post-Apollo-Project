@@ -126,7 +126,7 @@ def inspect_trusted_path_for_fixture(target: Path):
     Pin the actual directory inode before and after the read. It still does
     not authenticate writable ancestor paths or an installed service unit.
     """
-    if (type(target) is not Path or not target.is_absolute()
+    if (not isinstance(target, Path) or not target.is_absolute()
             or ".." in target.parts or os.geteuid() == 0):
         refuse()
     fd = -1

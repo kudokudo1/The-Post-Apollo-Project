@@ -19,7 +19,7 @@ test("W14 WEATHER uses three differentiated instruments rather than the W13 tile
  assert.match(terminal,/color: Colors.magenta/);
  assert.match(terminal,/color: Colors.yellow/);
  assert.match(terminal,/color: Colors.cyan/);
- assert.match(terminal,/font.pixelSize: 37/);
+ assert.match(terminal,/font.pixelSize: 43/);
  assert.match(terminal,/font.pixelSize: 16/);
  assert.match(terminal,/font.pixelSize: 11/);
  assert.match(terminal,/id: dailyRepeater/);

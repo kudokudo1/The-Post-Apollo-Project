@@ -115,7 +115,10 @@ def main():
     for fixture, which in ((sb, "source"), (tb, "target")):
         modified = copy.deepcopy(fixture)
         modified["safe_actions"] = ["copy"]
-        refused(contract.build_plan, modified, tb if which == "source" else sb)
+        if which == "source":
+            refused(contract.build_plan, modified, tb)
+        else:
+            refused(contract.build_plan, sb, modified)
         modified = copy.deepcopy(fixture)
         modified["extra_authenticated_claim"] = True
         if which == "source":

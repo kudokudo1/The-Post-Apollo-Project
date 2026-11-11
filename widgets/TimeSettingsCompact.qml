@@ -37,28 +37,23 @@ Item {
         anchors.margins: 3
         spacing: 5
 
-        Row {
+        GohuText {
             width: parent.width
-            height: 24
-            spacing: 6
-            GohuText {
-                width: (parent.width - parent.spacing) / 2
-                height: parent.height
-                verticalAlignment: Text.AlignVCenter
-                text: "OFFSET // " + TimeSettings.displayOffsetLabel
-                font.pixelSize: 11
-                color: TimeSettings.displayOffsetMs === 0 ? Colors.white : Colors.orange
-                elide: Text.ElideRight
-            }
-            GohuText {
-                width: (parent.width - parent.spacing) / 2
-                height: parent.height
-                verticalAlignment: Text.AlignVCenter
-                text: "PREVIEW // " + compact.calibratedPreview
-                font.pixelSize: 10
-                color: Colors.cyan
-                elide: Text.ElideRight
-            }
+            height: 20
+            verticalAlignment: Text.AlignVCenter
+            text: "OFFSET // " + TimeSettings.displayOffsetLabel
+            font.pixelSize: 11
+            color: TimeSettings.displayOffsetMs === 0 ? Colors.white : Colors.orange
+            elide: Text.ElideRight
+        }
+        GohuText {
+            width: parent.width
+            height: 28
+            verticalAlignment: Text.AlignVCenter
+            text: "PREVIEW // " + compact.calibratedPreview
+            font.pixelSize: 16
+            color: Colors.cyan
+            elide: Text.ElideRight
         }
         Row {
             width: parent.width
@@ -82,14 +77,10 @@ Item {
                 available: compact.dockFormatAvailable
                 idleForegroundColor: Colors.cyan
                 hoverForegroundColor: Colors.cyan
-                selectedForegroundColor: Colors.cyan
                 idleBorderColor: Colors.cyan
                 hoverBorderColor: Colors.cyan
-                selectedBorderColor: Colors.cyan
                 idleContentGlowColor: Colors.cyan
-                selectedContentGlowColor: Colors.cyan
                 idleSoftGlowColor: Colors.cyan
-                selectedSoftGlowColor: Colors.cyan
                 onLeftClicked: compact.dockFormatRequested(false)
             }
             TimeActionButton {
@@ -102,14 +93,10 @@ Item {
                 available: compact.dockFormatAvailable
                 idleForegroundColor: Colors.orange
                 hoverForegroundColor: Colors.orange
-                selectedForegroundColor: Colors.orange
                 idleBorderColor: Colors.orange
                 hoverBorderColor: Colors.orange
-                selectedBorderColor: Colors.orange
                 idleContentGlowColor: Colors.orange
-                selectedContentGlowColor: Colors.orange
                 idleSoftGlowColor: Colors.orange
-                selectedSoftGlowColor: Colors.orange
                 onLeftClicked: compact.dockFormatRequested(true)
             }
         }
@@ -311,7 +298,9 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: 3
-        spacing: 5
+        // Extra trigger controls fit without a page scroller, including
+        // a visible manual RESYNC confirmation row.
+        spacing: 3
         GohuText {
             width: parent.width
             height: 16
@@ -435,6 +424,36 @@ Item {
             }
         }
         Row {
+            id: autoEventTriggers
+            width: parent.width
+            height: 30
+            spacing: 6
+            TimeActionButton {
+                width: (parent.width - parent.spacing) / 2
+                height: 29
+                actionRole: "sync"
+                label: TimeSettings.autoCheckOnReload
+                       ? "RELOAD ON" : "RELOAD OFF"
+                labelPixelSize: 10
+                selected: TimeSettings.autoCheckOnReload
+                available: TimeSettings.autoCheckCanEdit
+                onLeftClicked: TimeSettings.setAutoCheckTrigger(
+                    "checkOnReload", !TimeSettings.autoCheckOnReload)
+            }
+            TimeActionButton {
+                width: (parent.width - parent.spacing) / 2
+                height: 29
+                actionRole: "sync"
+                label: TimeSettings.autoCheckOnClockOpen
+                       ? "CLOCK OPEN ON" : "CLOCK OPEN OFF"
+                labelPixelSize: 9
+                selected: TimeSettings.autoCheckOnClockOpen
+                available: TimeSettings.autoCheckCanEdit
+                onLeftClicked: TimeSettings.setAutoCheckTrigger(
+                    "checkOnClockOpen", !TimeSettings.autoCheckOnClockOpen)
+            }
+        }
+        Row {
             width: parent.width
             height: 18
             spacing: 6
@@ -526,7 +545,7 @@ Item {
             color: Colors.orange
             text: TimeSettings.resyncConfirmRequired
                   ? "CONFIRMATION MAY CONTACT NTP SERVERS (IP VISIBLE) AND CHANGE LOG / FILE TIMES. POLKIT MAY PROMPT."
-                  : "AUTOMATIC CHECK NEVER SETS HOST TIME. ONE-SHOT RESYNC REQUIRES CONFIRMATION / POLKIT."
+                  : "AUTO MASTER CONTROLS RELOAD / CLOCK-OPEN CHECKS. NO AUTO HOST CORRECTION. RESYNC REQUIRES CONFIRMATION / POLKIT."
         }
     }
     // The ordinary pages never scroll. Full error/authorization messages are
@@ -601,6 +620,8 @@ Item {
                                        + " // " + String(TimeSettings.hostInfo.ntpSynchronized || "unknown") },
                             { label: "RTC LOCAL", value: String(TimeSettings.hostInfo.rtcLocal || "unknown") },
                             { label: "AUTO CHECK", value: TimeSettings.autoCheckResult },
+                            { label: "ON RELOAD", value: TimeSettings.autoCheckOnReload ? "ON" : "OFF" },
+                            { label: "ON CLOCK OPEN", value: TimeSettings.autoCheckOnClockOpen ? "ON" : "OFF" },
                             { label: "AUTO STORAGE", value: TimeSettings.autoCheckErrorCode },
                             { label: "REFERENCE", value: TimeSettings.referenceMessage },
                             { label: "REFERENCE SOURCE", value: TimeSettings.referenceSource },

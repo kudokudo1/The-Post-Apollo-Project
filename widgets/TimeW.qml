@@ -400,6 +400,7 @@ PanelWindow {
         && !countdownHoursField.activeFocus
         && !countdownMinutesField.activeFocus
         && !countdownSecondsField.activeFocus
+        && !alarmPlaceholderPane.editingActive
         && !machineMarkerInput.activeFocus
         && !converterDateInput.activeFocus && !converterTimeInput.activeFocus
     property string worldLookupZone: ""

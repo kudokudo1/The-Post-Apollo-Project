@@ -6,11 +6,14 @@ on:
       - "services/time/MachineBraveProtectedMetadataContract.py"
       - "services/time/MachineBraveArchiveAdmissionIntent.py"
       - "services/time/MachineBraveProcessLease.py"
+      - "services/time/MachineBraveRequestCancellation.py"
       - "tests/timew/test_machine_brave_protected_metadata_contract.py"
       - "tests/timew/test_machine_brave_archive_admission_intent.py"
       - "tests/timew/test_machine_brave_process_lease.py"
+      - "tests/timew/test_machine_brave_request_cancellation.py"
       - "docs/timew-machine-protected-metadata-broker.md"
       - "docs/timew-machine-process-lifecycle.md"
+      - "docs/timew-machine-request-cancellation.md"
       - ".github/workflows/timew-machine-protected-metadata-broker.yml"
   workflow_dispatch:
 
@@ -27,6 +30,8 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_brave_archive_admission_intent.py
       - name: Linux kernel peerpidfd process exit and executable change invalidation
         run: python3 -B -I tests/timew/test_machine_brave_process_lease.py
+      - name: Socket EOF half-close and real Linux session drift cancellation regression
+        run: python3 -B -I tests/timew/test_machine_brave_request_cancellation.py
       - name: CI-only privileged distinct-UID kernel permission denial and metadata contract
         run: sudo -n python3 -B -I tests/timew/test_machine_brave_protected_metadata_contract.py
       - name: Existing offline archive, ciphertext and safety regressions

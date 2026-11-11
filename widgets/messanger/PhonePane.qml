@@ -2454,6 +2454,17 @@ Rectangle {
         }
     }
 
+    // The separate PHONE address book uses the same star handle style as
+    // native message lists. Viewport geometry keeps it on the narrow sidebar,
+    // rather than mounting to the large right-side conversation pane.
+    NeonScrollBar {
+        flickable: phoneAddressBook
+        geometryMode: "viewport"
+        handleStyle: "star"
+        accountForContentOrigin: true
+        visible: phoneAddressBook.visible && scrollable
+    }
+
     // No invented people or unapproved phone numbers. The real ContactList
     // remains empty until a different, trusted owner provides scoped data.
     Text {

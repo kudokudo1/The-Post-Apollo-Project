@@ -32,6 +32,7 @@ def admit_fixture_signed_copy(
     resource_id, source_revision, source_captured_ms, payload, now_ms,
     on_stage=None, peer_witness_sha256="", request_binding_sha256="",
     commit_guard=None, service_witness_sha256="",
+    service_grant_sha256="",
 ):
     """Verify fixture root+owner proof before atomic nonce+test-copy commit.
 
@@ -74,7 +75,8 @@ def admit_fixture_signed_copy(
         peer_witness_sha256=peer_witness_sha256,
         request_binding_sha256=request_binding_sha256,
         commit_guard=commit_guard,
-        service_witness_sha256=service_witness_sha256)
+        service_witness_sha256=service_witness_sha256,
+        service_grant_sha256=service_grant_sha256)
     # This represents a committed TEST fixture, not any authorized real copy.
     return {"state":result["state"],
             "snapshotId":result["snapshotId"],
@@ -85,6 +87,7 @@ def admit_fixture_signed_copy(
             "peerWitnessSha256":result["peerWitnessSha256"],
             "requestBindingSha256":result["requestBindingSha256"],
             "serviceWitnessSha256":result["serviceWitnessSha256"],
+            "serviceGrantSha256":result["serviceGrantSha256"],
             "receiptIsTestOnly":True,
             "sourceProcessVerified":False,
             "trustedTimeVerified":False,

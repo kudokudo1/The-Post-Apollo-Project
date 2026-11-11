@@ -42,8 +42,8 @@ case "$phase" in
       sha256sum --check --status identity-artifact-manifest.sha256
     ) || fail "OFFLINE_ARTIFACT_SHA_REFUSED"
     rpmfile="$data/identity-silverblue-ci.rpm"
-    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$rpmfile")" ==
-       "$pkg 0.1 noarch" ]] || fail "WRONG_SIGNED_RPM_ROLE"
+    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$rpmfile")" == "$pkg 0.1 noarch" ]] ||
+      fail "WRONG_SIGNED_RPM_ROLE"
     [[ -z "$(rpm -qp --scripts "$rpmfile")" &&
        -z "$(rpm -qp --triggers "$rpmfile")" ]] ||
       fail "AUTOEXEC_SCRIPTLET_REFUSED"
@@ -151,8 +151,8 @@ ID_MONITOR
     fail "UNAUTHORIZED_REBOOT_DURING_INSTALL"
     ;;
   layer_pending)
-    [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}' "$pkg")" ==
-       "$pkg 0.1 noarch" ]] || fail "LAYER_NOT_IN_BOOTED_RPMDB"
+    [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}' "$pkg")" == "$pkg 0.1 noarch" ]] ||
+      fail "LAYER_NOT_IN_BOOTED_RPMDB"
     [[ -e "$prefix/identity-gateway-ci" &&
        -f "/usr/lib/systemd/system/$unit" ]] ||
       fail "IDENTITY_ENTRYPOINT_OR_UNIT_NOT_BOOTED"

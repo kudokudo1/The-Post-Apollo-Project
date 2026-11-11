@@ -1,0 +1,53 @@
+name: Social PHONE Personal Keyring + Authorization P36 (Disposable)
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhonePersonalKeyringP36.py'
+      - 'services/phone/PhonePersonalHostGateP36.py'
+      - 'services/phone/PhonePersonalContactIdentity.py'
+      - 'services/phone/PhonePersonalContactVault.py'
+      - 'tests/phone/test_phone_personal_host_gate_p36.py'
+      - 'tests/phone/fixtures/PhoneP36DisposableKeyring.py'
+      - 'tests/phone/fixtures/PhoneP36PrivateSession.sh'
+      - '.github/workflows/social-phone-personal-keyring-authority-p36.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhonePersonalKeyringP36.py'
+      - 'services/phone/PhonePersonalHostGateP36.py'
+      - 'tests/phone/test_phone_personal_host_gate_p36.py'
+      - 'tests/phone/fixtures/PhoneP36DisposableKeyring.py'
+      - 'tests/phone/fixtures/PhoneP36PrivateSession.sh'
+      - '.github/workflows/social-phone-personal-keyring-authority-p36.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-keyring-authority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Select isolated Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install crypto only on this disposable runner
+        run: python -m pip install --disable-pip-version-check 'cryptography==50.0.2'
+      - name: Compile fixture and consent boundaries
+        run: |
+          python -m py_compile services/phone/PhonePersonalKeyringP36.py services/phone/PhonePersonalHostGateP36.py tests/phone/test_phone_personal_host_gate_p36.py tests/phone/fixtures/PhoneP36DisposableKeyring.py
+      - name: Synthetic negative/authorization tests
+        run: |
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_host_gate_p36.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_contact_vault.py' -v
+      - name: Install temporary provider exclusively on CI runner
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            dbus dbus-x11 gnome-keyring libsecret-tools libglib2.0-bin
+      - name: Disposable real Secret Service lookup and fresh-process vault recovery
+        run: dbus-run-session -- bash tests/phone/fixtures/PhoneP36PrivateSession.sh

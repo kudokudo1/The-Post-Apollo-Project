@@ -12,12 +12,14 @@ Item {
     property bool panelVisible: visible
 
     onPanelVisibleChanged: {
-        if (panelVisible && area === "devices")
+        if (panelVisible && area === "devices"
+                && !KittyScrollSettings.terminalMode)
             SwayScrollSettings.refresh();
     }
 
     Flickable {
         id: scroll
+        visible: !KittyScrollSettings.terminalMode
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -41,6 +43,14 @@ Item {
                     font.pixelSize: 12
                     color: Colors.cyan
                     wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 34
+                    label: "KITTY // TERMINAL SCROLL"
+                    labelPixelSize: 10
+                    available: !SwayScrollSettings.busy
+                    onLeftClicked: KittyScrollSettings.chooseMode(true)
                 }
                 GohuText {
                     width: parent.width
@@ -272,8 +282,14 @@ Item {
             }
         }
     }
+    CpuPlusSettingsKittyScrollPane {
+        anchors.fill: parent
+        area: mousePane.area
+        visible: KittyScrollSettings.terminalMode
+    }
     NeonScrollBar {
         flickable: scroll
-        visible: mousePane.panelVisible && scrollable
+        visible: mousePane.panelVisible
+                 && !KittyScrollSettings.terminalMode && scrollable
     }
 }

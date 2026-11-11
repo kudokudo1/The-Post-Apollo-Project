@@ -343,8 +343,9 @@ Item {
                     available: KeyboardLockSettings.canApply
                     selected: KeyboardLockSettings.confirmRequired
                     onLeftClicked: KeyboardLockSettings.prepareApply(
-                        KeyboardLedObservation.savedNum,
-                        KeyboardLedObservation.savedCaps
+                        KeyboardLedObservation.currentNum,
+                        KeyboardLedObservation.currentCaps,
+                        KeyboardLedObservation.fresh
                     )
                 }
                 ActionButton {

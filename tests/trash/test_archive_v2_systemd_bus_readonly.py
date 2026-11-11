@@ -91,8 +91,12 @@ class SimulatedSystemBus:
 
     def reply(self, signature, body, sender, override_key):
         override = self.overrides.get(override_key, {})
+        message_type = override.get("type",MessageType.METHOD_RETURN)
         return Message(
-            message_type=override.get("type",MessageType.METHOD_RETURN),
+            message_type=message_type,
+            reply_serial=1,
+            error_name=("org.freedesktop.DBus.Error.Failed"
+                        if message_type == MessageType.ERROR else None),
             signature=override.get("signature",signature),
             body=override.get("body",body),
             sender=override.get("sender",sender),

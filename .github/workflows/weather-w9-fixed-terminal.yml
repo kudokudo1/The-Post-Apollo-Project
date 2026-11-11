@@ -1,4 +1,4 @@
-name: Weather Station W15 original weather glyphs, forecast centering and non-panning overview
+name: Weather Station W16 one-page overview, larger original weather glyphs and ⚡︎
 
 on:
   pull_request:
@@ -9,12 +9,14 @@ on:
       - 'widgets/weather/StationWeatherLineGlyph.qml'
       - 'widgets/weather/StationWeatherTerminalSummary.qml'
       - 'widgets/weather/StationHome.qml'
+      - 'widgets/weather/StationHomeMetricCard.qml'
       - 'widgets/weather/StationWeatherTwilightGrid.qml'
       - 'tests/weather/test_weather_w11_prominence.js'
       - 'tests/weather/test_weather_w12_current_meters.js'
       - 'tests/weather/test_weather_w13_centered_meters.js'
       - 'tests/weather/test_weather_w14_instrument_visual.js'
       - 'tests/weather/test_weather_w15_original_icons_fixed_overview.js'
+      - 'tests/weather/test_weather_w16_one_page_icons.js'
       - 'tests/weather/test_weather_w10_three_band_solar.js'
       - 'widgets/weather/StationSky.qml'
       - 'tests/weather/test_weather_w9_fixed_paged_terminal.js'
@@ -46,6 +48,7 @@ jobs:
           node --test tests/weather/test_weather_w13_centered_meters.js
           node --test tests/weather/test_weather_w14_instrument_visual.js
           node --test tests/weather/test_weather_w15_original_icons_fixed_overview.js
+          node --test tests/weather/test_weather_w16_one_page_icons.js
           node --test tests/weather/test_weather_w8_unified_terminal.js
           node --test tests/weather/test_weather_subject_panels_m2a.js
           node --test tests/weather/test_weather_subject_panels_m2b.js
@@ -94,7 +97,7 @@ jobs:
           if grep -E 'W14_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi
-      - name: Native W15 WEATHER OVERVIEW no-pan with intact summary and card groups
+      - name: Native W16 both Snapshot and AUTO card groups in one fixed overview
         shell: bash
         run: |
           set -euo pipefail
@@ -117,8 +120,8 @@ jobs:
             > "$work/native.log" 2>&1 || rc=$?
           cat "$work/native.log"
           test "$rc" -eq 0
-          grep -F "W15_OVERVIEW_NATIVE_PASS // TWO_SIZES_NO_PAN_INTACT_CARD_GROUPS" "$work/native.log"
-          if grep -E 'W15_OVERVIEW_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+          grep -F "W16_OVERVIEW_NATIVE_PASS // BOTH_CARD_GROUPS_NO_PAN_440_520" "$work/native.log"
+          if grep -E 'W16_OVERVIEW_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi
       - name: Upload optional native WEATHER visual preview
@@ -137,13 +140,13 @@ jobs:
           path: /tmp/weather-w14-compact-preview.png
           if-no-files-found: warn
           retention-days: 14
-      - name: Upload native W15 OVERVIEW card-group previews
+      - name: Upload native W16 single-page overview previews
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: weather-w15-overview-fixed-previews
+          name: weather-w16-one-page-overview
           path: |
-            /tmp/weather-w15-overview-now.png
-            /tmp/weather-w15-overview-auto.png
+            /tmp/weather-w16-overview-compact.png
+            /tmp/weather-w16-overview-wide.png
           if-no-files-found: warn
           retention-days: 14

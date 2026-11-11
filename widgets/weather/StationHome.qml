@@ -19,10 +19,12 @@ Rectangle {
     // archive in a compact single viewport without wheel scrolling.
     readonly property bool compactHistory:
         subjectRoute === "" && workspaceSection === "history"
-    // W15 // Non-panning, full-display WEATHER OVERVIEW route only.
+    // W16 // WEATHER OVERVIEW: summary and BOTH full-width card groups.
+    // Only an actual NWS alert may need extra vertical room.
     readonly property bool fixedWeatherOverview:
         subjectRoute === "weather/overview"
-    property string overviewPage: "snapshot"
+    readonly property bool overviewRequiresScroll:
+        fixedWeatherOverview && officialAlertSummary.available
     readonly property alias overviewViewportItem: homeScroll
     readonly property alias overviewContentItem: homeContent
     readonly property alias overviewSummaryItem: weatherOverviewSummary
@@ -54,13 +56,6 @@ Rectangle {
         if (homeScroll) homeScroll.contentY = 0;
     }
     onSubjectRouteChanged: {
-        if (homeScroll)
-            homeScroll.contentY = 0;
-        if (fixedWeatherOverview)
-            overviewPage = officialAlertSummary.available
-                           ? "alerts" : "snapshot";
-    }
-    onOverviewPageChanged: {
         if (homeScroll)
             homeScroll.contentY = 0;
     }
@@ -968,9 +963,12 @@ Rectangle {
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        interactive: !home.compactHistory && !home.fixedWeatherOverview
+        interactive: !home.compactHistory
+                     && (!home.fixedWeatherOverview
+                         || home.overviewRequiresScroll)
         contentWidth: width
-        contentHeight: home.fixedWeatherOverview ? height : Math.max(
+        contentHeight: home.fixedWeatherOverview
+                       && !home.overviewRequiresScroll ? height : Math.max(
             height,
             homeContent.y + homeContent.implicitHeight
                 + (home.compactHistory ? 4 : 24)
@@ -1035,12 +1033,6 @@ Rectangle {
             height: visible ? 158 : 0
             compact: true
             weatherService: home.weatherService
-            overviewNavigation: home.fixedWeatherOverview
-            overviewSelection: home.overviewPage
-            overviewHasAlert: home.officialAlertSummary.available
-            onOverviewSelectionRequested: function(page) {
-                home.overviewPage = page;
-            }
         }
 
         StationSectionDivider {
@@ -1062,8 +1054,6 @@ Rectangle {
             spacing: 8
             visible: home.officialAlertSummary.available
                      && home.sectionVisible("alerts")
-                     && (!home.fixedWeatherOverview
-                         || home.overviewPage==="alerts")
 
             StationSectionDivider {
                 width: parent.width
@@ -1228,17 +1218,18 @@ Rectangle {
         Row {
             id: weatherSnapshotRow
             visible: home.sectionVisible("snapshot")
-                     && (!home.fixedWeatherOverview
-                         || home.overviewPage==="snapshot")
             width: parent.width
             height: home.fixedWeatherOverview
-                    ? Math.max(1,Math.min(118,homeScroll.height-159))
+                    ? Math.max(1,Math.floor(
+                        (homeScroll.height-weatherOverviewSummary.height)/2))
                     : 118
-            spacing: 12
+            spacing: home.fixedWeatherOverview ? 4 : 12
 
             StationHomeMetricCard {
-                width: (parent.width - 24) / 3
+                width: (parent.width - parent.spacing*2) / 3
                 height: parent.height
+                compact: home.fixedWeatherOverview
+                overviewDense: home.fixedWeatherOverview
 
                 title: "CURRENT WEATHER"
                 valueText:
@@ -1263,8 +1254,10 @@ Rectangle {
             }
 
             StationHomeMetricCard {
-                width: (parent.width - 24) / 3
+                width: (parent.width - parent.spacing*2) / 3
                 height: parent.height
+                compact: home.fixedWeatherOverview
+                overviewDense: home.fixedWeatherOverview
 
                 title: "NEXT HOURS"
                 valueText:
@@ -1299,8 +1292,10 @@ Rectangle {
             }
 
             StationHomeMetricCard {
-                width: (parent.width - 24) / 3
+                width: (parent.width - parent.spacing*2) / 3
                 height: parent.height
+                compact: home.fixedWeatherOverview
+                overviewDense: home.fixedWeatherOverview
 
                 title: "AIR QUALITY"
                 valueText:
@@ -1662,13 +1657,13 @@ Rectangle {
         Row {
             id: weatherRelevantRow
             visible: home.sectionVisible("relevant")
-                     && (!home.fixedWeatherOverview
-                         || home.overviewPage==="relevant")
             width: parent.width
             height: home.fixedWeatherOverview
-                    ? Math.max(1,Math.min(118,homeScroll.height-159))
+                    ? Math.max(1,homeScroll.height
+                              -weatherOverviewSummary.height
+                              -weatherSnapshotRow.height)
                     : 118
-            spacing: 12
+            spacing: home.fixedWeatherOverview ? 4 : 12
 
             Repeater {
                 model: home.watchItems
@@ -1690,6 +1685,8 @@ Rectangle {
                             home.watchItems.length
                         )
                     height: parent.height
+                    compact: home.fixedWeatherOverview
+                    overviewDense: home.fixedWeatherOverview
 
                     title: modelData.title
                     valueText: modelData.value
@@ -1715,10 +1712,11 @@ Rectangle {
                     meterValue: modelData.meterValue
                     meterFillColor:
                         home.sourceMeterFill(modelData.source)
-                    provenanceText: home.homeFavoritesStore
-                        ? CardProvenance.provenance(
-                            modelData, home.sourceHealthRows
-                          ) : ""
+                    provenanceText: home.fixedWeatherOverview ? ""
+                        : home.homeFavoritesStore
+                          ? CardProvenance.provenance(
+                                modelData, home.sourceHealthRows
+                            ) : ""
                     pinEnabled: !!home.homeFavoritesStore
                     pinned: home.homeFavoritesStore
                         ? home.homeFavoritesStore.cardKeys.indexOf(
@@ -1802,6 +1800,7 @@ Rectangle {
         handleStyle: "star"
         geometryHost: home
         visible: scrollable && !home.compactHistory
-                 && !home.fixedWeatherOverview
+                 && (!home.fixedWeatherOverview
+                     || home.overviewRequiresScroll)
     }
 }

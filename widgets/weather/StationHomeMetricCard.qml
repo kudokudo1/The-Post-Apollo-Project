@@ -10,6 +10,10 @@ Rectangle {
     property string footerText: ""
     // W3 // All existing readings; compact presentation is HISTORY-only.
     property bool compact: false
+    // W16 // Weather OVERVIEW alone can show both existing card groups in
+    // one compact viewport. Does not alter HISTORY or regular HOME cards.
+    property bool overviewDense: false
+    readonly property alias contentItem: standardCardContents
     // Only canonical HOME SERVICES uses this fit-safe two-row instrument.
     property bool servicesCompact: false
     readonly property alias compactFooterItem: servicesFooter
@@ -36,10 +40,11 @@ Rectangle {
     border.color: Colors.cyan
 
     Column {
+        id: standardCardContents
         visible: !card.servicesCompact
         anchors.fill: parent
-        anchors.margins: card.compact ? 4 : 10
-        spacing: card.compact ? 1 : 5
+        anchors.margins: card.overviewDense ? 2 : (card.compact ? 4 : 10)
+        spacing: card.overviewDense ? 0 : (card.compact ? 1 : 5)
 
         GohuText {
             text: card.title

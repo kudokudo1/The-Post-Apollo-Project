@@ -9,12 +9,7 @@ Rectangle {
     objectName: "weather-w8-terminal-summary"
     property var weatherService: null
     property bool compact: false
-    // W15 // Header-only navigation for the fixed WEATHER OVERVIEW.
-    // Content, meters, headings, icons and box geometry below are unchanged.
-    property bool overviewNavigation: false
-    property string overviewSelection: "snapshot"
-    property bool overviewHasAlert: false
-    signal overviewSelectionRequested(string selection)
+    // W16 // One continuous OVERVIEW, no internal page selector.
 
     // Read-only geometry for native visual-fit verification.
     readonly property alias currentMetricItem: metricRow
@@ -74,7 +69,7 @@ Rectangle {
         if(n===45 || n===48) return "≋";
         if((n>=51 && n<=67) || (n>=80 && n<=82)) return "☂";
         if((n>=71 && n<=77) || (n>=85 && n<=86)) return "❄";
-        if(n>=95) return "⚡";
+        if(n>=95) return "⚡︎";
         return "◌";
     }
     readonly property var metrics: [
@@ -108,11 +103,10 @@ Rectangle {
             height: 14
             spacing: 3
             GohuText {
-                width: Math.max(1,parent.width
-                      *(terminal.overviewNavigation ? 0.52 : 0.63))
+                width: Math.max(1,parent.width*0.63)
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
-                text: terminal.overviewNavigation
+                text: terminal.compact
                       ? "WEATHER // OVERVIEW"
                       : "WEATHER // CURRENT + AIR + FORECAST"
                 color: Colors.cyan
@@ -120,8 +114,7 @@ Rectangle {
                 elide: Text.ElideRight
             }
             QuietText {
-                visible: !terminal.overviewNavigation
-                width: visible ? Math.max(1,parent.width*0.35) : 0
+                width: Math.max(1,parent.width*0.35)
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignRight
@@ -132,36 +125,6 @@ Rectangle {
                 color: terminal.conditionsReady ? Colors.cyan : Colors.orange
                 font.pixelSize: 8
                 elide: Text.ElideRight
-            }
-            Row {
-                id: overviewHeaderPages
-                objectName: "weather-w15-overview-header-selector"
-                visible: terminal.overviewNavigation
-                width: visible ? Math.max(1,parent.width*0.48-6) : 0
-                height: parent.height
-                spacing: 2
-                Repeater {
-                    model: [
-                        {key:"snapshot",label:"NOW"},
-                        {key:"relevant",label:"AUTO"},
-                        {key:"alerts",label:"ALERT"}
-                    ]
-                    delegate: ActionButton {
-                        required property var modelData
-                        width: Math.max(1,(overviewHeaderPages.width-4)/3)
-                        height: 13
-                        label: modelData.label
-                        labelPixelSize: 8
-                        contentPadding: 0
-                        accentColor: modelData.key==="alerts"
-                                     ? Colors.orange : Colors.cyan
-                        selected: terminal.overviewSelection===modelData.key
-                        available: modelData.key!=="alerts" ||
-                                   terminal.overviewHasAlert
-                        onClicked: terminal.overviewSelectionRequested(
-                            modelData.key)
-                    }
-                }
             }
         }
 
@@ -258,7 +221,7 @@ Rectangle {
                             height: 27
                             verticalAlignment: Text.AlignVCenter
                             text: terminal.glyph(sample.weatherCode,sample.condition)
-                            font.pixelSize: 18
+                            font.pixelSize: 25
                             color: Colors.yellow
                         }
                         Column {
@@ -333,7 +296,7 @@ Rectangle {
                             height: 27
                             verticalAlignment: Text.AlignVCenter
                             text: terminal.glyph(sample.weatherCode,sample.condition)
-                            font.pixelSize: 18
+                            font.pixelSize: 25
                             color: Colors.yellow
                         }
                         Column {

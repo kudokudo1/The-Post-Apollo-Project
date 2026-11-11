@@ -93,6 +93,25 @@ def quiet_pcm_frame(pcm: bytes, threshold: float = 500.0) -> bool:
             < threshold * threshold)
 
 
+def clear_pause_at_end(pcm: bytes, *, minimum_ms: int = 400,
+                       threshold: float = 350.0) -> bool:
+    """Require sustained low energy before dropping prior-window overlap.
+
+    Check every 100ms frame in the trailing window. A single speech-like
+    frame keeps the previous overlap to protect cut-off words. No captured
+    samples, frame levels, or voice-derived details are logged.
+    """
+    frame_bytes = RATE * FRAME_BYTES // 10
+    required = frame_bytes * max(4, min(6, (minimum_ms + 99) // 100))
+    if len(pcm) < required:
+        return False
+    ending = pcm[-required:]
+    return all(
+        quiet_pcm_frame(ending[pos:pos + frame_bytes], threshold)
+        for pos in range(0, required, frame_bytes)
+    )
+
+
 def clean_transcript(value: str) -> str:
     if not isinstance(value, str):
         return ""
@@ -492,6 +511,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
         attempted_session = False
         previous_text = ""
         previous_pcm_tail = b""
+        previous_chunk_ended_quietly = False
         def start_persistent_once(*, early: bool = False):
             nonlocal session, attempted_session
             if attempted_session or cancelled.is_set() or not prefer_persistent:
@@ -548,11 +568,23 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                         # A 750-ms overlap gives the decoder continuity at
                         # word boundaries. Prior recognized text is sent only
                         # to the private model over its AF_UNIX socket.
-                        raw = session.transcribe(previous_pcm_tail + chunk,
+                        # The previous 750ms is useful across a word cut,
+                        # but re-decoding it after a verified quiet boundary
+                        # wastes CPU and may repeat the previous phrase.
+                        # Keep overlap for all continuous/uncertain speech.
+                        overlap = previous_pcm_tail
+                        if (speech_pause_ms > 0 and previous_chunk_ended_quietly
+                                and overlap):
+                            overlap = b""
+                            send("stage", detail="SILENT_OVERLAP_SKIPPED")
+                        raw = session.transcribe(overlap + chunk,
                                                  prompt=previous_text[-160:])
                         cleaned = clean_transcript(raw)
                         phrase = trim_repeated_prefix(previous_text, cleaned)
                         previous_pcm_tail = chunk[-OVERLAP_BYTES:]
+                        previous_chunk_ended_quietly = (
+                            speech_pause_ms > 0 and clear_pause_at_end(chunk)
+                        )
                         if phrase:
                             previous_text = (previous_text + " " + phrase)[-300:]
                     send_timing("INFERENCE", decoding_at)

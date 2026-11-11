@@ -17,13 +17,23 @@ signer=$base/signer.ed25519
 socket=$runtime/identity-command-v0.sock
 pid=0
 user_created=0
+policy_loaded=0
+policyfile=/var/lib/postapollo-id-ci-assets/postapollo_identity_ci.pp
+dropindir="/run/systemd/system/$unit.d"
+launcher="$base/ci-python3"
 
 cleanup() {
-  # Never preserve user, runtime or ephemeral private signing key into rollback.
+  # The policy and drop-in are VM-only; never let either reach rollback.
   timeout --signal=TERM --kill-after=2s 12s systemctl stop "$unit" >/dev/null 2>&1 || true
+  rm -f -- "$dropindir/10-disposable-selinux.conf"
+  rmdir "$dropindir" 2>/dev/null || true
+  systemctl daemon-reload >/dev/null 2>&1 || true
   rm -rf -- "$base"
   if [[ "$user_created" == 1 ]]; then
     userdel "$name" >/dev/null 2>&1 || true
+  fi
+  if [[ "$policy_loaded" == 1 ]]; then
+    timeout --signal=TERM --kill-after=4s 150s semodule -r postapollo_identity_ci >/var/tmp/c4b-id-selinux-unload.log 2>&1 || true
   fi
   systemctl reset-failed "$unit" >/dev/null 2>&1 || true
 }
@@ -51,6 +61,31 @@ pre_active="$(systemctl show "$unit" --property=ActiveState --value)"
 [[ "$pre_pid" == 0 && "$pre_active" != active ]] ||
   fail "UNIT_ACTIVATED_WITHOUT_CI_MARKER"
 echo "C4B_ID_PASS // REAL_SYSTEMD_UNIT_REFUSED_WITHOUT_MARKER"
+
+# Load the compiled C4b-owned test domain solely inside this disposable VM.
+# No persistent policy is installed on the workstation or accepted by C3e.
+[[ -f "$policyfile" && ! -L "$policyfile" &&
+   "$(stat -c '%u:%g:%a' "$policyfile")" == '0:0:600' ]] ||
+  fail "OFFLINE_COMPILED_SELINUX_MODULE_NOT_PRESENT"
+command -v semodule >/dev/null 2>&1 && command -v chcon >/dev/null 2>&1 ||
+  fail "FEDORA_SELINUX_GUEST_TOOLS_ABSENT"
+if semodule -l | grep -Eq '^postapollo_identity_ci([[:space:]]|$)'; then
+  fail "IDENTITY_SELINUX_MODULE_ALREADY_LOADED"
+fi
+policy_rc=0
+timeout --signal=TERM --kill-after=4s 150s semodule -i "$policyfile" >/var/tmp/c4b-id-selinux-load.log 2>&1 ||
+  policy_rc="$?"
+if [[ "$policy_rc" != 0 ]]; then
+  sed -n '1,24p' /var/tmp/c4b-id-selinux-load.log |
+    sed 's/^/C4B_ID_SELINUX_LOAD_DETAIL \/\/ /' >/dev/ttyS0 || true
+  fail "COMPILED_SELINUX_MODULE_LOAD_REFUSED"
+fi
+policy_loaded=1
+semodule -l | grep -Eq '^postapollo_identity_ci([[:space:]]|$)' ||
+  fail "COMPILED_SELINUX_MODULE_NOT_ACTIVE"
+[[ "$(getenforce)" == Enforcing ]] ||
+  fail "SELINUX_ENFORCING_LOST_AFTER_MODULE_INSTALL"
+echo "C4B_ID_PASS // DEDICATED_TEST_SELINUX_MODULE_LOADED_ENFORCING"
 
 # This fixture requires Fedora's system Python Ed25519 support. Never pip
 # install a mutable dependency into the offline guest or weaken import pins.
@@ -89,6 +124,30 @@ printf '%s\n' 'CI-ONLY-SUPERVISED-NATIVE-IDENTITY-GATE' >"$base/authorized-test.
 chmod 0444 "$base/authorized-test.marker"
 chown root:root "$base" "$base/runtime.env" "$base/authorized-test.marker"
 chmod 0711 "$base"
+# The original /usr RPM files stay immutable. A byte-identical copy of the
+# Fedora-provided Python executable is a temporary test-specific transition
+# entrypoint. It is NOT a production Python or policy installation.
+install -m 0555 /usr/bin/python3 "$launcher" ||
+  fail "CI_ONLY_PYTHON_ENTRYPOINT_COPY_REFUSED"
+cmp -s /usr/bin/python3 "$launcher" ||
+  fail "CI_ONLY_PYTHON_ENTRYPOINT_NOT_BYTE_IDENTICAL"
+chcon -t postapollo_identity_ci_run_t   "$base" "$runtime" "$signer" "$base/runtime.env" "$base/authorized-test.marker" ||
+  fail "CI_ONLY_RUNTIME_LABEL_REFUSED"
+chcon -t postapollo_identity_ci_exec_t "$launcher" ||
+  fail "CI_ONLY_PYTHON_ENTRYPOINT_LABEL_REFUSED"
+[[ "$(stat -c '%u:%g:%a' "$launcher")" == '0:0:555' ]] ||
+  fail "CI_ONLY_PYTHON_ENTRYPOINT_NOT_ROOT_IMMUTABLE"
+ls -Z "$launcher" | grep -Fq ':postapollo_identity_ci_exec_t:' ||
+  fail "CI_ONLY_PYTHON_ENTRYPOINT_WRONG_SELINUX_TYPE"
+mkdir -m 0755 -p "$dropindir"
+cat >"$dropindir/10-disposable-selinux.conf" <<'CI_ID_SELINUX_UNIT'
+[Service]
+ExecStart=
+ExecStart=/run/postapollo-identity-silverblue-ci-only/ci-python3 -I -B /usr/libexec/post-apollo/identity/identity-gateway-ci
+CI_ID_SELINUX_UNIT
+chmod 0644 "$dropindir/10-disposable-selinux.conf"
+systemctl daemon-reload || fail "CI_ONLY_DAEMON_RELOAD_WITH_CUSTOM_ENTRYPOINT_FAILED"
+echo "C4B_ID_PASS // SEPARATE_LABELED_IDENTITY_EXECUTABLE_AND_EPHEMERAL_SYSTEMD_OVERRIDE"
 
 systemctl reset-failed "$unit" >/dev/null 2>&1 || true
 timeout --signal=TERM --kill-after=2s 12s systemctl start "$unit" ||
@@ -117,8 +176,11 @@ tr '\0' ' ' <"/proc/$pid/cmdline" |
   grep -Fq '/usr/libexec/post-apollo/identity/identity-gateway-ci' ||
   fail "KERNEL_PROCESS_COMMAND_MISMATCH"
 selinux="$(cat "/proc/$pid/attr/current")"
-[[ -n "$selinux" && "$selinux" != "unconfined_t" ]] ||
-  fail "KERNEL_SELINUX_CONTEXT_MISSING"
+printf 'C4B_ID_SELINUX_OBSERVED // %.180s\n' "$selinux"
+[[ "$selinux" == 'system_u:system_r:postapollo_identity_ci_t:s0' &&
+   "$(getenforce)" == Enforcing ]] ||
+  fail "DEDICATED_ENFORCING_IDENTITY_DOMAIN_NOT_ACTIVE"
+echo "C4B_ID_PASS // REAL_ENFORCING_DEDICATED_SELINUX_DOMAIN_OBSERVED"
 printf 'C4B_ID_SERVICE_OBSERVED // pid=%s uid=%s gid=%s cgroup=%s selinux=%s\n' \
   "$pid" "$uid" "$gid" "$cgroup" "$selinux"
 echo "C4B_ID_PASS // REAL_SYSTEMD_IDENTITY_GATEWAY_SOCKET_AND_PROCESS_OBSERVED"
@@ -242,7 +304,14 @@ done
   fail "SOCKET_OR_PROCESS_REMAINS_AFTER_STOP"
 cleanup
 trap - EXIT
-[[ ! -e "$base" ]] && ! getent passwd "$name" >/dev/null ||
+[[ ! -e "$base" && ! -e "$dropindir" ]] &&
+  ! getent passwd "$name" >/dev/null ||
   fail "TEMPORARY_USER_OR_PRIVATE_KEY_REMAINS"
+if semodule -l | grep -Eq '^postapollo_identity_ci([[:space:]]|$)'; then
+  fail "DISPOSABLE_SELINUX_MODULE_REMAINS_AFTER_STOP"
+fi
+[[ "$(getenforce)" == Enforcing ]] ||
+  fail "SELINUX_ENFORCING_LOST_DURING_TEARDOWN"
+echo "C4B_ID_PASS // DEDICATED_SELINUX_MODULE_REMOVED_AFTER_SERVICE_STOP"
 echo "C4B_ID_PASS // REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP"
 echo "C4B_ID_LIMITATION // NO_PRODUCTION_RELEASE_ENROLLMENT_OR_C5_OPERATOR_CONSENT"

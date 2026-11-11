@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "../../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
 
 // W8 // One read-only weather terminal instrument shared by the complete
 // WEATHER workspace and its OVERVIEW. It never owns providers, timers, or
@@ -54,22 +55,6 @@ Rectangle {
             && String(value).trim() !== "" && isFinite(n)
             && n>-900 && n<200 ? Math.round(n)+"°F" : "--°F";
     }
-    function glyph(weatherCode, condition) {
-        const n=Number(weatherCode);
-        const label=String(condition||"").toLowerCase();
-        if(weatherCode === null || weatherCode === undefined
-           || String(weatherCode).trim()==="")
-            return label.indexOf("rain")>=0 ? "☂"
-              : label.indexOf("sun")>=0 || label.indexOf("clear")>=0 ? "☀"
-              : label.indexOf("cloud")>=0 ? "☁" : "◌";
-        if(n === 0) return "☀";
-        if(n<=3) return "☁";
-        if(n===45 || n===48) return "≋";
-        if((n>=51 && n<=67) || (n>=80 && n<=82)) return "☂";
-        if((n>=71 && n<=77) || (n>=85 && n<=86)) return "❄";
-        if(n>=95) return "⚡";
-        return "◌";
-    }
     readonly property var metrics: [
         {label:"CONDITIONS",value:conditionsReady
              ? temp(weatherService.tempF) : "--°F",
@@ -106,7 +91,7 @@ Rectangle {
                 verticalAlignment: Text.AlignVCenter
                 text: "WEATHER // CURRENT + AIR + FORECAST"
                 color: Colors.cyan
-                font.pixelSize: 10
+                font.pixelSize: 11
                 elide: Text.ElideRight
             }
             QuietText {
@@ -128,17 +113,24 @@ Rectangle {
             id: metricRow
             objectName: "weather-w8-current-air-metrics"
             width: parent.width
-            height: 43
+            height: 48
             spacing: 3
             Repeater {
                 model: terminal.metrics
-                delegate: Rectangle {
+                delegate: Item {
                     required property var modelData
+                    required property int index
                     width: Math.max(1,(metricRow.width-9)/4)
                     height: metricRow.height
-                    color: Colors.black
-                    border.width: 1
-                    border.color: modelData.accent
+                    Rectangle {
+                        visible: index>0
+                        width: 1
+                        height: parent.height-8
+                        x: 0
+                        y: 4
+                        color: modelData.accent
+                        opacity: 0.65
+                    }
                     Column {
                         anchors.fill: parent
                         anchors.margins: 3
@@ -147,7 +139,7 @@ Rectangle {
                             width: parent.width
                             height: 9
                             text: modelData.label
-                            font.pixelSize: 8
+                            font.pixelSize: 9
                             color: modelData.accent
                             elide: Text.ElideRight
                         }
@@ -155,15 +147,15 @@ Rectangle {
                             width: parent.width
                             height: 14
                             text: modelData.value
-                            font.pixelSize: 12
-                            color: Colors.white
+                            font.pixelSize: index===0 ? 18 : 14
+                            color: modelData.accent
                             elide: Text.ElideRight
                         }
                         QuietText {
                             width: parent.width
                             height: 9
                             text: modelData.info
-                            font.pixelSize: 8
+                            font.pixelSize: 9
                             elide: Text.ElideRight
                         }
                     }
@@ -174,7 +166,7 @@ Rectangle {
         QuietText {
             width: parent.width
             height: 10
-            text: "NEXT HOURS // TEMPERATURE + PRECIPITATION"
+            text: "NEXT HOURS // PRECIPITATION CHANCE DURING EACH HOUR"
             color: Colors.orange
             font.pixelSize: 8
             elide: Text.ElideRight
@@ -184,46 +176,55 @@ Rectangle {
             id: hourlyRow
             objectName: "weather-w8-hourly-strip"
             width: parent.width
-            height: 30
+            height: 29
             spacing: 3
             Repeater {
                 model: Math.min(3,terminal.hourlySamples.length)
-                delegate: Rectangle {
+                delegate: Item {
+                    required property int index
                     readonly property var sample: terminal.hourlySamples[index] || {}
+                    readonly property var cycle:
+                        WeatherCyclePolicy.forecast(sample.date,sample.time,terminal.dailySamples)
                     width: Math.max(1,(hourlyRow.width-6)/3)
                     height: hourlyRow.height
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.blue
+                    Rectangle {
+                        visible: index>0
+                        x: 0
+                        height: parent.height
+                        width: 1
+                        color: Colors.blue
+                    }
                     Row {
                         anchors.fill: parent
-                        anchors.margins: 3
-                        spacing: 4
-                        GohuText {
-                            width: 20
-                            height: parent.height
-                            verticalAlignment: Text.AlignVCenter
-                            text: terminal.glyph(sample.weatherCode,sample.condition)
-                            font.pixelSize: 18
-                            color: Colors.yellow
+                        anchors.margins: 2
+                        spacing: 3
+                        StationWeatherLineGlyph {
+                            width: 27
+                            height: 27
+                            mode: cycle.solar==="night" ? "night-weather" : "weather"
+                            condition: sample.condition || ""
+                            weatherCode: sample.weatherCode
+                            moonPhase: cycle.moonPhase
+                            ink: Colors.orange
                         }
                         Column {
-                            width: Math.max(1,parent.width-24)
-                            spacing: 1
+                            width: Math.max(1,parent.width-30)
+                            spacing: 2
                             GohuText {
                                 width: parent.width
                                 height: 10
-                                text: String(sample.timeLabel || "--")
-                                      +" // "+terminal.temp(sample.tempF)
+                                text: String(sample.date||"--").slice(5)
+                                      +" "+String(sample.timeLabel||"--")
+                                      +"  "+terminal.temp(sample.tempF)
                                 font.pixelSize: 9
                                 color: Colors.white
                                 elide: Text.ElideRight
                             }
-                            QuietText {
+                            GohuText {
                                 width: parent.width
-                                height: 9
-                                text: "RAIN "+terminal.percent(sample.chanceRain)
-                                font.pixelSize: 8
+                                height: 10
+                                text: terminal.percent(sample.chanceRain)+" CHANCE"
+                                font.pixelSize: 9
                                 color: Colors.cyan
                                 elide: Text.ElideRight
                             }
@@ -231,7 +232,7 @@ Rectangle {
                     }
                 }
             }
-            QuietText {
+            GohuText {
                 visible: terminal.hourlySamples.length===0
                 width: parent.width
                 text: "HOURLY FORECAST // WAITING FOR PROVIDER"
@@ -240,12 +241,12 @@ Rectangle {
             }
         }
 
-        QuietText {
+        GohuText {
             width: parent.width
             height: 10
-            text: "NEXT DAYS // HIGH + LOW + PRECIPITATION"
-            color: Colors.orange
-            font.pixelSize: 8
+            text: "NEXT DAYS // HIGHS, LOWS + DAILY RAIN CHANCE"
+            color: Colors.magenta
+            font.pixelSize: 9
             elide: Text.ElideRight
         }
 
@@ -253,47 +254,55 @@ Rectangle {
             id: dailyRow
             objectName: "weather-w8-daily-strip"
             width: parent.width
-            height: 30
+            height: 29
             spacing: 3
             Repeater {
                 model: Math.min(3,terminal.dailySamples.length)
-                delegate: Rectangle {
+                delegate: Item {
+                    required property int index
                     readonly property var sample: terminal.dailySamples[index] || {}
+                    readonly property var cycle:
+                        WeatherCyclePolicy.atLocal(sample.date,720,terminal.dailySamples)
                     width: Math.max(1,(dailyRow.width-6)/3)
                     height: dailyRow.height
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.magenta
+                    Rectangle {
+                        visible: index>0
+                        x: 0
+                        height: parent.height
+                        width: 1
+                        color: Colors.magenta
+                    }
                     Row {
                         anchors.fill: parent
-                        anchors.margins: 3
-                        spacing: 4
-                        GohuText {
-                            width: 20
-                            height: parent.height
-                            verticalAlignment: Text.AlignVCenter
-                            text: terminal.glyph(sample.weatherCode,sample.condition)
-                            font.pixelSize: 18
-                            color: Colors.yellow
+                        anchors.margins: 2
+                        spacing: 3
+                        StationWeatherLineGlyph {
+                            width: 27
+                            height: 27
+                            mode: "weather"
+                            condition: sample.condition || ""
+                            weatherCode: sample.weatherCode
+                            moonPhase: cycle.moonPhase
+                            ink: Colors.magenta
                         }
                         Column {
-                            width: Math.max(1,parent.width-24)
-                            spacing: 1
+                            width: Math.max(1,parent.width-30)
+                            spacing: 2
                             GohuText {
                                 width: parent.width
                                 height: 10
-                                text: String(sample.date || "--") + " // "
+                                text: String(sample.date || "--").slice(5)+"  "
                                       +terminal.temp(sample.maxTempF)
                                       +"/"+terminal.temp(sample.minTempF)
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color: Colors.white
                                 elide: Text.ElideRight
                             }
-                            QuietText {
+                            GohuText {
                                 width: parent.width
-                                height: 9
-                                text: "RAIN "+terminal.percent(sample.chanceRain)
-                                font.pixelSize: 8
+                                height: 10
+                                text: terminal.percent(sample.chanceRain)+" RAIN CHANCE"
+                                font.pixelSize: 9
                                 color: Colors.cyan
                                 elide: Text.ElideRight
                             }
@@ -301,7 +310,7 @@ Rectangle {
                     }
                 }
             }
-            QuietText {
+            GohuText {
                 visible: terminal.dailySamples.length===0
                 width: parent.width
                 text: "DAILY FORECAST // WAITING FOR PROVIDER"

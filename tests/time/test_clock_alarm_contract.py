@@ -15,7 +15,7 @@ MODULE = (ROOT / "services/time/qmldir").read_text(encoding="utf-8")
 class ClockAlarmContracts(unittest.TestCase):
     def test_one_owner_and_explicit_page_in_timew(self):
         self.assertIn('singleton AlarmService 1.0 AlarmService.qml', MODULE)
-        self.assertIn('AlarmPane {', TIMEW)
+        self.assertIn('AlarmManagerPane {', TIMEW)
         self.assertIn('id: alarmPlaceholderPane', TIMEW)
         self.assertIn('timew.toolsView === "alarm"', TIMEW)
         self.assertNotIn('ALARM CONTROLS // NOT IMPLEMENTED', TIMEW)

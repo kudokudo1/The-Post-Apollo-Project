@@ -1,0 +1,41 @@
+name: Social PHONE Personal Contact Vault P35 (Synthetic)
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhonePersonalContactVault.py'
+      - 'services/phone/PhonePersonalContactIdentity.py'
+      - 'tests/phone/test_phone_personal_contact_vault.py'
+      - 'tests/phone/test_phone_personal_contact_identity.py'
+      - '.github/workflows/social-phone-personal-contact-vault-p35.yml'
+  push:
+    paths:
+      - 'services/phone/PhonePersonalContactVault.py'
+      - 'services/phone/PhonePersonalContactIdentity.py'
+      - 'tests/phone/test_phone_personal_contact_vault.py'
+      - 'tests/phone/test_phone_personal_contact_identity.py'
+      - '.github/workflows/social-phone-personal-contact-vault-p35.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-sealed-vault:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up isolated CI Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install CI-only audited crypto primitive dependency
+        run: |
+          python -m pip install --disable-pip-version-check 'cryptography==50.0.2'
+      - name: Compile vault and policy (no host or keyring access)
+        run: |
+          python -m py_compile services/phone/PhonePersonalContactVault.py services/phone/PhonePersonalContactIdentity.py tests/phone/test_phone_personal_contact_vault.py
+      - name: Run synthetic encrypted vault and identity tests
+        run: |
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_contact_vault.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_contact_identity.py' -v

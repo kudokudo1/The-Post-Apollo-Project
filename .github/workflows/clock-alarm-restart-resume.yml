@@ -127,5 +127,25 @@ jobs:
           const backward=p.tick(restarted(one),at(11,6,38));
           assert.equal(backward.started.length,0);
           assert.equal(backward.missed.length,0);
-          console.log('Clock startup and resume across grace, day, pause, multiple weeks, legacy and snooze: PASS');
+          // A live ring whose clock moves backwards expires instead of
+          // remaining indefinitely active.
+          const rollbackRing=p.tick(restarted(fired.document),at(11,6,38));
+          assert.deepEqual(Array.from(rollbackRing.expired),[1]);
+          assert.equal(rollbackRing.document.alarms[0].ringing,false);
+          // Two-minute grace survives a local calendar rollover:
+          // Wednesday 23:59 should ring on Thursday 00:00:45.
+          const beforeMidnight=at(11,23,58,30);
+          const midnightSchedule=armed(beforeMidnight,[3],23,59);
+          const afterMidnight=at(12,0,0,45);
+          assert.equal(p.nextOccurrenceMs(midnightSchedule.alarms[0],afterMidnight),
+            at(11,23,59));
+          const midnightRing=p.tick(restarted(midnightSchedule),afterMidnight);
+          assert.deepEqual(Array.from(midnightRing.started),[1]);
+          assert.equal(midnightRing.document.alarms[0].lastFiredDay,'2026-11-11');
+          assert.equal(midnightRing.document.alarms[0].lastExpectedAtMs,at(11,23,59));
+          assert.equal(p.tick(restarted(midnightRing.document),at(12,0,0,46)).started.length,0);
+          const midnightExpired=p.tick(restarted(midnightSchedule),at(12,0,3));
+          assert.deepEqual(Array.from(midnightExpired.missed),[1]);
+          assert.equal(midnightExpired.started.length,0);
+          console.log('Clock startup, midnight grace, missed-day, pause, legacy and snooze recovery: PASS');
           JS

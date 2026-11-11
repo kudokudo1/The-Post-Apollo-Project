@@ -37,6 +37,7 @@ def admit_peer_bound_fixture(
     source_captured_ms, payload, now_ms, on_stage=None,
     commit_guard=None, expected_peer_witness_sha256=None,
     service_witness_sha256="", service_grant_sha256="",
+    service_release_sha256="",
 ):
     """Bind a live kernel peer witness to a signed TEST copy and its nonce.
 
@@ -80,6 +81,13 @@ def admit_peer_bound_fixture(
                               for c in service_grant_sha256)))
              and (service_grant_sha256 == "" or service_witness_sha256 != ""),
              "BROKER_SERVICE_GRANT_INVALID")
+    _require(type(service_release_sha256) is str
+             and (service_release_sha256 == ""
+                  or (len(service_release_sha256) == 64
+                      and all(c in "0123456789abcdef"
+                              for c in service_release_sha256)))
+             and (service_release_sha256 == "" or service_grant_sha256 != ""),
+             "BROKER_SERVICE_RELEASE_INVALID")
     claim_hash = hashlib.sha256(encoded_claim).hexdigest()
     authority_hash = hashlib.sha256(encoded_manifest).hexdigest()
     request = {
@@ -98,6 +106,8 @@ def admit_peer_bound_fixture(
         request["serviceWitnessSha256"] = service_witness_sha256
     if service_grant_sha256:
         request["serviceGrantSha256"] = service_grant_sha256
+    if service_release_sha256:
+        request["serviceReleaseSha256"] = service_release_sha256
     encoded = json.dumps(request, sort_keys=True, ensure_ascii=True,
                          separators=(",",":"), allow_nan=False)
     binding = hashlib.sha256(encoded.encode("ascii")).hexdigest()
@@ -115,6 +125,7 @@ def admit_peer_bound_fixture(
         commit_guard=commit_guard,
         service_witness_sha256=service_witness_sha256,
         service_grant_sha256=service_grant_sha256,
+        service_release_sha256=service_release_sha256,
     )
     _require(result["peerWitnessSha256"] == evidence["peerWitnessSha256"]
              and result["requestBindingSha256"] == binding,
@@ -129,6 +140,7 @@ def admit_peer_bound_fixture(
         "requestBindingSha256":binding,
         "serviceWitnessSha256":service_witness_sha256,
         "serviceGrantSha256":service_grant_sha256,
+        "serviceReleaseSha256":service_release_sha256,
         "nonce":claim["nonce"],
         "kernelPeerMatchedFixture":True,
         "payloadIntegrityStored":True,

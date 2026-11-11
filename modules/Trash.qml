@@ -1522,7 +1522,7 @@ PanelWindow {
                     }
 
                     GohuText {
-                        width: Math.max(20, parent.width - 137)
+                        width: Math.max(20, parent.width - 142)
                         height: 26
                         font.pixelSize: 9
                         color: Colors.yellow

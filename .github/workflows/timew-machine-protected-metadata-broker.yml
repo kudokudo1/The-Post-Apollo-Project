@@ -7,15 +7,18 @@ on:
       - "services/time/MachineBraveArchiveAdmissionIntent.py"
       - "services/time/MachineBraveProcessLease.py"
       - "services/time/MachineBraveRequestCancellation.py"
+      - "services/time/MachineBraveProtectedArchivePreflight.py"
       - "tests/timew/test_machine_brave_protected_metadata_contract.py"
       - "tests/timew/test_machine_brave_archive_admission_intent.py"
       - "tests/timew/test_machine_brave_process_lease.py"
       - "tests/timew/test_machine_brave_request_cancellation.py"
       - "tests/timew/test_machine_brave_absolute_frame_deadline.py"
+      - "tests/timew/test_machine_brave_protected_archive_preflight.py"
       - "docs/timew-machine-protected-metadata-broker.md"
       - "docs/timew-machine-process-lifecycle.md"
       - "docs/timew-machine-request-cancellation.md"
       - "docs/timew-machine-absolute-frame-deadline.md"
+      - "docs/timew-machine-protected-archive-preflight.md"
       - ".github/workflows/timew-machine-protected-metadata-broker.yml"
   workflow_dispatch:
 
@@ -36,6 +39,8 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_brave_request_cancellation.py
       - name: Total monotonic deadline across slow incremental socket frames and mid-read session drift
         run: python3 -B -I tests/timew/test_machine_brave_absolute_frame_deadline.py
+      - name: Read-only future protected archive migration inventory and stale-plan refusal
+        run: python3 -B -I tests/timew/test_machine_brave_protected_archive_preflight.py
       - name: CI-only privileged distinct-UID kernel permission denial and metadata contract
         run: sudo -n python3 -B -I tests/timew/test_machine_brave_protected_metadata_contract.py
       - name: Existing offline archive, ciphertext and safety regressions

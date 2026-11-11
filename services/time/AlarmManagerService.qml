@@ -130,6 +130,24 @@ Scope {
     function enableAlarm(id, enabled) {
         return saveAlarm(id, {enabled: enabled});
     }
+    function toggleFavorite(id) {
+        const row = findAlarm(id);
+        if (!row) return false;
+        return saveAlarm(id, {favorite: row.favorite !== true});
+    }
+    function saveAlarmNote(id, value) {
+        const row = findAlarm(id);
+        if (!row || !Policy.validNote(value)) {
+            feedback = "INVALID NOTE // MAX " + Policy.MAX_NOTE_LENGTH;
+            return false;
+        }
+        const normalized = value.trim();
+        if ((row.note || "") === normalized) {
+            feedback = "NOTE UNCHANGED";
+            return true;
+        }
+        return saveAlarm(id, {note: normalized});
+    }
     function pauseAlarm(id, resumeDate) {
         if (!Policy.validDate(resumeDate, true)) {
             feedback = "INVALID RESUME DATE";

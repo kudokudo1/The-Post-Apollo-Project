@@ -74,7 +74,7 @@ class AlarmManagerV2Contracts(unittest.TestCase):
         self.assertIn('id: volumeRow', PANE)
         self.assertIn('"TEST SOUND"', PANE)
         self.assertIn('"SAVE + ARM"', PANE)
-        self.assertIn('"CONFIRM DELETE"', PANE)
+        self.assertIn('CONFIRM DELETE // PRESS RED X AGAIN', PANE)
         self.assertIn('"STOP ALL"', PANE)
         self.assertIn('"SNOOZE // 5M"', PANE)
         self.assertIn('"ONE TIME"', PANE)
@@ -131,6 +131,81 @@ class AlarmManagerV2Contracts(unittest.TestCase):
         self.assertIn('pane.draftDays.indexOf(index) >= 0', PANE)
         self.assertIn('if (pane.draftDays.length === 0)', PANE)
         self.assertIn('pane.draftDays = [new Date().getDay()]', PANE)
+
+    def test_entry_actions_are_ordered_and_confirmed(self):
+        # The row is fully inside the existing clipped/scrolling list.
+        row = PANE.split('delegate: Row {', 1)[1].split(
+            '        NeonScrollBar {', 1)[0]
+        self.assertLess(row.index('id: favoriteAlarm'), row.index('id: toggleAlarm'))
+        self.assertLess(row.index('id: toggleAlarm'), row.index('id: selectAlarm'))
+        self.assertLess(row.index('id: selectAlarm'), row.index('id: noteAlarm'))
+        self.assertLess(row.index('id: noteAlarm'), row.index('id: deleteAlarm'))
+        self.assertIn('onLeftClicked: AlarmManagerService.toggleFavorite(', row)
+        self.assertIn('onLeftClicked: pane.openNote(entry.rowAlarm.id)', row)
+        self.assertIn('onLeftClicked: pane.removeById(entry.rowAlarm.id)', row)
+        self.assertIn('pane.deleteConfirmId === entry.rowAlarm.id', row)
+        self.assertIn('CONFIRM DELETE // PRESS RED X AGAIN', PANE)
+        self.assertIn('id: listRail', PANE)
+        self.assertIn('id: alarmList', PANE)
+        self.assertNotIn('pane.removeSelected()', PANE)
+
+    def test_note_editor_uses_explicit_save_and_preserves_failed_draft(self):
+        self.assertIn('property bool noteDirty: false', PANE)
+        self.assertIn('property int noteSavePendingId: 0', PANE)
+        self.assertIn('function canLeaveNote(id)', PANE)
+        self.assertIn('SAVE OR DISCARD NOTE BEFORE CHANGING ALARM', PANE)
+        self.assertIn('function saveNote()', PANE)
+        self.assertIn('function discardNote()', PANE)
+        self.assertIn('function settleNoteWrite()', PANE)
+        self.assertIn('NOTE NOT SAVED // KEEP DRAFT VISIBLE', PANE)
+        self.assertIn('onStorageStateChanged()', PANE)
+        self.assertIn('id: alarmNote', PANE)
+        self.assertIn('maximumLength: Policy.MAX_NOTE_LENGTH', PANE)
+        self.assertIn('readOnly: pane.noteSavePendingId !== 0', PANE)
+        self.assertIn('onAccepted: pane.saveNote()', PANE)
+        self.assertIn('label: "SAVE NOTE"', PANE)
+        self.assertIn('label: "DISCARD DRAFT"', PANE)
+        self.assertIn('Policy.validNote(value)', OWNER)
+        self.assertIn('function saveAlarmNote(id, value)', OWNER)
+        self.assertIn('function toggleFavorite(id)', OWNER)
+        self.assertIn('note: alarmNote.text.trim()', PANE)
+
+    def test_legacy_v2_persistence_compatibility_and_unique_names(self):
+        self.assertIn('MAX_NOTE_LENGTH = 256', POLICY)
+        self.assertIn('function validNote(value)', POLICY)
+        self.assertIn('a.favorite === undefined', POLICY)
+        self.assertIn('a.note === undefined', POLICY)
+        self.assertIn('cloneDocument(v)', POLICY)
+        self.assertIn('favorite: false, note: ""', POLICY)
+        self.assertIn('name: "New Alarm " + id', POLICY)
+        self.assertIn('var suffix = next.nextId;', POLICY)
+        self.assertIn('"New Alarm " + suffix', POLICY)
+        self.assertIn('"favorite", "note"', POLICY)
+
+    def test_tone_and_time_fields_follow_requested_color_grammar(self):
+        self.assertIn('label: "TONE"', PANE)
+        tabs = PANE.split('id: editTabs', 1)[1].split(
+            'id: editOptions', 1)[0]
+        self.assertIn('idleForegroundColor: Colors.cyan', tabs)
+        self.assertIn('idleBorderColor: Colors.magenta', tabs)
+        self.assertIn('idleSoftGlowColor: Colors.magenta', tabs)
+        self.assertIn('selectedForegroundColor: Colors.cyan', tabs)
+        self.assertIn('selectedBorderColor: Colors.magenta', tabs)
+        for field in ('alarmHour', 'alarmMinute'):
+            region = PANE.split('id: ' + field, 1)[1].split(
+                'background: Rectangle', 1)[0]
+            self.assertIn('color: Colors.white', region)
+            self.assertIn('layer.enabled: true', region)
+            self.assertIn('shadowColor: Colors.white', region)
+        for title in ('HOUR', 'MIN'):
+            region = PANE.split('text: "' + title + '"', 1)[1].split(
+                '}', 2)[0]
+            self.assertIn('color: Colors.white', region)
+            self.assertIn('shadowColor: Colors.white', region)
+        save = PANE.split('id: editorActions', 1)[1].split(
+            'id: ringActions', 1)[0]
+        self.assertIn('accentColor: Colors.green', save)
+        self.assertNotIn('onLeftClicked: pane.removeSelected()', save)
 
     def test_audio_remains_optional_and_ids_allowlisted(self):
         self.assertIn('active: false', OWNER)

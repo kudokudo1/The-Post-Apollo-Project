@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import qs.services.time
 import "../components"
 import "../services/time/AlarmManagerPolicy.js" as Policy
@@ -24,11 +25,17 @@ Item {
     property string draftSoundId: "chime"
     property int draftVolume: 60
     property int deleteConfirmId: 0
+    property bool loadingNote: false
+    property bool noteDirty: false
+    property int noteSavePendingId: 0
+    property string noteSavePendingText: ""
+    property string noteFeedback: ""
 
     readonly property bool editingActive:
         alarmSearch.activeFocus || alarmName.activeFocus
         || alarmHour.activeFocus || alarmMinute.activeFocus
         || alarmDate.activeFocus || alarmResumeDate.activeFocus
+        || alarmNote.activeFocus
 
     readonly property var visibleAlarms: {
         const term = alarmSearch.text.toLowerCase().trim();
@@ -47,9 +54,16 @@ Item {
             : "0 / " + visibleAlarms.length
     readonly property var dayNames: ["SUN","MON","TUE","WED","THU","FRI","SAT"]
 
+    function canLeaveNote(id) {
+        if (id === selectedId || (!noteDirty && noteSavePendingId === 0))
+            return true;
+        AlarmManagerService.feedback = "SAVE OR DISCARD NOTE BEFORE CHANGING ALARM";
+        settingsTab = "note";
+        return false;
+    }
     function choose(id) {
         const a = AlarmManagerService.findAlarm(id);
-        if (!a) return;
+        if (!a || !canLeaveNote(id)) return false;
         selectedId = id;
         settingsTab = "schedule";
         deleteConfirmId = 0;
@@ -65,8 +79,64 @@ Item {
         alarmMinute.text = ("0" + a.minute).slice(-2);
         alarmDate.text = a.date || Policy.dateOffset(Date.now(), 1);
         alarmResumeDate.text = a.pausedUntilDate || "";
+        loadingNote = true;
+        alarmNote.text = a.note || "";
+        loadingNote = false;
+        noteDirty = false;
+        noteFeedback = "";
+        return true;
+    }
+    function openNote(id) {
+        if (!choose(id)) return;
+        settingsTab = "note";
+        alarmNote.forceActiveFocus();
+    }
+    function saveNote() {
+        if (!selectedAlarm || !AlarmManagerService.canEdit
+                || noteSavePendingId !== 0) return false;
+        const desired = alarmNote.text.trim();
+        if (desired === (selectedAlarm.note || "")) {
+            noteDirty = false;
+            noteFeedback = "NOTE UNCHANGED";
+            return true;
+        }
+        const id = selectedId;
+        if (!AlarmManagerService.saveAlarmNote(id, alarmNote.text)) {
+            noteFeedback = "NOTE SAVE NOT ACCEPTED";
+            return false;
+        }
+        noteSavePendingId = id;
+        noteSavePendingText = desired;
+        noteDirty = true;
+        noteFeedback = "SAVING // KEEP NOTE OPEN";
+        return true;
+    }
+    function discardNote() {
+        if (noteSavePendingId !== 0 || !selectedAlarm) return;
+        loadingNote = true;
+        alarmNote.text = selectedAlarm.note || "";
+        loadingNote = false;
+        noteDirty = false;
+        noteFeedback = "UNSAVED NOTE DISCARDED";
+    }
+    function settleNoteWrite() {
+        if (noteSavePendingId === 0) return;
+        if (AlarmManagerService.storageState === "ready") {
+            const saved = AlarmManagerService.findAlarm(noteSavePendingId);
+            if (saved && (saved.note || "") === noteSavePendingText) {
+                noteSavePendingId = 0;
+                noteDirty = alarmNote.text.trim() !== noteSavePendingText;
+                noteFeedback = "NOTE SAVED TO ALARM STORE";
+            }
+        } else if (AlarmManagerService.storageState === "error") {
+            noteSavePendingId = 0;
+            noteDirty = true;
+            noteFeedback = "NOTE NOT SAVED // KEEP DRAFT VISIBLE";
+            settingsTab = "note";
+        }
     }
     function create() {
+        if (!canLeaveNote(-1)) return;
         const id = AlarmManagerService.createAlarm();
         if (id > 0) {
             alarmSearch.text = "";
@@ -74,7 +144,7 @@ Item {
         }
     }
     function copySelected() {
-        if (!selectedAlarm) return;
+        if (!selectedAlarm || !canLeaveNote(-1)) return;
         const id = AlarmManagerService.duplicateAlarm(selectedId);
         if (id > 0) {
             alarmSearch.text = "";
@@ -100,10 +170,19 @@ Item {
             enabled: arm ? true : draftEnabled,
             soundEnabled: draftSoundEnabled,
             soundId: draftSoundId,
-            volumePercent: draftVolume
+            volumePercent: draftVolume,
+            note: alarmNote.text.trim()
         };
-        if (AlarmManagerService.saveAlarm(selectedId, patch))
-            choose(selectedId);
+        const hadDraft = noteDirty;
+        if (AlarmManagerService.saveAlarm(selectedId, patch)) {
+            if (hadDraft) {
+                noteSavePendingId = selectedId;
+                noteSavePendingText = alarmNote.text.trim();
+                noteFeedback = "SAVING // KEEP NOTE OPEN";
+            } else {
+                choose(selectedId);
+            }
+        }
     }
     function toggleDay(index) {
         if (draftDays.indexOf(index) >= 0)
@@ -133,15 +212,16 @@ Item {
         choose(rows[idx].id);
         alarmList.positionViewAtIndex(idx, ListView.Contain);
     }
-    function removeSelected() {
-        if (!selectedAlarm) return;
-        if (deleteConfirmId !== selectedId) {
-            deleteConfirmId = selectedId;
+    function removeById(id) {
+        if (!AlarmManagerService.canEdit) return;
+        if (deleteConfirmId !== id) {
+            deleteConfirmId = id;
+            AlarmManagerService.feedback = "CONFIRM DELETE // PRESS RED X AGAIN";
             return;
         }
-        const id = selectedId;
+        if (!canLeaveNote(id === selectedId ? -1 : id)) return;
         deleteConfirmId = 0;
-        if (AlarmManagerService.removeAlarm(id)) {
+        if (AlarmManagerService.removeAlarm(id) && selectedId === id) {
             selectedId = 0;
             if (AlarmManagerService.count)
                 choose(AlarmManagerService.document.alarms[0].id);
@@ -160,6 +240,9 @@ Item {
         function onCountChanged() {
             if (!pane.selectedAlarm && AlarmManagerService.count > 0)
                 pane.choose(AlarmManagerService.document.alarms[0].id);
+        }
+        function onStorageStateChanged() {
+            pane.settleNoteWrite();
         }
     }
 
@@ -248,8 +331,16 @@ Item {
                 spacing: 3
                 GohuText {
                     text: "HOUR"
-                    color: Colors.cyan
+                    color: Colors.white
                     font.pixelSize: 9
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: Colors.white
+                        shadowBlur: 0.8
+                        shadowHorizontalOffset: 0
+                        shadowVerticalOffset: 0
+                    }
                 }
                 TextField {
                     id: alarmHour
@@ -258,13 +349,21 @@ Item {
                     maximumLength: 2
                     inputMethodHints: Qt.ImhDigitsOnly
                     validator: IntValidator { bottom: 0; top: 23 }
-                    color: Colors.magenta
+                    color: Colors.white
+                    placeholderTextColor: Colors.white
                     font.pixelSize: 12
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: Colors.white
+                        shadowBlur: 0.65
+                        shadowHorizontalOffset: 0
+                        shadowVerticalOffset: 0
+                    }
                     background: Rectangle {
                         color: Colors.black
                         border.width: 1
-                        border.color: alarmHour.activeFocus
-                            ? Colors.magenta : Colors.cyan
+                        border.color: Colors.white
                     }
                 }
             }
@@ -273,8 +372,16 @@ Item {
                 spacing: 3
                 GohuText {
                     text: "MIN"
-                    color: Colors.cyan
+                    color: Colors.white
                     font.pixelSize: 9
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: Colors.white
+                        shadowBlur: 0.8
+                        shadowHorizontalOffset: 0
+                        shadowVerticalOffset: 0
+                    }
                 }
                 TextField {
                     id: alarmMinute
@@ -283,13 +390,21 @@ Item {
                     maximumLength: 2
                     inputMethodHints: Qt.ImhDigitsOnly
                     validator: IntValidator { bottom: 0; top: 59 }
-                    color: Colors.magenta
+                    color: Colors.white
+                    placeholderTextColor: Colors.white
                     font.pixelSize: 12
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: Colors.white
+                        shadowBlur: 0.65
+                        shadowHorizontalOffset: 0
+                        shadowVerticalOffset: 0
+                    }
                     background: Rectangle {
                         color: Colors.black
                         border.width: 1
-                        border.color: alarmMinute.activeFocus
-                            ? Colors.magenta : Colors.cyan
+                        border.color: Colors.white
                     }
                 }
             }
@@ -324,34 +439,54 @@ Item {
             id: editTabs
             width: parent.width
             height: 29
-            spacing: 6
+            spacing: 4
             visible: pane.selectedAlarm !== null
             ActionButton {
-                width: (editTabs.width - 2 * editTabs.spacing) / 3
+                width: (editTabs.width - 3 * editTabs.spacing) / 4
                 height: parent.height
-                label: "SCHEDULE"
-                labelPixelSize: 10
+                label: "SCHED"
+                labelPixelSize: 9
                 selected: pane.settingsTab === "schedule"
                 accentColor: Colors.cyan
                 onLeftClicked: pane.settingsTab = "schedule"
             }
             ActionButton {
-                width: (editTabs.width - 2 * editTabs.spacing) / 3
+                width: (editTabs.width - 3 * editTabs.spacing) / 4
                 height: parent.height
                 label: "PAUSE"
-                labelPixelSize: 10
+                labelPixelSize: 9
                 selected: pane.settingsTab === "pause"
                 accentColor: Colors.yellow
                 onLeftClicked: pane.settingsTab = "pause"
             }
             ActionButton {
-                width: (editTabs.width - 2 * editTabs.spacing) / 3
+                width: (editTabs.width - 3 * editTabs.spacing) / 4
                 height: parent.height
-                label: "SOUND"
-                labelPixelSize: 10
+                label: "TONE"
+                labelPixelSize: 9
                 selected: pane.settingsTab === "sound"
-                accentColor: Colors.magenta
+                accentColor: Colors.cyan
+                idleForegroundColor: Colors.cyan
+                idleBorderColor: Colors.magenta
+                idleContentGlowColor: Colors.magenta
+                idleSoftGlowColor: Colors.magenta
+                hoverBorderColor: Colors.magenta
+                hoverContentGlowColor: Colors.magenta
+                hoverSoftGlowColor: Colors.magenta
+                selectedBorderColor: Colors.magenta
+                selectedForegroundColor: Colors.cyan
+                hoverForegroundColor: Colors.cyan
+                selectedSoftGlowColor: Colors.magenta
                 onLeftClicked: pane.settingsTab = "sound"
+            }
+            ActionButton {
+                width: (editTabs.width - 3 * editTabs.spacing) / 4
+                height: parent.height
+                label: "NOTE"
+                labelPixelSize: 9
+                selected: pane.settingsTab === "note"
+                accentColor: Colors.orange
+                onLeftClicked: pane.settingsTab = "note"
             }
         }
 
@@ -362,8 +497,8 @@ Item {
             clip: true
             visible: pane.selectedAlarm !== null
 
-            // The three editors share the same height. No sound buttons occupy
-            // the schedule page until SOUND is explicitly selected.
+            // Four editors share one bounded slot. TONE and NOTE remain
+            // hidden until chosen without changing the pinned layout height.
             Column {
                 width: parent.width
                 spacing: 5
@@ -610,6 +745,74 @@ Item {
                     }
                 }
             }
+
+            Column {
+                id: alarmNoteEditor
+                width: parent.width
+                spacing: 5
+                visible: pane.settingsTab === "note"
+                TextField {
+                    id: alarmNote
+                    width: parent.width
+                    height: 31
+                    maximumLength: Policy.MAX_NOTE_LENGTH
+                    placeholderText: "NOTE FOR SELECTED ALARM"
+                    placeholderTextColor: Colors.cyan
+                    color: Colors.magenta
+                    selectionColor: Colors.magenta
+                    selectedTextColor: Colors.black
+                    font.family: "GohuFont 11 Nerd Font Mono"
+                    font.pixelSize: 11
+                    selectByMouse: true
+                    readOnly: pane.noteSavePendingId !== 0
+                    background: Rectangle {
+                        color: Colors.black
+                        border.width: 1
+                        border.color: alarmNote.activeFocus
+                            ? Colors.magenta : Colors.cyan
+                    }
+                    onTextChanged: {
+                        if (!pane.loadingNote && pane.selectedAlarm)
+                            pane.noteDirty = text.trim()
+                                !== (pane.selectedAlarm.note || "");
+                    }
+                    onAccepted: pane.saveNote()
+                }
+                Row {
+                    id: noteActions
+                    width: parent.width
+                    height: 28
+                    spacing: 5
+                    ActionButton {
+                        width: (noteActions.width - noteActions.spacing) / 2
+                        height: parent.height
+                        label: "SAVE NOTE"
+                        labelPixelSize: 10
+                        accentColor: Colors.green
+                        available: AlarmManagerService.canEdit
+                            && pane.noteSavePendingId === 0
+                        onLeftClicked: pane.saveNote()
+                    }
+                    ActionButton {
+                        width: (noteActions.width - noteActions.spacing) / 2
+                        height: parent.height
+                        label: "DISCARD DRAFT"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        available: pane.noteSavePendingId === 0
+                        onLeftClicked: pane.discardNote()
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    height: 17
+                    text: pane.noteFeedback || "NOTES // MAX "
+                        + Policy.MAX_NOTE_LENGTH + " CHARACTERS"
+                    color: Colors.white
+                    font.pixelSize: 9
+                    elide: Text.ElideRight
+                }
+            }
         }
 
         Row {
@@ -619,34 +822,24 @@ Item {
             spacing: 6
             visible: pane.selectedAlarm !== null
             ActionButton {
-                width: (editorActions.width - 2 * editorActions.spacing) / 3
+                width: (editorActions.width - editorActions.spacing) / 2
                 height: parent.height
                 label: "SAVE"
                 labelPixelSize: 11
-                accentColor: Colors.cyan
+                accentColor: Colors.green
                 available: AlarmManagerService.canEdit
                 onLeftClicked: pane.apply(false)
             }
             ActionButton {
-                width: (editorActions.width - 2 * editorActions.spacing) / 3
+                width: (editorActions.width - editorActions.spacing) / 2
                 height: parent.height
                 label: "SAVE + ARM"
                 labelPixelSize: 11
-                accentColor: Colors.orange
+                accentColor: Colors.green
                 available: AlarmManagerService.canEdit
                 onLeftClicked: pane.apply(true)
             }
-            ActionButton {
-                width: (editorActions.width - 2 * editorActions.spacing) / 3
-                height: parent.height
-                label: pane.deleteConfirmId === pane.selectedId
-                    ? "CONFIRM DELETE" : "DELETE"
-                labelPixelSize: 10
-                accentColor: Colors.red
-                available: AlarmManagerService.canEdit
-                onLeftClicked: pane.removeSelected()
-            }
-        }
+         }
 
         Row {
             id: ringActions
@@ -710,34 +903,38 @@ Item {
             delegate: Row {
                 id: entry
                 width: alarmList.width
-                height: 35
-                spacing: 5
+                height: 40
+                spacing: 2
                 readonly property var rowAlarm: modelData
+
+                // FAVORITE is always the far-left action, like Angel.
                 ActionButton {
-                    width: Math.max(0, entry.width - toggleAlarm.width
-                                    - entry.spacing)
+                    id: favoriteAlarm
+                    width: 24
                     height: parent.height
-                    selected: pane.selectedId === entry.rowAlarm.id
-                    labelHorizontalAlignment: Text.AlignLeft
-                    labelPixelSize: 10
-                    label: ("0" + entry.rowAlarm.hour).slice(-2) + ":"
-                        + ("0" + entry.rowAlarm.minute).slice(-2) + " // "
-                        + entry.rowAlarm.name.slice(0, 17)
-                        + " // " + pane.scheduleLabel(entry.rowAlarm)
-                        + (entry.rowAlarm.ringing ? " RING" : "")
-                        + (entry.rowAlarm.completed ? " DONE" : "")
-                    accentColor: entry.rowAlarm.ringing ? Colors.magenta
-                        : entry.rowAlarm.enabled ? Colors.orange : Colors.white
-                    trackLabelGlowLocally: true
-                    onLeftClicked: pane.choose(entry.rowAlarm.id)
+                    label: "★"
+                    labelPixelSize: 13
+                    contentPadding: 2
+                    selected: entry.rowAlarm.favorite === true
+                    accentColor: entry.rowAlarm.favorite
+                        ? Colors.magenta : Colors.white
+                    idleBorderColor: entry.rowAlarm.favorite
+                        ? Colors.magenta : Colors.cyan
+                    selectedContentGlowColor: Colors.magenta
+                    selectedSoftGlowColor: Colors.magenta
+                    available: AlarmManagerService.canEdit
+                    onLeftClicked: AlarmManagerService.toggleFavorite(
+                        entry.rowAlarm.id)
                 }
+                // ON/OFF precedes the alarm selection, not after it.
                 ActionButton {
                     id: toggleAlarm
-                    width: 61
+                    width: 31
                     height: parent.height
                     label: entry.rowAlarm.enabled ? "ON" : "OFF"
                     selected: entry.rowAlarm.enabled
-                    labelPixelSize: 10
+                    labelPixelSize: 9
+                    contentPadding: 2
                     accentColor: entry.rowAlarm.enabled
                         ? Colors.orange : Colors.cyan
                     available: AlarmManagerService.canEdit
@@ -748,6 +945,60 @@ Item {
                                 && pane.selectedId === entry.rowAlarm.id)
                             pane.draftEnabled = nextState;
                     }
+                }
+                ActionButton {
+                    id: selectAlarm
+                    width: Math.max(0, entry.width - favoriteAlarm.width
+                                   - toggleAlarm.width - noteAlarm.width
+                                   - deleteAlarm.width - 4 * entry.spacing)
+                    height: parent.height
+                    selected: pane.selectedId === entry.rowAlarm.id
+                    labelHorizontalAlignment: Text.AlignLeft
+                    contentPadding: 4
+                    labelPixelSize: 10
+                    // Two lines keep the alarm's name readable in TimeW's
+                    // narrow, five-action compact rows.
+                    label: ("0" + entry.rowAlarm.hour).slice(-2) + ":"
+                        + ("0" + entry.rowAlarm.minute).slice(-2)
+                        + "\n" + entry.rowAlarm.name
+                        + (entry.rowAlarm.ringing ? " RING" : "")
+                        + (entry.rowAlarm.completed ? " DONE" : "")
+                    accentColor: entry.rowAlarm.ringing ? Colors.magenta
+                        : entry.rowAlarm.enabled ? Colors.orange : Colors.white
+                    trackLabelGlowLocally: true
+                    onLeftClicked: pane.choose(entry.rowAlarm.id)
+                }
+                // NOTE is always immediately left of the delete action.
+                ActionButton {
+                    id: noteAlarm
+                    width: 24
+                    height: parent.height
+                    label: entry.rowAlarm.note ? "✎" : "+"
+                    labelPixelSize: 13
+                    contentPadding: 2
+                    selected: pane.selectedId === entry.rowAlarm.id
+                        && pane.settingsTab === "note"
+                    accentColor: entry.rowAlarm.note
+                        ? Colors.orange : Colors.cyan
+                    available: AlarmManagerService.canEdit
+                    onLeftClicked: pane.openNote(entry.rowAlarm.id)
+                }
+                // DELETE is always furthest right. Two clicks are required.
+                ActionButton {
+                    id: deleteAlarm
+                    width: 24
+                    height: parent.height
+                    label: pane.deleteConfirmId === entry.rowAlarm.id
+                        ? "!" : "×"
+                    labelPixelSize: 15
+                    contentPadding: 2
+                    selected: pane.deleteConfirmId === entry.rowAlarm.id
+                    accentColor: Colors.red
+                    idleBorderColor: Colors.red
+                    selectedForegroundColor: Colors.red
+                    selectedBorderColor: Colors.red
+                    available: AlarmManagerService.canEdit
+                    onLeftClicked: pane.removeById(entry.rowAlarm.id)
                 }
             }
         }

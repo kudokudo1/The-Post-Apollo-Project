@@ -51,6 +51,52 @@ jobs:
           assert.deepEqual(Array.from(onlyToday.document.alarms[0].weekdays),
             [new Date(d1).getDay()]);
           assert.equal(onlyToday.document.alarms[0].enabled,false);
+          assert.equal(onlyToday.document.alarms[0].name,'New Alarm 1');
+          assert.equal(onlyToday.document.alarms[0].favorite,false);
+          assert.equal(onlyToday.document.alarms[0].note,'');
+          const afterFirst=p.create(onlyToday.document,d1);
+          assert.equal(afterFirst.document.alarms[1].name,'New Alarm 2');
+          const afterSecond=p.create(afterFirst.document,d1);
+          assert.equal(afterSecond.document.alarms[2].name,'New Alarm 3');
+          const deleted=p.remove(afterSecond.document,2);
+          const afterDeleted=p.create(deleted.document,d1);
+          assert.equal(afterDeleted.document.alarms[2].name,'New Alarm 4');
+          const claimed=p.update(onlyToday.document,1,
+            {name:'New Alarm 2'},d1).document;
+          const withoutCollision=p.create(claimed,d1);
+          assert.equal(withoutCollision.document.alarms[1].name,'New Alarm 3');
+          // A pre-feature V2 document remains readable, with defaults
+          // materialized in memory but without writing on parse.
+          const preFeature=JSON.parse(JSON.stringify(onlyToday.document));
+          delete preFeature.alarms[0].favorite;
+          delete preFeature.alarms[0].note;
+          const previous=p.parse(JSON.stringify(preFeature));
+          assert.equal(previous.ok,true);
+          assert.equal(previous.document.alarms[0].favorite,false);
+          assert.equal(previous.document.alarms[0].note,'');
+          assert.equal(p.parse(JSON.stringify({...preFeature,
+            alarms:[{...preFeature.alarms[0],note:{bad:true}}]})).ok,false);
+          assert.equal(p.parse(JSON.stringify({...preFeature,
+            alarms:[{...preFeature.alarms[0],favorite:'yes'}]})).ok,false);
+          let metadata=p.update(previous.document,1,
+            {note:'Take medicine',favorite:true},d1);
+          assert.equal(metadata.ok,true);
+          assert.equal(metadata.document.alarms[0].note,'Take medicine');
+          assert.equal(metadata.document.alarms[0].favorite,true);
+          assert.equal(metadata.document.alarms[0].enabled,false);
+          assert.deepEqual(Array.from(metadata.document.alarms[0].weekdays),
+            [new Date(d1).getDay()]);
+          assert.equal(p.parse(JSON.stringify(metadata.document)).ok,true);
+          assert.equal(p.update(metadata.document,1,
+            {note:'X'.repeat(p.MAX_NOTE_LENGTH+1)},d1).ok,false);
+          assert.equal(p.update(metadata.document,1,
+            {note:'line1\nline2'},d1).ok,false);
+          assert.equal(p.update(metadata.document,1,
+            {favorite:'true'},d1).ok,false);
+          const dupMeta=p.duplicate(metadata.document,1);
+          assert.equal(dupMeta.ok,true);
+          assert.equal(dupMeta.document.alarms[1].note,'Take medicine');
+          assert.equal(dupMeta.document.alarms[1].favorite,false);
           // Editing or duplicating another saved alarm must never reset
           // its explicitly selected recurrence.
           let doc = p.initialDocument();
@@ -167,6 +213,8 @@ jobs:
           assert.equal(migration.document.alarms[0].name,'OLD');
           assert.equal(migration.document.alarms[0].volumePercent,35);
           assert.equal(migration.document.alarms[0].weekdays.length,7);
+          assert.equal(migration.document.alarms[0].favorite,false);
+          assert.equal(migration.document.alarms[0].note,'');
           assert.equal(p.parse(JSON.stringify(migration.document)).ok,true);
           assert.equal(p.migrateLegacy('corrupt',d1).ok,false);
           let capacity=p.initialDocument();

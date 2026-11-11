@@ -5,6 +5,7 @@
 var VERSION = 2;
 var MAX_ALARMS = 100;
 var MAX_NAME_LENGTH = 40;
+var MAX_NOTE_LENGTH = 256; // Same short, explicit-save note style as Angel
 var MAX_LATE_MS = 2 * 60 * 1000;
 var MAX_RING_MS = 15 * 60 * 1000;
 var SNOOZE_MS = 5 * 60 * 1000;
@@ -17,6 +18,10 @@ function timestamp(n) { return integer(n, 0, 8640000000000000); }
 function safeName(v) {
     return typeof v === "string" && v.length <= MAX_NAME_LENGTH
         && !/[\x00-\x1f\x7f]/.test(v);
+}
+function validNote(value) {
+    return typeof value === "string" && value.length <= MAX_NOTE_LENGTH
+        && !/[\x00-\x1f\x7f]/.test(value);
 }
 function validDate(value, allowEmpty) {
     if (allowEmpty && value === "") return true;
@@ -63,6 +68,9 @@ function validAlarm(a) {
     return !!a && typeof a === "object" && !Array.isArray(a)
         && integer(a.id, 1, Number.MAX_SAFE_INTEGER - 1)
         && safeName(a.name) && a.name.length > 0
+        // New optional fields remain compatible with existing V2 files.
+        && (a.favorite === undefined || typeof a.favorite === "boolean")
+        && (a.note === undefined || validNote(a.note))
         && integer(a.hour, 0, 23) && integer(a.minute, 0, 59)
         && (a.mode === "once" || a.mode === "weekly")
         && weekdaysValid(a.weekdays)
@@ -102,12 +110,15 @@ function parse(text) {
     try { v = JSON.parse(String(text)); }
     catch (e) { return {ok: false, error: "INVALID_JSON"}; }
     if (!validDocument(v)) return {ok: false, error: "INVALID_ALARMS"};
-    return {ok: true, document: v};
+    // Do not touch a readable on-disk V2 file merely to add defaults.
+    // The next user-initiated save writes the fields atomically.
+    return {ok: true, document: cloneDocument(v)};
 }
 function cloneDocument(doc) {
     return {version: VERSION, nextId: doc.nextId,
-            alarms: doc.alarms.map(function(a) { return Object.assign({}, a,
-                                               {weekdays: a.weekdays.slice()}); })};
+            alarms: doc.alarms.map(function(a) { return Object.assign(
+                {favorite: false, note: ""}, a,
+                {weekdays: a.weekdays.slice()}); })};
 }
 function byId(doc, id) {
     if (!validDocument(doc)) return null;
@@ -119,7 +130,8 @@ function freshAlarm(id, nowMs) {
     // Only the current local weekday is selected for a new alarm.
     // The caller supplies nowMs so the default is deterministic in tests.
     var instant = timestamp(nowMs) && nowMs > 0 ? nowMs : Date.now();
-    return {id: id, name: "NEW ALARM", hour: 7, minute: 0,
+    return {id: id, name: "New Alarm " + id, favorite: false, note: "",
+            hour: 7, minute: 0,
             mode: "weekly", weekdays: [new Date(instant).getDay()], date: "",
             keepSaved: true, enabled: false, pausedUntilDate: "",
             soundId: "chime", soundEnabled: true, volumePercent: 60,
@@ -131,6 +143,13 @@ function create(doc, nowMs) {
             || doc.nextId >= Number.MAX_SAFE_INTEGER - 1)
         return {ok: false, error: "MAX_ALARMS_OR_INVALID_STORE"};
     var next = cloneDocument(doc), alarm = freshAlarm(next.nextId, nowMs);
+    // Stable monotonically increasing IDs remain unique even after deletion;
+    // also skip any identical names a user might have assigned manually.
+    var suffix = next.nextId;
+    while (next.alarms.some(function(a) {
+        return a.name === "New Alarm " + suffix;
+    })) suffix++;
+    alarm.name = "New Alarm " + suffix;
     next.nextId += 1;
     next.alarms.push(alarm);
     return {ok: true, document: next, id: alarm.id};
@@ -144,6 +163,7 @@ function duplicate(doc, id) {
         id: next.nextId,
         name: (old.name.slice(0, MAX_NAME_LENGTH - 5) + " COPY"),
         enabled: false, pausedUntilDate: "", completed: false,
+        favorite: false,
         lastFiredDay: "", ringing: false, ringStartedAtMs: 0,
         snoozeUntilMs: 0
     });
@@ -161,12 +181,12 @@ function update(doc, id, patch, nowMs) {
     if (!old) return {ok: false, error: "ALARM_NOT_FOUND"};
     var allowed = ["name", "hour", "minute", "mode", "weekdays", "date",
                    "keepSaved", "enabled", "pausedUntilDate", "soundId",
-                   "soundEnabled", "volumePercent"];
+                   "soundEnabled", "volumePercent", "favorite", "note"];
     for (var key in patch)
         if (Object.prototype.hasOwnProperty.call(patch, key)
                 && allowed.indexOf(key) < 0)
             return {ok: false, error: "INVALID_EDIT_FIELD"};
-    var target = Object.assign({}, old, patch);
+    var target = Object.assign({favorite: false, note: ""}, old, patch);
     // A schedule edit means a new future occurrence, without surprising
     // immediate playback when the chosen minute already happened today.
     var scheduleChanged = target.hour !== old.hour || target.minute !== old.minute

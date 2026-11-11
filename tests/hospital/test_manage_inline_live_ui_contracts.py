@@ -289,6 +289,27 @@ check('SAFETY AUTO-STOP // FINISHING LAST CHUNK' in manager
       and 'SAFETY LIMIT SOON // FINISH PHRASE' in manager,
       "Manage surfaces early cutoff and dropped audio, never silent truncation")
 
+check('def timing_packet(metric: str, milliseconds: int)' in script
+      and 'TIMING_FIELDS = frozenset(' in script
+      and '"AUDIO_READY", "MODEL_STARTUP", "QUEUE_WAIT"' in script
+      and '"INFERENCE", "FIRST_TEXT"' in script
+      and 'clips.put((raw, time.monotonic()), timeout=0.1)' in script
+      and 'send_timing("AUDIO_READY", started_at)' in script
+      and 'send_timing("QUEUE_WAIT", enqueued_at)' in script
+      and 'send_timing("MODEL_STARTUP", model_loading_at)' in script
+      and 'send_timing("INFERENCE", decoding_at)' in script
+      and 'send_timing("FIRST_TEXT", started_at)' in script,
+      "Capture/queue/model/decode timings are fixed-code integer receipts only")
+check('property int firstTextMs: -1' in live
+      and 'property int peakInferenceMs: -1' in live
+      and 'property int peakQueueWaitMs: -1' in live
+      and 'if (data.kind === "timing")' in live
+      and 'Number.isInteger(ms)' in live
+      and 'ms > 45000' in live
+      and 'console.warn("HOSPITAL_VOICE_TIMING // " + metric' in live
+      and 'root.speechInputService.timingSummary' in manager,
+      "Hospital validates bounded timing and shows summary after normal dictation")
+
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")
     for issue in issues: print(" - " + issue)

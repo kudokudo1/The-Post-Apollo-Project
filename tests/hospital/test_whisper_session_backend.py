@@ -127,6 +127,24 @@ def build_fake_runtime(root: Path):
 
 
 class PersistentWhisperTests(unittest.TestCase):
+    def test_timing_packets_are_numeric_bounded_and_never_include_speech(self):
+        self.assertEqual(
+            json.loads(live.timing_packet("AUDIO_READY", 1400)),
+            {"kind": "timing", "detail": "AUDIO_READY", "ms": 1400})
+        self.assertEqual(
+            json.loads(live.timing_packet("INFERENCE", 999999))["ms"],
+            45000)
+        self.assertEqual(
+            json.loads(live.timing_packet("QUEUE_WAIT", -50))["ms"],
+            0)
+        for invalid in ("TRANSCRIPT", "MODEL_PATH", "SPOKEN_WORDS"):
+            with self.assertRaises(ValueError):
+                live.timing_packet(invalid, 100)
+        with self.assertRaises(ValueError):
+            live.timing_packet("INFERENCE", True)
+        with self.assertRaises(ValueError):
+            live.timing_packet("INFERENCE", "do or did")
+
     def test_overlap_removes_only_matching_multitoken_boundary(self):
         self.assertEqual(
             live.trim_repeated_prefix("Turn left at the", "at the next light"),
@@ -166,6 +184,7 @@ class PersistentWhisperTests(unittest.TestCase):
                 selector.register(process.stdout, selectors.EVENT_READ)
                 seen = set()
                 spoken = []
+                timings = []
                 deadline = time.monotonic() + 16
                 while time.monotonic() < deadline and len(spoken) < 2:
                     entry = packet_from_pipe(process, selector, pending)
@@ -173,6 +192,12 @@ class PersistentWhisperTests(unittest.TestCase):
                         continue
                     if entry["kind"] == "stage":
                         seen.add(entry["detail"])
+                    elif entry["kind"] == "timing":
+                        self.assertEqual(set(entry), {"kind", "detail", "ms"})
+                        self.assertIs(type(entry["ms"]), int)
+                        self.assertGreaterEqual(entry["ms"], 0)
+                        self.assertLessEqual(entry["ms"], 45000)
+                        timings.append(entry)
                     elif entry["kind"] == "partial":
                         spoken.append(entry["text"])
                         self.assertIsNone(
@@ -182,6 +207,12 @@ class PersistentWhisperTests(unittest.TestCase):
                 self.assertEqual(spoken,
                                  ["Turn left at the", "next light"], seen)
                 self.assertIn("MODEL_SESSION_READY", seen)
+                codes = [record["detail"] for record in timings]
+                for code in ("AUDIO_READY", "MODEL_STARTUP", "QUEUE_WAIT",
+                             "INFERENCE", "FIRST_TEXT"):
+                    self.assertIn(code, codes)
+                self.assertGreaterEqual(codes.count("INFERENCE"), 2)
+                self.assertGreaterEqual(codes.count("QUEUE_WAIT"), 2)
                 self.assertNotIn("MODEL_SESSION_UNAVAILABLE", seen)
                 self.assertNotIn("CAPTURE_STOPPED", seen)
                 self.assertEqual(starts.read_text().splitlines(), ["start"])
@@ -203,6 +234,11 @@ class PersistentWhisperTests(unittest.TestCase):
                     process.kill()
                     process.wait(timeout=4)
                 selector.close()
+                # Close all fake child pipes even after assertion failures.
+                # Leaving stderr/stdout open produced ResourceWarning in CI.
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    if stream is not None and not stream.closed:
+                        stream.close()
 
     def test_missing_session_falls_back_to_guarded_cli(self):
         with tempfile.TemporaryDirectory(prefix="hospital-whisper-fallback-") as tmp:

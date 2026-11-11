@@ -558,5 +558,28 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
                         probe.index("system_u:system_r:postapollo_identity_ci_t:s0' &&"))
 
 
+    def test_19_runner_apt_fallback_uses_only_official_signed_https_sources(self):
+        workflow = (ROOT / ".github/workflows/connections-identity-silverblue-real-boot.yml").read_text()
+        for required in (
+            'C4B_ID_PASS // RUNNER_APT_DEFAULT_MIRROR_READY',
+            'C4B_ID_PASS // RUNNER_APT_OFFICIAL_SIGNED_HTTPS_FALLBACK_READY',
+            'OFFICIAL_UBUNTU_ARCHIVE_KEYRING_ABSENT',
+            'https://archive.ubuntu.com/ubuntu/',
+            'https://security.ubuntu.com/ubuntu/',
+            'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg',
+            'Dir::Etc::sourcelist=$fallback_sources',
+            'Dir::Etc::sourceparts=-',
+            'OFFICIAL_SIGNED_HTTPS_RUNNER_APT_UPDATE',
+            'qemu-system-x86 qemu-utils xorriso genisoimage',
+        ):
+            self.assertIn(required, workflow)
+        self.assertNotIn('Acquire::AllowInsecureRepositories=true', workflow)
+        self.assertNotIn('AllowUnauthenticated=true', workflow)
+        self.assertNotIn('Verify-Peer=false', workflow)
+        self.assertNotIn('apt-get install --allow-unauthenticated', workflow)
+        self.assertLess(workflow.index('RUNNER_APT_OFFICIAL_SIGNED_HTTPS_FALLBACK_READY'),
+                        workflow.index('qemu-system-x86 qemu-utils xorriso genisoimage'))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

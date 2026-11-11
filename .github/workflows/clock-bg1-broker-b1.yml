@@ -36,7 +36,7 @@ jobs:
           import subprocess
           changed=set(subprocess.check_output([
               'git','diff','--name-only',
-              'origin/feat/clock-bg1-ownership-fence-20261111...HEAD'],
+              'origin/main...HEAD'],
               text=True).splitlines())
           allowed={
               'services/time/AlarmOwnershipBroker.py',

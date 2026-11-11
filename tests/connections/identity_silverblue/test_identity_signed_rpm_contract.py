@@ -458,5 +458,28 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertNotIn('NetworkNamespace', transient)
 
 
+    def test_15_real_selinux_policy_load_is_bounded_and_diagnostic(self):
+        probe = (AREA / "guest_identity_service_probe.sh").read_text()
+        host = (AREA / "run_official_silverblue_identity.sh").read_text()
+        for marker in (
+            'C4B_ID_SELINUX_STAGE // before_module_install',
+            'C4B_ID_SELINUX_STAGE // after_module_install rc=%s',
+            'C4B_ID_SELINUX_STAGE // before_module_unload',
+            'C4B_ID_SELINUX_STAGE // after_module_unload rc=%s',
+            'timeout --signal=TERM --kill-after=4s 150s semodule -i',
+            'timeout --signal=TERM --kill-after=4s 150s semodule -r',
+            'COMPILED_SELINUX_MODULE_LOAD_REFUSED',
+        ):
+            self.assertIn(marker, probe)
+        for marker in (
+            'C4B_ID_BLOCKED // REAL_ENFORCING_SELINUX_POLICY_LOAD_STALLED',
+            'selinux_load_started=0',
+            'SECONDS - selinux_load_started > 205',
+            'SELINUX_STAGE|SELINUX_LOAD_DETAIL|SELINUX_UNLOAD_DETAIL',
+        ):
+            self.assertIn(marker, host)
+        self.assertNotIn('setenforce 0', probe)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

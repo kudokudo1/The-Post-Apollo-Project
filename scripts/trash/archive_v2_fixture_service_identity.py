@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import socket
 import stat
 
 HEX = re.compile(r"^[0-9a-f]{64}$")
@@ -163,6 +164,22 @@ class PinnedFixtureServiceFiles:
         raw = json.dumps(fields,sort_keys=True,ensure_ascii=True,
                          separators=(",",":")).encode("ascii")
         return hashlib.sha256(raw).hexdigest()
+
+    def check_connection(self, connected_socket):
+        """Bind the pinned socket pathname to this accepted Unix socket."""
+        _need(isinstance(connected_socket, socket.socket)
+              and connected_socket.family == socket.AF_UNIX
+              and connected_socket.type & socket.SOCK_STREAM
+                    == socket.SOCK_STREAM,
+              "SERVICE_SOCKET_CONNECTION_INVALID")
+        try:
+            address = connected_socket.getsockname()
+        except OSError as exc:
+            raise ServiceFixtureError("SERVICE_SOCKET_CONNECTION_INVALID") from exc
+        _need(type(address) is str
+              and address == str(self.root / self.policy["socketName"]),
+              "SERVICE_SOCKET_CONNECTION_MISMATCH")
+        return self.require_unchanged()
 
     def require_unchanged(self):
         now = self._read()

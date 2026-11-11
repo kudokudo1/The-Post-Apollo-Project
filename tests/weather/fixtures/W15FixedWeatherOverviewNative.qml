@@ -107,19 +107,32 @@ ShellRoot {
         if(content.implicitHeight>scroll.height+1)
             return "ONE_PAGE_CLIPPED "+content.implicitHeight
                 +" > "+scroll.height;
-        if(snap.height<(window.height<286 ? 46 : 55)
-           || autoCards.height<(window.height<286 ? 46 : 55))
+        if(snap.height<(window.height<286 ? 46 : 48)
+           || autoCards.height<(window.height<286 ? 46 : 48))
             return "CARDS_TOO_SMALL "+snap.height+"/"+autoCards.height;
-        if(snap.height>60 || autoCards.height>60)
+        if(snap.height>51 || autoCards.height>51)
             return "OVERSIZED_EMPTY_CARDS "+snap.height+"/"+autoCards.height;
-        if(rail.height!==31 || rail.buttonRepeater.count!==3
+        const condensed=window.height<286;
+        if(rail.height!==(condensed ? 31 : 49)
+           || rail.buttonRepeater.count!==3
            || rail.width<content.width-1)
             return "W21_OVERVIEW_RAIL_MISSING";
+        if(!condensed && (!rail.titleItem.visible
+           || rail.titleItem.text!=="WEATHER // OVERVIEW"
+           || rail.titleItem.height!==18))
+            return "W22_WEATHER_OVERVIEW_HEADER_MISSING";
         for(let i=0;i<3;i++) {
             const button=rail.buttonRepeater.itemAt(i);
-            if(!button || button.width<rail.width/3-6
-                || button.height!==25)
+            if(!button || button.width<rail.width/3-7
+                || button.height!==(condensed ? 25 : 24))
                 return "W21_RAIL_BUTTON_NOT_FULL_WIDTH_"+i;
+            if(i>0) {
+                const previous=rail.buttonRepeater.itemAt(i-1);
+                const left=button.mapToItem(rail,0,0).x;
+                const right=previous.mapToItem(rail,previous.width,0).x;
+                if(left-right<7)
+                    return "W22_WEATHER_TAB_GAP_TOO_NARROW_"+i;
+            }
         }
         if(!root.checkedWeatherRailRoute) {
             rail.buttonRepeater.itemAt(1).clicked(null);
@@ -136,7 +149,7 @@ ShellRoot {
             return "TALL_WEATHER_INSTRUMENT_STILL_TINY";
         if(window.height>=500) {
             const instrument=summary.compactInstrument;
-            if(snap.height>60 || autoCards.height>60)
+            if(snap.height>51 || autoCards.height>51)
                 return "W20_LOWER_CARDS_NOT_REDUCED";
             if(instrument.currentStrip.height<130 ||
                instrument.currentStrip.height>134)

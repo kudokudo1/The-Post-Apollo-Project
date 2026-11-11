@@ -53,8 +53,8 @@ assert.equal(result.persisted,false);
 assert.equal(result.restore_allowed,false);
 assert.deepEqual(result.safe_actions,[]);
 assert.deepEqual(result.counts,{
-  normal_windows:3,tabs:13,candidate_only:9,
-  requires_sensitive_review:2,not_eligible:2,
+  normal_windows:3,tabs:13,candidate_only:8,
+  requires_sensitive_review:2,not_eligible:3,
   private_windows_skipped:1
 });
 assert.deepEqual(result.windows.map(w=>[

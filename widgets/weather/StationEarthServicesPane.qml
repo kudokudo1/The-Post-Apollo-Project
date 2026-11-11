@@ -33,7 +33,7 @@ Rectangle {
     }
 
     StationServicesConsole {
-        id: console
+        id: earthServicesConsole
         objectName: "earth-e9-services-console"
         anchors.fill: parent
         familyLabel: "EARTH"

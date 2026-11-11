@@ -36,6 +36,9 @@ def _sibling(name):
 
 _gate_module = _sibling("AlarmOwnershipGate")
 _observer_module = _sibling("AlarmBackgroundObserver")
+_shadow_module = _sibling("AlarmShadowTransactions")
+ShadowStore = _shadow_module.ShadowStore
+ShadowRefused = _shadow_module.Refused
 OwnershipGate = _gate_module.OwnershipGate
 Refused = _gate_module.Refused
 evaluate_alarm = _observer_module.evaluate_alarm
@@ -157,6 +160,7 @@ class BrokerServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
     def __init__(self, path, alarm_file, state_dir, test_now_ms):
         self.alarm_file = alarm_file
         self.gate = OwnershipGate(alarm_file, state_dir)
+        self.shadow = ShadowStore(state_dir, alarm_file)
         self.test_now_ms = test_now_ms
         # Only a same-UID Python synthetic test client qualifies for this
         # source-only prototype. Not proof of Quickshell binary identity.
@@ -211,6 +215,12 @@ class BrokerHandler(socketserver.StreamRequestHandler):
             "renew": {"op"},
             "release": {"op"},
             "reserve": {"op", "alarmId", "expectedDueMs", "sourceDigest"},
+            "shadow_begin": {"op", "sourceDigest"},
+            "shadow_view": {"op"},
+            "shadow_tick": {"op", "revision", "alarmId", "expectedDueMs"},
+            "shadow_stop": {"op", "revision", "alarmId", "ringStartedMs"},
+            "shadow_snooze": {"op", "revision", "alarmId", "ringStartedMs"},
+            "shadow_edit": {"op", "revision", "alarmId", "patch"},
         }
         if op not in shapes or set(message) != shapes[op]:
             raise Refused("INVALID_REQUEST_FIELDS")
@@ -239,6 +249,47 @@ class BrokerHandler(socketserver.StreamRequestHandler):
                 self.server.active_owner = self
                 self.token, self.epoch = lease["token"], lease["epoch"]
             return {"ok": True, "epoch": self.epoch, "reservedOnly": True}
+        if op.startswith("shadow_"):
+            with self.server.state_guard:
+                self._require_owner()
+                # Every shadow action is forced through the current broker
+                # lease, including after an owner disconnect or timeout.
+                self.server.gate.renew(self.role, self.token, ttl_ms=5000)
+                if op == "shadow_begin":
+                    witnessed, doc, _ = _source_snapshot(
+                        self.server.alarm_file, self.server.now_ms())
+                    if type(message["sourceDigest"]) is not str or message["sourceDigest"] != witnessed:
+                        raise Refused("STALE_ALARM_FILE_REVISION")
+                    result = self.server.shadow.initialize(
+                        doc, witnessed, self.epoch, validate_snapshot)
+                    after_digest, _, _ = _source_snapshot(
+                        self.server.alarm_file, self.server.now_ms())
+                    if after_digest != witnessed:
+                        raise Refused("SOURCE_CHANGED_DURING_SHADOW_INIT")
+                    return dict({"ok": True, "shadowOnly": True}, **result)
+                shadow_view = self.server.shadow.view()
+                source_digest, _, _ = _source_snapshot(
+                    self.server.alarm_file, self.server.now_ms())
+                if source_digest != shadow_view["sourceDigest"]:
+                    # Another writer still controls the actual V2 file.
+                    # Synthetic shadow operations must fail closed instead
+                    # of quietly shadowing a different real alarm revision.
+                    raise Refused("SOURCE_CHANGED_OUTSIDE_SHADOW")
+                if op == "shadow_view":
+                    return dict({"ok": True, "shadowOnly": True}, **shadow_view)
+                result = self.server.shadow.transition(
+                        self.epoch, message["revision"],
+                        op.removeprefix("shadow_"),
+                        message["alarmId"], self.server.now_ms(),
+                        expected_due_ms=message.get("expectedDueMs", 0),
+                        ring_started_ms=message.get("ringStartedMs", 0),
+                        patch=message.get("patch"),
+                        evaluate=evaluate_alarm, validate=validate_snapshot)
+                after_digest, _, _ = _source_snapshot(
+                    self.server.alarm_file, self.server.now_ms())
+                if after_digest != source_digest:
+                    raise Refused("SOURCE_CHANGED_DURING_SHADOW_TRANSITION")
+                return dict({"ok": True, "shadowOnly": True}, **result)
         if op in ("renew", "release", "reserve"):
             with self.server.state_guard:
                 self._require_owner()
@@ -296,8 +347,10 @@ class BrokerHandler(socketserver.StreamRequestHandler):
                 try:
                     message = json.loads(data)
                     result = self.process(message)
-                except (UnicodeError, ValueError, TypeError, Refused, OSError) as exc:
-                    reason = str(exc) if isinstance(exc, Refused) else "INVALID_REQUEST"
+                except (UnicodeError, ValueError, TypeError, Refused, ShadowRefused,
+                        ObserverRefused, OSError) as exc:
+                    reason = (str(exc) if isinstance(exc, (Refused, ShadowRefused))
+                              else "INVALID_SHADOW_OR_REQUEST")
                     result = {"ok": False, "reason": reason}
                 self._reply(result)
         except (Refused, OSError, TimeoutError):

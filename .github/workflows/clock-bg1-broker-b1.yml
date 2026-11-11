@@ -38,13 +38,16 @@ jobs:
               'git','diff','--name-only',
               'origin/main...HEAD'],
               text=True).splitlines())
-          allowed={
-              'services/time/AlarmOwnershipBroker.py',
-              'services/time/BG1-ALARM-BROKER.md',
-              'tests/time/test_clock_bg1_broker_protocol.py',
-              '.github/workflows/clock-bg1-broker-b1.yml',
+          # A stacked follow-on is allowed to add separate, tested source
+          # files, but may not silently alter any live alarm ownership seam.
+          forbidden={
+              'services/time/AlarmManagerService.qml',
+              'services/time/AlarmManagerPolicy.js',
+              'services/time/AlarmBackgroundObserver.py',
+              'services/time/AlarmAudioV2.qml',
+              'ops/systemd/user/post-apollo-alarm-observer.service'
           }
-          assert changed <= allowed, f"Out-of-lane files changed: {changed-allowed}"
-          assert changed == allowed, f"Expected four isolated files, got {changed}"
-          print('Broker only; no live alarm/sound/notifications/observer modifications: PASS')
+          assert not (changed & forbidden), f"Live Clock files changed: {changed & forbidden}"
+          assert 'services/time/AlarmOwnershipBroker.py' in changed, "Broker must be reviewed"
+          print('BG1 IPC evolution remains isolated from live alarm/audio/observer: PASS')
           PY

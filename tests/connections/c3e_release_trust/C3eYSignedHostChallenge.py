@@ -266,6 +266,15 @@ def inspect_and_consume(*, ledger_root, challenge: bytes,
                    for frame in signed_receipts)
             or type(independently_measured) is not dict):
         _deny("SIGNED_INPUTS_INVALID")
+    # Freeze all caller-owned mutable collections once. A caller could
+    # otherwise swap a valid receipt bundle or expected pins between the
+    # signed hash comparison and the C3e-X verification below.
+    frames = tuple(signed_receipts)
+    measured_pins = dict(independently_measured)
+    try:
+        measured_sha256 = _hash(X._canonical(measured_pins))
+    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+        raise Refused("SNAPSHOT_PINS_NOT_CANONICAL") from exc
     record = _statement(signed_statement)
     if (record["schema"] != SCHEMA or record["role"] != ROLE
             or record["purpose"] != PURPOSE or record["audience"] != AUDIENCE
@@ -276,8 +285,8 @@ def inspect_and_consume(*, ledger_root, challenge: bytes,
             or record["challengeSha256"] != _hash(challenge)
             or record["evidenceSha256"] != _hash(evidence_line)
             or type(record["receiptSha256"]) is not list
-            or record["receiptSha256"] != [_hash(x) for x in signed_receipts]
-            or record["snapshotSha256"] != _hash(X._canonical(independently_measured))
+            or record["receiptSha256"] != [_hash(x) for x in frames]
+            or record["snapshotSha256"] != measured_sha256
             or record["receiptKeySha256"] != _hash(receipt_public)):
         _deny("FULL_RECORD_SIGNATURE_BINDING_REFUSED")
     try:
@@ -290,9 +299,9 @@ def inspect_and_consume(*, ledger_root, challenge: bytes,
     # denial-frame signatures against the SAME caller-pinned receipt key.
     try:
         receipt = X.inspect_running_denials(
-            evidence_line=evidence_line, signed_receipts=signed_receipts,
+            evidence_line=evidence_line, signed_receipts=frames,
             independently_pinned_receipt_key=independently_pinned_receipt_key,
-            independently_measured=independently_measured)
+            independently_measured=measured_pins)
     except (X.Refused, UnicodeError, ValueError, TypeError) as exc:
         raise Refused("C3EX_IDENTITY_DENIAL_CONSISTENCY_REFUSED") from exc
     if (receipt.get("fourSignedDenialsConsistentInCI") is not True

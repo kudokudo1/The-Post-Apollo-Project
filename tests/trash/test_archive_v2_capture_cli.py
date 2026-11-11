@@ -145,11 +145,12 @@ class CaptureCliTests(unittest.TestCase):
         with self.assertRaisesRegex(cli.CaptureCliError,
                                     "SOURCE_NOT_ALLOWLISTED"):
             self.request("preview", "hospital", "room", "1")
-        with self.assertRaises(source.LifecycleError):
+        with self.assertRaisesRegex(cli.AdapterError,
+                                    "STALE_DEMO_SOURCE_REFRESH"):
             self.request("preview", "demo", "file:///etc/passwd", "2026")
         self.crawl.unlink()
         self.crawl.symlink_to(self.root / "unrelated.json")
-        with self.assertRaises(source.LifecycleError):
+        with self.assertRaises(cli.AdapterError):
             self.request("preview", "demo", page()["url"], page()["observedAt"])
         self.assertFalse((self.data / DB_NAME).exists())
 

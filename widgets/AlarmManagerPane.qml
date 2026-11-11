@@ -10,7 +10,8 @@ Column {
     id: pane
     spacing: 8
     property int selectedId: 0
-    readonly property var selectedAlarm: AlarmManagerService.findAlarm(selectedId)
+    readonly property var selectedAlarm: Policy.byId(
+        AlarmManagerService.document, selectedId)
     property string draftMode: "weekly"
     property var draftDays: [0, 1, 2, 3, 4, 5, 6]
     property bool draftKeepSaved: true
@@ -105,6 +106,13 @@ Column {
     Component.onCompleted: {
         if (AlarmManagerService.count)
             choose(AlarmManagerService.document.alarms[0].id);
+    }
+    Connections {
+        target: AlarmManagerService
+        function onCountChanged() {
+            if (!pane.selectedAlarm && AlarmManagerService.count > 0)
+                pane.choose(AlarmManagerService.document.alarms[0].id);
+        }
     }
 
     Row {

@@ -318,6 +318,8 @@ class TestArchiveStoreAdmissionV2y:
                 raise ArchiveMigrationRefused("V2Y_NONCE_OR_SNAPSHOT_REPLAY") from exc
             except sqlite3.DatabaseError as exc:
                 db.rollback()
+                if getattr(exc, "sqlite_errorcode", None) == sqlite3.SQLITE_FULL:
+                    raise ArchiveMigrationRefused("V2Y_ARCHIVE_DISK_QUOTA") from exc
                 raise ArchiveMigrationRefused("V2Y_ARCHIVE_WRITE_FAILED") from exc
             except BaseException:
                 db.rollback()

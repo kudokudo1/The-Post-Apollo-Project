@@ -128,7 +128,8 @@ def transcribe_chunk(stt_helper: str, audio: bytes, *,
 def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
          first_chunk_ms: int = 1400, vad: bool = False, threshold: int = 600,
          silence_ms: int = 2200, min_speech_ms: int = 250,
-         pilot_one_chunk: bool = False) -> int:
+         pilot_one_chunk: bool = False,
+         pilot_live_chunks: int = 0) -> int:
     if not Path(stt_helper).is_file():
         print(packet("error", detail="LOCAL WHISPER HELPER UNAVAILABLE"),
               flush=True)
@@ -257,24 +258,40 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
             1000, min(1000 * max(2, min(4, chunk_seconds)), first_chunk_ms)) // 1000
         first_chunk_sent = False
         first_chunk_reported = False
-        # Operator-authorized pilot is deliberately one model launch.
-        # Silence is bounded by PCM duration too; no 90s open microphone.
-        limit = RATE * FRAME_BYTES * (6 if pilot_one_chunk else MAX_SECONDS)
+        accepted_chunks = 0
+        backpressure_reported = False
+        # The follow-up trial restores incremental text while retaining a
+        # ceiling on total model launches, capture duration and queue depth.
+        live_chunk_ceiling = max(0, min(8, int(pilot_live_chunks)))
+        pilot = pilot_one_chunk or live_chunk_ceiling > 0
+        limit = RATE * FRAME_BYTES * (
+            6 if pilot_one_chunk else 25 if live_chunk_ceiling else MAX_SECONDS)
         heard_speech = False
         speech_ms = 0
         quiet_ms = 0
 
         def enqueue(raw):
-            nonlocal first_chunk_reported
+            nonlocal first_chunk_reported, accepted_chunks, backpressure_reported
             if not raw or not is_speech(raw) or stopping_error.is_set():
+                return False
+            if live_chunk_ceiling and accepted_chunks >= live_chunk_ceiling:
                 return False
             try:
                 clips.put(raw, timeout=0.1)
+                accepted_chunks += 1
                 if not first_chunk_reported:
                     first_chunk_reported = True
                     send("stage", detail="FIRST_AUDIO_QUEUED")
                 return True
             except queue.Full:
+                if live_chunk_ceiling:
+                    # Keep recording and deliver the first model result while
+                    # the mic is still open. Drop ONLY this unqueued chunk;
+                    # never spawn concurrent Whisper workers or enlarge queue.
+                    if not backpressure_reported:
+                        backpressure_reported = True
+                        send("stage", detail="MODEL_BACKPRESSURE")
+                    return False
                 stopping_error.set()
                 send("error", detail="LOCAL MODEL TOO SLOW // DICTATION STOPPED")
                 stopping.set()
@@ -310,8 +327,11 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                     sent = enqueue(bytes(pending[:next_size]))
                     del pending[:next_size]
                     first_chunk_sent = first_chunk_sent or sent
-                    if pilot_one_chunk and sent:
-                        # Never queue a second model call in this first test.
+                    if (pilot_one_chunk and sent) or (
+                            live_chunk_ceiling
+                            and accepted_chunks >= live_chunk_ceiling):
+                        # One active model, bounded queued clips, and a hard
+                        # ceiling on model launches per live trial.
                         stopping.set()
                         halt_child()
                         break
@@ -324,13 +344,14 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
             # Short spoken endings used to disappear (<1s was discarded).
             # Gate on speech first, then pad a final subsecond clip to 1s so
             # Whisper can recognize it after an explicit STOP.
-            if not pilot_one_chunk and not cancelled.is_set() and is_speech(bytes(pending)):
+            if not pilot and not cancelled.is_set() and is_speech(bytes(pending)):
                 tail = bytes(pending)
                 minimum = RATE * FRAME_BYTES * MIN_TAIL_SECONDS
                 if len(tail) < minimum:
                     tail += bytes(minimum - len(tail))
                 enqueue(tail)
             capture_done.set()
+            send("stage", detail="CAPTURE_STOPPED")
             # Sentinel eventually enters after the finite queued chunks.
             while not cancelled.is_set() and not recognition_done.is_set():
                 try:
@@ -402,6 +423,8 @@ def main():
     parser.add_argument("--first-chunk-ms", type=int, default=1400)
     parser.add_argument("--pilot-one-chunk", action="store_true",
                         help="capture only the first speech chunk and run Whisper once")
+    parser.add_argument("--pilot-live-chunks", type=int, default=0,
+                        help="bounded incremental trial: max 1-8 model chunks")
     parser.add_argument("--vad", action="store_true")
     parser.add_argument("--threshold", type=int, default=600)
     parser.add_argument("--silence-ms", type=int, default=2200)
@@ -410,7 +433,8 @@ def main():
     return live(args.stt_helper, chunk_seconds=args.chunk_seconds,
                 first_chunk_ms=args.first_chunk_ms, vad=args.vad, threshold=args.threshold,
                 silence_ms=args.silence_ms, min_speech_ms=args.min_speech_ms,
-                pilot_one_chunk=args.pilot_one_chunk)
+                pilot_one_chunk=args.pilot_one_chunk,
+                pilot_live_chunks=args.pilot_live_chunks)
 
 
 if __name__ == "__main__":

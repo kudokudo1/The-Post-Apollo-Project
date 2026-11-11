@@ -204,7 +204,14 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
          silence_ms: int = 2200, min_speech_ms: int = 250,
          pilot_one_chunk: bool = False,
          pilot_live_chunks: int = 0, prefer_persistent: bool = False,
-         speech_pause_ms: int = 0) -> int:
+         speech_pause_ms: int = 0, decoder_trial: str = "standard") -> int:
+    if decoder_trial not in ("standard", "fast"):
+        print(packet("error", detail="INVALID DECODER TRIAL"), flush=True)
+        return 2
+    # An explicit fast trial is only supported with the same guarded
+    # persistent private AF_UNIX server. Legacy CLI keeps original settings.
+    fast_trial = (decoder_trial == "fast" and prefer_persistent
+                  and pilot_live_chunks > 0 and not pilot_one_chunk)
     if not Path(stt_helper).is_file():
         print(packet("error", detail="LOCAL WHISPER HELPER UNAVAILABLE"),
               flush=True)
@@ -512,6 +519,8 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
         previous_text = ""
         previous_pcm_tail = b""
         previous_chunk_ended_quietly = False
+        if decoder_trial == "fast" and not fast_trial:
+            send("stage", detail="DECODER_FAST_FALLBACK")
         def start_persistent_once(*, early: bool = False):
             nonlocal session, attempted_session
             if attempted_session or cancelled.is_set() or not prefer_persistent:
@@ -522,6 +531,8 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
             # An incompatible server still falls back to the guarded CLI.
             if not hospital_whisper_session.server_available(stt_helper):
                 send("stage", detail="MODEL_SESSION_UNAVAILABLE")
+                if fast_trial:
+                    send("stage", detail="DECODER_FAST_FALLBACK")
                 return
             if early:
                 send("stage", detail="MODEL_EARLY_START")
@@ -535,10 +546,14 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 model_started(session.process)
                 persistent_model_ready.set()
                 send("stage", detail="MODEL_SESSION_READY")
+                if fast_trial:
+                    send("stage", detail="DECODER_FAST_ACTIVE")
             except (OSError, ValueError, RuntimeError,
                     subprocess.SubprocessError):
                 candidate.close()
                 send("stage", detail="MODEL_SESSION_UNAVAILABLE")
+                if fast_trial:
+                    send("stage", detail="DECODER_FAST_FALLBACK")
 
         try:
             while not cancelled.is_set():
@@ -578,7 +593,9 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                             overlap = b""
                             send("stage", detail="SILENT_OVERLAP_SKIPPED")
                         raw = session.transcribe(overlap + chunk,
-                                                 prompt=previous_text[-160:])
+                                                 prompt=previous_text[-160:],
+                                                 decoder_mode=("FAST" if fast_trial
+                                                               else "STANDARD"))
                         cleaned = clean_transcript(raw)
                         phrase = trim_repeated_prefix(previous_text, cleaned)
                         previous_pcm_tail = chunk[-OVERLAP_BYTES:]
@@ -651,6 +668,9 @@ def main():
                         help="prefer one private AF_UNIX Whisper model session")
     parser.add_argument("--speech-pause-ms", type=int, default=0,
                         help="optional 400-650ms pause flush on persistent model only")
+    parser.add_argument("--decoder-trial", choices=("standard", "fast"),
+                        default="standard",
+                        help="opt-in single-candidate greedy A/B trial; standard is default")
     parser.add_argument("--vad", action="store_true")
     parser.add_argument("--threshold", type=int, default=600)
     parser.add_argument("--silence-ms", type=int, default=2200)
@@ -662,7 +682,8 @@ def main():
                 pilot_one_chunk=args.pilot_one_chunk,
                 pilot_live_chunks=args.pilot_live_chunks,
                 prefer_persistent=args.prefer_persistent,
-                speech_pause_ms=args.speech_pause_ms)
+                speech_pause_ms=args.speech_pause_ms,
+                decoder_trial=args.decoder_trial)
 
 
 if __name__ == "__main__":

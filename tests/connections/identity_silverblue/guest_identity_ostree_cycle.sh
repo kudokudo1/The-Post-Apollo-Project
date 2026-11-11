@@ -71,7 +71,7 @@ case "$phase" in
     # Identity signer. Trust is explicitly pinned by the CI fetcher to
     # Fedora 44 primary fingerprint 36F612DC...6D9F90A6.
     crypto="$data/identity-python3-cryptography-f44.rpm"
-    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$crypto")" ==
+    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$crypto")" == \
        'python3-cryptography 50.0.0 1.fc44 x86_64' ]] ||
       fail "WRONG_VENDOR_RUNTIME_ROLE"
     [[ -z "$(rpm -qp --scripts "$crypto")" &&
@@ -189,7 +189,7 @@ ID_MONITOR
   layer_pending)
     [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}' "$pkg")" == "$pkg 0.1 noarch" ]] ||
       fail "LAYER_NOT_IN_BOOTED_RPMDB"
-    [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' python3-cryptography)" ==
+    [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' python3-cryptography)" == \
        'python3-cryptography 50.0.0 1.fc44 x86_64' ]] ||
       fail "FEDORA_SIGNED_RUNTIME_NOT_IN_BOOTED_RPMDB"
     vendor_verify=/var/tmp/id-ci-crypto-rpm-verify.log

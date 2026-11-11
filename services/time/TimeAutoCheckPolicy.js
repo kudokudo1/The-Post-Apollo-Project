@@ -120,7 +120,8 @@ function isDue(doc, nowMs, lastStartedAtMs) {
 // measurement still counts as an attempt, so repeated Clock opens or a
 // Quickshell restart do not continuously spawn chronyd -Q or chronyc.
 function canStartAutomaticCheck(doc, trigger, nowMs,
-                                lastAutoStartedAtMs, lastReferenceStartedAtMs) {
+                                lastAutoStartedAtMs, lastReferenceStartedAtMs,
+                                evidence) {
     if (!triggerEnabled(doc, trigger) || !validTimestamp(nowMs))
         return false;
     if (trigger === "interval" && !isDue(doc, nowMs, lastAutoStartedAtMs))
@@ -130,6 +131,28 @@ function canStartAutomaticCheck(doc, trigger, nowMs,
     var reference = validTimestamp(lastReferenceStartedAtMs)
                     ? lastReferenceStartedAtMs : 0;
     var recent = Math.max(saved, session, reference);
+
+    if (evidence) {
+        // Read the saved measurement BEFORE deciding whether a restart needs
+        // another query. A timestamp alone is not usable accuracy evidence.
+        if (!evidence.ready || evidence.fresh)
+            return false;
+        var failed = validTimestamp(evidence.lastFailureAtMs)
+                     ? evidence.lastFailureAtMs : 0;
+        if (failed && nowMs >= failed
+                && nowMs - failed < MIN_AUTOMATIC_GAP_MS)
+            return false;
+        // In-session manual/auto checks still suppress redundant click storms.
+        var active = Math.max(session, reference);
+        if (active && nowMs >= active
+                && nowMs - active < MIN_AUTOMATIC_GAP_MS)
+            return false;
+        // Migration from the old schedule can have an attempt stamp but no
+        // saved reference. One reload/open check is then warranted.
+        if (!evidence.hasMeasurement)
+            return true;
+    }
+
     // If the host clock stepped backwards, don't pin a cooldown to a
     // timestamp in the future. The next real attempt gets a new timestamp.
     return !recent || nowMs < recent

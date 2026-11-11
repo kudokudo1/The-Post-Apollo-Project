@@ -37,8 +37,8 @@ class ArchiveStoreMigrationV2yTests(unittest.TestCase):
             "demo-scrape","legacy-resource","old-revision",
             OLD_PAYLOAD,display_label="Older archive copy",
             captured_ms=1760000000000)
-        self.baseline = self.archive.status()
         self.bridge = TestArchiveStoreAdmissionV2y(self.archive)
+        self.baseline = self.archive.status()
 
     def pair(self, **kwargs):
         return self.v2x.signed_pair(**kwargs)
@@ -198,9 +198,10 @@ class ArchiveStoreMigrationV2yTests(unittest.TestCase):
         self.assertEqual(self.counts(),(1,1,0))
 
     def test_source_revision_conflict_does_not_destroy_legacy_copy(self):
-        self.admit()
+        first=self.admit()
         pair=self.pair(nonce="b"*32,revision="1"*64,
-                       snapshot_id="b"*32)
+                       snapshot_id="b"*32,
+                       parent=first["localReceiptSha256"])
         with self.assertRaisesRegex(ArchiveMigrationRefused,
                                     "V2Y_NONCE_OR_SNAPSHOT_REPLAY"):
             self.admit(pair=pair)

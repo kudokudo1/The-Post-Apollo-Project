@@ -18,6 +18,13 @@ Rectangle {
     color: Colors.black
     clip: true
 
+    // W11: daily is a compact ticker, with remaining height divided
+    // between an enlarged current instrument and dominant next hours.
+    readonly property real bandBudget: Math.max(1,height - 14 - 11 - 4*2)
+    readonly property real dailyHeight: Math.max(40,Math.min(52,bandBudget*0.22))
+    readonly property real currentHeight: Math.max(60,Math.round((bandBudget-dailyHeight)*0.40))
+    readonly property real hourlyHeight: Math.max(1,bandBudget-dailyHeight-currentHeight)
+
     readonly property var hourlyRows: sky && sky.weatherService
         && sky.weatherService.forecastReady && sky.hourlyForecast
         ? sky.hourlyForecast : []
@@ -86,7 +93,7 @@ Rectangle {
             id: currentBand
             objectName: "weather-w10-current-air-band"
             width: parent.width
-            height: 54
+            height: panel.currentHeight
             color: Colors.dark
             border.width: 1
             border.color: Colors.cyan
@@ -105,10 +112,10 @@ Rectangle {
                     }
                     GohuText {
                         anchors.top: parent.top
-                        anchors.topMargin: 13
+                        anchors.topMargin: 20
                         text: panel.currentReady
                             ? panel.reading(panel.sky.weatherService.tempF,"°F") : "--°F"
-                        font.pixelSize: 20
+                        font.pixelSize: 28
                         color: Colors.orange
                     }
                     GohuText {
@@ -116,7 +123,7 @@ Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         text: panel.currentReady && panel.sky
                             ? panel.sky.conditionState.icon : "?"
-                        font.pixelSize: 26
+                        font.pixelSize: 38
                         color: panel.currentReady && panel.sky
                             ? panel.sky.iconColor(panel.sky.conditionState.color)
                             : Colors.white
@@ -150,9 +157,9 @@ Rectangle {
                         }
                         GohuText {
                             anchors.top: parent.top
-                            anchors.topMargin: 17
+                            anchors.topMargin: 22
                             width: parent.width
-                            font.pixelSize: 13
+                            font.pixelSize: 17
                             color: Colors.white
                             elide: Text.ElideRight
                             text: modelData.key==="air"
@@ -188,8 +195,8 @@ Rectangle {
                     QuietText { text: "PRESSURE"; font.pixelSize: 8; color: Colors.cyan }
                     GohuText {
                         anchors.top: parent.top
-                        anchors.topMargin: 17
-                        font.pixelSize: 11
+                        anchors.topMargin: 22
+                        font.pixelSize: 14
                         color: Colors.white
                         text: panel.currentReady
                               ? (panel.sky.pressureValue >= 0
@@ -213,7 +220,7 @@ Rectangle {
             id: hourlyBand
             objectName: "weather-w10-hourly-band"
             width: parent.width
-            height: 77
+            height: panel.hourlyHeight
             color: Colors.black
             border.width: 1
             border.color: Colors.blue
@@ -259,6 +266,8 @@ Rectangle {
                     delegate: Rectangle {
                         id: hourCell
                         required property int index
+                        readonly property alias mainGlyph: hourlyWeatherGlyph
+                        readonly property alias rainMeter: hourlyRainMeter
                         readonly property var entry: panel.hourlyRows[index] || ({})
                         readonly property var weatherState: panel.state(entry)
                         readonly property var solarCycle:
@@ -282,19 +291,20 @@ Rectangle {
                         }
                         Item {
                             width: parent.width
-                            height: 34
+                            height: Math.max(34,Math.min(62,hourCell.height-34))
                             anchors.verticalCenter: parent.verticalCenter
                             Text {
                                 anchors.centerIn: parent
+                                id: hourlyWeatherGlyph
                                 text: hourCell.weatherState.icon
-                                font.pixelSize: 32
+                                font.pixelSize: Math.max(34,Math.min(56,parent.height-2))
                                 color: panel.colorFor(hourCell.weatherState)
                                 visible: hourCell.artwork==="weather"
                             }
                             WeatherCelestialGlyph {
                                 anchors.centerIn: parent
-                                width: 32
-                                height: 32
+                                width: Math.max(34,Math.min(58,parent.height-2))
+                                height: width
                                 mode: hourCell.artwork
                                 weatherKind: WeatherCyclePolicy.nightKind(hourCell.weatherState)
                                 solar: hourCell.solarCycle.solar
@@ -306,19 +316,20 @@ Rectangle {
                         QuietText {
                             anchors.left: parent.left
                             anchors.bottom: parent.bottom
-                            anchors.bottomMargin: 9
+                            anchors.bottomMargin: 14
                             width: parent.width
                             text: panel.rainLabel(hourCell.entry.chanceRain)
                             horizontalAlignment: Text.AlignHCenter
-                            font.pixelSize: 7
+                            font.pixelSize: 9
                             color: Colors.cyan
                         }
                         Rectangle {
+                            id: hourlyRainMeter
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
                             anchors.margins: 3
-                            height: 4
+                            height: 8
                             color: Colors.black
                             border.width: 1
                             border.color: Colors.cyan
@@ -353,7 +364,7 @@ Rectangle {
             id: dailyBand
             objectName: "weather-w10-daily-band"
             width: parent.width
-            height: Math.max(1,panel.height - 14 - 54 - 77 - 11 - bands.spacing*4)
+            height: panel.dailyHeight
             color: Colors.black
             border.width: 1
             border.color: Colors.magenta
@@ -361,7 +372,7 @@ Rectangle {
             GohuText {
                 anchors.left: parent.left
                 anchors.top: parent.top
-                anchors.margins: 3
+                anchors.margins: 2
                 text: "FORECAST // DAILY"
                 font.pixelSize: 9
                 color: Colors.orange
@@ -369,11 +380,11 @@ Rectangle {
             Row {
                 id: dayCards
                 anchors.top: parent.top
-                anchors.topMargin: 15
+                anchors.topMargin: 16
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                anchors.margins: 3
+                anchors.margins: 2
                 spacing: 3
                 Repeater {
                     id: dayRepeater
@@ -392,74 +403,81 @@ Rectangle {
                         color: Colors.dark
                         border.width: 1
                         border.color: Colors.magenta
-                        GohuText {
-                            anchors.left: parent.left
-                            anchors.top: parent.top
-                            anchors.margins: 3
-                            text: String(dayCell.entry.date||"--")
-                                  +"  "+panel.reading(dayCell.entry.maxTempF,"°")
-                                  +" / "+panel.reading(dayCell.entry.minTempF,"°F")
-                            font.pixelSize: 9
-                            color: Colors.white
-                        }
-                        QuietText {
-                            anchors.left: parent.left
-                            anchors.top: parent.top
-                            anchors.topMargin: 15
-                            anchors.leftMargin: 3
-                            width: parent.width-6
-                            text: "SUN "+String(dayCell.entry.sunrise||"--")
-                                  +" → "+String(dayCell.entry.sunset||"--")
-                            font.pixelSize: 7
-                            elide: Text.ElideRight
-                        }
-                        Item {
-                            anchors.centerIn: parent
-                            width: 45
-                            height: 44
-                            Text {
-                                anchors.centerIn: parent
-                                text: dayCell.weatherState.icon
-                                font.pixelSize: 42
-                                color: panel.colorFor(dayCell.weatherState)
-                                visible: dayCell.artwork==="weather"
+                        Row {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            spacing: 3
+                            Item {
+                                width: 44
+                                height: parent.height
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: dayCell.weatherState.icon
+                                    font.pixelSize: 44
+                                    color: panel.colorFor(dayCell.weatherState)
+                                    visible: dayCell.artwork==="weather"
+                                }
+                                WeatherCelestialGlyph {
+                                    anchors.centerIn: parent
+                                    width: 44
+                                    height: width
+                                    mode: dayCell.artwork
+                                    solar: dayCell.solarCycle.solar
+                                    moonPhase: dayCell.solarCycle.moonPhase
+                                    ink: panel.colorFor(dayCell.weatherState)
+                                    visible: dayCell.artwork!=="weather"
+                                }
                             }
-                            WeatherCelestialGlyph {
-                                anchors.centerIn: parent
-                                width: 43
-                                height: 43
-                                mode: dayCell.artwork
-                                solar: dayCell.solarCycle.solar
-                                moonPhase: dayCell.solarCycle.moonPhase
-                                ink: panel.colorFor(dayCell.weatherState)
-                                visible: dayCell.artwork!=="weather"
-                            }
-                        }
-                        QuietText {
-                            anchors.bottom: parent.bottom
-                            anchors.left: parent.left
-                            anchors.leftMargin: 3
-                            anchors.bottomMargin: 7
-                            text: panel.rainLabel(dayCell.entry.chanceRain)
-                            font.pixelSize: 8
-                        }
-                        Rectangle {
-                            anchors.bottom: parent.bottom
-                            anchors.right: parent.right
-                            anchors.rightMargin: 3
-                            anchors.bottomMargin: 8
-                            width: 48
-                            height: 5
-                            color: Colors.black
-                            border.width: 1
-                            border.color: Colors.cyan
-                            Rectangle {
-                                x: 1
-                                y: 1
-                                height: Math.max(0,parent.height-2)
-                                width: (parent.width-2)
-                                       *panel.chanceRatio(dayCell.entry.chanceRain)
-                                color: Colors.orange
+                            Column {
+                                width: Math.max(1,parent.width-49)
+                                height: parent.height
+                                spacing: 1
+                                GohuText {
+                                    width: parent.width
+                                    height: 10
+                                    font.pixelSize: 9
+                                    elide: Text.ElideRight
+                                    text: String(dayCell.entry.date||"--").slice(5)
+                                          +"  "+panel.reading(dayCell.entry.maxTempF,"°")
+                                          +" / "+panel.reading(dayCell.entry.minTempF,"°F")
+                                    color: Colors.white
+                                }
+                                QuietText {
+                                    width: parent.width
+                                    height: 9
+                                    font.pixelSize: 7
+                                    elide: Text.ElideRight
+                                    text: "SUN "+String(dayCell.entry.sunrise||"--")
+                                          +" → "+String(dayCell.entry.sunset||"--")
+                                }
+                                Row {
+                                    width: parent.width
+                                    height: 8
+                                    spacing: 3
+                                    QuietText {
+                                        width: Math.min(44,parent.width*0.42)
+                                        height: parent.height
+                                        font.pixelSize: 8
+                                        text: panel.rainLabel(dayCell.entry.chanceRain)
+                                        color: Colors.cyan
+                                        elide: Text.ElideRight
+                                    }
+                                    Rectangle {
+                                        width: Math.max(1,parent.width-47)
+                                        height: 7
+                                        color: Colors.black
+                                        border.width: 1
+                                        border.color: Colors.cyan
+                                        Rectangle {
+                                            x: 1
+                                            y: 1
+                                            height: Math.max(0,parent.height-2)
+                                            width: Math.max(0,(parent.width-2)
+                                                   *panel.chanceRatio(dayCell.entry.chanceRain))
+                                            color: Colors.orange
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

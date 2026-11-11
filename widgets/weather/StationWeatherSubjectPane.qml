@@ -135,6 +135,8 @@ Rectangle {
             readonly property alias pageRail: instrumentRail
             readonly property alias combinedPanel: combinedDisplay
             readonly property alias solarVisual: solarChart
+            readonly property alias twilightGrid: twilightTimingGrid
+            readonly property alias solarGraphViewport: solarGraphArea
 
             Row {
                 id: instrumentRail
@@ -186,20 +188,11 @@ Rectangle {
                     weatherService: weatherPane.weatherService
                     runtimeNowMs: weatherPane.runtimeNowMs
                     visible: !skyHost.combined
-                        || skyHost.activeInstrument === "twilight"
-                    width: skyHost.combined ? 800 : instrumentViewport.width
-                    height: skyHost.combined ? 800 : instrumentViewport.height
-                    transformOrigin: Item.TopLeft
-                    scale: skyHost.combined
-                        ? Math.min(1,
-                            instrumentViewport.width/Math.max(1,width),
-                            twilightTextArea.height
-                                / Math.max(1,focusedContentHeight))
-                        : 1
-                    x: skyHost.combined
-                        ? Math.max(0,(instrumentViewport.width-width*scale)/2)
-                        : 0
-                    // TWILIGHT stays at the TOP, never vertically centered.
+                    width: instrumentViewport.width
+                    height: instrumentViewport.height
+                    // TWILIGHT stays at the TOP via the full-width grid below,
+                    // while the hidden SKY retains all original calculations.
+                    x: 0
                     y: 0
                 }
 
@@ -220,8 +213,15 @@ Rectangle {
                     anchors.top: parent.top
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    height: visible ? Math.max(90,
-                          instrumentViewport.height*0.50) : 0
+                    height: visible ? Math.max(104,
+                          instrumentViewport.height*0.38) : 0
+                    StationWeatherTwilightGrid {
+                        id: twilightTimingGrid
+                        objectName: "weather-w11-twilight-timing-grid"
+                        anchors.fill: parent
+                        visible: parent.visible
+                        sky: originalSky
+                    }
                 }
 
                 Item {
@@ -240,9 +240,10 @@ Rectangle {
                     StationCosmosVisualInstruments {
                         id: solarChart
                         objectName: "weather-w10-existing-solar-graph"
-                        width: 680
-                        height: 204
+                        width: solarGraphArea.width
+                        height: solarGraphArea.height
                         compactMode: true
+                        fullBleedSolar: true
                         showMoon: false
                         showSun: true
                         moonReady: false
@@ -258,12 +259,9 @@ Rectangle {
                             ? weatherPane.weatherService.latitude : ""
                         longitude: weatherPane.weatherService
                             ? weatherPane.weatherService.longitude : ""
-                        transformOrigin: Item.TopLeft
-                        scale: Math.min(1,
-                            solarGraphArea.width/Math.max(1,width),
-                            solarGraphArea.height/Math.max(1,height))
-                        x: Math.max(0,(solarGraphArea.width-width*scale)/2)
+                        x: 0
                         y: 0
+                        scale: 1
                     }
                 }
             }

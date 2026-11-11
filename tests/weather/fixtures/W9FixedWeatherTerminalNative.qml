@@ -3,8 +3,8 @@ import QtQuick.Window
 import Quickshell
 import "widgets/weather" as Weather
 
-// W10 // Disposable native test for 3-in-1 WEATHER and top-aligned TWILIGHT
-// with the reused solar curve. No live providers or desktop writes.
+// W11 // Disposable native test for enlarged current/hourly, compact daily,
+// and full-bleed solar TWILIGHT. No live providers or desktop writes.
 ShellRoot {
     id: root
     property int ticks: 0
@@ -14,7 +14,7 @@ ShellRoot {
     function fail(reason) {
         if(finished)return;
         finished=true;
-        console.error("W10_NATIVE_FAIL // "+reason);
+        console.error("W11_NATIVE_FAIL // "+reason);
         Qt.quit();
     }
     QtObject {
@@ -124,24 +124,51 @@ ShellRoot {
                     combined,0,combined.dailyItem.height).y;
                 if(dailyBottom>combined.height)
                     return root.fail("DAILY_OUT_OF_VIEW");
+                if(combined.currentItem.height<65
+                   || combined.hourlyItem.height<=combined.currentItem.height
+                   || combined.hourlyItem.height<95
+                   || combined.dailyItem.height>54)
+                    return root.fail("WEATHER_BAND_PROMINENCE // "
+                        +combined.currentItem.height+" / "
+                        +combined.hourlyItem.height+" / "
+                        +combined.dailyItem.height);
+                const firstHour=combined.hourRepeater.itemAt(0);
+                if(!firstHour || !firstHour.mainGlyph || !firstHour.rainMeter
+                   || firstHour.mainGlyph.font.pixelSize<48
+                   || firstHour.rainMeter.height<8)
+                    return root.fail("HOURLY_ARTWORK_OR_BAR_NOT_ENLARGED");
                 host.activeInstrument="twilight";
                 root.phase=1;
                 return;
             }
             if(root.phase===1) {
-                if(host.activeInstrument!=="twilight" || !sky.visible)
+                if(host.activeInstrument!=="twilight" || sky.visible)
                     return;
                 if(sky.weatherFocus!=="twilight")
                     return root.fail("TWILIGHT_ROUTE");
-                if(sky.y!==0)
-                    return root.fail("TWILIGHT_CENTERED_VERTICALLY");
-                const upper=host.viewport.height*0.50;
-                if(sky.focusedContentHeight*sky.scale > upper+2)
-                    return root.fail("TWILIGHT_TOP_OVERFLOW");
+                const grid=host.twilightGrid;
+                const graph=host.solarGraphViewport;
+                if(!grid || !graph || !grid.visible || !graph.visible
+                   || grid.x!==0 || grid.y!==0)
+                    return root.fail("TWILIGHT_FULL_GRID_MISSING");
+                if(Math.abs(grid.width-host.viewport.width)>1
+                   || Math.abs(graph.width-host.viewport.width)>1
+                   || Math.abs(solar.width-graph.width)>1
+                   || Math.abs(solar.height-graph.height)>1)
+                    return root.fail("TWILIGHT_INSET_GRAPH");
+                const graphBottom=graph.mapToItem(
+                    host.viewport,0,graph.height).y;
+                if(Math.abs(graphBottom-host.viewport.height)>2
+                   || Math.abs(graph.y-grid.height)>2)
+                    return root.fail("TWILIGHT_BANDS_NOT_FILLING // "
+                        +graphBottom+" / "+host.viewport.height);
                 if(!solar.showSun || solar.showMoon
-                   || solar.height*solar.scale>host.viewport.height-upper+2
-                   || solar.scale<=0)
-                    return root.fail("SOLAR_CURVE_NOT_FITTING");
+                   || !solar.fullBleedSolar || solar.scale!==1
+                   || solar.solarCanvasItem.width<graph.width*0.80
+                   || solar.solarCanvasItem.height<40)
+                    return root.fail("SOLAR_CURVE_NOT_FULL_BLEED // "
+                        +solar.solarCanvasItem.width+"x"
+                        +solar.solarCanvasItem.height);
                 host.activeInstrument="weather";
                 sampleWeather.forecastReady=false;
                 root.phase=2;
@@ -152,7 +179,7 @@ ShellRoot {
                    || combined.dailyRows.length!==0)
                     return root.fail("STALE_FORECAST_PRESENT");
                 root.finished=true;
-                console.log("W10_NATIVE_PASS // THREE_BANDS_PLUS_TOP_TWILIGHT_SOLAR_520X300");
+                console.log("W11_NATIVE_PASS // PROMINENT_WEATHER_AND_FULL_BLEED_TWILIGHT_520X300");
                 Qt.quit();
             }
         }

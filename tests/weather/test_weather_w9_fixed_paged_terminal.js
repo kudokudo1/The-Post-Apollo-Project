@@ -37,7 +37,7 @@ test("W10 preserves W9 fixed-no-scroll behavior in two focused screens",()=>{
  assert.match(pane,/StationCosmosVisualInstruments\s*\{/);
  assert.match(pane,/solarDate: originalSky\.astronomySummary\.date/);
  assert.match(pane,/solarCivilOffsetMinutes: originalSky\.moonCivilOffsetMinutes/);
- assert.match(pane,/twilightTextArea\.height/);
+ assert.match(pane,/StationWeatherTwilightGrid\s*\{/);
 });
 
 test("W9 only the unified WEATHER view paginates original sections",()=>{

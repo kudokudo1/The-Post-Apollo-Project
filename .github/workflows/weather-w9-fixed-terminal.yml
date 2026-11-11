@@ -31,6 +31,7 @@ on:
       - 'widgets/weather/StationCosmosVisualInstruments.qml'
       - 'tests/weather/fixtures/W9FixedWeatherTerminalNative.qml'
       - 'tests/weather/fixtures/W15FixedWeatherOverviewNative.qml'
+      - 'tests/weather/fixtures/W21MagickOverviewNative.qml'
       - '.github/workflows/weather-w9-fixed-terminal.yml'
   workflow_dispatch:
 permissions:
@@ -138,6 +139,33 @@ jobs:
           if grep -E 'W16_OVERVIEW_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi
+      - name: Native W21 MAGICK Overview long-rail navigation and layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(pwd)"
+          work="$(mktemp -d /tmp/weather-w21-magick.XXXXXXXX)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -m 700 "$work/home" "$work/runtime" "$work/cache" "$work/config"
+          mkdir -p "$work/config/widgets"
+          cp -a "$root/components" "$work/config/components"
+          cp -a "$root/widgets/weather" "$work/config/widgets/weather"
+          cp -a "$root/widgets/tasks" "$work/config/widgets/tasks"
+          cp -a "$root/services" "$work/config/services"
+          cp "$root/tests/weather/fixtures/W21MagickOverviewNative.qml" "$work/config/shell.qml"
+          rc=0
+          timeout --signal=TERM --kill-after=3s 40s \
+            env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
+            XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            quickshell --no-color -p "$work/config/shell.qml" \
+            > "$work/native.log" 2>&1 || rc=$?
+          cat "$work/native.log"
+          test "$rc" -eq 0
+          grep -F "W21_MAGICK_RAIL_NATIVE_PASS // FULL_WIDTH_ROUTE_AND_DIVIDER" "$work/native.log"
+          if grep -E 'W21_MAGICK_RAIL_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+            exit 1
+          fi
       - name: Upload optional native WEATHER visual preview
         if: always()
         uses: actions/upload-artifact@v4
@@ -154,6 +182,14 @@ jobs:
         with:
           name: weather-w14-compact-preview
           path: /tmp/weather-w14-compact-preview.png
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload native W21 MAGICK Overview screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-w21-magick-overview
+          path: /tmp/weather-w21-magick-overview.png
           if-no-files-found: warn
           retention-days: 14
       - name: Upload native W16 single-page overview previews

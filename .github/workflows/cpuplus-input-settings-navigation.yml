@@ -1,10 +1,14 @@
-name: CPU++ Input Settings Stage 0 Navigation
+name: CPU++ Input Settings Navigation and Keyboard Lock Startup
 
 on:
   pull_request:
     paths:
       - "widgets/CpuPlusW.qml"
+      - "widgets/cpuplus/CpuPlusSettingsKeyboardPane.qml"
+      - "services/input/**"
       - "tests/cpuplus/test_cpuplus_input_category_navigation.py"
+      - "tests/cpuplus/test_keyboard_lock_*.py"
+      - "tests/cpuplus/test_keyboard_lock_policy.cjs"
       - ".github/workflows/cpuplus-input-settings-navigation.yml"
   workflow_dispatch:
 
@@ -16,5 +20,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify settings category navigation without device writes
+      - name: Verify seven Settings routes and icon-only design
         run: python3 tests/cpuplus/test_cpuplus_input_category_navigation.py
+      - name: Verify keyboard startup UI and explicit confirmation
+        run: python3 tests/cpuplus/test_keyboard_lock_controls.py
+      - name: Verify isolated Sway file writer safety and reversibility
+        run: python3 tests/cpuplus/test_keyboard_lock_startup.py
+      - name: Verify saved keyboard policy format
+        run: node tests/cpuplus/test_keyboard_lock_policy.cjs

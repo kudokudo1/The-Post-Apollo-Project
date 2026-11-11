@@ -18,6 +18,7 @@ from urllib.parse import quote
 DB_NAME = "trashpp-archive-v2.sqlite3"
 STORE_SCHEMA = "post-apollo.trash-archive.v2a"
 PAGE_SIZE = 25
+MAX_QUERY_LENGTH = 80
 MAX_DIRECTORY_ARG = 4096
 CURSOR = re.compile(r"^([1-9][0-9]{0,12}):([0-9a-f]{32})$")
 HEX_ID = re.compile(r"^[0-9a-f]{32}$")
@@ -76,11 +77,17 @@ def _cursor(value):
     return int(match.group(1)), match.group(2)
 
 
-def _response(items, count, next_cursor=None, state="READY"):
+def _query(value):
+    _require(isinstance(value, str) and len(value) <= MAX_QUERY_LENGTH
+             and all(c.isprintable() for c in value), "INVALID_SEARCH_QUERY")
+    return value.strip()
+
+
+def _response(items, count, next_cursor=None, state="READY", query=""):
     return {"ok": True, "kind": "archive-v2-index", "readOnly": True,
             "schema": STORE_SCHEMA, "state": state, "total": count,
             "items": items, "hasMore": next_cursor is not None,
-            "nextCursor": next_cursor, "pageSize": PAGE_SIZE}
+            "nextCursor": next_cursor, "pageSize": PAGE_SIZE, "query": query}
 
 
 def _row(raw):
@@ -114,12 +121,13 @@ def _row(raw):
                              "restore": False, "burn": False}}
 
 
-def index(directory, cursor=""):
+def index(directory, cursor="", query=""):
     page_after = _cursor(cursor)
+    needle = _query(query)
     root = _dir(directory)
     database = root / DB_NAME
     if not _private_regular(database):
-        return _response([], 0, state="NOT_INSTALLED")
+        return _response([], 0, state="NOT_INSTALLED", query=needle)
     # V2a deliberately uses DELETE rollback journals, not WAL. Refuse any
     # unexpected sidecar before SQLite opens the database.
     for suffix in ("-wal", "-shm"):
@@ -136,14 +144,35 @@ def index(directory, cursor=""):
         with sqlite3.connect(uri, uri=True, timeout=1) as db:
             db.execute("PRAGMA query_only=ON")
             db.execute("PRAGMA busy_timeout=1000")
+            # Pin the count and page to one read transaction. A source
+            # insertion between queries must not fabricate a stale total.
+            db.execute("BEGIN")
             meta = db.execute("SELECT schema_id FROM archive_meta WHERE id=1").fetchone()
             _require(meta == (STORE_SCHEMA,), "ARCHIVE_SCHEMA_UNSUPPORTED")
-            total = db.execute("SELECT count(*) FROM snapshots").fetchone()[0]
-            where = "WHERE (captured_ms,id) < (?,?)" if page_after else ""
-            params = (*page_after, PAGE_SIZE + 1) if page_after else (PAGE_SIZE + 1,)
+            # Literal substring matching via parameter binding. Unlike LIKE,
+            # '%' and '_' remain literal characters. SQLite's built-in lower()
+            # is ASCII-case-insensitive; non-ASCII case folding is not promised.
+            search_clause = (
+                "(instr(lower(display_label), ?) > 0 "
+                "OR instr(lower(resource_id), ?) > 0 "
+                "OR instr(lower(owner_id), ?) > 0)"
+            )
+            search_params = (needle.lower(),) * 3
+            filters = [search_clause] if needle else []
+            if page_after:
+                filters.append("(captured_ms,id) < (?,?)")
+            where = " WHERE " + " AND ".join(filters) if filters else ""
+            count_where = " WHERE " + search_clause if needle else ""
+            total = db.execute(
+                "SELECT count(*) FROM snapshots" + count_where,
+                search_params if needle else ()
+            ).fetchone()[0]
+            params = ((search_params if needle else ())
+                      + (page_after if page_after else ())
+                      + (PAGE_SIZE + 1,))
             records = db.execute(
                 "SELECT id,owner_id,resource_id,source_revision,captured_ms,"
-                "display_label,sha256,length(payload) FROM snapshots "
+                "display_label,sha256,length(payload) FROM snapshots"
                 + where + " ORDER BY captured_ms DESC,id DESC LIMIT ?",
                 params
             ).fetchall()
@@ -158,16 +187,17 @@ def index(directory, cursor=""):
             last = selected[-1] if has_more else None
             next_cursor = (str(last["recordedAtMs"]) + ":" + last["id"]
                            if last else None)
-            return _response(selected, total, next_cursor)
+            return _response(selected, total, next_cursor, query=needle)
     except sqlite3.Error as exc:
         raise ReadIndexError("ARCHIVE_INDEX_UNAVAILABLE") from exc
 
 
 def main(argv):
     try:
-        if len(argv) not in (3, 4) or argv[1] != "index":
+        if len(argv) not in (3, 4, 5) or argv[1] != "index":
             raise ReadIndexError("READ_ONLY_INDEX_ONLY")
-        result = index(argv[2], argv[3] if len(argv) == 4 else "")
+        result = index(argv[2], argv[3] if len(argv) >= 4 else "",
+                       argv[4] if len(argv) == 5 else "")
     except ReadIndexError as exc:
         result = {"ok": False, "error": str(exc)}
     except Exception:

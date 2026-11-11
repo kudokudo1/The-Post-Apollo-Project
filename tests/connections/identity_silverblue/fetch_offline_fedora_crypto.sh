@@ -53,6 +53,7 @@ install -m 0644 "$key" /out/identity-fedora44-runtime-public.asc
   sha256sum identity-python3-cryptography-f44.rpm \
     identity-fedora44-runtime-public.asc > identity-fedora44-runtime-manifest.sha256
 )
+chmod 0644 /out/identity-fedora44-runtime-manifest.sha256
 [[ "$(find /out -maxdepth 1 -type f | wc -l)" == 3 ]] ||
   { echo "C4B_ID_BLOCKED // FEDORA_RUNTIME_OUTPUT_ROSTER_UNEXPECTED"; exit 2; }
 echo "C4B_ID_PASS // OFFICIAL_FEDORA44_ED25519_RUNTIME_RPM_INDEPENDENTLY_SIGNED_AND_PINNED"

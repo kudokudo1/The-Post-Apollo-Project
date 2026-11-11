@@ -204,7 +204,8 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
          silence_ms: int = 2200, min_speech_ms: int = 250,
          pilot_one_chunk: bool = False,
          pilot_live_chunks: int = 0, prefer_persistent: bool = False,
-         speech_pause_ms: int = 0, decoder_trial: str = "standard") -> int:
+         speech_pause_ms: int = 0, decoder_trial: str = "standard",
+         responsive_partial_trial: bool = False) -> int:
     if decoder_trial not in ("standard", "fast"):
         print(packet("error", detail="INVALID DECODER TRIAL"), flush=True)
         return 2
@@ -212,6 +213,12 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
     # persistent private AF_UNIX server. Legacy CLI keeps original settings.
     fast_trial = (decoder_trial == "fast" and prefer_persistent
                   and pilot_live_chunks > 0 and not pilot_one_chunk)
+    # Independent cadence trial, mutually exclusive with fast decoding and
+    # limited to the already-guarded persistent 2-second-chunk pilot.
+    responsive_trial = (responsive_partial_trial
+                        and decoder_trial == "standard" and prefer_persistent
+                        and pilot_live_chunks > 0 and not pilot_one_chunk
+                        and max(2, min(4, chunk_seconds)) == 2)
     if not Path(stt_helper).is_file():
         print(packet("error", detail="LOCAL WHISPER HELPER UNAVAILABLE"),
               flush=True)
@@ -361,6 +368,10 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
         accepted_chunks = 0
         backpressure_reported = False
         quiet_run_ms = 0
+        responsive_used = False
+        # Repay one short window in a later chunk: 1.2s + 2.8s instead
+        # of 2s + 2s, preserving total six-job audio coverage.
+        responsive_catchup_bytes = 0
         # A pause triggers early submission only if the same guarded model
         # is already ready and at least 1.2s of audio is accumulated. The
         # legacy CLI path and first 1.4s chunk retain their normal cadence.
@@ -450,7 +461,8 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                                     if quiet_pcm_frame(data) else 0)
                 else:
                     quiet_run_ms = 0
-                next_size = target if first_chunk_sent else first_target
+                next_size = (target + responsive_catchup_bytes
+                             if first_chunk_sent else first_target)
                 full_chunk = len(pending) >= next_size
                 pause_chunk = (not full_chunk and first_chunk_sent
                                and persistent_model_ready.is_set()
@@ -459,14 +471,32 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                                and clips.empty()
                                and len(pending) >= PAUSE_MIN_BYTES
                                and quiet_run_ms >= pause_gap_ms)
-                if full_chunk or pause_chunk:
-                    take_size = next_size if full_chunk else len(pending)
+                # One optional early follow-up only when the existing model
+                # is ready and idle and its queue has no prior work.
+                responsive_chunk = (not full_chunk and not pause_chunk
+                                    and first_chunk_sent and responsive_trial
+                                    and not responsive_used
+                                    and not responsive_catchup_bytes
+                                    and persistent_model_ready.is_set()
+                                    and recognition_idle.is_set()
+                                    and clips.empty()
+                                    and len(pending) >= PAUSE_MIN_BYTES)
+                if full_chunk or pause_chunk or responsive_chunk:
+                    take_size = (next_size if full_chunk else
+                                 PAUSE_MIN_BYTES if responsive_chunk else len(pending))
                     sent = enqueue(bytes(pending[:take_size]))
                     del pending[:take_size]
                     first_chunk_sent = first_chunk_sent or sent
                     quiet_run_ms = 0
                     if pause_chunk and sent:
                         send("stage", detail="PAUSE_CHUNK_READY")
+                    if responsive_chunk and sent:
+                        responsive_used = True
+                        responsive_catchup_bytes = target - PAUSE_MIN_BYTES
+                        send("stage", detail="RESPONSIVE_CHUNK_READY")
+                    elif full_chunk and sent and responsive_catchup_bytes:
+                        responsive_catchup_bytes = 0
+                        send("stage", detail="RESPONSIVE_CATCHUP_CHUNK")
                     if (pilot_one_chunk and sent) or (
                             live_chunk_ceiling
                             and accepted_chunks >= live_chunk_ceiling):
@@ -521,6 +551,8 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
         previous_chunk_ended_quietly = False
         if decoder_trial == "fast" and not fast_trial:
             send("stage", detail="DECODER_FAST_FALLBACK")
+        if responsive_partial_trial and not responsive_trial:
+            send("stage", detail="RESPONSIVE_TRIAL_FALLBACK")
         def start_persistent_once(*, early: bool = False):
             nonlocal session, attempted_session
             if attempted_session or cancelled.is_set() or not prefer_persistent:
@@ -533,6 +565,8 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 send("stage", detail="MODEL_SESSION_UNAVAILABLE")
                 if fast_trial:
                     send("stage", detail="DECODER_FAST_FALLBACK")
+                if responsive_trial:
+                    send("stage", detail="RESPONSIVE_TRIAL_FALLBACK")
                 return
             if early:
                 send("stage", detail="MODEL_EARLY_START")
@@ -548,12 +582,16 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 send("stage", detail="MODEL_SESSION_READY")
                 if fast_trial:
                     send("stage", detail="DECODER_FAST_ACTIVE")
+                if responsive_trial:
+                    send("stage", detail="RESPONSIVE_TRIAL_ACTIVE")
             except (OSError, ValueError, RuntimeError,
                     subprocess.SubprocessError):
                 candidate.close()
                 send("stage", detail="MODEL_SESSION_UNAVAILABLE")
                 if fast_trial:
                     send("stage", detail="DECODER_FAST_FALLBACK")
+                if responsive_trial:
+                    send("stage", detail="RESPONSIVE_TRIAL_FALLBACK")
 
         try:
             while not cancelled.is_set():
@@ -671,6 +709,8 @@ def main():
     parser.add_argument("--decoder-trial", choices=("standard", "fast"),
                         default="standard",
                         help="opt-in single-candidate greedy A/B trial; standard is default")
+    parser.add_argument("--responsive-partial-trial", action="store_true",
+                        help="opt in to one idle 1.2s follow-up with later 2.8s catchup")
     parser.add_argument("--vad", action="store_true")
     parser.add_argument("--threshold", type=int, default=600)
     parser.add_argument("--silence-ms", type=int, default=2200)
@@ -683,7 +723,8 @@ def main():
                 pilot_live_chunks=args.pilot_live_chunks,
                 prefer_persistent=args.prefer_persistent,
                 speech_pause_ms=args.speech_pause_ms,
-                decoder_trial=args.decoder_trial)
+                decoder_trial=args.decoder_trial,
+                responsive_partial_trial=args.responsive_partial_trial)
 
 
 if __name__ == "__main__":

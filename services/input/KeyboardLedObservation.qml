@@ -148,6 +148,13 @@ Scope {
     function receiveSample(raw) {
         sampleReturned = true;
         nowMs = Date.now();
+        const previousSampleAtMs = lastSampleAtMs;
+        if (previousSampleAtMs > 0
+                && nowMs - previousSampleAtMs > 6000) {
+            // A gap means we did not witness the intervening key changes.
+            witnessNum = "unknown";
+            witnessCaps = "unknown";
+        }
         let reply;
         try { reply = JSON.parse(String(raw)); }
         catch (_) {
@@ -175,6 +182,7 @@ Scope {
         } else {
             candidateNum = "unknown";
             stableNum = 0;
+            witnessNum = "unknown";
         }
         if (caps.status === "observed") {
             stableCaps = candidateCaps === caps.value
@@ -183,6 +191,7 @@ Scope {
         } else {
             candidateCaps = "unknown";
             stableCaps = 0;
+            witnessCaps = "unknown";
         }
         if (stableNum >= 2) {
             recordStable("num", candidateNum, nowMs);

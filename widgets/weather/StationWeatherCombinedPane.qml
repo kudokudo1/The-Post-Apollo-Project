@@ -266,6 +266,8 @@ Rectangle {
                     delegate: Rectangle {
                         id: hourCell
                         required property int index
+                        readonly property alias mainGlyph: hourlyWeatherGlyph
+                        readonly property alias rainMeter: hourlyRainMeter
                         readonly property var entry: panel.hourlyRows[index] || ({})
                         readonly property var weatherState: panel.state(entry)
                         readonly property var solarCycle:
@@ -293,6 +295,7 @@ Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                             Text {
                                 anchors.centerIn: parent
+                                id: hourlyWeatherGlyph
                                 text: hourCell.weatherState.icon
                                 font.pixelSize: Math.max(34,Math.min(56,parent.height-2))
                                 color: panel.colorFor(hourCell.weatherState)
@@ -321,6 +324,7 @@ Rectangle {
                             color: Colors.cyan
                         }
                         Rectangle {
+                            id: hourlyRainMeter
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
@@ -376,7 +380,7 @@ Rectangle {
             Row {
                 id: dayCards
                 anchors.top: parent.top
-                anchors.topMargin: 12
+                anchors.topMargin: 16
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
@@ -404,18 +408,18 @@ Rectangle {
                             anchors.margins: 2
                             spacing: 3
                             Item {
-                                width: Math.max(24,Math.min(34,parent.height))
+                                width: 44
                                 height: parent.height
                                 Text {
                                     anchors.centerIn: parent
                                     text: dayCell.weatherState.icon
-                                    font.pixelSize: Math.max(24,Math.min(34,parent.height))
+                                    font.pixelSize: 44
                                     color: panel.colorFor(dayCell.weatherState)
                                     visible: dayCell.artwork==="weather"
                                 }
                                 WeatherCelestialGlyph {
                                     anchors.centerIn: parent
-                                    width: Math.max(23,Math.min(34,parent.height))
+                                    width: 44
                                     height: width
                                     mode: dayCell.artwork
                                     solar: dayCell.solarCycle.solar
@@ -425,7 +429,7 @@ Rectangle {
                                 }
                             }
                             Column {
-                                width: Math.max(1,parent.width-39)
+                                width: Math.max(1,parent.width-49)
                                 height: parent.height
                                 spacing: 1
                                 GohuText {

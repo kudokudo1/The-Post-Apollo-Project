@@ -236,6 +236,31 @@ check('send("stage", detail="CAPTURE_STOPPED")' in script
       and 'voiceState = "transcribing";' in live,
       "Auto-closed mic is visible as processing while buffered partials continue")
 
+# Quality backend is opt-in from HospitalW, private and child-resource-limited.
+session = (root / "scripts/hospital_whisper_session.py").read_text()
+check('preferPersistentModel: true' in host
+      and 'property bool preferPersistentModel: false' in live
+      and 'command.push("--prefer-persistent")' in live
+      and 'MODEL_SESSION_READY' in live
+      and 'MODEL_SESSION_UNAVAILABLE' in live
+      and 'prefer_persistent=args.prefer_persistent' in script,
+      "Persistent session is optional, with stage-only availability reporting")
+check('socket.AF_UNIX' in session
+      and 'MAX_RESPONSE_BYTES = 65536' in session
+      and 'start_new_session=True' in session
+      and 'MODEL_GUARD), "--session"' in session
+      and 'MAX_SESSION_CPU_SECONDS = 48' in sandbox
+      and 'MAX_VIRTUAL_BYTES = 3 * 1024 * 1024 * 1024' in sandbox
+      and 'exec "$server" -m "$model" --host "$socket_path"' in stt
+      and '-ng -t 2 -p 1' in stt,
+      "One private local CPU-only guarded model is reused, never a TCP listener")
+check('OVERLAP_BYTES = RATE * FRAME_BYTES * 3 // 4' in script
+      and 'trim_repeated_prefix(' in script
+      and 'session.transcribe(previous_pcm_tail + chunk,' in script
+      and 'prompt=previous_text[-160:]' in script
+      and 'phrase = transcribe_chunk(stt_helper, chunk' in script,
+      "Bounded overlapping windows and de-duplication preserve guarded CLI fallback")
+
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")
     for issue in issues: print(" - " + issue)

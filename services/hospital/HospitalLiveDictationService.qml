@@ -19,6 +19,9 @@ Scope {
     // Off by default: only the owning Hospital menu opts into a bounded
     // multi-chunk trial, never unguarded continuous transcription.
     property int pilotLiveChunks: 0
+    // Optional, fail-closed private Unix socket model reuse. No network port.
+    // HospitalW opts in; old Quickshell and CLI installs retain fallback.
+    property bool preferPersistentModel: false
     property string lastError: ""
     property string lastTranscript: ""
     // Short lifecycle code only, never spoken words or audio. A few stage
@@ -100,6 +103,8 @@ Scope {
             command.push("--pilot-one-chunk");
         else if (pilotLiveChunks > 0)
             command.push("--pilot-live-chunks", String(Math.max(1, Math.min(8, pilotLiveChunks))));
+        if (preferPersistentModel && pilotLiveChunks > 0)
+            command.push("--prefer-persistent");
         if (vadActive) {
             command.push("--vad", "--threshold", String(vadSpeechThreshold),
                 "--silence-ms", String(vadSilenceMs),
@@ -152,7 +157,7 @@ Scope {
             // Python emits fixed low-cardinality lifecycle codes. The
             // allowlist prevents untrusted child output reaching the journal.
             const code = String(data.detail || "");
-            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|MODEL_BACKPRESSURE|CAPTURE_STOPPED|RECORDING_COMPLETED)$/.test(code))
+            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|MODEL_BACKPRESSURE|CAPTURE_STOPPED|MODEL_SESSION_STARTING|MODEL_SESSION_READY|MODEL_SESSION_UNAVAILABLE|RECORDING_COMPLETED)$/.test(code))
                 return;
             if (lastStage !== code) {
                 lastStage = code;

@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Compile Python and test owner collisions, fencing and durable claim ledger
         run: |
           python3 -I -B -c 'import ast,pathlib; ast.parse(pathlib.Path("services/time/AlarmOwnershipGate.py").read_text())'

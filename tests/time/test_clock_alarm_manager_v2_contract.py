@@ -142,6 +142,8 @@ class AlarmManagerV2Contracts(unittest.TestCase):
         self.assertLess(row.index('id: noteAlarm'), row.index('id: deleteAlarm'))
         self.assertIn('onLeftClicked: AlarmManagerService.toggleFavorite(', row)
         self.assertIn('onLeftClicked: pane.openNote(entry.rowAlarm.id)', row)
+        self.assertIn('if (id !== selectedId && !choose(id)) return;', PANE)
+        self.assertIn('if (choose(rows[idx].id))', PANE)
         self.assertIn('onLeftClicked: pane.removeById(entry.rowAlarm.id)', row)
         self.assertIn('pane.deleteConfirmId === entry.rowAlarm.id', row)
         self.assertIn('CONFIRM DELETE // PRESS RED X AGAIN', PANE)

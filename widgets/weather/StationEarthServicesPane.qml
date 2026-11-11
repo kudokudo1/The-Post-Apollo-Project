@@ -16,6 +16,25 @@ Rectangle {
     property string viewMode: "runtime"
     property string selectedSourceId: ""
 
+    // E2 inspector compatibility: these report the existing source snapshot,
+    // and the canonical list remains the only visual row renderer.
+    readonly property int readyCount: runtimeRows.filter(function(row) {
+        return row && row.ready === true;
+    }).length
+    readonly property var selectedSource: {
+        const rows=Array.isArray(runtimeRows) ? runtimeRows : [];
+        for(let i=0;i<rows.length;i++)
+            if(rows[i].id===selectedSourceId) return rows[i];
+        return rows.length ? rows[0] : null;
+    }
+    readonly property alias dashboard: earthServicesConsole
+    onViewModeChanged: {
+        if (earthServicesConsole) {
+            if (viewMode === "sources") earthServicesConsole.focusDirectory();
+            else earthServicesConsole.focusRuntime();
+        }
+    }
+
     readonly property var sourceDirectory: {
         const items = [];
         const rows = Array.isArray(sourceRows) ? sourceRows : [];

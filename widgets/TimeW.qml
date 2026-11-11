@@ -4522,31 +4522,11 @@ PanelWindow {
                         }
                     }
 
-                    Column {
+                    AlarmPane {
                         id: alarmPlaceholderPane
                         visible: timew.selectedMode === "tools"
                                  && timew.toolsView === "alarm"
                         width: parent.width
-                        spacing: 12
-                        GohuText {
-                            width: parent.width
-                            text: "ALARM // PLANNED"
-                            color: Colors.cyan
-                            font.pixelSize: 14
-                        }
-                        GohuText {
-                            width: parent.width
-                            text: "ALARM CONTROLS // NOT IMPLEMENTED"
-                            color: Colors.white
-                            font.pixelSize: 11
-                        }
-                        GohuText {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            text: "Navigation placeholder only. No alarm scheduling, notifications, timers or host actions run here."
-                            color: Colors.orange
-                            font.pixelSize: 10
-                        }
                     }
 
                     Column {

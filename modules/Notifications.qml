@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import "../components"
 import qs.services.notifications
+import qs.services.time
 import "../services/notifications/NotificationFacets.js" as NotificationFacets
 import "../services/notifications/BrowserSiteIdentity.js" as BrowserSiteIdentity
 import "../services/notifications/NotificationPopupInteraction.js" as PopupInteraction
@@ -240,6 +241,15 @@ PanelWindow {
                 // originating native notification remains callable.
                 readonly property var externalActions: NotificationsService.externalActionsRevision >= 0
                     ? NotificationsService.externalActionsFor(notificationCard.notificationId) : []
+                // Transient STOP/SNOOZE controls require a current, exact
+                // Clock alarm ring; never persist callable action metadata.
+                readonly property var clockAlarmActions:
+                    AlarmManagerService.nowMs > 0
+                    && NotificationsService.notificationsRevision >= 0
+                    ? ClockAlarmNotificationActions.optionsFor(notificationCard.notificationId)
+                    : []
+                readonly property var popupActions:
+                    clockAlarmActions.length > 0 ? clockAlarmActions : externalActions
 
                 anchors.fill: parent
 
@@ -430,9 +440,8 @@ PanelWindow {
                     }
                 }
 
-                // Native notification actions. Unlike historical metadata,
-                // these are forwarded to the original sender using the live
-                // QsNotification action objects held ONLY in the service.
+                // Native sender actions or current Clock alarm controls.
+                // Never reconstruct callable actions from saved history.
                 Row {
                     id: externalActionRow
                     anchors {
@@ -442,11 +451,11 @@ PanelWindow {
                     anchors.bottomMargin: 9
                     anchors.rightMargin: 13
                     spacing: 6
-                    visible: notificationCard.externalActions.length > 0
+                    visible: notificationCard.popupActions.length > 0
                     z: 3
 
                     Repeater {
-                        model: notificationCard.externalActions
+                        model: notificationCard.popupActions
                         delegate: Rectangle {
                             id: nativeActionButton
                             required property var modelData
@@ -478,6 +487,14 @@ PanelWindow {
                                 onClicked: {
                                     const identifier = String(nativeActionButton.modelData.identifier || "");
                                     const label = String(nativeActionButton.modelData.label || "");
+                                    if (notificationCard.clockAlarmActions.length > 0) {
+                                        // Direct one-click action on the exact
+                                        // live occurrence, never an old alert.
+                                        notificationCard.clearOpenIntent();
+                                        ClockAlarmNotificationActions.dispatch(
+                                            notificationCard.notificationId, identifier);
+                                        return;
+                                    }
                                     if (PopupInteraction.opensDestination(identifier, label)) {
                                         const intent = identifier === "default"
                                             ? "destination" : "native:" + identifier;

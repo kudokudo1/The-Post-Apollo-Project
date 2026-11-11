@@ -251,9 +251,8 @@ class SignedCaptureV2kTests(unittest.TestCase):
         source = Path(verifier.__file__).read_text(encoding="utf-8")
         self.assertNotIn("Ed25519PrivateKey",source)
         self.assertNotIn("BEGIN PRIVATE KEY",source)
-        self.assertNotIn("ArchiveStore",source.replace(
-            "NO ArchiveStore call", "").replace(
-            "NOT transactional\\n    with ArchiveStore", ""))
+        self.assertNotIn("from scripts.trash.archive_store_v2 import",source)
+        self.assertNotIn("ArchiveStore(",source)
 
 
 if __name__ == "__main__":

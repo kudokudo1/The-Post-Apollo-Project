@@ -328,6 +328,25 @@ check('clips = queue.Queue(maxsize=MAX_QUEUE)' in script
       and 'interval: root.pilotLiveChunks > 0 ? 45000 : 20000' in live,
       "Startup overlap changes no CPU/RAM caps, queue depth, model count or watchdog")
 
+check('PAUSE_MIN_BYTES = RATE * FRAME_BYTES * 6 // 5' in script
+      and 'def quiet_pcm_frame(pcm: bytes' in script
+      and 'persistent_model_ready = threading.Event()' in script
+      and 'persistent_model_ready.set()' in script
+      and 'quiet_run_ms >= pause_gap_ms' in script
+      and 'not full_chunk and first_chunk_sent' in script
+      and 'speech_pause_ms: int = 0' in script
+      and 'send("stage", detail="PAUSE_CHUNK_READY")' in script,
+      "Only already-loaded persistent Whisper uses short natural pause chunks")
+check('property int speechPauseMs: 0' in live
+      and 'speechPauseMs: 450' in host
+      and 'command.push("--speech-pause-ms"' in live
+      and 'PAUSE_CHUNK_READY' in live
+      and 'if (preferPersistentModel && pilotLiveChunks > 0)' in live
+      and 'pilotLiveChunks: 6' in host
+      and 'chunkSeconds: 2' in host
+      and 'firstChunkMs: 1400' in host,
+      "Pause-aware partials opt in only from guarded Hospital owner, max cadence unchanged")
+
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")
     for issue in issues: print(" - " + issue)

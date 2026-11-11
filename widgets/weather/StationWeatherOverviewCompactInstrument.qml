@@ -29,6 +29,7 @@ Rectangle {
     readonly property string currentArt: currentReady
         ? WeatherCyclePolicy.artworkFor(currentState,observationCycle) : "weather"
     readonly property alias mainGlyph: currentIcon
+    readonly property alias currentStrip: nowBand
     readonly property alias currentMeters: metricsRepeater
     readonly property alias hourRepeater: hourRepeater
     readonly property alias dayRepeater: dayRepeater

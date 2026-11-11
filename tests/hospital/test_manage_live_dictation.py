@@ -49,6 +49,194 @@ def next_json_packet(process, selector, pending: bytearray, *, timeout: float):
 
 
 class LiveDictationTests(unittest.TestCase):
+    def test_bounded_incremental_multiple_partials_before_stop(self):
+        # The microphone MUST remain active while successive guarded model
+        # chunks deliver text. No real audio device or Whisper is used.
+        with tempfile.TemporaryDirectory(prefix="hospital-incremental-") as folder:
+            root = Path(folder)
+            fakebin = root / "bin"
+            fakebin.mkdir()
+            recorder = fakebin / "pw-record"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys,time\n"
+                "speech=(1500).to_bytes(2,'little',signed=True)\n"
+                "for _ in range(100):\n"
+                " sys.stdout.buffer.write(speech*1600)\n"
+                " sys.stdout.buffer.flush()\n"
+                " time.sleep(0.035)\n"
+                "time.sleep(10)\n"
+            )
+            recorder.chmod(0o700)
+            count = root / "model-calls"
+            helper = root / "whisper.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                'if [[ "$1" == "--check" ]]; then exit 0; fi\n'
+                'printf "run\\n" >> "$HOSPITAL_MODEL_CALLS"\n'
+                'printf "Incremental phrase.\\n"\n'
+            )
+            helper.chmod(0o700)
+            env = dict(os.environ,
+                       PATH=str(fakebin) + ":" + os.environ["PATH"],
+                       HOSPITAL_MODEL_CALLS=str(count))
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), str(helper),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-live-chunks", "6"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+            selector = selectors.DefaultSelector()
+            pending = bytearray()
+            try:
+                selector.register(process.stdout, selectors.EVENT_READ)
+                chunks = []
+                stages = []
+                deadline = time.monotonic() + 9
+                while time.monotonic() < deadline and len(chunks) < 2:
+                    event = next_json_packet(process, selector, pending,
+                                             timeout=0.3)
+                    if event is None:
+                        continue
+                    if event["kind"] == "stage":
+                        stages.append(event["detail"])
+                    elif event["kind"] == "partial":
+                        chunks.append(event["text"])
+                        self.assertIsNone(process.poll(),
+                                          "Live text must arrive BEFORE STOP")
+                    elif event["kind"] == "error":
+                        self.fail(str(event))
+                self.assertEqual(chunks,
+                                 ["Incremental phrase.", "Incremental phrase."])
+                self.assertIn("FIRST_TEXT_READY", stages)
+                self.assertNotIn("CAPTURE_STOPPED", stages,
+                                 "Second phrase must arrive with mic still open")
+                process.stdin.write("STOP\n")
+                process.stdin.flush()
+                process.stdin.close()
+                process.wait(timeout=12)
+                self.assertEqual(process.returncode, 0)
+                self.assertGreaterEqual(len(count.read_text().splitlines()), 2)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=3)
+                selector.close()
+
+    def test_slow_whisper_does_not_force_stop_before_first_partial(self):
+        # In the bounded trial, queue overflow reports lost audio instead of
+        # turning a slow local model into hidden stop-then-transcribe behavior.
+        with tempfile.TemporaryDirectory(prefix="hospital-stream-lag-") as folder:
+            root = Path(folder)
+            fakebin = root / "bin"
+            fakebin.mkdir()
+            recorder = fakebin / "pw-record"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys,time\n"
+                "speech=(1500).to_bytes(2,'little',signed=True)\n"
+                "for _ in range(120):\n"
+                " sys.stdout.buffer.write(speech*1600)\n"
+                " sys.stdout.buffer.flush()\n"
+                " time.sleep(0.002)\n"
+                "time.sleep(10)\n"
+            )
+            recorder.chmod(0o700)
+            helper = root / "whisper.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                'if [[ "$1" == "--check" ]]; then exit 0; fi\n'
+                "sleep 0.8\n"
+                'printf "Slow but live.\\n"\n'
+            )
+            helper.chmod(0o700)
+            env = dict(os.environ, PATH=str(fakebin) + ":" + os.environ["PATH"])
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), str(helper),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-live-chunks", "6"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+            selector = selectors.DefaultSelector()
+            pending = bytearray()
+            try:
+                selector.register(process.stdout, selectors.EVENT_READ)
+                seen = set()
+                first_text = False
+                deadline = time.monotonic() + 9
+                while time.monotonic() < deadline and not (
+                        first_text and "MODEL_BACKPRESSURE" in seen):
+                    event = next_json_packet(process, selector, pending,
+                                             timeout=0.3)
+                    if event is None:
+                        continue
+                    if event["kind"] == "stage":
+                        seen.add(event["detail"])
+                    elif event["kind"] == "partial":
+                        self.assertEqual(event["text"], "Slow but live.")
+                        first_text = True
+                        self.assertIsNone(process.poll())
+                    elif event["kind"] == "error":
+                        self.fail(str(event))
+                self.assertTrue(first_text, "No early phrase despite queued speech")
+                self.assertIn("MODEL_BACKPRESSURE", seen)
+                self.assertNotIn("CAPTURE_STOPPED", seen,
+                                 "Queue lag must not secretly stop the mic")
+                process.stdin.write("STOP\n")
+                process.stdin.flush()
+                process.stdin.close()
+                process.wait(timeout=12)
+                self.assertEqual(process.returncode, 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=3)
+                selector.close()
+
+    def test_bounded_live_autostops_after_six_model_chunks(self):
+        with tempfile.TemporaryDirectory(prefix="hospital-stream-cap-") as folder:
+            root = Path(folder)
+            fakebin = root / "bin"
+            fakebin.mkdir()
+            recorder = fakebin / "pw-record"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys,time\n"
+                "speech=(1600).to_bytes(2,'little',signed=True)\n"
+                "for _ in range(150):\n"
+                " sys.stdout.buffer.write(speech*1600)\n"
+                " sys.stdout.buffer.flush()\n"
+                " time.sleep(0.035)\n"
+                "time.sleep(10)\n"
+            )
+            recorder.chmod(0o700)
+            counter = root / "model-calls"
+            helper = root / "whisper.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                'if [[ "$1" == "--check" ]]; then exit 0; fi\n'
+                'printf "run\\n" >> "$HOSPITAL_MODEL_CALLS"\n'
+                'printf "Guarded chunk.\\n"\n'
+            )
+            helper.chmod(0o700)
+            env = dict(os.environ,
+                       PATH=str(fakebin) + ":" + os.environ["PATH"],
+                       HOSPITAL_MODEL_CALLS=str(counter))
+            run = subprocess.run(
+                [sys.executable, str(SCRIPT), str(helper),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-live-chunks", "6"],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                env=env, timeout=12)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            rows = [json.loads(line) for line in run.stdout.splitlines()]
+            stages = [p["detail"] for p in rows if p["kind"] == "stage"]
+            self.assertIn("CAPTURE_STOPPED", stages)
+            self.assertIn("RECORDING_COMPLETED", stages)
+            self.assertEqual(sum(p["kind"] == "partial" for p in rows), 6)
+            self.assertEqual(counter.read_text().splitlines(), ["run"] * 6,
+                             "No model launch beyond six permitted chunks")
+
     def test_pilot_live_one_chunk_and_no_second_whisper_launch(self):
         # The authorized live trial is simulated with fake pw-record + model.
         # No host mic, actual Whisper, auth credentials or desktop processes.

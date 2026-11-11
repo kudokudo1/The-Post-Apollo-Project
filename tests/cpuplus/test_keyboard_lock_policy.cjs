@@ -11,9 +11,9 @@ const p = {};
 vm.runInNewContext(code, p);
 assert.deepEqual(JSON.parse(JSON.stringify(p.initialDocument())),
     {version: 1, num: "system", caps: "system"});
-for (const mode of ["system", "on", "off"])
+for (const mode of ["system", "on", "off", "remember"])
     assert.equal(p.validMode(mode), true);
-for (const mode of ["remember", "enabled", true, "", 1])
+for (const mode of ["enabled", true, "", 1])
     assert.equal(p.validMode(mode), false);
 let doc = p.initialDocument();
 doc = p.withMode(doc, "num", "on").document;

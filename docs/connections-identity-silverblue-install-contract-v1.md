@@ -5,7 +5,7 @@
 **STAFF ROLE //** external Hospital-compatible DOC implementation, live registration unverified  
 **ASSIGNMENT //** independently inspectable signed Identity **RPM**, supervised Silverblue service origin, SELinux/seat/process and rollback proof  
 **AUTHORITY //** operator expressly authorized this separate assignment November 10, 2026, without merging, workstation installation or production activation  
-**STATUS //** Phase 1 signed package and ephemeral manifest tests verified; real Silverblue installation, RPM layering and first reboot observed; strict installed-file verification and second rollback boot pending; running systemd/SELinux Identity gateway unverified  
+**STATUS //** Phase 1 signed RPM and synthetic release-envelope tests verified. Phase 2 real offline Silverblue installation/layering/two-boot rollback verified. Phase 3 real supervised nonroot systemd/AF_UNIX service and four signed UNAVAILABLE receipts verified; process was **unconfined_service_t**, NOT a dedicated SELinux domain. Current C4b process-continuity checks and separate compile-only custom policy prototype are pending runtime verification.  
 **OWNERSHIP //** `tests/connections/identity_silverblue/**`, its new workflow, this document. Identity DOC retains `services/identity/**`, `tests/identity/**`; protected C3e retains the trust reviewer/importer; C5 retains consent.
 
 ## IMPLEMENTATION
@@ -37,13 +37,19 @@ These are **interface requirements to review**, not a published, accepted produc
 
 ## HOW TO USE
 
-GitHub Actions only: open the dedicated C4b Identity Silverblue draft PR and inspect the `C4b Identity Silverblue signed RPM contract` run. Expect a signed disposable RPM and isolated-keyring verification. Do not install the RPM locally, trust it for a real sign-in, or accept this as a completed two-boot test.
+GitHub Actions only: inspect draft PR #1785's signed RPM, actual official Silverblue VM, and compile-only SELinux policy checks. No desktop action. The real two-boot rollback and signed deny-only gateway have passed in disposable CI. Do not install these RPMs locally or treat passing CI as independently enrolled production trust, confirmed confinement, or real C5 consent.
 
 ## VERIFY
 
 **Phase 1 acceptance:** exact-head source/adversarial contracts PASS, real Fedora 44 RPM build with original eight modules and inert unit, OpenPGP signature untrusted-before/imported-after in separate RPM DB, separate synthetic Ed25519 release-root signature over exact RPM+module+receipt-key public fingerprint with negative signature/key/floor/roster tests, no pre/post scripts or new credentials, no private signing key exported.
 
-**Verified in prior official Silverblue CI:** disposable offline Fedora Silverblue 44 installer, independently checked signed Identity RPM, real rpm-ostree layering, and first boot into the installed package. [Guest run #42947183789](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42947183789) revealed **nine timestamp-only `T` mismatches** in `rpm -V` output. That run failed closed before rollback. The correction permits timestamps only on the exact nine allowlisted files, while requiring clean `rpm -V --nomtime`, full verified digests/modes/owners, and all deny-only service gates. **Not yet verified:** second rollback reboot, complete teardown, independently enrolled release root/receipt-key custody, running Identity process/socket/SELinux/seat identity, or signed negative receipts. These remain Phase 2+ requirements.
+**Phase 2 real OS lifecycle [#42951211291](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42951211291): PASS.** Official offline Fedora Silverblue 44 installer, signed Identity RPM, first real OSTree deployment/reboot, full nine-file integrity with timestamp-only exception and clean `rpm -V --nomtime`, second rollback reboot, absence of Identity package, installed modules/unit, signer DB and test marker; SELinux remained enforcing.
+
+**Phase 3 running service [#42993936702](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42993936702): PASS within deny-only CI scope.** Offline signed Fedora cryptography/CFFI/pycparser runtime dependencies; nonroot actual canonical installed Identity gateway supervised by systemd; PID/UID/GID/cgroup, kernel socket and process context observed; signed UNAVAILABLE for BEGIN, STATUS, CANCEL and RECOVER; test runtime/user/key deletion before real second rollback, and all four installed RPMs absent after rollback. **Crucial limitation:** observed SELinux domain was `system_u:system_r:unconfined_service_t:s0`. This is not dedicated SELinux confinement.
+
+**Next process continuity check:** CI-only guest script now rechecks kernel `SO_PEERCRED`, systemd MainPID, `/proc/PID/stat` start ticks, all effective/real/FS UIDs/GIDs, cgroup and SELinux label before and after every signed denial; exact-head real VM verdict pending. This validates observed continuity only, not a protected release root, logind seat, guest code identity independent of guest reports, or the C5 consent interface.
+
+**Next SELinux gate:** `selinux/postapollo_identity_ci.te` proposes a distinct test-only domain; `selinux/build_policy_ci.sh` and its separate workflow compile it in a disposable Fedora 44 container without policy load. **Compiling a module is not proof of confinement.** Subsequent operator-approved C4b CI must bind a labelled entrypoint, enforce an exact unique domain, prove denied forbidden actions, and remove the test policy before rollback. Independent C3e/Identity DOC security review remains mandatory.
 
 ## WATCH OUT FOR
 
@@ -55,15 +61,17 @@ The Identity gateway fixture currently refuses all real login, peer, seat and op
 - [x] Existing Identity DOC gateway, witness, adapter and Ubuntu fixture inspected
 - [x] Signed RPM/source/signature and synthetic release-root tests PASS on previous exact head (must retest on new source commits)
 - [ ] Identity-specific signed release manifest with separate authority and revocation floors (reviewed)
-- [ ] Real offline official Silverblue RPM-OSTree install, second boot, supervisor/SELinux evidence, deny-only IPC
-- [ ] Real rollback and complete absence of guest package/keys/policy/runtime
+- [x] Real official Silverblue RPM-OSTree install, second boot, signed deny-only IPC (CI-only)
+- [x] Real rollback and complete absence of guest package/keys/runtime (no custom policy installed yet)
+- [ ] Unique enforcing SELinux domain with actual denied accesses, process replacement negative checks, policy removal and full rollback
+- [ ] Kernel peer/PID start/cgroup/SELinux continuity gate verified by latest real VM
 - [ ] Independent protected C3e technical review and Identity DOC interface acceptance
 - [ ] Operator final acceptance and separately authorized merge
 - [ ] Production activation: **HOLD**, not included in this assignment
 
 ## NEXT
 
-Finish official Silverblue installed-RPM integrity and real rollback verification, then add actual Identity running-service and SELinux evidence without changing `c2v_silverblue/**` or the existing C4d branch. Coordinate external pins and immutable module set with Identity DOC and protected C3e; escalate any desired shared-controller changes before editing.
+Verify the exact-head kernel peer/PID-start/cgroup continuity test, then independently compile and test the proposed dedicated SELinux domain. Do not call confinement complete until the actual Silverblue guest launches the gateway in that domain under enforcing policy, denies forbidden accesses, and proves complete test policy teardown. Coordinate protected release/receipt signer and consent seams with C3e, Identity DOC and C5 without editing their owned files.
 
 ## DECISIONS
 

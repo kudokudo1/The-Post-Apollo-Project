@@ -225,14 +225,14 @@ tr '\0' ' ' <"/proc/$pid/cmdline" |
   grep -Fq '/usr/libexec/post-apollo/identity/identity-gateway-ci' ||
   fail "KERNEL_PROCESS_COMMAND_MISMATCH"
 selinux="$(cat "/proc/$pid/attr/current")"
-printf 'C4B_ID_SELINUX_OBSERVED // %.180s\n' "$selinux"
+printf 'C4B_ID_SELINUX_OBSERVED // %.180s\n' "$selinux" >/dev/ttyS0
 [[ "$selinux" == 'system_u:system_r:postapollo_identity_ci_t:s0' &&
    "$(getenforce)" == Enforcing ]] ||
   fail "DEDICATED_ENFORCING_IDENTITY_DOMAIN_NOT_ACTIVE"
-echo "C4B_ID_PASS // REAL_ENFORCING_DEDICATED_SELINUX_DOMAIN_OBSERVED"
+echo "C4B_ID_PASS // REAL_ENFORCING_DEDICATED_SELINUX_DOMAIN_OBSERVED" >/dev/ttyS0
 printf 'C4B_ID_SERVICE_OBSERVED // pid=%s uid=%s gid=%s cgroup=%s selinux=%s\n' \
-  "$pid" "$uid" "$gid" "$cgroup" "$selinux"
-echo "C4B_ID_PASS // REAL_SYSTEMD_IDENTITY_GATEWAY_SOCKET_AND_PROCESS_OBSERVED"
+  "$pid" "$uid" "$gid" "$cgroup" "$selinux" >/dev/ttyS0
+echo "C4B_ID_PASS // REAL_SYSTEMD_IDENTITY_GATEWAY_SOCKET_AND_PROCESS_OBSERVED" >/dev/ttyS0
 
 # The real installed gateway, not an imitation server, must sign four
 # UNAVAILABLE receipts. The verifier sees the disposable signer public key

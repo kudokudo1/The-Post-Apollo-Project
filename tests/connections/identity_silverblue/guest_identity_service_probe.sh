@@ -126,20 +126,60 @@ echo "C4B_ID_PASS // REAL_SYSTEMD_IDENTITY_GATEWAY_SOCKET_AND_PROCESS_OBSERVED"
 # The real installed gateway, not an imitation server, must sign four
 # UNAVAILABLE receipts. The verifier sees the disposable signer public key
 # from its own test-only seed; this is NOT independently enrolled host trust.
-python3 -I -B - "$socket" "$signer" <<'PY'
-import secrets,socket,sys
+python3 -I -B - "$socket" "$signer" "$pid" "$uid" "$gid" "$cgroup" "$selinux" <<'PY'
+import secrets,socket,struct,subprocess,sys
 from pathlib import Path
 sys.path.insert(0,"/usr/libexec/post-apollo/identity")
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from signed_command_receipt_v0 import build_request,verify_receipt
-key=Ed25519PrivateKey.from_private_bytes(Path(sys.argv[2]).read_bytes()).public_key()
+sockpath,signerpath=sys.argv[1:3]
+pid,uid,gid=map(int,sys.argv[3:6])
+expected_cgroup,expected_lsm=sys.argv[6:8]
+key=Ed25519PrivateKey.from_private_bytes(Path(signerpath).read_bytes()).public_key()
+
+def start_ticks():
+    # /proc/<pid>/stat field 22, with a parenthesized process name
+    # that can itself contain spaces. Read from the kernel, never JSON.
+    data=Path(f"/proc/{pid}/stat").read_text()
+    if ") " not in data: raise RuntimeError("malformed kernel process stat")
+    fields=data.rsplit(") ",1)[1].split()
+    if len(fields)<20:raise RuntimeError("truncated kernel process stat")
+    return int(fields[19])
+
+pinned_start=start_ticks()
+if pinned_start<=0:raise RuntimeError("invalid kernel process start time")
+
+def check_origin(stage):
+    current=subprocess.check_output([
+        "/usr/bin/systemctl","show",
+        "post-apollo-identity-silverblue-ci.service",
+        "--property=MainPID","--value"],timeout=3,text=True).strip()
+    if current!=str(pid) or start_ticks()!=pinned_start:
+        raise RuntimeError(f"{stage}: supervisor PID/start changed")
+    if Path(f"/proc/{pid}/attr/current").read_text().strip()!=expected_lsm:
+        raise RuntimeError(f"{stage}: kernel SELinux context changed")
+    groups=Path(f"/proc/{pid}/status").read_text().splitlines()
+    for tag,value in (("Uid:",uid),("Gid:",gid)):
+        field=next((x for x in groups if x.startswith(tag)),None)
+        if field is None or field.split()[1:]!=[str(value)]*4:
+            raise RuntimeError(f"{stage}: kernel service {tag} changed")
+    raw=Path(f"/proc/{pid}/cgroup").read_text()
+    if expected_cgroup not in raw.splitlines()[0].split(":")[-1]:
+        raise RuntimeError(f"{stage}: kernel service cgroup changed")
+
 for action in ("BEGIN","STATUS","CANCEL","RECOVER"):
+    check_origin(f"before {action}")
     nonce=secrets.token_urlsafe(32)
     rid=None if action=="BEGIN" else "CI_NO_LOGIN_REQUEST_01234567"
     request=build_request(action,rid,nonce)
     with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as conn:
         conn.settimeout(3)
-        conn.connect(sys.argv[1])
+        conn.connect(sockpath)
+        # SO_PEERCRED comes from the Linux kernel, not a service JSON claim.
+        peer=struct.unpack("3i",conn.getsockopt(
+            socket.SOL_SOCKET,socket.SO_PEERCRED,struct.calcsize("3i")))
+        if peer!=(pid,uid,gid):
+            raise RuntimeError(f"{action}: kernel socket peer changed")
         conn.sendall(request)
         out=b""
         while not out.endswith(b"\n"):
@@ -151,7 +191,9 @@ for action in ("BEGIN","STATUS","CANCEL","RECOVER"):
                            command_request_id=rid,client_nonce=nonce)
     if receipt["state"]!="UNAVAILABLE" or receipt["requestId"] is not None:
         raise RuntimeError("identity command was not denied")
+    check_origin(f"after {action}")
     print(f"C4B_ID_PASS // INSTALLED_SIGNED_UNAVAILABLE_{action}")
+print("C4B_ID_PASS // KERNEL_PEER_PID_START_AND_SUPERVISOR_RECHECKED_FOR_FOUR_SIGNED_DENIALS")
 PY
 if [[ -e "$runtime/identity-display-v0.sock" ]]; then
   fail "UNAPPROVED_BROWSER_HOST_SOCKET_EXISTS"

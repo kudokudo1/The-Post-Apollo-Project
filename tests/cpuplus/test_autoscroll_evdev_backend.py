@@ -131,7 +131,18 @@ class FakeLinuxIntegration(unittest.TestCase):
         def monotonic():
             clock[0]+=0.015
             return clock[0]
-        with patch.dict(sys.modules,{"evdev":module}),patch.dict(os.environ,{
+        class FakeStopServer:
+            closed = False
+            def __enter__(self):
+                return self
+            def healthy(self):
+                return True
+            def poll(self):
+                return False
+            def close(self):
+                self.closed = True
+        fake_stop = FakeStopServer()
+        with patch.object(backend, "StopServer", return_value=fake_stop),patch.dict(sys.modules,{"evdev":module}),patch.dict(os.environ,{
                 backend.RUN_MARKER:"1","SWAYSOCK":"/fake/sway"},clear=True),patch.object(
                 backend.os,"getuid",return_value=1000),patch.object(
                 backend,"no_native_lock",return_value=True),patch.object(
@@ -143,6 +154,7 @@ class FakeLinuxIntegration(unittest.TestCase):
                 backend.signal,"signal",side_effect=install_signal):
             self.assertEqual(backend.run_live("/dev/input/by-id/mockmouse"),0)
         self.assertTrue(device.closed)
+        self.assertTrue(fake_stop.closed)
         self.assertFalse(device.grabbed)
         self.assertTrue(outputs[0].closed)
         self.assertTrue(any(isinstance(x,tuple) and len(x)==3

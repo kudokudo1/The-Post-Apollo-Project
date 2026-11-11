@@ -27,6 +27,7 @@ import sys
 import time
 
 from AutoscrollMouseEngine import MouseAutoscroll, BTN_MIDDLE
+from AutoscrollStopChannel import StopServer
 
 MOUSE_MIN = 272
 MOUSE_MAX = 287
@@ -150,6 +151,7 @@ def run_live(device_path: str) -> int:
     from evdev import ecodes, InputDevice, UInput
     source = InputDevice(str(physical))
     virtual = None
+    stop_server = None
     grabbed = False
     stop = False
     engine = MouseAutoscroll()
@@ -175,9 +177,19 @@ def run_live(device_path: str) -> int:
                          vendor=source.info.vendor,
                          product=source.info.product,
                          bustype=source.info.bustype)
+        # A private same-user STOP endpoint must exist before the first
+        # device grab; if it disappears or is replaced, stop immediately.
+        stop_server = StopServer()
+        stop_server.__enter__()
         source.grab()  # Kernel releases automatically if daemon crashes.
         grabbed = True
         while not stop:
+            if not stop_server.healthy():
+                engine.cancel("stop_channel_lost")
+                break
+            if stop_server.poll():
+                engine.cancel("external_stop")
+                break
             now = time.monotonic()
             if now - last_focus_check >= FOCUS_SECONDS:
                 focus = sway_focus()
@@ -252,6 +264,8 @@ def run_live(device_path: str) -> int:
         source.close()
         if virtual is not None:
             virtual.close()
+        if stop_server is not None:
+            stop_server.close()
 
 
 def main(argv=None) -> int:

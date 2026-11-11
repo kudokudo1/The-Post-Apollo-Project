@@ -45,6 +45,9 @@ fi
 if ! grep -q 'SCROLL_MODE_NATIVE_PASS // LOCK_CANCEL_AND_AUTOSCROLL_GATED' "$log"; then
   echo "MOUSE_NATIVE_FAIL // Scroll Mode consent or autoscroll gating not verified";exit 1
 fi
+if ! grep -q 'AUTOSCROLL_OVERLAY_NATIVE_PASS' "$log"; then
+  echo "MOUSE_NATIVE_FAIL // overlay gating and revocation not exercised";exit 1
+fi
 if grep -q 'MOUSE_NATIVE_FAIL' "$log"; then exit 1; fi
 if find "$work/config-home" -name 'post-apollo-*scroll*.conf' | grep -q .; then
   echo "MOUSE_NATIVE_FAIL // unexpected compositor config write";exit 1

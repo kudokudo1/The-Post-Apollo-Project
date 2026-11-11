@@ -37,8 +37,10 @@ class NativeMiddleScrollTests(unittest.TestCase):
         if argv == ["swaymsg", "-t", "get_inputs"]:
             return SimpleNamespace(returncode=0, stdout=json.dumps([
                 {"identifier": self.device_id, "name": "USB Mouse",
-                 "type": "pointer", "scroll_method": self.method,
-                 "scroll_button_lock": self.lock, "scroll_button": self.button},
+                 "type": "pointer", "libinput": {
+                     "scroll_method": self.method,
+                     "scroll_button_lock": self.lock,
+                     "scroll_button": self.button}},
                 {"identifier": "keyboard", "type": "keyboard"}]))
         if argv[:3] != ["swaymsg", "input", self.device_id]:
             raise AssertionError("unknown command: " + str(argv))

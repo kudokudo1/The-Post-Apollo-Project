@@ -127,7 +127,8 @@ def transcribe_chunk(stt_helper: str, audio: bytes, *,
 
 def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
          first_chunk_ms: int = 1400, vad: bool = False, threshold: int = 600,
-         silence_ms: int = 2200, min_speech_ms: int = 250) -> int:
+         silence_ms: int = 2200, min_speech_ms: int = 250,
+         pilot_one_chunk: bool = False) -> int:
     if not Path(stt_helper).is_file():
         print(packet("error", detail="LOCAL WHISPER HELPER UNAVAILABLE"),
               flush=True)
@@ -256,7 +257,9 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
             1000, min(1000 * max(2, min(4, chunk_seconds)), first_chunk_ms)) // 1000
         first_chunk_sent = False
         first_chunk_reported = False
-        limit = RATE * FRAME_BYTES * MAX_SECONDS
+        # Operator-authorized pilot is deliberately one model launch.
+        # Silence is bounded by PCM duration too; no 90s open microphone.
+        limit = RATE * FRAME_BYTES * (6 if pilot_one_chunk else MAX_SECONDS)
         heard_speech = False
         speech_ms = 0
         quiet_ms = 0
@@ -307,6 +310,11 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                     sent = enqueue(bytes(pending[:next_size]))
                     del pending[:next_size]
                     first_chunk_sent = first_chunk_sent or sent
+                    if pilot_one_chunk and sent:
+                        # Never queue a second model call in this first test.
+                        stopping.set()
+                        halt_child()
+                        break
                 if (vad and heard_speech and quiet_ms >= max(300, silence_ms)) \
                         or received >= limit:
                     stopping.set()
@@ -316,7 +324,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
             # Short spoken endings used to disappear (<1s was discarded).
             # Gate on speech first, then pad a final subsecond clip to 1s so
             # Whisper can recognize it after an explicit STOP.
-            if not cancelled.is_set() and is_speech(bytes(pending)):
+            if not pilot_one_chunk and not cancelled.is_set() and is_speech(bytes(pending)):
                 tail = bytes(pending)
                 minimum = RATE * FRAME_BYTES * MIN_TAIL_SECONDS
                 if len(tail) < minimum:
@@ -392,6 +400,8 @@ def main():
     parser.add_argument("stt_helper")
     parser.add_argument("--chunk-seconds", type=int, default=CHUNK_SECONDS)
     parser.add_argument("--first-chunk-ms", type=int, default=1400)
+    parser.add_argument("--pilot-one-chunk", action="store_true",
+                        help="capture only the first speech chunk and run Whisper once")
     parser.add_argument("--vad", action="store_true")
     parser.add_argument("--threshold", type=int, default=600)
     parser.add_argument("--silence-ms", type=int, default=2200)
@@ -399,7 +409,8 @@ def main():
     args = parser.parse_args()
     return live(args.stt_helper, chunk_seconds=args.chunk_seconds,
                 first_chunk_ms=args.first_chunk_ms, vad=args.vad, threshold=args.threshold,
-                silence_ms=args.silence_ms, min_speech_ms=args.min_speech_ms)
+                silence_ms=args.silence_ms, min_speech_ms=args.min_speech_ms,
+                pilot_one_chunk=args.pilot_one_chunk)
 
 
 if __name__ == "__main__":

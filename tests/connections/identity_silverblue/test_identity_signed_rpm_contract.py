@@ -199,5 +199,58 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertNotIn("ssh ", workflow)
 
 
+    def test_10_real_signed_denial_is_supervised_and_removed_before_rollback(self):
+        guest = (AREA / "guest_identity_ostree_cycle.sh").read_text()
+        host = (AREA / "run_official_silverblue_identity.sh").read_text()
+        probe = (AREA / "guest_identity_service_probe.sh").read_text()
+        workflow = (ROOT / ".github/workflows/connections-identity-silverblue-real-boot.yml").read_text()
+        for needle in (
+            "GUEST_RPM_VERIFIER_HELPER_MISSING_OR_MODIFIED_MODE",
+            'service_probe=/usr/local/libexec/postapollo-id-ci-service-probe.sh',
+            "REAL_SYSTEMD_DENY_ONLY_IDENTITY_SERVICE_PROBE_REFUSED",
+            "REAL_IDENTITY_SERVICE_PROBE_FINISHED_BEFORE_ROLLBACK",
+            "POSTROLLBACK_DISPOSABLE_TEST_USER_LEFTOVER",
+            "POSTROLLBACK_TEST_PRIVATE_KEY_OR_RUNTIME_LEFTOVER",
+        ):
+            self.assertIn(needle, guest)
+        self.assertLess(guest.index('REAL_IDENTITY_SERVICE_PROBE_FINISHED_BEFORE_ROLLBACK'),
+                        guest.index('rpm-ostree rollback --reboot'))
+        for needle in (
+            'guest_identity_service_probe.sh',
+            'chmod 0700 /usr/local/libexec/postapollo-id-ci-service-probe.sh',
+            'REAL_SYSTEMD_UNIT_REFUSED_WITHOUT_MARKER',
+            'REAL_SYSTEMD_IDENTITY_GATEWAY_SOCKET_AND_PROCESS_OBSERVED',
+            'REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP',
+        ):
+            self.assertIn(needle, host)
+        for action in ("BEGIN", "STATUS", "CANCEL", "RECOVER"):
+            self.assertIn(f"INSTALLED_SIGNED_UNAVAILABLE_{action}", host)
+        for needle in (
+            '[[ "$(id -u)" == 0 && -e /run/ostree-booted',
+            '[[ "$(getenforce)" == Enforcing',
+            'post-apollo-identity-silverblue-ci.service',
+            'UNIT_REFUSED_WITHOUT_CI_MARKER',
+            'systemctl show "$unit" --property=MainPID',
+            'systemctl show "$unit" --property=ControlGroup',
+            '"/proc/$pid/status"',
+            '"/proc/$pid/attr/current"',
+            'signed_command_receipt_v0 import build_request,verify_receipt',
+            '("BEGIN","STATUS","CANCEL","RECOVER")',
+            'receipt["state"]!="UNAVAILABLE"',
+            'chmod 0600 "$signer"',
+            'systemctl stop "$unit"',
+            'rm -rf -- "$base"',
+            'userdel "$name"',
+            'REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP',
+            'NO_PRODUCTION_RELEASE_ENROLLMENT_OR_C5_OPERATOR_CONSENT',
+        ):
+            self.assertIn(needle, probe)
+        self.assertNotIn("https://", probe)
+        self.assertNotIn("curl ", probe)
+        self.assertNotIn("pip install", probe)
+        self.assertNotIn("oauth", probe.lower())
+        self.assertIn('bash -n tests/connections/identity_silverblue/guest_identity_service_probe.sh', workflow)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -83,11 +83,23 @@ Scope {
         return true;
     }
 
-    function prepareApply() {
+    function prepareApply(savedNum, savedCaps) {
         if (!canApply)
             return false;
+        if (document.num === "remember"
+                && savedNum !== "on" && savedNum !== "off") {
+            feedback = "NUM REMEMBER REQUIRES A SAVED LED OBSERVATION";
+            return false;
+        }
+        if (document.caps === "remember"
+                && savedCaps !== "on" && savedCaps !== "off") {
+            feedback = "CAPS REMEMBER REQUIRES A SAVED LED OBSERVATION";
+            return false;
+        }
+        confirmedSnapshotNum = String(savedNum || "unknown");
+        confirmedSnapshotCaps = String(savedCaps || "unknown");
         confirmRequired = true;
-        feedback = "CONFIRM USER SWAY STARTUP CONFIG CHANGE";
+        feedback = "CONFIRM STARTUP POLICY // NO LIVE KEY CHANGES";
         return true;
     }
     function cancelApply() {
@@ -99,17 +111,21 @@ Scope {
             return false;
         confirmRequired = false;
         applying = true;
+        rememberSuspended = false;
+        queuedRememberNum = "";
+        queuedRememberCaps = "";
         hostError = "";
-        feedback = "WRITING USER SWAY STARTUP FILES";
+        feedback = "WRITING MANAGED SWAY STARTUP FRAGMENT";
         applyProcess.exec([
             "python3", "-B", "-I",
             Quickshell.shellPath("services/input/SwayKeyboardStartup.py"),
-            "apply", document.num, document.caps
+            "apply-policy", document.num, document.caps,
+            confirmedSnapshotNum, confirmedSnapshotCaps
         ]);
         return true;
     }
     function inspectHost() {
-        if (inspecting || applying)
+        if (inspecting || applying || rememberSyncing)
             return false;
         inspecting = true;
         hostError = "";

@@ -11,7 +11,7 @@ const solar=read("StationCosmosVisualInstruments.qml");
 test("W12 balances current/hourly and a readable compact daily strip",()=>{
   for(const word of ["bandBudget","dailyHeight","currentHeight","hourlyHeight"])
     assert.match(combined,new RegExp("readonly property real "+word));
-  assert.match(combined,/Math\.min\(70,bandBudget\*0\.28\)/);
+  assert.match(combined,/Math\.min\(74,bandBudget\*0\.30\)/);
   assert.match(combined,/height: panel\.currentHeight/);
   assert.match(combined,/height: panel\.hourlyHeight/);
   assert.match(combined,/height: panel\.dailyHeight/);
@@ -20,7 +20,7 @@ test("W12 balances current/hourly and a readable compact daily strip",()=>{
   assert.match(combined,/font\.pixelSize: Math\.max\(34,Math\.min\(56,parent\.height-2\)\)/);
   assert.match(combined,/id: hourlyRainMeter/);
   assert.match(combined,/height: 8\s+color: Colors\.black/);
-  assert.match(combined,/font\.pixelSize: 44/);
+  assert.match(combined,/font\.pixelSize: Math\.min\(44,parent\.height\)/);
   assert.match(combined,/WeatherCelestialGlyph\s*\{/);
   assert.match(combined,/panel\.sky\.inspectedHourIndex=index/);
   assert.match(combined,/forecastReady && sky\.hourlyForecast/);

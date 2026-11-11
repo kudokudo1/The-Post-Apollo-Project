@@ -33,11 +33,11 @@ for(const [src,context] of [[navSource,nav],[magickSource,magick],[cosmosSource,
   vm.runInContext(src.replace(/^\.pragma library\s*$/m,""),context);
 vm.runInContext(workspacePolicy.replace(/^\.pragma library\s*$/m,""),wnav);
 
-test("all 16 MAGICK destinations exist in the canonical subject tree", () => {
+test("all 17 MAGICK destinations exist in the canonical subject tree", () => {
   assert.equal(magick.FORMAT,"post-apollo.weather.magick-reference.g1.v1");
   const routes=Object.keys(magick.ROUTES);
-  assert.equal(routes.length,16);
-  assert.equal(new Set(routes).size,16);
+  assert.equal(routes.length,17);
+  assert.equal(new Set(routes).size,17);
   for(const route of routes) {
     const found=nav.findRoute(route);
     assert.ok(found,"route not in existing subject tree: "+route);
@@ -126,7 +126,7 @@ test("MAGICK keeps source evidence visibly separated from symbolic interpretatio
   assert.match(overview,/MAGICK \/\/ CELESTIAL CHART/);
   assert.match(overview,/SUN \/\/ DAYLIGHT/);
   assert.match(pane,/onRouteRequested: function\(path\)/);
-  assert.match(pane,/active: magickPane\.visible && magickPane\.kind === "reference"/);
+  assert.match(pane,/active: magickPane\.visible && !magickPane\.servicesRoute/);
   assert.match(pane,/MagickPolicy\.noteFor\(magickPane\.subjectRoute\)/);
 });
 

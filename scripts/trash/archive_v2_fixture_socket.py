@@ -22,6 +22,9 @@ from scripts.trash.archive_v2_peer_evidence import inspect_fixture_peer
 from scripts.trash.archive_v2_peer_lifecycle import (
     PeerLeaseError, pin_fixture_peer,
 )
+from scripts.trash.archive_v2_fixture_service_identity import (
+    PinnedFixtureServiceFiles, ServiceFixtureError,
+)
 from scripts.trash.archive_v2_owner_trust import OwnerTrustError
 from scripts.trash.archive_v2_peer_evidence import BrokerPeerError
 from scripts.trash.archive_v2_signed_capture import SignedCaptureError
@@ -150,6 +153,9 @@ def _safe_reply(result):
             "humanConsentVerified":False,
             "archiveCopyAuthorized":False,
             "peerLifetimeCheckedBeforeCommit":True,
+            "serviceWitnessSha256":result["serviceWitnessSha256"],
+            "serviceFilesMatchedBeforeCommit":
+                bool(result["serviceWitnessSha256"]),
             "captureAllowed":False,
             "restoreAllowed":False,
             "burnAllowed":False,
@@ -157,7 +163,7 @@ def _safe_reply(result):
 
 
 def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
-                              ledger, now_ms):
+                              ledger, now_ms, service_files=None):
     """Handle ONE framed request and reply; no loop, listener or live keys.
 
     A successful result admits a TEST ledger copy only. All failures produce
@@ -180,8 +186,23 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
             # Fail-closed if pidfd is unsupported or the peer exits before
             # the nonce+synthetic copy transaction commits.
             witness = inspect_fixture_peer(connection, peer_policy)
+            if service_files is not None:
+                _require(type(service_files) is PinnedFixtureServiceFiles,
+                         "BROKER_SERVICE_FIXTURE_REQUIRED")
+                service_evidence = service_files.check_connection(connection)
+                _require(service_evidence["ownerId"] == packet["ownerId"],
+                         "BROKER_SERVICE_OWNER_MISMATCH")
+                service_digest = service_evidence["serviceWitnessSha256"]
+            else:
+                service_digest = ""
             with pin_fixture_peer(connection, witness) as lifetime:
                 lifetime.require_alive()
+                def before_fixture_commit():
+                    lifetime.require_alive()
+                    if service_files is not None:
+                        latest = service_files.check_connection(connection)
+                        _require(latest["serviceWitnessSha256"] == service_digest,
+                                 "BROKER_SERVICE_WITNESS_CHANGED")
                 admitted = admit_peer_bound_fixture(
                     connection, peer_policy,
                     packet["signedManifest"], pinned_test_root,
@@ -191,15 +212,17 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
                     source_revision=packet["sourceRevision"],
                     source_captured_ms=packet["sourceCapturedAtMs"],
                     payload=payload, now_ms=now_ms,
-                    commit_guard=lifetime.require_alive,
-                    expected_peer_witness_sha256=witness["peerWitnessSha256"])
+                    commit_guard=before_fixture_commit,
+                    expected_peer_witness_sha256=witness["peerWitnessSha256"],
+                    service_witness_sha256=service_digest)
             _require(admitted["captureAllowed"] is False
                      and admitted["productionAllowed"] is False
                      and admitted["sourceProcessVerified"] is False,
                      "BROKER_UNEXPECTED_PRIVILEGE")
             result = _safe_reply(admitted)
         except (FixtureWireError, BrokerHandoffError, BrokerPeerError,
-                PeerLeaseError, SignedCaptureError, OwnerTrustError,
+                PeerLeaseError, ServiceFixtureError, SignedCaptureError,
+                OwnerTrustError,
                 TrustHistoryError, AtomicAdmissionError) as exc:
             code = str(exc)
             result = {"ok":False, "error":code if SAFE_CODE.fullmatch(code)

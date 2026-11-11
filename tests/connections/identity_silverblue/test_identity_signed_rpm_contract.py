@@ -359,11 +359,11 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
                 return self.value
 
         expected = "system_u:system_r:postapollo_identity_ci_t:s0"
-        self.assertEqual(decoder(KernelBytes(expected.encode() + b"\\x00")), expected)
+        self.assertEqual(decoder(KernelBytes(expected.encode() + b"\x00")), expected)
         self.assertEqual(decoder(KernelBytes(expected.encode())), expected)
-        for malformed in (b"", b"\\x00", b"label\\x00suffix",
-                          b"label\\n", b"label\\x00\\x00",
-                          b"label\\xff"):
+        for malformed in (b"", b"\x00", b"label\x00suffix",
+                          b"label\n", b"label\x00\x00",
+                          b"label\xff"):
             with self.subTest(malformed=malformed):
                 with self.assertRaises((RuntimeError, UnicodeError)):
                     decoder(KernelBytes(malformed))

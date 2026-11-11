@@ -35,7 +35,8 @@ def paths(home=None, base=None):
     base = Path(base)
     if not home.is_absolute() or not base.is_absolute():
         raise KittyConfigError("UNSUPPORTED_PATH")
-    if base == home or not base.is_relative_to(home):
+    if (base == home or not base.is_relative_to(home)
+            or not base.resolve().is_relative_to(home.resolve())):
         raise KittyConfigError("CONFIG_OUTSIDE_HOME")
     if not base.is_dir() or base.is_symlink():
         raise KittyConfigError("CONFIG_DIR_UNAVAILABLE")
@@ -66,6 +67,21 @@ def read_regular(path, missing_ok=False):
             raise KittyConfigError("INVALID_UTF8") from exc
     finally:
         os.close(fd)
+
+
+def read_config(main, home, missing_ok=False):
+    # A source-controlled kitty.conf can be inspected through a symlink.
+    # Enrollment cannot rewrite the symlink or its tracked source.
+    if main.is_symlink():
+        try:
+            target = main.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise KittyConfigError("UNSAFE_CONFIG_SYMLINK") from exc
+        if (target == home.resolve()
+                or not target.is_relative_to(home.resolve())):
+            raise KittyConfigError("UNSAFE_CONFIG_SYMLINK")
+        return read_regular(target)
+    return read_regular(main, missing_ok=missing_ok)
 
 
 def include_line(fragment):
@@ -142,7 +158,8 @@ def atomic_write(path, content, mode):
 
 def status(home=None, base=None):
     main, fragment, backup = paths(home, base)
-    cfg = read_regular(main, missing_ok=True)
+    cfg = read_config(main, Path(home) if home is not None else Path.home(),
+                      missing_ok=True)
     if cfg is None:
         return {"status": "needs_config", "config": str(main)}
     included = enrolled(cfg[0], fragment)
@@ -155,11 +172,17 @@ def status(home=None, base=None):
             **values}
 
 
-def enroll(home=None, base=None):
+def enroll(wheel, touch, home=None, base=None):
+    desired = fragment_text(wheel, touch)
     main, fragment, backup = paths(home, base)
+    if main.is_symlink():
+        raise KittyConfigError("SYMLINK_CONFIG_MANUAL_INCLUDE")
     cfg, mode = read_regular(main)
     if enrolled(cfg, fragment):
         return {"status": "already_enrolled", "fragment": str(fragment)}
+    existing = read_regular(fragment, missing_ok=True)
+    if existing is not None:
+        parse_fragment(existing[0])
     if backup.exists() or backup.is_symlink():
         raise KittyConfigError("BACKUP_ALREADY_EXISTS")
     try:
@@ -169,6 +192,11 @@ def enroll(home=None, base=None):
             sink.write(cfg.encode("utf-8"))
             sink.flush()
             os.fsync(sink.fileno())
+        # Write the owned settings before pointing Kitty at them. A failed
+        # main-file update leaves an unused fragment rather than a missing
+        # include during automatic configuration reload.
+        if existing is None or existing[0] != desired:
+            atomic_write(fragment, desired, 0o600)
         new = cfg + ("" if not cfg or cfg.endswith("\n") else "\n")
         new += "\n# Post-Apollo optional Kitty scroll configuration\n"
         new += include_line(fragment) + "\n"
@@ -176,13 +204,16 @@ def enroll(home=None, base=None):
     except OSError as exc:
         raise KittyConfigError("ENROLL_WRITE_FAILED") from exc
     return {"status": "enrolled", "backup": str(backup),
-            "fragment": str(fragment), "runtime_verified": False}
+            "fragment": str(fragment), "wheel": factor(wheel, 0.5, 16),
+            "touch": factor(touch, 0.25, 8),
+            "runtime_verified": False}
 
 
 def apply(wheel, touch, home=None, base=None):
     desired = fragment_text(wheel, touch)
     main, fragment, _ = paths(home, base)
-    cfg, _mode = read_regular(main)
+    cfg, _mode = read_config(
+        main, Path(home) if home is not None else Path.home())
     if not enrolled(cfg, fragment):
         raise KittyConfigError("INCLUDE_MISSING")
     old = read_regular(fragment, missing_ok=True)
@@ -204,8 +235,8 @@ def main(argv=None):
     try:
         if args == ["status"]:
             out = status()
-        elif args == ["enroll"]:
-            out = enroll()
+        elif len(args) == 3 and args[0] == "enroll":
+            out = enroll(args[1], args[2])
         elif len(args) == 3 and args[0] == "apply":
             out = apply(args[1], args[2])
         else:

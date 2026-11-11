@@ -22,6 +22,19 @@ from scripts.trash.archive_v2_peer_evidence import inspect_fixture_peer
 from scripts.trash.archive_v2_peer_lifecycle import (
     PeerLeaseError, pin_fixture_peer,
 )
+from scripts.trash.archive_v2_fixture_service_identity import (
+    PinnedFixtureServiceFiles, ServiceFixtureError,
+)
+from scripts.trash.archive_v2_service_grant import (
+    ServiceGrantError, verify_fixture_service_grant,
+)
+from scripts.trash.archive_v2_service_release_history import (
+    ServiceReleaseError, TestServiceReleaseHistory,
+)
+from scripts.trash.archive_v2_origin_checkpoint import (
+    FixtureOriginError, measure_fixture_origin,
+    verify_fixture_checkpoint,
+)
 from scripts.trash.archive_v2_owner_trust import OwnerTrustError
 from scripts.trash.archive_v2_peer_evidence import BrokerPeerError
 from scripts.trash.archive_v2_signed_capture import SignedCaptureError
@@ -150,6 +163,18 @@ def _safe_reply(result):
             "humanConsentVerified":False,
             "archiveCopyAuthorized":False,
             "peerLifetimeCheckedBeforeCommit":True,
+            "serviceWitnessSha256":result["serviceWitnessSha256"],
+            "serviceGrantSha256":result["serviceGrantSha256"],
+            "serviceReleaseSha256":result["serviceReleaseSha256"],
+            "originWitnessSha256":result["originWitnessSha256"],
+            "checkpointSha256":result["checkpointSha256"],
+            "cgroupObservedBeforeCommit":bool(result["originWitnessSha256"]),
+            "externalCheckpointChecked":bool(result["checkpointSha256"]),
+            "systemdUnitVerified":False,
+            "releaseFloorChecked":bool(result["serviceReleaseSha256"]),
+            "signedServiceGrantChecked":bool(result["serviceGrantSha256"]),
+            "serviceFilesMatchedBeforeCommit":
+                bool(result["serviceWitnessSha256"]),
             "captureAllowed":False,
             "restoreAllowed":False,
             "burnAllowed":False,
@@ -157,7 +182,12 @@ def _safe_reply(result):
 
 
 def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
-                              ledger, now_ms):
+                              ledger, now_ms, service_files=None,
+                              signed_service_grant=None,
+                              signed_service_release=None,
+                              service_release_history=None,
+                              origin_policy=None,
+                              signed_checkpoint=None, checkpoint_root=None):
     """Handle ONE framed request and reply; no loop, listener or live keys.
 
     A successful result admits a TEST ledger copy only. All failures produce
@@ -180,8 +210,103 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
             # Fail-closed if pidfd is unsupported or the peer exits before
             # the nonce+synthetic copy transaction commits.
             witness = inspect_fixture_peer(connection, peer_policy)
+            if origin_policy is not None:
+                origin_evidence = measure_fixture_origin(
+                    connection, witness, origin_policy)
+                origin_digest = origin_evidence["originWitnessSha256"]
+            else:
+                origin_digest = ""
+            _require((signed_checkpoint is None and checkpoint_root is None)
+                     or (signed_checkpoint is not None
+                         and checkpoint_root is not None
+                         and signed_service_release is not None
+                         and type(service_release_history)
+                             is TestServiceReleaseHistory),
+                     "CHECKPOINT_COMPONENTS_REQUIRED")
+            _require(signed_service_grant is None or service_files is not None,
+                     "SERVICE_GRANT_FILES_REQUIRED")
+            if service_files is not None:
+                _require(type(service_files) is PinnedFixtureServiceFiles,
+                         "BROKER_SERVICE_FIXTURE_REQUIRED")
+                service_evidence = service_files.check_connection(connection)
+                _require(service_evidence["ownerId"] == packet["ownerId"],
+                         "BROKER_SERVICE_OWNER_MISMATCH")
+                service_digest = service_evidence["serviceWitnessSha256"]
+            else:
+                service_digest = ""
+            _require((signed_service_release is None and
+                      service_release_history is None)
+                     or (signed_service_release is not None
+                         and signed_service_grant is not None
+                         and type(service_release_history)
+                             is TestServiceReleaseHistory),
+                     "RELEASE_FLOOR_REQUIRED")
+            if signed_service_grant is not None:
+                grant_evidence = verify_fixture_service_grant(
+                    signed_service_grant, pinned_test_root, service_files,
+                    packet["signedManifest"], now_ms=now_ms)
+                _require(grant_evidence["ownerId"] == packet["ownerId"]
+                         and grant_evidence["serviceWitnessSha256"]
+                             == service_digest,
+                         "SERVICE_GRANT_BINDING_MISMATCH")
+                grant_digest = grant_evidence["serviceGrantSha256"]
+            else:
+                grant_digest = ""
+            if signed_service_release is not None:
+                release_evidence = service_release_history.require_current(
+                    signed_service_release, pinned_test_root,
+                    owner_id=packet["ownerId"],
+                    grant_sha256=grant_digest, now_ms=now_ms)
+                release_digest = release_evidence["releaseSha256"]
+            else:
+                release_digest = ""
+            if signed_checkpoint is not None:
+                checkpoint_evidence = verify_fixture_checkpoint(
+                    signed_checkpoint, checkpoint_root,
+                    history=service_release_history,
+                    signed_release=signed_service_release,
+                    release_root=pinned_test_root,
+                    owner_id=packet["ownerId"],
+                    grant_sha256=grant_digest, now_ms=now_ms)
+                checkpoint_digest = checkpoint_evidence["checkpointSha256"]
+            else:
+                checkpoint_digest = ""
             with pin_fixture_peer(connection, witness) as lifetime:
                 lifetime.require_alive()
+                def before_fixture_commit():
+                    lifetime.require_alive()
+                    if service_files is not None:
+                        latest = service_files.check_connection(connection)
+                        _require(latest["serviceWitnessSha256"] == service_digest,
+                                 "BROKER_SERVICE_WITNESS_CHANGED")
+                    if signed_service_grant is not None:
+                        checked_grant = verify_fixture_service_grant(
+                            signed_service_grant, pinned_test_root,
+                            service_files, packet["signedManifest"], now_ms=now_ms)
+                        _require(checked_grant["serviceGrantSha256"] == grant_digest,
+                                 "BROKER_GRANT_CHANGED")
+                    if origin_policy is not None:
+                        latest_origin = measure_fixture_origin(
+                            connection, witness, origin_policy)
+                        _require(latest_origin["originWitnessSha256"] == origin_digest,
+                                 "BROKER_ORIGIN_CHANGED")
+                    if signed_service_release is not None:
+                        checked_release = service_release_history.require_current(
+                            signed_service_release, pinned_test_root,
+                            owner_id=packet["ownerId"],
+                            grant_sha256=grant_digest, now_ms=now_ms)
+                        _require(checked_release["releaseSha256"] == release_digest,
+                                 "BROKER_RELEASE_CHANGED")
+                    if signed_checkpoint is not None:
+                        latest_checkpoint = verify_fixture_checkpoint(
+                            signed_checkpoint, checkpoint_root,
+                            history=service_release_history,
+                            signed_release=signed_service_release,
+                            release_root=pinned_test_root,
+                            owner_id=packet["ownerId"],
+                            grant_sha256=grant_digest, now_ms=now_ms)
+                        _require(latest_checkpoint["checkpointSha256"] ==
+                                 checkpoint_digest, "BROKER_CHECKPOINT_CHANGED")
                 admitted = admit_peer_bound_fixture(
                     connection, peer_policy,
                     packet["signedManifest"], pinned_test_root,
@@ -191,15 +316,22 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
                     source_revision=packet["sourceRevision"],
                     source_captured_ms=packet["sourceCapturedAtMs"],
                     payload=payload, now_ms=now_ms,
-                    commit_guard=lifetime.require_alive,
-                    expected_peer_witness_sha256=witness["peerWitnessSha256"])
+                    commit_guard=before_fixture_commit,
+                    expected_peer_witness_sha256=witness["peerWitnessSha256"],
+                    service_witness_sha256=service_digest,
+                    service_grant_sha256=grant_digest,
+                    service_release_sha256=release_digest,
+                    origin_witness_sha256=origin_digest,
+                    checkpoint_sha256=checkpoint_digest)
             _require(admitted["captureAllowed"] is False
                      and admitted["productionAllowed"] is False
                      and admitted["sourceProcessVerified"] is False,
                      "BROKER_UNEXPECTED_PRIVILEGE")
             result = _safe_reply(admitted)
         except (FixtureWireError, BrokerHandoffError, BrokerPeerError,
-                PeerLeaseError, SignedCaptureError, OwnerTrustError,
+                PeerLeaseError, ServiceFixtureError, ServiceGrantError,
+                ServiceReleaseError, FixtureOriginError, SignedCaptureError,
+                OwnerTrustError,
                 TrustHistoryError, AtomicAdmissionError) as exc:
             code = str(exc)
             result = {"ok":False, "error":code if SAFE_CODE.fullmatch(code)

@@ -80,8 +80,15 @@ ShellRoot {
         if(scroll.interactive || scroll.contentHeight>scroll.height+1
            || Math.abs(scroll.contentY)>1)
             return "STILL_PANNING";
-        if(summary.height!==158)
-            return "WEATHER_SUMMARY_CHANGED";
+        if(summary.height!==164 || !summary.compactInstrument ||
+           summary.compactInstrument.currentMeters.count!==4 ||
+           summary.compactInstrument.hourRepeater.count!==3 ||
+           summary.compactInstrument.dayRepeater.count!==3)
+            return "WEATHER_MIRROR_DATA_LOST";
+        if(summary.compactInstrument.hourlyStrip.height<45
+           || summary.compactInstrument.dailyStrip.height<24)
+            return "WEATHER_MIRROR_INSTRUMENTS_SHRUNK";
+
         if(!snap.visible || !autoCards.visible)
             return "CARD_GROUPS_NOT_BOTH_VISIBLE";
         if(content.implicitHeight>scroll.height+1)
@@ -118,7 +125,7 @@ ShellRoot {
                 if(!root.capturedCompact) {
                     root.capturedCompact=true;
                     window.contentItem.grabToImage(function(image) {
-                        if(image && image.saveToFile("/tmp/weather-w16-overview-compact.png"))
+                        if(image && image.saveToFile("/tmp/weather-w17-overview-compact.png"))
                             console.log("W16_OVERVIEW_COMPACT_CAPTURED");
                     },Qt.size(880,550));
                     return;
@@ -134,7 +141,7 @@ ShellRoot {
                 if(!root.capturedWide) {
                     root.capturedWide=true;
                     window.contentItem.grabToImage(function(image) {
-                        if(image && image.saveToFile("/tmp/weather-w16-overview-wide.png"))
+                        if(image && image.saveToFile("/tmp/weather-w17-overview-wide.png"))
                             console.log("W16_OVERVIEW_WIDE_CAPTURED");
                     },Qt.size(1040,600));
                     return;

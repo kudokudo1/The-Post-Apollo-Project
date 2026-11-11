@@ -225,6 +225,45 @@ Column {
         }
     }
 
+    Row {
+        id: alarmVolumeControls
+        width: pane.width
+        height: 32
+        spacing: 8
+        ActionButton {
+            width: 64
+            height: parent.height
+            label: "VOL -10"
+            labelPixelSize: 10
+            accentColor: Colors.cyan
+            available: AlarmService.canEdit
+                       && AlarmService.alarm.volumePercent > 0
+            onLeftClicked: AlarmService.setVolumePercent(
+                Math.max(0, AlarmService.alarm.volumePercent - 10))
+        }
+        GohuText {
+            width: Math.max(0, alarmVolumeControls.width - 128
+                                 - 2 * alarmVolumeControls.spacing)
+            height: parent.height
+            verticalAlignment: Text.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
+            text: "VOLUME // " + AlarmService.alarm.volumePercent + "%"
+            color: Colors.white
+            font.pixelSize: 11
+        }
+        ActionButton {
+            width: 64
+            height: parent.height
+            label: "VOL +10"
+            labelPixelSize: 10
+            accentColor: Colors.cyan
+            available: AlarmService.canEdit
+                       && AlarmService.alarm.volumePercent < 100
+            onLeftClicked: AlarmService.setVolumePercent(
+                Math.min(100, AlarmService.alarm.volumePercent + 10))
+        }
+    }
+
     GohuText {
         width: pane.width
         text: "STATUS // " + AlarmService.feedback

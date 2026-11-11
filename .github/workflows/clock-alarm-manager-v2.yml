@@ -1,0 +1,180 @@
+name: Clock alarm manager V2 contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/TimeW.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "services/time/AlarmManagerPolicy.js"
+      - "services/time/AlarmManagerService.qml"
+      - "services/time/AlarmAudioV2.qml"
+      - "services/time/qmldir"
+      - "assets/sounds/clock-alarm-soft.wav"
+      - "assets/sounds/clock-alarm-urgent.wav"
+      - "tests/time/test_clock_alarm_manager_v2_contract.py"
+      - ".github/workflows/clock-alarm-manager-v2.yml"
+  push:
+    paths:
+      - "widgets/TimeW.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "services/time/AlarmManagerPolicy.js"
+      - "services/time/AlarmManagerService.qml"
+      - "services/time/AlarmAudioV2.qml"
+      - "services/time/qmldir"
+      - "assets/sounds/clock-alarm-soft.wav"
+      - "assets/sounds/clock-alarm-urgent.wav"
+      - "tests/time/test_clock_alarm_manager_v2_contract.py"
+      - ".github/workflows/clock-alarm-manager-v2.yml"
+
+jobs:
+  source-and-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source, safeguards and real WAV file headers
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_alarm_manager_v2_contract.py' -v
+      - name: Run executable calendar, migration and management tests
+        env:
+          TZ: America/New_York
+        run: |
+          node <<'JS'
+          const fs = require('fs'), vm = require('vm'), assert = require('assert/strict');
+          const p = {};
+          const source = fs.readFileSync('services/time/AlarmManagerPolicy.js', 'utf8')
+            .replace(/^\.pragma library\s*/, '');
+          vm.runInNewContext(source, p);
+          const day = (y,m,d,h=0,min=0)=> new Date(y,m-1,d,h,min,0,0).getTime();
+          const d1=day(2026,11,10,12), wed=day(2026,11,11,7,30),
+                fri=day(2026,11,13,7,30), sat=day(2026,11,14,7,30);
+          let doc = p.initialDocument();
+          assert.equal(p.validDocument(doc),true);
+          assert.equal(p.parse(JSON.stringify(doc)).ok,true);
+          assert.equal(p.parse('not json').ok,false);
+          const fresh = p.create(doc); doc = fresh.document;
+          assert.equal(fresh.id,1);
+          const second = p.create(doc); doc = second.document;
+          const third = p.create(doc); doc = third.document;
+          assert.equal(doc.alarms.length,3);
+          let a = p.update(doc,1,{name:'WED REPEAT',hour:7,minute:30,
+            mode:'weekly',weekdays:[3],enabled:true,soundId:'soft',volumePercent:30},d1);
+          assert.equal(a.ok,true);
+          doc=a.document;
+          a=p.update(doc,2,{name:'FRI SAT WED',hour:7,minute:30,weekdays:[3,5,6],
+            enabled:true,soundId:'urgent',volumePercent:90},d1);
+          assert.equal(a.ok,true); doc=a.document;
+          a=p.update(doc,3,{name:'ONLY THIS WED',hour:7,minute:30,mode:'once',
+            date:'2026-11-11',weekdays:[],keepSaved:false,enabled:true},d1);
+          assert.equal(a.ok,true); doc=a.document;
+          assert.equal(p.nextOccurrenceMs(p.byId(doc,1),d1),wed);
+          assert.equal(p.nextOccurrenceMs(p.byId(doc,2),d1),wed);
+          assert.equal(p.nextOccurrenceMs(p.byId(doc,3),d1),wed);
+          assert.equal(p.tick(doc,wed-1).changed,false);
+          const reached=p.tick(doc,wed);
+          assert.deepEqual(Array.from(reached.started),[1,2,3]);
+          doc=reached.document;
+          assert.equal(doc.alarms.filter(a=>a.ringing).length,3);
+          const restored=p.parse(JSON.stringify(doc));
+          assert.equal(restored.ok,true);
+          assert.equal(p.tick(restored.document,wed+1000).changed,false);
+          const stoppedOnce=p.stop(doc,3);
+          assert.equal(stoppedOnce.ok,true);
+          doc=stoppedOnce.document;
+          assert.equal(p.byId(doc,3),null);
+          const snoozed=p.snooze(doc,1,wed+1000);
+          assert.equal(snoozed.ok,true); doc=snoozed.document;
+          assert.equal(p.byId(doc,1).snoozeUntilMs,wed+301000);
+          assert.equal(p.tick(doc,wed+300999).changed,false);
+          const snoozeRing=p.tick(doc,wed+301000);
+          assert.deepEqual(Array.from(snoozeRing.started),[1]);
+          doc=p.stop(snoozeRing.document,1).document;
+          doc=p.stop(doc,2).document;
+          assert.equal(p.tick(doc,wed+600000).changed,false);
+          assert.equal(p.nextOccurrenceMs(p.byId(doc,1),wed+600000),
+            day(2026,11,18,7,30));
+          assert.equal(p.nextOccurrenceMs(p.byId(doc,2),wed+600000),fri);
+          const disable=p.update(doc,1,{enabled:false},wed+601000);
+          assert.equal(disable.ok,true);
+          assert.equal(p.nextOccurrenceMs(p.byId(disable.document,1),wed+601000),0);
+          const reenable=p.update(disable.document,1,{enabled:true},wed+601000);
+          assert.equal(reenable.ok,true);
+          doc=reenable.document;
+          const pause=p.update(doc,2,{pausedUntilDate:'2026-11-14'},wed+601000);
+          assert.equal(pause.ok,true);
+          assert.equal(p.nextOccurrenceMs(p.byId(pause.document,2),wed+601000),sat);
+          assert.equal(p.tick(pause.document,fri).started.length,0);
+          assert.equal(p.tick(pause.document,sat).started.includes(2),true);
+
+          let once = p.create(p.initialDocument()).document;
+          const onceId=once.alarms[0].id;
+          once=p.update(once,onceId,{mode:'once',date:'2026-11-11',weekdays:[],
+            hour:7,minute:30,enabled:true,keepSaved:true},d1).document;
+          once=p.tick(once,wed).document;
+          once=p.stop(once,onceId).document;
+          assert.equal(p.byId(once,onceId).completed,true);
+          assert.equal(p.byId(once,onceId).enabled,false);
+          assert.equal(p.update(once,onceId,{enabled:true},wed+4000).ok,false);
+          const moved=p.update(once,onceId,{date:'2026-11-13',enabled:true},
+            wed+4000);
+          assert.equal(moved.ok,true);
+          assert.equal(moved.document.alarms[0].completed,false);
+          const missed=p.tick(moved.document,day(2026,11,15,12));
+          assert.deepEqual(Array.from(missed.missed),[onceId]);
+          assert.equal(missed.document.alarms[0].completed,true);
+          assert.equal(p.update(doc,1,{weekdays:[]},wed).ok,false);
+          assert.equal(p.update(doc,1,{name:'bad\nname'},wed).ok,false);
+          assert.equal(p.update(doc,1,{soundId:'../../evil'},wed).ok,false);
+          assert.equal(p.update(doc,1,{volumePercent:101},wed).ok,false);
+          assert.equal(p.update(doc,1,{ringing:true},wed).ok,false);
+          assert.equal(p.validDate('2026-02-30',false),false);
+          assert.equal(p.validDate('2026-11-31',false),false);
+          assert.equal(p.validDate('2026-11-30',false),true);
+          assert.equal(p.update(doc,1,{mode:'once',date:'2026-11-10',
+            enabled:true},d1).ok,false);
+          const disposable=p.create(p.initialDocument()).document;
+          let d=p.update(disposable,1,{mode:'once',date:'2026-11-11',
+            weekdays:[],hour:7,minute:30,keepSaved:false,enabled:true},d1).document;
+          d=p.tick(d,wed).document;
+          const autoExpired=p.tick(d,wed+16*60000);
+          assert.deepEqual(Array.from(autoExpired.expired),[1]);
+          assert.equal(autoExpired.document.alarms.length,0);
+
+          // DST: no double fire during the repeated fall-back hour;
+          // nonexistent spring-forward 02:30 normalizes deterministically.
+          const fallBase=day(2026,10,31,22);
+          let fall=p.create(p.initialDocument()).document;
+          fall=p.update(fall,1,{hour:1,minute:30,weekdays:[0],enabled:true},fallBase).document;
+          const firstFall=day(2026,11,1,1,30);
+          fall=p.tick(fall,firstFall).document;
+          fall=p.stop(fall,1).document;
+          const secondFall=firstFall+3600000;
+          assert.equal(p.tick(fall,secondFall).started.length,0);
+          const spring=p.dayAt('2026-03-08',2,30);
+          assert.equal(new Date(spring).getHours(),3);
+
+          const legacy={version:1,alarm:{hour:8,minute:5,label:'OLD',
+            enabled:true,soundEnabled:false,volumePercent:35,lastFiredDay:'',
+            snoozeUntilMs:0,ringing:false,ringStartedAtMs:0}};
+          const migration=p.migrateLegacy(JSON.stringify(legacy),d1);
+          assert.equal(migration.ok,true);
+          assert.equal(migration.document.alarms.length,1);
+          assert.equal(migration.document.alarms[0].name,'OLD');
+          assert.equal(migration.document.alarms[0].volumePercent,35);
+          assert.equal(migration.document.alarms[0].weekdays.length,7);
+          assert.equal(p.parse(JSON.stringify(migration.document)).ok,true);
+          assert.equal(p.migrateLegacy('corrupt',d1).ok,false);
+          let capacity=p.initialDocument();
+          for(let i=0;i<p.MAX_ALARMS;i++) capacity=p.create(capacity).document;
+          assert.equal(capacity.alarms.length,100);
+          assert.equal(p.create(capacity).ok,false);
+          assert.equal(p.remove(capacity,50).document.alarms.length,99);
+          const cloned=p.duplicate(doc,1);
+          assert.equal(cloned.ok,true);
+          assert.equal(cloned.document.alarms.length,doc.alarms.length+1);
+          assert.equal(p.byId(cloned.document,cloned.id).enabled,false);
+          assert.equal(p.byId(cloned.document,cloned.id).soundId,'soft');
+          assert.equal(p.duplicate(capacity,1).ok,false);
+          assert.equal(p.parse(JSON.stringify({...capacity,nextId:1})).ok,false);
+          assert.equal(p.parse(JSON.stringify({...capacity,alarms:[
+            capacity.alarms[0],capacity.alarms[0]]})).ok,false);
+          console.log('Alarm V2 policy executable calendar and migration assertions passed');
+          JS

@@ -11,6 +11,8 @@ ShellRoot {
     property int phase: 0
     property int ticks: 0
     property bool finished: false
+    property bool capturedNow: false
+    property bool capturedAuto: false
     function fail(message) {
         if(finished)return;
         finished=true;
@@ -105,6 +107,14 @@ ShellRoot {
             if(root.phase===0) {
                 if(!overview.overviewSnapshotItem.visible)
                     return root.fail("SNAPSHOT_NOT_DEFAULT");
+                if(!root.capturedNow) {
+                    root.capturedNow=true;
+                    window.contentItem.grabToImage(function(image) {
+                        if(image && image.saveToFile("/tmp/weather-w15-overview-now.png"))
+                            console.log("W15_OVERVIEW_NOW_CAPTURED");
+                    },Qt.size(880,550));
+                    return;
+                }
                 overview.overviewPage="relevant";
                 root.phase=1;
                 return;
@@ -113,6 +123,14 @@ ShellRoot {
                 if(!overview.overviewRelevantItem.visible ||
                    overview.overviewSnapshotItem.visible)
                     return root.fail("AUTO_GROUP_NOT_SWITCHED");
+                if(!root.capturedAuto) {
+                    root.capturedAuto=true;
+                    window.contentItem.grabToImage(function(image) {
+                        if(image && image.saveToFile("/tmp/weather-w15-overview-auto.png"))
+                            console.log("W15_OVERVIEW_AUTO_CAPTURED");
+                    },Qt.size(880,550));
+                    return;
+                }
                 window.width=520;
                 window.height=300;
                 overview.overviewPage="snapshot";

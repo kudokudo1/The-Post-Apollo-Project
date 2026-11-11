@@ -85,8 +85,8 @@ ShellRoot {
                 root.phase=2;return;
             }
             if(root.phase===2) {
-                if(sources.visible||runtime.visible||health.visible
-                    ||!scroll.interactive)
+                if(services.visible || sources.visible || runtime.visible || health.visible
+                    ||!scroll.interactive || !scroll.visible)
                     return root.fail("OVERVIEW_LEAKS_SOURCES");
                 // Existing legacy HOME aliases may be selected without a
                 // second service. Source-only layout remains the same.

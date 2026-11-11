@@ -8,6 +8,9 @@ import "../components"
 Column {
     id: pane
     spacing: 10
+    readonly property bool editingActive:
+        alarmHourField.activeFocus || alarmMinuteField.activeFocus
+        || alarmNameField.activeFocus
 
     GohuText {
         width: pane.width

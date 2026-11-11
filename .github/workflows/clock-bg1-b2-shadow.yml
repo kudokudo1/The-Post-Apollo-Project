@@ -47,7 +47,8 @@ jobs:
               'services/time/AlarmShadowTransactions.py',
               'services/time/BG1-ALARM-SHADOW-TRANSACTIONS.md',
               'tests/time/test_clock_bg1_b2_shadow_transactions.py',
-              '.github/workflows/clock-bg1-b2-shadow.yml'
+              '.github/workflows/clock-bg1-b2-shadow.yml',
+              '.github/workflows/clock-bg1-broker-b1.yml'
           }
           assert changed == permitted, f'Unexpected files: {changed ^ permitted}'
           for forbidden in ('services/time/AlarmManagerService.qml',

@@ -22,6 +22,12 @@ Scope {
     // Optional, fail-closed private Unix socket model reuse. No network port.
     // HospitalW opts in; old Quickshell and CLI installs retain fallback.
     property bool preferPersistentModel: false
+    // Native streaming trial is source-wired but CLOSED until the operator
+    // explicitly authorizes a local model/dependency and host activation.
+    // HospitalW does not set these properties.
+    property bool streamingTrialAllowed: false
+    property string streamingModelDir: ""
+    property bool activeStreaming: false
     // Optional pause-aware chunks. Disabled by default for standalone
     // engine, unguarded sessions, and nonpersistent CLI fallback.
     property int speechPauseMs: 0
@@ -87,7 +93,11 @@ Scope {
         Quickshell.shellPath("scripts/hospital-live-dictation.py")
     readonly property string whisperHelper:
         Quickshell.shellPath("scripts/hospital-reception-stt.sh")
+    readonly property string streamingOwnerScript:
+        Quickshell.shellPath("scripts/hospital_streaming_vosk_owner.py")
 
+    signal streamingPacketReady(var packet)
+    signal streamingFinished()
     signal liveTextReady(string text)
     signal captureStopped()
     signal liveFinished()
@@ -112,8 +122,16 @@ Scope {
         }
         if (busy || liveProcess.running)
             return false;
+        const streamingRequested = requestedDecoderMode === "STREAMING";
+        if (streamingRequested && (!streamingTrialAllowed
+                || !streamingModelDir.trim() || pilotLiveChunks <= 0
+                || pilotOneChunk)) {
+            lastError = "STREAMING TRIAL HOLD // OPERATOR HOST APPROVAL REQUIRED";
+            voiceError(lastError);
+            return false;
+        }
         if (!backendReady) {
-            lastError = "LOCAL LIVE DICTATION UNAVAILABLE // CHECK PIPEWIRE + WHISPER";
+            lastError = "LOCAL DICTATION UNAVAILABLE // CHECK PIPEWIRE + WHISPER";
             voiceError(lastError);
             return false;
         }
@@ -121,7 +139,9 @@ Scope {
             && preferPersistentModel && pilotLiveChunks > 0 && !pilotOneChunk;
         // Never allow a stale FAST choice to carry over from Surgery into
         // Reception or Intercom, which call this without a mode argument.
-        decoderModeUsed = fastRequested ? "FAST PENDING" : "STANDARD";
+        decoderModeUsed = streamingRequested ? "STREAMING PENDING"
+            : fastRequested ? "FAST PENDING" : "STANDARD";
+        activeStreaming = streamingRequested;
         wasCancelled = false;
         doneSeen = false;
         packetCount = 0;
@@ -140,26 +160,34 @@ Scope {
         recordingStartedAt = Date.now();
         recordingElapsedSeconds = 0;
         voiceState = "recording";
-        const command = ["python3", scriptPath, whisperHelper,
-            "--chunk-seconds", String(Math.max(2, Math.min(4, chunkSeconds))),
-            "--first-chunk-ms", String(Math.max(1000,
-                Math.min(chunkSeconds * 1000, firstChunkMs)))];
-        if (pilotOneChunk)
-            command.push("--pilot-one-chunk");
-        else if (pilotLiveChunks > 0)
-            command.push("--pilot-live-chunks", String(Math.max(1, Math.min(8, pilotLiveChunks))));
-        if (preferPersistentModel && pilotLiveChunks > 0) {
-            command.push("--prefer-persistent");
-            if (fastRequested)
-                command.push("--decoder-trial", "fast");
-            if (speechPauseMs > 0)
-                command.push("--speech-pause-ms",
-                    String(Math.max(400, Math.min(650, speechPauseMs))));
-        }
-        if (vadActive) {
-            command.push("--vad", "--threshold", String(vadSpeechThreshold),
-                "--silence-ms", String(vadSilenceMs),
-                "--min-speech-ms", String(vadMinimumSpeechMs));
+        // The ONE host-owned Process chooses exactly one backend. An opt-in
+        // streaming trial cannot launch Whisper and Vosk together.
+        const command = streamingRequested
+            ? ["python3", streamingOwnerScript, "--streaming-trial",
+                "--model-dir", streamingModelDir]
+            : ["python3", scriptPath, whisperHelper,
+                "--chunk-seconds", String(Math.max(2, Math.min(4, chunkSeconds))),
+                "--first-chunk-ms", String(Math.max(1000,
+                    Math.min(chunkSeconds * 1000, firstChunkMs)))];
+        if (!streamingRequested) {
+            if (pilotOneChunk)
+                command.push("--pilot-one-chunk");
+            else if (pilotLiveChunks > 0)
+                command.push("--pilot-live-chunks",
+                    String(Math.max(1, Math.min(8, pilotLiveChunks))));
+            if (preferPersistentModel && pilotLiveChunks > 0) {
+                command.push("--prefer-persistent");
+                if (fastRequested)
+                    command.push("--decoder-trial", "fast");
+                if (speechPauseMs > 0)
+                    command.push("--speech-pause-ms",
+                        String(Math.max(400, Math.min(650, speechPauseMs))));
+            }
+            if (vadActive) {
+                command.push("--vad", "--threshold", String(vadSpeechThreshold),
+                    "--silence-ms", String(vadSilenceMs),
+                    "--min-speech-ms", String(vadMinimumSpeechMs));
+            }
         }
         liveProcess.exec(command);
         clock.restart();
@@ -234,7 +262,7 @@ Scope {
             // Python emits fixed low-cardinality lifecycle codes. The
             // allowlist prevents untrusted child output reaching the journal.
             const code = String(data.detail || "");
-            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|MODEL_BACKPRESSURE|CAPTURE_STOPPED|CAPTURE_LIMIT_NEAR|CAPTURE_CHUNK_LIMIT|CAPTURE_DURATION_LIMIT|CAPTURE_SILENCE_LIMIT|CAPTURE_SOURCE_ENDED|CAPTURE_USER_STOP|MODEL_EARLY_START|MODEL_SESSION_STARTING|MODEL_SESSION_READY|MODEL_SESSION_UNAVAILABLE|DECODER_FAST_ACTIVE|DECODER_FAST_FALLBACK|PAUSE_CHUNK_READY|SILENT_OVERLAP_SKIPPED|RECORDING_COMPLETED)$/.test(code))
+            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|MODEL_BACKPRESSURE|CAPTURE_STOPPED|CAPTURE_LIMIT_NEAR|CAPTURE_CHUNK_LIMIT|CAPTURE_DURATION_LIMIT|CAPTURE_SILENCE_LIMIT|CAPTURE_SOURCE_ENDED|CAPTURE_USER_STOP|MODEL_EARLY_START|MODEL_SESSION_STARTING|MODEL_SESSION_READY|MODEL_SESSION_UNAVAILABLE|DECODER_FAST_ACTIVE|DECODER_FAST_FALLBACK|STREAM_RECORDER_STARTED|PAUSE_CHUNK_READY|SILENT_OVERLAP_SKIPPED|RECORDING_COMPLETED)$/.test(code))
                 return;
             if (lastStage !== code) {
                 lastStage = code;
@@ -259,7 +287,38 @@ Scope {
             }
             return;
         }
-        if (data.kind === "partial") {
+        if (activeStreaming && (data.kind === "hypothesis"
+                || data.kind === "commit")) {
+            // The offline probe already bounds packets; recheck the event
+            // shape before handing it to the one field-owned preview policy.
+            if (Object.keys(data).length !== 4
+                    || typeof data.text !== "string"
+                    || typeof data.revision !== "number"
+                    || !Number.isInteger(data.revision)
+                    || typeof data.clear_provisional !== "boolean"
+                    || data.clear_provisional !== (data.kind === "commit")) {
+                lastError = "INVALID STREAMING PACKET // CANCELLED";
+                voiceError(lastError);
+                cancel();
+                return;
+            }
+            streamingPacketReady(data);
+            return;
+        }
+        if (activeStreaming && data.kind === "metrics") {
+            // Numeric-only timings. Never log interim words or PCM.
+            if (Number.isInteger(data.first_hypothesis_ms)
+                    && data.first_hypothesis_ms >= -1
+                    && data.first_hypothesis_ms <= 45000)
+                firstTextMs = data.first_hypothesis_ms;
+            return;
+        }
+        if (activeStreaming && data.kind === "status") {
+            if (data.code === "CAPTURE_DURATION_LIMIT")
+                captureStopReason = "CAPTURE_DURATION_LIMIT";
+            return;
+        }
+        if (data.kind === "partial" && !activeStreaming) {
             if (typeof data.text !== "string")
                 return;
             const sentence = data.text.trim();
@@ -346,20 +405,25 @@ Scope {
         onExited: function(code, status) {
             cancelWatchdog.stop();
             pilotWatchdog.stop();
+            const wasStreaming = root.activeStreaming;
+            root.activeStreaming = false;
             if (root.wasCancelled)
                 return;
             root.recordingStartedAt = 0;
             root.recordingElapsedSeconds = 0;
             root.voiceState = root.backendReady ? "idle" : "unavailable";
             root.clockStop();
-            if (root.doneSeen) {
-                root.liveFinished();
+            if (root.doneSeen && Number(code) === 0) {
+                if (wasStreaming)
+                    root.streamingFinished();
+                else
+                    root.liveFinished();
                 return;
             }
-            if (!root.doneSeen) {
+            if (!root.doneSeen || Number(code) !== 0) {
                 root.lastError = Number(code) === 0
                     ? "LIVE DICTATION ENDED WITHOUT FINAL RECEIPT"
-                    : "LOCAL LIVE DICTATION STOPPED UNEXPECTEDLY";
+                    : "LOCAL DICTATION STOPPED UNEXPECTEDLY";
                 root.voiceError(root.lastError);
             }
         }

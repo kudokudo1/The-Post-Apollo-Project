@@ -1,0 +1,92 @@
+name: Clock daily alarm audio contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/TimeW.qml"
+      - "widgets/AlarmPane.qml"
+      - "services/time/AlarmPolicy.js"
+      - "services/time/AlarmService.qml"
+      - "services/time/AlarmAudio.qml"
+      - "services/time/qmldir"
+      - "assets/sounds/clock-alarm-chime.wav"
+      - "tests/time/test_clock_alarm_contract.py"
+      - ".github/workflows/clock-alarm-contracts.yml"
+  push:
+    paths:
+      - "widgets/TimeW.qml"
+      - "widgets/AlarmPane.qml"
+      - "services/time/AlarmPolicy.js"
+      - "services/time/AlarmService.qml"
+      - "services/time/AlarmAudio.qml"
+      - "services/time/qmldir"
+      - "assets/sounds/clock-alarm-chime.wav"
+      - "tests/time/test_clock_alarm_contract.py"
+      - ".github/workflows/clock-alarm-contracts.yml"
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Alarm UI, service boundaries and source WAV
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_alarm_contract.py' -v
+      - name: Test daily firing, snooze, restore and invalid input
+        run: |
+          node <<'JS'
+          const assert = require('assert/strict');
+          const fs = require('fs');
+          const vm = require('vm');
+          const policy = {};
+          const raw = fs.readFileSync('services/time/AlarmPolicy.js','utf8');
+          vm.runInNewContext(raw.replace(/^\.pragma library\s*/,''), policy);
+          const p = policy;
+          const empty = p.initialDocument();
+          assert.equal(empty.alarm.enabled,false);
+          assert.equal(p.parse(JSON.stringify(empty)).ok,true);
+          assert.equal(p.parse('bad json').ok,false);
+          assert.equal(p.parse(JSON.stringify({...empty,alarm:{...empty.alarm,hour:24}})).ok,false);
+          assert.equal(p.parse(JSON.stringify({...empty,alarm:{...empty.alarm,ringing:true}})).ok,false);
+          const base = new Date(2026,10,11,6,0).getTime();
+          const dueAt = new Date(2026,10,11,7,30).getTime();
+          const armed = p.withSettings(empty,'07','30','Wake',base);
+          assert.equal(armed.ok,true);
+          assert.equal(armed.document.alarm.enabled,true);
+          assert.equal(armed.document.alarm.label,'Wake');
+          assert.equal(p.withSettings(empty,'24','30','X',base).ok,false);
+          assert.equal(p.withSettings(empty,'07','60','X',base).ok,false);
+          assert.equal(p.withSettings(empty,'7;rm','00','X',base).ok,false);
+          assert.equal(p.withSettings(empty,'07','30','X\nY',base).ok,false);
+          assert.equal(p.tick(armed.document,dueAt-1).event,'waiting');
+          const start = p.tick(armed.document,dueAt);
+          assert.equal(start.event,'ring');
+          assert.equal(start.document.alarm.ringing,true);
+          assert.equal(start.document.alarm.lastFiredDay,p.dayKey(dueAt));
+          assert.equal(p.tick(start.document,dueAt+1000).event,'ringing');
+          const saved = p.parse(JSON.stringify(start.document));
+          assert.equal(saved.ok,true);
+          assert.equal(p.tick(saved.document,dueAt+60000).event,'ringing');
+          const snoozed = p.snooze(saved.document,dueAt+1000);
+          assert.equal(snoozed.ok,true);
+          assert.equal(snoozed.document.alarm.ringing,false);
+          assert.equal(p.tick(snoozed.document,dueAt+1000+299999).event,'snoozing');
+          const again = p.tick(snoozed.document,dueAt+1000+300000);
+          assert.equal(again.event,'ring');
+          const stopped = p.stop(again.document);
+          assert.equal(stopped.document.alarm.ringing,false);
+          assert.equal(stopped.document.alarm.enabled,true);
+          assert.equal(p.tick(stopped.document,dueAt+600000).event,'waiting');
+          const tomorrow = new Date(2026,10,12,7,30).getTime();
+          assert.equal(p.tick(stopped.document,tomorrow).event,'ring');
+          const expired = p.tick(start.document,dueAt+16*60000);
+          assert.equal(expired.event,'expired');
+          assert.equal(expired.document.alarm.ringing,false);
+          assert.equal(p.tick(armed.document,dueAt+121000).event,'waiting');
+          const lateArm=p.withSettings(empty,'07','30','Late',dueAt+30000);
+          assert.equal(lateArm.document.alarm.lastFiredDay,p.dayKey(dueAt));
+          assert.equal(p.tick(lateArm.document,dueAt+31000).event,'waiting');
+          const silent=p.withSound(armed.document,false);
+          assert.equal(silent.document.alarm.soundEnabled,false);
+          assert.equal(p.disarm(start.document).document.alarm.enabled,false);
+          // No host changes: the policy is pure schedule arithmetic.
+          JS

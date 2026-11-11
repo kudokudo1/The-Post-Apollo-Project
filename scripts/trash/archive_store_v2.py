@@ -76,16 +76,29 @@ class ArchiveStore:
         self._check_root()
         _private_file(self.path, allow_missing=True)
         _private_file(self.root / (DB_NAME + "-journal"), allow_missing=True)
+        created = False
         if not self.path.exists():
             try:
                 fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY
                              | getattr(os, "O_NOFOLLOW", 0), 0o600)
                 os.close(fd)
+                created = True
             except FileExistsError:
                 _private_file(self.path)
             except OSError as exc:
                 raise ArchiveError("ARCHIVE_CREATE_FAILED") from exc
         self._init()
+        # Persist the newly created database directory entry as well as its pages.
+        if created:
+            try:
+                fd = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY
+                             | getattr(os, "O_NOFOLLOW", 0))
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+            except OSError as exc:
+                raise ArchiveError("ARCHIVE_DIRECTORY_SYNC_FAILED") from exc
 
     def _check_root(self):
         try:
@@ -99,6 +112,14 @@ class ArchiveStore:
         self._check_root()
         _private_file(self.path)
         _private_file(self.root / (DB_NAME + "-journal"), allow_missing=True)
+        # This store uses rollback journals, not WAL. Refuse unexpected
+        # sidecars before SQLite can open them, including dangling symlinks.
+        for extension in ("-wal", "-shm"):
+            try:
+                (self.root / (DB_NAME + extension)).lstat()
+            except FileNotFoundError:
+                continue
+            raise ArchiveError("ARCHIVE_UNEXPECTED_SIDECAR")
         try:
             db = sqlite3.connect(str(self.path), timeout=10)
             db.execute("PRAGMA journal_mode=DELETE")
@@ -146,7 +167,8 @@ class ArchiveStore:
     def save(self, owner_id, resource_id, source_revision, payload,
              display_label="", captured_ms=None):
         """Store a validated, source-provided copy; never read the source file."""
-        _require(owner_id in PILOT_OWNERS, "OWNER_NOT_AUTHORIZED")
+        _require(isinstance(owner_id, str) and owner_id in PILOT_OWNERS,
+                 "OWNER_NOT_AUTHORIZED")
         _identity(resource_id)
         _identity(source_revision)
         _require(type(payload) is bytes and 0 < len(payload) <= MAX_ITEM_BYTES,

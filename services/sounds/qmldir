@@ -1,0 +1,3 @@
+module qs.services.sounds
+
+singleton SoundLibraryService 1.0 SoundLibraryService.qml

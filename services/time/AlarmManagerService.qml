@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.services.sounds
 import "AlarmManagerPolicy.js" as Policy
 
 // V2 is the only mounted Alarm owner; V1 remains read-only migration input.
@@ -288,7 +289,9 @@ Scope {
     }
 
     function previewSound(soundId, volumePercent) {
-        if (ringingCount > 0 || Policy.SOUND_IDS.indexOf(soundId) < 0
+        if (ringingCount > 0 || !Policy.validSoundId(soundId)
+                || (SoundLibraryService.isImportedId(soundId)
+                    && !SoundLibraryService.byId(soundId))
                 || !Number.isInteger(volumePercent)
                 || volumePercent < 0 || volumePercent > 100)
             return false;

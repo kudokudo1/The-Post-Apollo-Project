@@ -10,6 +10,10 @@ var MAX_LATE_MS = 2 * 60 * 1000;
 var MAX_RING_MS = 15 * 60 * 1000;
 var SNOOZE_MS = 5 * 60 * 1000;
 var SOUND_IDS = ["chime", "soft", "urgent"];
+function validSoundId(id) {
+    return SOUND_IDS.indexOf(id) >= 0
+        || (typeof id === "string" && /^user-[0-9a-f]{64}$/.test(id));
+}
 var EVENT_KINDS = ["none", "fired", "missed", "stopped", "snoozed", "expired"];
 
 function integer(n, min, max) {
@@ -105,7 +109,7 @@ function validAlarm(a) {
         && typeof a.keepSaved === "boolean"
         && typeof a.enabled === "boolean"
         && validDate(a.pausedUntilDate, true)
-        && SOUND_IDS.indexOf(a.soundId) >= 0
+        && validSoundId(a.soundId)
         && typeof a.soundEnabled === "boolean"
         && integer(a.volumePercent, 0, 100)
         && validDate(a.lastFiredDay, true)

@@ -1,0 +1,54 @@
+name: Clock shared sound library V1
+
+on:
+  pull_request:
+    paths:
+      - "services/sounds/**"
+      - "services/time/AlarmManagerPolicy.js"
+      - "services/time/AlarmManagerService.qml"
+      - "services/time/AlarmAudioV2.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "tests/time/test_clock_sound_library_v1.py"
+      - ".github/workflows/clock-sound-library-v1.yml"
+  push:
+    paths:
+      - "services/sounds/**"
+      - "services/time/AlarmManagerPolicy.js"
+      - "services/time/AlarmManagerService.qml"
+      - "services/time/AlarmAudioV2.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "tests/time/test_clock_sound_library_v1.py"
+      - ".github/workflows/clock-sound-library-v1.yml"
+
+jobs:
+  local-wav-host-and-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify bounded WAV imports, managed persistence, source controls
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_sound_library_v1.py' -v
+      - name: Run existing Clock V2 scheduling and audio source contracts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_alarm_manager_v2_contract.py' -v
+      - name: Verify custom tone ID allowlist, no arbitrary file URL as an alarm ID
+        run: |
+          node <<'JS'
+          const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm');
+          const p={};
+          vm.runInNewContext(fs.readFileSync('services/time/AlarmManagerPolicy.js','utf8').replace(/^\.pragma library\s*/,''),p);
+          const token='user-'+'a'.repeat(64);
+          assert.equal(p.validSoundId(token),true);
+          assert.equal(p.validSoundId('chime'),true);
+          assert.equal(p.validSoundId('soft'),true);
+          assert.equal(p.validSoundId('urgent'),true);
+          for(const v of ['user-test','user-'+'z'.repeat(64),'file:///etc/passwd',
+                          '../tone.wav','https://host/tone.wav','',null]){
+            assert.equal(p.validSoundId(v),false);
+          }
+          const now=Date.now();
+          const created=p.create(p.initialDocument(),now);
+          const edited=p.update(created.document,created.id,{soundId:token},now);
+          assert.equal(edited.ok,true);
+          assert.equal(p.parse(JSON.stringify(edited.document)).ok,true);
+          assert.equal(p.update(created.document,created.id,{soundId:'file:///tmp/a.wav'},now).ok,false);
+          console.log('Managed custom IDs only; alarm schema remains V2: PASS');
+          JS

@@ -1,7 +1,9 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
+import QtQuick.Dialogs
 import qs.services.time
+import qs.services.sounds
 import "../components"
 import "../services/time/AlarmManagerPolicy.js" as Policy
 
@@ -24,6 +26,10 @@ Item {
     property bool draftSoundEnabled: true
     property string draftSoundId: "chime"
     property int draftVolume: 60
+    property bool soundLibraryOpen: false
+    property string librarySelectedId: ""
+    property string libraryDeleteConfirmId: ""
+    readonly property var libraryTones: SoundLibraryService.tones
     property int deleteConfirmId: 0
     property bool loadingNote: false
     // An absent one-time date is an AUTO suggestion, not tomorrow by fiat.
@@ -39,7 +45,7 @@ Item {
         alarmSearch.activeFocus || alarmName.activeFocus
         || alarmHour.activeFocus || alarmMinute.activeFocus
         || alarmDate.activeFocus || alarmResumeDate.activeFocus
-        || alarmNote.activeFocus
+        || alarmNote.activeFocus || libraryRename.activeFocus
 
     readonly property var visibleAlarms: {
         const term = alarmSearch.text.toLowerCase().trim();
@@ -51,11 +57,15 @@ Item {
     }
     readonly property int selectedListIndex: visibleAlarms.findIndex(
         function(a) { return a.id === selectedId; })
-    readonly property bool canStepSelection: visibleAlarms.length > 1
-    readonly property string selectionLabel:
-        selectedListIndex >= 0
-            ? (selectedListIndex + 1) + " / " + visibleAlarms.length
-            : "0 / " + visibleAlarms.length
+    readonly property bool canStepSelection: soundLibraryOpen
+        ? libraryTones.length > 1 : visibleAlarms.length > 1
+    readonly property string selectionLabel: soundLibraryOpen
+        ? "TONES " + (libraryTones.findIndex(function(t) {
+            return t.id === librarySelectedId;
+        }) + 1) + " / " + libraryTones.length
+        : selectedListIndex >= 0
+        ? (selectedListIndex + 1) + " / " + visibleAlarms.length
+        : "0 / " + visibleAlarms.length
     readonly property var dayNames: ["SUN","MON","TUE","WED","THU","FRI","SAT"]
 
     function canLeaveNote(id) {
@@ -235,7 +245,63 @@ Item {
             ? Policy.dayAt(typed, 12, 0) : Date.now();
         alarmDate.text = Policy.dateOffset(start, days);
     }
+    function chooseLibraryTone(id) {
+        const tone = SoundLibraryService.byId(id);
+        if (!tone) return false;
+        librarySelectedId = id;
+        libraryRename.text = tone.name;
+        libraryDeleteConfirmId = "";
+        return true;
+    }
+    function openLibrary() {
+        soundLibraryOpen = true;
+        SoundLibraryService.refresh();
+        if (libraryTones.length > 0 && !SoundLibraryService.byId(librarySelectedId))
+            chooseLibraryTone(libraryTones[0].id);
+    }
+    function applyLibraryTone() {
+        if (!SoundLibraryService.byId(librarySelectedId)) return;
+        draftSoundId = librarySelectedId;
+        soundLibraryOpen = false;
+    }
+    function importNameFromUrl(fileUrl) {
+        const tail = String(fileUrl || "").split("/").pop().split("?")[0];
+        let name = "";
+        try { name = decodeURIComponent(tail); }
+        catch (e) { name = "Imported tone"; }
+        name = name.replace(/\.wav$/i, "").replace(/[\x00-\x1f\x7f]/g, "")
+            .trim().slice(0, 40);
+        return name || "Imported tone";
+    }
+    function deleteLibraryTone() {
+        if (!SoundLibraryService.byId(librarySelectedId)) return;
+        if (draftSoundId === librarySelectedId
+                || AlarmManagerService.ringingCount > 0
+                || AlarmManagerService.previewing) {
+            SoundLibraryService.feedback = "TONE IN USE // SELECT ANOTHER FIRST";
+            return;
+        }
+        if (libraryDeleteConfirmId !== librarySelectedId) {
+            libraryDeleteConfirmId = librarySelectedId;
+            SoundLibraryService.feedback = "CONFIRM REMOVE // PRESS DELETE AGAIN";
+            return;
+        }
+        libraryDeleteConfirmId = "";
+        SoundLibraryService.remove(librarySelectedId);
+    }
     function stepSelection(delta) {
+        if (soundLibraryOpen) {
+            const list = libraryTones;
+            if (list.length < 1) return;
+            let idx = list.findIndex(function(t) {
+                return t.id === librarySelectedId;
+            });
+            if (idx < 0) idx = delta > 0 ? -1 : list.length;
+            idx = Math.max(0, Math.min(list.length - 1, idx + delta));
+            if (chooseLibraryTone(list[idx].id))
+                libraryList.positionViewAtIndex(idx, ListView.Contain);
+            return;
+        }
         const rows = visibleAlarms;
         if (rows.length < 1) return;
         let idx = rows.findIndex(function(a) { return a.id === selectedId; });
@@ -260,6 +326,9 @@ Item {
                 choose(AlarmManagerService.document.alarms[0].id);
         }
     }
+    onSettingsTabChanged: {
+        if (settingsTab !== "sound") soundLibraryOpen = false;
+    }
     onSelectedAlarmChanged: {
         if (!selectedAlarm && AlarmManagerService.count > 0)
             choose(AlarmManagerService.document.alarms[0].id);
@@ -267,6 +336,30 @@ Item {
     Component.onCompleted: {
         if (AlarmManagerService.count)
             choose(AlarmManagerService.document.alarms[0].id);
+    }
+    Connections {
+        target: SoundLibraryService
+        function onSelectedImportedIdChanged() {
+            if (SoundLibraryService.selectedImportedId !== "")
+                pane.chooseLibraryTone(SoundLibraryService.selectedImportedId);
+        }
+        function onTonesChanged() {
+            if (pane.librarySelectedId !== ""
+                    && !SoundLibraryService.byId(pane.librarySelectedId)) {
+                pane.librarySelectedId = "";
+                libraryRename.text = "";
+            }
+        }
+    }
+    FileDialog {
+        id: soundImportDialog
+        title: "IMPORT WAV INTO POST-APOLLO SOUND LIBRARY"
+        fileMode: FileDialog.OpenFile
+        nameFilters: ["PCM WAV audio (*.wav)"]
+        onAccepted: {
+            SoundLibraryService.importWav(
+                selectedFile.toString(), pane.importNameFromUrl(selectedFile));
+        }
     }
     Connections {
         target: AlarmManagerService
@@ -724,22 +817,28 @@ Item {
             Column {
                 width: parent.width
                 spacing: 4
-                visible: pane.settingsTab === "sound"
+                visible: pane.settingsTab === "sound" && !pane.soundLibraryOpen
                 Row {
                     id: soundChoices
                     width: parent.width
                     height: 29
                     spacing: 5
                     Repeater {
-                        model: ["chime", "soft", "urgent"]
+                        model: ["chime", "soft", "urgent", "library"]
                         delegate: ActionButton {
-                            width: (soundChoices.width - 2 * soundChoices.spacing) / 3
+                            width: (soundChoices.width - 3 * soundChoices.spacing) / 4
                             height: parent.height
                             label: modelData.toUpperCase()
-                            labelPixelSize: 10
-                            selected: pane.draftSoundId === modelData
+                            labelPixelSize: 9
+                            selected: modelData === "library"
+                                ? pane.soundLibraryOpen
+                                : pane.draftSoundId === modelData
                             accentColor: Colors.magenta
-                            onLeftClicked: pane.draftSoundId = modelData
+                            onLeftClicked: {
+                                if (modelData === "library")
+                                    pane.openLibrary();
+                                else pane.draftSoundId = modelData;
+                            }
                         }
                     }
                 }
@@ -800,6 +899,107 @@ Item {
                         accentColor: Colors.orange
                         onLeftClicked: AlarmManagerService.previewSound(
                             pane.draftSoundId, pane.draftVolume)
+                    }
+                }
+            }
+
+            Column {
+                id: soundLibraryEditor
+                width: parent.width
+                spacing: 4
+                visible: pane.settingsTab === "sound" && pane.soundLibraryOpen
+                Row {
+                    id: libraryTools
+                    width: parent.width
+                    height: 29
+                    spacing: 4
+                    ActionButton {
+                        width: (libraryTools.width - 2 * libraryTools.spacing) / 3
+                        height: parent.height
+                        label: "◀ BACK"
+                        labelPixelSize: 9
+                        accentColor: Colors.cyan
+                        onLeftClicked: pane.soundLibraryOpen = false
+                    }
+                    ActionButton {
+                        width: (libraryTools.width - 2 * libraryTools.spacing) / 3
+                        height: parent.height
+                        label: "IMPORT WAV"
+                        labelPixelSize: 9
+                        accentColor: Colors.magenta
+                        available: !SoundLibraryService.busy
+                            && SoundLibraryService.tones.length < SoundLibraryService.maxTones
+                        onLeftClicked: soundImportDialog.open()
+                    }
+                    ActionButton {
+                        width: (libraryTools.width - 2 * libraryTools.spacing) / 3
+                        height: parent.height
+                        label: "USE TONE"
+                        labelPixelSize: 9
+                        accentColor: Colors.green
+                        available: SoundLibraryService.byId(pane.librarySelectedId) !== null
+                        onLeftClicked: pane.applyLibraryTone()
+                    }
+                }
+                Row {
+                    id: libraryNameRow
+                    width: parent.width
+                    height: 29
+                    spacing: 4
+                    TextField {
+                        id: libraryRename
+                        width: (libraryNameRow.width - libraryNameRow.spacing) * 0.64
+                        height: parent.height
+                        maximumLength: 40
+                        placeholderText: "TONE NAME"
+                        placeholderTextColor: Colors.cyan
+                        color: Colors.magenta
+                        font.pixelSize: 10
+                        background: Rectangle {
+                            color: Colors.black
+                            border.width: 1
+                            border.color: libraryRename.activeFocus
+                                ? Colors.magenta : Colors.cyan
+                        }
+                    }
+                    ActionButton {
+                        width: libraryNameRow.width - libraryRename.width
+                            - libraryNameRow.spacing
+                        height: parent.height
+                        label: "SAVE NAME"
+                        labelPixelSize: 9
+                        accentColor: Colors.green
+                        available: !SoundLibraryService.busy
+                            && SoundLibraryService.byId(pane.librarySelectedId) !== null
+                        onLeftClicked: SoundLibraryService.rename(
+                            pane.librarySelectedId, libraryRename.text)
+                    }
+                }
+                Row {
+                    id: libraryActions
+                    width: parent.width
+                    height: 29
+                    spacing: 4
+                    ActionButton {
+                        width: (libraryActions.width - libraryActions.spacing) / 2
+                        height: parent.height
+                        label: "PREVIEW"
+                        labelPixelSize: 9
+                        accentColor: Colors.orange
+                        available: SoundLibraryService.byId(pane.librarySelectedId) !== null
+                        onLeftClicked: AlarmManagerService.previewSound(
+                            pane.librarySelectedId, pane.draftVolume)
+                    }
+                    ActionButton {
+                        width: (libraryActions.width - libraryActions.spacing) / 2
+                        height: parent.height
+                        label: pane.libraryDeleteConfirmId === pane.librarySelectedId
+                            ? "CONFIRM DELETE" : "DELETE TONE"
+                        labelPixelSize: 9
+                        accentColor: Colors.red
+                        available: !SoundLibraryService.busy
+                            && SoundLibraryService.byId(pane.librarySelectedId) !== null
+                        onLeftClicked: pane.deleteLibraryTone()
                     }
                 }
             }
@@ -973,7 +1173,9 @@ Item {
         GohuText {
             width: parent.width
             height: 17
-            text: "STATUS // " + AlarmManagerService.feedback
+            text: pane.soundLibraryOpen
+                ? "LIBRARY // " + SoundLibraryService.feedback
+                : "STATUS // " + AlarmManagerService.feedback
             color: AlarmManagerService.storageError
                    ? Colors.orange : Colors.cyan
             font.pixelSize: 10
@@ -1003,6 +1205,7 @@ Item {
             spacing: 4
             boundsBehavior: Flickable.StopAtBounds
             interactive: contentHeight > height
+            visible: !pane.soundLibraryOpen
             model: pane.visibleAlarms
 
             delegate: Row {
@@ -1108,9 +1311,37 @@ Item {
             }
         }
 
+        ListView {
+            id: libraryList
+            anchors {
+                top: parent.top
+                bottom: parent.bottom
+                left: parent.left
+                right: parent.right
+                rightMargin: listRail.crossExtent + 6
+            }
+            visible: pane.soundLibraryOpen
+            clip: true
+            spacing: 4
+            boundsBehavior: Flickable.StopAtBounds
+            interactive: contentHeight > height
+            model: pane.libraryTones
+            delegate: ActionButton {
+                required property var modelData
+                width: libraryList.width
+                height: 35
+                label: modelData.name + " // "
+                    + modelData.seconds.toFixed(1) + "S"
+                labelPixelSize: 10
+                selected: pane.librarySelectedId === modelData.id
+                accentColor: Colors.magenta
+                onLeftClicked: pane.chooseLibraryTone(modelData.id)
+            }
+        }
+
         NeonScrollBar {
             id: listRail
-            flickable: alarmList
+            flickable: pane.soundLibraryOpen ? libraryList : alarmList
             accountForContentOrigin: true
             geometryMode: "viewport"
             x: listFrame.width - width - 3
@@ -1126,10 +1357,17 @@ Item {
         }
         GohuText {
             anchors.centerIn: parent
-            visible: pane.visibleAlarms.length === 0
+            visible: !pane.soundLibraryOpen && pane.visibleAlarms.length === 0
             text: AlarmManagerService.count > 0
                 ? "NO MATCHING ALARMS" : "NO SAVED ALARMS // + NEW"
             font.pixelSize: 11
+            color: Colors.cyan
+        }
+        GohuText {
+            anchors.centerIn: parent
+            visible: pane.soundLibraryOpen && pane.libraryTones.length === 0
+            text: "NO IMPORTED TONES // IMPORT WAV"
+            font.pixelSize: 10
             color: Colors.cyan
         }
     }

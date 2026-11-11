@@ -10,6 +10,7 @@ var MAX_LATE_MS = 2 * 60 * 1000;
 var MAX_RING_MS = 15 * 60 * 1000;
 var SNOOZE_MS = 5 * 60 * 1000;
 var SOUND_IDS = ["chime", "soft", "urgent"];
+var EVENT_KINDS = ["none", "fired", "missed", "stopped", "snoozed", "expired"];
 
 function integer(n, min, max) {
     return typeof n === "number" && Number.isSafeInteger(n) && n >= min && n <= max;
@@ -91,6 +92,9 @@ function validAlarm(a) {
         // New optional fields remain compatible with existing V2 files.
         && (a.favorite === undefined || typeof a.favorite === "boolean")
         && (a.note === undefined || validNote(a.note))
+        && (a.lastEventKind === undefined || EVENT_KINDS.indexOf(a.lastEventKind) >= 0)
+        && (a.lastEventAtMs === undefined || timestamp(a.lastEventAtMs))
+        && (a.lastExpectedAtMs === undefined || timestamp(a.lastExpectedAtMs))
         && integer(a.hour, 0, 23) && integer(a.minute, 0, 59)
         && (a.mode === "once" || a.mode === "weekly")
         && weekdaysValid(a.weekdays)
@@ -137,7 +141,9 @@ function parse(text) {
 function cloneDocument(doc) {
     return {version: VERSION, nextId: doc.nextId,
             alarms: doc.alarms.map(function(a) { return Object.assign(
-                {favorite: false, note: ""}, a,
+                {favorite: false, note: "",
+                 lastEventKind: "none", lastEventAtMs: 0,
+                 lastExpectedAtMs: 0}, a,
                 {weekdays: a.weekdays.slice()}); })};
 }
 function byId(doc, id) {
@@ -156,7 +162,9 @@ function freshAlarm(id, nowMs) {
             keepSaved: true, enabled: false, pausedUntilDate: "",
             soundId: "chime", soundEnabled: true, volumePercent: 60,
             lastFiredDay: "", ringing: false, ringStartedAtMs: 0,
-            snoozeUntilMs: 0, completed: false};
+            snoozeUntilMs: 0, completed: false,
+            lastEventKind: "none", lastEventAtMs: 0,
+            lastExpectedAtMs: 0};
 }
 function create(doc, nowMs) {
     if (!validDocument(doc) || doc.alarms.length >= MAX_ALARMS
@@ -185,7 +193,8 @@ function duplicate(doc, id) {
         enabled: false, pausedUntilDate: "", completed: false,
         favorite: false,
         lastFiredDay: "", ringing: false, ringStartedAtMs: 0,
-        snoozeUntilMs: 0
+        snoozeUntilMs: 0, lastEventKind: "none",
+        lastEventAtMs: 0, lastExpectedAtMs: 0
     });
     next.nextId += 1;
     next.alarms.push(copy);
@@ -206,7 +215,8 @@ function update(doc, id, patch, nowMs) {
         if (Object.prototype.hasOwnProperty.call(patch, key)
                 && allowed.indexOf(key) < 0)
             return {ok: false, error: "INVALID_EDIT_FIELD"};
-    var target = Object.assign({favorite: false, note: ""}, old, patch);
+    var target = Object.assign({favorite: false, note: "",
+        lastEventKind: "none", lastEventAtMs: 0, lastExpectedAtMs: 0}, old, patch);
     // A schedule edit means a new future occurrence, without surprising
     // immediate playback when the chosen minute already happened today.
     var scheduleChanged = target.hour !== old.hour || target.minute !== old.minute
@@ -228,8 +238,13 @@ function update(doc, id, patch, nowMs) {
         target.snoozeUntilMs = 0;
         if (target.mode === "weekly") {
             var today = dayKey(nowMs);
+            const dueTime = dayAt(today, target.hour, target.minute);
+            // Setting a time during its own 2-minute grace window is a
+            // legitimate immediate alarm. Only mark it handled when truly
+            // expired, or when this unchanged alarm already fired today.
             if (target.weekdays.indexOf(new Date(nowMs).getDay()) >= 0
-                    && dayAt(today, target.hour, target.minute) <= nowMs)
+                    && ((nowMs - dueTime > MAX_LATE_MS)
+                        || (!scheduleChanged && old.lastFiredDay === today)))
                 target.lastFiredDay = today;
         }
     }
@@ -261,11 +276,13 @@ function finishOnce(a) {
     a.ringing = false; a.ringStartedAtMs = 0; a.snoozeUntilMs = 0;
     a.completed = true; a.enabled = false;
 }
-function stop(doc, id) {
+function stop(doc, id, nowMs) {
     var a = byId(doc, id);
     if (!a || !a.ringing) return {ok: false, error: "NOT_RINGING"};
     var next = cloneDocument(doc), row = byId(next, id);
     row.ringing = false; row.ringStartedAtMs = 0; row.snoozeUntilMs = 0;
+    row.lastEventKind = "stopped";
+    row.lastEventAtMs = timestamp(nowMs) && nowMs > 0 ? nowMs : Date.now();
     if (row.mode === "once") {
         if (row.keepSaved) finishOnce(row);
         else next.alarms = next.alarms.filter(function(e) { return e.id !== id; });
@@ -280,6 +297,8 @@ function snooze(doc, id, nowMs) {
     row.ringing = false;
     row.ringStartedAtMs = 0;
     row.snoozeUntilMs = nowMs + SNOOZE_MS;
+    row.lastEventKind = "snoozed";
+    row.lastEventAtMs = nowMs;
     return {ok: true, document: next};
 }
 function dueKey(a, nowMs) {
@@ -303,6 +322,8 @@ function tick(doc, nowMs) {
                 finishOnce(a);
                 if (!a.keepSaved) removedAfterExpiry.push(a.id);
             } else { a.ringing = false; a.ringStartedAtMs = 0; }
+            a.lastEventKind = "expired";
+            a.lastEventAtMs = nowMs;
             expired.push(a.id); changed = true; return;
         }
         if (a.snoozeUntilMs > 0) {
@@ -311,9 +332,14 @@ function tick(doc, nowMs) {
             a.snoozeUntilMs = 0; changed = true;
             if (lateSnooze > MAX_LATE_MS) {
                 if (a.mode === "once") finishOnce(a);
+                a.lastEventKind = "missed";
+                a.lastEventAtMs = nowMs;
                 missed.push(a.id); return;
             }
             a.ringing = true; a.ringStartedAtMs = nowMs;
+            a.lastEventKind = "fired";
+            a.lastEventAtMs = nowMs;
+            a.lastExpectedAtMs = nowMs - lateSnooze;
             started.push(a.id); return;
         }
         if (a.pausedUntilDate !== "" && today < a.pausedUntilDate) return;
@@ -321,21 +347,33 @@ function tick(doc, nowMs) {
             a.pausedUntilDate = ""; changed = true;
         }
         if (a.mode === "once" && a.date < today) {
-            finishOnce(a); missed.push(a.id); changed = true; return;
+            finishOnce(a);
+            a.lastEventKind = "missed";
+            a.lastEventAtMs = nowMs;
+            a.lastExpectedAtMs = dayAt(a.date, a.hour, a.minute);
+            missed.push(a.id); changed = true; return;
         }
         var due = dueKey(a, nowMs);
         if (due === "" || a.lastFiredDay === due) return;
         var late = nowMs - dayAt(today, a.hour, a.minute);
         if (late < 0) return;
         if (late > MAX_LATE_MS) {
-            if (a.mode === "once") {
-                finishOnce(a); missed.push(a.id); changed = true;
-            }
+            // Persist this missed occurrence for weekly AND one-time alarms.
+            // Otherwise a weekly failure silently disappears into next week.
+            if (a.mode === "once") finishOnce(a);
+            a.lastFiredDay = due;
+            a.lastEventKind = "missed";
+            a.lastEventAtMs = nowMs;
+            a.lastExpectedAtMs = dayAt(today, a.hour, a.minute);
+            missed.push(a.id); changed = true;
             return;
         }
         a.lastFiredDay = due;
         a.ringing = true;
         a.ringStartedAtMs = nowMs;
+        a.lastEventKind = "fired";
+        a.lastEventAtMs = nowMs;
+        a.lastExpectedAtMs = dayAt(today, a.hour, a.minute);
         started.push(a.id); changed = true;
     });
     if (removedAfterExpiry.length) {
@@ -362,7 +400,10 @@ function nextOccurrenceMs(a, nowMs) {
     for (var d = 0; d <= 7; d++) {
         var key = dateOffset(start, d), ms = dayAt(key, a.hour, a.minute);
         if (a.weekdays.indexOf(new Date(ms).getDay()) >= 0
-                && ms > nowMs && a.lastFiredDay !== key) return ms;
+                && a.lastFiredDay !== key
+                && (ms > nowMs
+                    || (ms <= nowMs && nowMs - ms <= MAX_LATE_MS)))
+            return ms;
     }
     return 0;
 }

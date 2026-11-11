@@ -125,6 +125,7 @@ class AtomicSignedAdmissionTests(unittest.TestCase):
         stat=self.ledger.test_copy_status("demo-scrape")
         self.assertEqual((stat["testCopies"],stat["consumedNonces"]),(1,1))
         witnessed=self.inspect()
+        self.assertTrue(witnessed["payloadIntegrityVerified"])
         self.assertEqual(witnessed["state"],"TEST_COPY_COMMITTED")
         self.assertEqual(witnessed["snapshotId"],result["snapshotId"])
         self.assertEqual(witnessed["proofSha256"],result["proofSha256"])
@@ -274,6 +275,26 @@ admit_fixture_signed_copy(data["manifest"],pinned,data["proof"],
         self.assertNotIn("payloadB64",details)
         self.assertFalse(details["productionAllowed"])
         self.assertEqual(self.ledger.status("demo-scrape")["consumedNonces"],1)
+
+    def test_recovery_is_readonly_and_rejects_modified_fixture_payload(self):
+        self.call()
+        file_path=self.root/FILE_NAME
+        before=file_path.read_bytes()
+        recovered=self.inspect()
+        self.assertEqual(recovered["state"],"TEST_COPY_COMMITTED")
+        self.assertTrue(recovered["payloadIntegrityVerified"])
+        self.assertEqual(file_path.read_bytes(),before)
+        # Model an unauthorized later byte rewrite in a copy record.
+        with sqlite3.connect(file_path) as db:
+            db.execute("UPDATE test_copies SET payload=?",
+                       (b"tampered test payload",))
+        with self.assertRaisesRegex(TrustHistoryError,
+                                    "TEST_ADMISSION_INTEGRITY_INVALID"):
+            self.inspect()
+        # The nonce is still consumed; corruption cannot permit replay.
+        with self.assertRaisesRegex(TrustHistoryError,
+                                    "SOURCE_NONCE_ALREADY_CONSUMED"):
+            self.call()
 
     def test_no_production_cli_source_import_or_quickshell_access(self):
         from scripts.trash import archive_v2_atomic_admission as gateway

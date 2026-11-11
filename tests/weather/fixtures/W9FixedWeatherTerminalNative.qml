@@ -10,6 +10,7 @@ ShellRoot {
     property int ticks: 0
     property int phase: 0
     property bool finished: false
+    property bool tallHeroCaptured: false
     readonly property var pages: ["weather","twilight"]
     function fail(reason) {
         if(finished)return;
@@ -290,7 +291,37 @@ ShellRoot {
                     },Qt.size(880,550));
                     return;
                 }
+                window.width=520;
+                window.height=380;
+                root.phase=4;
+                return;
+            }
+            if(root.phase===4) {
+                if(combined.width<519 || combined.width>521)
+                    return root.fail("W20_TALL_WIDTH_NOT_APPLIED");
+                if(combined.currentItem.mainGlyph.width<150 ||
+                   combined.currentItem.mainTemperature.font.pixelSize<43)
+                    return root.fail("W20_HERO_ICON_NOT_DRAMATIC // "
+                        +combined.currentItem.mainGlyph.width);
+                const mainIcon=combined.currentItem.mainGlyph;
+                const temp=combined.currentItem.mainTemperature;
+                const iconLeft=mainIcon.mapToItem(combined.currentItem,0,0).x;
+                const tempRight=temp.mapToItem(
+                    combined.currentItem,temp.width,0).x;
+                if(tempRight>iconLeft+1)
+                    return root.fail("W20_HERO_OVERLAPS_TEMPERATURE // "
+                        +tempRight+"/"+iconLeft);
+                if(!root.tallHeroCaptured) {
+                    root.tallHeroCaptured=true;
+                    window.contentItem.grabToImage(function(image) {
+                        if(image && image.saveToFile(
+                                "/tmp/weather-w20-current-hero-tall.png"))
+                            console.log("W20_HERO_TALL_PREVIEW_CAPTURED");
+                    },Qt.size(1040,760));
+                    return;
+                }
                 root.finished=true;
+                console.log("W20_NATIVE_PASS // GIANT_CURRENT_ARTWORK_520_380");
                 console.log("W14_NATIVE_PASS // TWO_SIZE_LINE_GLYPH_INSTRUMENT_520_440");
                 Qt.quit();
             }

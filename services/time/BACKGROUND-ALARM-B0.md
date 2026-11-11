@@ -19,7 +19,7 @@ Observation labels include `FUTURE`, `ELIGIBLE_IF_OWNED`,
 `MISSED_CANDIDATE`, `UNKNOWN_ARM_TIME`, `ALREADY_PROCESSED`,
 `ACTIVE_RING_IN_QUICKSHELL`, `SNOOZE_PENDING`, `DISABLED` and `PAUSED`.
 **Candidate** and **eligible** are diagnostic labels, not an instruction to
-ring. Each snapshot carries `actuationEnabled: false` and
+ring. The observer cannot ring an alarm or acknowledge its occurrence. Each snapshot carries `actuationEnabled: false` and
 `ownsAlarmFile: false`. A failed read yields `REFUSED`, never a fabricated
 due event.
 

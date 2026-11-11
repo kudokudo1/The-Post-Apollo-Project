@@ -38,6 +38,9 @@ Scope {
     property var autoCheckPendingDocument: null
     property var autoCheckQueuedDocument: null
     property double autoLastStartedAtMs: 0
+    // One reload-trigger per instantiated Quickshell service, not per save.
+    property bool autoCheckReloadHandled: false
+    property bool autoCheckOpenPendingWhileLoading: false
     property bool autoCheckInFlight: false
     property bool autoCheckResultSeen: false
     property bool autoCheckExited: false
@@ -47,6 +50,10 @@ Scope {
         !!autoCheckDocument.enabled
     readonly property int autoCheckIntervalHours:
         Number(autoCheckDocument.intervalHours || 6)
+    readonly property bool autoCheckOnReload:
+        autoCheckDocument.checkOnReload !== false
+    readonly property bool autoCheckOnClockOpen:
+        autoCheckDocument.checkOnClockOpen !== false
     readonly property double autoCheckLastAttemptAtMs:
         Math.max(autoLastStartedAtMs, Number(autoCheckDocument.lastAttemptAtMs || 0))
     readonly property double autoCheckNextDueAtMs:
@@ -244,25 +251,52 @@ Scope {
         return saveAutoCheck(next.document);
     }
 
-    function maybeAutoCheckTime() {
-        if (!autoCheckEnabled || !autoCheckCanEdit || autoCheckInFlight
-                || referenceChecking || authSessionActive || resyncAuthPending
-                || resyncProcess.running)
-            return;
+    function setAutoCheckTrigger(name, enabled) {
+        if (!autoCheckCanEdit || typeof enabled !== "boolean")
+            return false;
+        const base = autoCheckQueuedDocument || autoCheckPendingDocument
+                     || autoCheckDocument;
+        const next = AutoCheck.withTrigger(base, name, enabled);
+        if (!next.ok)
+            return false;
+        return saveAutoCheck(next.document);
+    }
+
+    function checkOnClockOpened() {
+        if (autoCheckStorageState === "loading") {
+            autoCheckOpenPendingWhileLoading = true;
+            return false;
+        }
+        return maybeAutoCheckTime("clock-open");
+    }
+
+    function maybeAutoCheckTime(trigger) {
+        const reason = trigger || "interval";
+        // Use the latest accepted edit, so a toggle immediately suppresses
+        // its trigger even while its atomic save is still in flight.
+        const active = autoCheckQueuedDocument || autoCheckPendingDocument
+                       || autoCheckDocument;
+        if (!autoCheckCanEdit || !AutoCheck.triggerEnabled(active, reason)
+                || autoCheckInFlight || referenceChecking || authSessionActive
+                || resyncAuthPending || resyncProcess.running)
+            return false;
         const now = Date.now();
-        if (!AutoCheck.isDue(autoCheckDocument, now, autoLastStartedAtMs))
-            return;
+        if (reason === "interval"
+                && !AutoCheck.isDue(active, now, autoLastStartedAtMs))
+            return false;
         if (!checkTimeAccuracy())
-            return;
+            return false;
         autoLastStartedAtMs = now;
         autoCheckInFlight = true;
         autoCheckResultSeen = false;
         autoCheckExited = false;
         autoCheckExitOk = false;
-        autoCheckResult = "CHECKING // CONFIGURED CHRONY REFERENCE";
-        const next = AutoCheck.withAttempt(autoCheckDocument, now);
+        autoCheckResult = "CHECKING // " + reason.toUpperCase()
+                          + " // CONFIGURED CHRONY REFERENCE";
+        const next = AutoCheck.withAttempt(active, now);
         if (next.ok && !saveAutoCheck(next.document))
             autoCheckErrorCode = "SCHEDULE_NOT_SAVED";
+        return true;
     }
 
     function completeAutoReferenceIfReady() {
@@ -776,7 +810,21 @@ Scope {
             timeSettings.autoCheckDocument = parsed.document;
             timeSettings.autoCheckStorageState = "ready";
             timeSettings.autoCheckErrorCode = "";
-            Qt.callLater(timeSettings.maybeAutoCheckTime);
+            if (!timeSettings.autoCheckReloadHandled) {
+                timeSettings.autoCheckReloadHandled = true;
+                Qt.callLater(function() {
+                    if (timeSettings.autoCheckOpenPendingWhileLoading) {
+                        timeSettings.autoCheckOpenPendingWhileLoading = false;
+                        timeSettings.checkOnClockOpened();
+                    }
+                    // Trigger once per Quickshell service load. The standard
+                    // due check remains active independently of this toggle.
+                    timeSettings.maybeAutoCheckTime("reload");
+                    timeSettings.maybeAutoCheckTime();
+                });
+            } else {
+                Qt.callLater(timeSettings.maybeAutoCheckTime);
+            }
         }
         onLoadFailed: function(error) {
             if (timeSettings.autoCheckStorageState === "saving")

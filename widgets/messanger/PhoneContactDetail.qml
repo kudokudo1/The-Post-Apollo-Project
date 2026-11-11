@@ -67,6 +67,7 @@ Rectangle {
                     label: "EDIT"
                     labelPixelSize: 10
                     accentColor: Colors.orange
+                    available: false
                     interactive: false // No authenticated local contact editor.
                 }
             }
@@ -197,6 +198,7 @@ Rectangle {
                     labelPixelSize: 9
                     labelMinimumPixelSize: 8
                     accentColor: Colors.magenta
+                    available: false
                     interactive: false // Email routing not connected.
                 }
             }
@@ -218,6 +220,7 @@ Rectangle {
                     labelPixelSize: 11
                     labelMinimumPixelSize: 9
                     accentColor: Colors.magenta
+                    available: detail.personalMetadataWritable
                     interactive: detail.personalMetadataWritable
                                  && detail.contact !== null
                     // Deliberately no onTriggered or invented saved state.
@@ -276,6 +279,7 @@ Rectangle {
                     label: "EDIT NOTE"
                     labelPixelSize: 10
                     accentColor: Colors.magenta
+                    available: false
                     interactive: false // No note editor or verified save authority.
                 }
                 ActionButton {
@@ -285,6 +289,7 @@ Rectangle {
                     labelPixelSize: 10
                     accentColor: Colors.red
                     destructive: true
+                    available: false
                     interactive: false // No trusted vault deletion response.
                 }
             }

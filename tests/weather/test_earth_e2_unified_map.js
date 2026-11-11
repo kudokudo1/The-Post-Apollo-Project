@@ -136,13 +136,10 @@ test("E2 final SERVICES observes same runtimeRows, RX OBS and provider states, n
  assert.match(earthPane,/StationEarthServicesPane\s*\{/);
  assert.match(earthPane,/runtimeRows: earthLoader\.item \? earthLoader\.item\.runtimeRows : \[\]/);
  assert.match(earthPane,/sourceRows: earthLoader\.item \? earthLoader\.item\.plannedSources : \[\]/);
- assert.match(servicePane,/RuntimePolicy\.rowAgeLabel\(/);
- assert.match(servicePane,/RuntimePolicy\.rowStateLabel\(/);
- assert.match(servicePane,/RuntimePolicy\.cadenceLabel\(/);
- assert.match(servicePane,/SOURCE DIRECTORY/);
- assert.match(servicePane,/RX = LOCAL RECEIPT \/\/ OBS = PROVIDER SAMPLE/);
- assert.match(servicePane,/id: rowScroll/);
- assert.doesNotMatch(servicePane,/WeatherServices\.|Process\s*\{|FileView\s*\{|XMLHttpRequest/);
+ assert.match(servicePane,/StationServicesConsole\\s*\\{/);
+ assert.match(servicePane,/runtimeRows: services\\.runtimeRows/);
+ assert.match(servicePane,/directoryRows: services\\.sourceDirectory/);
+  assert.doesNotMatch(servicePane,/WeatherServices\.|Process\s*\{|FileView\s*\{|XMLHttpRequest/);
  assert.match(discovery,/readonly property var runtimeRows/);
  assert.match(discovery,/readonly property var plannedSources/);
 });

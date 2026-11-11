@@ -101,7 +101,7 @@ ShellRoot {
         if(content.implicitHeight>scroll.height+1)
             return "ONE_PAGE_CLIPPED "+content.implicitHeight
                 +" > "+scroll.height;
-        if(snap.height<48 || autoCards.height<48)
+        if(snap.height<55 || autoCards.height<55)
             return "CARDS_TOO_SMALL "+snap.height+"/"+autoCards.height;
         if(snap.height>88 || autoCards.height>88)
             return "OVERSIZED_EMPTY_CARDS "+snap.height+"/"+autoCards.height;

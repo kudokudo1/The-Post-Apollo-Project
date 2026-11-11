@@ -69,11 +69,12 @@ check('id: editorFrame' in manager
       and 'id: micAction' in manager
       and 'label: "CANCEL"' in manager,
       "MIC/STOP and CANCEL live INSIDE each prompt rectangle")
-check('managerArea.voiceActive || micMouse.containsMouse' in manager
+check('managerArea.voiceActive || managerArea.streamingPreviewActive' in manager
       and '? Colors.yellow : Colors.dark' in manager
       and '? Colors.magenta : Colors.omnitrix' in manager,
-      "Mic preserves open-state yellow fill and magenta active styling")
-check('readonly property bool stopInProgress: voiceActive' in manager
+      "Mic preserves yellow active fill and magenta glow across exclusive engines")
+check('readonly property bool stopInProgress:' in manager
+      and '(voiceActive || streamingPreviewActive)' in manager
       and 'root.speechInputService.stopping' in manager
       and 'root.speechInputService.transcribing' in manager
       and manager.count('managerArea.stopInProgress ? Colors.red') >= 3
@@ -398,7 +399,9 @@ check('decoder_trial: str = "standard"' in script
       "Fast decoder only in bounded persistent AF_UNIX session; CLI fallback is truthful")
 check('function startRecording(requestedDecoderMode)' in live
       and 'requestedDecoderMode === "FAST"' in live
-      and 'decoderModeUsed = fastRequested ? "FAST PENDING" : "STANDARD"' in live
+      and 'decoderModeUsed = streamingRequested ? "STREAMING PENDING"' in live
+      and 'fastRequested ? "FAST PENDING" : "STANDARD"' in live
+      and 'streamingTrialAllowed: false' in live
       and 'command.push("--decoder-trial", "fast")' in live
       and 'DECODER_FAST_ACTIVE|DECODER_FAST_FALLBACK' in live
       and 'return decoderModeUsed + " // AUDIO "' in live

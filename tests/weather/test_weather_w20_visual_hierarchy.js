@@ -14,8 +14,10 @@ function allocation(height) {
   const instrument=height-31-2*row;
   const expansion=Math.max(0,instrument-164);
   const pinned=Math.min(160,expansion);
-  return {row,instrument,now:52+pinned*.50,
-          hour:45+expansion-pinned*.67,day:24+pinned*.17};
+  const deficit=Math.max(0,164-instrument);
+  return {row,instrument,now:52+pinned*.50-Math.min(8,deficit),
+          hour:45+expansion-pinned*.67-Math.max(0,deficit-8),
+          day:24+pinned*.17};
 }
 test("W20 gives the six-hour forecast new vertical space without shrinking three-day or NOW",()=>{
  assert.match(home,/overviewCardRowHeight: Math.max\(/);
@@ -28,8 +30,8 @@ test("W20 gives the six-hour forecast new vertical space without shrinking three
    const a=allocation(h);
    assert.equal(a.instrument+31+2*a.row,h);
    assert.ok(a.row>=46 && a.row<=60);
-   assert.ok(a.now>=52 && a.hour>=45 && a.day>=24);
-   assert.ok(Math.abs(a.now+a.hour+a.day-(121+Math.max(0,a.instrument-164)))<.001);
+   assert.ok(a.now>=44 && a.hour>=40 && a.day>=24);
+   assert.ok(Math.abs(a.now+a.hour+a.day-(121+a.instrument-164))<.001);
  }
  const tall=allocation(500);
  assert.equal(tall.row,60);

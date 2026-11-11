@@ -172,6 +172,12 @@ function update(doc, id, patch, nowMs) {
                 target.lastFiredDay = today;
         }
     }
+    if (target.pausedUntilDate !== ""
+            && target.pausedUntilDate > dayKey(nowMs)) {
+        target.ringing = false;
+        target.ringStartedAtMs = 0;
+        target.snoozeUntilMs = 0;
+    }
     if (patch.enabled === false) {
         target.ringing = false;
         target.ringStartedAtMs = 0;
@@ -249,6 +255,9 @@ function tick(doc, nowMs) {
         if (a.pausedUntilDate !== "" && today < a.pausedUntilDate) return;
         if (a.pausedUntilDate !== "") {
             a.pausedUntilDate = ""; changed = true;
+        }
+        if (a.mode === "once" && a.date < today) {
+            finishOnce(a); missed.push(a.id); changed = true; return;
         }
         var due = dueKey(a, nowMs);
         if (due === "" || a.lastFiredDay === due) return;

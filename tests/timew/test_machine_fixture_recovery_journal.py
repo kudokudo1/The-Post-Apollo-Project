@@ -111,6 +111,28 @@ def child_main():
     raise AssertionError("crash injection returned")
 
 
+def test_native_fixture_path_type():
+    """Accept only the concrete Linux Path, not a string or user subclass."""
+    root, path = fixture()
+    try:
+        plan = sample()
+        assert type(path) is type(Path("/"))
+        empty = journal.initialize(path, plan, KEY)
+        assert empty == {"sequence": 0, "mac": journal.EMPTY_MAC}
+        assert journal.inspect(path, plan, KEY, empty)["status"] == (
+            "fixture_pinned_head_observed")
+        refused(journal.inspect, str(path), plan, KEY, empty)
+
+        class DerivedNativePath(type(Path("/"))):
+            pass
+
+        refused(journal.inspect, DerivedNativePath(str(path)), plan, KEY, empty)
+        assert path.exists()
+        assert path.stat().st_mode & 0o777 == 0o600
+    finally:
+        shutil.rmtree(root)
+
+
 def test_normal():
     root, path = fixture()
     try:
@@ -245,6 +267,7 @@ def test_static_no_archives():
 
 def main():
     assert sys.platform.startswith("linux")
+    test_native_fixture_path_type()
     test_normal()
     test_crashes()
     test_tamper_and_floor()

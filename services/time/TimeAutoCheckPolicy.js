@@ -6,6 +6,7 @@ var VERSION = 1;
 var MIN_HOURS = 1;
 var MAX_HOURS = 168;
 var HOUR_MS = 60 * 60 * 1000;
+var MIN_AUTOMATIC_GAP_MS = 15 * 60 * 1000;
 
 function validHours(value) {
     return typeof value === "number" && isFinite(value)
@@ -113,6 +114,26 @@ function isDue(doc, nowMs, lastStartedAtMs) {
     // Recheck after a backwards host clock step instead of waiting indefinitely.
     return !last || nowMs < last
            || nowMs - last >= doc.intervalHours * HOUR_MS;
+}
+
+// All automatic sources share one quiet window. A failed/unsynchronized
+// measurement still counts as an attempt, so repeated Clock opens or a
+// Quickshell restart do not continuously spawn chronyd -Q or chronyc.
+function canStartAutomaticCheck(doc, trigger, nowMs,
+                                lastAutoStartedAtMs, lastReferenceStartedAtMs) {
+    if (!triggerEnabled(doc, trigger) || !validTimestamp(nowMs))
+        return false;
+    if (trigger === "interval" && !isDue(doc, nowMs, lastAutoStartedAtMs))
+        return false;
+    var saved = validTimestamp(doc.lastAttemptAtMs) ? doc.lastAttemptAtMs : 0;
+    var session = validTimestamp(lastAutoStartedAtMs) ? lastAutoStartedAtMs : 0;
+    var reference = validTimestamp(lastReferenceStartedAtMs)
+                    ? lastReferenceStartedAtMs : 0;
+    var recent = Math.max(saved, session, reference);
+    // If the host clock stepped backwards, don't pin a cooldown to a
+    // timestamp in the future. The next real attempt gets a new timestamp.
+    return !recent || nowMs < recent
+           || nowMs - recent >= MIN_AUTOMATIC_GAP_MS;
 }
 
 function nextDueAtMs(doc, lastStartedAtMs) {

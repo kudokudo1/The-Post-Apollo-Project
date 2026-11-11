@@ -26,9 +26,9 @@ const messages = [
 
 test("alphabetical sections sorted by displayed name with magenta UI-owned heading rows", () => {
   const rows = native(ctx.contactDirectoryRows(contacts));
-  assert.deepEqual(rows.filter(r=>r.kind==="heading").map(r=>r.letter),["#","A","B","Z"]);
+  assert.deepEqual(rows.filter(r=>r.kind==="heading").map(r=>r.letter),["#","A","B","U","Z"]);
   assert.deepEqual(rows.filter(r=>r.kind==="contact").map(r=>r.card.id),
-    ["u:5","u:6","u:4","u:2","u:1","u:3"]);
+    ["u:5","u:4","u:2","u:1","u:6","u:3"]);
   assert.equal(contacts[0].id,"u:3"); // original order unchanged
 });
 

@@ -195,15 +195,15 @@ Rectangle {
                     id: currentIcon
                     objectName: "weather-w17-original-main-glyph"
                     anchors.right: parent.right
-                    anchors.rightMargin: 12
+                    anchors.rightMargin: 18
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(122,47 + panel.expansion * 0.39,
+                    width: Math.min(112,47 + panel.expansion * 0.37,
                                     Math.max(47,parent.width * 0.58))
                     height: width
                     GohuText {
                         anchors.centerIn: parent
                         text: panel.iconText(panel.currentState)
-                        font.pixelSize: Math.min(171,currentIcon.width * 1.42)
+                        font.pixelSize: Math.min(156,currentIcon.width * 1.34)
                         color: panel.ink(panel.currentState.color)
                         visible: panel.currentArt==="weather"
                     }
@@ -211,7 +211,7 @@ Rectangle {
                         anchors.centerIn: parent
                         width: parent.width
                         height: parent.height
-                        scale: 1.32
+                        scale: 1.25
                         mode: panel.currentArt
                         solar: panel.observationCycle.solar
                         moonPhase: panel.observationCycle.moonPhase

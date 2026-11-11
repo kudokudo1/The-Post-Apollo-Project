@@ -973,6 +973,77 @@ Scope {
         }
     }
 
+    // This read-only kernel file changes on reboot; an old wall-clock
+    // timestamp must not authorize an old sample on a new boot.
+    FileView {
+        id: referenceBootFile
+        path: "/proc/sys/kernel/random/boot_id"
+        watchChanges: false
+        onLoaded: {
+            const boot = referenceBootFile.text().trim().toLowerCase();
+            timeSettings.referenceBootId = Reference.bootId(boot) ? boot : "";
+            timeSettings.referenceBootReadDone = true;
+            timeSettings.restoreReferenceAfterLoad();
+        }
+        onLoadFailed: function(error) {
+            timeSettings.referenceBootId = "";
+            timeSettings.referenceBootReadDone = true;
+            timeSettings.restoreReferenceAfterLoad();
+        }
+    }
+
+    FileView {
+        id: referenceFile
+        path: timeSettings.referenceStoragePath
+        watchChanges: false
+        atomicWrites: true
+        blockWrites: false
+        printErrors: false
+        onLoaded: {
+            if (timeSettings.referenceStorageState === "saving")
+                return;
+            const parsed = Reference.parse(referenceFile.text());
+            timeSettings.referenceLoadedDocument = parsed.ok
+                ? parsed.document : Reference.initialDocument();
+            timeSettings.referenceStorageState = parsed.ok
+                ? "ready" : "error";
+            timeSettings.referenceStoreError = parsed.ok ? "" : parsed.reason;
+            timeSettings.referenceStoreReadDone = true;
+            timeSettings.restoreReferenceAfterLoad();
+        }
+        onLoadFailed: function(error) {
+            if (timeSettings.referenceStorageState === "saving")
+                return;
+            const missing = error === FileViewError.FileNotFound;
+            timeSettings.referenceLoadedDocument = Reference.initialDocument();
+            timeSettings.referenceStorageState = missing ? "empty" : "error";
+            timeSettings.referenceStoreError = missing
+                ? "" : "REFERENCE_LOAD_FAILED";
+            timeSettings.referenceStoreReadDone = true;
+            timeSettings.restoreReferenceAfterLoad();
+        }
+        onSaved: {
+            if (timeSettings.referenceStorageState !== "saving"
+                    || timeSettings.referencePendingDocument === null)
+                return;
+            const saved = timeSettings.referencePendingDocument;
+            const queued = timeSettings.referenceQueuedDocument;
+            timeSettings.referencePendingDocument = null;
+            timeSettings.referenceQueuedDocument = null;
+            timeSettings.referenceStoreError = "";
+            if (queued !== null && JSON.stringify(saved) !== JSON.stringify(queued))
+                timeSettings.writeReferenceDocument(queued);
+            else
+                timeSettings.referenceStorageState = "ready";
+        }
+        onSaveFailed: function(error) {
+            timeSettings.referencePendingDocument = null;
+            timeSettings.referenceQueuedDocument = null;
+            timeSettings.referenceStorageState = "error";
+            timeSettings.referenceStoreError = "REFERENCE_SAVE_FAILED";
+        }
+    }
+
     FileView {
         id: autoCheckFile
         path: timeSettings.autoCheckStoragePath
@@ -994,21 +1065,7 @@ Scope {
             timeSettings.autoCheckDocument = parsed.document;
             timeSettings.autoCheckStorageState = "ready";
             timeSettings.autoCheckErrorCode = "";
-            if (!timeSettings.autoCheckReloadHandled) {
-                timeSettings.autoCheckReloadHandled = true;
-                Qt.callLater(function() {
-                    if (timeSettings.autoCheckOpenPendingWhileLoading) {
-                        timeSettings.autoCheckOpenPendingWhileLoading = false;
-                        timeSettings.checkOnClockOpened();
-                    }
-                    // Trigger once per Quickshell service load. The standard
-                    // due check remains active independently of this toggle.
-                    timeSettings.maybeAutoCheckTime("reload");
-                    timeSettings.maybeAutoCheckTime();
-                });
-            } else {
-                Qt.callLater(timeSettings.maybeAutoCheckTime);
-            }
+            timeSettings.maybeBeginStartupAutoChecks();
         }
         onLoadFailed: function(error) {
             if (timeSettings.autoCheckStorageState === "saving")
@@ -1017,6 +1074,7 @@ Scope {
                 error === FileViewError.FileNotFound ? "empty" : "error";
             timeSettings.autoCheckErrorCode =
                 error === FileViewError.FileNotFound ? "" : "SCHEDULE_LOAD_FAILED";
+            timeSettings.maybeBeginStartupAutoChecks();
         }
         onSaved: {
             if (timeSettings.autoCheckStorageState !== "saving"
@@ -1119,32 +1177,13 @@ Scope {
             onStreamFinished: {
                 try {
                     const value = JSON.parse(this.text);
-                    const offset = Number(value.offsetMs);
-                    const uncertainty = Number(value.uncertaintyMs || 0);
-                    if (value.status === "measured"
-                            && Number.isFinite(offset)
-                            && Number.isFinite(uncertainty)
-                            && uncertainty >= 0) {
-                        timeSettings.referenceOffsetMs = offset;
-                        timeSettings.referenceUncertaintyMs = uncertainty;
-                        timeSettings.referenceSource =
-                            String(value.source || "CHRONYD_ONESHOT");
-                        timeSettings.referenceCheckedAtMs = Date.now();
-                        timeSettings.referenceStatus = "measured";
-                        timeSettings.referenceMessage =
-                            "REFERENCE // "
-                            + (offset / 1000).toFixed(3) + "S"
-                            + (timeSettings.referenceSource === "CHRONY_TRACKING"
-                               ? " // DAEMON TRACKING ESTIMATE"
-                               : " // CHRONYD MEASUREMENT");
-                    } else {
-                        timeSettings.referenceStatus = "unavailable";
-                        timeSettings.referenceMessage =
-                            String(value.message || "NO REFERENCE SAMPLE");
-                    }
+                    if (value.status === "measured")
+                        timeSettings.recordReferenceMeasurement(value);
+                    else
+                        timeSettings.noteReferenceFailure(
+                            String(value.message || value.errorCode || "NO REFERENCE SAMPLE"));
                 } catch (error) {
-                    timeSettings.referenceStatus = "unavailable";
-                    timeSettings.referenceMessage = "REFERENCE RESULT INVALID";
+                    timeSettings.noteReferenceFailure("REFERENCE RESULT INVALID");
                 }
                 if (timeSettings.autoCheckInFlight) {
                     timeSettings.autoCheckResultSeen = true;
@@ -1154,10 +1193,8 @@ Scope {
         }
         onExited: function(code, exitStatus) {
             timeSettings.referenceChecking = false;
-            if (code !== 0) {
-                timeSettings.referenceStatus = "unavailable";
-                timeSettings.referenceMessage = "REFERENCE PROCESS FAILED";
-            }
+            if (code !== 0)
+                timeSettings.noteReferenceFailure("REFERENCE PROCESS FAILED");
             if (timeSettings.autoCheckInFlight) {
                 timeSettings.autoCheckExited = true;
                 timeSettings.autoCheckExitOk = code === 0;

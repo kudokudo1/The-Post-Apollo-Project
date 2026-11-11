@@ -42,7 +42,7 @@ def _file(path, missing=False):
 
 class TestReplayLedger:
     def __init__(self, private_root):
-        _check(type(private_root) in (str, Path),
+        _check(isinstance(private_root, (str, Path)),
                "CAPTURE_LEDGER_ROOT_INVALID")
         root = Path(private_root)
         _check(root.is_absolute() and ".." not in root.parts

@@ -63,6 +63,30 @@ class AlarmManagerV2Contracts(unittest.TestCase):
         self.assertIn("AlarmManagerService.removeAlarm(id)", PANE)
         self.assertIn("AlarmManagerService.saveAlarm(selectedId, patch)", PANE)
 
+    def test_compact_alarm_page_is_clipped_and_full_editor_remains_reachable(self):
+        # The root is a bounded Item, not a free-growing Column whose
+        # implicit height can place the save/delete row outside TimeW.
+        self.assertIn('Item {\n    id: pane\n    clip: true', PANE)
+        self.assertIn('id: alarmBodyFrame', PANE)
+        self.assertIn('height: Math.max(0, pane.height - y)', PANE)
+        self.assertIn('id: alarmViewport', PANE)
+        self.assertIn('contentHeight: alarmFlow.implicitHeight', PANE)
+        self.assertIn('anchors.fill: parent', PANE)
+        self.assertIn('anchors.rightMargin: alarmPageRail.crossExtent + 5', PANE)
+        self.assertIn('id: alarmFlow', PANE)
+        self.assertIn('id: alarmPageRail', PANE)
+        self.assertIn('containGlow: true', PANE)
+        self.assertIn('height: editorContent.implicitHeight', PANE)
+        self.assertNotIn('height: 264', PANE)
+        self.assertIn('interactive: false', PANE)
+        self.assertIn('y: headerRow.y + headerRow.height + 8', PANE)
+        self.assertIn('y: alarmSearch.y + alarmSearch.height + 8', PANE)
+        bounded = TIMEW.split('AlarmManagerPane {', 1)[1].split(
+            '                    }', 1)[0]
+        self.assertIn('505 - toolsSubModeStrip.height', bounded)
+        self.assertIn('parent.spacing', bounded)
+        self.assertIn('TOOLS // ALARMS // SAVED + SCHEDULED', TIMEW)
+
     def test_audio_remains_optional_and_ids_allowlisted(self):
         self.assertIn('active: false', OWNER)
         self.assertIn('source: "AlarmAudioV2.qml"', OWNER)

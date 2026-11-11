@@ -4,11 +4,12 @@ import qs.services.time
 import "../components"
 import "../services/time/AlarmManagerPolicy.js" as Policy
 
-// Single compact face for independent saved alarms. List and editor scroll
-// independently; header and emergency STOP ALL remain available.
-Column {
+// Compact Alarm owner view. Pinned header/search plus a bounded body
+// viewport: scroll the complete editor and its save/delete actions *inside*
+// TimeW. The short alarm list retains its independent scrollbar.
+Item {
     id: pane
-    spacing: 8
+    clip: true
     property int selectedId: 0
     readonly property var selectedAlarm: Policy.byId(
         AlarmManagerService.document, selectedId)
@@ -129,6 +130,7 @@ Column {
 
     Row {
         id: headerRow
+        y: 0
         height: 34
         width: pane.width
         spacing: 6
@@ -185,6 +187,7 @@ Column {
 
     TextField {
         id: alarmSearch
+        y: headerRow.y + headerRow.height + 8
         width: pane.width
         height: 30
         placeholderText: "SEARCH SAVED ALARMS"
@@ -202,8 +205,30 @@ Column {
     }
 
     Item {
-        id: listFrame
+        id: alarmBodyFrame
+        y: alarmSearch.y + alarmSearch.height + 8
         width: pane.width
+        height: Math.max(0, pane.height - y)
+        clip: true
+
+        Flickable {
+            id: alarmViewport
+            anchors.fill: parent
+            anchors.rightMargin: alarmPageRail.crossExtent + 5
+            contentWidth: width
+            contentHeight: alarmFlow.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            interactive: contentHeight > height
+
+            Column {
+                id: alarmFlow
+                width: alarmViewport.width
+                spacing: 8
+
+    Item {
+        id: listFrame
+        width: alarmFlow.width
         height: 155
         ListView {
             id: alarmList
@@ -281,7 +306,7 @@ Column {
 
     Row {
         id: panRow
-        width: pane.width
+        width: alarmFlow.width
         height: 27
         spacing: 8
         ActionButton {
@@ -305,7 +330,7 @@ Column {
     }
 
     GohuText {
-        width: pane.width
+        width: alarmFlow.width
         text: pane.selectedAlarm
             ? "EDIT // #" + pane.selectedId + " // "
               + AlarmManagerService.nextText(pane.selectedId)
@@ -317,8 +342,10 @@ Column {
 
     Item {
         id: editorFrame
-        width: pane.width
-        height: 264
+        width: alarmFlow.width
+        // The outer alarm viewport owns scrolling through the editor,
+        // including actions below it. Do not fix this at 264px.
+        height: editorContent.implicitHeight
         visible: pane.selectedAlarm !== null
         Flickable {
             id: editorScroll
@@ -332,7 +359,9 @@ Column {
             contentWidth: width
             contentHeight: editorContent.implicitHeight
             clip: true
-            interactive: contentHeight > height
+            // Scrolling is delegated to the bounded outer alarm viewport,
+            // avoiding two wheel consumers over the editor.
+            interactive: false
             boundsBehavior: Flickable.StopAtBounds
             Column {
                 id: editorContent
@@ -684,7 +713,7 @@ Column {
 
     Row {
         id: editorActions
-        width: pane.width
+        width: alarmFlow.width
         height: 34
         spacing: 6
         visible: pane.selectedAlarm !== null
@@ -727,7 +756,7 @@ Column {
     }
     Row {
         id: ringActions
-        width: pane.width
+        width: alarmFlow.width
         height: 31
         spacing: 6
         visible: pane.selectedAlarm !== null && pane.selectedAlarm.ringing
@@ -749,18 +778,38 @@ Column {
         }
     }
     GohuText {
-        width: pane.width
+        width: alarmFlow.width
         text: "STATUS // " + AlarmManagerService.feedback
         color: AlarmManagerService.storageError ? Colors.orange : Colors.cyan
         font.pixelSize: 10
         wrapMode: Text.Wrap
     }
     GohuText {
-        width: pane.width
+        width: alarmFlow.width
         text: "STORE // " + AlarmManagerService.storageState.toUpperCase()
             + "    AUDIO // " + AlarmManagerService.audioState
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.Wrap
+    }
+            }
+        }
+
+        NeonScrollBar {
+            id: alarmPageRail
+            flickable: alarmViewport
+            accountForContentOrigin: true
+            geometryMode: "viewport"
+            x: alarmBodyFrame.width - width - 3
+            y: 0
+            height: alarmBodyFrame.height
+            handleStyle: "star"
+            railColor: Colors.cyan
+            handleColor: Colors.magenta
+            handleBorderColor: Colors.magenta
+            railGlowColor: Colors.white
+            containGlow: true
+            visible: scrollable
+        }
     }
 }

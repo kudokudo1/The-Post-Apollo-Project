@@ -4528,6 +4528,11 @@ PanelWindow {
                         visible: timew.selectedMode === "tools"
                                  && timew.toolsView === "alarm"
                         width: parent.width
+                        // Same bounded content budget as the other TIMEW
+                        // secondary screens. Never size the pane from its
+                        // full editor/list content.
+                        height: Math.max(0, 505 - toolsSubModeStrip.height
+                                        - parent.spacing)
                     }
 
                     Column {
@@ -7014,7 +7019,7 @@ PanelWindow {
                               ? (timew.settingsView === "sync" ? "SETTINGS // REFERENCE + RESYNC"
                                  : "SETTINGS // VISUAL TIME + TIMEZONE")
                               : timew.selectedMode === "tools"
-                              ? (timew.toolsView === "alarm" ? "TOOLS // ALARM // PLANNED"
+                              ? (timew.toolsView === "alarm" ? "TOOLS // ALARMS // SAVED + SCHEDULED"
                                  : "TOOLS // STOPWATCH + COUNTDOWN // MONOTONIC")
                               : "ANGEL // EXPLICIT JOURNAL // LOCAL ONLY"
                         color: Colors.white

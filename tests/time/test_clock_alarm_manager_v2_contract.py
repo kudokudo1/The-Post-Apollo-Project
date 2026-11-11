@@ -74,7 +74,7 @@ class AlarmManagerV2Contracts(unittest.TestCase):
         self.assertIn('id: volumeRow', PANE)
         self.assertIn('"TEST SOUND"', PANE)
         self.assertIn('"SAVE + ARM"', PANE)
-        self.assertIn('"CONFIRM DELETE"', PANE)
+        self.assertIn('CONFIRM DELETE // PRESS RED X AGAIN', PANE)
         self.assertIn('"STOP ALL"', PANE)
         self.assertIn('"SNOOZE // 5M"', PANE)
         self.assertIn('"ONE TIME"', PANE)

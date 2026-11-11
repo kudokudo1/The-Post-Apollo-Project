@@ -234,6 +234,11 @@ class PersistentWhisperTests(unittest.TestCase):
                     process.kill()
                     process.wait(timeout=4)
                 selector.close()
+                # Close all fake child pipes even after assertion failures.
+                # Leaving stderr/stdout open produced ResourceWarning in CI.
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    if stream is not None and not stream.closed:
+                        stream.close()
 
     def test_missing_session_falls_back_to_guarded_cli(self):
         with tempfile.TemporaryDirectory(prefix="hospital-whisper-fallback-") as tmp:

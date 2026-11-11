@@ -83,9 +83,14 @@ Scope {
         return true;
     }
 
-    function prepareApply(savedNum, savedCaps) {
+    function prepareApply(savedNum, savedCaps, sampleFresh) {
         if (!canApply)
             return false;
+        if ((document.num === "remember" || document.caps === "remember")
+                && sampleFresh !== true) {
+            feedback = "REMEMBER NEEDS A FRESH STABLE LED READING";
+            return false;
+        }
         if (document.num === "remember"
                 && savedNum !== "on" && savedNum !== "off") {
             feedback = "NUM REMEMBER REQUIRES A SAVED LED OBSERVATION";

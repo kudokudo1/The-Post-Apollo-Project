@@ -43,7 +43,7 @@ class KeyboardLockControls(unittest.TestCase):
         self.assertIn("runtime_changed", HOST)
 
     def test_opt_in_no_sway_reload_and_explicit_confirm(self):
-        self.assertIn("function prepareApply(savedNum, savedCaps)", SERVICE)
+        self.assertIn("function prepareApply(savedNum, savedCaps, sampleFresh)", SERVICE)
         self.assertIn("function requestApply()", SERVICE)
         self.assertIn("if (!confirmRequired || !canApply)", SERVICE)
         self.assertIn('label: "CONFIRM INSTALL"', PANE)

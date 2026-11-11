@@ -134,6 +134,7 @@ def run_trial(model_dir: str, *, recorder_command=None, decoder_command=None,
     stdout_lock = threading.Lock()
     recorder = None
     decoder = None
+    reader = None
     old_term = None
     old_int = None
 
@@ -287,6 +288,19 @@ def run_trial(model_dir: str, *, recorder_command=None, decoder_command=None,
         stop.set()
         terminate_group(recorder)
         terminate_group(decoder)
+        # Reap and close every owned pipe even on model errors or CANCEL.
+        # Otherwise a long-running test host accumulates leaked descriptors.
+        if reader is not None and reader.is_alive():
+            reader.join(timeout=0.7)
+        for process in (recorder, decoder):
+            if process is None:
+                continue
+            for stream in (process.stdin, process.stdout, process.stderr):
+                if stream is not None and not stream.closed:
+                    try:
+                        stream.close()
+                    except OSError:
+                        pass
         if main_thread:
             signal.signal(signal.SIGTERM, old_term)
             signal.signal(signal.SIGINT, old_int)

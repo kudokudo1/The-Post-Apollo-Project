@@ -433,5 +433,30 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertNotIn('permissive ', probe)
 
 
+    def test_14_real_selinux_negative_probe_is_independent_and_syntax_valid(self):
+        probe = (AREA / "guest_identity_service_probe.sh").read_text()
+        host = (AREA / "run_official_silverblue_identity.sh").read_text()
+        prefix = 'cat >"$denial" <<\'PY\'\n'
+        self.assertEqual(probe.count(prefix), 1)
+        program = probe.split(prefix, 1)[1].split("\nPY\n", 1)[0]
+        compile(program, "disposable-selinux-negative.py", "exec")
+        for needle in (
+            'socket.AF_INET', 'socket.SOCK_STREAM', 'errno.EACCES',
+            'errno.EPERM', 'postapollo_identity_ci_t:s0',
+            'SELINUX_DOMAIN_ALLOWED_INET_SOCKET_CREATE'
+        ):
+            self.assertIn(needle, program)
+        self.assertIn('systemd-run --wait --pipe --collect', probe)
+        self.assertIn('"$launcher" -I -B "$denial"', probe)
+        self.assertIn('REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE', host)
+        self.assertIn('DEDICATED_SELINUX_MODULE_REMOVED_AFTER_SERVICE_STOP', host)
+        # A deny-only proof cannot rely on another OS sandbox blocking sockets.
+        transient = probe.split('systemd-run --wait --pipe --collect', 1)[1].split(
+            ' >"$negative_log"', 1)[0]
+        self.assertNotIn('RestrictAddressFamilies', transient)
+        self.assertNotIn('PrivateNetwork', transient)
+        self.assertNotIn('NetworkNamespace', transient)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

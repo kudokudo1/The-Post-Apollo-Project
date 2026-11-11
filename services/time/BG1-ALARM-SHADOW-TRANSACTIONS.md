@@ -17,6 +17,13 @@ occurrence receipts in ONE document. The real `time-alarms-v2.json` remains
 unchanged. All shadow changes are locked by `flock`, written to one temporary
 file, synced, atomically replaced and directory-synced.
 
+Before each shadow read or mutation, the broker rechecks the SHA-256
+of the **real** saved V2 file against the digest captured when the shadow
+was initialized. If another writer changes that file, all shadow
+operations refuse with `SOURCE_CHANGED_OUTSIDE_SHADOW` rather than using
+a stale schedule. The broker also checks source bytes after each transition,
+but that is still only a diagnostic fence, not a cross-file transaction.
+
 Only the existing synthetic socket owner may request:
 - `shadow_begin`: initialize a copy of an exact verified saved-alarm revision
 - `shadow_view`: read revision/owner epoch/counts, not private note content
@@ -57,6 +64,12 @@ A further deployment phase must:
    Reservation alone is not proof the user heard anything.
 5. Verify process crashes, disk failures, timezone and suspend behavior
    on the native target before allowing independent background actuation.
+
+The existing BG1-B1 workflow's changed-file guard was corrected on this
+stacked branch: it now forbids edits to live Clock, sound and observer
+surfaces instead of assuming that later milestones must contain exactly
+B1's original four files. BG1-B2A's own CI still requires the exact
+six-file change set and reruns all BG1-A and B1 regression tests.
 
 The current source code exposes no command that plays sound or sends
 notifications. All IPC responses retain `actuationEnabled:false`,

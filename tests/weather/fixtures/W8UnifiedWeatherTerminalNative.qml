@@ -96,12 +96,16 @@ ShellRoot {
                 return;
             }
             if(root.phase===1) {
-                if(weatherTerminal.height!==158)
+                if(weatherTerminal.height!==164 ||
+                   !weatherTerminal.compactInstrument ||
+                   weatherTerminal.compactInstrument.currentMeters.count!==4 ||
+                   weatherTerminal.compactInstrument.hourRepeater.count!==3 ||
+                   weatherTerminal.compactInstrument.dayRepeater.count!==3)
                     return root.fail("OVERVIEW_HEIGHT");
                 if(!root.overviewPreviewRequested) {
                     root.overviewPreviewRequested=true;
                     weatherTerminal.grabToImage(function(image){
-                        if(image && image.saveToFile("/tmp/weather-w14-overview-preview.png"))
+                        if(image && image.saveToFile("/tmp/weather-w17-overview-mirror-preview.png"))
                             console.log("W14_OVERVIEW_PREVIEW_CAPTURED");
                     },Qt.size(1024,316));
                     return;

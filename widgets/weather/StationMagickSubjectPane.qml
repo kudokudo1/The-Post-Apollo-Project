@@ -57,10 +57,11 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.leftMargin: 16
-        anchors.rightMargin: 16
-        anchors.topMargin: magickPane.independentScreen ? 0 : 10
-        spacing: 7
+        anchors.leftMargin: magickPane.subjectRoute === "magick/overview" ? 6 : 16
+        anchors.rightMargin: magickPane.subjectRoute === "magick/overview" ? 6 : 16
+        anchors.topMargin: magickPane.independentScreen ? 0
+                           : magickPane.subjectRoute === "magick/overview" ? 4 : 10
+        spacing: magickPane.subjectRoute === "magick/overview" ? 3 : 7
 
         GohuText {
             width: parent.width
@@ -68,6 +69,23 @@ Rectangle {
             color: Colors.magenta
             font.pixelSize: 17
             elide: Text.ElideRight
+        }
+
+        // W21 // Same long full-width navigation grammar as WEATHER.
+        // The existing MAGICK title and interpretation note remain intact.
+        StationSubjectOverviewRail {
+            id: magickOverviewRail
+            objectName: "magick-w21-overview-top-rail"
+            visible: magickPane.subjectRoute === "magick/overview"
+            width: parent.width
+            routes: [
+                {label:"LUNAR / SOLAR",path:"magick/lunar-solar/moon"},
+                {label:"ASTROLOGY",path:"magick/astrology/charts"},
+                {label:"LENSES",path:"magick/planetary/correspondences"}
+            ]
+            onRouteRequested: function(path) {
+                magickPane.routeRequested(path)
+            }
         }
 
         QuietText {

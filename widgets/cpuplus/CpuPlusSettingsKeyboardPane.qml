@@ -152,9 +152,83 @@ Item {
                 }
                 GohuText {
                     width: parent.width
-                    text: "PHYSICAL LOCK STATE // NOT SAMPLED"
+                    text: "LED PROXY // NOT VERIFIED XKB STATE"
                     color: Colors.orange
                     font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "LED NUM // " + KeyboardLedObservation.currentNum.toUpperCase()
+                          + " // " + KeyboardLedObservation.numStatus.toUpperCase()
+                    color: KeyboardLedObservation.currentNum === "unknown"
+                           ? Colors.orange : Colors.cyan
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "LED CAPS // " + KeyboardLedObservation.currentCaps.toUpperCase()
+                          + " // " + KeyboardLedObservation.capsStatus.toUpperCase()
+                    color: KeyboardLedObservation.currentCaps === "unknown"
+                           ? Colors.orange : Colors.cyan
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "SAVED LED NUM // "
+                          + KeyboardLedObservation.savedNum.toUpperCase()
+                    color: Colors.white
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "SAVED LED CAPS // "
+                          + KeyboardLedObservation.savedCaps.toUpperCase()
+                    color: Colors.white
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "MONITOR STORE // "
+                          + KeyboardLedObservation.storageState.toUpperCase()
+                          + (KeyboardLedObservation.storageError.length
+                             ? " / " + KeyboardLedObservation.storageError : "")
+                    color: KeyboardLedObservation.storageError.length
+                           ? Colors.orange : Colors.cyan
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 32
+                    label: KeyboardLedObservation.monitoringEnabled
+                           ? "STOP LED MONITOR" : "START LED MONITOR"
+                    labelPixelSize: 10
+                    selected: KeyboardLedObservation.monitoringEnabled
+                    available: KeyboardLedObservation.canEdit
+                    onLeftClicked: KeyboardLedObservation.setMonitoringEnabled(
+                        !KeyboardLedObservation.monitoringEnabled)
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 32
+                    label: "SAMPLE LED ONCE"
+                    labelPixelSize: 10
+                    available: !KeyboardLedObservation.sampling
+                    onLeftClicked: KeyboardLedObservation.sampleOnce()
+                }
+                GohuText {
+                    width: parent.width
+                    text: KeyboardLedObservation.probeError.length
+                          ? "LED PROBE // " + KeyboardLedObservation.probeError
+                          : "SAVES ONLY STABLE CHANGES // NO KEYSTROKE RECORDING"
+                    color: KeyboardLedObservation.probeError.length
+                           ? Colors.orange : Colors.white
+                    font.pixelSize: 9
                     wrapMode: Text.WordWrap
                 }
                 ActionButton {
@@ -189,6 +263,30 @@ Item {
                     text: "NO SWAY RELOAD OR KEY INJECTION. EFFECTIVE ON NEXT FULL SWAY START."
                     color: Colors.orange
                     font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "LED MONITOR IS OPT-IN. COPYING NEEDS TWO CONSISTENT "
+                          + "FRESH READINGS FROM BOTH LOCK LEDS."
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 34
+                    label: "COPY FRESH LED VALUES"
+                    labelPixelSize: 10
+                    available: KeyboardLedObservation.canCopyToStartup
+                    onLeftClicked: KeyboardLedObservation.copyObservedToStartup()
+                }
+                GohuText {
+                    width: parent.width
+                    text: "COPY UPDATES SAVED PREFERENCES ONLY. INSTALL STILL "
+                          + "REQUIRES PREPARE AND CONFIRM."
+                    color: Colors.orange
+                    font.pixelSize: 9
                     wrapMode: Text.WordWrap
                 }
                 ActionButton {

@@ -6,6 +6,8 @@ manager = (root / "widgets/HospitalWorkforceManagerView.qml").read_text()
 host = (root / "widgets/HospitalW.qml").read_text()
 live = (root / "services/hospital/HospitalLiveDictationService.qml").read_text()
 script = (root / "scripts/hospital-live-dictation.py").read_text()
+sandbox = (root / "scripts/hospital-whisper-sandbox.py").read_text()
+stt = (root / "scripts/hospital-reception-stt.sh").read_text()
 text = (root / "services/hospital/HospitalDictationTextPolicy.js").read_text()
 issues = []
 def check(ok, label):
@@ -163,6 +165,30 @@ check('voiceSelected: root.speechInputService.busy' in reception
       and 'color: micButton.voiceSelected ? Colors.yellow' in intercom
       and 'color: micButton.voiceSelected ? Colors.magenta' in intercom,
       "Front desk microphones use canonical active/open selection colors")
+
+check('property bool safetyHold: true' in live
+      and 'if (safetyHold)' in live
+      and 'VOICE SAFETY HOLD' in live
+      and 'svc.lastError || "MIC UNAVAILABLE' in manager,
+      "All microphones remain disabled pending actual host crash clearance")
+check('MODEL_GUARD = Path(__file__).with_name' in script
+      and 'str(MODEL_GUARD)' in script
+      and 'os.killpg(process.pid, signal.SIGKILL)' in script
+      and 'preexec_fn=' in script,
+      "Live recognizer always uses external child guard and group timeout")
+check('MAX_VIRTUAL_BYTES = 3 * 1024 * 1024 * 1024' in sandbox
+      and 'MAX_CPU_SECONDS = 12' in sandbox
+      and 'MAX_CORES = 2' in sandbox
+      and 'os.sched_setaffinity' in sandbox
+      and 'resource.RLIMIT_AS' in sandbox
+      and 'resource.RLIMIT_CPU' in sandbox
+      and 'resource.RLIMIT_CORE' in sandbox
+      and 'POST_APOLLO_STT_SAFE_MODE' in sandbox,
+      "Model CPU, memory, core dumps and CPU affinity are constrained")
+check('safe_args=(-ng -t 2)' in stt
+      and 'POST_APOLLO_STT_SAFE_MODE' in stt
+      and 'exec "$backend" "${safe_args[@]}"' in stt,
+      "Whisper disables GPU and caps threads only inside guarded live mode")
 
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")

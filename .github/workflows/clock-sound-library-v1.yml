@@ -8,6 +8,7 @@ on:
       - "services/time/AlarmManagerService.qml"
       - "services/time/AlarmAudioV2.qml"
       - "widgets/AlarmManagerPane.qml"
+      - "widgets/AlarmWavImportDialog.qml"
       - "tests/time/test_clock_sound_library_v1.py"
       - ".github/workflows/clock-sound-library-v1.yml"
   push:
@@ -17,6 +18,7 @@ on:
       - "services/time/AlarmManagerService.qml"
       - "services/time/AlarmAudioV2.qml"
       - "widgets/AlarmManagerPane.qml"
+      - "widgets/AlarmWavImportDialog.qml"
       - "tests/time/test_clock_sound_library_v1.py"
       - ".github/workflows/clock-sound-library-v1.yml"
 

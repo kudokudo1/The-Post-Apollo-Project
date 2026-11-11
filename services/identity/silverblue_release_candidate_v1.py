@@ -2,7 +2,7 @@
 
 This checks an *externally supplied* signed release and independent source/RPM
 pins. It never performs OS installed-host attestation, issues login permission,
-constructs SignedIdentityCommandClient, or authenticates operator consent.
+constructs a native command client, or authenticates operator consent.
 C4b owns the RPM/host lifecycle, C3e owns independent security review and C5
 owns one-use human authorization. Production admission is not implemented.
 """

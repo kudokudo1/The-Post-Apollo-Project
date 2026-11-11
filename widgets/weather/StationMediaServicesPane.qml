@@ -89,8 +89,8 @@ Rectangle {
     // Existing M2 contextual header buttons remain active. Their actions
     // jump within the combined dossier rather than hiding one data family.
     onViewModeChanged: {
-        if (viewMode === "sources") console.focusDirectory();
-        else console.focusRuntime();
+        if (viewMode === "sources") mediaServicesConsole.focusDirectory();
+        else mediaServicesConsole.focusRuntime();
     }
 
     StationServicesConsole {

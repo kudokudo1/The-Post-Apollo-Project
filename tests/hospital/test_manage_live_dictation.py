@@ -193,6 +193,62 @@ class LiveDictationTests(unittest.TestCase):
                     process.wait(timeout=3)
                 selector.close()
 
+    def test_bounded_live_short_stop_flushes_tail_without_exceeding_budget(self):
+        # A phrase shorter than 1.4s has no partial yet. STOP must still
+        # submit that small local audio tail through one guarded worker.
+        with tempfile.TemporaryDirectory(prefix="hospital-stream-tail-") as folder:
+            root = Path(folder)
+            fakebin = root / "bin"
+            fakebin.mkdir()
+            recorder = fakebin / "pw-record"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys,time\n"
+                "speech=(1600).to_bytes(2,'little',signed=True)\n"
+                "for _ in range(4):\n"
+                " sys.stdout.buffer.write(speech*1600)\n"
+                " sys.stdout.buffer.flush()\n"
+                " time.sleep(0.015)\n"
+                "time.sleep(10)\n"
+            )
+            recorder.chmod(0o700)
+            count = root / "model-calls"
+            helper = root / "whisper.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                'if [[ "$1" == "--check" ]]; then exit 0; fi\n'
+                'printf "run\\n" >> "$HOSPITAL_MODEL_CALLS"\n'
+                'printf "Short final phrase.\\n"\n'
+            )
+            helper.chmod(0o700)
+            env = dict(os.environ,
+                       PATH=str(fakebin) + ":" + os.environ["PATH"],
+                       HOSPITAL_MODEL_CALLS=str(count))
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), str(helper),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-live-chunks", "6"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+            try:
+                time.sleep(0.3)
+                self.assertIsNone(process.poll())
+                process.stdin.write("STOP\n")
+                process.stdin.flush()
+                process.stdin.close()
+                process.wait(timeout=10)
+                self.assertEqual(process.returncode, 0)
+                rows = [json.loads(line) for line in
+                        process.stdout.read().splitlines()]
+                self.assertEqual([row["text"] for row in rows
+                                  if row["kind"] == "partial"],
+                                 ["Short final phrase."])
+                self.assertEqual(count.read_text().splitlines(), ["run"])
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=3)
+
     def test_bounded_live_autostops_after_six_model_chunks(self):
         with tempfile.TemporaryDirectory(prefix="hospital-stream-cap-") as folder:
             root = Path(folder)

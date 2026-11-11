@@ -4523,7 +4523,7 @@ PanelWindow {
                         }
                     }
 
-                    AlarmPane {
+                    AlarmManagerPane {
                         id: alarmPlaceholderPane
                         visible: timew.selectedMode === "tools"
                                  && timew.toolsView === "alarm"

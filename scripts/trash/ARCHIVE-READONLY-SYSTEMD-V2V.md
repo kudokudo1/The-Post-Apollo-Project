@@ -15,7 +15,7 @@ SCOPE // scripts/trash, tests/trash and the already-owned Trash CI workflow; no 
 - Rechecks the well-known bus owner and the original pidfd after reading the properties. A lost owner, wrong UID/PID, changed invocation, incorrect property, malformed signature, unsupported library/host, bus error or timeout refuses with a stable code. The caller owns and closes its original pidfd; the probe only disconnects its own bus.
 - Returns a bounded evidence digest and `systemdUnitVerified=false`, `sourceServiceVerified=false`, `sourceAuthorityVerified=false`, `captureAllowed=false`, `productionAllowed=false`, `restoreAllowed=false` and `burnAllowed=false` even when read-only transport checks pass.
 - The current V2u fixture manager and V2m test broker are **not** replaced or connected to this probe. Source-owner policy, approved distinct UID, script/package integrity, protected release floors and true Archive authorization have not yet been established.
-- CI workflow installs the pinned `dbus-next==0.2.3` version only in the runner for these Python tests. No package is installed on the operator's machine by this PR.
+- CI workflow pins Python 3.13 and `dbus-next==0.2.3` in the runner. GitHub's previous floating Python `3.x` selected 3.15, where that library fails at import because `typing.no_type_check_decorator` was removed. Python 3.15 and other unsupported runtimes fail closed; no workaround is installed on the operator's machine.
 
 ## HOW TO USE
 

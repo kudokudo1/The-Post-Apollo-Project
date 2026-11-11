@@ -168,13 +168,15 @@ Rectangle {
                     objectName: "weather-w15-original-current-icon"
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(54,Math.min(78,currentPanel.height-7))
+                    // Keep the original artwork while making the primary
+                    // observation symbol the dominant icon of this band.
+                    width: Math.max(68,Math.min(90,currentPanel.height+12))
                     height: width
                     Text {
                         id: originalConditionGlyph
                         anchors.centerIn: parent
                         text: terminal.sky ? terminal.sky.conditionState.icon : "?"
-                        font.pixelSize: Math.max(50,mainWeatherIcon.width)
+                        font.pixelSize: Math.max(78,mainWeatherIcon.width+8)
                         color: terminal.sky
                                ? terminal.sky.iconColor(terminal.sky.conditionState.color)
                                : Colors.orange
@@ -186,6 +188,7 @@ Rectangle {
                         anchors.centerIn: parent
                         width: parent.width
                         height: parent.height
+                        scale: 1.14
                         mode: terminal.sky ? terminal.sky.currentCelestialMode : "moon"
                         weatherKind: terminal.sky
                                      ? WeatherCyclePolicy.nightKind(terminal.sky.conditionState)
@@ -472,7 +475,7 @@ Rectangle {
                                         Text {
                                             anchors.centerIn: parent
                                             text: hour.forecastState.icon
-                                            font.pixelSize: Math.max(34,hourGlyph.width)
+                                            font.pixelSize: Math.max(40,hourGlyph.width+7)
                                             color: terminal.ink(hour.entry)
                                             visible: hour.art==="weather"
                                         }
@@ -480,6 +483,7 @@ Rectangle {
                                             anchors.centerIn: parent
                                             width: parent.width
                                             height: parent.height
+                                            scale: 1.18
                                             mode: hour.art
                                             weatherKind: WeatherCyclePolicy.nightKind(
                                                 hour.forecastState)
@@ -608,7 +612,7 @@ Rectangle {
                             Text {
                                 anchors.centerIn: parent
                                 text: day.dayState.icon
-                                font.pixelSize: dayGlyph.width
+                                font.pixelSize: Math.max(34,dayGlyph.width+5)
                                 color: terminal.ink(day.entry)
                                 visible: day.art==="weather"
                             }
@@ -616,6 +620,7 @@ Rectangle {
                                 anchors.centerIn: parent
                                 width: parent.width
                                 height: parent.height
+                                scale: 1.15
                                 mode: day.art
                                 weatherKind: WeatherCyclePolicy.nightKind(day.dayState)
                                 solar: day.cycle.solar

@@ -333,6 +333,8 @@ class TestOwnerTrustHistory:
                 if on_stage is not None:
                     on_stage("after_copy")
                 db.commit()
+                if on_stage is not None:
+                    on_stage("after_commit")
             except TrustHistoryError:
                 db.rollback()
                 raise
@@ -352,6 +354,38 @@ class TestOwnerTrustHistory:
                 "authoritySha256": authority["manifestSha256"],
                 "captureAllowed": False, "productionAllowed": False,
                 "restoreAllowed": False, "burnAllowed": False}
+
+    def inspect_test_admission(self, owner, key, nonce):
+        """Recover a single fixture nonce outcome without reading payload."""
+        _check(type(owner) is str and ID.fullmatch(owner)
+               and type(key) is str and ID.fullmatch(key)
+               and type(nonce) is str and NONCE.fullmatch(nonce),
+               "TEST_ADMISSION_IDENTITY_INVALID")
+        with closing(self._connect()) as db:
+            row = db.execute("""SELECT c.proof_sha256,c.authority_sha256,
+                s.snapshot_id,s.proof_sha256,s.authority_sha256,
+                s.payload_sha256,s.resource_id,s.source_revision
+                FROM consumed c LEFT JOIN test_copies s
+                  ON s.owner_id=c.owner_id AND s.key_id=c.key_id
+                  AND s.nonce=c.nonce
+                WHERE c.owner_id=? AND c.key_id=? AND c.nonce=?""",
+                (owner,key,nonce)).fetchone()
+        if row is None:
+            return {"state":"TEST_NOT_ADMITTED",
+                    "productionAllowed":False}
+        if row[2] is None:
+            # Can be an older V2l nonce; it is NOT an archived snapshot.
+            return {"state":"TEST_NONCE_WITHOUT_COPY",
+                    "productionAllowed":False}
+        _check(row[0] == row[3] and row[1] == row[4]
+               and type(row[2]) is str and len(row[2]) == 32
+               and type(row[5]) is str and SHA.fullmatch(row[5]),
+               "TEST_ADMISSION_INTEGRITY_INVALID")
+        return {"state":"TEST_COPY_COMMITTED",
+                "snapshotId":row[2], "ownerId":owner,
+                "resourceId":row[6], "sourceRevision":row[7],
+                "proofSha256":row[0], "authoritySha256":row[1],
+                "payloadSha256":row[5], "productionAllowed":False}
 
     def test_copy_status(self, owner):
         """Read-only counts, never return even synthetic payload."""

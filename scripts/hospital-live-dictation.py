@@ -42,6 +42,9 @@ MIN_TAIL_SECONDS = 1
 MAX_QUEUE = 2
 MODEL_GUARD = Path(__file__).with_name("hospital-whisper-sandbox.py")
 OVERLAP_BYTES = RATE * FRAME_BYTES * 3 // 4  # 750 ms of preceding speech
+# Require 300ms of PCM and two 100ms speech windows before prewarming.
+# Early model loading must not happen on idle/silent microphone capture.
+WARMUP_MIN_BYTES = RATE * FRAME_BYTES * 3 // 10
 TOKENS = re.compile(r"[^\W_]+(?:['’][^\W_]+)*", re.UNICODE)
 PLACEHOLDER = re.compile(
     r"\[\s*(?:BLANK_AUDIO|NO_SPEECH|SILENCE|MUSIC|NO_AUDIO)\s*\]",
@@ -185,6 +188,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
     clips = queue.Queue(maxsize=MAX_QUEUE)
     send_lock = threading.Lock()
     capture_done = threading.Event()
+    model_warmup_requested = threading.Event()
     recognition_done = threading.Event()
     stopping_error = threading.Event()
     # Single owner-reason receipt for STOP vs internal safety shutdown.
@@ -359,6 +363,15 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                     break
                 pending.extend(data)
                 received += len(data)
+                if (prefer_persistent and pilot_live_chunks > 0
+                        and not pilot_one_chunk
+                        and not model_warmup_requested.is_set()
+                        and len(pending) >= WARMUP_MIN_BYTES
+                        and is_speech(bytes(pending))):
+                    # Same single guarded worker, no new queue slot. Start its
+                    # model concurrently with capture rather than serially
+                    # AFTER the opening 1.4-second chunk.
+                    model_warmup_requested.set()
                 if vad:
                     samples = array.array("h")
                     samples.frombytes(data[:len(data) - len(data) % 2])
@@ -432,38 +445,48 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
         attempted_session = False
         previous_text = ""
         previous_pcm_tail = b""
+        def start_persistent_once(*, early: bool = False):
+            nonlocal session, attempted_session
+            if attempted_session or cancelled.is_set() or not prefer_persistent:
+                return
+            attempted_session = True
+            # Only the one existing recognition thread calls this function.
+            # No separate loader or concurrent Whisper model can be spawned.
+            # An incompatible server still falls back to the guarded CLI.
+            if not hospital_whisper_session.server_available(stt_helper):
+                send("stage", detail="MODEL_SESSION_UNAVAILABLE")
+                return
+            if early:
+                send("stage", detail="MODEL_EARLY_START")
+            send("stage", detail="MODEL_SESSION_STARTING")
+            candidate = hospital_whisper_session.WhisperSession(stt_helper)
+            try:
+                model_loading_at = time.monotonic()
+                candidate.start(cancelled=cancelled)
+                send_timing("MODEL_STARTUP", model_loading_at)
+                session = candidate
+                model_started(session.process)
+                send("stage", detail="MODEL_SESSION_READY")
+            except (OSError, ValueError, RuntimeError,
+                    subprocess.SubprocessError):
+                candidate.close()
+                send("stage", detail="MODEL_SESSION_UNAVAILABLE")
+
         try:
             while not cancelled.is_set():
                 try:
-                    item = clips.get(timeout=0.2)
+                    item = clips.get(timeout=0.1)
                 except queue.Empty:
                     if capture_done.is_set():
                         break
+                    if model_warmup_requested.is_set() and not attempted_session:
+                        start_persistent_once(early=True)
                     continue
                 if item is None:
                     break
                 chunk, enqueued_at = item
                 send_timing("QUEUE_WAIT", enqueued_at)
-                if prefer_persistent and not attempted_session:
-                    attempted_session = True
-                    # Fail closed to the previous guarded CLI if no compatible
-                    # Unix-domain socket binary is installed. Never open TCP.
-                    if hospital_whisper_session.server_available(stt_helper):
-                        send("stage", detail="MODEL_SESSION_STARTING")
-                        candidate = hospital_whisper_session.WhisperSession(stt_helper)
-                        try:
-                            model_loading_at = time.monotonic()
-                            candidate.start(cancelled=cancelled)
-                            send_timing("MODEL_STARTUP", model_loading_at)
-                            session = candidate
-                            model_started(session.process)
-                            send("stage", detail="MODEL_SESSION_READY")
-                        except (OSError, ValueError, RuntimeError,
-                                subprocess.SubprocessError):
-                            candidate.close()
-                            send("stage", detail="MODEL_SESSION_UNAVAILABLE")
-                    else:
-                        send("stage", detail="MODEL_SESSION_UNAVAILABLE")
+                start_persistent_once()
                 if cancelled.is_set():
                     break
                 try:

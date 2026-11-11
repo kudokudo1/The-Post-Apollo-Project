@@ -80,19 +80,20 @@ ShellRoot {
         const scroll=overview.overviewViewportItem;
         const content=overview.overviewContentItem;
         const summary=overview.overviewSummaryItem;
+        const rail=overview.overviewRailItem;
         const snap=overview.overviewSnapshotItem;
         const autoCards=overview.overviewRelevantItem;
-        if(!scroll || !content || !summary || !snap || !autoCards)
+        if(!scroll || !content || !summary || !rail || !snap || !autoCards)
             return "ONE_PAGE_ITEMS_MISSING";
         if(scroll.interactive || scroll.contentHeight>scroll.height+1
            || Math.abs(scroll.contentY)>1)
             return "STILL_PANNING";
-        if(summary.height<164 || !summary.compactInstrument ||
+        if(summary.height<150 || !summary.compactInstrument ||
            summary.compactInstrument.currentMeters.count!==4 ||
            summary.compactInstrument.hourRepeater.count!==6 ||
            summary.compactInstrument.dayRepeater.count!==3)
             return "WEATHER_MIRROR_DATA_LOST";
-        if(summary.compactInstrument.hourlyStrip.height<45
+        if(summary.compactInstrument.hourlyStrip.height<40
            || summary.compactInstrument.dailyStrip.height<24)
             return "WEATHER_MIRROR_INSTRUMENTS_SHRUNK";
 
@@ -101,11 +102,22 @@ ShellRoot {
         if(content.implicitHeight>scroll.height+1)
             return "ONE_PAGE_CLIPPED "+content.implicitHeight
                 +" > "+scroll.height;
-        if(snap.height<55 || autoCards.height<55)
+        if(snap.height<(window.height<286 ? 46 : 55)
+           || autoCards.height<(window.height<286 ? 46 : 55))
             return "CARDS_TOO_SMALL "+snap.height+"/"+autoCards.height;
-        if(snap.height>88 || autoCards.height>88)
+        if(snap.height>60 || autoCards.height>60)
             return "OVERSIZED_EMPTY_CARDS "+snap.height+"/"+autoCards.height;
-        if(Math.abs(summary.height+snap.height+autoCards.height-scroll.height)>2)
+        if(rail.height!==31 || rail.buttonRepeater.count!==3
+           || rail.width<content.width-1)
+            return "W21_OVERVIEW_RAIL_MISSING";
+        for(let i=0;i<3;i++) {
+            const button=rail.buttonRepeater.itemAt(i);
+            if(!button || button.width<rail.width/3-6
+                || button.height!==25)
+                return "W21_RAIL_BUTTON_NOT_FULL_WIDTH_"+i;
+        }
+        if(Math.abs(summary.height+rail.height+snap.height
+                    +autoCards.height-scroll.height)>2)
             return "OVERVIEW_HEIGHT_BUDGET_LOST";
         if(window.height>=500 && (summary.height<330 ||
            summary.compactInstrument.mainGlyph.width<80 ||
@@ -113,7 +125,7 @@ ShellRoot {
             return "TALL_WEATHER_INSTRUMENT_STILL_TINY";
         if(window.height>=500) {
             const instrument=summary.compactInstrument;
-            if(snap.height>68 || autoCards.height>68)
+            if(snap.height>60 || autoCards.height>60)
                 return "W20_LOWER_CARDS_NOT_REDUCED";
             if(instrument.currentStrip.height<130 ||
                instrument.currentStrip.height>134)
@@ -121,7 +133,7 @@ ShellRoot {
             if(instrument.dailyStrip.height<50 ||
                instrument.dailyStrip.height>53)
                 return "W20_THREE_DAY_CHANGED "+instrument.dailyStrip.height;
-            if(instrument.hourlyStrip.height<125 ||
+            if(instrument.hourlyStrip.height<120 ||
                instrument.hourlyStrip.height<instrument.dailyStrip.height*2.3)
                 return "W20_SIX_PERIOD_FORECAST_TOO_SMALL";
         }

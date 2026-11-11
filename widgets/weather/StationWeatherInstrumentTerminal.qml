@@ -24,9 +24,11 @@ Rectangle {
     // W20 // Give the primary current condition a real HERO-sized area.
     // Keep at least 84px for the hourly readings and 41px for the daily
     // panel (including date, rain bar and peak chance). Artwork stays SKY.
-    readonly property real hourlyHeight: Math.max(84,Math.round(budget*0.33))
+    // W21 // Move height from oversized NOW into six hourly forecasts.
+    // The compact forecast and minimum daily rain-label budgets survive.
+    readonly property real hourlyHeight: Math.max(84,Math.round(budget*0.42))
     readonly property real currentHeight: Math.max(1,Math.min(
-        Math.round(budget*0.57),budget-hourlyHeight-33))
+        Math.round(budget*0.48),budget-hourlyHeight-33))
     // W19 // Existing inter-band padding occupied eight precious pixels in
     // compact WEATHER. Each band has its own divider, so reclaim that space
     // for the three-day rain bar without reducing NOW or hourly instruments.
@@ -180,14 +182,15 @@ Rectangle {
                     // W20 // Remove the 104px cap and the old 50%-width
                     // squeeze; the icon is the primary visual landmark.
                     width: Math.max(86,Math.min(180,currentPanel.height+8,
-                                     largeCurrent.width*0.72))
+                                     largeCurrent.width*0.80))
                     height: width
                     Text {
                         id: originalConditionGlyph
                         anchors.centerIn: parent
                         text: terminal.sky ? terminal.sky.conditionState.icon : "?"
-                        font.pixelSize: Math.min(178,Math.max(116,
-                                         mainWeatherIcon.width * 1.13))
+                        // W21 // Grow the *drawn symbol*, not its empty box.
+                        font.pixelSize: Math.min(220,Math.max(124,
+                                         mainWeatherIcon.width * 1.38))
                         color: terminal.sky
                                ? terminal.sky.iconColor(terminal.sky.conditionState.color)
                                : Colors.orange
@@ -199,7 +202,7 @@ Rectangle {
                         anchors.centerIn: parent
                         width: parent.width
                         height: parent.height
-                        scale: 1.24
+                        scale: 1.35
                         mode: terminal.sky ? terminal.sky.currentCelestialMode : "moon"
                         weatherKind: terminal.sky
                                      ? WeatherCyclePolicy.nightKind(terminal.sky.conditionState)

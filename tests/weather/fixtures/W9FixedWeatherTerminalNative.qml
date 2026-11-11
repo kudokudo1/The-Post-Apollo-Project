@@ -246,6 +246,12 @@ ShellRoot {
                     first,0,first.rainMeter.height).y;
                 const lastDailyEdge=combined.dailyItem.mapToItem(
                     combined,0,combined.dailyItem.height).y;
+                const narrowDay=combined.dayCardsRepeater.itemAt(0);
+                const dailyChanceEnd=narrowDay.chanceItem.mapToItem(
+                    narrowDay,0,narrowDay.chanceItem.height).y;
+                if(dailyChanceEnd>narrowDay.height+1)
+                    return root.fail("NARROW_DAILY_RAIN_LABEL_CLIPPED // "
+                                     +dailyChanceEnd+"/"+narrowDay.height);
                 const footerEdge=combined.footerItem.mapToItem(
                     combined,0,combined.footerItem.height).y;
                 if(rainEnd>first.height+2 ||

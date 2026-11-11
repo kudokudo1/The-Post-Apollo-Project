@@ -73,6 +73,15 @@
       <button type="button" id="open-save-review">OPEN SEALED SAVE REVIEW</button>
       <p id="save-review-open-status" role="status" aria-live="polite">NO SAVE REVIEW OPENED</p>
     </section>
+    <section class="local-link" aria-label="Manual read-back of encrypted test snapshot">
+      <h2>SEALED SNAPSHOT // READ-ONLY REVIEW</h2>
+      <p>Use the saved record ID and your original passphrase to authenticate
+      an encrypted test snapshot. Only hostnames and tab positions appear.
+      This does not open pages, restore tabs, or change monitor placement.
+      Requires a separately registered disposable read-only native host.</p>
+      <button type="button" id="open-read-review">OPEN ENCRYPTED READ REVIEW</button>
+      <p id="read-review-open-status" role="status" aria-live="polite">NO SNAPSHOT READ</p>
+    </section>
     <section class="limits" aria-label="Recovery limitations">
       <p>Window numbers last only for this browser run. They are not Sway window IDs. Saved sessions have no trusted monitor mapping yet.</p>
       <p>Basic inventory ignores addresses and titles. The separately clicked tab preview reads current-window addresses only after optional permission, shows redacted classifications and never saves data. The marker test reads only its own random title.</p>
@@ -85,5 +94,6 @@
   <script type="module" src="open-marker-ui.mjs"></script>
   <script type="module" src="session-preview-ui.mjs"></script>
   <script type="module" src="open-save-review.mjs"></script>
+  <script type="module" src="open-read-review.mjs"></script>
 </body>
 </html>

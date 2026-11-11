@@ -1,0 +1,37 @@
+name: TimeW MACHINE encrypted read-back and redacted preview
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineBraveReadHost.py"
+      - "services/time/MachineBraveReadTrial.py"
+      - "integrations/machine/brave-topology/**"
+      - "tests/timew/test_machine_brave_sealed_readback.mjs"
+      - "tests/timew/test_machine_brave_readback_e2e.mjs"
+      - "tests/timew/test_machine_brave_read_review_ui.mjs"
+      - "docs/timew-machine-brave-sealed-readback.md"
+      - ".github/workflows/timew-machine-brave-sealed-readback.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sealed-readback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate WebCrypto envelope and redact all URL paths
+        run: node tests/timew/test_machine_brave_sealed_readback.mjs
+      - name: Full synthetic save, private file, read-only native host and WebCrypto review
+        run: node tests/timew/test_machine_brave_readback_e2e.mjs
+      - name: Simulated Brave read review explicit action and focus expiry
+        run: node tests/timew/test_machine_brave_read_review_ui.mjs
+      - name: Preserve earlier write, vault and tab consent boundaries
+        run: |
+          node tests/timew/test_machine_brave_session_seal.mjs
+          node tests/timew/test_machine_brave_save_review_ui.mjs
+          python3 -B -I tests/timew/test_machine_brave_save_native_trial.py
+          python3 -B -I tests/timew/test_machine_brave_sealed_vault.py
+          python3 -B -I tests/timew/test_machine_brave_session_recovery_contract.py

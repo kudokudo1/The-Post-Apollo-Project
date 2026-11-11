@@ -12,6 +12,8 @@ Rectangle {
     property bool compact: false
     // Only canonical HOME SERVICES uses this fit-safe two-row instrument.
     property bool servicesCompact: false
+    readonly property alias compactFooterItem: servicesFooter
+    readonly property alias compactBodyItem: servicesCompactText
 
     property color accentColor: Colors.cyan
     property color valueColor: Colors.white
@@ -142,6 +144,7 @@ Rectangle {
             elide: Text.ElideRight
         }
         QuietText {
+            id: servicesFooter
             objectName: "home-services-last-success-footer"
             width: parent.width
             height: 11

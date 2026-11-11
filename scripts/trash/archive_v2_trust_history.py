@@ -161,6 +161,7 @@ class TestOwnerTrustHistory:
                         payload BLOB NOT NULL,
                         peer_witness_sha256 TEXT NOT NULL DEFAULT '',
                         request_binding_sha256 TEXT NOT NULL DEFAULT '',
+                        service_witness_sha256 TEXT NOT NULL DEFAULT '',
                         CHECK((peer_witness_sha256='' AND request_binding_sha256='')
                            OR (length(peer_witness_sha256)=64
                            AND length(request_binding_sha256)=64)),
@@ -179,6 +180,9 @@ class TestOwnerTrustHistory:
                     if "request_binding_sha256" not in columns:
                         db.execute("""ALTER TABLE test_copies ADD COLUMN
                             request_binding_sha256 TEXT NOT NULL DEFAULT ''""")
+                    if "service_witness_sha256" not in columns:
+                        db.execute("""ALTER TABLE test_copies ADD COLUMN
+                            service_witness_sha256 TEXT NOT NULL DEFAULT ''""")
             except sqlite3.DatabaseError as exc:
                 raise TrustHistoryError("SOURCE_TRUST_INIT_FAILED") from exc
 
@@ -310,7 +314,7 @@ class TestOwnerTrustHistory:
                         resource_id, source_revision, source_captured_ms,
                         payload_sha256, on_stage=None,
                         peer_witness_sha256="", request_binding_sha256="",
-                        commit_guard=None):
+                        service_witness_sha256="", commit_guard=None):
         """Atomically consume a fixture nonce and insert a synthetic copy.
 
         on_stage supports injected exception and abrupt-process-exit tests.
@@ -349,6 +353,13 @@ class TestOwnerTrustHistory:
                "TEST_CRASH_HOOK_INVALID")
         _check(commit_guard is None or callable(commit_guard),
                "TEST_COMMIT_GUARD_INVALID")
+        _check(type(service_witness_sha256) is str
+               and (service_witness_sha256 == ""
+                    or SHA.fullmatch(service_witness_sha256)),
+               "TEST_SERVICE_WITNESS_INVALID")
+        _check(service_witness_sha256 == "" or
+               (peer_witness_sha256 != "" and request_binding_sha256 != ""),
+               "TEST_SERVICE_WITNESS_INVALID")
         _check(type(peer_witness_sha256) is str
                and type(request_binding_sha256) is str
                and ((peer_witness_sha256 == ""
@@ -381,12 +392,14 @@ class TestOwnerTrustHistory:
                     (snapshot_id,owner_id,key_id,nonce,proof_sha256,
                      authority_sha256,resource_id,source_revision,
                      source_captured_ms,payload_sha256,payload,
-                     peer_witness_sha256,request_binding_sha256)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                     peer_witness_sha256,request_binding_sha256,
+                     service_witness_sha256)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (sid,owner,key,nonce,digest,authority["manifestSha256"],
                      resource_id,source_revision,source_captured_ms,
                      payload_sha256,payload,
-                     peer_witness_sha256,request_binding_sha256))
+                     peer_witness_sha256,request_binding_sha256,
+                     service_witness_sha256))
                 if on_stage is not None:
                     on_stage("after_copy")
                 # V2p lifetime check is inside the SAME BEGIN IMMEDIATE
@@ -416,6 +429,7 @@ class TestOwnerTrustHistory:
                 "authoritySha256": authority["manifestSha256"],
                 "peerWitnessSha256": peer_witness_sha256,
                 "requestBindingSha256": request_binding_sha256,
+                "serviceWitnessSha256": service_witness_sha256,
                 "captureAllowed": False, "productionAllowed": False,
                 "restoreAllowed": False, "burnAllowed": False}
 
@@ -429,7 +443,8 @@ class TestOwnerTrustHistory:
             row = db.execute("""SELECT c.proof_sha256,c.authority_sha256,
                 s.snapshot_id,s.proof_sha256,s.authority_sha256,
                 s.payload_sha256,s.resource_id,s.source_revision,s.payload,
-                s.peer_witness_sha256,s.request_binding_sha256
+                s.peer_witness_sha256,s.request_binding_sha256,
+                s.service_witness_sha256
                 FROM consumed c LEFT JOIN test_copies s
                   ON s.owner_id=c.owner_id AND s.key_id=c.key_id
                   AND s.nonce=c.nonce
@@ -449,7 +464,10 @@ class TestOwnerTrustHistory:
                and hashlib.sha256(row[8]).hexdigest() == row[5]
                and type(row[9]) is str and type(row[10]) is str
                and ((row[9] == "" and row[10] == "")
-                    or (SHA.fullmatch(row[9]) and SHA.fullmatch(row[10]))),
+                    or (SHA.fullmatch(row[9]) and SHA.fullmatch(row[10])))
+               and type(row[11]) is str
+               and (row[11] == "" or SHA.fullmatch(row[11]))
+               and (row[11] == "" or row[9] != ""),
                "TEST_ADMISSION_INTEGRITY_INVALID")
         return {"state":"TEST_COPY_COMMITTED",
                 "snapshotId":row[2], "ownerId":owner,
@@ -459,6 +477,7 @@ class TestOwnerTrustHistory:
                 "payloadIntegrityVerified":True,
                 "peerWitnessSha256":row[9],
                 "requestBindingSha256":row[10],
+                "serviceWitnessSha256":row[11],
                 "productionAllowed":False}
 
     def test_copy_status(self, owner):

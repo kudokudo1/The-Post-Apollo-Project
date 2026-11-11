@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Post-Apollo MACHINE // Brave Window Inventory (Read-Only Pilot)",
   "version": "0.4.0",
-  "description": "Read-only Brave inventory and explicit current-window tab eligibility preview; no tab addresses saved, no background capture or restore.",
+  "description": "Brave window inventory and consented current-window tab eligibility preview; no addresses retained or restore actions.",
   "minimum_chrome_version": "110",
   "incognito": "not_allowed",
   "permissions": [],

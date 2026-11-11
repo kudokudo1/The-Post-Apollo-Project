@@ -260,6 +260,12 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         for required in (
             'fingerprint=36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6',
             'rpm_name=python3-cryptography-50.0.0-1.fc44.x86_64.rpm',
+            'python3-cffi|2.0.0|3.fc44|x86_64',
+            'python3-pycparser|2.22|8.fc44|noarch',
+            'identity-python3-cffi-f44.rpm',
+            'identity-python3-pycparser-f44.rpm',
+            'python3-cffi-2.0.0-3.fc44.x86_64.rpm',
+            'python3-pycparser-2.22-8.fc44.noarch.rpm',
             'RPM-GPG-KEY-fedora-44-primary',
             'FEDORA44_KEY_FINGERPRINT_MISMATCH',
             'FEDORA_SIGNER_PRETRUST_REFUSAL_MISSING',
@@ -276,7 +282,12 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             'identity-python3-cryptography-f44.rpm',
             'rpm-ostree install --cache-only',
             'OFFLINE_SIGNED_FEDORA_ED25519_RUNTIME_BOOTED_AND_VERIFIED',
-            'rpm -V --nomtime python3-cryptography',
+            'rpm -V --nomtime "$name"',
+            'python3-cffi|2.0.0|3.fc44|x86_64',
+            'python3-pycparser|2.22|8.fc44|noarch',
+            'identity-python3-cffi-f44.rpm',
+            'identity-python3-pycparser-f44.rpm',
+            'for vendorpkg in python3-cryptography python3-cffi python3-pycparser; do',
             'FEDORA_ED25519_TEST_RUNTIME_REMAINS_AFTER_ROLLBACK',
         ):
             self.assertIn(required, guest)
@@ -291,6 +302,8 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             'identity-fedora44-runtime-manifest.sha256',
             'identity-fedora44-runtime-public.asc',
             'identity-python3-cryptography-f44.rpm',
+            'identity-python3-cffi-f44.rpm',
+            'identity-python3-pycparser-f44.rpm',
             'SIGNED_OFFLINE_FEDORA44_ED25519_DEPENDENCY_VERIFIED',
             'OFFLINE_SIGNED_FEDORA_ED25519_RUNTIME_BOOTED_AND_VERIFIED',
         ):
@@ -301,6 +314,8 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             '"$RUNNER_TEMP/c4b-identity-fedora-crypto"',
         ):
             self.assertIn(required, workflow)
+        self.assertIn('rpm-ostree install --cache-only', guest)
+        self.assertIn('for pattern in (expected,vendor,cffi,pycparser)', guest)
         self.assertEqual(host.count("-nic none"), 2)
         self.assertNotIn("pip install", guest)
         self.assertNotIn("pip install", host)

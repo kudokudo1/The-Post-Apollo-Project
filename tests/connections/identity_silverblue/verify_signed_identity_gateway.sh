@@ -13,7 +13,7 @@ dnf -y --setopt=install_weak_deps=False install rpm gnupg2
 rpmfile=/input/identity-silverblue-ci.rpm
 public=/input/identity-disposable-rpm-public.asc
 [[ -s "$rpmfile" && -s "$public" &&
-   "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$rpmfile")" ==
+   "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$rpmfile")" == \
    'post-apollo-identity-silverblue-ci 0.1 noarch' ]] ||
   { echo "C4B_ID_FAIL // RPM_ROLE_REFUSED"; exit 2; }
 [[ -z "$(rpm -qp --scripts "$rpmfile")" &&

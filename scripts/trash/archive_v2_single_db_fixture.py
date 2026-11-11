@@ -358,6 +358,11 @@ class TestAtomicArchiveCommit:
                 ).fetchone()
                 _require(used+len(payload) <= self.payload_quota,
                          "FIXTURE_PAYLOAD_QUOTA")
+                used_nonce = db.execute("""SELECT 1 FROM test_nonces
+                    WHERE owner_id=? AND key_id=? AND nonce=?""",
+                    (claim["ownerId"],source["keyId"],source["nonce"])
+                ).fetchone()
+                _require(used_nonce is None, "FIXTURE_NONCE_OR_COPY_REPLAY")
                 previous = db.execute("""SELECT r.local_receipt_sha256
                     FROM test_receipts r JOIN test_snapshots s
                       ON s.id=r.snapshot_id

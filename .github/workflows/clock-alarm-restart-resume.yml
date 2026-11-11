@@ -31,7 +31,7 @@ jobs:
           const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
           const p={}; vm.runInNewContext(fs.readFileSync('services/time/AlarmManagerPolicy.js','utf8')
             .replace(/^\.pragma library\s*/,''),p);
-          const at=(day,h,m,s=0)=>new Date(2026,10,day,h,m,s).getTime();
+          const at=(day,h,m=0,s=0)=>new Date(2026,10,day,h,m,s).getTime();
           function armed(before, days=[3], hour=6, minute=40){
             const start=p.create(p.initialDocument(),before).document;
             const updated=p.update(start,1,{hour,minute,weekdays:days,enabled:true},before);

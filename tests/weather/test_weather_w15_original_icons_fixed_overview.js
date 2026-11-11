@@ -60,7 +60,7 @@ test("W15 changes no shared card internals, meters or data collectors",()=>{
  assert.match(card,/property bool compact: false/);
  assert.match(card,/property real meterValue: 0/);
  assert.match(card,/height: 7/);
- assert.match(card,/font\.pixelSize: card\.overviewDense \? 13/);
+ assert.match(card,/font\.pixelSize: card\.overviewDense \? \(card.height<50 \? 9 : 13/);
  assert.match(home,/StationHomeMetricCard\s*\{/);
  assert.match(summary,/objectName: "weather-w8-current-air-metrics"/);
  assert.match(summary,/objectName: "weather-w8-hourly-strip"/);

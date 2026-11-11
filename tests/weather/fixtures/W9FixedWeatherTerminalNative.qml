@@ -232,6 +232,15 @@ ShellRoot {
                     return root.fail("NARROW_CONTENT_OVERFLOW // "
                         +rainEnd+" / "+first.height+" // "
                         +lastDailyEdge+" / "+combined.height);
+                for(const idx of [0,1,2]) {
+                    const metric=combined.currentItem.weatherMeters.itemAt(idx);
+                    const valueBottom=metric.readoutRow.mapToItem(
+                        metric,0,metric.readoutRow.height).y;
+                    const barTop=metric.meter.mapToItem(metric,0,0).y;
+                    if(valueBottom>barTop+1)
+                        return root.fail("NARROW_METRIC_OVERLAP_"+idx+" // "
+                            +valueBottom+" > "+barTop);
+                }
                 if(!root.narrowPreviewRequested) {
                     root.narrowPreviewRequested=true;
                     window.contentItem.grabToImage(function(image){

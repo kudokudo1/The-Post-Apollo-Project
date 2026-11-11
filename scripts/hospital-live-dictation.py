@@ -45,6 +45,9 @@ OVERLAP_BYTES = RATE * FRAME_BYTES * 3 // 4  # 750 ms of preceding speech
 # Require 300ms of PCM and two 100ms speech windows before prewarming.
 # Early model loading must not happen on idle/silent microphone capture.
 WARMUP_MIN_BYTES = RATE * FRAME_BYTES * 3 // 10
+# Optional pause-aware partials only after the existing persistent model is
+# loaded. Never schedule clips shorter than 1.2s; 2s remains the maximum.
+PAUSE_MIN_BYTES = RATE * FRAME_BYTES * 6 // 5
 TOKENS = re.compile(r"[^\W_]+(?:['’][^\W_]+)*", re.UNICODE)
 PLACEHOLDER = re.compile(
     r"\[\s*(?:BLANK_AUDIO|NO_SPEECH|SILENCE|MUSIC|NO_AUDIO)\s*\]",
@@ -76,6 +79,18 @@ def is_speech(pcm: bytes, threshold: float = 500.0) -> bool:
             if count >= 2:
                 return True
     return False
+
+
+def quiet_pcm_frame(pcm: bytes, threshold: float = 500.0) -> bool:
+    """Only 100ms-frame energy, never samples, leaves this Python process."""
+    if len(pcm) < FRAME_BYTES:
+        return False
+    samples = array.array("h")
+    samples.frombytes(pcm[:len(pcm) - len(pcm) % FRAME_BYTES])
+    if sys.byteorder != "little":
+        samples.byteswap()
+    return (sum(int(v) * int(v) for v in samples) / max(1, len(samples))
+            < threshold * threshold)
 
 
 def clean_transcript(value: str) -> str:
@@ -169,7 +184,8 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
          first_chunk_ms: int = 1400, vad: bool = False, threshold: int = 600,
          silence_ms: int = 2200, min_speech_ms: int = 250,
          pilot_one_chunk: bool = False,
-         pilot_live_chunks: int = 0, prefer_persistent: bool = False) -> int:
+         pilot_live_chunks: int = 0, prefer_persistent: bool = False,
+         speech_pause_ms: int = 0) -> int:
     if not Path(stt_helper).is_file():
         print(packet("error", detail="LOCAL WHISPER HELPER UNAVAILABLE"),
               flush=True)
@@ -189,6 +205,9 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
     send_lock = threading.Lock()
     capture_done = threading.Event()
     model_warmup_requested = threading.Event()
+    persistent_model_ready = threading.Event()
+    recognition_idle = threading.Event()
+    recognition_idle.set()  # no extra requests while the model is occupied
     recognition_done = threading.Event()
     stopping_error = threading.Event()
     # Single owner-reason receipt for STOP vs internal safety shutdown.
@@ -315,6 +334,12 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
         first_chunk_reported = False
         accepted_chunks = 0
         backpressure_reported = False
+        quiet_run_ms = 0
+        # A pause triggers early submission only if the same guarded model
+        # is already ready and at least 1.2s of audio is accumulated. The
+        # legacy CLI path and first 1.4s chunk retain their normal cadence.
+        pause_gap_ms = (max(400, min(650, speech_pause_ms))
+                        if speech_pause_ms > 0 else 0)
         # The follow-up trial restores incremental text while retaining a
         # ceiling on total model launches, capture duration and queue depth.
         live_chunk_ceiling = max(0, min(8, int(pilot_live_chunks)))
@@ -389,11 +414,33 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                         quiet_ms += frame_ms
                     else:
                         speech_ms = 0
+                # Natural sentence gaps can be sent sooner than the fixed
+                # 2-second batch, but only on the already loaded AF_UNIX
+                # backend. Do not emit very short fragments or extra jobs.
+                if (pause_gap_ms and first_chunk_sent
+                        and persistent_model_ready.is_set()):
+                    frame_ms = round(len(data) * 1000 / (RATE * FRAME_BYTES))
+                    quiet_run_ms = (quiet_run_ms + frame_ms
+                                    if quiet_pcm_frame(data) else 0)
+                else:
+                    quiet_run_ms = 0
                 next_size = target if first_chunk_sent else first_target
-                if len(pending) >= next_size:
-                    sent = enqueue(bytes(pending[:next_size]))
-                    del pending[:next_size]
+                full_chunk = len(pending) >= next_size
+                pause_chunk = (not full_chunk and first_chunk_sent
+                               and persistent_model_ready.is_set()
+                               and pause_gap_ms > 0
+                               and recognition_idle.is_set()
+                               and clips.empty()
+                               and len(pending) >= PAUSE_MIN_BYTES
+                               and quiet_run_ms >= pause_gap_ms)
+                if full_chunk or pause_chunk:
+                    take_size = next_size if full_chunk else len(pending)
+                    sent = enqueue(bytes(pending[:take_size]))
+                    del pending[:take_size]
                     first_chunk_sent = first_chunk_sent or sent
+                    quiet_run_ms = 0
+                    if pause_chunk and sent:
+                        send("stage", detail="PAUSE_CHUNK_READY")
                     if (pilot_one_chunk and sent) or (
                             live_chunk_ceiling
                             and accepted_chunks >= live_chunk_ceiling):
@@ -466,6 +513,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 send_timing("MODEL_STARTUP", model_loading_at)
                 session = candidate
                 model_started(session.process)
+                persistent_model_ready.set()
                 send("stage", detail="MODEL_SESSION_READY")
             except (OSError, ValueError, RuntimeError,
                     subprocess.SubprocessError):
@@ -490,6 +538,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 if cancelled.is_set():
                     break
                 try:
+                    recognition_idle.clear()
                     decoding_at = time.monotonic()
                     if session is None:
                         phrase = transcribe_chunk(stt_helper, chunk,
@@ -518,6 +567,8 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                     stopping.set()
                     halt_child()
                     break
+                finally:
+                    recognition_idle.set()
                 if phrase:
                     if not first_text_ready:
                         first_text_ready = True
@@ -566,6 +617,8 @@ def main():
                         help="bounded incremental trial: max 1-8 model chunks")
     parser.add_argument("--prefer-persistent", action="store_true",
                         help="prefer one private AF_UNIX Whisper model session")
+    parser.add_argument("--speech-pause-ms", type=int, default=0,
+                        help="optional 400-650ms pause flush on persistent model only")
     parser.add_argument("--vad", action="store_true")
     parser.add_argument("--threshold", type=int, default=600)
     parser.add_argument("--silence-ms", type=int, default=2200)
@@ -576,7 +629,8 @@ def main():
                 silence_ms=args.silence_ms, min_speech_ms=args.min_speech_ms,
                 pilot_one_chunk=args.pilot_one_chunk,
                 pilot_live_chunks=args.pilot_live_chunks,
-                prefer_persistent=args.prefer_persistent)
+                prefer_persistent=args.prefer_persistent,
+                speech_pause_ms=args.speech_pause_ms)
 
 
 if __name__ == "__main__":

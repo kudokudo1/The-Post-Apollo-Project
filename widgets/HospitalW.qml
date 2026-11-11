@@ -2583,6 +2583,9 @@ PanelWindow {
         // Prefer one CPU-only private Unix-socket model per recording.
         // If whisper-server is absent, retain prior guarded CLI inference.
         preferPersistentModel: true
+        // Natural phrase pauses may flush one guarded chunk early while
+        // continuous speech retains the previous two-second cadence.
+        speechPauseMs: 450
         chunkSeconds: 2
         firstChunkMs: 1400
         maxPackets: 48

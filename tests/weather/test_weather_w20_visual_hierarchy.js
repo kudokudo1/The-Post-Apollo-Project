@@ -49,7 +49,7 @@ test("W20 makes original full-WEATHER icon a giant focus while preserving all me
  assert.match(weather,/largeCurrent.width\*0.80/);
  assert.match(weather,/Math.min\(180,currentPanel.height\+8/);
  assert.match(weather,/font.pixelSize: 43/);
- assert.match(weather,/mainWeatherIcon.width \* 1.38/);
+ assert.match(weather,/currentPanel.height \* 1.33/);
  assert.match(weather,/terminal.sky.conditionState.icon/);
  assert.match(weather,/WeatherCelestialGlyph\s*\{/);
  assert.match(weather,/scale: 1.35/);

@@ -15,6 +15,10 @@ import time
 import unittest
 from unittest import mock
 
+# The canonical Hospital fake-audio workflow also exercises the optional
+# persistent local Whisper session before it may be deployed.
+from test_whisper_session_backend import PersistentWhisperTests
+
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "hospital-live-dictation.py"
 SPEC = importlib.util.spec_from_file_location("hospital_live_dictation", SCRIPT)

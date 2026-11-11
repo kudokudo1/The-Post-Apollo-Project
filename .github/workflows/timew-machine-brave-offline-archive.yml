@@ -1,0 +1,31 @@
+name: TimeW MACHINE offline sealed snapshot archive staging
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineBraveOfflineArchive.py"
+      - "tests/timew/test_machine_brave_offline_archive.py"
+      - "tests/timew/test_machine_brave_offline_archive_crypto.mjs"
+      - "docs/timew-machine-brave-offline-archive.md"
+      - ".github/workflows/timew-machine-brave-offline-archive.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify sealed source, consent refusal, private destination, dedup and rollback
+        run: python3 -B -I tests/timew/test_machine_brave_offline_archive.py
+      - name: Verify real synthetic WebCrypto ciphertext survives offline archive and authenticated readback
+        run: node tests/timew/test_machine_brave_offline_archive_crypto.mjs
+      - name: Preserve previous vault and read-only browser security boundaries
+        run: |
+          node tests/timew/test_machine_brave_sealed_readback.mjs
+          node tests/timew/test_machine_brave_session_seal.mjs
+          python3 -B -I tests/timew/test_machine_brave_sealed_vault.py
+          python3 -B -I tests/timew/test_machine_brave_session_recovery_contract.py

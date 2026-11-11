@@ -30,7 +30,7 @@ test("E2 bottom tabs separate one overview, one map, WATER, GROUND and final SER
    ["ground","earth/ground/full"],
    ["services","earth/services/health"]]);
  assert.deepEqual(plain(workspace.GROUPS.weather.map(x=>x.key)),[
-   "overview","conditions","forecasts","hazards","history","services"]);
+   "overview","conditions","hazards","history","services"]);
  for(const x of workspace.GROUPS.earth)
    assert.equal(tree.findRoute(x.path).subject,"earth");
  for(const name of ["geology","geography","events","fires","maps","investigations"])

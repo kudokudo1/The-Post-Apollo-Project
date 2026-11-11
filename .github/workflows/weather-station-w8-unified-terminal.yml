@@ -1,0 +1,85 @@
+name: Weather Station W8 unified weather terminal
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationWeatherTerminalSummary.qml'
+      - 'widgets/weather/StationWeatherSubjectPanelPolicy.js'
+      - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
+      - 'widgets/weather/StationSky.qml'
+      - 'widgets/weather/StationHome.qml'
+      - 'tests/weather/test_weather_w8_unified_terminal.js'
+      - 'tests/weather/test_weather_cosmos_domain_separation_m28r.js'
+      - 'tests/weather/test_ground_full_visual_parity_m28q.js'
+      - 'tests/weather/test_earth_e2_unified_map.js'
+      - 'tests/weather/test_workspace_landing_w1.js'
+      - 'tests/weather/fixtures/W8UnifiedWeatherTerminalNative.qml'
+      - '.github/workflows/weather-station-w8-unified-terminal.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  source-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Unified WEATHER source ownership and legacy routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/weather/test_weather_w8_unified_terminal.js
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+          node --test tests/weather/test_weather_subject_panels_m2b.js
+          node --test tests/weather/test_weather_cosmos_domain_separation_m28r.js
+          node --test tests/weather/test_ground_full_visual_parity_m28q.js
+          node --test tests/weather/test_earth_e2_unified_map.js
+          node --test tests/weather/test_services_w6_canonical_rollout.js
+          node --test tests/weather/test_home_w3_sources_and_history_fit.js
+
+  native-terminal:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:unstable
+    timeout-minutes: 12
+    steps:
+      - name: Install disposable Quickshell
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git quickshell qt6-qpa-plugins \
+            qml6-module-qtquick-effects qml6-module-qtquick-dialogs \
+            qml6-module-qt5compat-graphicaleffects coreutils findutils
+      - uses: actions/checkout@v4
+      - name: Native 520x300 weather terminal full and compact
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(pwd)"
+          work="$(mktemp -d /tmp/weather-w8.XXXXXXXX)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -m 700 "$work/home" "$work/runtime" "$work/cache" "$work/config"
+          mkdir -p "$work/config/widgets"
+          cp -a "$root/components" "$work/config/components"
+          cp -a "$root/widgets/weather" "$work/config/widgets/weather"
+          cp -a "$root/services" "$work/config/services"
+          cp "$root/tests/weather/fixtures/W8UnifiedWeatherTerminalNative.qml" "$work/config/shell.qml"
+          rc=0
+          timeout --signal=TERM --kill-after=3s 40s \
+            env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
+            XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            quickshell --no-color -p "$work/config/shell.qml" \
+            > "$work/native.log" 2>&1 || rc=$?
+          cat "$work/native.log"
+          test "$rc" -eq 0
+          grep -F "W8_NATIVE_PASS // UNIFIED_TERMINAL_FULL_OVERVIEW_AND_NO_STALE_FORECAST" "$work/native.log"
+          if grep -E 'W8_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+            exit 1
+          fi

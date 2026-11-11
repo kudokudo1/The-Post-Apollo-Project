@@ -59,31 +59,34 @@ test("all 14 original SKY sections are partitioned: observatory in COSMOS, terre
     assert.equal(cosmos.visibleFor("sky","cosmos/sky/full",unwanted),false,unwanted);
 });
 
-test("NOW + AIR shows Earth observations and atmosphere; FORECAST shows full hourly + daily + photo light",()=>{
+test("one WEATHER screen shows conditions, air, hourly + daily + photo light",()=>{
   const weatherTabs=workspace.GROUPS.weather;
   const now=weatherTabs.find(x=>x.key==="conditions");
-  const forecast=weatherTabs.find(x=>x.key==="forecasts");
+  const legacyForecast="weather/forecasts/hourly";
+  assert.equal(weatherTabs.length,5);
+  assert.equal(now.label,"WEATHER");
   assert.equal(now.path,"weather/conditions/current");
-  assert.equal(forecast.path,"weather/forecasts/hourly");
+  assert.equal(weatherTabs.some(x=>x.key==="forecasts"),false);
+  assert.equal(workspace.selectedGroup(legacyForecast),"conditions");
   assert.equal(nav.findRoute(now.path).subject,"weather");
-  assert.equal(nav.findRoute(forecast.path).subject,"weather");
+  assert.equal(nav.findRoute(legacyForecast).subject,"weather");
   assert.equal(weather.kindForRoute(now.path),"sky");
-  assert.equal(weather.kindForRoute(forecast.path),"sky");
-  for(const s of ["header","current","atmosphere"])
+  assert.equal(weather.kindForRoute(legacyForecast),"sky");
+  for(const s of ["header","current","atmosphere","hourly","daily","twilight"])
     assert.equal(weather.visibleFor("sky",now.path,s),true);
   for(const s of ["header","hourly","daily","twilight"])
-    assert.equal(weather.visibleFor("sky",forecast.path,s),true);
+    assert.equal(weather.visibleFor("sky",legacyForecast,s),true);
   assert.equal(weather.visibleFor("sky",now.path,"runtime"),false);
   assert.equal(weather.kindForRoute("weather/services/health"),"services");
-  assert.equal(weather.visibleFor("sky",now.path,"hourly"),false);
-  assert.equal(weather.visibleFor("sky",forecast.path,"current"),false);
+  assert.equal(weather.visibleFor("sky",now.path,"moon"),false);
+  assert.equal(weather.visibleFor("sky",legacyForecast,"current"),false);
   for(const route of ["weather/conditions/air","weather/conditions/pollen","weather/forecasts/air"]){
     assert.ok(nav.findRoute(route));
     assert.equal(weather.kindForRoute(route),"ground");
   }
   assert.equal(weather.kindForRoute("weather/overview"),"home");
   assert.equal(weather.visibleFor("home","weather/overview","snapshot"),true);
-  for(const route of [now.path,forecast.path,"weather/overview"])
+  for(const route of [now.path,legacyForecast,"weather/overview"])
     assert.equal(weather.needsSource(route,"astronomy"),false);
 });
 

@@ -24,8 +24,7 @@ var GROUPS = {
     ],
     weather:[
         {label:"OVERVIEW",path:"weather/overview",key:"overview"},
-        {label:"NOW + AIR",path:"weather/conditions/current",key:"conditions"},
-        {label:"FORECAST",path:"weather/forecasts/hourly",key:"forecasts"},
+        {label:"WEATHER",path:"weather/conditions/current",key:"conditions"},
         {label:"HAZARDS",path:"weather/hazards/alerts",key:"hazards"},
         {label:"HISTORY",path:"weather/history/historical-forecast",key:"history"},
         {label:"SERVICES",path:"weather/services/health",key:"services"}
@@ -108,6 +107,9 @@ function selectedGroup(path) {
     var group=tokens[1]||"overview";
     if (family==="home" && (group==="runtime" || group==="health"))
         return "sources";
+    // W8 // historical forecast deep links highlight the combined WEATHER
+    // terminal instead of an obsolete bottom FORECAST button.
+    if(family==="weather" && group==="forecasts") return "conditions";
     // All original map / event / geography / investigation deep links
     // belong to the one consolidated MAP / EVENTS tab.
     if(family==="earth" && ["maps","geography","geology",

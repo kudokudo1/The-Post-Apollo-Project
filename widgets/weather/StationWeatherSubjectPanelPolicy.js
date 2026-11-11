@@ -25,9 +25,10 @@ var ROUTES = {
   "earth/water/rivers/hydrograph": {page:"ground",sections:["rivers"]},
   "earth/water/marine": {page:"ground",sections:["marine"]},
   "earth/water/coast": {page:"ground",sections:["coast"]},
-  // NOW + AIR aggregates original terrestrial readings in one scrollable
-  // StationSky view; detailed ground air/gas/pollen pages stay independent.
-  "weather/conditions/current": {page:"sky", sections:["header","current","atmosphere"]},
+  // W8 // One WEATHER terminal now owns the original current/air and complete
+  // forecast instruments; old forecast and air deep links remain valid.
+  "weather/conditions/current": {page:"sky", sections:[
+    "header","current","atmosphere","hourly","daily","twilight"]},
   "weather/conditions/atmosphere": {page:"sky", sections:["header","atmosphere"]},
   // WEATHER W4: consolidated read-only runtime dashboard, not a collector.
   "weather/services/health": {page:"services", sections:[]},

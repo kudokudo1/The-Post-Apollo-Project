@@ -162,7 +162,7 @@ try:
             })
         with patch.object(vault.os, "link", side_effect=OSError("injected link failure")):
             refused(archive.archive,str(trial),second["record_id"],
-                    second["sha256"],confirmation=approve,destination=base)
+                    second["sha256"],confirmation=lambda _id: True,destination=base)
         assert entries[0].read_bytes() == original_file
         assert not list(archive_root.glob(".tmp-*"))
 

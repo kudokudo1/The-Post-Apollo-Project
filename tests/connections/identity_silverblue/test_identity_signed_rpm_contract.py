@@ -174,7 +174,8 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
     def test_09_real_boot_ci_is_strict_and_never_deploys_to_workstation(self):
         path = ROOT / ".github/workflows/connections-identity-silverblue-real-boot.yml"
         workflow = path.read_text()
-        self.assertIn("runs-on: ubuntu-latest", workflow)
+        self.assertIn("runs-on: ubuntu-24.04", workflow)
+        self.assertIn("sudo chmod a+rw /dev/kvm", workflow)
         self.assertIn("timeout-minutes: 75", workflow)
         self.assertIn("POST_APOLLO_ID_SILVERBLUE_CI_ONLY: '1'", workflow)
         self.assertIn("fedora:44", workflow)

@@ -45,7 +45,7 @@ test("COSMOS offers an astronomy-only SKY and complete SPACE as native bottom mo
   const main=plain(tabs.tabsFor("cosmos/overview"));
   assert.ok(main.some(x=>x.label==="ASTRONOMY"&&x.path==="cosmos/planets-stars/celestial-fix"&&x.key==="sky"));
   assert.ok(nav.findRoute(SKY), "full historical astronomy remains under INDEX");
-  assert.ok(main.some(x=>x.label==="SPACE"&&x.path==="cosmos/space-weather/overview"&&x.key==="space-weather"));
+  assert.ok(main.some(x=>x.label==="SERVICES"&&x.path==="cosmos/space-weather/overview"&&x.key==="space-weather"));
   assert.ok(nav.findRoute(SPACE),"complete SPACE remains under INDEX");
   assert.equal(tabs.selectedGroup(SKY),"sky");
   assert.equal(tabs.selectedGroup(SPACE),"space-weather");

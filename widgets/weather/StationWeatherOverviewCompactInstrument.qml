@@ -379,65 +379,74 @@ Rectangle {
                         font.pixelSize: 7
                         color: Colors.yellow
                     }
-                    Item {
-                        id: hourIcon
-                        objectName: "weather-w17-original-hourly-glyph"
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        y: 8 + (hourStrip.height - 45) * 0.18
-                        width: Math.min(50,19 + (hourStrip.height - 45) * 0.45)
-                        height: width
+                    // W19 // Icon, temperature, meter, chance form one
+                    // centered reading. The meter cannot look like a divider.
+                    Column {
+                        id: hourReadingStack
+                        objectName: "weather-w19-hourly-reading-stack"
+                        width: parent.width
+                        y: Math.max(8,8 + (hour.height-8-implicitHeight)/2)
+                        spacing: hour.height>65 ? 2 : 0
+                        Item {
+                            id: hourIcon
+                            objectName: "weather-w17-original-hourly-glyph"
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            width: Math.min(50,13 + Math.max(0,hour.height-45)*0.55)
+                            height: width
+                            GohuText {
+                                anchors.centerIn: parent
+                                text: panel.iconText(hour.state)
+                                font.pixelSize: Math.min(54,hourIcon.width + 5)
+                                color: panel.ink(hour.state.color)
+                                visible: hour.art==="weather"
+                            }
+                            WeatherCelestialGlyph {
+                                anchors.centerIn: parent
+                                width: parent.width
+                                height: parent.height
+                                mode: hour.art
+                                solar: hour.cycle.solar
+                                moonPhase: hour.cycle.moonPhase
+                                weatherKind: WeatherCyclePolicy.nightKind(hour.state)
+                                ink: panel.ink(hour.state.color)
+                                visible: hour.art!=="weather"
+                            }
+                        }
                         GohuText {
-                            anchors.centerIn: parent
-                            text: panel.iconText(hour.state)
-                            font.pixelSize: Math.min(54,22 + panel.expansion * 0.18)
-                            color: panel.ink(hour.state.color)
-                            visible: hour.art==="weather"
-                        }
-                        WeatherCelestialGlyph {
-                            anchors.centerIn: parent
+                            id: hourTemperature
                             width: parent.width
-                            height: parent.height
-                            mode: hour.art
-                            solar: hour.cycle.solar
-                            moonPhase: hour.cycle.moonPhase
-                            weatherKind: WeatherCyclePolicy.nightKind(hour.state)
-                            ink: panel.ink(hour.state.color)
-                            visible: hour.art!=="weather"
+                            height: hour.height>65 ? 13 : 10
+                            horizontalAlignment: Text.AlignHCenter
+                            text: panel.reading(hour.entry.tempF,"°F")
+                            font.pixelSize: hour.height>65 ? 11 : 9
+                            color: Colors.white
                         }
-                    }
-                    GohuText {
-                        y: 27 + (hourStrip.height - 45) * 0.70
-                        width: parent.width
-                        horizontalAlignment: Text.AlignHCenter
-                        text: panel.reading(hour.entry.tempF,"°F")
-                        font.pixelSize: 11
-                        color: Colors.white
-                    }
-                    GohuText {
-                        y: 36 + (hourStrip.height - 45) * 0.85
-                        width: parent.width
-                        horizontalAlignment: Text.AlignHCenter
-                        text: panel.percent(hour.entry.chanceRain)
-                        font.pixelSize: 7
-                        color: Colors.cyan
-                    }
-                    Rectangle {
-                        id: hourMeter
-                        objectName: "weather-w17-hourly-rain-meter"
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        height: 3
-                        color: Colors.black
-                        border.width: 1
-                        border.color: Colors.cyan
                         Rectangle {
-                            x: 1
-                            y: 1
-                            height: Math.max(0,parent.height-2)
-                            width: Math.max(0,(parent.width-2)*
-                                  panel.ratio(hour.entry.chanceRain,100))
-                            color: Colors.orange
+                            id: hourMeter
+                            objectName: "weather-w17-hourly-rain-meter"
+                            width: Math.max(0,parent.width-6)
+                            height: hour.height>65 ? 6 : 5
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            color: Colors.black
+                            border.width: 1
+                            border.color: Colors.cyan
+                            Rectangle {
+                                x: 1
+                                y: 1
+                                height: Math.max(0,parent.height-2)
+                                width: Math.max(0,(parent.width-2)*
+                                      panel.ratio(hour.entry.chanceRain,100))
+                                color: Colors.orange
+                            }
+                        }
+                        GohuText {
+                            id: hourChance
+                            width: parent.width
+                            height: hour.height>65 ? 10 : 8
+                            horizontalAlignment: Text.AlignHCenter
+                            text: panel.percent(hour.entry.chanceRain)
+                            font.pixelSize: hour.height>65 ? 8 : 7
+                            color: Colors.cyan
                         }
                     }
                 }

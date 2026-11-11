@@ -144,7 +144,8 @@ def _local_description(value, maximum):
 
 def _hub_notes_rows(doc):
     """B8 owner inventory: metadata only, never note body or write access."""
-    if (not isinstance(doc, dict) or doc.get("version") != 1
+    if (not isinstance(doc, dict) or type(doc.get("version")) is not int
+            or doc["version"] != 1
             or not _integer(doc.get("nextId"), 1, 1000000000)
             or not isinstance(doc.get("notes"), list)
             or len(doc["notes"]) > 100):
@@ -187,7 +188,8 @@ def _hub_due_date(value):
 
 def _hub_todo_rows(doc):
     """B7 owner inventory: bounded title, identity, dates only, no drafts."""
-    if (not isinstance(doc, dict) or doc.get("version") not in (1, 2, 3)
+    if (not isinstance(doc, dict) or type(doc.get("version")) is not int
+            or doc["version"] not in (1, 2, 3)
             or not _integer(doc.get("nextId"), 1, 1000000000)
             or not isinstance(doc.get("tasks"), list)
             or len(doc["tasks"]) > 200):

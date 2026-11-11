@@ -31,6 +31,23 @@ Rectangle {
     property bool personalNeedsExplicitReload: false
     // The QML tree must exist before lifecycle handlers reference children.
     property bool personalReadUiReady: false
+    // Selection is an opaque key into only the current authorized local
+    // contact snapshot. Never persist it or merge it with SMS thread IDs.
+    property string selectedPhoneContactId: ""
+    readonly property var selectedPhoneContactCard: {
+        if (!visible || selectedSection !== "CONTACTS"
+                || !personalApproved || personalNeedsExplicitReload
+                || personalReadStatus !== "LOCAL_SNAPSHOT"
+                || !phoneReadAdapter.active
+                || selectedPhoneContactId === "")
+            return null;
+        var cards = phoneReadAdapter.contactCards;
+        for (var i = 0; i < cards.length; ++i) {
+            if (String(cards[i].id) === selectedPhoneContactId)
+                return cards[i];
+        }
+        return null;
+    }
     Component.onCompleted: personalReadUiReady = true
     // A local Social identity is a display selector, never an auth grant.
     property string activeSocialIdentityId: ""
@@ -40,6 +57,7 @@ Rectangle {
         if (personalReadProcess.running)
             personalReadProcess.running = false;
         phoneReadAdapter.forgetHostView();
+        selectedPhoneContactId = "";
         personalApproved = false;
         personalPermissionOpen = false;
         personalNeedsExplicitReload = true;
@@ -599,6 +617,8 @@ Rectangle {
 
     onSelectedSectionChanged: {
         if (!personalReadUiReady) return;
+        if (selectedSection !== "CONTACTS")
+            selectedPhoneContactId = "";
         if (selectedSection !== "DEVICE") closeStagedSetup();
         if (selectedSection !== "CALLS") {
             callsWorkspaceGeneration += 1;
@@ -718,6 +738,7 @@ Rectangle {
             if (phoneStorageUnlockProcess.running)
                 phoneStorageUnlockProcess.running = false;
             phoneReadAdapter.forgetHostView();
+            selectedPhoneContactId = "";
             personalPermissionOpen = false;
             personalApproved = false;
         }
@@ -737,6 +758,7 @@ Rectangle {
             personalPermissionOpen = false;
             personalApproved = false;
             phoneReadAdapter.forgetHostView();
+            selectedPhoneContactId = "";
             selectedSection = "MESSAGES";
             setupState = "NOT STARTED";
             setupReport = ({});
@@ -834,6 +856,41 @@ Rectangle {
             waiting = waiting || liveCalls[i].state === "waiting";
         }
         return active && waiting;
+    }
+
+    // Contact actions operate only on the current, approved Personal snapshot.
+    // A contact's primary value is a display field, not a trusted SMS thread
+    // identity or authority to dial. Never auto-place a call from CONTACTS.
+    function contactPrimaryDialNumber(card) {
+        if (!card || typeof card.primary !== "string")
+            return "";
+        var raw = card.primary.trim();
+        if (!/^[+]?[0-9 ()-]{3,32}$/.test(raw))
+            return "";
+        var normalized = raw.replace(/[ ()-]/g, "");
+        return /^[+]?[0-9]{3,18}$/.test(normalized) ? normalized : "";
+    }
+
+    function openSelectedContactForCall() {
+        var number = contactPrimaryDialNumber(selectedPhoneContactCard);
+        if (!visible || selectedSection !== "CONTACTS" || number === "")
+            return;
+        // Existing CALLS workspace still checks backend READY and requires
+        // REVIEW OUTGOING CALL, then a separate CONFIRM CALL.
+        selectedSection = "CALLS";
+        phoneDialInput.text = number;
+        callsConfirmDial = false;
+        callsPendingDial = "";
+    }
+
+    function openSelectedContactMessages() {
+        if (!visible || selectedSection !== "CONTACTS"
+                || selectedPhoneContactCard === null)
+            return;
+        // There is no stable, authorized contacts-to-SMS conversation key
+        // in the BlueFerry projection. Never guess a matching thread, send
+        // an SMS or silently grant Messages read permission.
+        selectedSection = "MESSAGES";
     }
 
     function refreshCallsWorkspace() {
@@ -1123,6 +1180,7 @@ Rectangle {
     function revokePersonalAccess() {
         if (!visible || personalRevokeProcess.running)
             return;
+        selectedPhoneContactId = "";
         personalReadGeneration += 1;
         if (personalReadProcess.running)
             personalReadProcess.running = false;
@@ -1138,6 +1196,7 @@ Rectangle {
     }
 
     function clearPersonalView() {
+        selectedPhoneContactId = "";
         phoneReadAdapter.forgetHostView();
         personalReadStatus = "VIEW_CLEARED";
     }
@@ -2424,31 +2483,52 @@ Rectangle {
         clip: true
         model: phoneReadAdapter.contactCards
         delegate: Rectangle {
+            id: addressBookRow
             required property var modelData
             width: phoneAddressBook.width
-            height: 58
-            color: Colors.dark
+            height: 64
+            readonly property bool isSelected: phonePane.selectedPhoneContactId
+                                               === String(modelData.id)
+            color: isSelected ? Colors.yellow : Colors.dark
             border.width: 1
-            border.color: Colors.cyan
+            border.color: isSelected ? Colors.orange : Colors.cyan
+            clip: true
             Column {
                 anchors.fill: parent
                 anchors.margins: 8
                 spacing: 5
                 Text {
                     width: parent.width
+                    height: 19
                     text: modelData.displayNameInProfile || "Unnamed contact"
                     textFormat: Text.PlainText
-                    color: Colors.orange
+                    color: addressBookRow.isSelected ? Colors.black : Colors.orange
                     font.pixelSize: 11
+                    wrapMode: Text.NoWrap
+                    maximumLineCount: 1
+                    clip: true
                     elide: Text.ElideRight
                 }
                 Text {
                     width: parent.width
+                    height: 16
                     text: modelData.primary || ""
                     textFormat: Text.PlainText
-                    color: Colors.cyan
+                    color: addressBookRow.isSelected ? Colors.black : Colors.cyan
                     font.pixelSize: 9
+                    wrapMode: Text.NoWrap
+                    maximumLineCount: 1
+                    clip: true
                     elide: Text.ElideRight
+                }
+            }
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                    if (phonePane.personalApproved
+                            && phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                            && !phonePane.personalNeedsExplicitReload)
+                        phonePane.selectedPhoneContactId = String(modelData.id);
                 }
             }
         }
@@ -2516,6 +2596,19 @@ Rectangle {
                                 : phoneReadAdapter.conversations.length > 0
                                   ? "SELECT A PHONE CONVERSATION"
                                   : "PHONE NOT LINKED"
+    }
+
+    // CONTACTS is a read-only address-book workspace. Its selected detail
+    // screen uses only the currently visible, approved, validated card fields.
+    // No guessed phone/email records, SMS join, FaceTime provider or call dial.
+    PhoneContactDetail {
+        id: phoneContactDetail
+        anchors.fill: phoneChatFeed
+        z: 5
+        contact: phonePane.selectedPhoneContactCard
+        canPrepareCall: phonePane.contactPrimaryDialNumber(contact) !== ""
+        onCallRequested: phonePane.openSelectedContactForCall()
+        onMessageRequested: phonePane.openSelectedContactMessages()
     }
 
     // Informative, content-free status on the existing MESSAGES/CONTACTS pane.

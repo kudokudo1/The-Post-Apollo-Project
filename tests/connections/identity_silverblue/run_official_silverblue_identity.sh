@@ -149,13 +149,13 @@ for n in $(seq 1 700); do
   if ! kill -0 "$pid" 2>/dev/null; then break; fi
   if (( n % 20 == 0 )); then
     echo "C4B_ID_HOST_HEARTBEAT // poll=$n"
-    grep -aE 'C4B_ID_(PASS|FAIL|STAGE|BLOCKED|PENDING)' \
+    grep -aE 'C4B_ID_(PASS|FAIL|STAGE|BLOCKED|PENDING|RPM_VERIFY_RC|RPM_VERIFY_DETAIL)' \
       "$tmp/identity-guest-serial.log" 2>/dev/null | tail -n 12 || true
   fi
   sleep 2
 done
 echo "C4B_ID_HOST_EVIDENCE // BOUNDED_REAL_GUEST_MARKERS"
-grep -aE 'C4B_ID_(PASS|FAIL|STAGE|BLOCKED|PENDING)' \
+grep -aE 'C4B_ID_(PASS|FAIL|STAGE|BLOCKED|PENDING|RPM_VERIFY_RC|RPM_VERIFY_DETAIL)' \
   "$tmp/identity-guest-serial.log" 2>/dev/null | tail -n 65 || true
 if [[ "$final" != 1 ]]; then
   echo "C4B_ID_BLOCKED // ORIGINAL_REAL_IDENTITY_OSTREE_ROLLBACK_NOT_VERIFIED"

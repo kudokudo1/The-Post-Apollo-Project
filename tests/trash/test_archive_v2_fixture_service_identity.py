@@ -150,7 +150,8 @@ class ServiceIdentityV2qTests(unittest.TestCase):
         return {"grant": grant, "signatureB64": base64.b64encode(
             key.sign(canonical_service_grant(grant))).decode("ascii")}
 
-    def send(self, *, service=None, signed_service_grant=None):
+    def send(self, *, service=None, signed_service_grant=None,
+             signed_service_release=None, service_release_history=None):
         if service is None:
             service = self.pinned
         elif service is False:
@@ -164,7 +165,9 @@ class ServiceIdentityV2qTests(unittest.TestCase):
                     pinned_test_root=self.trust_root,
                     ledger=self.ledger, now_ms=NOW,
                     service_files=service,
-                    signed_service_grant=signed_service_grant)
+                    signed_service_grant=signed_service_grant,
+                    signed_service_release=signed_service_release,
+                    service_release_history=service_release_history)
 
     def counts(self):
         return self.ledger.test_copy_status("demo-scrape")

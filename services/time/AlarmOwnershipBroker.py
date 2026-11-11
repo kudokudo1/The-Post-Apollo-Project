@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -21,8 +22,25 @@ import sys
 import threading
 import time
 
-from AlarmOwnershipGate import OwnershipGate, Refused
-from AlarmBackgroundObserver import evaluate_alarm, validate_snapshot
+# Explicit source-tree sibling loading works even with python -I; do not
+# search the user working directory for lookalike modules.
+def _sibling(name):
+    target = Path(__file__).resolve().with_name(name + ".py")
+    spec = importlib.util.spec_from_file_location(name, target)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Missing bundled Clock component: " + name)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_gate_module = _sibling("AlarmOwnershipGate")
+_observer_module = _sibling("AlarmBackgroundObserver")
+OwnershipGate = _gate_module.OwnershipGate
+Refused = _gate_module.Refused
+evaluate_alarm = _observer_module.evaluate_alarm
+validate_snapshot = _observer_module.validate_snapshot
+ObserverRefused = _observer_module.Refused
 
 MAX_FRAME = 8192
 MAX_ALARMS_BYTES = 2 * 1024 * 1024
@@ -91,7 +109,7 @@ def _source_snapshot(alarm_file, now_ms):
     try:
         doc = json.loads(raw)
         validate_snapshot(doc)
-    except (ValueError, UnicodeError, KeyError, TypeError, Refused) as exc:
+    except (ValueError, UnicodeError, KeyError, TypeError, Refused, ObserverRefused) as exc:
         raise Refused("INVALID_ALARM_DOCUMENT") from exc
     # Snapshot hash is a PRE-ACTUATION witness only. It does not make
     # Quickshell's current FileView write transactional with this broker.

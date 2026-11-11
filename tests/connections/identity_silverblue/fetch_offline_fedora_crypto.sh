@@ -23,7 +23,7 @@ url="https://download.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x
 curl --fail --location --retry 2 --connect-timeout 20 --max-time 240 \
   "$url" -o "$rpmfile" ||
   { echo "C4B_ID_BLOCKED // FEDORA_CRYPTOGRAPHY_RPM_DOWNLOAD_REFUSED"; exit 2; }
-[[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$rpmfile")" ==
+[[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$rpmfile")" == \
    "python3-cryptography 50.0.0 1.fc44 x86_64" ]] ||
   { echo "C4B_ID_BLOCKED // WRONG_FEDORA_CRYPTOGRAPHY_RPM_ROLE"; exit 2; }
 [[ -z "$(rpm -qp --scripts "$rpmfile")" &&

@@ -76,7 +76,7 @@ assert.ok(marker.includes('chrome.permissions.contains('));
 assert.ok(marker.includes('chrome.runtime.sendNativeMessage('));
 assert.ok(marker.includes('checkMarkerReply(token, response)'));
 assert.ok(marker.includes('chrome.tabs.remove(tab.id)'));
-assert.ok(marker.includes('"TITLE MARKER MATCHED // TEMPORARY // NO RESTORE"'));
+assert.ok(marker.includes("TITLE MARKER MATCHED // TEMPORARY // NO RESTORE"));
 assert.ok(marker.includes('verify.addEventListener("click", compare)'));
 assert.ok(marker.includes('close.addEventListener("click", closeOwn)'));
 assert.ok(marker.indexOf("chrome.permissions.contains(")

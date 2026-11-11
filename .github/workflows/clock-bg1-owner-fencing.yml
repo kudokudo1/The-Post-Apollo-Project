@@ -1,0 +1,55 @@
+name: Clock BG1-A ownership fencing foundation
+
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmOwnershipGate.py"
+      - "services/time/BG1-ALARM-OWNERSHIP.md"
+      - "tests/time/test_clock_bg1_owner_fencing_contract.py"
+      - ".github/workflows/clock-bg1-owner-fencing.yml"
+  push:
+    paths:
+      - "services/time/AlarmOwnershipGate.py"
+      - "services/time/BG1-ALARM-OWNERSHIP.md"
+      - "tests/time/test_clock_bg1_owner_fencing_contract.py"
+      - ".github/workflows/clock-bg1-owner-fencing.yml"
+
+jobs:
+  test-ownership-fence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compile Python and test owner collisions, fencing and durable claim ledger
+        run: |
+          python3 -I -B -c 'import ast,pathlib; ast.parse(pathlib.Path("services/time/AlarmOwnershipGate.py").read_text())'
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_owner_fencing_contract.py' -v
+      - name: Prove BG1-A does not alter running Clock or B0
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          changed=subprocess.check_output(
+              ['git','diff','--name-only','origin/main...HEAD'],text=True
+          ).splitlines()
+          allowed={
+              'services/time/AlarmOwnershipGate.py',
+              'services/time/BG1-ALARM-OWNERSHIP.md',
+              'tests/time/test_clock_bg1_owner_fencing_contract.py',
+              '.github/workflows/clock-bg1-owner-fencing.yml',
+          }
+          unexpected=set(changed)-allowed
+          assert not unexpected, f"Unexpected production changes: {unexpected}"
+          for path in ('services/time/AlarmManagerService.qml',
+                       'services/time/AlarmManagerPolicy.js',
+                       'services/time/AlarmBackgroundObserver.py',
+                       'ops/systemd/user/post-apollo-alarm-observer.service'):
+              assert path not in changed
+          code=Path('services/time/AlarmOwnershipGate.py').read_text()
+          assert 'actuationEnabled": False' in code
+          assert 'RESERVED_ONLY' in code
+          assert 'notify-send' not in code
+          assert 'subprocess.run(' not in code
+          print('No runtime actuation or live ownership integration: PASS')
+          PY

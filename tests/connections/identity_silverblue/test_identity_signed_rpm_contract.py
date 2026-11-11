@@ -161,7 +161,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             "OFFLINE_NO_NETWORK_REQUIRED",
             "SIGNED_RPM_PRETRUST_MUST_FAIL",
             "ISOLATED_SIGNED_RPM_VERIFICATION_FAILED",
-            'rpm-ostree install --cache-only /var/lib/postapollo-id-ci-assets/identity-silverblue-ci.rpm',
+            'rpm-ostree install --cache-only',
             "C4B_ID_PENDING_EXACT_IDENTITY_DEPLOYMENT",
             "REAL_SILVERBLUE_BOOTED_SIGNED_IDENTITY_RPM_INERT",
             "REAL_SILVERBLUE_IDENTITY_RPM_LAYER_REMOVED",
@@ -250,6 +250,60 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertNotIn("pip install", probe)
         self.assertNotIn("oauth", probe.lower())
         self.assertIn('bash -n tests/connections/identity_silverblue/guest_identity_service_probe.sh', workflow)
+
+
+    def test_11_offline_fedora_runtime_is_separately_signed_and_rollback_bound(self):
+        downloader = (AREA / "fetch_offline_fedora_crypto.sh").read_text()
+        guest = (AREA / "guest_identity_ostree_cycle.sh").read_text()
+        host = (AREA / "run_official_silverblue_identity.sh").read_text()
+        workflow = (ROOT / ".github/workflows/connections-identity-silverblue-real-boot.yml").read_text()
+        for required in (
+            'fingerprint=36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6',
+            'rpm_name=python3-cryptography-50.0.0-1.fc44.x86_64.rpm',
+            'RPM-GPG-KEY-fedora-44-primary',
+            'FEDORA44_KEY_FINGERPRINT_MISMATCH',
+            'FEDORA_SIGNER_PRETRUST_REFUSAL_MISSING',
+            'FEDORA_SIGNED_RUNTIME_INVALID',
+            'FEDORA_RUNTIME_SIGNATURE_NOT_TRUSTED',
+            'identity-fedora44-runtime-manifest.sha256',
+            'OFFICIAL_FEDORA44_ED25519_RUNTIME_RPM_INDEPENDENTLY_SIGNED_AND_PINNED',
+        ):
+            self.assertIn(required, downloader)
+        for required in (
+            'identity-fedora44-runtime-manifest.sha256',
+            'VENDOR_SIGNER_PRETRUST_REFUSAL_MISSING',
+            'VENDOR_RPM_SIGNATURE_INVALID',
+            'identity-python3-cryptography-f44.rpm',
+            'rpm-ostree install --cache-only',
+            'OFFLINE_SIGNED_FEDORA_ED25519_RUNTIME_BOOTED_AND_VERIFIED',
+            'rpm -V --nomtime python3-cryptography',
+            'FEDORA_ED25519_TEST_RUNTIME_REMAINS_AFTER_ROLLBACK',
+        ):
+            self.assertIn(required, guest)
+        self.assertLess(guest.index('SIGNED_OFFLINE_FEDORA44_ED25519_DEPENDENCY_VERIFIED'),
+                        guest.index('rpm-ostree install --cache-only'))
+        self.assertLess(guest.index('OFFLINE_SIGNED_FEDORA_ED25519_RUNTIME_BOOTED_AND_VERIFIED'),
+                        guest.index('REAL_IDENTITY_SERVICE_PROBE_FINISHED_BEFORE_ROLLBACK'))
+        self.assertLess(guest.index('FEDORA_ED25519_TEST_RUNTIME_REMAINS_AFTER_ROLLBACK'),
+                        guest.index('REAL_SILVERBLUE_IDENTITY_RPM_LAYER_REMOVED'))
+        for required in (
+            'runtime_dir="$2"',
+            'identity-fedora44-runtime-manifest.sha256',
+            'identity-fedora44-runtime-public.asc',
+            'identity-python3-cryptography-f44.rpm',
+            'SIGNED_OFFLINE_FEDORA44_ED25519_DEPENDENCY_VERIFIED',
+            'OFFLINE_SIGNED_FEDORA_ED25519_RUNTIME_BOOTED_AND_VERIFIED',
+        ):
+            self.assertIn(required, host)
+        for required in (
+            'fetch_offline_fedora_crypto.sh',
+            'Obtain exact official Fedora 44 signed offline Ed25519 runtime',
+            '"$RUNNER_TEMP/c4b-identity-fedora-crypto"',
+        ):
+            self.assertIn(required, workflow)
+        self.assertEqual(host.count("-nic none"), 2)
+        self.assertNotIn("pip install", guest)
+        self.assertNotIn("pip install", host)
 
 
 if __name__ == "__main__":

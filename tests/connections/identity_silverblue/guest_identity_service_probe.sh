@@ -126,7 +126,12 @@ echo "C4B_ID_PASS // REAL_SYSTEMD_IDENTITY_GATEWAY_SOCKET_AND_PROCESS_OBSERVED"
 # The real installed gateway, not an imitation server, must sign four
 # UNAVAILABLE receipts. The verifier sees the disposable signer public key
 # from its own test-only seed; this is NOT independently enrolled host trust.
-python3 -I -B - "$socket" "$signer" "$pid" "$uid" "$gid" "$cgroup" "$selinux" <<'PY'
+# Preserve bounded guest Python errors on the serial evidence channel before
+# the surrounding lifecycle powers down. The previous CI only exposed a generic
+# probe failure, forcing a costly full reinstall to identify its cause.
+probe_log=/var/tmp/c4b-id-service-probe.log
+probe_rc=0
+python3 -I -B - "$socket" "$signer" "$pid" "$uid" "$gid" "$cgroup" "$selinux" >"$probe_log" 2>&1 <<'PY' || probe_rc="$?"
 import secrets,socket,struct,subprocess,sys
 from pathlib import Path
 sys.path.insert(0,"/usr/libexec/post-apollo/identity")
@@ -196,6 +201,18 @@ for action in ("BEGIN","STATUS","CANCEL","RECOVER"):
     print(f"C4B_ID_PASS // INSTALLED_SIGNED_UNAVAILABLE_{action}")
 print("C4B_ID_PASS // KERNEL_PEER_PID_START_AND_SUPERVISOR_RECHECKED_FOR_FOUR_SIGNED_DENIALS")
 PY
+# Bounded, prefix-tagged diagnostic lines survive the host's evidence filter;
+# retain exact PASS markers for authoritative host-side stage checks.
+while IFS= read -r line; do
+  case "$line" in
+    C4B_ID_PASS\ //*) echo "$line" ;;
+    *) printf 'C4B_ID_SERVICE_PROBE_DETAIL // %.500s\n' "$line" ;;
+  esac
+done < <(sed -n '1,28p' "$probe_log")
+[[ "$probe_rc" == 0 ]] || {
+  echo "C4B_ID_SERVICE_PROBE_RC // $probe_rc"
+  fail "KERNEL_OR_SIGNED_RECEIPT_CONTINUITY_REFUSED"
+}
 if [[ -e "$runtime/identity-display-v0.sock" ]]; then
   fail "UNAPPROVED_BROWSER_HOST_SOCKET_EXISTS"
 fi

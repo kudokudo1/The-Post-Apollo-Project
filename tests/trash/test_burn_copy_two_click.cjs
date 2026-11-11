@@ -176,6 +176,39 @@ test("one visual modal and one Burn workspace hold result until DONE",()=>{
     assert.match(qml,/id: researchBurnLabelClip/);
 });
 
+test("orange fill persists after loading and black label covers full width",()=>{
+    const face=qml.slice(qml.indexOf("id: researchBurnFace"),
+                         qml.indexOf("id: cancelManagedResearchBurn"));
+    const guard=/readonly property bool loading:\s*trashLauncher\.researchBurnClickArmed\s*&& trashLauncher\.burnUiStage === ""/;
+    assert.match(face,guard);
+    // Read the actual QML visibility expression. Its evaluation, not the
+    // animation-complete flag, decides when the overlay is shown.
+    const expr=face.match(guard)[0].split("loading:")[1].trim();
+    for (const sample of [
+        {armed:false,stage:"",finished:false,visible:false},
+        {armed:true,stage:"",finished:false,visible:true},
+        {armed:true,stage:"",finished:true,visible:true},
+        {armed:true,stage:"clicked",finished:true,visible:false},
+        {armed:true,stage:"working",finished:true,visible:false}
+    ]) {
+        const visible=vm.runInNewContext(expr,{
+            trashLauncher:{
+                researchBurnClickArmed:sample.armed,
+                researchBurnLoadComplete:sample.finished,
+                burnUiStage:sample.stage
+            }
+        });
+        assert.equal(visible,sample.visible,JSON.stringify(sample));
+    }
+    assert.match(face,/visible: researchBurnFace\.loading/g);
+    assert.equal((face.match(/visible: researchBurnFace\.loading/g)||[]).length,2);
+    assert.match(face,/\* trashLauncher\.researchBurnLoadProgress/);
+    assert.match(face,/height: Math\.max\(0, parent\.height - 4\)/);
+    assert.match(face,/color: Colors\.black\s+text: researchBurnFace\.displayedLabel/);
+    assert.match(face,/: "CLICK AGAIN \/\/ BURN"/);
+    assert.match(face,/horizontalAlignment: Text\.AlignHCenter/);
+});
+
 test("single Burn menu filters both sources and requires scope for bulk",()=>{
     assert.match(qml,/id: burnSourceFilters/);
     assert.match(qml,/model: trashLauncher\.burnDisplayRows/);

@@ -2115,9 +2115,12 @@ PanelWindow {
                             Item {
                                 id: researchBurnFace
                                 anchors.fill: parent
+                                // Keep the full orange fill at 100% after
+                                // arming completes. Only the second click
+                                // transitions to the magenta feedback stage.
                                 readonly property bool loading:
                                     trashLauncher.researchBurnClickArmed
-                                    && !trashLauncher.researchBurnLoadComplete
+                                    && trashLauncher.burnUiStage === ""
                                 readonly property string displayedLabel:
                                     trashLauncher.burnUiStage === "clicked"
                                     ? "CONFIRMING..."
@@ -2131,9 +2134,10 @@ PanelWindow {
                                     ? "LOADING SAFETY..."
                                     : "CLICK AGAIN // BURN"
 
-                                // Full-height orange fill is visible ONLY
-                                // during the 850 ms arming animation. At full
-                                // load the normal solid-black button returns.
+                                // Fill the entire button during loading AND
+                                // hold orange when armed, with the centered
+                                // text black through the clipped label layer.
+                                // The second click switches to magenta feedback.
                                 Rectangle {
                                     id: researchBurnLoadFill
                                     x: 2

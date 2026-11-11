@@ -902,33 +902,37 @@ Item {
                 id: entry
                 width: alarmList.width
                 height: 35
-                spacing: 5
+                spacing: 3
                 readonly property var rowAlarm: modelData
+
+                // FAVORITE is always the far-left action, like Angel.
                 ActionButton {
-                    width: Math.max(0, entry.width - toggleAlarm.width
-                                    - entry.spacing)
+                    id: favoriteAlarm
+                    width: 27
                     height: parent.height
-                    selected: pane.selectedId === entry.rowAlarm.id
-                    labelHorizontalAlignment: Text.AlignLeft
-                    labelPixelSize: 10
-                    label: ("0" + entry.rowAlarm.hour).slice(-2) + ":"
-                        + ("0" + entry.rowAlarm.minute).slice(-2) + " // "
-                        + entry.rowAlarm.name.slice(0, 17)
-                        + " // " + pane.scheduleLabel(entry.rowAlarm)
-                        + (entry.rowAlarm.ringing ? " RING" : "")
-                        + (entry.rowAlarm.completed ? " DONE" : "")
-                    accentColor: entry.rowAlarm.ringing ? Colors.magenta
-                        : entry.rowAlarm.enabled ? Colors.orange : Colors.white
-                    trackLabelGlowLocally: true
-                    onLeftClicked: pane.choose(entry.rowAlarm.id)
+                    label: "★"
+                    labelPixelSize: 13
+                    contentPadding: 2
+                    selected: entry.rowAlarm.favorite === true
+                    accentColor: entry.rowAlarm.favorite
+                        ? Colors.magenta : Colors.white
+                    idleBorderColor: entry.rowAlarm.favorite
+                        ? Colors.magenta : Colors.cyan
+                    selectedContentGlowColor: Colors.magenta
+                    selectedSoftGlowColor: Colors.magenta
+                    available: AlarmManagerService.canEdit
+                    onLeftClicked: AlarmManagerService.toggleFavorite(
+                        entry.rowAlarm.id)
                 }
+                // ON/OFF precedes the alarm selection, not after it.
                 ActionButton {
                     id: toggleAlarm
-                    width: 61
+                    width: 35
                     height: parent.height
                     label: entry.rowAlarm.enabled ? "ON" : "OFF"
                     selected: entry.rowAlarm.enabled
-                    labelPixelSize: 10
+                    labelPixelSize: 9
+                    contentPadding: 2
                     accentColor: entry.rowAlarm.enabled
                         ? Colors.orange : Colors.cyan
                     available: AlarmManagerService.canEdit
@@ -939,6 +943,58 @@ Item {
                                 && pane.selectedId === entry.rowAlarm.id)
                             pane.draftEnabled = nextState;
                     }
+                }
+                ActionButton {
+                    id: selectAlarm
+                    width: Math.max(0, entry.width - favoriteAlarm.width
+                                   - toggleAlarm.width - noteAlarm.width
+                                   - deleteAlarm.width - 4 * entry.spacing)
+                    height: parent.height
+                    selected: pane.selectedId === entry.rowAlarm.id
+                    labelHorizontalAlignment: Text.AlignLeft
+                    contentPadding: 4
+                    labelPixelSize: 10
+                    label: ("0" + entry.rowAlarm.hour).slice(-2) + ":"
+                        + ("0" + entry.rowAlarm.minute).slice(-2) + " // "
+                        + entry.rowAlarm.name
+                        + (entry.rowAlarm.ringing ? " RING" : "")
+                        + (entry.rowAlarm.completed ? " DONE" : "")
+                    accentColor: entry.rowAlarm.ringing ? Colors.magenta
+                        : entry.rowAlarm.enabled ? Colors.orange : Colors.white
+                    trackLabelGlowLocally: true
+                    onLeftClicked: pane.choose(entry.rowAlarm.id)
+                }
+                // NOTE is always immediately left of the delete action.
+                ActionButton {
+                    id: noteAlarm
+                    width: 27
+                    height: parent.height
+                    label: entry.rowAlarm.note ? "✎" : "+"
+                    labelPixelSize: 13
+                    contentPadding: 2
+                    selected: pane.selectedId === entry.rowAlarm.id
+                        && pane.settingsTab === "note"
+                    accentColor: entry.rowAlarm.note
+                        ? Colors.orange : Colors.cyan
+                    available: AlarmManagerService.canEdit
+                    onLeftClicked: pane.openNote(entry.rowAlarm.id)
+                }
+                // DELETE is always furthest right. Two clicks are required.
+                ActionButton {
+                    id: deleteAlarm
+                    width: 27
+                    height: parent.height
+                    label: pane.deleteConfirmId === entry.rowAlarm.id
+                        ? "!" : "×"
+                    labelPixelSize: 15
+                    contentPadding: 2
+                    selected: pane.deleteConfirmId === entry.rowAlarm.id
+                    accentColor: Colors.red
+                    idleBorderColor: Colors.red
+                    selectedForegroundColor: Colors.red
+                    selectedBorderColor: Colors.red
+                    available: AlarmManagerService.canEdit
+                    onLeftClicked: pane.removeById(entry.rowAlarm.id)
                 }
             }
         }

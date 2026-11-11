@@ -43,8 +43,16 @@ class ClockCompactSettingsContracts(unittest.TestCase):
         self.assertIn('label: "24H"', visual)
         self.assertIn('Colors.cyan', visual)
         self.assertIn('Colors.orange', visual)
-        self.assertIn('selectedForegroundColor: Colors.cyan', visual)
-        self.assertIn('selectedForegroundColor: Colors.orange', visual)
+        # Idle format identities stay cyan/orange; OPEN overrides use the
+        # canonical TimeActionButton yellow/magenta selected recipe.
+        self.assertIn('idleForegroundColor: Colors.cyan', visual)
+        self.assertIn('idleForegroundColor: Colors.orange', visual)
+        self.assertIn('idleBorderColor: Colors.cyan', visual)
+        self.assertIn('idleBorderColor: Colors.orange', visual)
+        self.assertNotIn('selectedForegroundColor: Colors.cyan', visual)
+        self.assertNotIn('selectedForegroundColor: Colors.orange', visual)
+        self.assertIn('font.pixelSize: 16', visual)
+        self.assertIn('text: "PREVIEW // " + compact.calibratedPreview', visual)
         self.assertIn('selected: !compact.dock24Hour', visual)
         self.assertIn('selected: compact.dock24Hour', visual)
         self.assertIn('compact.dockFormatRequested(false)', visual)

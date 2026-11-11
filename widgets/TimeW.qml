@@ -1946,6 +1946,9 @@ PanelWindow {
             dismissResyncPopup();
         }
         if (menuOpen) {
+            // Actual Clock opening (dock or keyboard), never on close.
+            // Runs only when the saved AUTO master and CLOCK OPEN option allow.
+            TimeSettings.checkOnClockOpened();
             Qt.callLater(restoreKeyboardFocus);
             if (selectedMode === "tools") {
                 refreshStopwatch();
@@ -3483,6 +3486,8 @@ PanelWindow {
                             width: (calcSubModeStrip.width - calcSubModeStrip.spacing) / 2
                             height: parent.height
                             bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                             textOnly: true
                             labelText: "CONVERT"
                             labelFontSize: 11
@@ -3495,6 +3500,8 @@ PanelWindow {
                             width: (calcSubModeStrip.width - calcSubModeStrip.spacing) / 2
                             height: parent.height
                             bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                             textOnly: true
                             labelText: "MATH"
                             labelFontSize: 11
@@ -3949,6 +3956,8 @@ PanelWindow {
                                 width: (mathTypeStrip.width - mathTypeStrip.spacing) / 2
                                 height: parent.height
                                 bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                                 textOnly: true
                                 labelText: "ADD / SUB"
                                 labelFontSize: 11
@@ -3960,6 +3969,8 @@ PanelWindow {
                                 width: (mathTypeStrip.width - mathTypeStrip.spacing) / 2
                                 height: parent.height
                                 bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                                 textOnly: true
                                 labelText: "BETWEEN"
                                 labelFontSize: 11
@@ -4464,6 +4475,8 @@ PanelWindow {
                                     - toolsSubModeStrip.spacing * 2) / 3
                             height: parent.height
                             bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                             textOnly: true
                             labelText: "STOPWATCH"
                             labelFontSize: 11
@@ -4480,6 +4493,8 @@ PanelWindow {
                                     - toolsSubModeStrip.spacing * 2) / 3
                             height: parent.height
                             bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                             textOnly: true
                             labelText: "COUNTDOWN"
                             labelFontSize: 11
@@ -4496,6 +4511,8 @@ PanelWindow {
                                     - toolsSubModeStrip.spacing * 2) / 3
                             height: parent.height
                             bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                             textOnly: true
                             labelText: "ALARM"
                             labelFontSize: 11
@@ -6951,6 +6968,8 @@ PanelWindow {
                             width: (settingsSubModeStrip.width - settingsSubModeStrip.spacing) / 2
                             height: parent.height
                             bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                             textOnly: true
                             labelText: "VISUAL TIME"
                             labelFontSize: 11
@@ -6962,6 +6981,8 @@ PanelWindow {
                             width: (settingsSubModeStrip.width - settingsSubModeStrip.spacing) / 2
                             height: parent.height
                             bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                             textOnly: true
                             labelText: "SYNC"
                             labelFontSize: 11

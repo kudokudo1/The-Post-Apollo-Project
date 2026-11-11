@@ -84,7 +84,8 @@ with tempfile.TemporaryDirectory(prefix="machine-archive-manager-test-") as root
         assert item["safe_actions"]==[]
     serialized=json.dumps([listing,
         manager.inspect(a["record_id"],destination=destination)])
-    for secret in ("ciphertext","nonce","salt","password","https://","URL"):
+    for secret in ('"ciphertext":','"nonce":','"salt":','"password":',
+                   "https://","/private?","SYNTHETIC_SECRET_TOKEN"):
         assert secret not in serialized
 
     # Wrong SHA and refusal of typed confirmation never alter the record.

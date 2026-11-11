@@ -53,6 +53,12 @@ ShellRoot {
         for(const c of item.children || []) {
             const x=find(c,name); if(x) return x;
         }
+        if(item.contentItem) {
+            const x=find(item.contentItem,name); if(x) return x;
+        }
+        if(item.item) {
+            const x=find(item.item,name); if(x) return x;
+        }
         return null;
     }
     function fail(message) {
@@ -89,7 +95,7 @@ ShellRoot {
             const report=root.find(console,"services-console-selected-report");
             const directory=root.find(console,"services-console-directory-heading");
             if(!top || !cards || !dossier || !report || !directory) {
-                if(root.ticks>10) return root.fail("CONSOLE_NODES");
+                if(root.ticks>10) return root.fail("CONSOLE_NODES H="+!!top+" C="+!!cards+" S="+!!dossier+" R="+!!report+" D="+!!directory);
                 return;
             }
             if(String(stationConsole.color).toLowerCase()==="#ffffff")

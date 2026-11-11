@@ -50,7 +50,8 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             ca-certificates git quickshell qt6-qpa-plugins \
-            qml6-module-qtquick-effects qml6-module-qt5compat-graphicaleffects \
+            qml6-module-qtquick-effects qml6-module-qtquick-dialogs \
+            qml6-module-qt5compat-graphicaleffects \
             coreutils findutils
       - uses: actions/checkout@v4
       - name: Native MAGICK route, real inventory, HOME bounded footer

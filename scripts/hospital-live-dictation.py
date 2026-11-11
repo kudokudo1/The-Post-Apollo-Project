@@ -25,6 +25,8 @@ import threading
 import wave
 from pathlib import Path
 
+import hospital_whisper_session
+
 RATE = 16000
 FRAME_BYTES = 2
 READ_BYTES = RATE * FRAME_BYTES // 10
@@ -33,6 +35,8 @@ MAX_SECONDS = 90
 MIN_TAIL_SECONDS = 1
 MAX_QUEUE = 2
 MODEL_GUARD = Path(__file__).with_name("hospital-whisper-sandbox.py")
+OVERLAP_BYTES = RATE * FRAME_BYTES * 3 // 4  # 750 ms of preceding speech
+TOKENS = re.compile(r"[^\\W_]+(?:['’][^\\W_]+)*", re.UNICODE)
 PLACEHOLDER = re.compile(
     r"\[\s*(?:BLANK_AUDIO|NO_SPEECH|SILENCE|MUSIC|NO_AUDIO)\s*\]",
     re.IGNORECASE,
@@ -77,6 +81,21 @@ def clean_transcript(value: str) -> str:
     if CONTROL.search(text):
         return ""
     return text[:4000]
+
+
+def trim_repeated_prefix(previous: str, current: str) -> str:
+    """Remove exact repeated words caused by a small overlapping PCM window.
+
+    Require at least two matching words to avoid deleting a deliberate "I",
+    "yes", or repeated single-word answer.
+    """
+    before = [m.group().casefold() for m in TOKENS.finditer(previous)]
+    spans = list(TOKENS.finditer(current))
+    after = [m.group().casefold() for m in spans]
+    for size in range(min(8, len(before), len(after)), 1, -1):
+        if before[-size:] == after[:size]:
+            return current[spans[size - 1].end():].lstrip(" ,.;:!?’'—-")
+    return current
 
 
 def packet(kind: str, *, text: str = "", detail: str = "") -> str:
@@ -129,7 +148,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
          first_chunk_ms: int = 1400, vad: bool = False, threshold: int = 600,
          silence_ms: int = 2200, min_speech_ms: int = 250,
          pilot_one_chunk: bool = False,
-         pilot_live_chunks: int = 0) -> int:
+         pilot_live_chunks: int = 0, prefer_persistent: bool = False) -> int:
     if not Path(stt_helper).is_file():
         print(packet("error", detail="LOCAL WHISPER HELPER UNAVAILABLE"),
               flush=True)

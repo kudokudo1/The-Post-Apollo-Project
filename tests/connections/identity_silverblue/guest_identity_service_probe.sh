@@ -154,6 +154,18 @@ def start_ticks():
 pinned_start=start_ticks()
 if pinned_start<=0:raise RuntimeError("invalid kernel process start time")
 
+def read_kernel_lsm(path):
+    # Linux /proc/PID/attr/current emits one NUL-terminated LSM context.
+    # Bash command substitution removes that NUL when initially pinning
+    # the label; Python's str.strip() does NOT. Normalize only a single
+    # terminal NUL, reject embedded NULs, control newlines or bad encoding.
+    raw=path.read_bytes()
+    if raw.endswith(b"\\x00"):
+        raw=raw[:-1]
+    if not raw or b"\\x00" in raw or b"\\n" in raw:
+        raise RuntimeError("malformed kernel SELinux context bytes")
+    return raw.decode("ascii")
+
 def check_origin(stage):
     current=subprocess.check_output([
         "/usr/bin/systemctl","show",
@@ -161,7 +173,7 @@ def check_origin(stage):
         "--property=MainPID","--value"],timeout=3,text=True).strip()
     if current!=str(pid) or start_ticks()!=pinned_start:
         raise RuntimeError(f"{stage}: supervisor PID/start changed")
-    observed_lsm=Path(f"/proc/{pid}/attr/current").read_text().strip()
+    observed_lsm=read_kernel_lsm(Path(f"/proc/{pid}/attr/current"))
     if observed_lsm!=expected_lsm:
         raise RuntimeError(
             f"{stage}: kernel SELinux context changed "

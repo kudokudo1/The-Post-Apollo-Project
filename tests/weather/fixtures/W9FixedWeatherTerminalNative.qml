@@ -98,7 +98,7 @@ ShellRoot {
             }
             const sky=host.renderer;
             const target=root.pages[root.phase];
-            if(host.focus !== target) host.focus=target;
+            if(host.activeInstrument !== target) host.activeInstrument=target;
             if(sky.weatherFocus!==target)return;
             if(!host.pageRail.visible || host.pageRail.height!==26
                     || sky.visualScroll.interactive)

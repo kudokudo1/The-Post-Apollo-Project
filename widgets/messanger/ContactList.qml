@@ -26,6 +26,10 @@ Rectangle {
     // window while hiding only the native contact contents.
     property bool discordMode: false
 
+    // PHONE-only: bounded two-line SMS previews. Other Social providers
+    // retain their existing row geometry and rendering by default.
+    property bool phonePreviewMode: false
+
     signal contactClicked
 
     // ============================================================
@@ -327,9 +331,11 @@ Rectangle {
             required property int index
 
             width: conversationList.width
-            height: 66
+            height: contactRoot.phonePreviewMode ? 90 : 66
 
             radius: 0
+            // Preserve the existing outer glow; clip the text items below,
+            // not the entire delegate, to keep PHONE rows from overlapping.
             clip: false
 
             // ====================================================
@@ -374,6 +380,11 @@ Rectangle {
                 }
 
                 text: modelData.displayNameInProfile || modelData.nickname || modelData.id || "UNKNOWN"
+                textFormat: contactRoot.phonePreviewMode ? Text.PlainText : Text.AutoText
+                height: contactRoot.phonePreviewMode ? 22 : implicitHeight
+                clip: contactRoot.phonePreviewMode
+                maximumLineCount: contactRoot.phonePreviewMode ? 1 : 2147483647
+                wrapMode: Text.NoWrap
 
                 elide: Text.ElideRight
 
@@ -419,7 +430,18 @@ Rectangle {
                     bottomMargin: 9
                 }
 
-                text: modelData.lastMessage ? modelData.lastMessage : ""
+                // PHONE displays a sanitized visual excerpt only: the source
+                // message and full conversation remain unchanged. Newlines
+                // and repeated whitespace cannot create extra visible rows.
+                text: contactRoot.phonePreviewMode
+                      ? String(modelData.lastMessage || "").replace(/\s+/g, " ").trim()
+                      : (modelData.lastMessage ? modelData.lastMessage : "")
+                textFormat: contactRoot.phonePreviewMode ? Text.PlainText : Text.AutoText
+                height: contactRoot.phonePreviewMode ? 36 : implicitHeight
+                clip: contactRoot.phonePreviewMode
+                wrapMode: contactRoot.phonePreviewMode
+                          ? Text.WrapAtWordBoundaryOrAnywhere : Text.NoWrap
+                maximumLineCount: contactRoot.phonePreviewMode ? 2 : 2147483647
 
                 elide: Text.ElideRight
 

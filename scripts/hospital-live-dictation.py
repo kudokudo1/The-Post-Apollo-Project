@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local chunked live dictation for Hospital Manage, never a form submit.
+"""Shared local Hospital live dictation, never a form submit.
 
 PipeWire raw 16 kHz PCM is captured continuously while a separate thread runs
 the already installed whisper-cli helper against short, isolated WAV chunks.

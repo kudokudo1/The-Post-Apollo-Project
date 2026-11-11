@@ -2580,6 +2580,9 @@ PanelWindow {
         safetyHold: false
         pilotOneChunk: false
         pilotLiveChunks: 6
+        // Prefer one CPU-only private Unix-socket model per recording.
+        // If whisper-server is absent, retain prior guarded CLI inference.
+        preferPersistentModel: true
         chunkSeconds: 2
         firstChunkMs: 1400
         maxPackets: 48

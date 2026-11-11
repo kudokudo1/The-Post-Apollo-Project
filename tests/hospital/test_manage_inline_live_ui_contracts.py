@@ -6,6 +6,8 @@ manager = (root / "widgets/HospitalWorkforceManagerView.qml").read_text()
 host = (root / "widgets/HospitalW.qml").read_text()
 live = (root / "services/hospital/HospitalLiveDictationService.qml").read_text()
 script = (root / "scripts/hospital-live-dictation.py").read_text()
+session = (root / "scripts/hospital_whisper_session.py").read_text()
+reception_voice = (root / "services/hospital/HospitalSpeechInputService.qml").read_text()
 sandbox = (root / "scripts/hospital-whisper-sandbox.py").read_text()
 stt = (root / "scripts/hospital-reception-stt.sh").read_text()
 text = (root / "services/hospital/HospitalDictationTextPolicy.js").read_text()
@@ -371,6 +373,39 @@ check('SILENT_OVERLAP_SKIPPED' in live
       and 'pilotLiveChunks: 6' in host
       and 'MAX_QUEUE = 2' in script,
       "Silence-aware compute saving inherits guarded pause opt-in and CPU limits")
+
+check('DECODER_MODES = frozenset(("STANDARD", "FAST"))' in session
+      and 'if decoder_mode == "FAST":' in session
+      and 'fields.append(("best_of", "1"))' in session
+      and 'decoder_mode: str = "STANDARD"' in session
+      and 'if decoder_mode not in DECODER_MODES:' in session,
+      "Standard retains former request; Fast explicitly selects one greedy candidate")
+check('decoder_trial: str = "standard"' in script
+      and 'parser.add_argument("--decoder-trial", choices=("standard", "fast")' in script
+      and 'fast_trial = (decoder_trial == "fast" and prefer_persistent' in script
+      and 'and pilot_live_chunks > 0 and not pilot_one_chunk)' in script
+      and 'decoder_mode=("FAST" if fast_trial' in script
+      and 'send("stage", detail="DECODER_FAST_ACTIVE")' in script
+      and 'send("stage", detail="DECODER_FAST_FALLBACK")' in script,
+      "Fast decoder only in bounded persistent AF_UNIX session; CLI fallback is truthful")
+check('function startRecording(requestedDecoderMode)' in live
+      and 'requestedDecoderMode === "FAST"' in live
+      and 'decoderModeUsed = fastRequested ? "FAST PENDING" : "STANDARD"' in live
+      and 'command.push("--decoder-trial", "fast")' in live
+      and 'DECODER_FAST_ACTIVE|DECODER_FAST_FALLBACK' in live
+      and 'return decoderModeUsed + " // AUDIO "' in live
+      and 'liveEngine.startRecording()' in reception_voice,
+      "One-shot A/B mode, Reception and Intercom continue Standard by default")
+check('property string decoderMode: "STANDARD"' in manager
+      and 'function selectDecoderMode(value)' in manager
+      and 'svc.startRecording(root.decoderMode)' in manager
+      and 'label: "VOICE // STANDARD"' in manager
+      and 'label: "VOICE // FAST TRIAL"' in manager
+      and '!root.speechInputService.busy && !root.otherVoiceBusy' in manager
+      and 'root.mode === "SETUP" || root.mode === "JOB"' in manager
+      and 'pilotLiveChunks: 6' in host
+      and 'MAX_QUEUE = 2' in script,
+      "Surgery opt-in A/B UI is locked while busy; original voice safety limits remain")
 
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")

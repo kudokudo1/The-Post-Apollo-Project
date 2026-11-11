@@ -503,5 +503,26 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertLess(probe.index('module_name_verified'), probe.index('DEDICATED_TEST_SELINUX_MODULE_LOADED_ENFORCING'))
 
 
+    def test_17_unhandled_selinux_guest_error_is_serial_visible_and_bounded(self):
+        probe = (AREA / "guest_identity_service_probe.sh").read_text()
+        host = (AREA / "run_official_silverblue_identity.sh").read_text()
+        self.assertIn("trap 'on_unhandled_error \"$?\" \"$LINENO\"' ERR", probe)
+        for line in (
+            'C4B_ID_FAIL // IDENTITY_SERVICE_UNHANDLED_SHELL_ERROR line=%s rc=%s',
+            'C4B_ID_SELINUX_STAGE // before_nonroot_runtime_preparation',
+            'C4B_ID_SELINUX_STAGE // nonroot_user_prepared',
+            'C4B_ID_SELINUX_STAGE // runtime_and_signer_prepared',
+            'C4B_ID_SELINUX_STAGE // before_confined_systemd_start',
+        ):
+            self.assertIn(line, probe)
+        self.assertLess(probe.index('before_nonroot_runtime_preparation'),
+                        probe.index('nonroot_user_prepared'))
+        self.assertLess(probe.index('nonroot_user_prepared'),
+                        probe.index('runtime_and_signer_prepared'))
+        self.assertLess(probe.index('runtime_and_signer_prepared'),
+                        probe.index('before_confined_systemd_start'))
+        self.assertIn("C4B_ID_(PASS|FAIL|STAGE|BLOCKED", host)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

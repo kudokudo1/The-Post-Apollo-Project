@@ -1,0 +1,59 @@
+name: Clock ALARM inline calendar picker
+on:
+  pull_request:
+    paths:
+      - "widgets/AlarmManagerPane.qml"
+      - "widgets/AlarmCalendarPicker.qml"
+      - "tests/time/test_clock_alarm_calendar_picker_contract.py"
+      - ".github/workflows/clock-alarm-calendar-picker.yml"
+  push:
+    paths:
+      - "widgets/AlarmManagerPane.qml"
+      - "widgets/AlarmCalendarPicker.qml"
+      - "tests/time/test_clock_alarm_calendar_picker_contract.py"
+      - ".github/workflows/clock-alarm-calendar-picker.yml"
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate original Clock alarm contracts and inline calendar
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_manager_v2_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_calendar_picker_contract.py' -v
+      - name: Exercise actual calendar-cell and future-date policy code
+        env:
+          TZ: America/New_York
+        run: |
+          node <<'JS'
+          const fs = require('fs'), vm = require('vm'), assert = require('node:assert/strict');
+          const ui = fs.readFileSync('widgets/AlarmCalendarPicker.qml','utf8');
+          const policySource = fs.readFileSync('services/time/AlarmManagerPolicy.js','utf8')
+            .replace(/^\\.pragma library\\s*/, '');
+          const Policy = {};
+          vm.runInNewContext(policySource, Policy);
+          const cellsMatch = /readonly property var calendarCells: \{([\s\S]*?)\n    \}\n    readonly property int dayHeight/.exec(ui);
+          assert(cellsMatch, 'calendar grid implementation missing');
+          const cells = new Function('viewYear','viewMonth','Policy', cellsMatch[1]);
+          const feb = cells(2024,1,Policy);
+          assert.equal(feb.length,42);
+          assert.equal(feb.filter(x=>x.inMonth).length,29);
+          assert(feb.some(x=>x.inMonth && x.dateKey==='2024-02-29'));
+          const spring = cells(2026,2,Policy);
+          assert.equal(spring.filter(x=>x.inMonth).length,31);
+          assert(spring.some(x=>x.inMonth && x.dateKey==='2026-03-08'));
+          const fall = cells(2026,10,Policy);
+          assert.equal(fall.filter(x=>x.inMonth).length,30);
+          assert(fall.some(x=>x.inMonth && x.dateKey==='2026-11-01'));
+          const selectionMatch = /function maySelect\(key\) \{([\s\S]*?)\n    \}\n    function chooseDay/.exec(ui);
+          assert(selectionMatch, 'date eligibility implementation missing');
+          const permitted = new Function('key','target','alarmHour','alarmMinute','Policy','Date', selectionMatch[1]);
+          const fakeDate={now:()=>new Date(2026,10,11,9,0,0).getTime()};
+          assert.equal(permitted('2026-11-11','once',10,0,Policy,fakeDate),true);
+          assert.equal(permitted('2026-11-11','once',8,0,Policy,fakeDate),false);
+          assert.equal(permitted('2026-11-10','once',10,0,Policy,fakeDate),false);
+          assert.equal(permitted('2026-11-12','pause',0,0,Policy,fakeDate),true);
+          assert.equal(permitted('2026-11-11','pause',0,0,Policy,fakeDate),false);
+          assert.equal(permitted('2026-02-30','pause',0,0,Policy,fakeDate),false);
+          console.log('42-cell DST/leap calendar and one-time/pause validation PASS');
+          JS

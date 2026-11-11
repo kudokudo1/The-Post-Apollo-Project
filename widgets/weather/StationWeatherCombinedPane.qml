@@ -18,11 +18,11 @@ Rectangle {
     color: Colors.black
     clip: true
 
-    // W11: daily is a compact ticker, with remaining height divided
-    // between an enlarged current instrument and dominant next hours.
+    // W12: all three bands fit the fixed viewport. Daily receives enough
+    // room for actual glyphs while current/hourly retain readable symbols.
     readonly property real bandBudget: Math.max(1,height - 14 - 11 - 4*2)
-    readonly property real dailyHeight: Math.max(40,Math.min(52,bandBudget*0.22))
-    readonly property real currentHeight: Math.max(60,Math.round((bandBudget-dailyHeight)*0.40))
+    readonly property real dailyHeight: Math.max(62,Math.min(74,bandBudget*0.30))
+    readonly property real currentHeight: Math.max(69,Math.round((bandBudget-dailyHeight)*0.47))
     readonly property real hourlyHeight: Math.max(1,bandBudget-dailyHeight-currentHeight)
 
     readonly property var hourlyRows: sky && sky.weatherService
@@ -91,6 +91,9 @@ Rectangle {
 
         Rectangle {
             id: currentBand
+            readonly property alias conditionIconItem: conditionArt
+            readonly property alias temperatureMeterItem: temperatureBar
+            readonly property alias metricCards: currentMetricRepeater
             objectName: "weather-w10-current-air-band"
             width: parent.width
             height: panel.currentHeight
@@ -99,118 +102,223 @@ Rectangle {
             border.color: Colors.cyan
 
             Row {
+                id: currentMetrics
                 anchors.fill: parent
                 anchors.margins: 3
                 spacing: 3
+
                 Item {
-                    width: Math.max(1,(parent.width-12)*0.25)
-                    height: parent.height
-                    GohuText {
+                    id: currentCondition
+                    width: Math.max(1,(currentMetrics.width-12)*0.31)
+                    height: currentMetrics.height
+
+                    QuietText {
+                        anchors.top: parent.top
+                        width: parent.width
+                        height: 10
                         text: "CURRENT // CONDITIONS"
                         font.pixelSize: 8
                         color: Colors.orange
+                        elide: Text.ElideRight
                     }
                     GohuText {
+                        anchors.left: parent.left
                         anchors.top: parent.top
-                        anchors.topMargin: 20
-                        text: panel.currentReady
-                            ? panel.reading(panel.sky.weatherService.tempF,"°F") : "--°F"
-                        font.pixelSize: 28
+                        anchors.topMargin: 19
+                        width: Math.max(1,parent.width*0.56)
+                        font.pixelSize: 29
                         color: Colors.orange
+                        text: panel.currentReady
+                            ? panel.reading(panel.sky.weatherService.tempF,"°F")
+                            : "--°F"
+                        elide: Text.ElideRight
                     }
-                    GohuText {
+                    Item {
+                        id: conditionArt
+                        objectName: "weather-w12-current-condition-icon"
                         anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: panel.currentReady && panel.sky
-                            ? panel.sky.conditionState.icon : "?"
-                        font.pixelSize: 38
-                        color: panel.currentReady && panel.sky
-                            ? panel.sky.iconColor(panel.sky.conditionState.color)
-                            : Colors.white
+                        anchors.top: parent.top
+                        anchors.topMargin: 11
+                        width: Math.min(69,currentCondition.height-17)
+                        height: width
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: panel.currentReady && panel.sky
+                                ? panel.sky.conditionState.icon : "?"
+                            font.pixelSize: Math.max(50,conditionArt.width)
+                            color: panel.currentReady && panel.sky
+                                ? panel.sky.iconColor(panel.sky.conditionState.color)
+                                : Colors.white
+                            visible: !panel.currentReady || !panel.sky
+                                || panel.sky.currentCelestialMode==="weather"
+                        }
+                        WeatherCelestialGlyph {
+                            anchors.centerIn: parent
+                            width: conditionArt.width
+                            height: conditionArt.height
+                            mode: panel.sky ? panel.sky.currentCelestialMode : "weather"
+                            weatherKind: panel.sky
+                                ? WeatherCyclePolicy.nightKind(panel.sky.conditionState)
+                                : "clear"
+                            solar: panel.sky ? panel.sky.skyCycle.solar : "day"
+                            moonPhase: panel.sky ? panel.sky.skyCycle.moonPhase : 0
+                            ink: panel.currentReady && panel.sky
+                                ? panel.sky.iconColor(panel.sky.conditionState.color)
+                                : Colors.white
+                            visible: panel.currentReady && panel.sky
+                                && panel.sky.currentCelestialMode!=="weather"
+                        }
                     }
                     QuietText {
-                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.bottom: temperatureBar.top
+                        anchors.bottomMargin: 2
                         width: parent.width
                         text: panel.currentReady
                             ? String(panel.sky.weatherService.condition||"--").toUpperCase()
                             : "NO OBSERVATION"
                         font.pixelSize: 8
+                        color: Colors.white
                         elide: Text.ElideRight
                     }
+                    Rectangle {
+                        id: temperatureBar
+                        objectName: "weather-w12-temperature-meter"
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 8
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.cyan
+                        Rectangle {
+                            x: 1
+                            y: 1
+                            height: Math.max(0,parent.height-2)
+                            width: Math.max(0,(parent.width-2)
+                                   *(panel.currentReady ? panel.sky.temperatureMeter : 0))
+                            color: Colors.orange
+                        }
+                    }
                 }
+
                 Repeater {
+                    id: currentMetricRepeater
                     model: [
-                        {label:"AIR QUALITY", key:"air"},
+                        {label:"AIR QUALITY",key:"air"},
                         {label:"HUMIDITY",key:"humidity"},
-                        {label:"WIND",key:"wind"}
+                        {label:"WIND",key:"wind"},
+                        {label:"PRESSURE",key:"pressure"}
                     ]
                     delegate: Item {
+                        id: metric
                         required property var modelData
-                        width: Math.max(1,(currentBand.width-26)*0.19)
-                        height: currentBand.height-6
+                        readonly property alias directionArrow: windArrow
+                        readonly property alias dataMeter: metricMeter
+                        width: Math.max(1,(currentMetrics.width-12)*0.1725)
+                        height: currentMetrics.height
+                        readonly property bool hasMeter: modelData.key!=="pressure"
+                        readonly property real meterRatio: !panel.sky ? 0
+                            : modelData.key==="air"
+                              ? (panel.airReady ? panel.sky.aqiMeter : 0)
+                            : modelData.key==="humidity"
+                              ? (panel.currentReady ? panel.sky.humidityMeter : 0)
+                            : modelData.key==="wind"
+                              ? (panel.currentReady ? panel.sky.windMeter : 0)
+                            : 0
+
                         QuietText {
-                            text: modelData.label
+                            anchors.top: parent.top
                             width: parent.width
+                            height: 10
+                            horizontalAlignment: Text.AlignHCenter
+                            text: modelData.label
                             font.pixelSize: 8
                             color: Colors.cyan
                             elide: Text.ElideRight
                         }
-                        GohuText {
+                        Row {
                             anchors.top: parent.top
                             anchors.topMargin: 22
-                            width: parent.width
-                            font.pixelSize: 17
-                            color: Colors.white
-                            elide: Text.ElideRight
-                            text: modelData.key==="air"
-                                  ? (panel.airReady
-                                     ? panel.reading(panel.sky.weatherService.aqi,"")
-                                     : "--")
-                                  : modelData.key==="humidity"
-                                    ? (panel.currentReady
-                                       ? panel.reading(panel.sky.humidityValue,"%") : "--")
-                                    : (panel.currentReady
-                                       ? panel.reading(panel.sky.windValue," MPH") : "--")
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            spacing: 1
+                            GohuText {
+                                id: windArrow
+                                objectName: "weather-w12-wind-arrow"
+                                visible: modelData.key==="wind"
+                                width: visible ? 19 : 0
+                                height: 20
+                                verticalAlignment: Text.AlignVCenter
+                                text: "↑"
+                                font.pixelSize: 22
+                                color: Colors.orange
+                                rotation: panel.currentReady && panel.sky
+                                    ? panel.sky.windAngle(
+                                        panel.sky.weatherService.windDirection)
+                                    : 0
+                            }
+                            GohuText {
+                                font.pixelSize: modelData.key==="pressure" ? 12 : 15
+                                color: Colors.white
+                                text: modelData.key==="air"
+                                      ? (panel.airReady
+                                         ? panel.reading(panel.sky.weatherService.aqi,"")
+                                         : "--")
+                                      : modelData.key==="humidity"
+                                        ? (panel.currentReady
+                                           ? panel.reading(panel.sky.humidityValue,"%")
+                                           : "--")
+                                      : modelData.key==="wind"
+                                        ? (panel.currentReady
+                                           ? panel.reading(panel.sky.windValue,"")
+                                           : "--")
+                                      : (panel.currentReady && panel.sky.pressureValue>=0
+                                         ? panel.reading(panel.sky.pressureValue," hPa") : "--")
+                            }
                         }
                         QuietText {
-                            anchors.bottom: parent.bottom
-                            width: parent.width
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: metricMeter.visible
+                                ? metricMeter.top : parent.bottom
+                            anchors.bottomMargin: 2
+                            height: 10
+                            horizontalAlignment: Text.AlignHCenter
                             font.pixelSize: 8
                             elide: Text.ElideRight
                             text: modelData.key==="air"
                                   ? (panel.airReady
                                      ? String(panel.sky.weatherService.aqiLabel||"AQI")
                                      : "WAITING")
-                                  : modelData.key==="humidity"
-                                    ? "RELATIVE"
-                                    : (panel.currentReady
+                                  : modelData.key==="humidity" ? "RELATIVE"
+                                  : modelData.key==="wind"
+                                    ? (panel.currentReady
                                        ? String(panel.sky.weatherService.windDirection||"")
-                                       : "WIND --")
+                                         +" // MPH" : "WIND --")
+                                  : (panel.currentReady && panel.sky.visibilityValue>=0
+                                     ? "VIS "+panel.reading(panel.sky.visibilityValue," mi")
+                                     : "VIS --")
                         }
-                    }
-                }
-                Item {
-                    width: Math.max(1,(currentBand.width-20)*0.17)
-                    height: currentBand.height-6
-                    QuietText { text: "PRESSURE"; font.pixelSize: 8; color: Colors.cyan }
-                    GohuText {
-                        anchors.top: parent.top
-                        anchors.topMargin: 22
-                        font.pixelSize: 14
-                        color: Colors.white
-                        text: panel.currentReady
-                              ? (panel.sky.pressureValue >= 0
-                                ? panel.reading(panel.sky.pressureValue," hPa") : "--") : "--"
-                    }
-                    QuietText {
-                        anchors.bottom: parent.bottom
-                        width: parent.width
-                        font.pixelSize: 8
-                        elide: Text.ElideRight
-                        text: panel.currentReady
-                              ? "VIS " + (panel.sky.visibilityValue >= 0
-                                ? panel.reading(panel.sky.visibilityValue," mi") : "--")
-                              : "VIS --"
+                        Rectangle {
+                            id: metricMeter
+                            objectName: "weather-w12-current-data-meter"
+                            visible: metric.hasMeter
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            height: visible ? 8 : 0
+                            color: Colors.black
+                            border.width: 1
+                            border.color: Colors.cyan
+                            Rectangle {
+                                x: 1
+                                y: 1
+                                height: Math.max(0,parent.height-2)
+                                width: Math.max(0,(parent.width-2)*metric.meterRatio)
+                                color: Colors.orange
+                            }
+                        }
                     }
                 }
             }
@@ -392,6 +500,7 @@ Rectangle {
                     delegate: Rectangle {
                         id: dayCell
                         required property int index
+                        readonly property alias iconHolder: dayArtwork
                         readonly property var entry: panel.dailyRows[index] || ({})
                         readonly property var weatherState: panel.state(entry)
                         readonly property var solarCycle:
@@ -408,18 +517,19 @@ Rectangle {
                             anchors.margins: 2
                             spacing: 3
                             Item {
-                                width: 44
+                                id: dayArtwork
+                                width: Math.min(44,parent.height)
                                 height: parent.height
                                 Text {
                                     anchors.centerIn: parent
                                     text: dayCell.weatherState.icon
-                                    font.pixelSize: 44
+                                    font.pixelSize: Math.min(44,parent.height)
                                     color: panel.colorFor(dayCell.weatherState)
                                     visible: dayCell.artwork==="weather"
                                 }
                                 WeatherCelestialGlyph {
                                     anchors.centerIn: parent
-                                    width: 44
+                                    width: Math.min(44,parent.height)
                                     height: width
                                     mode: dayCell.artwork
                                     solar: dayCell.solarCycle.solar
@@ -430,12 +540,14 @@ Rectangle {
                             }
                             Column {
                                 width: Math.max(1,parent.width-49)
-                                height: parent.height
+                                height: Math.min(parent.height,34)
+                                anchors.verticalCenter: parent.verticalCenter
                                 spacing: 1
                                 GohuText {
                                     width: parent.width
                                     height: 10
                                     font.pixelSize: 9
+                                    horizontalAlignment: Text.AlignHCenter
                                     elide: Text.ElideRight
                                     text: String(dayCell.entry.date||"--").slice(5)
                                           +"  "+panel.reading(dayCell.entry.maxTempF,"°")
@@ -446,6 +558,7 @@ Rectangle {
                                     width: parent.width
                                     height: 9
                                     font.pixelSize: 7
+                                    horizontalAlignment: Text.AlignHCenter
                                     elide: Text.ElideRight
                                     text: "SUN "+String(dayCell.entry.sunrise||"--")
                                           +" → "+String(dayCell.entry.sunset||"--")
@@ -458,6 +571,7 @@ Rectangle {
                                         width: Math.min(44,parent.width*0.42)
                                         height: parent.height
                                         font.pixelSize: 8
+                                        horizontalAlignment: Text.AlignHCenter
                                         text: panel.rainLabel(dayCell.entry.chanceRain)
                                         color: Colors.cyan
                                         elide: Text.ElideRight

@@ -30,6 +30,9 @@ echo "C4B_ID_STAGE // $phase"
 case "$phase" in
   initial)
     if rpm -q "$pkg" >/dev/null 2>&1; then fail "PACKAGE_PREEXISTS"; fi
+    if rpm -q python3-cryptography >/dev/null 2>&1; then
+      fail "FEDORA_RUNTIME_PREEXISTS_AND_CANNOT_PROVE_ROLLBACK"
+    fi
     [[ ! -e "$prefix/identity-gateway-ci" &&
        ! -e /usr/lib/systemd/system/"$unit" ]] ||
       fail "IDENTITY_GATEWAY_PREEXISTS"
@@ -39,7 +42,8 @@ case "$phase" in
       fail "OFFLINE_ASSET_MEDIA_MISSING"
     (
       cd "$data"
-      sha256sum --check --status identity-artifact-manifest.sha256
+      sha256sum --check --status identity-artifact-manifest.sha256 &&
+      sha256sum --check --status identity-fedora44-runtime-manifest.sha256
     ) || fail "OFFLINE_ARTIFACT_SHA_REFUSED"
     rpmfile="$data/identity-silverblue-ci.rpm"
     [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$rpmfile")" == "$pkg 0.1 noarch" ]] ||
@@ -63,6 +67,34 @@ case "$phase" in
     if printf '%s\n' "$verified" | grep -Eiq 'NOKEY|NOTTRUSTED|NOT OK|MISSING|BAD'; then
       fail "SIGNATURE_CONTAINS_UNTRUSTED_MARKER"
     fi
+    # Independent Fedora 44 package signing authority, NOT disposable
+    # Identity signer. Trust is explicitly pinned by the CI fetcher to
+    # Fedora 44 primary fingerprint 36F612DC...6D9F90A6.
+    crypto="$data/identity-python3-cryptography-f44.rpm"
+    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$crypto")" ==
+       'python3-cryptography 50.0.0 1.fc44 x86_64' ]] ||
+      fail "WRONG_VENDOR_RUNTIME_ROLE"
+    [[ -z "$(rpm -qp --scripts "$crypto")" &&
+       -z "$(rpm -qp --triggers "$crypto")" ]] ||
+      fail "VENDOR_RUNTIME_HAS_AUTOEXEC_SCRIPTLET"
+    vendordb="$store/vendor-rpmdb"
+    mkdir -m 0700 "$vendordb"
+    rpm --dbpath "$vendordb" --initdb ||
+      fail "VENDOR_RPMDB_INIT_FAILED"
+    vendor_pre="$(rpmkeys --dbpath "$vendordb" --checksig -v "$crypto" 2>&1 || true)"
+    printf '%s\n' "$vendor_pre" | grep -Eiq 'NOKEY|NOTTRUSTED|MISSING' ||
+      fail "VENDOR_SIGNER_PRETRUST_REFUSAL_MISSING"
+    rpmkeys --dbpath "$vendordb" --import "$data/identity-fedora44-runtime-public.asc" ||
+      fail "VENDOR_PUBLIC_KEY_IMPORT_FAILED"
+    vendor_result="$(rpmkeys --dbpath "$vendordb" --checksig -v "$crypto" 2>&1)" ||
+      fail "VENDOR_RPM_SIGNATURE_INVALID"
+    printf '%s\n' "$vendor_result" | grep -Eiq 'Signature.*OK|RSA.*OK|PGP.*OK|Header.*OK' ||
+      fail "VENDOR_RPM_SIGNATURE_NOT_CONFIRMED"
+    if printf '%s\n' "$vendor_result" | grep -Eiq 'NOKEY|NOTTRUSTED|NOT OK|MISSING|BAD'; then
+      fail "VENDOR_RPM_SIGNATURE_NOT_TRUSTED"
+    fi
+    install -m 0600 "$crypto" "$store/identity-python3-cryptography-f44.rpm"
+    echo "C4B_ID_PASS // SIGNED_OFFLINE_FEDORA44_ED25519_DEPENDENCY_VERIFIED"
     install -m 0600 "$rpmfile" "$store/identity-silverblue-ci.rpm"
     install -m 0600 "$data/identity-artifact-manifest.sha256" "$store/seed-manifest"
     echo "C4B_ID_PASS // SIGNED_IDENTITY_RPM_VERIFIED_OFFLINE_BEFORE_LAYER"
@@ -83,7 +115,9 @@ case "$phase" in
 #!/usr/bin/bash
 set +e
 timeout --signal=TERM --kill-after=15s 480s \
-  rpm-ostree install --cache-only /var/lib/postapollo-id-ci-assets/identity-silverblue-ci.rpm \
+  rpm-ostree install --cache-only \
+    /var/lib/postapollo-id-ci-assets/identity-silverblue-ci.rpm \
+    /var/lib/postapollo-id-ci-assets/identity-python3-cryptography-f44.rpm \
   >/var/tmp/id-ci-install.log 2>&1
 printf '%s\n' "$?" >/run/id-ci-worker-result
 ID_WORKER
@@ -107,8 +141,10 @@ head=ds[0]
 pending=bool(head.get("staged") or head.get("pending")) or head.get("booted") is False
 refs=head.get("requested-local-packages") or []
 expected=r"^(?:sha256:[0-9a-fA-F]{64}:)?"+re.escape(sys.argv[2])+r"-0\.1-1\.fc44\.noarch$"
-if not pending or not isinstance(refs,list) or not any(
-        isinstance(v,str) and re.fullmatch(expected,v) for v in refs):
+vendor=r"^(?:sha256:[0-9a-fA-F]{64}:)?python3-cryptography-50\.0\.0-1\.fc44\.x86_64$"
+if not pending or not isinstance(refs,list) or not all(
+        any(isinstance(v,str) and re.fullmatch(pattern,v) for v in refs)
+        for pattern in (expected,vendor)):
     sys.exit(1)
 print("C4B_ID_PENDING_EXACT_IDENTITY_DEPLOYMENT")
 ID_PENDING
@@ -153,6 +189,21 @@ ID_MONITOR
   layer_pending)
     [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}' "$pkg")" == "$pkg 0.1 noarch" ]] ||
       fail "LAYER_NOT_IN_BOOTED_RPMDB"
+    [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' python3-cryptography)" ==
+       'python3-cryptography 50.0.0 1.fc44 x86_64' ]] ||
+      fail "FEDORA_SIGNED_RUNTIME_NOT_IN_BOOTED_RPMDB"
+    vendor_verify=/var/tmp/id-ci-crypto-rpm-verify.log
+    vendor_rc=0
+    timeout --signal=TERM --kill-after=3s 35s rpm -V --nomtime python3-cryptography >"$vendor_verify" 2>&1 ||
+      vendor_rc="$?"
+    if [[ "$vendor_rc" != 0 || -s "$vendor_verify" ]]; then
+      sed -n '1,24p' "$vendor_verify" |
+        sed 's/^/C4B_ID_VENDOR_VERIFY_DETAIL \/\/ /' >/dev/ttyS0 || true
+      fail "SIGNED_FEDORA_RUNTIME_BOOTED_FILE_INTEGRITY_REFUSED"
+    fi
+    /usr/bin/python3 -I -B -c 'from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey' ||
+      fail "FEDORA_SIGNED_RUNTIME_ED25519_IMPORT_REFUSED"
+    echo "C4B_ID_PASS // OFFLINE_SIGNED_FEDORA_ED25519_RUNTIME_BOOTED_AND_VERIFIED"
     [[ -e "$prefix/identity-gateway-ci" &&
        -f "/usr/lib/systemd/system/$unit" ]] ||
       fail "IDENTITY_ENTRYPOINT_OR_UNIT_NOT_BOOTED"
@@ -243,6 +294,9 @@ ID_MONITOR
     rpm-ostree rollback --reboot || fail "REAL_IDENTITY_ROLLBACK_COMMAND_FAILED"
     ;;
   rollback_pending)
+    if rpm -q python3-cryptography >/dev/null 2>&1; then
+      fail "FEDORA_ED25519_TEST_RUNTIME_REMAINS_AFTER_ROLLBACK"
+    fi
     if rpm -q "$pkg" >/dev/null 2>&1; then
       fail "IDENTITY_RPM_REMAINS_AFTER_ROLLBACK"
     fi

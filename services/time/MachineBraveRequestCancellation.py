@@ -14,12 +14,10 @@ identity. Same-user programs can share a session and namespace. No prod server.
 from __future__ import annotations
 
 from dataclasses import dataclass
-import errno
 import hashlib
 import os
 from pathlib import Path
 import select
-import socket
 import stat
 import time
 
@@ -76,32 +74,24 @@ def _session_context(pid: int) -> SessionContext:
 
 
 def _socket_still_waiting(connection) -> bool:
-    """No FIN/half-close/error and no trailing unframed/pipelined bytes.
+    """Immediate Linux socket poll after the exact first frame is consumed.
 
-    This is checked AFTER consuming the exact one-request frame. There is no
-    busy loop or background polling. An unread byte is a protocol violation.
+    No recv() call: Python sockets configured with a positive timeout can
+    internally wait for readability even when MSG_DONTWAIT is supplied.
+    Once one exact frame has been consumed, ANY POLLIN means either excess
+    bytes or EOF. POLLRDHUP/HUP/ERR/NVAL also mean cancellation.
     """
     try:
         fd = connection.fileno()
         if type(fd) is not int or fd < 0:
             return False
-        # POLLRDHUP is Linux-specific. Do not silently weaken this check.
         if not hasattr(select, "POLLRDHUP"):
             return False
         poller = select.poll()
-        mask = select.POLLERR | select.POLLHUP | select.POLLIN | select.POLLRDHUP
-        poller.register(fd, mask)
-        observed = poller.poll(0)
-        if any(events & (select.POLLERR | select.POLLHUP |
-                         select.POLLRDHUP) for _, events in observed):
-            return False
-        # MSG_DONTWAIT avoids consuming the next byte or blocking. An empty
-        # result is peer EOF; any actual byte means forbidden pipelining.
-        try:
-            pending = connection.recv(1, socket.MSG_PEEK | socket.MSG_DONTWAIT)
-        except BlockingIOError as exc:
-            return exc.errno in (errno.EAGAIN, errno.EWOULDBLOCK)
-        return False  # EOF or extra byte are both invalid.
+        flags = (select.POLLIN | select.POLLERR | select.POLLHUP |
+                 select.POLLRDHUP | select.POLLNVAL)
+        poller.register(fd, flags)
+        return len(poller.poll(0)) == 0
     except (OSError, AttributeError, TypeError, ValueError):
         return False
 

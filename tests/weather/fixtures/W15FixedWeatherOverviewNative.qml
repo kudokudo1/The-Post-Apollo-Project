@@ -107,10 +107,24 @@ ShellRoot {
             return "OVERSIZED_EMPTY_CARDS "+snap.height+"/"+autoCards.height;
         if(Math.abs(summary.height+snap.height+autoCards.height-scroll.height)>2)
             return "OVERVIEW_HEIGHT_BUDGET_LOST";
-        if(window.height>=500 && (summary.height<300 ||
+        if(window.height>=500 && (summary.height<330 ||
            summary.compactInstrument.mainGlyph.width<80 ||
-           summary.compactInstrument.hourlyStrip.height<85))
+           summary.compactInstrument.hourlyStrip.height<120))
             return "TALL_WEATHER_INSTRUMENT_STILL_TINY";
+        if(window.height>=500) {
+            const instrument=summary.compactInstrument;
+            if(snap.height>68 || autoCards.height>68)
+                return "W20_LOWER_CARDS_NOT_REDUCED";
+            if(instrument.currentStrip.height<130 ||
+               instrument.currentStrip.height>134)
+                return "W20_NOW_BAND_CHANGED "+instrument.currentStrip.height;
+            if(instrument.dailyStrip.height<50 ||
+               instrument.dailyStrip.height>53)
+                return "W20_THREE_DAY_CHANGED "+instrument.dailyStrip.height;
+            if(instrument.hourlyStrip.height<125 ||
+               instrument.hourlyStrip.height<instrument.dailyStrip.height*2.3)
+                return "W20_SIX_PERIOD_FORECAST_TOO_SMALL";
+        }
         if(summary.glyph(95,"Thunderstorm")!=="⚡︎")
             return "THUNDERBOLT_CODEPOINT_WRONG";
         // W19 // Rain meters are a data reading between temperature

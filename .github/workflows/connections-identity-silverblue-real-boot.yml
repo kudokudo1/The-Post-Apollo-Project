@@ -103,9 +103,36 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          timeout 150s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 update ||
-            { echo "C4B_ID_BLOCKED // RUNNER_APT_UPDATE"; exit 2; }
-          timeout 360s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 install \
+          # GitHub's transient Ubuntu Azure HTTP mirror can become unreachable.
+          # Retry only with Canonical's official HTTPS Ubuntu repositories,
+          # retaining archive-keyring signature verification. Never disable
+          # APT certificate checks or trust unsigned packages.
+          apt_opts=(-o Acquire::Retries=2 -o Acquire::http::Timeout=25 -o Acquire::https::Timeout=25)
+          if timeout 150s sudo apt-get "${apt_opts[@]}" update; then
+            echo "C4B_ID_PASS // RUNNER_APT_DEFAULT_MIRROR_READY"
+          else
+            test -f /usr/share/keyrings/ubuntu-archive-keyring.gpg ||
+              { echo "C4B_ID_BLOCKED // OFFICIAL_UBUNTU_ARCHIVE_KEYRING_ABSENT"; exit 2; }
+            fallback_sources="$RUNNER_TEMP/c4b-identity-ubuntu-https.sources"
+            cat >"$fallback_sources" <<'C4B_UBUNTU_SIGNED_HTTPS'
+          Types: deb
+          URIs: https://archive.ubuntu.com/ubuntu/
+          Suites: noble noble-updates noble-backports
+          Components: main restricted universe multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+          Types: deb
+          URIs: https://security.ubuntu.com/ubuntu/
+          Suites: noble-security
+          Components: main restricted universe multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          C4B_UBUNTU_SIGNED_HTTPS
+            apt_opts+=(-o "Dir::Etc::sourcelist=$fallback_sources" -o "Dir::Etc::sourceparts=-" -o APT::Get::List-Cleanup=0)
+            timeout 200s sudo apt-get "${apt_opts[@]}" update ||
+              { echo "C4B_ID_BLOCKED // OFFICIAL_SIGNED_HTTPS_RUNNER_APT_UPDATE"; exit 2; }
+            echo "C4B_ID_PASS // RUNNER_APT_OFFICIAL_SIGNED_HTTPS_FALLBACK_READY"
+          fi
+          timeout 360s sudo apt-get "${apt_opts[@]}" install \
             -y --no-install-recommends qemu-system-x86 qemu-utils xorriso genisoimage ||
             { echo "C4B_ID_BLOCKED // RUNNER_APT_INSTALL"; exit 2; }
       - name: Real official Silverblue boot signed Identity RPM layer and rollback

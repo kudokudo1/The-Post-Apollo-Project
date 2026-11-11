@@ -2521,13 +2521,16 @@ Rectangle {
             anchors.topMargin: 10
             height: 23
             text: phonePane.contactSearchQuery
-            textFormat: Text.PlainText
             color: Colors.magenta
             font.pixelSize: 11
             clip: true
             maximumLength: 128
             selectByMouse: true
-            cursorDelegate: Rectangle { width: 2; color: Colors.orange }
+            cursorDelegate: Rectangle {
+                width: 2
+                height: phoneContactsSearch.font.pixelSize + 2
+                color: Colors.orange
+            }
             onTextChanged: {
                 phonePane.contactSearchQuery = text;
                 phonePane.selectedPhoneContactId = "";
@@ -2544,16 +2547,20 @@ Rectangle {
             anchors.topMargin: 10
             height: 23
             text: phonePane.messageSearchQuery
-            textFormat: Text.PlainText
             color: Colors.magenta
             font.pixelSize: 11
             clip: true
             maximumLength: 128
             selectByMouse: true
-            cursorDelegate: Rectangle { width: 2; color: Colors.orange }
+            cursorDelegate: Rectangle {
+                width: 2
+                height: phoneMessagesSearch.font.pixelSize + 2
+                color: Colors.orange
+            }
             onTextChanged: {
                 phonePane.messageSearchQuery = text;
-                phoneContactList.clearSelection();
+                if (phonePane.personalReadUiReady && phoneContactList)
+                    phoneContactList.clearSelection();
             }
         }
         Text {

@@ -146,7 +146,7 @@ ShellRoot {
                 const hour=combined.hourRepeater.itemAt(0);
                 if(!hour || !hour.glyph || !hour.rainMeter ||
                    !hour.timeItem.text.includes("11/10") ||
-                   hour.glyph.width<22 || hour.rainMeter.height<4)
+                   hour.glyph.width<28 || hour.rainMeter.height<4)
                     return root.fail("FORECAST_HOUR_CONTEXT_OR_SYMBOL");
                 const dailyBottom=combined.dailyItem.mapToItem(
                     combined,0,combined.dailyItem.height).y;

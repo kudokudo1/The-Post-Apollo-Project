@@ -57,8 +57,9 @@ ShellRoot {
             const sources=find(home,"home-w3-sources-title");
             const runtime=find(home,"home-w3-sources-runtime");
             const health=find(home,"home-w3-sources-health");
+            const services=find(home,"home-w6-services-console");
             if(!scroll||!content||!charts||!archive||!summaries
-                ||!days||!sources||!runtime||!health) {
+                ||!days||!sources||!runtime||!health||!services) {
                 if(root.ticks>7)return root.fail("HOME_W3_NODES_MISSING");
                 return;
             }
@@ -77,15 +78,15 @@ ShellRoot {
                 root.phase=1;return;
             }
             if(root.phase===1) {
-                if(!sources.visible||!runtime.visible||!health.visible
-                    ||charts.visible||archive.visible||!scroll.interactive)
+                if(!services.visible || scroll.visible || charts.visible || archive.visible
+                    ||services.width<=0 || services.height<=0)
                     return root.fail("SOURCES_VISIBILITY_OR_OWNER");
                 home.workspaceSection="overview";
                 root.phase=2;return;
             }
             if(root.phase===2) {
-                if(sources.visible||runtime.visible||health.visible
-                    ||!scroll.interactive)
+                if(services.visible || sources.visible || runtime.visible || health.visible
+                    ||!scroll.interactive || !scroll.visible)
                     return root.fail("OVERVIEW_LEAKS_SOURCES");
                 // Existing legacy HOME aliases may be selected without a
                 // second service. Source-only layout remains the same.
@@ -93,7 +94,7 @@ ShellRoot {
                 root.phase=3;return;
             }
             if(root.phase===3) {
-                if(!runtime.visible||!health.visible
+                if(!services.visible || scroll.visible
                     ||charts.visible||archive.visible)
                     return root.fail("LEGACY_HEALTH_BOOKMARK_NOT_SOURCES");
                 root.done=true;

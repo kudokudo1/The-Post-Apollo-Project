@@ -191,7 +191,7 @@ ShellRoot {
                     || p.runtimeRows.length!==2
                     || p.sourceRows.length!==2
                     || p.readyCount!==1
-                    || !find(p,"earth-e2-service-row-scroll"))
+                    || !p.dashboard || !p.dashboard.detailItem)
                     return root.fail("RUNTIME_SOURCE_ROWS_MISSING");
                 p.viewMode="sources";
                 root.phase=4;return;
@@ -199,7 +199,7 @@ ShellRoot {
             if(root.phase===4) {
                 const p=panel.item;
                 if(p.viewMode!=="sources"
-                    || !find(p,"earth-e2-services-divider"))
+                    || !p.dashboard || !p.dashboard.headerItem)
                     return root.fail("SOURCE_DIRECTORY_NOT_AVAILABLE");
                 p.viewMode="runtime";
                 p.selectedSourceId="gdacs";

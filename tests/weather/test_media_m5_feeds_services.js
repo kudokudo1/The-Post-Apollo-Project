@@ -56,7 +56,8 @@ test("M6 retains M5 last-observed NEWS runtime and source diagnostics in SERVICE
     assert.ok(header.includes('{id:"runtime",label:"RUNTIME // OWNERS"}'));
     assert.ok(media.includes('mode==="runtime" || mode==="sources"'));
     assert.ok(!media.includes('|| mode==="feeds"'));
-    assert.ok(services.includes('media-m5-services-body-scroll'));
+    assert.ok(services.includes('StationServicesConsole {'));
+    assert.ok(services.includes('directoryRows: services.directoryRows'));
 });
 
 test("M6 OVERVIEW splits fixed NEWS and RADIO 50/50 with compact RADIO presentation only",()=>{

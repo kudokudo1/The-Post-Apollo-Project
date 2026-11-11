@@ -20,7 +20,7 @@ var GROUPS = {
         {label:"SNAPSHOT",path:"home/snapshot",key:"snapshot"},
         {label:"HISTORY",path:"home/history",key:"history"},
         {label:"MAGICK",path:"home/magick",key:"magick"},
-        {label:"SOURCES",path:"home/health",key:"sources"}
+        {label:"SERVICES",path:"home/health",key:"sources"}
     ],
     weather:[
         {label:"OVERVIEW",path:"weather/overview",key:"overview"},
@@ -37,7 +37,7 @@ var GROUPS = {
         // Observatory only: terrestrial weather belongs to WEATHER.
         {label:"ASTRONOMY",path:"cosmos/planets-stars/celestial-fix",key:"sky"},
         {label:"EVENTS",path:"cosmos/events/overview",key:"events"},
-        {label:"SPACE",path:"cosmos/space-weather/overview",key:"space-weather"}
+        {label:"SERVICES",path:"cosmos/space-weather/overview",key:"space-weather"}
     ],
     earth:[
         {label:"OVERVIEW",path:"earth/overview",key:"overview"},

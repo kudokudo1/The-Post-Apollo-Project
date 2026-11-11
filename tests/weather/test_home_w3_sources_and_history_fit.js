@@ -20,7 +20,7 @@ vm.runInContext(deckText.replace(/^\.pragma library\s*$/m,""),deck);
 test("W3 HOME has SOURCES last, no separate runtime/health buttons, and retains legacy bookmarks",()=>{
     const tabs=native(nav.GROUPS.home);
     assert.deepEqual(tabs.map(x=>x.label),[
-        "OVERVIEW","AUTO","QUICK","SNAPSHOT","HISTORY","MAGICK","SOURCES"
+        "OVERVIEW","AUTO","QUICK","SNAPSHOT","HISTORY","MAGICK","SERVICES"
     ]);
     assert.equal(tabs[tabs.length-1].path,"home/health");
     assert.equal(nav.homeSectionFor("home/health"),"sources");

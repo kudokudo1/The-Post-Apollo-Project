@@ -51,41 +51,83 @@ class AlarmManagerV2Contracts(unittest.TestCase):
         self.assertIn("manager.nowMs = Date.now()", OWNER)
         self.assertIn("interval: 1000", OWNER)
 
-    def test_compact_scrollable_list_and_editor(self):
-        for token in ["ListView {", "id: alarmList", "id: editorScroll",
-                      "id: editorRail", "id: listRail", "NeonScrollBar {",
-                      "id: alarmSearch", "stepSelection(delta)",
-                      '"ONE TIME"', '"REPEAT / WEEKLY"', '"SAVE + ARM"',
-                      '"STOP ALL"', '"CONFIRM DELETE"', '"SNOOZE // 5M"',
-                      '"YYYY-MM-DD"', "draftDays", "toggleDay(index)"]:
-            self.assertIn(token, PANE)
-        self.assertIn("AlarmManagerService.createAlarm()", PANE)
-        self.assertIn("AlarmManagerService.removeAlarm(id)", PANE)
-        self.assertIn("AlarmManagerService.saveAlarm(selectedId, patch)", PANE)
-
-    def test_compact_alarm_page_is_clipped_and_full_editor_remains_reachable(self):
-        # The root is a bounded Item, not a free-growing Column whose
-        # implicit height can place the save/delete row outside TimeW.
+    def test_pinned_management_controls_and_tabbed_optional_sound(self):
         self.assertIn('Item {\n    id: pane\n    clip: true', PANE)
-        self.assertIn('id: alarmBodyFrame', PANE)
+        self.assertIn('id: pinnedControls', PANE)
+        self.assertIn('id: managerCommands', PANE)
+        self.assertIn('id: alarmSearch', PANE)
+        self.assertIn('id: newAlarm', PANE)
+        self.assertIn('id: duplicateAlarm', PANE)
+        self.assertIn('id: emergencyStop', PANE)
+        self.assertIn('id: entryFields', PANE)
+        self.assertIn('id: editorActions', PANE)
+        self.assertIn('id: editTabs', PANE)
+        self.assertIn('id: editOptions', PANE)
+        self.assertIn('height: 99', PANE)
+        self.assertIn('property string settingsTab: "schedule"', PANE)
+        self.assertIn('pane.settingsTab === "sound"', PANE)
+        self.assertIn('pane.settingsTab === "pause"', PANE)
+        self.assertIn('pane.settingsTab === "schedule"', PANE)
+        self.assertIn('id: soundChoices', PANE)
+        self.assertIn('id: soundOptions', PANE)
+        self.assertIn('id: volumeRow', PANE)
+        self.assertIn('"TEST SOUND"', PANE)
+        self.assertIn('"SAVE + ARM"', PANE)
+        self.assertIn('"CONFIRM DELETE"', PANE)
+        self.assertIn('"STOP ALL"', PANE)
+        self.assertIn('"SNOOZE // 5M"', PANE)
+        self.assertIn('"ONE TIME"', PANE)
+        self.assertIn('"REPEAT / WEEKLY"', PANE)
+        self.assertIn('draftDays', PANE)
+        self.assertIn('toggleDay(index)', PANE)
+        self.assertIn('AlarmManagerService.createAlarm()', PANE)
+        self.assertIn('AlarmManagerService.removeAlarm(id)', PANE)
+        self.assertIn('AlarmManagerService.saveAlarm(selectedId, patch)', PANE)
+
+    def test_only_lower_saved_items_scroll_inside_bounded_timew(self):
+        self.assertIn('id: listFrame', PANE)
+        self.assertIn('y: pinnedControls.y + pinnedControls.implicitHeight + 5', PANE)
         self.assertIn('height: Math.max(0, pane.height - y)', PANE)
-        self.assertIn('id: alarmViewport', PANE)
-        self.assertIn('contentHeight: alarmFlow.implicitHeight', PANE)
-        self.assertIn('anchors.fill: parent', PANE)
-        self.assertIn('anchors.rightMargin: alarmPageRail.crossExtent + 5', PANE)
-        self.assertIn('id: alarmFlow', PANE)
-        self.assertIn('id: alarmPageRail', PANE)
+        self.assertIn('ListView {', PANE)
+        self.assertIn('id: alarmList', PANE)
+        self.assertIn('id: listRail', PANE)
+        self.assertIn('NeonScrollBar {', PANE)
+        self.assertIn('accountForContentOrigin: true', PANE)
+        self.assertIn('geometryMode: "viewport"', PANE)
         self.assertIn('containGlow: true', PANE)
-        self.assertIn('height: editorContent.implicitHeight', PANE)
-        self.assertNotIn('height: 264', PANE)
-        self.assertIn('interactive: false', PANE)
-        self.assertIn('y: headerRow.y + headerRow.height + 8', PANE)
-        self.assertIn('y: alarmSearch.y + alarmSearch.height + 8', PANE)
-        bounded = TIMEW.split('AlarmManagerPane {', 1)[1].split(
-            '                    }', 1)[0]
-        self.assertIn('505 - toolsSubModeStrip.height', bounded)
-        self.assertIn('parent.spacing', bounded)
-        self.assertIn('TOOLS // ALARMS // SAVED + SCHEDULED', TIMEW)
+        self.assertIn('interactive: contentHeight > height', PANE)
+        self.assertNotIn('id: alarmViewport', PANE)
+        self.assertNotIn('id: editorScroll', PANE)
+        self.assertNotIn('id: panRow', PANE)
+        self.assertIn('505 - toolsSubModeStrip.height', TIMEW)
+        self.assertIn('- parent.spacing - 24', TIMEW)
+
+    def test_previous_and_next_are_pinned_in_timew_bottom_footer(self):
+        footer = TIMEW.split('id: alarmFooterNavigation', 1)[1].split(
+            '                    GohuText {\n                        // The floating result sheet',
+            1)[0]
+        self.assertIn('visible: timew.selectedMode === "tools"', footer)
+        self.assertIn('timew.toolsView === "alarm"', footer)
+        self.assertIn('label: "◀ PREVIOUS"', footer)
+        self.assertIn('label: "NEXT ▶"', footer)
+        self.assertIn('alarmPlaceholderPane.stepSelection(-1)', footer)
+        self.assertIn('alarmPlaceholderPane.stepSelection(1)', footer)
+        self.assertIn('alarmPlaceholderPane.selectionLabel', footer)
+        self.assertIn('alarmPlaceholderPane.canStepSelection', footer)
+        self.assertIn('readonly property bool canStepSelection:', PANE)
+        self.assertIn('function stepSelection(delta)', PANE)
+        self.assertIn('&& timew.toolsView === "alarm")', TIMEW)
+        self.assertNotIn('TOOLS // ALARMS // SAVED + SCHEDULED', TIMEW)
+
+    def test_new_alarm_selects_only_local_today_and_legacy_stays_daily(self):
+        self.assertIn('weekdays: [new Date(instant).getDay()]', POLICY)
+        self.assertIn('var instant = timestamp(nowMs)', POLICY)
+        self.assertIn('function create(doc, nowMs)', POLICY)
+        self.assertIn('Policy.create(document, Date.now())', OWNER)
+        self.assertIn('a.weekdays = [0, 1, 2, 3, 4, 5, 6]', POLICY)
+        self.assertIn('property var draftDays: [new Date().getDay()]', PANE)
+        self.assertIn('draftDays = a.weekdays.slice()', PANE)
+        self.assertIn('pane.draftDays.indexOf(index) >= 0', PANE)
 
     def test_audio_remains_optional_and_ids_allowlisted(self):
         self.assertIn('active: false', OWNER)

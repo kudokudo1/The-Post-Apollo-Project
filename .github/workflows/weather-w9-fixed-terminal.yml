@@ -137,3 +137,13 @@ jobs:
           path: /tmp/weather-w14-compact-preview.png
           if-no-files-found: warn
           retention-days: 14
+      - name: Upload native W15 OVERVIEW card-group previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-w15-overview-fixed-previews
+          path: |
+            /tmp/weather-w15-overview-now.png
+            /tmp/weather-w15-overview-auto.png
+          if-no-files-found: warn
+          retention-days: 14

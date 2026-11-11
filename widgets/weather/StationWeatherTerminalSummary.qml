@@ -9,6 +9,13 @@ Rectangle {
     objectName: "weather-w8-terminal-summary"
     property var weatherService: null
     property bool compact: false
+    // W15 // Header-only navigation for the fixed WEATHER OVERVIEW.
+    // Content, meters, headings, icons and box geometry below are unchanged.
+    property bool overviewNavigation: false
+    property string overviewSelection: "snapshot"
+    property bool overviewHasAlert: false
+    signal overviewSelectionRequested(string selection)
+
     // Read-only geometry for native visual-fit verification.
     readonly property alias currentMetricItem: metricRow
     readonly property alias hourlyItem: hourlyRow
@@ -101,7 +108,8 @@ Rectangle {
             height: 14
             spacing: 3
             GohuText {
-                width: Math.max(1,parent.width*0.63)
+                width: Math.max(1,parent.width
+                      *(terminal.overviewNavigation ? 0.52 : 0.63))
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
                 text: "WEATHER // CURRENT + AIR + FORECAST"
@@ -110,7 +118,8 @@ Rectangle {
                 elide: Text.ElideRight
             }
             QuietText {
-                width: Math.max(1,parent.width*0.35)
+                visible: !terminal.overviewNavigation
+                width: visible ? Math.max(1,parent.width*0.35) : 0
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignRight
@@ -121,6 +130,36 @@ Rectangle {
                 color: terminal.conditionsReady ? Colors.cyan : Colors.orange
                 font.pixelSize: 8
                 elide: Text.ElideRight
+            }
+            Row {
+                id: overviewHeaderPages
+                objectName: "weather-w15-overview-header-selector"
+                visible: terminal.overviewNavigation
+                width: visible ? Math.max(1,parent.width*0.48-6) : 0
+                height: parent.height
+                spacing: 2
+                Repeater {
+                    model: [
+                        {key:"snapshot",label:"NOW"},
+                        {key:"relevant",label:"AUTO"},
+                        {key:"alerts",label:"ALERT"}
+                    ]
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: Math.max(1,(overviewHeaderPages.width-4)/3)
+                        height: 13
+                        label: modelData.label
+                        labelPixelSize: 8
+                        contentPadding: 0
+                        accentColor: modelData.key==="alerts"
+                                     ? Colors.orange : Colors.cyan
+                        selected: terminal.overviewSelection===modelData.key
+                        available: modelData.key!=="alerts" ||
+                                   terminal.overviewHasAlert
+                        onClicked: terminal.overviewSelectionRequested(
+                            modelData.key)
+                    }
+                }
             }
         }
 

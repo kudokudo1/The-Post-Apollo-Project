@@ -168,7 +168,7 @@ Rectangle {
                     anchors.top: parent.top
                     anchors.topMargin: 1
                     width: parent.width
-                    font.pixelSize: 9
+                    font.pixelSize: Math.min(12,9 + panel.expansion * 0.018)
                     color: Colors.orange
                     text: "NOW // "+(panel.currentReady
                        ? String(panel.weatherService.condition||"UNKNOWN").toUpperCase()
@@ -189,13 +189,13 @@ Rectangle {
                     anchors.right: parent.right
                     anchors.rightMargin: 1
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(90,47 + panel.expansion * 0.27,
-                                    Math.max(47,parent.width * 0.47))
+                    width: Math.min(108,47 + panel.expansion * 0.34,
+                                    Math.max(47,parent.width * 0.49))
                     height: width
                     GohuText {
                         anchors.centerIn: parent
                         text: panel.iconText(panel.currentState)
-                        font.pixelSize: Math.min(97,currentIcon.width + 5)
+                        font.pixelSize: Math.min(114,currentIcon.width + 6)
                         color: panel.ink(panel.currentState.color)
                         visible: panel.currentArt==="weather"
                     }
@@ -255,6 +255,7 @@ Rectangle {
                             font.pixelSize: 8
                         }
                         Row {
+                            id: metricReadoutRow
                             anchors.left: parent.left
                             anchors.top: parent.top
                             anchors.topMargin: (metric.modelData.key==="pressure" ? 7 : 9)
@@ -281,8 +282,15 @@ Rectangle {
                             visible: metric.modelData.key!=="pressure"
                             anchors.left: parent.left
                             anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            height: 3
+                            // W19 // Center bars between values and the cell
+                            // edge, rather than using them as bottom dividers.
+                            y: metric.height < 35 ? metric.height - height
+                               : Math.min(metric.height-height-2,
+                                  metricReadoutRow.y + metricReadoutRow.height
+                                  +Math.max(2,(metric.height
+                                     -metricReadoutRow.y-metricReadoutRow.height
+                                     -height)/2))
+                            height: visible ? (metric.height < 35 ? 4 : 6) : 0
                             color: Colors.black
                             border.width: 1
                             border.color: metric.modelData.color
@@ -352,6 +360,9 @@ Rectangle {
                     readonly property string art: WeatherCyclePolicy.artworkFor(state,cycle)
                     width: (hourStrip.width-5)/6
                     height: hourStrip.height
+                    readonly property alias rainMeter: hourMeter
+                    readonly property alias temperatureItem: hourTemperature
+                    readonly property alias chanceItem: hourChance
                     Rectangle {
                         visible: index>0
                         x: 0
@@ -475,6 +486,9 @@ Rectangle {
                     readonly property string art: WeatherCyclePolicy.artworkFor(state,cycle)
                     width: (dayStrip.width-6)/3
                     height: dayStrip.height
+                    readonly property alias rainMeter: dayRainMeter
+                    readonly property alias temperatureItem: dayTemperature
+                    readonly property alias chanceItem: dayChance
                     Rectangle {
                         visible: index>0
                         width: 1

@@ -17,6 +17,16 @@ Scope {
     property var pendingDocument: null
     property var queuedDocument: null
     property bool confirmRequired: false
+    property string confirmedSnapshotNum: "unknown"
+    property string confirmedSnapshotCaps: "unknown"
+    property bool hostRememberNum: false
+    property bool hostRememberCaps: false
+    property bool rememberSyncing: false
+    property bool rememberSyncReturned: false
+    property bool rememberSuspended: false
+    property string queuedRememberNum: ""
+    property string queuedRememberCaps: ""
+    property string runningRememberLock: ""
 
     readonly property bool canEdit:
         storageState === "ready" || storageState === "empty"
@@ -24,6 +34,7 @@ Scope {
     readonly property bool canApply:
         storageState === "ready" && pendingDocument === null
         && queuedDocument === null && !applying && !inspecting
+        && !rememberSyncing
     readonly property var effectiveDocument:
         queuedDocument !== null ? queuedDocument
         : pendingDocument !== null ? pendingDocument : document
@@ -39,7 +50,10 @@ Scope {
     property string feedback: "STARTUP POLICY NOT YET INSPECTED"
     readonly property bool profileInstalled:
         hostStatus === "installed"
-        && installedNum === numMode && installedCaps === capsMode
+        && (numMode === "remember"
+            ? hostRememberNum : !hostRememberNum && installedNum === numMode)
+        && (capsMode === "remember"
+            ? hostRememberCaps : !hostRememberCaps && installedCaps === capsMode)
 
     function beginWrite(next) {
         pendingDocument = next;
@@ -57,6 +71,10 @@ Scope {
             return false;
         }
         confirmRequired = false;
+        if (lockName === "num")
+            queuedRememberNum = "";
+        else
+            queuedRememberCaps = "";
         if (pendingDocument !== null)
             queuedDocument = choice.document;
         else

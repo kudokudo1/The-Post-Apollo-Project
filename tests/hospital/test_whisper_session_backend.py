@@ -87,6 +87,10 @@ def build_fake_runtime(root: Path):
                 data = self.rfile.read(int(self.headers["Content-Length"]))
                 assert b'name="file"' in data
                 assert b"speech.wav" in data and b"RIFF" in data
+                decoder = ("FAST" if b'name="best_of"\r\n\r\n1\r\n' in data
+                           else "STANDARD")
+                with open(os.environ["TEST_SERVER_DECODERS"], "a") as file:
+                    file.write(decoder + "\n")
                 count = pathlib.Path(os.environ["TEST_SERVER_REQUESTS"])
                 with count.open("a") as file:
                     file.write(str(len(data)) + "\n")
@@ -113,6 +117,7 @@ def build_fake_runtime(root: Path):
     server.chmod(0o700)
     starts = root / "server-starts"
     requests = root / "server-requests"
+    decoders = root / "server-decoders"
     pid = root / "server-pid"
     cli_calls = root / "cli-calls"
     env = dict(os.environ,
@@ -122,6 +127,7 @@ def build_fake_runtime(root: Path):
                POST_APOLLO_STT_MODEL=str(model),
                TEST_SERVER_STARTS=str(starts),
                TEST_SERVER_REQUESTS=str(requests),
+               TEST_SERVER_DECODERS=str(decoders),
                TEST_SERVER_PID=str(pid),
                TEST_CLI_CALLS=str(cli_calls))
     return env, starts, requests, pid, cli_calls
@@ -145,6 +151,24 @@ class PersistentWhisperTests(unittest.TestCase):
             live.timing_packet("INFERENCE", True)
         with self.assertRaises(ValueError):
             live.timing_packet("INFERENCE", "do or did")
+
+    def test_standard_decoder_request_unchanged_fast_is_explicit_single_candidate(self):
+        backend = live.hospital_whisper_session
+        fake_pcm = bytes(3200)
+        standard, standard_type = backend.multipart_audio(
+            fake_pcm, "fake context", decoder_mode="STANDARD")
+        fast, fast_type = backend.multipart_audio(
+            fake_pcm, "fake context", decoder_mode="FAST")
+        self.assertNotIn(b'name="best_of"', standard)
+        self.assertIn(b'name="best_of"\\r\\n\\r\\n1\\r\\n', fast)
+        self.assertIn(b'name="prompt"\\r\\n\\r\\nfake context', standard)
+        self.assertIn(b'name="prompt"\\r\\n\\r\\nfake context', fast)
+        self.assertIn("multipart/form-data", standard_type)
+        self.assertIn("multipart/form-data", fast_type)
+        with self.assertRaises(ValueError):
+            backend.multipart_audio(fake_pcm, "", decoder_mode="FASTER")
+        with self.assertRaises(ValueError):
+            backend.multipart_audio(fake_pcm, "", decoder_mode="admin")
 
     def test_overlap_removes_only_matching_multitoken_boundary(self):
         self.assertEqual(

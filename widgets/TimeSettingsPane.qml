@@ -555,6 +555,21 @@ Item {
                     wrapMode: Text.WordWrap
                 }
                 GohuText {
+                    width: parent.width
+                    text: "REFERENCE // " + TimeSettings.referenceLiveDetail
+                    color: Colors.cyan
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    visible: TimeSettings.referenceFailureMessage !== ""
+                    width: parent.width
+                    text: "LAST ERROR // " + TimeSettings.referenceFailureMessage
+                    color: Colors.orange
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
                     visible: TimeSettings.autoCheckErrorCode !== ""
                     width: parent.width
                     text: "STORAGE // " + TimeSettings.autoCheckErrorCode

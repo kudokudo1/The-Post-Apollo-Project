@@ -11,6 +11,7 @@ on:
       - "services/time/TimeSettings.qml"
       - "services/time/TimeSettingsPolicy.js"
       - "services/time/TimeAutoCheckPolicy.js"
+      - "services/time/TimeReferencePolicy.js"
       - "components/SelectorDial.qml"
       - "services/time/TimeHostControl.py"
       - "services/time/qmldir"
@@ -20,6 +21,7 @@ on:
       - "tests/time/test_clock_settings_compact_contract.py"
       - "tests/time/test_clock_auto_event_triggers_contract.py"
       - "tests/time/test_clock_auto_check_dedup_contract.py"
+      - "tests/time/test_clock_reference_cache_v2_contract.py"
       - "shell.qml"
       - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
@@ -33,6 +35,7 @@ on:
       - "services/time/TimeSettings.qml"
       - "services/time/TimeSettingsPolicy.js"
       - "services/time/TimeAutoCheckPolicy.js"
+      - "services/time/TimeReferencePolicy.js"
       - "components/SelectorDial.qml"
       - "services/time/TimeHostControl.py"
       - "services/time/qmldir"
@@ -42,6 +45,7 @@ on:
       - "tests/time/test_clock_settings_compact_contract.py"
       - "tests/time/test_clock_auto_event_triggers_contract.py"
       - "tests/time/test_clock_auto_check_dedup_contract.py"
+      - "tests/time/test_clock_reference_cache_v2_contract.py"
       - "shell.qml"
       - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
@@ -60,6 +64,7 @@ jobs:
           python3 -m unittest discover -s tests/time -p 'test_clock_settings_compact_contract.py' -v
           python3 -m unittest discover -s tests/time -p 'test_clock_auto_event_triggers_contract.py' -v
           python3 -m unittest discover -s tests/time -p 'test_clock_auto_check_dedup_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_reference_cache_v2_contract.py' -v
       - name: Check bounded visual calibration policy
         run: |
           node <<'JS'
@@ -171,4 +176,61 @@ jobs:
                                                "clock-open", t+2*60*60*1000, 0, 0), false);
           assert.equal(p.canStartAutomaticCheck(afterReload, "invalid", t+2*60*60*1000, 0, 0), false);
           assert.equal(p.canStartAutomaticCheck(hourly, "clock-open", NaN, 0, 0), false);
+          JS
+
+      - name: Verify cache migration, prediction bounds and read-only gating
+        run: |
+          node <<'JS'
+          const fs = require('fs');
+          const vm = require('vm');
+          const assert = require('assert/strict');
+          function load(path) {
+            const p = {};
+            vm.runInNewContext(fs.readFileSync(path, 'utf8').replace(/^\.pragma library\s*/, ''), p);
+            return p;
+          }
+          const p = load('services/time/TimeReferencePolicy.js');
+          const a = load('services/time/TimeAutoCheckPolicy.js');
+          const boot = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+          const other = 'ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee';
+          const t = 1700000000000;
+          const empty = p.initialDocument();
+          assert.equal(p.parse(JSON.stringify(empty)).ok, true);
+          assert.equal(p.parse('bad json').ok, false);
+          assert.equal(p.parse(JSON.stringify({...empty, sample:{offsetMs:1}})).ok, false);
+          const s1 = p.withMeasurement(empty,
+            {source:'CHRONYD_ONESHOT',offsetMs:1000,uncertaintyMs:5},t,boot);
+          assert.equal(s1.ok, true);
+          const restored = p.parse(JSON.stringify(s1.document)).document;
+          assert.equal(p.estimate(restored,t+60000,boot).fresh,true);
+          assert.equal(p.estimate(restored,t+60000,boot).offsetMs,1000);
+          assert.equal(p.estimate(restored,t+60000,boot).uncertaintyMs,11);
+          assert.equal(p.estimate(restored,t+60000,other).available,false);
+          assert.equal(p.estimate(restored,t-1,boot).available,false);
+          assert.equal(p.estimate(restored,t+16*60000,boot).fresh,false);
+          const failure=p.withFailure(restored,t+61000,'NO SOURCE');
+          assert.equal(failure.ok,true);
+          assert.equal(failure.document.sample.offsetMs,1000);
+          assert.equal(failure.document.lastError,'NO SOURCE');
+          assert.equal(p.estimate(failure.document,t+65000,boot).available,true);
+          const second=p.withMeasurement(restored,
+            {source:'CHRONYD_ONESHOT',offsetMs:1018,uncertaintyMs:5},t+3600000,boot);
+          assert.equal(second.document.sample.trendKnown,true);
+          assert.equal(second.document.sample.trendPpm,5);
+          assert.ok(p.estimate(second.document,t+3660000,boot).offsetMs>1018);
+          const tracking=p.withMeasurement(empty,
+            {source:'CHRONY_TRACKING',offsetMs:100,uncertaintyMs:2},t,boot);
+          assert.equal(p.estimate(tracking.document,t+60000,boot).predicted,false);
+          assert.equal(p.estimate(tracking.document,t+60000,boot).uncertaintyMs,62);
+          const enabled=a.withSchedule(a.initialDocument(),true,1).document;
+          const stamped=a.withAttempt(enabled,t).document;
+          const evidence={ready:true,fresh:false,hasMeasurement:false,lastFailureAtMs:0};
+          assert.equal(a.canStartAutomaticCheck(stamped,'reload',t+1000,0,0,evidence),true);
+          assert.equal(a.canStartAutomaticCheck(stamped,'reload',t+1000,0,0,{...evidence,ready:false}),false);
+          assert.equal(a.canStartAutomaticCheck(stamped,'clock-open',t+1000,0,0,{...evidence,fresh:true}),false);
+          assert.equal(a.canStartAutomaticCheck(stamped,'clock-open',t+1000,0,0,{...evidence,lastFailureAtMs:t}),false);
+          assert.equal(a.canStartAutomaticCheck(stamped,'reload',t+1000,t,0,evidence),false);
+          assert.equal(a.canStartAutomaticCheck(stamped,'interval',t+1000,0,0,evidence),false);
+          assert.equal(a.canStartAutomaticCheck(stamped,'reload',t+16*60000,0,0,evidence),true);
+          assert.equal(a.canStartAutomaticCheck(a.withSchedule(stamped,false,1).document,'reload',t+16*60000,0,0,evidence),false);
           JS

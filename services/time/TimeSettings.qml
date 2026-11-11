@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import "TimeSettingsPolicy.js" as Policy
 import "TimeAutoCheckPolicy.js" as AutoCheck
+import "TimeReferencePolicy.js" as Reference
 import "WorldZoneSearch.js" as ZoneSearch
 import "WorldFavoritesPolicy.js" as Favorites
 
@@ -87,15 +88,50 @@ Scope {
     // Tracks manual checks and post-RESYNC verification as well as AUTO.
     // This is session-only; automatic attempts also have a durable timestamp.
     property double referenceLastAttemptAtMs: 0
+    property bool referenceAttemptSucceeded: false
+    property bool referenceAttemptResultSeen: false
+    property string referenceFailureMessage: ""
+    property double referenceFailureAtMs: 0
+
+    // Durable measurement evidence, independent of cadence and RESYNC.
+    readonly property string referenceStoragePath:
+        Quickshell.dataDir + "/time-reference-v1.json"
+    property string referenceStorageState: "loading"
+    property string referenceStoreError: ""
+    property var referenceDocument: Reference.initialDocument()
+    property var referenceLoadedDocument: null
+    property var referencePendingDocument: null
+    property var referenceQueuedDocument: null
+    property bool referenceStoreReadDone: false
+    property bool referenceBootReadDone: false
+    property bool referenceRestoreHandled: false
+    property string referenceBootId: ""
+    // Local arithmetic only; never starts Chrony or a network request.
+    property double referenceNowMs: Date.now()
+    readonly property var referenceEstimate:
+        Reference.estimate(referenceDocument, referenceNowMs, referenceBootId)
+    readonly property string referenceLiveDetail:
+        referenceEstimate.available
+        ? (referenceEstimate.fresh ? "ESTIMATE" : "STALE")
+          + " // OFFSET " + (referenceEstimate.offsetMs / 1000).toFixed(3)
+          + "S // UNCERTAINTY "
+          + (referenceEstimate.uncertaintyMs / 1000).toFixed(3) + "S"
+          + (referenceEstimate.predicted ? " // TREND" : " // HELD")
+        : "NO VALID CACHED REFERENCE"
     property bool postResyncVerificationPending: false
     readonly property int referenceMaxAgeMs: 15 * 60 * 1000
     readonly property int referenceWarningThresholdMs: 1000
 
     function hasFreshReference(nowEpochMs) {
-        return referenceStatus === "measured"
-               && Number.isFinite(nowEpochMs)
-               && nowEpochMs >= referenceCheckedAtMs
-               && nowEpochMs - referenceCheckedAtMs <= referenceMaxAgeMs;
+        if (referenceStatus !== "measured" || !Number.isFinite(nowEpochMs))
+            return false;
+        const projected = Reference.estimate(referenceDocument, nowEpochMs,
+                                             referenceBootId);
+        // No boot-id means the result is session-only and never durable.
+        return projected.available ? projected.fresh
+               : referenceBootId === "" && referenceCheckedAtMs > 0
+                 && nowEpochMs >= referenceCheckedAtMs
+                 && nowEpochMs - referenceCheckedAtMs <= referenceMaxAgeMs;
     }
 
     function dockZoneOffsetMismatch(nowEpochMs) {
@@ -116,15 +152,19 @@ Scope {
         // Only the portion of the estimate that exceeds its source error
         // bound can count as evidence that the host clock is wrong.
         return hasFreshReference(nowEpochMs)
-               && Math.abs(referenceOffsetMs) - referenceUncertaintyMs
-                  >= referenceWarningThresholdMs;
+               && Math.abs(referenceEstimate.available ? referenceEstimate.offsetMs
+                            : referenceOffsetMs)
+               - (referenceEstimate.available ? referenceEstimate.uncertaintyMs
+                  : referenceUncertaintyMs) >= referenceWarningThresholdMs;
     }
 
     function referenceIsUncertain(nowEpochMs) {
         return hasFreshReference(nowEpochMs)
                && !referenceIsOutOfSync(nowEpochMs)
-               && Math.abs(referenceOffsetMs) + referenceUncertaintyMs
-                  >= referenceWarningThresholdMs;
+               && Math.abs(referenceEstimate.available ? referenceEstimate.offsetMs
+                            : referenceOffsetMs)
+               + (referenceEstimate.available ? referenceEstimate.uncertaintyMs
+                  : referenceUncertaintyMs) >= referenceWarningThresholdMs;
     }
 
     // The Clock header and dock use identical evidence and expiry. A
@@ -204,17 +244,141 @@ Scope {
         if (referenceChecking || authSessionActive)
             return false;
         referenceChecking = true;
-        referenceStatus = "checking";
+        referenceAttemptSucceeded = false;
+        referenceAttemptResultSeen = false;
+        if (referenceCheckedAtMs <= 0)
+            referenceStatus = "checking";
+        // Do not destroy the previous measurement while a new check runs.
         referenceMessage = "CHECKING CONFIGURED CHRONY REFERENCE...";
-        referenceCheckedAtMs = 0;
-        referenceUncertaintyMs = 0;
-        referenceSource = "NONE";
         referenceLastAttemptAtMs = Date.now();
         referenceProcess.exec([
             "python3", "-B", "-I",
             Quickshell.shellPath("services/time/TimeHostControl.py"), "measure"
         ]);
         return true;
+    }
+
+    function writeReferenceDocument(next) {
+        referencePendingDocument = next;
+        referenceStorageState = "saving";
+        referenceFile.setText(JSON.stringify(next, null, 2) + "\n");
+    }
+
+    function persistReferenceDocument(next) {
+        referenceDocument = next; // update live view before disk save
+        if (referenceStorageState !== "ready"
+                && referenceStorageState !== "empty"
+                && referenceStorageState !== "saving")
+            return;
+        if (referencePendingDocument !== null)
+            referenceQueuedDocument = next;
+        else
+            writeReferenceDocument(next);
+    }
+
+    function noteReferenceFailure(message) {
+        referenceAttemptSucceeded = false;
+        referenceFailureAtMs = Date.now();
+        referenceFailureMessage = String(message || "REFERENCE UNAVAILABLE");
+        referenceStatus = referenceCheckedAtMs > 0 ? "measured" : "unavailable";
+        referenceMessage = referenceFailureMessage;
+        // Preserve the old sample: a failure is not evidence of zero offset.
+        const next = Reference.withFailure(referenceDocument,
+                                           referenceFailureAtMs,
+                                           referenceFailureMessage);
+        if (next.ok)
+            persistReferenceDocument(next.document);
+    }
+
+    function recordReferenceMeasurement(output) {
+        const now = Date.now();
+        const offset = Number(output.offsetMs);
+        const uncertainty = Number(output.uncertaintyMs);
+        const source = String(output.source || "");
+        if (!Number.isFinite(offset) || !Number.isFinite(uncertainty)
+                || uncertainty < 0 || Math.abs(offset) > 86400000
+                || uncertainty > 86400000
+                || (source !== "CHRONY_TRACKING"
+                    && source !== "CHRONYD_ONESHOT")) {
+            noteReferenceFailure("INVALID REFERENCE MEASUREMENT");
+            return;
+        }
+        referenceOffsetMs = offset;
+        referenceUncertaintyMs = uncertainty;
+        referenceSource = source;
+        referenceCheckedAtMs = now;
+        referenceStatus = "measured";
+        referenceAttemptSucceeded = true;
+        referenceFailureMessage = "";
+        referenceFailureAtMs = 0;
+        referenceMessage = "REFERENCE // " + (offset / 1000).toFixed(3) + "S"
+                           + (source === "CHRONY_TRACKING"
+                              ? " // DAEMON TRACKING ESTIMATE"
+                              : " // CHRONYD MEASUREMENT");
+        const next = Reference.withMeasurement(referenceDocument,
+            { offsetMs: offset, uncertaintyMs: uncertainty, source: source },
+            now, referenceBootId);
+        if (next.ok)
+            persistReferenceDocument(next.document);
+    }
+
+    function restoreReferenceAfterLoad() {
+        if (referenceRestoreHandled || !referenceStoreReadDone
+                || !referenceBootReadDone)
+            return;
+        referenceRestoreHandled = true;
+        const saved = referenceLoadedDocument || Reference.initialDocument();
+        if (referenceCheckedAtMs <= 0)
+            referenceDocument = saved;
+        const projected = Reference.estimate(referenceDocument, Date.now(),
+                                              referenceBootId);
+        if (projected.available && referenceCheckedAtMs <= 0) {
+            const sample = referenceDocument.sample;
+            referenceOffsetMs = sample.offsetMs;
+            referenceUncertaintyMs = sample.uncertaintyMs;
+            referenceSource = sample.source;
+            referenceCheckedAtMs = sample.checkedAtMs;
+            referenceStatus = "measured";
+            referenceMessage = projected.fresh
+                ? "CACHED REFERENCE // NO EXTRA QUERY"
+                : "CACHED REFERENCE STALE // A NEW CHECK MAY BE DUE";
+        }
+        if (referenceDocument.lastFailureAtMs > 0) {
+            referenceFailureAtMs = referenceDocument.lastFailureAtMs;
+            referenceFailureMessage = referenceDocument.lastError;
+            autoCheckResult = "UNAVAILABLE // " + referenceFailureMessage;
+        } else if (projected.available) {
+            autoCheckResult = "CACHED // " + referenceLiveDetail;
+        }
+        referenceLoadedDocument = null;
+        maybeBeginStartupAutoChecks();
+    }
+
+    function maybeBeginStartupAutoChecks() {
+        if (autoCheckReloadHandled || autoCheckStorageState === "loading"
+                || !referenceRestoreHandled)
+            return;
+        autoCheckReloadHandled = true;
+        Qt.callLater(function() {
+            if (autoCheckOpenPendingWhileLoading) {
+                autoCheckOpenPendingWhileLoading = false;
+                timeSettings.checkOnClockOpened();
+            }
+            timeSettings.maybeAutoCheckTime("reload");
+            timeSettings.maybeAutoCheckTime();
+        });
+    }
+
+    function invalidateReferenceForResync() {
+        referenceStatus = "unchecked";
+        referenceCheckedAtMs = 0;
+        referenceUncertaintyMs = 0;
+        referenceSource = "NONE";
+        const previous = referenceDocument;
+        persistReferenceDocument({ version: Reference.VERSION, sample: null,
+            lastAttemptAtMs: previous.lastAttemptAtMs,
+            lastFailureAtMs: previous.lastFailureAtMs,
+            lastError: previous.lastError });
     }
 
     function writeAutoCheck(next) {
@@ -267,7 +431,7 @@ Scope {
     }
 
     function checkOnClockOpened() {
-        if (autoCheckStorageState === "loading") {
+        if (autoCheckStorageState === "loading" || !referenceRestoreHandled) {
             autoCheckOpenPendingWhileLoading = true;
             return false;
         }
@@ -280,14 +444,24 @@ Scope {
         // its trigger even while its atomic save is still in flight.
         const active = autoCheckQueuedDocument || autoCheckPendingDocument
                        || autoCheckDocument;
-        if (!autoCheckCanEdit || !AutoCheck.triggerEnabled(active, reason)
+        // Malformed/unreadable evidence storage must not permit repeated
+        // automatic probes across rapid shell reloads. Manual CHECK TIME
+        // remains available to the operator.
+        if (!referenceRestoreHandled || referenceStorageState === "error"
+                || !autoCheckCanEdit || !AutoCheck.triggerEnabled(active, reason)
                 || autoCheckInFlight || referenceChecking || authSessionActive
                 || resyncAuthPending || resyncProcess.running)
             return false;
         const now = Date.now();
+        const estimate = Reference.estimate(referenceDocument, now,
+                                             referenceBootId);
         if (!AutoCheck.canStartAutomaticCheck(active, reason, now,
                                               autoLastStartedAtMs,
-                                              referenceLastAttemptAtMs))
+                                              referenceLastAttemptAtMs,
+                                              { ready: referenceRestoreHandled,
+                                                fresh: estimate.fresh,
+                                                hasMeasurement: estimate.available,
+                                                lastFailureAtMs: referenceFailureAtMs }))
             return false;
         if (!checkTimeAccuracy())
             return false;
@@ -316,13 +490,20 @@ Scope {
         const offset = (referenceOffsetMs / 1000).toFixed(3) + "S";
         const uncertainty = (referenceUncertaintyMs / 1000).toFixed(3) + "S";
         autoCheckResult = !autoCheckExitOk
-                          || referenceStatus !== "measured"
+                          || !referenceAttemptSucceeded
                           ? "UNAVAILABLE // " + referenceMessage
                           : referenceIsOutOfSync(Date.now())
                           ? "OUT OF SYNC // OFFSET " + offset
                             + " // UNCERTAINTY " + uncertainty
                           : "MEASURED // OFFSET " + offset
                             + " // UNCERTAINTY " + uncertainty;
+    }
+
+    Timer {
+        interval: 1000
+        running: true
+        repeat: true
+        onTriggered: timeSettings.referenceNowMs = Date.now()
     }
 
     Timer {
@@ -576,10 +757,7 @@ Scope {
         resyncMessage = "PREPARING GRAPHICAL POLKIT AUTHORIZATION...";
         // Never show a pre-sync reading as freshly confirmed after a
         // privileged correction or a new burst request.
-        referenceStatus = "unchecked";
-        referenceCheckedAtMs = 0;
-        referenceUncertaintyMs = 0;
-        referenceSource = "NONE";
+        invalidateReferenceForResync();
         postResyncVerificationPending = false;
         authRegistrationFallback.restart();
     }
@@ -801,6 +979,77 @@ Scope {
         }
     }
 
+    // This read-only kernel file changes on reboot; an old wall-clock
+    // timestamp must not authorize an old sample on a new boot.
+    FileView {
+        id: referenceBootFile
+        path: "/proc/sys/kernel/random/boot_id"
+        watchChanges: false
+        onLoaded: {
+            const boot = referenceBootFile.text().trim().toLowerCase();
+            timeSettings.referenceBootId = Reference.bootId(boot) ? boot : "";
+            timeSettings.referenceBootReadDone = true;
+            timeSettings.restoreReferenceAfterLoad();
+        }
+        onLoadFailed: function(error) {
+            timeSettings.referenceBootId = "";
+            timeSettings.referenceBootReadDone = true;
+            timeSettings.restoreReferenceAfterLoad();
+        }
+    }
+
+    FileView {
+        id: referenceFile
+        path: timeSettings.referenceStoragePath
+        watchChanges: false
+        atomicWrites: true
+        blockWrites: false
+        printErrors: false
+        onLoaded: {
+            if (timeSettings.referenceStorageState === "saving")
+                return;
+            const parsed = Reference.parse(referenceFile.text());
+            timeSettings.referenceLoadedDocument = parsed.ok
+                ? parsed.document : Reference.initialDocument();
+            timeSettings.referenceStorageState = parsed.ok
+                ? "ready" : "error";
+            timeSettings.referenceStoreError = parsed.ok ? "" : parsed.reason;
+            timeSettings.referenceStoreReadDone = true;
+            timeSettings.restoreReferenceAfterLoad();
+        }
+        onLoadFailed: function(error) {
+            if (timeSettings.referenceStorageState === "saving")
+                return;
+            const missing = error === FileViewError.FileNotFound;
+            timeSettings.referenceLoadedDocument = Reference.initialDocument();
+            timeSettings.referenceStorageState = missing ? "empty" : "error";
+            timeSettings.referenceStoreError = missing
+                ? "" : "REFERENCE_LOAD_FAILED";
+            timeSettings.referenceStoreReadDone = true;
+            timeSettings.restoreReferenceAfterLoad();
+        }
+        onSaved: {
+            if (timeSettings.referenceStorageState !== "saving"
+                    || timeSettings.referencePendingDocument === null)
+                return;
+            const saved = timeSettings.referencePendingDocument;
+            const queued = timeSettings.referenceQueuedDocument;
+            timeSettings.referencePendingDocument = null;
+            timeSettings.referenceQueuedDocument = null;
+            timeSettings.referenceStoreError = "";
+            if (queued !== null && JSON.stringify(saved) !== JSON.stringify(queued))
+                timeSettings.writeReferenceDocument(queued);
+            else
+                timeSettings.referenceStorageState = "ready";
+        }
+        onSaveFailed: function(error) {
+            timeSettings.referencePendingDocument = null;
+            timeSettings.referenceQueuedDocument = null;
+            timeSettings.referenceStorageState = "error";
+            timeSettings.referenceStoreError = "REFERENCE_SAVE_FAILED";
+        }
+    }
+
     FileView {
         id: autoCheckFile
         path: timeSettings.autoCheckStoragePath
@@ -822,21 +1071,7 @@ Scope {
             timeSettings.autoCheckDocument = parsed.document;
             timeSettings.autoCheckStorageState = "ready";
             timeSettings.autoCheckErrorCode = "";
-            if (!timeSettings.autoCheckReloadHandled) {
-                timeSettings.autoCheckReloadHandled = true;
-                Qt.callLater(function() {
-                    if (timeSettings.autoCheckOpenPendingWhileLoading) {
-                        timeSettings.autoCheckOpenPendingWhileLoading = false;
-                        timeSettings.checkOnClockOpened();
-                    }
-                    // Trigger once per Quickshell service load. The standard
-                    // due check remains active independently of this toggle.
-                    timeSettings.maybeAutoCheckTime("reload");
-                    timeSettings.maybeAutoCheckTime();
-                });
-            } else {
-                Qt.callLater(timeSettings.maybeAutoCheckTime);
-            }
+            timeSettings.maybeBeginStartupAutoChecks();
         }
         onLoadFailed: function(error) {
             if (timeSettings.autoCheckStorageState === "saving")
@@ -845,6 +1080,7 @@ Scope {
                 error === FileViewError.FileNotFound ? "empty" : "error";
             timeSettings.autoCheckErrorCode =
                 error === FileViewError.FileNotFound ? "" : "SCHEDULE_LOAD_FAILED";
+            timeSettings.maybeBeginStartupAutoChecks();
         }
         onSaved: {
             if (timeSettings.autoCheckStorageState !== "saving"
@@ -947,33 +1183,15 @@ Scope {
             onStreamFinished: {
                 try {
                     const value = JSON.parse(this.text);
-                    const offset = Number(value.offsetMs);
-                    const uncertainty = Number(value.uncertaintyMs || 0);
-                    if (value.status === "measured"
-                            && Number.isFinite(offset)
-                            && Number.isFinite(uncertainty)
-                            && uncertainty >= 0) {
-                        timeSettings.referenceOffsetMs = offset;
-                        timeSettings.referenceUncertaintyMs = uncertainty;
-                        timeSettings.referenceSource =
-                            String(value.source || "CHRONYD_ONESHOT");
-                        timeSettings.referenceCheckedAtMs = Date.now();
-                        timeSettings.referenceStatus = "measured";
-                        timeSettings.referenceMessage =
-                            "REFERENCE // "
-                            + (offset / 1000).toFixed(3) + "S"
-                            + (timeSettings.referenceSource === "CHRONY_TRACKING"
-                               ? " // DAEMON TRACKING ESTIMATE"
-                               : " // CHRONYD MEASUREMENT");
-                    } else {
-                        timeSettings.referenceStatus = "unavailable";
-                        timeSettings.referenceMessage =
-                            String(value.message || "NO REFERENCE SAMPLE");
-                    }
+                    if (value.status === "measured")
+                        timeSettings.recordReferenceMeasurement(value);
+                    else
+                        timeSettings.noteReferenceFailure(
+                            String(value.message || value.errorCode || "NO REFERENCE SAMPLE"));
                 } catch (error) {
-                    timeSettings.referenceStatus = "unavailable";
-                    timeSettings.referenceMessage = "REFERENCE RESULT INVALID";
+                    timeSettings.noteReferenceFailure("REFERENCE RESULT INVALID");
                 }
+                timeSettings.referenceAttemptResultSeen = true;
                 if (timeSettings.autoCheckInFlight) {
                     timeSettings.autoCheckResultSeen = true;
                     timeSettings.completeAutoReferenceIfReady();
@@ -982,10 +1200,11 @@ Scope {
         }
         onExited: function(code, exitStatus) {
             timeSettings.referenceChecking = false;
-            if (code !== 0) {
-                timeSettings.referenceStatus = "unavailable";
-                timeSettings.referenceMessage = "REFERENCE PROCESS FAILED";
-            }
+            // The process exit may follow a specific Chrony/DNS refusal;
+            // do not replace that useful error with a generic exit message.
+            if (code !== 0 && (!timeSettings.referenceAttemptResultSeen
+                    || timeSettings.referenceAttemptSucceeded))
+                timeSettings.noteReferenceFailure("REFERENCE PROCESS FAILED");
             if (timeSettings.autoCheckInFlight) {
                 timeSettings.autoCheckExited = true;
                 timeSettings.autoCheckExitOk = code === 0;

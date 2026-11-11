@@ -525,7 +525,7 @@ Item {
             width: parent.width
             height: 20
             text: "CHECK // " + TimeSettings.referenceStatus.toUpperCase()
-                  + " // " + TimeSettings.referenceMessage
+                  + " // " + TimeSettings.referenceLiveDetail
             font.pixelSize: 10
             color: Colors.cyan
             elide: Text.ElideRight
@@ -628,6 +628,10 @@ Item {
                             { label: "REFERENCE", value: TimeSettings.referenceMessage },
                             { label: "REFERENCE SOURCE", value: TimeSettings.referenceSource },
                             { label: "RESYNC", value: TimeSettings.resyncMessage },
+                            { label: "REFERENCE ESTIMATE", value: TimeSettings.referenceLiveDetail },
+                            { label: "LAST CHECK ERROR", value: TimeSettings.referenceFailureMessage },
+                            { label: "REFERENCE CACHE", value: TimeSettings.referenceStorageState
+                                      + " // " + TimeSettings.referenceStoreError },
                             { label: "RESYNC ERROR", value: TimeSettings.resyncErrorCode },
                             { label: "AUTH PATH", value: TimeSettings.resyncAuthPath },
                             { label: "POLKIT", value: TimeSettings.authFlowStage

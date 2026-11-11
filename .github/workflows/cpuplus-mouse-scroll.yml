@@ -10,6 +10,9 @@ on:
       - "services/input/SwayScrollLock.py"
       - "services/input/ScrollModeSettings.qml"
       - "services/input/AutoscrollMouseEngine.py"
+      - "services/input/AutoscrollOriginProbe.py"
+      - "tests/cpuplus/test_autoscroll_origin_probe.py"
+      - "tests/cpuplus/test_autoscroll_capability_stop_ui.py"
       - "services/input/AutoscrollStopChannel.py"
       - "services/input/AutoscrollStop.py"
       - "widgets/cpuplus/AutoscrollAnchorOverlay.qml"
@@ -77,6 +80,10 @@ jobs:
         run: python3 tests/cpuplus/test_autoscroll_stop_channel.py
       - name: Verify click-through anchor overlay and STOP integration
         run: python3 tests/cpuplus/test_autoscroll_overlay_stop_contract.py
+      - name: Verify read-only Sway/Wayland cursor-origin capability probe
+        run: python3 tests/cpuplus/test_autoscroll_origin_probe.py
+      - name: Verify CPU++ global capability and STOP cannot activate scrolling
+        run: python3 tests/cpuplus/test_autoscroll_capability_stop_ui.py
       - name: Verify CPU++ Scroll Mode routing and no unverified global injection
         run: python3 tests/cpuplus/test_scroll_mode_ui.py
       - name: Verify CPU++ three-bay integration and reserved-category guards

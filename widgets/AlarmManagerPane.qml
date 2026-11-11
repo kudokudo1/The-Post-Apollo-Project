@@ -220,10 +220,11 @@ Column {
                     accentColor: entry.rowAlarm.enabled ? Colors.orange : Colors.cyan
                     available: AlarmManagerService.canEdit
                     onLeftClicked: {
-                        AlarmManagerService.enableAlarm(
-                            entry.rowAlarm.id, !entry.rowAlarm.enabled);
-                        if (pane.selectedId === entry.rowAlarm.id)
-                            pane.draftEnabled = !entry.rowAlarm.enabled;
+                        const nextState = !entry.rowAlarm.enabled;
+                        if (AlarmManagerService.enableAlarm(
+                                entry.rowAlarm.id, nextState)
+                                && pane.selectedId === entry.rowAlarm.id)
+                            pane.draftEnabled = nextState;
                     }
                 }
             }
@@ -461,6 +462,7 @@ Column {
                     id: keepRow
                     width: parent.width
                     height: 29
+                    visible: pane.draftMode === "once"
                     spacing: 7
                     ActionButton {
                         width: parent.width

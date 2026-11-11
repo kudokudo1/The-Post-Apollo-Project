@@ -1915,6 +1915,10 @@ PanelWindow {
             TimeSettings.prepareResync();
     }
 
+    function toggle() {
+        menuOpen = !menuOpen;
+    }
+
     function openNotificationAlarm(alarmId) {
         // Resolve against saved alarm IDs. Do not create an alarm, interpret
         // notification titles, or discard a different alarm's unsaved note.
@@ -1928,10 +1932,6 @@ PanelWindow {
         if (!menuOpen)
             menuOpen = true;
         return true;
-    }
-
-    function toggle() {
-        menuOpen = !menuOpen;
     }
 
     function chooseMode(index) {

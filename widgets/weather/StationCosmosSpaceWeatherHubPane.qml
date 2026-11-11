@@ -158,7 +158,7 @@ Rectangle {
             GohuText {
                 width: Math.max(1,parent.width-126)
                 height: parent.height
-                text: "COSMOS // SPACE WEATHER"
+                text: "COSMOS // SERVICES"
                 color: Colors.magenta
                 font.pixelSize: 12
                 elide: Text.ElideRight

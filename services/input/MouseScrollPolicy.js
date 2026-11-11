@@ -9,7 +9,7 @@ var DEVICE_ID = /^[A-Za-z0-9_.:+-]{1,160}$/;
 
 function validFactor(value) {
     return typeof value === "number" && isFinite(value)
-           && FACTORS.indexOf(value) >= 0;
+           && value >= 0.25 && value <= 6;
 }
 function validId(id) {
     return typeof id === "string" && DEVICE_ID.test(id);

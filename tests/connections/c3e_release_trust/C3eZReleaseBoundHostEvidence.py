@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import sys
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -20,7 +21,14 @@ def _load(name: str, path: Path):
     if spec is None or spec.loader is None:
         raise RuntimeError("C3EZ_REQUIRED_VALIDATOR_MISSING")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # dataclasses in the existing Identity release reader inspect the
+    # defining module via sys.modules while resolving postponed annotations.
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(name, None)
+        raise
     return module
 
 

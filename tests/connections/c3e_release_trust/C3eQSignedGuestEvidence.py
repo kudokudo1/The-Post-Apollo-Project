@@ -51,7 +51,16 @@ def deny(code: str):
     raise Refused(code)
 
 
+def _canonical_ticks(value):
+    return (type(value) is str and 1 <= len(value) <= 24 and
+            value.isascii() and value.isdecimal() and
+            str(int(value)) == value and int(value) > 0)
+
+
 def exact_json(data: bytes):
+    if type(data) is not bytes or not 1 <= len(data) <= MAX_EVIDENCE:
+        deny("EVIDENCE_JSON_INVALID")
+
     def unique(items):
         out = {}
         for key, value in items:
@@ -61,10 +70,20 @@ def exact_json(data: bytes):
         return out
     try:
         value = json.loads(data.decode("utf-8"), object_pairs_hook=unique)
-    except (ValueError, UnicodeError):
+    except (ValueError, UnicodeError, RecursionError):
         deny("EVIDENCE_JSON_INVALID")
     if type(value) is not dict or set(value) != FIELDS:
         deny("EVIDENCE_SHAPE_REFUSED")
+    # C3e-Q signatures bind exact bytes, so require exactly one canonical
+    # sorted/compact ASCII representation of an otherwise valid statement.
+    # Do not accept differently encoded copies of the same signed meaning.
+    try:
+        canonical = json.dumps(value, sort_keys=True, separators=(",", ":"),
+                               ensure_ascii=True, allow_nan=False).encode("ascii")
+    except (ValueError, TypeError, RecursionError):
+        deny("EVIDENCE_JSON_INVALID")
+    if data != canonical:
+        deny("EVIDENCE_NONCANONICAL_JSON_REFUSED")
     if (value["schema"] != SCHEMA or value["systemd_unit"] != UNIT or
             value["guest_provenance"] != GUEST or
             value["selinux_enforcing"] is not True):
@@ -86,9 +105,7 @@ def exact_json(data: bytes):
             deny("EVIDENCE_PROCESS_IDENTITY_INVALID")
     if value["dbus_owner_pid"] != value["service_pid"]:
         deny("DBUS_SYSTEMD_PROCESS_MISMATCH")
-    if (type(value["process_start_ticks"]) is not str or
-            not value["process_start_ticks"].isdecimal() or
-            int(value["process_start_ticks"]) <= 0):
+    if not _canonical_ticks(value["process_start_ticks"]):
         deny("PROCESS_START_TICKS_INVALID")
     return value
 
@@ -188,9 +205,7 @@ class OneUseTestChallenge:
             if type(h) is not str or HEX64.fullmatch(h) is None:
                 deny("INDEPENDENT_PIN_INVALID")
         if (type(expected_service_pid) is not int or expected_service_pid <= 0
-                or type(expected_start_ticks) is not str or
-                not expected_start_ticks.isdecimal() or
-                int(expected_start_ticks) <= 0):
+                or not _canonical_ticks(expected_start_ticks)):
             deny("INDEPENDENT_PROCESS_PIN_INVALID")
         signed = verify_detached(
             evidence=evidence, signature=signature,

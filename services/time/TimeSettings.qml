@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import "TimeSettingsPolicy.js" as Policy
 import "TimeAutoCheckPolicy.js" as AutoCheck
+import "TimeReferencePolicy.js" as Reference
 import "WorldZoneSearch.js" as ZoneSearch
 import "WorldFavoritesPolicy.js" as Favorites
 
@@ -87,15 +88,49 @@ Scope {
     // Tracks manual checks and post-RESYNC verification as well as AUTO.
     // This is session-only; automatic attempts also have a durable timestamp.
     property double referenceLastAttemptAtMs: 0
+    property bool referenceAttemptSucceeded: false
+    property string referenceFailureMessage: ""
+    property double referenceFailureAtMs: 0
+
+    // Durable measurement evidence, independent of cadence and RESYNC.
+    readonly property string referenceStoragePath:
+        Quickshell.dataDir + "/time-reference-v1.json"
+    property string referenceStorageState: "loading"
+    property string referenceStoreError: ""
+    property var referenceDocument: Reference.initialDocument()
+    property var referenceLoadedDocument: null
+    property var referencePendingDocument: null
+    property var referenceQueuedDocument: null
+    property bool referenceStoreReadDone: false
+    property bool referenceBootReadDone: false
+    property bool referenceRestoreHandled: false
+    property string referenceBootId: ""
+    // Local arithmetic only; never starts Chrony or a network request.
+    property double referenceNowMs: Date.now()
+    readonly property var referenceEstimate:
+        Reference.estimate(referenceDocument, referenceNowMs, referenceBootId)
+    readonly property string referenceLiveDetail:
+        referenceEstimate.available
+        ? (referenceEstimate.fresh ? "ESTIMATE" : "STALE")
+          + " // OFFSET " + (referenceEstimate.offsetMs / 1000).toFixed(3)
+          + "S // UNCERTAINTY "
+          + (referenceEstimate.uncertaintyMs / 1000).toFixed(3) + "S"
+          + (referenceEstimate.predicted ? " // TREND" : " // HELD")
+        : "NO VALID CACHED REFERENCE"
     property bool postResyncVerificationPending: false
     readonly property int referenceMaxAgeMs: 15 * 60 * 1000
     readonly property int referenceWarningThresholdMs: 1000
 
     function hasFreshReference(nowEpochMs) {
-        return referenceStatus === "measured"
-               && Number.isFinite(nowEpochMs)
-               && nowEpochMs >= referenceCheckedAtMs
-               && nowEpochMs - referenceCheckedAtMs <= referenceMaxAgeMs;
+        if (referenceStatus !== "measured" || !Number.isFinite(nowEpochMs))
+            return false;
+        const projected = Reference.estimate(referenceDocument, nowEpochMs,
+                                             referenceBootId);
+        // No boot-id means the result is session-only and never durable.
+        return projected.available ? projected.fresh
+               : referenceBootId === "" && referenceCheckedAtMs > 0
+                 && nowEpochMs >= referenceCheckedAtMs
+                 && nowEpochMs - referenceCheckedAtMs <= referenceMaxAgeMs;
     }
 
     function dockZoneOffsetMismatch(nowEpochMs) {
@@ -116,15 +151,19 @@ Scope {
         // Only the portion of the estimate that exceeds its source error
         // bound can count as evidence that the host clock is wrong.
         return hasFreshReference(nowEpochMs)
-               && Math.abs(referenceOffsetMs) - referenceUncertaintyMs
-                  >= referenceWarningThresholdMs;
+               && Math.abs(referenceEstimate.available ? referenceEstimate.offsetMs
+                            : referenceOffsetMs)
+               - (referenceEstimate.available ? referenceEstimate.uncertaintyMs
+                  : referenceUncertaintyMs) >= referenceWarningThresholdMs;
     }
 
     function referenceIsUncertain(nowEpochMs) {
         return hasFreshReference(nowEpochMs)
                && !referenceIsOutOfSync(nowEpochMs)
-               && Math.abs(referenceOffsetMs) + referenceUncertaintyMs
-                  >= referenceWarningThresholdMs;
+               && Math.abs(referenceEstimate.available ? referenceEstimate.offsetMs
+                            : referenceOffsetMs)
+               + (referenceEstimate.available ? referenceEstimate.uncertaintyMs
+                  : referenceUncertaintyMs) >= referenceWarningThresholdMs;
     }
 
     // The Clock header and dock use identical evidence and expiry. A

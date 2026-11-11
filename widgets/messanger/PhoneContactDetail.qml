@@ -168,7 +168,7 @@ Rectangle {
                     label: "CALL"
                     labelPixelSize: 10
                     labelMinimumPixelSize: 8
-                    accentColor: Colors.magenta
+                    accentColor: Colors.green
                     interactive: detail.contact !== null && detail.canPrepareCall
                     onTriggered: detail.callRequested()
                 }
@@ -382,7 +382,7 @@ Rectangle {
                             label: "MAKE CALL"
                             labelPixelSize: 9
                             labelMinimumPixelSize: 8
-                            accentColor: Colors.magenta
+                            accentColor: Colors.green
                             interactive: detail.contact !== null
                                          && detail.canPrepareNumber(phoneNumberEntry.modelData)
                             onTriggered: detail.callNumberRequested(String(phoneNumberEntry.modelData))

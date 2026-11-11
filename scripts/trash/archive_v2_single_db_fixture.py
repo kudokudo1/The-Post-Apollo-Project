@@ -35,7 +35,7 @@ SCHEMA = "post-apollo.trashpp.fixture-signed-archive-receipt.v2x"
 FIELDS = frozenset((
     "schema", "audience", "purpose", "policyOrigin", "receiptKeyId",
     "snapshotId", "ownerId", "resourceId", "sourceRevision",
-    "sourceCapturedAtMs", "archivedAtMs", "payloadSha256",
+    "sourceCapturedAtMs", "archivedAtMs", "displayLabel", "payloadSha256",
     "captureKeyId", "nonce", "proofSha256", "externalFloorSha256",
     "previousReceiptSha256",
 ))
@@ -83,6 +83,9 @@ def canonical_receipt_claim(claim):
              and SHA.fullmatch(claim["sourceRevision"])
              and type(claim["payloadSha256"]) is str
              and SHA.fullmatch(claim["payloadSha256"])
+             and type(claim["displayLabel"]) is str
+             and len(claim["displayLabel"]) <= 120
+             and all(c.isprintable() for c in claim["displayLabel"])
              and type(claim["nonce"]) is str
              and NONCE.fullmatch(claim["nonce"])
              and type(claim["proofSha256"]) is str
@@ -299,10 +302,7 @@ class TestAtomicArchiveCommit:
         _require(type(display_label) is str
                  and len(display_label) <= 120
                  and all(c.isprintable() for c in display_label)
-                 and callable(on_stage) if on_stage is not None else
-                 (type(display_label) is str
-                  and len(display_label) <= 120
-                  and all(c.isprintable() for c in display_label)),
+                 and (on_stage is None or callable(on_stage)),
                  "FIXTURE_LABEL_OR_HOOK_INVALID")
         digest = hashlib.sha256(payload).hexdigest()
         _require(type(signed_receipt) is dict
@@ -310,11 +310,13 @@ class TestAtomicArchiveCommit:
                  "FIXTURE_RECEIPT_ENVELOPE_INVALID")
         claim = signed_receipt["claim"]
         _require(_ms(now_ms)
-                 and claim.get("archivedAtMs") <= now_ms + 30000
                  and type(grant_sha256) is str and SHA.fullmatch(grant_sha256),
                  "FIXTURE_CLOCK_OR_GRANT_INVALID")
         signed_hash, signed_raw = _verified_signature(
             signed_receipt, receipt_key)
+        _require(claim["archivedAtMs"] <= now_ms + 30000
+                 and claim["displayLabel"] == display_label,
+                 "FIXTURE_RECEIPT_LABEL_OR_TIME_MISMATCH")
         _require(receipt_key["publicKeyBytes"] !=
                  capture_policy.get("publicKeyBytes"),
                  "FIXTURE_RECEIPT_KEY_NOT_DISTINCT")
@@ -483,12 +485,12 @@ class TestAtomicArchiveCommit:
                  and (claim["snapshotId"],claim["ownerId"],
                       claim["resourceId"],claim["sourceRevision"],
                       claim["sourceCapturedAtMs"],claim["archivedAtMs"],
-                      claim["payloadSha256"],claim["captureKeyId"],
-                      claim["nonce"],claim["proofSha256"],
-                      claim["externalFloorSha256"],
+                      claim["displayLabel"],claim["payloadSha256"],
+                      claim["captureKeyId"],claim["nonce"],
+                      claim["proofSha256"],claim["externalFloorSha256"],
                       claim["previousReceiptSha256"])
                      == (sid,owner,resource,revision,captured,archived,
-                         payload_sha,capture_key_id,nonce,proof,
+                         label,payload_sha,capture_key_id,nonce,proof,
                          floor_hash,prev_hash),
                  "FIXTURE_RECOVERY_INTEGRITY_INVALID")
         _verified_signature({"claim":claim,"signatureB64":signature},receipt_key)

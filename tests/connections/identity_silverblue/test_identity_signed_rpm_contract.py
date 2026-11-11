@@ -341,6 +341,32 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertIn("check_origin(f\"before {action}\")", program)
         self.assertIn("check_origin(f\"after {action}\")", program)
         compile(program, "guest_identity_service_probe.sh:kernel-peer-python", "exec")
+        module = ast.parse(program)
+        lsm_function = next(
+            node for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name == "read_kernel_lsm"
+        )
+        scope = {}
+        exec(compile(ast.Module(body=[lsm_function], type_ignores=[]),
+                     "<isolated-kernel-lsm-decoder>", "exec"), scope)
+        decoder = scope["read_kernel_lsm"]
+
+        class KernelBytes:
+            def __init__(self, value):
+                self.value = value
+
+            def read_bytes(self):
+                return self.value
+
+        expected = "system_u:system_r:postapollo_identity_ci_t:s0"
+        self.assertEqual(decoder(KernelBytes(expected.encode() + b"\\x00")), expected)
+        self.assertEqual(decoder(KernelBytes(expected.encode())), expected)
+        for malformed in (b"", b"\\x00", b"label\\x00suffix",
+                          b"label\\n", b"label\\x00\\x00",
+                          b"label\\xff"):
+            with self.subTest(malformed=malformed):
+                with self.assertRaises((RuntimeError, UnicodeError)):
+                    decoder(KernelBytes(malformed))
 
 
 if __name__ == "__main__":

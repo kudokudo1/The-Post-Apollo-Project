@@ -111,6 +111,14 @@ Scope {
         feedback = "ALARM CREATED // EDIT AND ENABLE TO ARM";
         return r.id;
     }
+    function duplicateAlarm(id) {
+        if (!canEdit) return 0;
+        const r = Policy.duplicate(document, id);
+        if (!r.ok) { feedback = r.error; return 0; }
+        if (!saveDocument(r.document)) return 0;
+        feedback = "COPY CREATED // EDIT AND ARM";
+        return r.id;
+    }
     function saveAlarm(id, edit) {
         if (!canEdit) { feedback = "STORAGE UNAVAILABLE"; return false; }
         const r = Policy.update(document, id, edit, Date.now());
@@ -245,8 +253,10 @@ Scope {
             return;
         }
         if (saveDocument(r.document)) {
-            if (r.started.length)
+            if (r.started.length) {
+                if (previewing) endPreview();
                 feedback = "RINGING // " + r.started.length + " ALARM(S)";
+            }
             else if (r.missed.length)
                 feedback = "MISSED // " + r.missed.length + " ALARM(S)";
         }

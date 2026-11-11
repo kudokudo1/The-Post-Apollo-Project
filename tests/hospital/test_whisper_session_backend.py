@@ -548,6 +548,69 @@ class PersistentWhisperTests(unittest.TestCase):
                     if stream is not None and not stream.closed:
                         stream.close()
 
+    def test_responsive_trial_rebalances_one_early_window_without_extra_jobs(self):
+        # Synthetic 100ms voiced frames; no real mic or speech. One early
+        # 1.2s follow-up must be paired with a 2.8s catch-up instead of
+        # shortening the total six-job capture or spawning extra workers.
+        with tempfile.TemporaryDirectory(prefix="hospital-responsive-trial-") as tmp:
+            root = Path(tmp)
+            env, starts, requests, pid_file, cli_calls = build_fake_runtime(root)
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(HELPER),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-live-chunks", "6", "--prefer-persistent",
+                 "--responsive-partial-trial"],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                env=env, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            records = [json.loads(line) for line in result.stdout.splitlines()]
+            stages = [row["detail"] for row in records if row["kind"] == "stage"]
+            phrases = [row["text"] for row in records if row["kind"] == "partial"]
+            self.assertEqual(stages.count("RESPONSIVE_TRIAL_ACTIVE"), 1)
+            self.assertNotIn("RESPONSIVE_TRIAL_FALLBACK", stages)
+            self.assertEqual(stages.count("RESPONSIVE_CHUNK_READY"), 1)
+            self.assertEqual(stages.count("RESPONSIVE_CATCHUP_CHUNK"), 1)
+            self.assertIn("CAPTURE_CHUNK_LIMIT", stages)
+            self.assertNotIn("MODEL_BACKPRESSURE", stages)
+            self.assertEqual(starts.read_text().splitlines(), ["start"])
+            self.assertFalse(cli_calls.exists())
+            self.assertEqual(len(phrases), 6, "Still at most six model jobs")
+            sizes = [int(n) for n in requests.read_text().splitlines()]
+            self.assertEqual(len(sizes), 6)
+            self.assertTrue(12000 <= sizes[1] - sizes[0] <= 24000,
+                            "Second request must use 1.2s plus old overlap")
+            self.assertGreater(sizes[2] - sizes[1], 43000,
+                               "Third request repays the 0.8s early flush")
+            self.assertEqual(
+                (root / "server-decoders").read_text().splitlines(),
+                ["STANDARD"] * 6, "Responsive must not alter decoder quality")
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(pid_file.read_text()), 0)
+
+    def test_responsive_trial_falls_back_when_private_server_missing(self):
+        with tempfile.TemporaryDirectory(prefix="hospital-responsive-fallback-") as tmp:
+            root = Path(tmp)
+            env, starts, requests, _pid_file, cli_calls = build_fake_runtime(root)
+            env["POST_APOLLO_STT_SERVER_BIN"] = str(root / "absent-server")
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(HELPER),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-live-chunks", "2", "--prefer-persistent",
+                 "--responsive-partial-trial"],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                env=env, timeout=14)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            stages = [row["detail"] for row in
+                      (json.loads(line) for line in result.stdout.splitlines())
+                      if row["kind"] == "stage"]
+            self.assertIn("RESPONSIVE_TRIAL_FALLBACK", stages)
+            for code in ("RESPONSIVE_TRIAL_ACTIVE", "RESPONSIVE_CHUNK_READY",
+                         "RESPONSIVE_CATCHUP_CHUNK"):
+                self.assertNotIn(code, stages)
+            self.assertFalse(starts.exists())
+            self.assertFalse(requests.exists())
+            self.assertTrue(cli_calls.exists())
+
     def test_fast_decoder_is_one_guarded_session_only_and_reports_actual_use(self):
         with tempfile.TemporaryDirectory(prefix="hospital-decoder-fast-") as tmp:
             root = Path(tmp)

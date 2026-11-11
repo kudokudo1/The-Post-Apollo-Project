@@ -44,7 +44,7 @@ class KittyScrollUiContract(unittest.TestCase):
         self.assertNotIn("subprocess",HELPER)
         self.assertNotIn("swaymsg",HELPER)
         self.assertNotIn("os.system", HELPER)
-        self.assertIn("No Kitty/Sway process", HELPER)
+        self.assertIn("no terminal restart, no synthetic input", HELPER)
         self.assertIn("KITTY_NATIVE_PASS // TWO_FACTORS_STAGED_NO_CONFIG_WRITE",FIXTURE)
 
     def test_no_fullscreen_tui_claim(self):

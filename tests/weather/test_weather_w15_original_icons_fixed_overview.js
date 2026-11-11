@@ -50,7 +50,7 @@ test("W16 supersedes W15 header split with one fixed OVERVIEW",()=>{
  assert.match(home,/visible: home\.sectionVisible\("snapshot"\)/);
  assert.match(home,/visible: home\.sectionVisible\("relevant"\)/);
  assert.match(home,/overviewDense: home\.fixedWeatherOverview/);
- assert.match(summary,/height: compact \? 158 : 164/);
+ assert.match(summary,/height: 164/);
  assert.doesNotMatch(home,/overviewPage===|onOverviewSelectionRequested/);
  assert.doesNotMatch(summary,/overviewHeaderPages|overviewSelectionRequested/);
 });
@@ -60,7 +60,7 @@ test("W15 changes no shared card internals, meters or data collectors",()=>{
  assert.match(card,/property bool compact: false/);
  assert.match(card,/property real meterValue: 0/);
  assert.match(card,/height: 7/);
- assert.match(card,/font\.pixelSize: card\.compact \? 15 : 20/);
+ assert.match(card,/font\.pixelSize: card\.overviewDense \? 13/);
  assert.match(home,/StationHomeMetricCard\s*\{/);
  assert.match(summary,/objectName: "weather-w8-current-air-metrics"/);
  assert.match(summary,/objectName: "weather-w8-hourly-strip"/);

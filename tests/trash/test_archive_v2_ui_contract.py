@@ -87,7 +87,7 @@ class V2ArchiveUiContractTests(unittest.TestCase):
         self.assertIn('READ_ONLY_INDEX_ONLY', INDEX)
         self.assertIn('PAGE_SIZE = 25', INDEX)
         self.assertIn('MAX_QUERY_LENGTH = 80', INDEX)
-        self.assertIn('instr(lower(display_label), ?)', INDEX)
+        self.assertIn('instr(lower(s.display_label), ?)', INDEX)
         self.assertIn('db.execute("BEGIN")', INDEX)
         self.assertIn('NOT_INSTALLED', INDEX)
         self.assertNotIn('def save(', INDEX)

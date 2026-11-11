@@ -30,9 +30,11 @@ echo "C4B_ID_STAGE // $phase"
 case "$phase" in
   initial)
     if rpm -q "$pkg" >/dev/null 2>&1; then fail "PACKAGE_PREEXISTS"; fi
-    if rpm -q python3-cryptography >/dev/null 2>&1; then
-      fail "FEDORA_RUNTIME_PREEXISTS_AND_CANNOT_PROVE_ROLLBACK"
-    fi
+    for vendorpkg in python3-cryptography python3-cffi python3-pycparser; do
+      if rpm -q "$vendorpkg" >/dev/null 2>&1; then
+        fail "FEDORA_RUNTIME_PREEXISTS_AND_CANNOT_PROVE_ROLLBACK"
+      fi
+    done
     [[ ! -e "$prefix/identity-gateway-ci" &&
        ! -e /usr/lib/systemd/system/"$unit" ]] ||
       fail "IDENTITY_GATEWAY_PREEXISTS"
@@ -67,33 +69,46 @@ case "$phase" in
     if printf '%s\n' "$verified" | grep -Eiq 'NOKEY|NOTTRUSTED|NOT OK|MISSING|BAD'; then
       fail "SIGNATURE_CONTAINS_UNTRUSTED_MARKER"
     fi
-    # Independent Fedora 44 package signing authority, NOT disposable
-    # Identity signer. Trust is explicitly pinned by the CI fetcher to
-    # Fedora 44 primary fingerprint 36F612DC...6D9F90A6.
-    crypto="$data/identity-python3-cryptography-f44.rpm"
-    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$crypto")" == \
-       'python3-cryptography 50.0.0 1.fc44 x86_64' ]] ||
-      fail "WRONG_VENDOR_RUNTIME_ROLE"
-    [[ -z "$(rpm -qp --scripts "$crypto")" &&
-       -z "$(rpm -qp --triggers "$crypto")" ]] ||
-      fail "VENDOR_RUNTIME_HAS_AUTOEXEC_SCRIPTLET"
+    # Official Fedora 44 package signer is NOT the disposable Identity signer.
+    # All three packages are exact NEVRA and hash-pinned on the read-only ISO.
     vendordb="$store/vendor-rpmdb"
     mkdir -m 0700 "$vendordb"
-    rpm --dbpath "$vendordb" --initdb ||
-      fail "VENDOR_RPMDB_INIT_FAILED"
-    vendor_pre="$(rpmkeys --dbpath "$vendordb" --checksig -v "$crypto" 2>&1 || true)"
-    printf '%s\n' "$vendor_pre" | grep -Eiq 'NOKEY|NOTTRUSTED|MISSING' ||
-      fail "VENDOR_SIGNER_PRETRUST_REFUSAL_MISSING"
+    rpm --dbpath "$vendordb" --initdb || fail "VENDOR_RPMDB_INIT_FAILED"
+    for vendor_spec in \
+      'identity-python3-cryptography-f44.rpm|python3-cryptography|50.0.0|1.fc44|x86_64' \
+      'identity-python3-cffi-f44.rpm|python3-cffi|2.0.0|3.fc44|x86_64' \
+      'identity-python3-pycparser-f44.rpm|python3-pycparser|2.22|8.fc44|noarch'; do
+      IFS='|' read -r filename name version release arch <<< "$vendor_spec"
+      candidate="$data/$filename"
+      [[ -f "$candidate" && ! -L "$candidate" ]] ||
+        fail "SIGNED_FEDORA_VENDOR_RPM_MISSING"
+      [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$candidate")" == \
+         "$name $version $release $arch" ]] ||
+        fail "WRONG_VENDOR_RUNTIME_ROLE"
+      [[ -z "$(rpm -qp --scripts "$candidate")" &&
+         -z "$(rpm -qp --triggers "$candidate")" ]] ||
+        fail "VENDOR_RUNTIME_HAS_AUTOEXEC_SCRIPTLET"
+      vendor_pre="$(rpmkeys --dbpath "$vendordb" --checksig -v "$candidate" 2>&1 || true)"
+      printf '%s\n' "$vendor_pre" | grep -Eiq 'NOKEY|NOTTRUSTED|MISSING' ||
+        fail "VENDOR_SIGNER_PRETRUST_REFUSAL_MISSING"
+    done
     rpmkeys --dbpath "$vendordb" --import "$data/identity-fedora44-runtime-public.asc" ||
       fail "VENDOR_PUBLIC_KEY_IMPORT_FAILED"
-    vendor_result="$(rpmkeys --dbpath "$vendordb" --checksig -v "$crypto" 2>&1)" ||
-      fail "VENDOR_RPM_SIGNATURE_INVALID"
-    printf '%s\n' "$vendor_result" | grep -Eiq 'Signature.*OK|RSA.*OK|PGP.*OK|Header.*OK' ||
-      fail "VENDOR_RPM_SIGNATURE_NOT_CONFIRMED"
-    if printf '%s\n' "$vendor_result" | grep -Eiq 'NOKEY|NOTTRUSTED|NOT OK|MISSING|BAD'; then
-      fail "VENDOR_RPM_SIGNATURE_NOT_TRUSTED"
-    fi
-    install -m 0600 "$crypto" "$store/identity-python3-cryptography-f44.rpm"
+    for vendor_spec in \
+      'identity-python3-cryptography-f44.rpm|python3-cryptography|50.0.0|1.fc44|x86_64' \
+      'identity-python3-cffi-f44.rpm|python3-cffi|2.0.0|3.fc44|x86_64' \
+      'identity-python3-pycparser-f44.rpm|python3-pycparser|2.22|8.fc44|noarch'; do
+      IFS='|' read -r filename name version release arch <<< "$vendor_spec"
+      candidate="$data/$filename"
+      vendor_result="$(rpmkeys --dbpath "$vendordb" --checksig -v "$candidate" 2>&1)" ||
+        fail "VENDOR_RPM_SIGNATURE_INVALID"
+      printf '%s\n' "$vendor_result" | grep -Eiq 'Signature.*OK|RSA.*OK|PGP.*OK|Header.*OK' ||
+        fail "VENDOR_RPM_SIGNATURE_NOT_CONFIRMED"
+      if printf '%s\n' "$vendor_result" | grep -Eiq 'NOKEY|NOTTRUSTED|NOT OK|MISSING|BAD'; then
+        fail "VENDOR_RPM_SIGNATURE_NOT_TRUSTED"
+      fi
+      install -m 0600 "$candidate" "$store/$filename"
+    done
     echo "C4B_ID_PASS // SIGNED_OFFLINE_FEDORA44_ED25519_DEPENDENCY_VERIFIED"
     install -m 0600 "$rpmfile" "$store/identity-silverblue-ci.rpm"
     install -m 0600 "$data/identity-artifact-manifest.sha256" "$store/seed-manifest"

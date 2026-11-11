@@ -241,6 +241,105 @@ class PersistentWhisperTests(unittest.TestCase):
                     if stream is not None and not stream.closed:
                         stream.close()
 
+    def test_speech_gated_model_ready_before_first_audio_chunk(self):
+        # Simulated speech arrives at a real-time pace. One 0.3s voiced
+        # prefix starts guarded model loading while the first 1.4s chunk
+        # is still being collected. No actual sound hardware/model.
+        with tempfile.TemporaryDirectory(prefix="hospital-early-model-") as tmp:
+            env, starts, requests, _pid_file, _cli_calls = build_fake_runtime(
+                Path(tmp))
+            env["TEST_RECORDER_STEP_DELAY"] = "0.080"
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), str(HELPER),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-live-chunks", "6", "--prefer-persistent"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+            selector = selectors.DefaultSelector()
+            pending = bytearray()
+            try:
+                selector.register(process.stdout, selectors.EVENT_READ)
+                stages = []
+                deadline = time.monotonic() + 8
+                got_text = False
+                while time.monotonic() < deadline and not got_text:
+                    row = packet_from_pipe(process, selector, pending)
+                    if row is None:
+                        continue
+                    if row["kind"] == "stage":
+                        stages.append(row["detail"])
+                    elif row["kind"] == "partial":
+                        got_text = True
+                    elif row["kind"] == "error":
+                        self.fail(str(row))
+                self.assertTrue(got_text, "First phrase should arrive")
+                self.assertIn("MODEL_EARLY_START", stages)
+                self.assertIn("MODEL_SESSION_READY", stages)
+                self.assertIn("FIRST_AUDIO_QUEUED", stages)
+                self.assertLess(stages.index("MODEL_SESSION_READY"),
+                                stages.index("FIRST_AUDIO_QUEUED"),
+                                "Model must load while speech is captured")
+                self.assertEqual(starts.read_text().splitlines(), ["start"])
+                self.assertTrue(requests.exists())
+                process.stdin.write("STOP\n")
+                process.stdin.flush()
+                process.stdin.close()
+                process.wait(timeout=8)
+                self.assertEqual(process.returncode, 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=3)
+                selector.close()
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    if stream is not None and not stream.closed:
+                        stream.close()
+
+    def test_silent_recording_never_prewarms_persistent_model(self):
+        # Silence must never launch a model merely because the mic is open.
+        # Capture always remains finite and uses no actual PipeWire device.
+        with tempfile.TemporaryDirectory(prefix="hospital-idle-model-") as tmp:
+            root = Path(tmp)
+            env, starts, _requests, _pid, cli_calls = build_fake_runtime(root)
+            recorder = root / "bin" / "pw-record"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys,time\n"
+                "for _ in range(70):\n"
+                " sys.stdout.buffer.write(bytes(3200))\n"
+                " sys.stdout.buffer.flush()\n"
+                " time.sleep(0.012)\n"
+                "time.sleep(15)\n")
+            recorder.chmod(0o700)
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), str(HELPER),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-live-chunks", "6", "--prefer-persistent"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+            try:
+                time.sleep(1)
+                self.assertIsNone(process.poll())
+                process.stdin.write("STOP\n")
+                process.stdin.flush()
+                process.stdin.close()
+                output, errors = process.communicate(timeout=8)
+                self.assertEqual(process.returncode, 0, errors)
+                stages = [r["detail"] for r in
+                          (json.loads(line) for line in output.splitlines())
+                          if r["kind"] == "stage"]
+                self.assertIn("CAPTURE_USER_STOP", stages)
+                self.assertNotIn("MODEL_EARLY_START", stages)
+                self.assertFalse(starts.exists(), "No model on silence")
+                self.assertFalse(cli_calls.exists(), "No CLI on silence")
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=3)
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    if stream is not None and not stream.closed:
+                        stream.close()
+
     def test_missing_session_falls_back_to_guarded_cli(self):
         with tempfile.TemporaryDirectory(prefix="hospital-whisper-fallback-") as tmp:
             env, starts, _, _, cli_calls = build_fake_runtime(Path(tmp))

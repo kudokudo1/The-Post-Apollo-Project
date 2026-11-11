@@ -248,8 +248,12 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             'check_origin(f"before {action}")',
             'check_origin(f"after {action}")',
             'KERNEL_PEER_PID_START_AND_SUPERVISOR_RECHECKED_FOR_FOUR_SIGNED_DENIALS',
+            'C4B_ID_SERVICE_PROBE_DETAIL',
+            'C4B_ID_SERVICE_PROBE_RC',
+            'KERNEL_OR_SIGNED_RECEIPT_CONTINUITY_REFUSED',
         ):
             self.assertIn(needle, probe)
+        self.assertIn("SERVICE_PROBE_DETAIL|SERVICE_PROBE_RC", host)
         self.assertNotIn("https://", probe)
         self.assertNotIn("curl ", probe)
         self.assertNotIn("pip install", probe)

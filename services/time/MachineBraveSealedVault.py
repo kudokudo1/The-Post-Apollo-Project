@@ -277,12 +277,14 @@ def put(request):
         os.unlink(temp, dir_fd=dfd)
         created = False
         os.fsync(dfd)
-    except BaseException:
+    except BaseException as exc:
         if linked:
             os.unlink(dest, dir_fd=dfd)
         if created:
             os.unlink(temp, dir_fd=dfd)
         os.fsync(dfd)
+        if isinstance(exc, (OSError, ValueError)):
+            raise VaultError("SEALED VAULT REFUSED") from exc
         raise
     finally:
         os.close(dfd)

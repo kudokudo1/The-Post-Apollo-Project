@@ -86,7 +86,7 @@ jobs:
             > "$work/native.log" 2>&1 || rc=$?
           cat "$work/native.log"
           test "$rc" -eq 0
-          grep -F "W14_NATIVE_PASS // LINE_GLYPH_TERMINAL_AND_PADDED_RAIL_520X300" "$work/native.log"
+          grep -F "W14_NATIVE_PASS // TWO_SIZE_LINE_GLYPH_INSTRUMENT_520_440" "$work/native.log"
           if grep -E 'W14_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi
@@ -96,5 +96,13 @@ jobs:
         with:
           name: weather-w14-visual-preview
           path: /tmp/weather-w14-visual-preview.png
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload 440x275 compact visual preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-w14-compact-preview
+          path: /tmp/weather-w14-compact-preview.png
           if-no-files-found: warn
           retention-days: 14

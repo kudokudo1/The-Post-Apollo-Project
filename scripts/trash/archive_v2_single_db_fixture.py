@@ -462,7 +462,12 @@ class TestAtomicArchiveCommit:
                 JOIN test_receipts r ON r.snapshot_id=s.id
                 WHERE n.owner_id=? AND n.key_id=? AND n.nonce=?""",
                 (owner_id,capture_key_id,nonce)).fetchone()
+            orphan = None if row is not None else db.execute(
+                """SELECT 1 FROM test_nonces
+                WHERE owner_id=? AND key_id=? AND nonce=?""",
+                (owner_id,capture_key_id,nonce)).fetchone()
         if row is None:
+            _require(orphan is None, "FIXTURE_RECOVERY_INTEGRITY_INVALID")
             return {"state":"TEST_NOT_ADMITTED","productionAllowed":False}
         (proof,sid,owner,resource,revision,captured,archived,label,
          payload_sha,payload,local_hash,prev_hash,signed_raw,signature,

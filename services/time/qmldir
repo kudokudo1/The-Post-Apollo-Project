@@ -2,3 +2,4 @@ module qs.services.time
 
 singleton TimeSettings 1.0 TimeSettings.qml
 singleton AngelObservationsStore 1.0 AngelObservationsStore.qml
+singleton AlarmService 1.0 AlarmService.qml

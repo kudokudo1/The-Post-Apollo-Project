@@ -130,6 +130,13 @@ jobs:
           assert.equal(p.validDate('2026-11-30',false),true);
           assert.equal(p.update(doc,1,{mode:'once',date:'2026-11-10',
             enabled:true},d1).ok,false);
+          const disposable=p.create(p.initialDocument()).document;
+          let d=p.update(disposable,1,{mode:'once',date:'2026-11-11',
+            weekdays:[],hour:7,minute:30,keepSaved:false,enabled:true},d1).document;
+          d=p.tick(d,wed).document;
+          const autoExpired=p.tick(d,wed+16*60000);
+          assert.deepEqual(Array.from(autoExpired.expired),[1]);
+          assert.equal(autoExpired.document.alarms.length,0);
 
           // DST: no double fire during the repeated fall-back hour;
           // nonexistent spring-forward 02:30 normalizes deterministically.

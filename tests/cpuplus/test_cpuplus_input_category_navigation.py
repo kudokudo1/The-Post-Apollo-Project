@@ -33,7 +33,7 @@ class InputCategoryNavigation(unittest.TestCase):
         self.assertIn('settingsInputPreviewTitle + " // SELECT"', SOURCE)
         self.assertIn('settingsInputPreviewTitle + " // OVERVIEW"', SOURCE)
         self.assertIn('settingsInputPreviewTitle + " // CONTROL"', SOURCE)
-        self.assertIn("settingsInputPreviewSelected))", SOURCE)
+        self.assertIn("&& !(cpuPlusWindow.selectedModeIndex === 6", SOURCE)
 
 
 if __name__ == "__main__":

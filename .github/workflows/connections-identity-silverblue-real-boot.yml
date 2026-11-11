@@ -39,6 +39,7 @@ jobs:
             { echo "C4B_ID_BLOCKED // OFFICIAL_VM_KVM_PERMISSION_REFUSED"; exit 2; }
           bash -n tests/connections/identity_silverblue/build_signed_identity_gateway.sh
           bash -n tests/connections/identity_silverblue/verify_signed_identity_gateway.sh
+          bash -n tests/connections/identity_silverblue/guest_identity_service_probe.sh
           bash -n tests/connections/identity_silverblue/run_official_silverblue_identity.sh
           bash -n tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh
           python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py

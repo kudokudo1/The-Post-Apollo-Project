@@ -47,9 +47,25 @@
       <button type="button" id="open-marker">OPEN TEMPORARY WINDOW CHECK TAB</button>
       <p id="marker-open-status" role="status" aria-live="polite">NO MARKER TAB OPENED</p>
     </section>
+    <section class="local-link" aria-label="Optional one-window tab recovery eligibility preview">
+      <h2>BROWSER TABS // EXPLICIT PRIVACY GATE</h2>
+      <p>Brave's optional tabs permission can expose addresses and titles
+      across normal browser windows. It is broader than this preview.
+      We request it only when you click ALLOW. Nothing is read at grant time.</p>
+      <button type="button" id="grant-tabs">ALLOW TAB ADDRESS ACCESS</button>
+      <button type="button" id="preview-tabs">PREVIEW THIS WINDOW ONCE</button>
+      <button type="button" id="revoke-tabs">REVOKE ACTIVE TAB ACCESS</button>
+      <p id="tab-preview-status" role="status" aria-live="polite">NO TAB PREVIEW REQUESTED</p>
+      <p id="tab-preview-summary" aria-label="Redacted current window tab totals"></p>
+      <ol id="tab-preview-list" aria-label="Redacted tab position eligibility"></ol>
+      <p>No tab addresses, titles, bookmarks, cookies or contents are displayed,
+      logged, sent to a native host or saved. This is a momentary eligibility
+      preview, not a restorable snapshot. REVOKE removes active access,
+      although Brave may remember an earlier grant.</p>
+    </section>
     <section class="limits" aria-label="Recovery limitations">
       <p>Window numbers last only for this browser run. They are not Sway window IDs.</p>
-      <p>No existing tab titles, page addresses, profiles or page contents are read or saved. Only the new test tab's own random title is compared once with Sway after permission.</p>
+      <p>Basic inventory ignores addresses and titles. The separately clicked tab preview reads current-window addresses only after optional permission, shows redacted classifications and never saves data. The marker test reads only its own random title.</p>
       <p>NO SESSION LINK // NO RESTORE ACTIONS</p>
     </section>
   </main>
@@ -57,5 +73,6 @@
   <script type="module" src="native-probe-ui.mjs"></script>
   <script type="module" src="focus-observe-ui.mjs"></script>
   <script type="module" src="open-marker-ui.mjs"></script>
+  <script type="module" src="session-preview-ui.mjs"></script>
 </body>
 </html>

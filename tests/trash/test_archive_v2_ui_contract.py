@@ -76,7 +76,10 @@ class V2ArchiveUiContractTests(unittest.TestCase):
         self.assertIn('NOT_INSTALLED', INDEX)
         self.assertNotIn('def save(', INDEX)
         self.assertNotIn('def burn(', INDEX)
-        self.assertNotIn('from scripts.trash', INDEX)
+        self.assertIn('archive_directory(directory, create=False)', INDEX)
+        self.assertIn('from scripts.trash.archive_v2_location', INDEX)
+        self.assertNotIn('from scripts.trash.archive_store_v2', INDEX)
+        self.assertNotIn('archive_directory(directory, create=True)', INDEX)
         # A missing database must not be instantiated as a side effect of
         # opening the Archive UI.
         self.assertNotIn('CREATE TABLE', INDEX)

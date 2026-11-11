@@ -170,7 +170,7 @@ Rectangle {
             Item {
                 id: mainReadout
                 x: 5
-                width: parent.width*0.44-6
+                width: parent.width*0.49-6
                 height: parent.height
                 GohuText {
                     anchors.top: parent.top
@@ -195,7 +195,7 @@ Rectangle {
                     id: currentIcon
                     objectName: "weather-w17-original-main-glyph"
                     anchors.right: parent.right
-                    anchors.rightMargin: 1
+                    anchors.rightMargin: 12
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.min(122,47 + panel.expansion * 0.39,
                                     Math.max(47,parent.width * 0.58))
@@ -232,7 +232,7 @@ Rectangle {
                 }
             }
             Rectangle {
-                x: parent.width*0.44
+                x: parent.width*0.49
                 width: 1
                 y: 3
                 height: parent.height-6
@@ -241,8 +241,8 @@ Rectangle {
             }
             Grid {
                 id: telemetryGrid
-                x: parent.width*0.44+5
-                width: parent.width*0.56-7
+                x: parent.width*0.49+5
+                width: parent.width*0.51-7
                 height: parent.height
                 columns: 2
                 rowSpacing: 2

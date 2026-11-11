@@ -33,7 +33,7 @@ class ClockTimeSettingsContract(unittest.TestCase):
         policy = (ROOT / "services/time/TimeSettingsPolicy.js").read_text()
         self.assertIn("atomicWrites: true", service)
         self.assertIn("time-settings-v1.json", service)
-        self.assertIn("MAX_OFFSET_MS = 300000", policy)
+        self.assertIn("MAX_OFFSET_MS = 24 * 60 * 60 * 1000", policy)
         self.assertIn("adjustDisplayMs", service)
         self.assertIn('"set-timezone", zoneChoice', service)
         self.assertNotIn("set-timezone", policy)

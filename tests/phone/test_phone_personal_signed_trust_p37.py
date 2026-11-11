@@ -303,8 +303,10 @@ class SignedTrustP37Tests(unittest.TestCase):
             self.assertNotIn(forbidden, source)
         self.assertIn('vaultWriteEnabled": False', source)
         self.assertIn("Ed25519PublicKey.from_public_bytes(", source)
-        self.assertIn("HOST_DOMAIN +", source)
-        self.assertIn("CONSENT_DOMAIN +", source)
+        self.assertIn("_verify_signature(host_public_key, host_signature, HOST_DOMAIN, host_frame)", source)
+        self.assertIn("_verify_signature(consent_public_key, consent_signature,", source)
+        self.assertIn("CONSENT_DOMAIN, consent_frame)", source)
+        self.assertIn("signature, domain + raw", source)
 
 
 if __name__ == "__main__":

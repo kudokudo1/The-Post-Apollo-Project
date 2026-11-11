@@ -277,7 +277,7 @@ Item {
         let name = "";
         try { name = decodeURIComponent(tail); }
         catch (e) { name = "Imported tone"; }
-        name = name.replace(/\.wav$/i, "").replace(/[\x00-\x1f\x7f]/g, "")
+        name = name.replace(/\.(wav|mp3)$/i, "").replace(/[\x00-\x1f\x7f]/g, "")
             .trim().slice(0, 40);
         return name || "Imported tone";
     }
@@ -365,7 +365,7 @@ Item {
         source: "AlarmWavImportDialog.qml"
         onLoaded: {
             item.fileSelected.connect(function(url) {
-                SoundLibraryService.importWav(
+                SoundLibraryService.importAudio(
                     url, pane.importNameFromUrl(url));
             });
             item.openChooser();
@@ -938,7 +938,7 @@ Item {
                     ActionButton {
                         width: (libraryTools.width - 2 * libraryTools.spacing) / 3
                         height: parent.height
-                        label: "IMPORT WAV"
+                        label: "+ WAV/MP3"
                         labelPixelSize: 9
                         accentColor: Colors.magenta
                         available: !SoundLibraryService.busy
@@ -1380,7 +1380,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             visible: pane.soundLibraryOpen && pane.libraryTones.length === 0
-            text: "NO IMPORTED TONES // IMPORT WAV"
+            text: "NO TONES // IMPORT WAV OR MP3"
             font.pixelSize: 10
             color: Colors.cyan
         }

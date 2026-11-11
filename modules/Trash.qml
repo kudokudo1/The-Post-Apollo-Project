@@ -1449,11 +1449,22 @@ PanelWindow {
                 Flickable {
                     id: cleanupPageViewport
                     anchors.fill: parent
+                    // Compact keeps a pinned scroll rail beneath the content.
+                    // Hunt and Swipe retain their own pointer gestures.
+                    anchors.bottomMargin: trashLauncher.chassisSize === "compact" ? 29 : 0
                     visible: trashLauncher.activeMode === "cleanup"
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     contentWidth: width
-                    contentHeight: Math.max(height, 525)
+                    // Stacked Batch needs more vertical space than the
+                    // original 525px side-by-side Camera design. The parent
+                    // viewport is bounded; the contents are explicitly
+                    // scrollable instead of falling below the panel frame.
+                    contentHeight: Math.max(height,
+                        trashLauncher.chassisSize === "compact"
+                        && trashLauncher.cameraCleanupController
+                        && trashLauncher.cameraCleanupController.cleanupTechnique === "batch"
+                        ? 650 : 525)
                     interactive: trashLauncher.cameraCleanupController
                                  && trashLauncher.cameraCleanupController.cleanupTechnique
                                     !== "swipe"
@@ -1477,6 +1488,69 @@ PanelWindow {
                             }
                         }
                     }
+                }
+
+                // This is outside the swipe deck and Hunt arena, so the
+                // arrow controls scroll the outer Cleanup page without
+                // stealing gestures or changing Camera's selection data.
+                Row {
+                    id: cleanupCompactScrollRail
+                    anchors.bottom: parent.bottom
+                    width: parent.width
+                    height: 27
+                    spacing: 5
+                    visible: trashLauncher.activeMode === "cleanup"
+                             && trashLauncher.chassisSize === "compact"
+
+                    ActionButton {
+                        width: 66
+                        height: 26
+                        label: "↑ UP"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        available: cleanupPageViewport.contentY > 0
+                        onLeftClicked: cleanupPageViewport.contentY = Math.max(
+                            0, cleanupPageViewport.contentY - 170)
+                    }
+
+                    GohuText {
+                        width: Math.max(20, parent.width - 137)
+                        height: 26
+                        font.pixelSize: 9
+                        color: Colors.yellow
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        text: "SCROLL // "
+                              + Math.round(100 * cleanupPageViewport.contentY
+                                           / Math.max(1, cleanupPageViewport.contentHeight
+                                                      - cleanupPageViewport.height)) + "%"
+                    }
+
+                    ActionButton {
+                        width: 66
+                        height: 26
+                        label: "↓ DOWN"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        available: cleanupPageViewport.contentY
+                                   < cleanupPageViewport.contentHeight
+                                     - cleanupPageViewport.height - 1
+                        onLeftClicked: cleanupPageViewport.contentY = Math.min(
+                            Math.max(0, cleanupPageViewport.contentHeight
+                                        - cleanupPageViewport.height),
+                            cleanupPageViewport.contentY + 170)
+                    }
+                }
+
+                NeonScrollBar {
+                    flickable: cleanupPageViewport
+                    x: cleanupPageViewport.width - width - 1
+                    y: 0
+                    height: cleanupPageViewport.height
+                    geometryMode: "viewport"
+                    handleStyle: "star"
+                    visible: trashLauncher.activeMode === "cleanup"
+                             && scrollable
                 }
 
                 Item {

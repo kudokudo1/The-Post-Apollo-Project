@@ -123,6 +123,17 @@ class FixturePeerLease:
                 "captureAllowed": False,
                 "productionAllowed": False}
 
+    @property
+    def fixture_pidfd(self):
+        """Borrow the original kernel pidfd for a deny-only fixture lookup."""
+        self.require_alive()
+        return self._fd
+
+    @property
+    def peer_witness_sha256(self):
+        self.require_alive()
+        return self._witness["peerWitnessSha256"]
+
     def close(self):
         if not self._closed:
             self._closed = True

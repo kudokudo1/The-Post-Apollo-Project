@@ -5,11 +5,13 @@ import base64
 import json
 import os
 from pathlib import Path
+import subprocess
 import shutil
 import stat
 import sys
 import tempfile
 from unittest.mock import patch
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "services/time"))
@@ -93,6 +95,34 @@ try:
         assert not (base / "post-apollo").exists()
         assert not Path("/tmp/UNTRUSTED-ATTACKER-DATA").exists()
 
+        # Production destination resolves the effective account home, not
+        # attacker-controlled HOME/XDG variables. No folder is made.
+        fake_home = base / "account"
+        fake_home.mkdir(mode=0o700)
+        (fake_home / ".local").mkdir(mode=0o700)
+        (fake_home / ".local" / "share").mkdir(mode=0o700)
+        with patch.object(archive.pwd, "getpwuid",
+                          return_value=SimpleNamespace(pw_dir=str(fake_home))):
+            with patch.dict(os.environ,{
+                    "HOME":"/tmp/WRONG-HOME-NOT-USED",
+                    "XDG_DATA_HOME":"/tmp/WRONG-DATA-NOT-USED"}):
+                assert archive._account_data_home() == fake_home / ".local" / "share"
+        assert not Path("/tmp/WRONG-DATA-NOT-USED").exists()
+        assert not (fake_home / ".local" / "share" / "post-apollo").exists()
+        if not fake_home.exists(): raise AssertionError("fixture vanished")
+
+        # No tty means the CLI archive command itself must fail safely.
+        cli = subprocess.run(
+            [sys.executable,"-B","-I",
+             str(ROOT / "services/time/MachineBraveOfflineArchive.py"),
+             "archive",str(trial),key,expected],
+            input=b"",stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+            timeout=8)
+        assert cli.returncode != 0
+        assert json.loads(cli.stdout)["status"] == "refused"
+        assert cli.stderr == b""
+        assert not (base / "post-apollo").exists()
+
         # Refused consent, wrong digest and unknown records must NOT write.
         called = []
         def deny(record_id):
@@ -175,7 +205,7 @@ try:
         source_two.unlink()
         source_two.write_bytes(before_two)
         os.chmod(source_two,0o600)
-        hard = source_path.parent / "hard.json"
+        hard = source_path.parent / "cccccccc-cccc-4ccc-8ccc-cccccccccccc.json"
         os.link(source_two,hard)
         refused(archive.inspect,str(trial),second["record_id"])
         hard.unlink()

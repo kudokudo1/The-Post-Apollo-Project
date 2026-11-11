@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """MACHINE // bounded cancellation and session-context drift checks.
 
-This negative-only guard observes the already accepted AF_UNIX connection and
-Linux kernel procfs session/cgroup/namespace attributes of its SO_PEERCRED
+This negative-only guard applies one absolute monotonic deadline across
+partial AF_UNIX reads and observes Linux kernel session/cgroup/namespace
+attributes of its SO_PEERCRED
 process. It invalidates an in-flight metadata request on socket disconnect,
 extra pipelined input, timeout, task exit, executable change, or observed
 session-context drift. It cannot grant archive access or verify logind seat
@@ -108,27 +109,53 @@ class InFlightGuard:
         self._born_ns = time.monotonic_ns()
         self._cancelled = False
 
-    def valid(self) -> bool:
+    def remaining_ns(self) -> int:
+        """Absolute monotonic budget shared by every partial frame read.
+
+        A fresh socket.recv timeout is NOT a fresh request lifetime.
+        Expiry or clock regression revokes this guard permanently.
+        """
         if self._cancelled:
-            return False
+            return 0
         try:
             age = time.monotonic_ns() - self._born_ns
             if age < 0 or age >= MAX_GUARD_NS:
                 self._cancelled = True
-                return False
-            if not self._lease.valid() or not _socket_still_waiting(self._connection):
+                return 0
+            return MAX_GUARD_NS - age
+        except (TypeError, ValueError, OverflowError):
+            self._cancelled = True
+            return 0
+
+    def receiving_valid(self) -> bool:
+        """During the first frame, check lease+session, NOT pending bytes.
+
+        The first request's unread bytes are legitimate. Socket EOF, a
+        second frame or half-close is checked AFTER consuming the frame.
+        """
+        if not self.remaining_ns():
+            return False
+        try:
+            if (not self._lease.valid() or
+                    _session_context(self._lease.identity.pid) != self._initial or
+                    not self._lease.valid()):
                 self._cancelled = True
                 return False
-            if _session_context(self._lease.identity.pid) != self._initial:
-                self._cancelled = True
-                return False
-            if not self._lease.valid() or not _socket_still_waiting(self._connection):
-                self._cancelled = True
-                return False
-            return True
+            return self.remaining_ns() > 0
         except (CancelledRequest, OSError, ValueError, AttributeError):
             self._cancelled = True
             return False
+
+    def valid(self) -> bool:
+        if not self.receiving_valid():
+            return False
+        if not _socket_still_waiting(self._connection):
+            self._cancelled = True
+            return False
+        if not self.receiving_valid() or not _socket_still_waiting(self._connection):
+            self._cancelled = True
+            return False
+        return True
 
     def cancel(self):
         self._cancelled = True

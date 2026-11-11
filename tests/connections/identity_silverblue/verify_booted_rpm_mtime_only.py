@@ -28,7 +28,7 @@ FILES = frozenset(
 ) | {"/usr/lib/systemd/system/post-apollo-identity-silverblue-ci.service"}
 # RPM verify output has a nine-character result field and a four-space
 # separator. Exact expression excludes non-T flags (including missing files).
-MTIME_ONLY = re.compile(r"^\.{7}T\.    (/usr/[^ \t\r\n]+)$")
+MTIME_ONLY = re.compile(r"^\.{7}T\.    (/[^ \t\r\n]+)$")
 
 
 class Refused(ValueError):

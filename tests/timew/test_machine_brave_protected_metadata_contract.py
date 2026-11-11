@@ -203,7 +203,8 @@ def main():
             raise RuntimeError("reserved CI fixture UID already assigned; refuse")
     test_root=Path(tempfile.mkdtemp(prefix="machine-ci-protected-metadata-"))
     assert test_root.parent==Path("/tmp")
-    test_root.chmod(0o755)  # allows reaching test socket, not sealed folder
+    os.chown(test_root,SERVICE_UID,SERVICE_UID)
+    test_root.chmod(0o755)  # service can create CI socket; browser can only traverse
     try:
         archive,path=_setup_archive(test_root)
         before=path.read_bytes()

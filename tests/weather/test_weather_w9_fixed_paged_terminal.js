@@ -33,7 +33,7 @@ test("W10 preserves W9 fixed-no-scroll behavior in two focused screens",()=>{
    ["TWILIGHT // SOLAR","twilight"]])
    assert.ok(pane.includes('label:"'+label+'",focus:"'+focus+'"'));
  assert.match(pane,/onClicked: skyHost\.activeInstrument = modelData\.focus/);
- assert.match(pane,/StationWeatherCombinedPane\s*\{/);
+ assert.match(pane,/StationWeatherInstrumentTerminal\s*\{/);
  assert.match(pane,/StationCosmosVisualInstruments\s*\{/);
  assert.match(pane,/solarDate: originalSky\.astronomySummary\.date/);
  assert.match(pane,/solarCivilOffsetMinutes: originalSky\.moonCivilOffsetMinutes/);

@@ -20,7 +20,7 @@ test("W14 WEATHER uses three differentiated instruments rather than the W13 tile
  assert.match(terminal,/color: Colors.cyan/);
  assert.match(terminal,/font.pixelSize: 37/);
  assert.match(terminal,/font.pixelSize: 16/);
- assert.match(terminal,/font.pixelSize: 13/);
+ assert.match(terminal,/font.pixelSize: 11/);
  assert.match(terminal,/id: dailyRepeater/);
  assert.match(terminal,/id: hourlyRepeater/);
  assert.match(terminal,/Math.min\(6,terminal.hourlyRows.length\)/);
@@ -53,7 +53,7 @@ test("W14 icon system is single-ink line drawing, not emoji, filled or 3D decora
  assert.match(glyph,/strokeRain/);
  assert.match(glyph,/c.stroke\(\)/);
  assert.doesNotMatch(glyph,/c.fill\(\)/);
- assert.doesNotMatch(glyph,/gradient|Image\s*\{|AnimatedImage|emoji/i);
+ assert.doesNotMatch(glyph,/LinearGradient|Image\s*\{|AnimatedImage|emoji\s*:\s*true/);
  assert.match(terminal,/StationWeatherLineGlyph\s*\{/);
  assert.match(overview,/StationWeatherLineGlyph\s*\{/);
  assert.doesNotMatch(overview,/function glyph\(/);

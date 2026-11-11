@@ -161,8 +161,11 @@ def check_origin(stage):
         "--property=MainPID","--value"],timeout=3,text=True).strip()
     if current!=str(pid) or start_ticks()!=pinned_start:
         raise RuntimeError(f"{stage}: supervisor PID/start changed")
-    if Path(f"/proc/{pid}/attr/current").read_text().strip()!=expected_lsm:
-        raise RuntimeError(f"{stage}: kernel SELinux context changed")
+    observed_lsm=Path(f"/proc/{pid}/attr/current").read_text().strip()
+    if observed_lsm!=expected_lsm:
+        raise RuntimeError(
+            f"{stage}: kernel SELinux context changed "
+            f"expected={expected_lsm!r} observed={observed_lsm!r}")
     groups=Path(f"/proc/{pid}/status").read_text().splitlines()
     for tag,value in (("Uid:",uid),("Gid:",gid)):
         field=next((x for x in groups if x.startswith(tag)),None)

@@ -130,8 +130,11 @@ def _dir_fd(path):
                    getattr(os, "O_NOFOLLOW", 0))
 
 def _safe_open_file(rootfd, name):
-    fd = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
-                 dir_fd=rootfd)
+    try:
+        fd = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                     dir_fd=rootfd)
+    except OSError as exc:
+        raise VaultError("SEALED VAULT REFUSED") from exc
     try:
         info = os.fstat(fd)
         if (not stat.S_ISREG(info.st_mode) or

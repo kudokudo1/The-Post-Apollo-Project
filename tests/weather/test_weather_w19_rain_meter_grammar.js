@@ -35,7 +35,7 @@ test("W19 forecast bars connect temperature with matching percentage on both scr
 test("W19 current-condition meters are thicker and optically raised",()=>{
  assert.match(weather,/id: metricValueRow/);
  assert.match(weather,/y: Math.min\(metric.height-height-1,/);
- assert.match(weather,/height: visible \? 7 : 0/);
+ assert.match(weather,/height: visible \? \(metric.height<40 \? 6 : 7\) : 0/);
  assert.match(overview,/id: metricReadoutRow/);
  assert.match(overview,/y: metric.height < 35 \? metric.height - height/);
  assert.match(overview,/height: visible \? \(metric.height < 35 \? 4 : 6\) : 0/);

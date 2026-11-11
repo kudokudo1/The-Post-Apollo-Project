@@ -18,6 +18,7 @@ on:
       - "tests/time/test_clock_auto_check_contract.py"
       - "tests/time/test_clock_settings_submodes_contract.py"
       - "tests/time/test_clock_settings_compact_contract.py"
+      - "tests/time/test_clock_auto_event_triggers_contract.py"
       - "shell.qml"
       - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
@@ -38,6 +39,7 @@ on:
       - "tests/time/test_clock_auto_check_contract.py"
       - "tests/time/test_clock_settings_submodes_contract.py"
       - "tests/time/test_clock_settings_compact_contract.py"
+      - "tests/time/test_clock_auto_event_triggers_contract.py"
       - "shell.qml"
       - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
@@ -54,6 +56,7 @@ jobs:
           python3 -m unittest discover -s tests/time -p 'test_clock_auto_check_contract.py' -v
           python3 -m unittest discover -s tests/time -p 'test_clock_settings_submodes_contract.py' -v
           python3 -m unittest discover -s tests/time -p 'test_clock_settings_compact_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_auto_event_triggers_contract.py' -v
       - name: Check bounded visual calibration policy
         run: |
           node <<'JS'
@@ -108,4 +111,27 @@ jobs:
           assert.equal(p.isDue(stamped, 999999, 0), true); // clock jumped back
           assert.equal(p.isDue(p.withSchedule(stamped, false, 168).document, 1000000 + 168*3600000, 0), false);
           assert.equal(p.withSchedule(first, true, 2.2).ok, false);
+          // New event switches do not invalidate existing v1 preferences.
+          const legacy = {version: 1, enabled: true, intervalHours: 6, lastAttemptAtMs: 100};
+          const migrated = p.parse(JSON.stringify(legacy));
+          assert.equal(migrated.ok, true);
+          assert.equal(migrated.document.checkOnReload, true);
+          assert.equal(migrated.document.checkOnClockOpen, true);
+          const reloadOff = p.withTrigger(migrated.document, "checkOnReload", false);
+          assert.equal(reloadOff.ok, true);
+          assert.equal(reloadOff.document.checkOnReload, false);
+          assert.equal(reloadOff.document.checkOnClockOpen, true);
+          assert.equal(reloadOff.document.intervalHours, 6);
+          assert.equal(reloadOff.document.lastAttemptAtMs, 100);
+          assert.equal(p.triggerEnabled(reloadOff.document, "reload"), false);
+          assert.equal(p.triggerEnabled(reloadOff.document, "clock-open"), true);
+          assert.equal(p.triggerEnabled(reloadOff.document, "interval"), true);
+          assert.equal(p.triggerEnabled(p.withSchedule(reloadOff.document, false, 6).document, "clock-open"), false);
+          assert.equal(p.withSchedule(reloadOff.document, true, 24).document.checkOnReload, false);
+          assert.equal(p.withAttempt(reloadOff.document, 500).document.checkOnReload, false);
+          assert.equal(p.parse(JSON.stringify(reloadOff.document)).document.checkOnReload, false);
+          assert.equal(p.parse(JSON.stringify({...legacy, checkOnClockOpen: null})).ok, false);
+          assert.equal(p.parse(JSON.stringify({...legacy, checkOnReload: "on"})).ok, false);
+          assert.equal(p.withTrigger(legacy, "unknown", true).ok, false);
+          assert.equal(p.withTrigger(legacy, "checkOnReload", "yes").ok, false);
           JS

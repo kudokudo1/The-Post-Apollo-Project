@@ -26,6 +26,15 @@ Scope {
     property string executing: ""
     property var expected: null
     property var autoscrollEngine: Auto.initial()
+    property bool originProbeBusy: false
+    property bool originProbeReturned: false
+    property string originProbeStatus: "unchecked"
+    property string originProbeMessage: "NO CURSOR ORIGIN WITNESS"
+    property bool originProtocolsAvailable: false
+    property int originOutputCount: 0
+    property bool stopBusy: false
+    property bool stopReturned: false
+    property string stopFeedback: "EMERGENCY STOP AVAILABLE IF AN EXPERIMENT IS RUNNING"
     readonly property bool autoscrollRuntimeAvailable: false
     readonly property bool canPrepare:
         !busy && pendingAction === "" && hostStatus === "ready"
@@ -35,6 +44,74 @@ Scope {
             && hasSnapshot)
     readonly property var chosenDevice: findDevice(selectedId)
 
+    function inspectAutoscrollCapabilities() {
+        if (originProbeBusy) return false;
+        originProbeBusy = true;
+        originProbeReturned = false;
+        originProbeStatus = "reading";
+        originProbeMessage = "READ-ONLY WAYLAND AND SWAY CAPABILITY INVENTORY";
+        originProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/input/AutoscrollOriginProbe.py"),
+            "--inspect"]);
+        return true;
+    }
+    function requestEmergencyStop() {
+        if (stopBusy) return false;
+        stopBusy = true;
+        stopReturned = false;
+        stopFeedback = "SENDING SAME-USER STOP REQUEST";
+        stopProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/input/AutoscrollStop.py"),
+            "--stop"]);
+        return true;
+    }
+    function acceptOrigin(raw) {
+        originProbeReturned = true;
+        let reply;
+        try { reply = JSON.parse(String(raw)); }
+        catch (_) {
+            originProbeStatus = "unavailable";
+            originProbeMessage = "INVALID PROBE RESULT";
+            return;
+        }
+        if (!reply || reply.pointer_origin_verified !== false
+                || reply.runtime_enabled !== false) {
+            originProbeStatus = "unavailable";
+            originProbeMessage = "UNTRUSTED PROBE RESULT";
+            return;
+        }
+        if (reply.status !== "inventory_only") {
+            originProbeStatus = "unavailable";
+            originProbeMessage = String(reply.code || reply.status || "NOT_READY");
+            return;
+        }
+        const advertised = reply.protocols
+            && reply.protocols.zwlr_layer_shell_v1 === true
+            && reply.protocols.zwlr_virtual_pointer_manager_v1 === true;
+        originProtocolsAvailable = advertised;
+        originOutputCount = Array.isArray(reply.outputs)
+            ? Math.min(16, reply.outputs.length) : 0;
+        originProbeStatus = "inventory_only";
+        originProbeMessage = "WAYLAND PROTOCOLS " + (advertised ? "ADVERTISED" : "UNVERIFIED")
+            + " // OUTPUTS " + originOutputCount
+            + " // CURSOR POSITION STILL UNVERIFIED";
+    }
+    function acceptStop(raw) {
+        stopReturned = true;
+        let reply;
+        try { reply = JSON.parse(String(raw)); }
+        catch (_) {
+            stopFeedback = "STOP RESPONSE INVALID // PROCESS NOT VERIFIED";
+            return;
+        }
+        if (reply && reply.status === "stop_acknowledged"
+                && reply.runtime_stopped === false) {
+            stopFeedback = "STOP REQUEST ACKNOWLEDGED // EXIT NOT YET VERIFIED";
+        } else {
+            stopFeedback = "NO CONFIRMED ACTIVE EXPERIMENT // "
+                + String(reply && reply.code || "STOP_UNAVAILABLE");
+        }
+    }
     function findDevice(identifier) {
         for (let i=0;i<devices.length;i++)
             if (devices[i].identifier === identifier) return devices[i];
@@ -199,6 +276,32 @@ Scope {
             }
             settings.inspectRunning = false;
             settings.executing = "";
+        }
+    }
+    Process {
+        id: originProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: settings.acceptOrigin(this.text)
+        }
+        onExited: function(code, exitStatus) {
+            settings.originProbeBusy = false;
+            if (code !== 0 || !settings.originProbeReturned) {
+                settings.originProbeStatus = "unavailable";
+                settings.originProbeMessage = "CAPABILITY PROBE DID NOT VERIFY";
+            }
+        }
+    }
+    Process {
+        id: stopProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: settings.acceptStop(this.text)
+        }
+        onExited: function(code, exitStatus) {
+            settings.stopBusy = false;
+            if (code !== 0 || !settings.stopReturned)
+                settings.stopFeedback = "STOP NOT ACKNOWLEDGED // CHECK PROCESS";
         }
     }
 }

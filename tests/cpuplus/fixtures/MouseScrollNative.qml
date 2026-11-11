@@ -131,6 +131,25 @@ ShellRoot {
                     // The no-origin fail-closed case must still remain hidden.
                     console.log("AUTOSCROLL_OVERLAY_NATIVE_PASS // NO_ORIGIN_FAIL_CLOSED");
                 }
+                ScrollModeSettings.acceptOrigin(JSON.stringify({
+                    status: "inventory_only", pointer_origin_verified: false,
+                    runtime_enabled: false,
+                    protocols: {zwlr_layer_shell_v1: true,
+                        zwlr_virtual_pointer_manager_v1: true},
+                    outputs: [{name:"TEST-OUTPUT"}]
+                }));
+                if (ScrollModeSettings.originProbeStatus !== "inventory_only"
+                        || !ScrollModeSettings.originProtocolsAvailable
+                        || ScrollModeSettings.autoscrollRuntimeAvailable) {
+                    root.fail("UNSAFE_AUTOSCROLL_CAPABILITY_RESULT");return;
+                }
+                ScrollModeSettings.acceptStop(JSON.stringify({
+                    status:"stop_acknowledged", runtime_stopped:false
+                }));
+                if (!ScrollModeSettings.stopFeedback.includes("EXIT NOT YET VERIFIED")) {
+                    root.fail("MISLEADING_STOP_ACK");return;
+                }
+                console.log("AUTOSCROLL_CAPABILITY_NATIVE_PASS // PROBE_ONLY_STOP_NOT_EXIT");
                 root.done = true;
                 return;
             }

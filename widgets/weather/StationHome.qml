@@ -25,6 +25,13 @@ Rectangle {
         subjectRoute === "weather/overview"
     readonly property bool overviewRequiresScroll:
         fixedWeatherOverview && officialAlertSummary.available
+    // W18 // Keep metric cards compact as the viewport grows. The saved
+    // height belongs to the weather artwork, forecast and their real bars.
+    readonly property real overviewCardRowHeight: Math.max(1, Math.min(
+        88, Math.floor(homeScroll.height * 0.18),
+        Math.floor(Math.max(0, homeScroll.height - 164) / 2)))
+    readonly property real overviewInstrumentHeight: Math.max(
+        0, homeScroll.height - 2 * overviewCardRowHeight)
     readonly property alias overviewViewportItem: homeScroll
     readonly property alias overviewContentItem: homeContent
     readonly property alias overviewSummaryItem: weatherOverviewSummary
@@ -1030,7 +1037,7 @@ Rectangle {
             objectName: "weather-w8-overview-terminal-summary"
             visible: home.subjectRoute === "weather/overview"
             width: parent.width
-            height: visible ? 164 : 0
+            height: visible ? home.overviewInstrumentHeight : 0
             compact: true
             weatherService: home.weatherService
             runtimeNowMs: home.runtimeNowMs
@@ -1221,9 +1228,7 @@ Rectangle {
             visible: home.sectionVisible("snapshot")
             width: parent.width
             height: home.fixedWeatherOverview
-                    ? Math.max(1,Math.floor(
-                        (homeScroll.height-weatherOverviewSummary.height)/2))
-                    : 118
+                    ? home.overviewCardRowHeight : 118
             spacing: home.fixedWeatherOverview ? 4 : 12
 
             StationHomeMetricCard {
@@ -1660,10 +1665,7 @@ Rectangle {
             visible: home.sectionVisible("relevant")
             width: parent.width
             height: home.fixedWeatherOverview
-                    ? Math.max(1,homeScroll.height
-                              -weatherOverviewSummary.height
-                              -weatherSnapshotRow.height)
-                    : 118
+                    ? home.overviewCardRowHeight : 118
             spacing: home.fixedWeatherOverview ? 4 : 12
 
             Repeater {

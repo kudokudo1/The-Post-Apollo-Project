@@ -9,6 +9,8 @@ Rectangle {
     id: panel
     objectName: "weather-w10-three-band-terminal"
     property var sky: null
+    readonly property alias headingItem: terminalHeading
+    readonly property alias headingTitle: terminalTitle
     readonly property alias currentItem: currentBand
     readonly property alias hourlyItem: hourlyBand
     readonly property alias dailyItem: dailyBand
@@ -74,6 +76,7 @@ Rectangle {
             height: 14
 
             GohuText {
+                id: terminalTitle
                 anchors.centerIn: parent
                 width: Math.max(1,parent.width-170)
                 height: parent.height
@@ -101,6 +104,8 @@ Rectangle {
         Rectangle {
             id: currentBand
             readonly property alias conditionIconItem: conditionArt
+            readonly property alias conditionReadoutStack: conditionStack
+            readonly property alias conditionCaptionItem: conditionCaption
             readonly property alias temperatureMeterItem: temperatureBar
             readonly property alias metricCards: currentMetricRepeater
             objectName: "weather-w10-current-air-band"
@@ -191,6 +196,7 @@ Rectangle {
                             }
                         }
                         QuietText {
+                            id: conditionCaption
                             width: parent.width
                             height: 10
                             text: panel.currentReady
@@ -235,6 +241,7 @@ Rectangle {
                         readonly property alias directionArrow: windArrow
                         readonly property alias dataMeter: metricMeter
                         readonly property alias readoutStack: metricStack
+                        readonly property alias captionItem: metricCaption
                         width: Math.max(1,(currentMetrics.width-12)*0.1725)
                         height: currentMetrics.height
                         readonly property bool hasMeter: modelData.key!=="pressure"
@@ -306,6 +313,7 @@ Rectangle {
                                 }
                             }
                             QuietText {
+                                id: metricCaption
                                 width: parent.width
                                 height: 10
                                 horizontalAlignment: Text.AlignHCenter
@@ -398,6 +406,9 @@ Rectangle {
                         id: hourCell
                         required property int index
                         readonly property alias mainGlyph: hourlyWeatherGlyph
+                        readonly property alias timeItem: hourTime
+                        readonly property alias artworkItem: hourArtwork
+                        readonly property alias rainCaptionItem: hourlyRainReading
                         readonly property alias rainMeter: hourlyRainMeter
                         readonly property var entry: panel.hourlyRows[index] || ({})
                         readonly property var weatherState: panel.state(entry)

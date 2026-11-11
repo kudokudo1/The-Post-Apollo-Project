@@ -331,12 +331,12 @@ PY
 # retain exact PASS markers for authoritative host-side stage checks.
 while IFS= read -r line; do
   case "$line" in
-    C4B_ID_PASS\ //*) echo "$line" ;;
-    *) printf 'C4B_ID_SERVICE_PROBE_DETAIL // %.500s\n' "$line" ;;
+    C4B_ID_PASS\ //*) echo "$line" >/dev/ttyS0 ;;
+    *) printf 'C4B_ID_SERVICE_PROBE_DETAIL // %.500s\n' "$line" >/dev/ttyS0 ;;
   esac
 done < <(sed -n '1,28p' "$probe_log")
 [[ "$probe_rc" == 0 ]] || {
-  echo "C4B_ID_SERVICE_PROBE_RC // $probe_rc"
+  echo "C4B_ID_SERVICE_PROBE_RC // $probe_rc" >/dev/ttyS0
   fail "KERNEL_OR_SIGNED_RECEIPT_CONTINUITY_REFUSED"
 }
 if [[ -e "$runtime/identity-display-v0.sock" ]]; then
@@ -383,7 +383,7 @@ sed -n '1,30p' "$negative_log" |
 [[ "$negative_rc" == 0 ]] &&
   grep -Fq 'C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE' "$negative_log" ||
   fail "REAL_ENFORCING_SELINUX_NETWORK_DENIAL_NOT_PROVEN"
-echo "C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE"
+echo "C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE" >/dev/ttyS0
 systemctl reset-failed "$negative_unit.service" >/dev/null 2>&1 || true
 rm -f -- "$denial"
 
@@ -405,6 +405,6 @@ if semodule -l | grep -Eq '^postapollo_identity_ci([[:space:]]|$)'; then
 fi
 [[ "$(getenforce)" == Enforcing ]] ||
   fail "SELINUX_ENFORCING_LOST_DURING_TEARDOWN"
-echo "C4B_ID_PASS // DEDICATED_SELINUX_MODULE_REMOVED_AFTER_SERVICE_STOP"
-echo "C4B_ID_PASS // REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP"
-echo "C4B_ID_LIMITATION // NO_PRODUCTION_RELEASE_ENROLLMENT_OR_C5_OPERATOR_CONSENT"
+echo "C4B_ID_PASS // DEDICATED_SELINUX_MODULE_REMOVED_AFTER_SERVICE_STOP" >/dev/ttyS0
+echo "C4B_ID_PASS // REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP" >/dev/ttyS0
+echo "C4B_ID_LIMITATION // NO_PRODUCTION_RELEASE_ENROLLMENT_OR_C5_OPERATOR_CONSENT" >/dev/ttyS0

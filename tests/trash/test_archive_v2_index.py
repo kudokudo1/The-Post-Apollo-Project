@@ -36,6 +36,7 @@ class ArchiveV2IndexTests(unittest.TestCase):
         self.assertEqual(result["state"], "NOT_INSTALLED")
         self.assertEqual(result["items"], [])
         self.assertEqual(result["total"], 0)
+        self.assertIsNone(result["capacity"])
         self.assertEqual(set(self.root.iterdir()), before)
 
     def test_pages_are_bounded_and_metadata_only(self):

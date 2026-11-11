@@ -133,6 +133,8 @@ timeout --signal=TERM --kill-after=15s 480s \
   rpm-ostree install --cache-only \
     /var/lib/postapollo-id-ci-assets/identity-silverblue-ci.rpm \
     /var/lib/postapollo-id-ci-assets/identity-python3-cryptography-f44.rpm \
+    /var/lib/postapollo-id-ci-assets/identity-python3-cffi-f44.rpm \
+    /var/lib/postapollo-id-ci-assets/identity-python3-pycparser-f44.rpm \
   >/var/tmp/id-ci-install.log 2>&1
 printf '%s\n' "$?" >/run/id-ci-worker-result
 ID_WORKER
@@ -157,9 +159,11 @@ pending=bool(head.get("staged") or head.get("pending")) or head.get("booted") is
 refs=head.get("requested-local-packages") or []
 expected=r"^(?:sha256:[0-9a-fA-F]{64}:)?"+re.escape(sys.argv[2])+r"-0\.1-1\.fc44\.noarch$"
 vendor=r"^(?:sha256:[0-9a-fA-F]{64}:)?python3-cryptography-50\.0\.0-1\.fc44\.x86_64$"
+cffi=r"^(?:sha256:[0-9a-fA-F]{64}:)?python3-cffi-2\.0\.0-3\.fc44\.x86_64$"
+pycparser=r"^(?:sha256:[0-9a-fA-F]{64}:)?python3-pycparser-2\.22-8\.fc44\.noarch$"
 if not pending or not isinstance(refs,list) or not all(
         any(isinstance(v,str) and re.fullmatch(pattern,v) for v in refs)
-        for pattern in (expected,vendor)):
+        for pattern in (expected,vendor,cffi,pycparser)):
     sys.exit(1)
 print("C4B_ID_PENDING_EXACT_IDENTITY_DEPLOYMENT")
 ID_PENDING
@@ -204,18 +208,25 @@ ID_MONITOR
   layer_pending)
     [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}' "$pkg")" == "$pkg 0.1 noarch" ]] ||
       fail "LAYER_NOT_IN_BOOTED_RPMDB"
-    [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' python3-cryptography)" == \
-       'python3-cryptography 50.0.0 1.fc44 x86_64' ]] ||
-      fail "FEDORA_SIGNED_RUNTIME_NOT_IN_BOOTED_RPMDB"
-    vendor_verify=/var/tmp/id-ci-crypto-rpm-verify.log
-    vendor_rc=0
-    timeout --signal=TERM --kill-after=3s 35s rpm -V --nomtime python3-cryptography >"$vendor_verify" 2>&1 ||
-      vendor_rc="$?"
-    if [[ "$vendor_rc" != 0 || -s "$vendor_verify" ]]; then
-      sed -n '1,24p' "$vendor_verify" |
-        sed 's/^/C4B_ID_VENDOR_VERIFY_DETAIL \/\/ /' >/dev/ttyS0 || true
-      fail "SIGNED_FEDORA_RUNTIME_BOOTED_FILE_INTEGRITY_REFUSED"
-    fi
+    for vendor_spec in \
+      'python3-cryptography|50.0.0|1.fc44|x86_64' \
+      'python3-cffi|2.0.0|3.fc44|x86_64' \
+      'python3-pycparser|2.22|8.fc44|noarch'; do
+      IFS='|' read -r name version release arch <<< "$vendor_spec"
+      [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$name")" == \
+         "$name $version $release $arch" ]] ||
+        fail "FEDORA_SIGNED_RUNTIME_NOT_IN_BOOTED_RPMDB"
+      vendor_verify="/var/tmp/id-ci-$name-rpm-verify.log"
+      vendor_rc=0
+      timeout --signal=TERM --kill-after=3s 35s rpm -V --nomtime "$name" >"$vendor_verify" 2>&1 ||
+        vendor_rc="$?"
+      if [[ "$vendor_rc" != 0 || -s "$vendor_verify" ]]; then
+        printf 'C4B_ID_VENDOR_VERIFY_RC // %s=%s\n' "$name" "$vendor_rc" >/dev/ttyS0
+        sed -n '1,24p' "$vendor_verify" |
+          sed 's/^/C4B_ID_VENDOR_VERIFY_DETAIL \/\/ /' >/dev/ttyS0 || true
+        fail "SIGNED_FEDORA_RUNTIME_BOOTED_FILE_INTEGRITY_REFUSED"
+      fi
+    done
     /usr/bin/python3 -I -B -c 'from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey' ||
       fail "FEDORA_SIGNED_RUNTIME_ED25519_IMPORT_REFUSED"
     echo "C4B_ID_PASS // OFFLINE_SIGNED_FEDORA_ED25519_RUNTIME_BOOTED_AND_VERIFIED"
@@ -309,9 +320,11 @@ ID_MONITOR
     rpm-ostree rollback --reboot || fail "REAL_IDENTITY_ROLLBACK_COMMAND_FAILED"
     ;;
   rollback_pending)
-    if rpm -q python3-cryptography >/dev/null 2>&1; then
-      fail "FEDORA_ED25519_TEST_RUNTIME_REMAINS_AFTER_ROLLBACK"
-    fi
+    for vendorpkg in python3-cryptography python3-cffi python3-pycparser; do
+      if rpm -q "$vendorpkg" >/dev/null 2>&1; then
+        fail "FEDORA_ED25519_TEST_RUNTIME_REMAINS_AFTER_ROLLBACK"
+      fi
+    done
     if rpm -q "$pkg" >/dev/null 2>&1; then
       fail "IDENTITY_RPM_REMAINS_AFTER_ROLLBACK"
     fi

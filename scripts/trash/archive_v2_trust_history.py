@@ -159,10 +159,26 @@ class TestOwnerTrustHistory:
                         source_captured_ms INTEGER NOT NULL,
                         payload_sha256 TEXT NOT NULL,
                         payload BLOB NOT NULL,
+                        peer_witness_sha256 TEXT NOT NULL DEFAULT '',
+                        request_binding_sha256 TEXT NOT NULL DEFAULT '',
+                        CHECK((peer_witness_sha256='' AND request_binding_sha256='')
+                           OR (length(peer_witness_sha256)=64
+                           AND length(request_binding_sha256)=64)),
                         UNIQUE(owner_id,key_id,nonce),
                         FOREIGN KEY(owner_id,key_id,nonce)
                             REFERENCES consumed(owner_id,key_id,nonce)
                     )""")
+                    # V2m test databases may already exist in a worker's
+                    # private fixture root. Preserve old rows without
+                    # claiming that they had any V2n kernel binding.
+                    columns = {item[1] for item in
+                               db.execute("PRAGMA table_info(test_copies)")}
+                    if "peer_witness_sha256" not in columns:
+                        db.execute("""ALTER TABLE test_copies ADD COLUMN
+                            peer_witness_sha256 TEXT NOT NULL DEFAULT ''""")
+                    if "request_binding_sha256" not in columns:
+                        db.execute("""ALTER TABLE test_copies ADD COLUMN
+                            request_binding_sha256 TEXT NOT NULL DEFAULT ''""")
             except sqlite3.DatabaseError as exc:
                 raise TrustHistoryError("SOURCE_TRUST_INIT_FAILED") from exc
 
@@ -292,7 +308,8 @@ class TestOwnerTrustHistory:
 
     def admit_test_copy(self, authority, proof, payload, *,
                         resource_id, source_revision, source_captured_ms,
-                        payload_sha256, on_stage=None):
+                        payload_sha256, on_stage=None,
+                        peer_witness_sha256="", request_binding_sha256=""):
         """Atomically consume a fixture nonce and insert a synthetic copy.
 
         on_stage supports injected exception and abrupt-process-exit tests.
@@ -329,6 +346,13 @@ class TestOwnerTrustHistory:
                "TEST_COPY_SOURCE_INVALID")
         _check(on_stage is None or callable(on_stage),
                "TEST_CRASH_HOOK_INVALID")
+        _check(type(peer_witness_sha256) is str
+               and type(request_binding_sha256) is str
+               and ((peer_witness_sha256 == ""
+                     and request_binding_sha256 == "")
+                    or (SHA.fullmatch(peer_witness_sha256)
+                        and SHA.fullmatch(request_binding_sha256))),
+               "TEST_PEER_BINDING_INVALID")
         sid = uuid4().hex
         with closing(self._connect()) as db:
             try:
@@ -353,11 +377,13 @@ class TestOwnerTrustHistory:
                 db.execute("""INSERT INTO test_copies
                     (snapshot_id,owner_id,key_id,nonce,proof_sha256,
                      authority_sha256,resource_id,source_revision,
-                     source_captured_ms,payload_sha256,payload)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                     source_captured_ms,payload_sha256,payload,
+                     peer_witness_sha256,request_binding_sha256)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (sid,owner,key,nonce,digest,authority["manifestSha256"],
                      resource_id,source_revision,source_captured_ms,
-                     payload_sha256,payload))
+                     payload_sha256,payload,
+                     peer_witness_sha256,request_binding_sha256))
                 if on_stage is not None:
                     on_stage("after_copy")
                 db.commit()
@@ -380,6 +406,8 @@ class TestOwnerTrustHistory:
                 "payloadSha256": payload_sha256,
                 "proofSha256": digest, "nonce": nonce,
                 "authoritySha256": authority["manifestSha256"],
+                "peerWitnessSha256": peer_witness_sha256,
+                "requestBindingSha256": request_binding_sha256,
                 "captureAllowed": False, "productionAllowed": False,
                 "restoreAllowed": False, "burnAllowed": False}
 
@@ -392,7 +420,8 @@ class TestOwnerTrustHistory:
         with closing(self._connect_readonly()) as db:
             row = db.execute("""SELECT c.proof_sha256,c.authority_sha256,
                 s.snapshot_id,s.proof_sha256,s.authority_sha256,
-                s.payload_sha256,s.resource_id,s.source_revision,s.payload
+                s.payload_sha256,s.resource_id,s.source_revision,s.payload,
+                s.peer_witness_sha256,s.request_binding_sha256
                 FROM consumed c LEFT JOIN test_copies s
                   ON s.owner_id=c.owner_id AND s.key_id=c.key_id
                   AND s.nonce=c.nonce
@@ -409,7 +438,10 @@ class TestOwnerTrustHistory:
                and type(row[2]) is str and len(row[2]) == 32
                and type(row[5]) is str and SHA.fullmatch(row[5])
                and type(row[8]) is bytes
-               and hashlib.sha256(row[8]).hexdigest() == row[5],
+               and hashlib.sha256(row[8]).hexdigest() == row[5]
+               and type(row[9]) is str and type(row[10]) is str
+               and ((row[9] == "" and row[10] == "")
+                    or (SHA.fullmatch(row[9]) and SHA.fullmatch(row[10]))),
                "TEST_ADMISSION_INTEGRITY_INVALID")
         return {"state":"TEST_COPY_COMMITTED",
                 "snapshotId":row[2], "ownerId":owner,
@@ -417,6 +449,8 @@ class TestOwnerTrustHistory:
                 "proofSha256":row[0], "authoritySha256":row[1],
                 "payloadSha256":row[5],
                 "payloadIntegrityVerified":True,
+                "peerWitnessSha256":row[9],
+                "requestBindingSha256":row[10],
                 "productionAllowed":False}
 
     def test_copy_status(self, owner):

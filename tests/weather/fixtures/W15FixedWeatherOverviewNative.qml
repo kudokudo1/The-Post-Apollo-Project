@@ -113,6 +113,46 @@ ShellRoot {
             return "TALL_WEATHER_INSTRUMENT_STILL_TINY";
         if(summary.glyph(95,"Thunderstorm")!=="⚡︎")
             return "THUNDERBOLT_CODEPOINT_WRONG";
+        // W19 // Rain meters are a data reading between temperature
+        // and percentage, for every hourly AND daily forecast item.
+        const instrument=summary.compactInstrument;
+        function barBetween(item,label) {
+            if(!item || !item.rainMeter || !item.temperatureItem || !item.chanceItem)
+                return label+"_REQUIRED_ITEMS_MISSING";
+            const tempBottom=item.temperatureItem.mapToItem(
+                item,0,item.temperatureItem.height).y;
+            const meterTop=item.rainMeter.mapToItem(item,0,0).y;
+            const meterBottom=item.rainMeter.mapToItem(
+                item,0,item.rainMeter.height).y;
+            const chanceTop=item.chanceItem.mapToItem(item,0,0).y;
+            if(item.rainMeter.height<5 || tempBottom>meterTop+1
+               || meterBottom>chanceTop+1)
+                return label+"_RAIN_METER_ORDER "+tempBottom+"/"
+                    +meterTop+"/"+meterBottom+"/"+chanceTop;
+            return "";
+        }
+        for(let i=0;i<6;i++) {
+            const problem=barBetween(instrument.hourRepeater.itemAt(i),
+                                     "HOUR_"+i);
+            if(problem!=="")return problem;
+        }
+        for(let i=0;i<3;i++) {
+            const problem=barBetween(instrument.dayRepeater.itemAt(i),
+                                     "DAY_"+i);
+            if(problem!=="")return problem;
+        }
+        if(window.height>=500) {
+            if(instrument.mainGlyph.width<95)
+                return "NOW_HERO_ARTWORK_NOT_ENLARGED";
+            for(let i=0;i<3;i++) {
+                const metric=instrument.currentMeters.itemAt(i);
+                const valueBottom=metric.readoutRow.mapToItem(
+                    metric,0,metric.readoutRow.height).y;
+                if(metric.meter.height<6 || metric.meter.y<valueBottom-1
+                   || metric.height-metric.meter.y-metric.meter.height<5)
+                    return "TOP_METERS_NOT_CENTERED_"+i;
+            }
+        }
         for(const group of [snap,autoCards]) {
             for(let i=0;i<group.children.length;i++) {
                 const c=group.children[i];

@@ -212,6 +212,11 @@ def verify_fixture_checkpoint(signed, pinned_checkpoint_root, *,
           and type(pinned_checkpoint_root["publicKeyBytes"]) is bytes
           and len(pinned_checkpoint_root["publicKeyBytes"]) == 32,
           "CHECKPOINT_ROOT_MISMATCH")
+    _need(type(release_root) is dict
+          and type(release_root.get("publicKeyBytes")) is bytes
+          and pinned_checkpoint_root["publicKeyBytes"]
+              != release_root["publicKeyBytes"],
+          "CHECKPOINT_ROOT_NOT_DISTINCT")
     _need(_ms(now_ms) and cp["validFromMs"] <= now_ms < cp["validUntilMs"]
           and cp["issuedAtMs"] <= now_ms + 30000,
           "CHECKPOINT_EXPIRED")

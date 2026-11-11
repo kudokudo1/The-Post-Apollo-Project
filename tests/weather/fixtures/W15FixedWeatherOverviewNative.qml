@@ -13,6 +13,7 @@ ShellRoot {
     property bool finished: false
     property bool capturedCompact: false
     property bool capturedWide: false
+    property bool capturedTall: false
     function fail(message) {
         if(finished)return;
         finished=true;
@@ -86,7 +87,7 @@ ShellRoot {
         if(scroll.interactive || scroll.contentHeight>scroll.height+1
            || Math.abs(scroll.contentY)>1)
             return "STILL_PANNING";
-        if(summary.height!==164 || !summary.compactInstrument ||
+        if(summary.height<164 || !summary.compactInstrument ||
            summary.compactInstrument.currentMeters.count!==4 ||
            summary.compactInstrument.hourRepeater.count!==6 ||
            summary.compactInstrument.dayRepeater.count!==3)
@@ -100,8 +101,16 @@ ShellRoot {
         if(content.implicitHeight>scroll.height+1)
             return "ONE_PAGE_CLIPPED "+content.implicitHeight
                 +" > "+scroll.height;
-        if(snap.height<55 || autoCards.height<55)
+        if(snap.height<48 || autoCards.height<48)
             return "CARDS_TOO_SMALL "+snap.height+"/"+autoCards.height;
+        if(snap.height>88 || autoCards.height>88)
+            return "OVERSIZED_EMPTY_CARDS "+snap.height+"/"+autoCards.height;
+        if(Math.abs(summary.height+snap.height+autoCards.height-scroll.height)>2)
+            return "OVERVIEW_HEIGHT_BUDGET_LOST";
+        if(window.height>=500 && (summary.height<300 ||
+           summary.compactInstrument.mainGlyph.width<80 ||
+           summary.compactInstrument.hourlyStrip.height<85))
+            return "TALL_WEATHER_INSTRUMENT_STILL_TINY";
         if(summary.glyph(95,"Thunderstorm")!=="⚡︎")
             return "THUNDERBOLT_CODEPOINT_WRONG";
         for(const group of [snap,autoCards]) {
@@ -152,8 +161,24 @@ ShellRoot {
                     },Qt.size(1040,600));
                     return;
                 }
+                window.height=500;
+                root.phase=2;
+                return;
+            }
+            if(root.phase===2) {
+                if(window.height!==500 || overview.overviewSnapshotItem.width<500)
+                    return root.fail("TALL_VIEW_NOT_RESIZED");
+                if(!root.capturedTall) {
+                    root.capturedTall=true;
+                    window.contentItem.grabToImage(function(image) {
+                        if(image && image.saveToFile("/tmp/weather-w18-overview-tall.png"))
+                            console.log("W18_OVERVIEW_TALL_CAPTURED");
+                    },Qt.size(1040,1000));
+                    return;
+                }
                 root.finished=true;
                 console.log("W16_OVERVIEW_NATIVE_PASS // BOTH_CARD_GROUPS_NO_PAN_440_520");
+                console.log("W18_OVERVIEW_NATIVE_PASS // TALL_VIEW_NO_EMPTY_PANELS");
                 Qt.quit();
             }
         }

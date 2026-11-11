@@ -41,7 +41,7 @@ test("W21 shares full-width C44 cyan-divider navigation across WEATHER and MAGIC
 test("W21 transfers full Weather NOW space to six forecast readings without replacing glyphs",()=>{
   assert.match(full,/Math.round\(budget\*0.48\)/);
   assert.match(full,/Math.round\(budget\*0.42\)/);
-  assert.match(full,/mainWeatherIcon.width \* 1.38/);
+  assert.match(full,/currentPanel.height \* 1.33/);
   assert.match(full,/scale: 1.35/);
   assert.match(full,/terminal.sky.conditionState.icon/);
   assert.match(full,/id: hourInstrumentStack/);
@@ -73,6 +73,8 @@ test("W21 makes Overview NOW art bigger, three-day art smaller, leaves lower dat
   assert.match(overview,/Math.min\(122,47 \+ panel.expansion \* 0.39,/);
   assert.match(overview,/Math.min\(171,currentIcon.width \* 1.42\)/);
   assert.match(overview,/scale: 1.32/);
+  assert.match(overview,/width: parent.width\*0.49-6/);
+  assert.match(overview,/anchors.rightMargin: 12/);
   assert.match(overview,/Math.min\(35,20 \+ \(dayStrip.height - 24\) \* 0.54\)/);
   assert.match(overview,/Math.min\(40,22 \+ panel.expansion \* 0.11\)/);
   assert.match(overview,/["']⚡︎["']/);

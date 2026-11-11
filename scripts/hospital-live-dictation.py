@@ -150,6 +150,9 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
     recorder = None
     model_lock = threading.Lock()
     active_model = None
+    first_model_started = False
+    first_model_ended = False
+    first_text_ready = False
 
     def halt_model():
         with model_lock:
@@ -172,17 +175,23 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
             threading.Timer(1.0, force_stop).start()
 
     def model_started(process):
-        nonlocal active_model
+        nonlocal active_model, first_model_started
         with model_lock:
             active_model = process
+        if not first_model_started:
+            first_model_started = True
+            send("stage", detail="FIRST_MODEL_STARTED")
         if cancelled.is_set():
             halt_model()
 
     def model_ended(process):
-        nonlocal active_model
+        nonlocal active_model, first_model_ended
         with model_lock:
             if active_model is process:
                 active_model = None
+        if not first_model_ended:
+            first_model_ended = True
+            send("stage", detail="FIRST_MODEL_ENDED")
 
     def send(kind, text="", detail=""):
         if cancelled.is_set():
@@ -214,6 +223,9 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
     except OSError:
         send("error", detail="PIPEWIRE RECORDING UNAVAILABLE")
         return 3
+    # Stage-only receipts, never audio, transcript contents, device names or
+    # process identifiers. QML publishes at most a handful per recording.
+    send("stage", detail="RECORDER_STARTED")
 
     def read_commands():
         try:
@@ -243,16 +255,21 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
         first_target = RATE * FRAME_BYTES * max(
             1000, min(1000 * max(2, min(4, chunk_seconds)), first_chunk_ms)) // 1000
         first_chunk_sent = False
+        first_chunk_reported = False
         limit = RATE * FRAME_BYTES * MAX_SECONDS
         heard_speech = False
         speech_ms = 0
         quiet_ms = 0
 
         def enqueue(raw):
+            nonlocal first_chunk_reported
             if not raw or not is_speech(raw) or stopping_error.is_set():
                 return False
             try:
                 clips.put(raw, timeout=0.1)
+                if not first_chunk_reported:
+                    first_chunk_reported = True
+                    send("stage", detail="FIRST_AUDIO_QUEUED")
                 return True
             except queue.Full:
                 stopping_error.set()
@@ -315,6 +332,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                     continue
 
     def recognize():
+        nonlocal first_text_ready
         while not cancelled.is_set():
             try:
                 chunk = clips.get(timeout=0.2)
@@ -328,16 +346,25 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 phrase = transcribe_chunk(stt_helper, chunk,
                                           on_start=model_started,
                                           on_end=model_ended)
-            except (RuntimeError, OSError, subprocess.TimeoutExpired):
+            except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:
+                # Distinguish slow/stalled inference from other model failures
+                # without exposing stderr, audio, identifiers or recognized text.
+                send("stage", detail=(
+                    "MODEL_TIMEOUT" if isinstance(error, subprocess.TimeoutExpired)
+                    else "MODEL_FAILURE"))
                 stopping_error.set()
                 send("error", detail="LOCAL WHISPER CHUNK FAILED")
                 stopping.set()
                 halt_child()
                 break
             if phrase:
+                if not first_text_ready:
+                    first_text_ready = True
+                    send("stage", detail="FIRST_TEXT_READY")
                 send("partial", text=phrase)
         recognition_done.set()
         if not cancelled.is_set() and not stopping_error.is_set():
+            send("stage", detail="RECORDING_COMPLETED")
             send("done")
 
     command_thread = threading.Thread(target=read_commands, daemon=True)

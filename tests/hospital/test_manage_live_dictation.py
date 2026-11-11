@@ -29,6 +29,25 @@ def pcm(value, seconds=1):
     return wave.tobytes()
 
 
+def next_json_packet(process, selector, pending: bytearray, *, timeout: float):
+    """Read multiple JSON lines from a pipe without TextIO read-ahead races.
+
+    Extra stage receipts can arrive in the same kernel read as a transcript.
+    Selecting on the file descriptor before every TextIO.readline() would
+    hide already buffered complete lines and produce false timeouts.
+    """
+    while b"\n" not in pending:
+        if not selector.select(timeout=timeout):
+            return None
+        part = os.read(process.stdout.fileno(), 65536)
+        if not part:
+            return None
+        pending.extend(part)
+    raw, _, remaining = pending.partition(b"\n")
+    pending[:] = remaining
+    return json.loads(raw.decode("utf-8"))
+
+
 class LiveDictationTests(unittest.TestCase):
     def test_no_audio_no_model_inference(self):
         self.assertFalse(live.is_speech(pcm(0, 5)))
@@ -181,11 +200,18 @@ class LiveDictationTests(unittest.TestCase):
             try:
                 selector.register(process.stdout, selectors.EVENT_READ)
                 partial = None
+                stage_codes = []
+                pending = bytearray()
                 deadline = time.monotonic() + 8
                 while time.monotonic() < deadline:
-                    if not selector.select(timeout=0.5):
+                    event = next_json_packet(process, selector, pending, timeout=0.5)
+                    if event is None:
                         continue
-                    event = json.loads(process.stdout.readline())
+                    if event["kind"] == "stage":
+                        self.assertEqual(event["text"], "")
+                        self.assertRegex(event["detail"], r"^[A-Z_]+$")
+                        stage_codes.append(event["detail"])
+                        continue
                     if event["kind"] == "partial":
                         partial = event["text"]
                         self.assertIsNone(process.poll(), "Mic must remain open")
@@ -193,6 +219,11 @@ class LiveDictationTests(unittest.TestCase):
                     if event["kind"] == "error":
                         self.fail(str(event))
                 self.assertEqual(partial, "First words while listening.")
+                self.assertTrue({
+                    "RECORDER_STARTED", "FIRST_AUDIO_QUEUED",
+                    "FIRST_MODEL_STARTED", "FIRST_MODEL_ENDED",
+                    "FIRST_TEXT_READY",
+                }.issubset(set(stage_codes)), stage_codes)
                 process.stdin.write("STOP\n")
                 process.stdin.flush()
                 process.stdin.close()
@@ -240,11 +271,12 @@ class LiveDictationTests(unittest.TestCase):
                 selector = selectors.DefaultSelector()
                 selector.register(process.stdout, selectors.EVENT_READ)
                 first = None
+                pending = bytearray()
                 deadline = time.monotonic() + 7
                 while time.monotonic() < deadline:
-                    if not selector.select(timeout=0.4):
+                    data = next_json_packet(process, selector, pending, timeout=0.4)
+                    if data is None:
                         continue
-                    data = json.loads(process.stdout.readline())
                     if data["kind"] == "partial":
                         first = data["text"]
                         break
@@ -257,7 +289,9 @@ class LiveDictationTests(unittest.TestCase):
                 process.stdin.close()
                 process.wait(timeout=8)
                 remaining = [
-                    json.loads(line) for line in process.stdout.read().splitlines()
+                    json.loads(line)
+                    for line in (pending.decode("utf-8")
+                                 + process.stdout.read()).splitlines()
                 ]
                 second = [row["text"] for row in remaining
                           if row["kind"] == "partial"]

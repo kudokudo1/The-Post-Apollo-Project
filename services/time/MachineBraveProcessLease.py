@@ -47,6 +47,8 @@ class Identity:
     start_ticks: int
     exe_device: int
     exe_inode: int
+    uid_fields: tuple[int, int, int, int]
+    gid_fields: tuple[int, int, int, int]
 
 
 def _pidfd_alive(fd: int) -> bool:
@@ -115,8 +117,11 @@ def _identity(pid: int, uid: int, gid: int) -> Identity:
             if len(numbers) != 4 or any(x < 0 for x in numbers):
                 refuse()
             found[key] = numbers
-    if (found.get(b"Uid:") != (uid,) * 4 or
-            found.get(b"Gid:") != (gid,) * 4):
+    # SO_PEERCRED represents effective credentials; the other three
+    # /proc slots may legitimately differ. Pin all four to detect changes.
+    uids = found.get(b"Uid:")
+    gids = found.get(b"Gid:")
+    if uids is None or gids is None or uids[1] != uid or gids[1] != gid:
         refuse()
     try:
         exe = os.stat(folder / "exe")
@@ -124,7 +129,7 @@ def _identity(pid: int, uid: int, gid: int) -> Identity:
         refuse()
     if not stat.S_ISREG(exe.st_mode) or exe.st_dev <= 0 or exe.st_ino <= 0:
         refuse()
-    return Identity(pid, uid, gid, ticks, exe.st_dev, exe.st_ino)
+    return Identity(pid, uid, gid, ticks, exe.st_dev, exe.st_ino, uids, gids)
 
 
 class ProcessLease:

@@ -209,7 +209,8 @@ def unsupported_and_parser_checks():
     assert "os.pidfd_open(" not in lifecycle_src.split("from __future__",1)[1]
     assert "SO_PEERPIDFD" in lifecycle_src
     assert "lifecycle.capture_socket_peer(" in handler
-    assert handler.count("lease.valid()")>=2
+    assert handler.count("guard.valid()")>=2
+    assert "cancellation.begin(connection, lease)" in handler
     assert "metadata_from_protected_root(" not in handler
     assert "test_only_grant" not in handler
     assert "return False" in handler

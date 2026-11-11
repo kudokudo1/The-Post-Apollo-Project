@@ -30,7 +30,7 @@ test("E2 bottom tabs separate one overview, one map, WATER, GROUND and final SER
    ["ground","earth/ground/full"],
    ["services","earth/services/health"]]);
  assert.deepEqual(plain(workspace.GROUPS.weather.map(x=>x.key)),[
-   "overview","conditions","forecasts","hazards","history"]);
+   "overview","conditions","forecasts","hazards","history","services"]);
  for(const x of workspace.GROUPS.earth)
    assert.equal(tree.findRoute(x.path).subject,"earth");
  for(const name of ["geology","geography","events","fires","maps","investigations"])
@@ -136,9 +136,9 @@ test("E2 final SERVICES observes same runtimeRows, RX OBS and provider states, n
  assert.match(earthPane,/StationEarthServicesPane\s*\{/);
  assert.match(earthPane,/runtimeRows: earthLoader\.item \? earthLoader\.item\.runtimeRows : \[\]/);
  assert.match(earthPane,/sourceRows: earthLoader\.item \? earthLoader\.item\.plannedSources : \[\]/);
- assert.match(servicePane,/StationServicesConsole\\s*\\{/);
- assert.match(servicePane,/runtimeRows: services\\.runtimeRows/);
- assert.match(servicePane,/directoryRows: services\\.sourceDirectory/);
+ assert.match(servicePane,/StationServicesConsole\s*\{/);
+ assert.match(servicePane,/runtimeRows: services\.runtimeRows/);
+ assert.match(servicePane,/directoryRows: services\.sourceDirectory/);
   assert.doesNotMatch(servicePane,/WeatherServices\.|Process\s*\{|FileView\s*\{|XMLHttpRequest/);
  assert.match(discovery,/readonly property var runtimeRows/);
  assert.match(discovery,/readonly property var plannedSources/);

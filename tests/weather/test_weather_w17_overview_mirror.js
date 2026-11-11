@@ -19,7 +19,7 @@ test("W17 compact OVERVIEW mirrors full WEATHER three-band instrument",()=>{
  assert.match(compact,/model: Math\.min\(3,panel\.dailySamples\.length\)/);
  assert.match(compact,/model: panel\.telemetry/);
  assert.match(compact,/height: 164/);
- assert.match(home,/height: visible \? 164 : 0/);
+ assert.match(home,/height: visible \? home\.overviewInstrumentHeight : 0/);
  assert.match(home,/runtimeNowMs: home\.runtimeNowMs/);
  assert.match(full,/objectName: "weather-w14-current-focus"/);
 });

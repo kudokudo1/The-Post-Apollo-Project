@@ -94,7 +94,7 @@ Rectangle {
     }
 
     StationServicesConsole {
-        id: console
+        id: mediaServicesConsole
         objectName: "media-m10-services-console"
         anchors.fill: parent
         embeddedHeader: services.embeddedHeader

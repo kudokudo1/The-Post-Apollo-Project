@@ -11,6 +11,8 @@ on:
       - "tests/cpuplus/test_cpuplus_input_category_navigation.py"
       - "tests/cpuplus/test_keyboard_lock_*.py"
       - "tests/cpuplus/test_keyboard_lock_policy.cjs"
+      - "tests/cpuplus/test_keyboard_led_*.py"
+      - "tests/cpuplus/test_keyboard_led_policy.cjs"
       - ".github/workflows/cpuplus-input-settings-navigation.yml"
   workflow_dispatch:
 
@@ -30,6 +32,12 @@ jobs:
         run: python3 tests/cpuplus/test_keyboard_lock_startup.py
       - name: Verify saved keyboard policy format
         run: node tests/cpuplus/test_keyboard_lock_policy.cjs
+      - name: Verify fake-sysfs LED proxy refusal and ambiguity
+        run: python3 tests/cpuplus/test_keyboard_led_probe.py
+      - name: Verify LED evidence boundary and explicit UI copy
+        run: python3 tests/cpuplus/test_keyboard_led_contract.py
+      - name: Verify persisted LED observation schema
+        run: node tests/cpuplus/test_keyboard_led_policy.cjs
 
   native-quickshell:
     runs-on: ubuntu-latest

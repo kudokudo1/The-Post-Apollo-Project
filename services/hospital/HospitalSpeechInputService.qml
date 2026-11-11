@@ -299,6 +299,15 @@ Scope {
             root.lastTranscript = String(text || "");
             root.liveTextReady(text);
         }
+        function onCaptureStopped() {
+            // The first phrase may already be visible, but the microphone
+            // has auto-closed at the bounded trial limit. Keep forwarding
+            // remaining partials while Whisper finishes its guarded queue.
+            if (!root.liveStreaming || !root.recording)
+                return;
+            root.recordingClock.stop();
+            root.voiceState = "transcribing";
+        }
         function onLiveFinished() {
             if (!root.liveStreaming || !root.busy)
                 return;

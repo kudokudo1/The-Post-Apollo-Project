@@ -369,5 +369,69 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
                     decoder(KernelBytes(malformed))
 
 
+    def test_13_real_selinux_domain_is_offline_loaded_and_removed(self):
+        probe = (AREA / "guest_identity_service_probe.sh").read_text()
+        guest = (AREA / "guest_identity_ostree_cycle.sh").read_text()
+        host = (AREA / "run_official_silverblue_identity.sh").read_text()
+        workflow = (ROOT / ".github/workflows/connections-identity-silverblue-real-boot.yml").read_text()
+        policy_build = (AREA / "selinux/build_policy_ci.sh").read_text()
+        policy = (AREA / "selinux/postapollo_identity_ci.te").read_text()
+        for required in (
+            'postapollo_identity_ci_t',
+            'postapollo_identity_ci_exec_t',
+            'init_daemon_domain(postapollo_identity_ci_t, postapollo_identity_ci_exec_t)',
+            'manage_sock_files_pattern(postapollo_identity_ci_t',
+        ):
+            self.assertIn(required, policy)
+        for denied in ('permissive postapollo_identity_ci_t',
+                       'unconfined_domain(postapollo_identity_ci_t)',
+                       'allow postapollo_identity_ci_t self:tcp_socket'):
+            self.assertNotIn(denied, policy)
+        for required in (
+            'postapollo_identity_ci.pp',
+            'postapollo_identity_ci.sha256',
+            'EXACT_COMPILED_POLICY_STAGED_FOR_READONLY_OFFLINE_GUEST',
+        ):
+            self.assertIn(required, policy_build)
+        for required in (
+            'OFFLINE_TEST_SELINUX_MODULE_HASH_BOUND_BEFORE_LAYER',
+            'POSTROLLBACK_TEST_SELINUX_MODULE_REMAINS',
+            'POSTROLLBACK_SELINUX_UNIT_OVERRIDE_LEFTOVER',
+        ):
+            self.assertIn(required, guest)
+        for required in (
+            'policy_dir="$3"',
+            'postapollo_identity_ci.pp',
+            'COMPILED_TEST_SELINUX_POLICY_DIGEST_REFUSED',
+            'REAL_ENFORCING_DEDICATED_SELINUX_DOMAIN_OBSERVED',
+            'DEDICATED_SELINUX_MODULE_REMOVED_AFTER_SERVICE_STOP',
+        ):
+            self.assertIn(required, host)
+        for required in (
+            'Build Fedora SELinux module in isolated container',
+            'c4b-identity-selinux-policy',
+            'postapollo_identity_ci.sha256',
+        ):
+            self.assertIn(required, workflow)
+        for required in (
+            'semodule -i "$policyfile"',
+            'semodule -r postapollo_identity_ci',
+            'chcon -t postapollo_identity_ci_exec_t "$launcher"',
+            'chcon -t postapollo_identity_ci_run_t',
+            'install -m 0555 /usr/bin/python3 "$launcher"',
+            'cmp -s /usr/bin/python3 "$launcher"',
+            'ExecStart=/run/postapollo-identity-silverblue-ci-only/ci-python3',
+            "system_u:system_r:postapollo_identity_ci_t:s0",
+            'REAL_ENFORCING_DEDICATED_SELINUX_DOMAIN_OBSERVED',
+            'DEDICATED_SELINUX_MODULE_REMOVED_AFTER_SERVICE_STOP',
+        ):
+            self.assertIn(required, probe)
+        self.assertLess(probe.index('semodule -i "$policyfile"'),
+                        probe.index('systemctl start "$unit" ||\n  fail "ACTUAL_SIGNED_INSTALLED_SERVICE_START_REFUSED"'))
+        self.assertNotIn('setenforce 0', probe)
+        self.assertNotIn('semodule -DB', probe)
+        self.assertNotIn('permissive ', probe)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

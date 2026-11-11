@@ -618,5 +618,30 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
                         workflow.index('/src/tests/connections/identity_silverblue/run_official_silverblue_identity.sh'))
 
 
+    def test_20_failure_retains_bounded_guest_markers_without_exposing_vm_transcript(self):
+        workflow = (ROOT / ".github/workflows/connections-identity-silverblue-real-boot.yml").read_text()
+        for required in (
+            'vm_evidence="$RUNNER_TEMP/c4b-identity-vm-guest-markers.log"',
+            'vm_raw="$RUNNER_TEMP/c4b-identity-vm-full-ci.log"',
+            '2>&1 | tee "$vm_raw"',
+            'vm_rc="${PIPESTATUS[0]}"',
+            'C4B_ID_(PASS|FAIL|BLOCKED|STAGE|SELINUX_[A-Z_]+|SERVICE_[A-Z_]+)',
+            'tail -n 180 >"$vm_evidence"',
+            'C4B_ID_VM_PROCESS_EXIT // %s',
+            'exit "$vm_rc"',
+            'Preserve bounded real-guest C4b marker evidence',
+            'if: always()',
+            'actions/upload-artifact@v4',
+            'name: c4b-identity-silverblue-guest-markers',
+            'path: ${{ runner.temp }}/c4b-identity-vm-guest-markers.log',
+            'retention-days: 1',
+        ):
+            self.assertIn(required, workflow)
+        self.assertNotIn('path: ${{ runner.temp }}/c4b-identity-vm-full-ci.log', workflow)
+        self.assertNotIn('upload-artifact@v3', workflow)
+        self.assertLess(workflow.index('exit "$vm_rc"'),
+                        workflow.index('Preserve bounded real-guest C4b marker evidence'))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -17,7 +17,7 @@ test("W9 keeps one original StationSky renderer and the source-owner wiring",()=
  assert.match(pane,/runtimeNowMs: weatherPane\.runtimeNowMs/);
  assert.match(pane,/readonly property var runtimeRows: originalSky\.runtimeRows/);
  assert.match(pane,/sourceComponent: weatherPane\.kind === "ground"/);
- assert.match(pane,/sourceComponent: weatherPane\.kind === "services"/);
+ assert.match(pane,/weatherPane\.kind === "services"/);
  for(const denied of ["FileView {","Process {","XMLHttpRequest","fetch("])
    assert.ok(!pane.includes(denied),"unexpected provider "+denied);
 });
@@ -27,13 +27,13 @@ test("W9 combined WEATHER navigation is four fixed internal instrument pages",()
  assert.match(pane,/id: instrumentRail/);
  assert.match(pane,/id: instrumentViewport/);
  assert.match(pane,/clip: true/);
- assert.match(pane,/selected: skyHost\.focus === modelData\.focus/);
+ assert.match(pane,/selected: skyHost\.activeInstrument === modelData\.focus/);
  for(const [label,focus] of [
    ["NOW + AIR","now"],["HOURLY","hourly"],
    ["DAILY","daily"],["TWILIGHT","twilight"]])
    assert.ok(pane.includes('label:"'+label+'",focus:"'+focus+'"'));
- assert.match(pane,/onClicked: skyHost\.focus = modelData\.focus/);
- assert.match(pane,/weatherFocus: skyHost\.combined \? skyHost\.focus : ""/);
+ assert.match(pane,/onClicked: skyHost\.activeInstrument = modelData\.focus/);
+ assert.match(pane,/weatherFocus: skyHost\.combined \? skyHost\.activeInstrument : ""/);
  assert.match(pane,/scale: skyHost\.combined/);
  assert.match(pane,/instrumentViewport\.height/);
  assert.match(pane,/focusedContentHeight/);

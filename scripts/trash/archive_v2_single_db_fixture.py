@@ -144,7 +144,7 @@ class TestAtomicArchiveCommit:
 
     def __init__(self, root, *, payload_quota=16*1024*1024,
                  disk_quota=DEFAULT_DISK):
-        _require(type(root) in (str, Path) and
+        _require(isinstance(root, (str, Path)) and
                  Path(root).is_absolute()
                  and ".." not in Path(root).parts
                  and Path(root).name.startswith("trashpp-v2x-fixture-")

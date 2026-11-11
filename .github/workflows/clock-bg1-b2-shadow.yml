@@ -1,0 +1,59 @@
+name: Clock BG1-B2A atomic synthetic shadow transactions
+
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmOwnershipBroker.py"
+      - "services/time/AlarmShadowTransactions.py"
+      - "services/time/BG1-ALARM-SHADOW-TRANSACTIONS.md"
+      - "tests/time/test_clock_bg1_b2_shadow_transactions.py"
+      - ".github/workflows/clock-bg1-b2-shadow.yml"
+  push:
+    paths:
+      - "services/time/AlarmOwnershipBroker.py"
+      - "services/time/AlarmShadowTransactions.py"
+      - "services/time/BG1-ALARM-SHADOW-TRANSACTIONS.md"
+      - "tests/time/test_clock_bg1_b2_shadow_transactions.py"
+      - ".github/workflows/clock-bg1-b2-shadow.yml"
+
+jobs:
+  synthetic-shadow:
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Parse all four Python broker/owner components
+        run: |
+          python3 -I -B -c 'import ast,pathlib;[ast.parse(pathlib.Path(p).read_text()) for p in ["services/time/AlarmOwnershipGate.py","services/time/AlarmBackgroundObserver.py","services/time/AlarmOwnershipBroker.py","services/time/AlarmShadowTransactions.py"]]'
+      - name: Real two-client IPC and atomic shadow transition regression
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2_shadow_transactions.py' -v
+      - name: Preserve BG1-B1 kernel-peer broker contracts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_broker_protocol.py' -v
+      - name: Preserve BG1-A process leases and durable claim contracts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_owner_fencing_contract.py' -v
+      - name: Protect live alarm, audio and notification ownership
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output([
+              'git','diff','--name-only',
+              'origin/fix/clock-bg1-b1-main-reconcile-20261111...HEAD'],
+              text=True).splitlines())
+          permitted={
+              'services/time/AlarmOwnershipBroker.py',
+              'services/time/AlarmShadowTransactions.py',
+              'services/time/BG1-ALARM-SHADOW-TRANSACTIONS.md',
+              'tests/time/test_clock_bg1_b2_shadow_transactions.py',
+              '.github/workflows/clock-bg1-b2-shadow.yml'
+          }
+          assert changed == permitted, f'Unexpected files: {changed ^ permitted}'
+          for forbidden in ('services/time/AlarmManagerService.qml',
+                             'services/time/AlarmManagerPolicy.js',
+                             'services/time/AlarmBackgroundObserver.py',
+                             'ops/systemd/user/post-apollo-alarm-observer.service'):
+              assert forbidden not in changed
+          print('BG1-B2A is synthetic, source-only and non-actuating: PASS')
+          PY

@@ -112,7 +112,9 @@ Rectangle {
                       *(terminal.overviewNavigation ? 0.52 : 0.63))
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
-                text: "WEATHER // CURRENT + AIR + FORECAST"
+                text: terminal.overviewNavigation
+                      ? "WEATHER // OVERVIEW"
+                      : "WEATHER // CURRENT + AIR + FORECAST"
                 color: Colors.cyan
                 font.pixelSize: 11
                 elide: Text.ElideRight

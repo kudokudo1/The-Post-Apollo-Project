@@ -12,6 +12,8 @@ Rectangle {
     clip: true
 
     property string familyLabel: "WEATHER"
+    // MEDIA already owns a fixed C44 title and two contextual controls.
+    property bool embeddedHeader: false
     property string statusScope: familyLabel
     property string headerStatus: ""
     property var runtimeRows: []
@@ -62,13 +64,14 @@ Rectangle {
         id: fixedTop
         objectName: "services-console-fixed-header"
         x: HeaderGeometry.inset
-        y: HeaderGeometry.inset
+        y: services.embeddedHeader ? 0 : HeaderGeometry.inset
         width: Math.max(0,services.width - 2*HeaderGeometry.inset)
         spacing: 0
 
         Row {
             width: parent.width
-            height: HeaderGeometry.titleHeight
+            height: services.embeddedHeader ? 0 : HeaderGeometry.titleHeight
+            visible: !services.embeddedHeader
             spacing: 4
             GohuText {
                 width: Math.max(1,parent.width-129)
@@ -93,13 +96,14 @@ Rectangle {
             }
         }
 
-        Item { width: parent.width; height: HeaderGeometry.titleToTabs }
+        Item { width: parent.width; height: services.embeddedHeader ? 0 : HeaderGeometry.titleToTabs }
 
         Row {
             id: statusStrips
             objectName: "services-console-status-strips"
             width: parent.width
-            height: HeaderGeometry.tabHeight
+            visible: !services.embeddedHeader
+            height: services.embeddedHeader ? 0 : HeaderGeometry.tabHeight
             spacing: HeaderGeometry.tabSpacing
             Rectangle {
                 width: HeaderGeometry.buttonWidth(statusStrips.width,2)
@@ -138,7 +142,8 @@ Rectangle {
 
         Item {
             width: parent.width
-            height: HeaderGeometry.tabsToRule + HeaderGeometry.ruleHeight
+            height: services.embeddedHeader ? 0
+                    : HeaderGeometry.tabsToRule + HeaderGeometry.ruleHeight
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -148,7 +153,7 @@ Rectangle {
             }
         }
 
-        Item { width: parent.width; height: HeaderGeometry.ruleToContent }
+        Item { width: parent.width; height: services.embeddedHeader ? 0 : HeaderGeometry.ruleToContent }
 
         Grid {
             id: metrics
@@ -236,6 +241,16 @@ Rectangle {
         }
     }
 
+    // Both sections remain in one dossier; MEDIA's legacy contextual tabs
+    // jump to the appropriate section without hiding data or duplicating feeds.
+    function focusDirectory() {
+        if (directoryRows.length > 0)
+            detailScroll.contentY = Math.min(
+                Math.max(0,detailScroll.contentHeight-detailScroll.height),
+                Math.max(0,directoryHeading.y));
+    }
+    function focusRuntime() { detailScroll.contentY = 0; }
+
     Flickable {
         id: detailScroll
         objectName: "services-console-detail-scroll"
@@ -322,6 +337,8 @@ Rectangle {
                 }
             }
             QuietText {
+                id: directoryHeading
+                objectName: "services-console-directory-heading"
                 width: parent.width
                 height: services.directoryRows.length > 0 ? 14 : 0
                 visible: services.directoryRows.length > 0

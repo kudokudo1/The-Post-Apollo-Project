@@ -34,9 +34,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
-      - name: Install vetted Ed25519 verifier for isolated V2k fixture tests
-        run: python3 -m pip install 'cryptography>=44,<48'
+          python-version: "3.13"
+      - name: Install pinned crypto and read-only D-Bus contract test dependencies
+        run: python3 -m pip install 'cryptography>=44,<48' 'dbus-next==0.2.3'
       - name: Verify Trash launcher, scoped GIO adapter, and deletion safeguards
         run: python3 -m unittest discover -s tests/trash -p 'test_*.py' -v
       - name: Verify Camera Cleanup handoff preserves shared queue and authority

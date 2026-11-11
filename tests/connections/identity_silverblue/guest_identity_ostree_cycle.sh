@@ -185,7 +185,13 @@ ID_MONITOR
       verify_rc="$?"
     if [[ "$verify_rc" != 0 || -s "$verify_file" ]]; then
       printf 'C4B_ID_RPM_VERIFY_RC // %s\n' "$verify_rc" >/dev/ttyS0
-      sed -n '1,24p' "$verify_file" >/dev/ttyS0 || true
+      # Prefix each nonempty rpm -V line so the host's bounded marker
+      # extraction retains the actual discrepancy through QEMU shutdown.
+      sed -n '1,24p' "$verify_file" |
+        sed -E 's/^/C4B_ID_RPM_VERIFY_DETAIL \/\/ /' >/dev/ttyS0 || true
+      if [[ ! -s "$verify_file" ]]; then
+        echo "C4B_ID_RPM_VERIFY_DETAIL // NO_STDOUT_OR_STDERR" >/dev/ttyS0
+      fi
       fail "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_REFUSED"
     fi
     echo "C4B_ID_PASS // SIGNED_INSTALLED_IDENTITY_RPM_FILE_DIGESTS_AND_MODES"

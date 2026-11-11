@@ -91,6 +91,9 @@ Rectangle {
 
         Rectangle {
             id: currentBand
+            readonly property alias conditionIconItem: conditionArt
+            readonly property alias temperatureMeterItem: temperatureBar
+            readonly property alias metricCards: currentMetricRepeater
             objectName: "weather-w10-current-air-band"
             width: parent.width
             height: panel.currentHeight
@@ -201,6 +204,7 @@ Rectangle {
                 }
 
                 Repeater {
+                    id: currentMetricRepeater
                     model: [
                         {label:"AIR QUALITY",key:"air"},
                         {label:"HUMIDITY",key:"humidity"},
@@ -210,6 +214,8 @@ Rectangle {
                     delegate: Item {
                         id: metric
                         required property var modelData
+                        readonly property alias directionArrow: windArrow
+                        readonly property alias dataMeter: metricMeter
                         width: Math.max(1,(currentMetrics.width-12)*0.1725)
                         height: currentMetrics.height
                         readonly property bool hasMeter: modelData.key!=="pressure"

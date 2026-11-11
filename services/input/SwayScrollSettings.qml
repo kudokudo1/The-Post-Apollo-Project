@@ -135,8 +135,8 @@ Scope {
             "python3", "-B", "-I",
             Quickshell.shellPath("services/input/SwayScrollControl.py"),
             "apply", applyId,
-            applyTarget.toFixed(2),
-            applyOriginal.toFixed(3)
+            applyTarget.toFixed(6),
+            applyOriginal.toFixed(6)
         ]);
         return true;
     }

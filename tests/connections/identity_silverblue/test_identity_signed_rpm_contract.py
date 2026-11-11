@@ -408,7 +408,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         ):
             self.assertIn(required, host)
         for required in (
-            'Build Fedora SELinux module in isolated container',
+            'Compile test-only SELinux daemon domain into verified offline VM seed',
             'c4b-identity-selinux-policy',
             'postapollo_identity_ci.sha256',
         ):

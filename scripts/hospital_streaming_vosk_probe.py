@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 import re
 import resource
+import signal
 import sys
 import time
 
@@ -25,6 +26,7 @@ FRAME_BYTES = 2
 FRAME_MS = 100
 READ_BYTES = SAMPLE_RATE * FRAME_BYTES * FRAME_MS // 1000
 MAX_AUDIO_SECONDS = 25
+MAX_WALL_SECONDS = 45
 MAX_AUDIO_BYTES = SAMPLE_RATE * FRAME_BYTES * MAX_AUDIO_SECONDS
 MAX_TEXT_CHARS = 4000
 MAX_PACKET_CHARS = 8192
@@ -173,6 +175,10 @@ def main() -> int:
         return 66
     try:
         apply_limits()
+        # SIGALRM's default action terminates even a stalled native model or
+        # blocked stdin read. CPU time alone cannot bound those stalls.
+        signal.signal(signal.SIGALRM, signal.SIG_DFL)
+        signal.alarm(MAX_WALL_SECONDS)
         # Lazy optional dependency; normal Hospital never loads this package.
         import vosk
         vosk.SetLogLevel(-1)
@@ -187,6 +193,8 @@ def main() -> int:
         # No raw exception, file path, audio, word, or model details in errors.
         print('{"kind":"status","code":"OFFLINE_PROBE_FAILED"}', flush=True)
         return 70
+    finally:
+        signal.alarm(0)
 
 
 if __name__ == "__main__":

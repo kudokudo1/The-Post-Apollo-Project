@@ -9,6 +9,10 @@ Rectangle {
     objectName: "weather-w8-terminal-summary"
     property var weatherService: null
     property bool compact: false
+    // Read-only geometry for native visual-fit verification.
+    readonly property alias currentMetricItem: metricRow
+    readonly property alias hourlyItem: hourlyRow
+    readonly property alias dailyItem: dailyRow
     readonly property bool conditionsReady:
         !!weatherService && weatherService.ready === true
     readonly property bool forecastReady:

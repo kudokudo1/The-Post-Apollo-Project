@@ -24,6 +24,13 @@ function nonnegative(v) {
   return Number.isSafeInteger(v) && v >= 0;
 }
 
+function freezeDeep(object) {
+  for (const value of Object.values(object)) {
+    if (value && typeof value === "object") freezeDeep(value);
+  }
+  return Object.freeze(object);
+}
+
 function classifyUrl(value) {
   if (typeof value !== "string" || value.length < 1
       || value.length > MAX_URL_LENGTH
@@ -53,6 +60,7 @@ export function planSyntheticBraveSession(rawWindows) {
   if (!Array.isArray(rawWindows) || rawWindows.length > MAX_SESSION_WINDOWS) {
     refuse();
   }
+  try {
   const windows = [];
   const usedLabels = new Set();
   let total = 0;
@@ -119,7 +127,7 @@ export function planSyntheticBraveSession(rawWindows) {
       tab_eligibility: positions
     });
   }
-  return {
+  return freezeDeep({
     kind: SESSION_PLAN_KIND,
     status: "synthetic_preview_only",
     read_only: true,
@@ -138,7 +146,11 @@ export function planSyntheticBraveSession(rawWindows) {
       not_eligible: excluded, private_windows_skipped: privateSkipped
     },
     windows
-  };
+  });
+  } catch {
+    // Never echo synthetic fixture URLs, labels, or getter exceptions.
+    refuse();
+  }
 }
 
 // Comparing a former browser-window count signature with today's count
@@ -154,7 +166,7 @@ export function assessRestartPairing(plan, observedNormalTabCounts) {
           n > MAX_SESSION_TABS_PER_WINDOW)) {
     refuse();
   }
-  return {
+  return freezeDeep({
     status: "manual_pairing_required",
     saved_window_slots: plan.windows.length,
     observed_window_slots: observedNormalTabCounts.length,
@@ -164,5 +176,5 @@ export function assessRestartPairing(plan, observedNormalTabCounts) {
     session_restorable: false,
     restore_allowed: false,
     safe_actions: []
-  };
+  });
 }

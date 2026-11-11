@@ -1,0 +1,38 @@
+name: Clock Sound Library MP3 conversion
+
+on:
+  pull_request:
+    paths:
+      - "services/sounds/SoundLibraryHost.py"
+      - "services/sounds/SoundLibraryService.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "widgets/AlarmWavImportDialog.qml"
+      - "tests/time/test_clock_sound_library_mp3_conversion.py"
+      - "tests/time/test_clock_sound_library_v1.py"
+      - ".github/workflows/clock-sound-library-mp3.yml"
+  push:
+    paths:
+      - "services/sounds/SoundLibraryHost.py"
+      - "services/sounds/SoundLibraryService.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "widgets/AlarmWavImportDialog.qml"
+      - "tests/time/test_clock_sound_library_mp3_conversion.py"
+      - "tests/time/test_clock_sound_library_v1.py"
+      - ".github/workflows/clock-sound-library-mp3.yml"
+
+jobs:
+  bounded-mp3-conversion:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg only inside disposable GitHub CI runner
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ffmpeg -hide_banner -version
+      - name: Exercise actual MP3 decoding and malicious/invalid input rejection
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_sound_library_mp3_conversion.py' -v
+      - name: Preserve existing managed WAV imports and UI contracts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_sound_library_v1.py' -v
+      - name: Compile isolated Python host
+        run: python3 -I -B -c 'import ast, pathlib; ast.parse(pathlib.Path("services/sounds/SoundLibraryHost.py").read_text())'

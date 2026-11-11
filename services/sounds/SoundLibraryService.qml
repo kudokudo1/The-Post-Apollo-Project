@@ -51,12 +51,19 @@ Scope {
         return true;
     }
     function refresh() { return start("list", {}); }
-    function importWav(fileUrl, displayName) {
-        if (!String(fileUrl).startsWith("file:"))
+    function importAudio(fileUrl, displayName) {
+        const url = String(fileUrl || "");
+        if (!url.startsWith("file:") || !/\.(wav|mp3)$/i.test(url)) {
+            feedback = "SOUND LIBRARY // CHOOSE WAV OR MP3";
             return false;
+        }
         if (!validName(displayName))
             return false;
-        return start("import", {source: String(fileUrl), name: displayName});
+        return start("import", {source: url, name: displayName});
+    }
+    // Preserve older call sites; WAV and MP3 now share one safe import lane.
+    function importWav(fileUrl, displayName) {
+        return importAudio(fileUrl, displayName);
     }
     function validName(name) {
         const value = String(name || "");

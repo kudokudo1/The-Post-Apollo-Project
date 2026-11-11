@@ -73,7 +73,7 @@ class ArchiveV2Tests(unittest.TestCase):
 
     def test_unapproved_owner_cannot_save(self):
         for owner in ("hospital", "finance-transactions", "apollo-hub-notes",
-                      "identity", "time-machine"):
+                      "identity", "time-machine", []):
             with self.assertRaisesRegex(mod.ArchiveError, "OWNER_NOT_AUTHORIZED"):
                 self.store.save(owner, "r1", "1", b"record")
         self.assertEqual(self.store.status()["total"], 0)
@@ -131,6 +131,21 @@ class ArchiveV2Tests(unittest.TestCase):
         self.store.path.symlink_to(self.root / "elsewhere")
         with self.assertRaisesRegex(mod.ArchiveError, "ARCHIVE_FILE_UNSAFE"):
             mod.ArchiveStore(self.root)
+
+    def test_unexpected_sqlite_sidecars_and_journal_symlink_refused(self):
+        for suffix in ("-wal", "-shm"):
+            sidecar = self.root / (mod.DB_NAME + suffix)
+            sidecar.symlink_to(self.root / "outside")
+            with self.assertRaisesRegex(mod.ArchiveError,
+                                        "ARCHIVE_UNEXPECTED_SIDECAR"):
+                mod.ArchiveStore(self.root)
+            sidecar.unlink()
+        journal = self.root / (mod.DB_NAME + "-journal")
+        journal.symlink_to(self.root / "outside")
+        with self.assertRaisesRegex(mod.ArchiveError, "ARCHIVE_FILE_UNSAFE"):
+            mod.ArchiveStore(self.root)
+        journal.unlink()
+        self.assertEqual(mod.ArchiveStore(self.root).verify()["items"], 0)
 
     def test_unsafe_permissions_refused(self):
         os.chmod(self.root, 0o777)

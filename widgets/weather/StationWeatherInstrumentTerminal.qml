@@ -263,7 +263,7 @@ Rectangle {
                                 text: "↑"
                                 width: visible ? 14 : 0
                                 color: Colors.yellow
-                                font.pixelSize: 16
+                                font.pixelSize: 14
                                 rotation: terminal.currentReady && terminal.sky
                                     ? terminal.sky.windAngle(
                                         terminal.sky.weatherService.windDirection)

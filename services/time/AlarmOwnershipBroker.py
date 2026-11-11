@@ -262,19 +262,34 @@ class BrokerHandler(socketserver.StreamRequestHandler):
                         raise Refused("STALE_ALARM_FILE_REVISION")
                     result = self.server.shadow.initialize(
                         doc, witnessed, self.epoch, validate_snapshot)
+                    after_digest, _, _ = _source_snapshot(
+                        self.server.alarm_file, self.server.now_ms())
+                    if after_digest != witnessed:
+                        raise Refused("SOURCE_CHANGED_DURING_SHADOW_INIT")
                     return dict({"ok": True, "shadowOnly": True}, **result)
+                shadow_view = self.server.shadow.view()
+                source_digest, _, _ = _source_snapshot(
+                    self.server.alarm_file, self.server.now_ms())
+                if source_digest != shadow_view["sourceDigest"]:
+                    # Another writer still controls the actual V2 file.
+                    # Synthetic shadow operations must fail closed instead
+                    # of quietly shadowing a different real alarm revision.
+                    raise Refused("SOURCE_CHANGED_OUTSIDE_SHADOW")
                 if op == "shadow_view":
-                    return dict({"ok": True, "shadowOnly": True},
-                                **self.server.shadow.view())
-                return dict({"ok": True, "shadowOnly": True},
-                    **self.server.shadow.transition(
+                    return dict({"ok": True, "shadowOnly": True}, **shadow_view)
+                result = self.server.shadow.transition(
                         self.epoch, message["revision"],
                         op.removeprefix("shadow_"),
                         message["alarmId"], self.server.now_ms(),
                         expected_due_ms=message.get("expectedDueMs", 0),
                         ring_started_ms=message.get("ringStartedMs", 0),
                         patch=message.get("patch"),
-                        evaluate=evaluate_alarm, validate=validate_snapshot))
+                        evaluate=evaluate_alarm, validate=validate_snapshot)
+                after_digest, _, _ = _source_snapshot(
+                    self.server.alarm_file, self.server.now_ms())
+                if after_digest != source_digest:
+                    raise Refused("SOURCE_CHANGED_DURING_SHADOW_TRANSITION")
+                return dict({"ok": True, "shadowOnly": True}, **result)
         if op in ("renew", "release", "reserve"):
             with self.server.state_guard:
                 self._require_owner()
@@ -332,9 +347,10 @@ class BrokerHandler(socketserver.StreamRequestHandler):
                 try:
                     message = json.loads(data)
                     result = self.process(message)
-                except (UnicodeError, ValueError, TypeError, Refused, ShadowRefused, OSError) as exc:
+                except (UnicodeError, ValueError, TypeError, Refused, ShadowRefused,
+                        ObserverRefused, OSError) as exc:
                     reason = (str(exc) if isinstance(exc, (Refused, ShadowRefused))
-                              else "INVALID_REQUEST")
+                              else "INVALID_SHADOW_OR_REQUEST")
                     result = {"ok": False, "reason": reason}
                 self._reply(result)
         except (Refused, OSError, TimeoutError):

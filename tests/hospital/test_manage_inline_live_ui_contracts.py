@@ -190,6 +190,23 @@ check('safe_args=(-ng -t 2)' in stt
       and 'exec "$backend" "${safe_args[@]}"' in stt,
       "Whisper disables GPU and caps threads only inside guarded live mode")
 
+check('property string lastStage: "SAFETY_HOLD"' in live
+      and 'if (safetyHold)' in live
+      and 'data.kind === "stage"' in live
+      and 'HOSPITAL_VOICE_STAGE // ' in live
+      and 'FIRST_MODEL_STARTED' in live
+      and 'MODEL_TIMEOUT' in live
+      and 'console.warn("HOSPITAL_VOICE_STAGE // " + code)' in live,
+      "Stage-only lifecycle diagnostics are allowlisted, with the mic still held")
+check('send("stage", detail="RECORDER_STARTED")' in script
+      and 'send("stage", detail="FIRST_AUDIO_QUEUED")' in script
+      and 'send("stage", detail="FIRST_MODEL_STARTED")' in script
+      and 'send("stage", detail="FIRST_MODEL_ENDED")' in script
+      and 'send("stage", detail="FIRST_TEXT_READY")' in script
+      and '"MODEL_TIMEOUT" if isinstance(error, subprocess.TimeoutExpired)' in script
+      and 'send("stage", detail="RECORDING_COMPLETED")' in script,
+      "The Python recorder emits bounded non-content milestones around first inference")
+
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")
     for issue in issues: print(" - " + issue)

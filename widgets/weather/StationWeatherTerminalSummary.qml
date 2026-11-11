@@ -9,6 +9,8 @@ Rectangle {
     objectName: "weather-w8-terminal-summary"
     property var weatherService: null
     property bool compact: false
+    property real runtimeNowMs: Date.now()
+    readonly property alias compactInstrument: compactWeatherMirror
     // W16 // One continuous OVERVIEW, no internal page selector.
 
     // Read-only geometry for native visual-fit verification.
@@ -92,8 +94,20 @@ Rectangle {
              : "VISIBILITY --",accent:Colors.magenta}
     ]
 
+    StationWeatherOverviewCompactInstrument {
+        id: compactWeatherMirror
+        objectName: "weather-w17-compact-full-weather-mirror"
+        anchors.fill: parent
+        visible: terminal.compact
+        weatherService: terminal.weatherService
+        runtimeNowMs: terminal.runtimeNowMs
+    }
+
+    // The historical 164px presentation remains for the legacy full
+    // StationSky route. OVERVIEW alone uses the compact WEATHER mirror.
     Column {
         id: content
+        visible: !terminal.compact
         anchors.fill: parent
         anchors.margins: 4
         spacing: 2

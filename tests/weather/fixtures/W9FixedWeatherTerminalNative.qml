@@ -3,8 +3,8 @@ import QtQuick.Window
 import Quickshell
 import "widgets/weather" as Weather
 
-// W12 // Disposable native test for current glyph/meters/wind arrow and
-// balanced hourly/daily sizes, preserving full TWILIGHT.
+// W13 // Native test for centered readings/header and meters attached to
+// their data, preserving W12 wind/forecast and full TWILIGHT.
 ShellRoot {
     id: root
     property int ticks: 0
@@ -14,7 +14,7 @@ ShellRoot {
     function fail(reason) {
         if(finished)return;
         finished=true;
-        console.error("W12_NATIVE_FAIL // "+reason);
+        console.error("W13_NATIVE_FAIL // "+reason);
         Qt.quit();
     }
     QtObject {
@@ -144,6 +144,66 @@ ShellRoot {
                    || firstHour.rainMeter.height<8)
                     return root.fail("HOURLY_ARTWORK_OR_BAR_LOST");
 
+                // W13 // Test relative alignment, not only bounding boxes.
+                const heading=combined.headingItem;
+                const headingTitle=combined.headingTitle;
+                const headingCenter=headingTitle.mapToItem(
+                    heading,headingTitle.width/2,headingTitle.height/2).x;
+                if(Math.abs(headingCenter-heading.width/2)>1.5)
+                    return root.fail("W13_HEADING_OFF_CENTER");
+
+                const caption=combined.currentItem.conditionCaptionItem;
+                const tempBar=combined.currentItem.temperatureMeterItem;
+                const cond=combined.currentItem.conditionReadoutStack;
+                const condTop=cond.mapToItem(combined.currentItem,0,0).y;
+                const condBottom=cond.mapToItem(
+                    combined.currentItem,0,cond.height).y;
+                const labelBottom=caption.mapToItem(
+                    combined.currentItem,0,caption.height).y;
+                const tempBarTop=tempBar.mapToItem(
+                    combined.currentItem,0,0).y;
+                if(condTop < -2 || condBottom>combined.currentItem.height+2
+                   || tempBarTop<labelBottom
+                   || tempBarTop-labelBottom>6)
+                    return root.fail("W13_TEMPERATURE_METER_TOO_FAR // "
+                        +condTop+" / "+condBottom+" / "
+                        +(tempBarTop-labelBottom));
+
+                for(const idx of [0,1,2,3]) {
+                    const metric=combined.currentItem.metricCards.itemAt(idx);
+                    const group=metric.readoutStack;
+                    const captionBottom=metric.captionItem.mapToItem(
+                        metric,0,metric.captionItem.height).y;
+                    const metricTop=group.mapToItem(metric,0,0).y;
+                    const metricBottom=group.mapToItem(metric,0,group.height).y;
+                    if(metricTop < -2 || metricBottom>metric.height+2)
+                        return root.fail("W13_METRIC_NOT_CENTERED_"+idx);
+                    if(metric.dataMeter.visible) {
+                        const barTop=metric.dataMeter.mapToItem(metric,0,0).y;
+                        if(barTop<captionBottom || barTop-captionBottom>6)
+                            return root.fail("W13_BAR_TOO_FAR_"+idx+" // "
+                                +(barTop-captionBottom));
+                    }
+                }
+                const hourArt=firstHour.artworkItem;
+                const rainLabel=firstHour.rainCaptionItem;
+                const artBottom=hourArt.mapToItem(
+                    firstHour,0,hourArt.height).y;
+                const rainTop=rainLabel.mapToItem(firstHour,0,0).y;
+                const rainBottom=rainLabel.mapToItem(
+                    firstHour,0,rainLabel.height).y;
+                const rainBarTop=firstHour.rainMeter.mapToItem(
+                    firstHour,0,0).y;
+                const rainBarBottom=firstHour.rainMeter.mapToItem(
+                    firstHour,0,firstHour.rainMeter.height).y;
+                if(rainTop-artBottom<0 || rainTop-artBottom>4
+                   || rainBarTop-rainBottom<0
+                   || rainBarTop-rainBottom>4
+                   || rainBarBottom>firstHour.height+2)
+                    return root.fail("W13_HOURLY_METER_DETACHED // "
+                        +(rainTop-artBottom)+" / "
+                        +(rainBarTop-rainBottom)+" / "+rainBarBottom);
+
                 const current=combined.currentItem;
                 if(!current.conditionIconItem
                    || current.conditionIconItem.width<50
@@ -205,7 +265,7 @@ ShellRoot {
                    || combined.dailyRows.length!==0)
                     return root.fail("STALE_FORECAST_PRESENT");
                 root.finished=true;
-                console.log("W12_NATIVE_PASS // CURRENT_METERS_WIND_AND_BALANCED_FORECAST_520X300");
+                console.log("W13_NATIVE_PASS // CENTERED_READOUTS_AND_ATTACHED_METERS_520X300");
                 Qt.quit();
             }
         }

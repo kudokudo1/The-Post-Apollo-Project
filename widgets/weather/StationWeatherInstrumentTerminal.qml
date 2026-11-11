@@ -649,11 +649,11 @@ Rectangle {
                             spacing: 0
                             GohuText {
                                 id: dayTemperature
-                                height: 12
+                                height: day.height<28 ? 10 : 12
                                 text: terminal.dateLabel(day.entry.date)+"  "+
                                       terminal.read(day.entry.maxTempF,"°")
                                       +"/"+terminal.read(day.entry.minTempF,"°F")
-                                font.pixelSize: 11
+                                font.pixelSize: day.height<28 ? 10 : 11
                                 color: Colors.white
                                 width: parent.width
                                 elide: Text.ElideRight
@@ -680,10 +680,10 @@ Rectangle {
                             }
                             GohuText {
                                 id: dayChance
-                                height: 9
+                                height: day.height<28 ? 8 : 9
                                 text: terminal.rainChance(day.entry.chanceRain)
-                                      +" PEAK RAIN CHANCE"
-                                font.pixelSize: 9
+                                      +" PEAK RAIN"
+                                font.pixelSize: day.height<28 ? 8 : 9
                                 color: Colors.cyan
                                 width: parent.width
                                 elide: Text.ElideRight

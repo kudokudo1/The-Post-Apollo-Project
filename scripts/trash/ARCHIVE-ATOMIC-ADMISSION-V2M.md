@@ -11,7 +11,7 @@ PERMISSIONS // GitHub draft PR/tests/docs only. No local host writes, source-own
 - Extends existing V2l private synthetic trust history with a fixture-only test_copies table. Signed public-key enrollment and current generation remain under the same test-ledger trust policy.
 - New archive_v2_atomic_admission.py verifies the existing test-root signed owner enrollment and Ed25519 source-claim signature before attempting storage. It checks the exact in-memory payload SHA-256 and original source timestamp. It does not read Weather/demo source files, accept arbitrary paths, or load keys from disk.
 - TestOwnerTrustHistory.admit_test_copy validates the current enrolled key generation and revocation, then consumes the nonce and writes a synthetic immutable copy **within one SQLite BEGIN IMMEDIATE transaction**. Both modifications commit together. Exceptions before commit roll back both. No ArchiveStore, production SQLite or Quickshell path is touched.
-- A read-only inspect_test_admission lookup resolves the nonce after a lost reply: NOT_ADMITTED if both writes rolled back, COPY_COMMITTED if both committed, or NONCE_WITHOUT_COPY for older V2l test-only nonce records that were never actual snapshots. It returns only fixed metadata and digests, never payload bytes.
+- A read-only inspect_test_admission lookup resolves the nonce after a lost reply: NOT_ADMITTED if both writes rolled back, COPY_COMMITTED if both committed, or NONCE_WITHOUT_COPY for older V2l test-only nonce records that were never actual snapshots. It opens the test ledger in SQLite read-only/query-only mode, verifies the saved synthetic payload checksum, then returns only fixed metadata and digests. It never returns payload bytes.
 - Fault hooks model exceptions and actual process exits after nonce insertion, after synthetic copy insertion, and immediately after commit. Recovery uses a newly opened SQLite connection to prove that crashes cannot create a committed nonce without its new V2m test copy or permit replay of a committed request.
 - Results stay strictly TEST_*_DENY_ONLY, with captureAllowed, sourceAuthorityVerified, trustedTimeVerified, humanConsentVerified, restoreAllowed, burnAllowed and productionAllowed all false.
 - The existing ArchiveStore, UI capacity bar, SAVE SNAPSHOT/CONFIRM COPY, VERIFY CHAIN, V2i unsigned receipts, Camera, GIO and Burn paths remain unmodified.
@@ -30,9 +30,10 @@ Tests cover:
 - Nonce replay refusal across independent ledger reopen
 - Exception rollback after nonce and after copy insertion
 - Real abrupt subprocess exit (os._exit) at both stages and immediately after commit
-- Receipt loss after commit: durable copy and nonce survive, retry is refused, read-only witness recovers ID
+- Receipt loss after commit: durable copy and nonce survive, retry is refused, read-only witness recovers ID and checks stored payload integrity
 - Invalid signature / revoked or stale enrolled key refusing before any test copy is written
 - Older V2l nonce never reported as a stored test copy
+- Corrupted synthetic payload after commit is rejected by the read-only recovery lookup, and its nonce remains consumed
 - No live Archive DB, source file, Quickshell process, Restore or Burn code path
 - Existing full Trash Python, JavaScript, and Meta Apollo Grammar regressions must pass.
 

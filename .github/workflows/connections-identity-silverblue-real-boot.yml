@@ -41,6 +41,7 @@ jobs:
           bash -n tests/connections/identity_silverblue/verify_signed_identity_gateway.sh
           bash -n tests/connections/identity_silverblue/guest_identity_service_probe.sh
           bash -n tests/connections/identity_silverblue/fetch_offline_fedora_crypto.sh
+          bash -n tests/connections/identity_silverblue/selinux/build_policy_ci.sh
           bash -n tests/connections/identity_silverblue/run_official_silverblue_identity.sh
           bash -n tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh
           python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
@@ -72,6 +73,21 @@ jobs:
           (cd "$RUNNER_TEMP/c4b-identity-fedora-crypto" &&
            sha256sum --check --status identity-fedora44-runtime-manifest.sha256)
           test "$(find "$RUNNER_TEMP/c4b-identity-fedora-crypto" -maxdepth 1 -type f | wc -l)" -eq 5
+      - name: Compile test-only SELinux daemon domain into verified offline VM seed
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c4b-identity-selinux-policy"
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-selinux-policy,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/selinux/build_policy_ci.sh
+          (cd "$RUNNER_TEMP/c4b-identity-selinux-policy" &&
+           sha256sum --check --status postapollo_identity_ci.sha256)
+          test "$(find "$RUNNER_TEMP/c4b-identity-selinux-policy" -maxdepth 1 -type f | wc -l)" -eq 2
       - name: Independently verify disposable RPM signer is untrusted before isolated import
         shell: bash
         run: |
@@ -99,7 +115,8 @@ jobs:
           timeout --signal=TERM --kill-after=20s 4200s \
             /usr/bin/bash tests/connections/identity_silverblue/run_official_silverblue_identity.sh \
               "$RUNNER_TEMP/c4b-identity-boot-rpm" \
-              "$RUNNER_TEMP/c4b-identity-fedora-crypto"
+              "$RUNNER_TEMP/c4b-identity-fedora-crypto" \
+              "$RUNNER_TEMP/c4b-identity-selinux-policy"
       - name: Confirm test did not activate sign-in or production authority
         shell: bash
         run: |

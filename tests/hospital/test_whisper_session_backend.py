@@ -244,6 +244,12 @@ class PersistentWhisperTests(unittest.TestCase):
                                  "Continuous speech must keep fixed cadence")
                 self.assertNotIn("SILENT_OVERLAP_SKIPPED", seen,
                                  "Never remove overlap across continuous speech")
+                self.assertNotIn("DECODER_FAST_ACTIVE", seen)
+                self.assertNotIn("DECODER_FAST_FALLBACK", seen)
+                self.assertEqual(
+                    (Path(tmp) / "server-decoders").read_text().splitlines(),
+                    ["STANDARD", "STANDARD"],
+                    "Unselected default must preserve the former decoder")
                 self.assertNotIn("CAPTURE_STOPPED", seen)
                 self.assertEqual(starts.read_text().splitlines(), ["start"])
                 sizes = [int(n) for n in requests.read_text().splitlines()]
@@ -538,6 +544,109 @@ class PersistentWhisperTests(unittest.TestCase):
                 if process.poll() is None:
                     process.kill()
                     process.wait(timeout=3)
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    if stream is not None and not stream.closed:
+                        stream.close()
+
+    def test_fast_decoder_is_one_guarded_session_only_and_reports_actual_use(self):
+        with tempfile.TemporaryDirectory(prefix="hospital-decoder-fast-") as tmp:
+            root = Path(tmp)
+            env, starts, requests, _pid, cli_calls = build_fake_runtime(root)
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), str(HELPER),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-live-chunks", "6", "--prefer-persistent",
+                 "--decoder-trial", "fast"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+            selector = selectors.DefaultSelector()
+            pending = bytearray()
+            try:
+                selector.register(process.stdout, selectors.EVENT_READ)
+                stages = []
+                partials = []
+                deadline = time.monotonic() + 8
+                while time.monotonic() < deadline and not partials:
+                    entry = packet_from_pipe(process, selector, pending)
+                    if entry is None:
+                        continue
+                    if entry["kind"] == "stage":
+                        stages.append(entry["detail"])
+                    elif entry["kind"] == "partial":
+                        partials.append(entry["text"])
+                    elif entry["kind"] == "error":
+                        self.fail(str(entry))
+                self.assertEqual(partials, ["Turn left at the"])
+                self.assertIn("MODEL_SESSION_READY", stages)
+                self.assertIn("DECODER_FAST_ACTIVE", stages)
+                self.assertNotIn("DECODER_FAST_FALLBACK", stages)
+                self.assertEqual(starts.read_text().splitlines(), ["start"])
+                self.assertFalse(cli_calls.exists())
+                self.assertEqual(requests.read_text().count("\n"), 1)
+                self.assertEqual(
+                    (root / "server-decoders").read_text().splitlines(),
+                    ["FAST"], "Only actual fast requests may bear best_of=1")
+                process.stdin.write("STOP\n")
+                process.stdin.flush()
+                process.stdin.close()
+                process.wait(timeout=9)
+                self.assertEqual(process.returncode, 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=3)
+                selector.close()
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    if stream is not None and not stream.closed:
+                        stream.close()
+
+    def test_fast_trial_without_compatible_server_is_truthful_cli_fallback(self):
+        with tempfile.TemporaryDirectory(prefix="hospital-decoder-fallback-") as tmp:
+            root = Path(tmp)
+            env, starts, _requests, _pid, cli_calls = build_fake_runtime(root)
+            env["POST_APOLLO_STT_SERVER_BIN"] = str(root / "missing-server")
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), str(HELPER),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-live-chunks", "6", "--prefer-persistent",
+                 "--decoder-trial", "fast"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+            selector = selectors.DefaultSelector()
+            pending = bytearray()
+            try:
+                selector.register(process.stdout, selectors.EVENT_READ)
+                stages = []
+                partials = []
+                deadline = time.monotonic() + 8
+                while time.monotonic() < deadline and not partials:
+                    entry = packet_from_pipe(process, selector, pending)
+                    if entry is None:
+                        continue
+                    if entry["kind"] == "stage":
+                        stages.append(entry["detail"])
+                    elif entry["kind"] == "partial":
+                        partials.append(entry["text"])
+                    elif entry["kind"] == "error":
+                        self.fail(str(entry))
+                self.assertEqual(partials, ["CLI fallback."])
+                self.assertIn("MODEL_SESSION_UNAVAILABLE", stages)
+                self.assertIn("DECODER_FAST_FALLBACK", stages)
+                self.assertNotIn("DECODER_FAST_ACTIVE", stages)
+                self.assertFalse(starts.exists())
+                self.assertFalse((root / "server-decoders").exists())
+                self.assertEqual(cli_calls.read_text().splitlines(),
+                                 ["one CLI call"])
+                process.stdin.write("STOP\n")
+                process.stdin.flush()
+                process.stdin.close()
+                process.wait(timeout=9)
+                self.assertEqual(process.returncode, 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=3)
+                selector.close()
                 for stream in (process.stdin, process.stdout, process.stderr):
                     if stream is not None and not stream.closed:
                         stream.close()

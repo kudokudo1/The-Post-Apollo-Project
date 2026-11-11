@@ -76,7 +76,10 @@ ShellRoot {
                     +weatherTerminal.metrics.length+" / "
                     +weatherTerminal.hourlySamples.length+" / "
                     +weatherTerminal.dailySamples.length+" // READY "
-                    +weatherTerminal.forecastReady);
+                    +weatherTerminal.forecastReady
+                    +" // ACTUAL "+String(weatherTerminal.weatherService
+                       ? weatherTerminal.weatherService.forecastReady : "NULL")
+                    +" // MOCK "+observations.forecastReady);
             if(!weatherTerminal.currentMetricItem
                 || !weatherTerminal.hourlyItem || !weatherTerminal.dailyItem)
                 return root.fail("INSTRUMENT_GEOMETRY_MISSING");

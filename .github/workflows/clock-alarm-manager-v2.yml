@@ -46,6 +46,13 @@ jobs:
           const day = (y,m,d,h=0,min=0)=> new Date(y,m-1,d,h,min,0,0).getTime();
           const d1=day(2026,11,10,12), wed=day(2026,11,11,7,30),
                 fri=day(2026,11,13,7,30), sat=day(2026,11,14,7,30);
+          const onlyToday=p.create(p.initialDocument(),d1);
+          assert.equal(onlyToday.ok,true);
+          assert.deepEqual(Array.from(onlyToday.document.alarms[0].weekdays),
+            [new Date(d1).getDay()]);
+          assert.equal(onlyToday.document.alarms[0].enabled,false);
+          // Editing or duplicating another saved alarm must never reset
+          // its explicitly selected recurrence.
           let doc = p.initialDocument();
           assert.equal(p.validDocument(doc),true);
           assert.equal(p.parse(JSON.stringify(doc)).ok,true);

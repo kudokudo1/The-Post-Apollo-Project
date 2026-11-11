@@ -292,7 +292,7 @@ sys.stdout.write('RESTART_RECOVERY_PASS')
         source = (ROOT / "services/phone/PhonePersonalContactVault.py").read_text()
         for forbidden in (
             "if __name__ ==", "def main(", "subprocess", "secret-tool",
-            "keyring.get_password", "os.environ", "DBus", "Quickshell",
+            "keyring.get_password", "os.environ", "import dbus", "dbus.Interface", "Quickshell",
             "PhoneContactDetail", "PhonePane", "FileView", "Qt.openUrlExternally",
             "os.system(", "print(",
         ):

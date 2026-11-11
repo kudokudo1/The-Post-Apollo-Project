@@ -12,6 +12,10 @@ import "../components"
 Column {
     id: cleanupPage
     required property var camera
+    // The 420px Trash++ chassis is a genuine narrow workspace. Keep all
+    // Camera-owned actions, but do not force the wide two-column preview
+    // or lengthy filter labels into it.
+    readonly property bool compactHosted: width <= 450
     // Camera owns every queue item and file action. This component only
     // renders and selects, and now lives INSIDE the Trash++ PanelWindow.
     function focusSwipe() {
@@ -54,8 +58,12 @@ Column {
             ActionButton {
                 width: (cleanupModeRow.width - 4 * cleanupModeRow.spacing) / 5
                 height: 32
-                label: modelData.label
-                labelPixelSize: 9
+                label: cleanupPage.compactHosted
+                       && modelData.id === "batch" ? "SCROLL"
+                       : cleanupPage.compactHosted
+                         && modelData.id === "grid" ? "GRID"
+                       : modelData.label
+                labelPixelSize: cleanupPage.compactHosted ? 9 : 9
                 selected: camera.cleanupTechnique === modelData.id
                 accentColor: modelData.id === "hunt"
                              ? Colors.cyan : Colors.magenta
@@ -191,7 +199,9 @@ Column {
             ActionButton {
                 width: (cleanupFilterRow.width - 4 * cleanupFilterRow.spacing) / 5
                 height: 27
-                label: modelData.label
+                label: cleanupPage.compactHosted
+                       && modelData.id === "screen-recordings"
+                       ? "SCREEN" : modelData.label
                 labelPixelSize: 9
                 accentColor: Colors.white
                 selected: camera.cleanupMediaFilter === modelData.id
@@ -320,16 +330,24 @@ Column {
             }
         }
 
-        Row {
+        Item {
             id: cleanupBatchView
             anchors.fill: parent
-            spacing: 9
             visible: camera.cleanupTechnique === "batch"
                      && !camera.cleanupQueueOpen
 
+            // Wide: file list and preview side by side.
+            // Compact: list above preview with both sections reachable via
+            // the Trash++ outer scroll controls, never a clipped preview.
             Column {
-                width: Math.floor(parent.width * 0.53)
-                height: parent.height
+                id: cleanupBatchListPane
+                x: 0
+                y: 0
+                width: cleanupPage.compactHosted
+                       ? parent.width : Math.floor(parent.width * 0.53)
+                height: cleanupPage.compactHosted
+                        ? Math.floor((parent.height - 9) * 0.57)
+                        : parent.height
                 spacing: 5
                 Row {
                     width: parent.width
@@ -385,7 +403,7 @@ Column {
                 }
                 Item {
                     width: parent.width
-                    height: Math.max(75, cleanupWorkArea.height - 101)
+                    height: Math.max(75, cleanupBatchListPane.height - 101)
                     ListView {
                         id: cleanupBatchList
                         anchors.fill: parent
@@ -468,9 +486,16 @@ Column {
                 }
             }
             Column {
-                width: parent.width - Math.floor(parent.width * 0.53)
-                       - parent.spacing
-                height: parent.height
+                id: cleanupBatchPreviewPane
+                x: cleanupPage.compactHosted
+                   ? 0 : cleanupBatchListPane.width + 9
+                y: cleanupPage.compactHosted
+                   ? cleanupBatchListPane.height + 9 : 0
+                width: cleanupPage.compactHosted
+                       ? parent.width : parent.width - cleanupBatchListPane.width - 9
+                height: cleanupPage.compactHosted
+                        ? parent.height - cleanupBatchListPane.height - 9
+                        : parent.height
                 spacing: 5
                 GohuText {
                     width: parent.width
@@ -482,7 +507,7 @@ Column {
                 CameraImageViewer {
                     id: cleanupViewer
                     width: parent.width
-                    height: Math.max(65, cleanupWorkArea.height - 88)
+                    height: Math.max(65, cleanupBatchPreviewPane.height - 88)
                     source: camera.selectedRecord
                             && camera.selectedRecord.mediaType.indexOf("video") < 0
                             ? camera.fileUrl(camera.selectedPath) : ""

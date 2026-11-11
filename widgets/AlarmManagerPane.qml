@@ -91,6 +91,18 @@ Column {
         else
             draftDays = draftDays.concat([index]).sort(function(a,b) {return a-b;});
     }
+    function scheduleLabel(a) {
+        if (a.mode === "once") return "ONCE " + a.date.slice(5);
+        if (a.weekdays.length === 7) return "DAILY";
+        const abbrev = ["SU","MO","TU","WE","TH","FR","SA"];
+        return a.weekdays.map(function(d) {return abbrev[d];}).join(" ");
+    }
+    function shiftAlarmDate(days) {
+        const typed = alarmDate.text.trim();
+        const start = Policy.validDate(typed, false)
+            ? Policy.dayAt(typed, 12, 0) : Date.now();
+        alarmDate.text = Policy.dateOffset(start, days);
+    }
     function stepSelection(delta) {
         const rows = visibleAlarms;
         if (rows.length < 1) return;
@@ -122,7 +134,8 @@ Column {
         spacing: 6
         GohuText {
             width: Math.max(0, headerRow.width - newAlarm.width
-                             - emergencyStop.width - 2 * headerRow.spacing)
+                             - emergencyStop.width - duplicateAlarm.width
+                             - 3 * headerRow.spacing)
             height: parent.height
             verticalAlignment: Text.AlignVCenter
             text: "ALARMS // " + AlarmManagerService.count + " / " + Policy.MAX_ALARMS
@@ -138,6 +151,24 @@ Column {
             accentColor: Colors.red
             available: AlarmManagerService.ringingCount > 0
             onLeftClicked: AlarmManagerService.stopAll()
+        }
+        ActionButton {
+            id: duplicateAlarm
+            width: 58
+            height: parent.height
+            label: "COPY"
+            labelPixelSize: 10
+            accentColor: Colors.white
+            available: pane.selectedAlarm !== null
+                && AlarmManagerService.canEdit
+                && AlarmManagerService.count < Policy.MAX_ALARMS
+            onLeftClicked: {
+                const id = AlarmManagerService.duplicateAlarm(pane.selectedId);
+                if (id > 0) {
+                    alarmSearch.text = "";
+                    pane.choose(id);
+                }
+            }
         }
         ActionButton {
             id: newAlarm
@@ -202,9 +233,10 @@ Column {
                     labelPixelSize: 10
                     label: ("0" + entry.rowAlarm.hour).slice(-2) + ":"
                         + ("0" + entry.rowAlarm.minute).slice(-2) + " // "
-                        + entry.rowAlarm.name
-                        + (entry.rowAlarm.ringing ? " // RINGING" : "")
-                        + (entry.rowAlarm.completed ? " // DONE" : "")
+                        + entry.rowAlarm.name.slice(0, 17)
+                        + " // " + pane.scheduleLabel(entry.rowAlarm)
+                        + (entry.rowAlarm.ringing ? " RING" : "")
+                        + (entry.rowAlarm.completed ? " DONE" : "")
                     accentColor: entry.rowAlarm.ringing ? Colors.magenta
                         : entry.rowAlarm.enabled ? Colors.orange : Colors.white
                     trackLabelGlowLocally: true
@@ -456,6 +488,37 @@ Column {
                             border.color: alarmDate.activeFocus
                                 ? Colors.magenta : Colors.cyan
                         }
+                    }
+                }
+                Row {
+                    id: dateNudgeRow
+                    width: parent.width
+                    height: 29
+                    visible: pane.draftMode === "once"
+                    spacing: 6
+                    ActionButton {
+                        width: (dateNudgeRow.width - 2 * dateNudgeRow.spacing) / 3
+                        height: parent.height
+                        label: "◀ DAY"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        onLeftClicked: pane.shiftAlarmDate(-1)
+                    }
+                    ActionButton {
+                        width: (dateNudgeRow.width - 2 * dateNudgeRow.spacing) / 3
+                        height: parent.height
+                        label: "TODAY"
+                        labelPixelSize: 10
+                        accentColor: Colors.orange
+                        onLeftClicked: alarmDate.text = Policy.dayKey(Date.now())
+                    }
+                    ActionButton {
+                        width: (dateNudgeRow.width - 2 * dateNudgeRow.spacing) / 3
+                        height: parent.height
+                        label: "DAY ▶"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        onLeftClicked: pane.shiftAlarmDate(1)
                     }
                 }
                 Row {

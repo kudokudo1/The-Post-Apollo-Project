@@ -1,0 +1,2 @@
+module qs.services.input
+singleton KeyboardLockSettings 1.0 KeyboardLockSettings.qml

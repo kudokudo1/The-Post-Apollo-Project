@@ -257,8 +257,8 @@ class SourceOwnerV2lTests(unittest.TestCase):
         third=dict(second,generation=3,issuedAtMs=1760000400002,
                    keyId="owner-demo-fixture-01",
                    publicKeyB64=self.manifest["publicKeyB64"],
-                   previousManifestSha256=self.signed(second)
-                      and hashlib.sha256(canonical_authority(second)).hexdigest())
+                   previousManifestSha256=hashlib.sha256(
+                       canonical_authority(second)).hexdigest())
         with self.assertRaisesRegex(TrustHistoryError,
                                     "SOURCE_AUTHORITY_REVOKED_KEY_REUSED"):
             self.enroll(ledger,third)

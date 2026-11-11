@@ -100,7 +100,6 @@ Rectangle {
 
         QuietText {
             text: card.provenanceText
-            visible: !card.overviewDense || text.length > 0
             font.pixelSize: 8
             elide: Text.ElideRight
             width: parent.width

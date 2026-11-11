@@ -27,7 +27,7 @@ class ClockCompactSettingsContracts(unittest.TestCase):
         self.assertIn('anchors.top: parent.top', COMPACT)
         self.assertIn('visible: compact.settingsSection === "visual"', COMPACT)
         self.assertIn('visible: compact.settingsSection === "sync"', COMPACT)
-        self.assertIn('zoneSearchFocused: compactSettings.zoneSearchFocused', PANE)
+        self.assertIn('systemZonePicker.searchFocused || compactSettings.zoneSearchFocused', PANE)
 
     def test_visual_keeps_dock_format_display_offset_and_confirmed_zone(self):
         visual = COMPACT.split('id: visual', 1)[1].split('id: sync', 1)[0]

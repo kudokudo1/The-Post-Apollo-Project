@@ -1,0 +1,85 @@
+name: C4b Identity real official Silverblue signed RPM boot/rollback (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/**'
+      - '.github/workflows/connections-identity-silverblue-real-boot.yml'
+  push:
+    branches: [main, 'feat/c4b-identity-silverblue-ci-*']
+    paths:
+      - 'tests/connections/identity_silverblue/**'
+      - '.github/workflows/connections-identity-silverblue-real-boot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  official-silverblue-identity:
+    name: Actual offline KVM Silverblue + signed Identity RPM + two-reboot rollback
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      POST_APOLLO_ID_SILVERBLUE_CI_ONLY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject non-disposable CI and unverified source syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_ACTOR" = kudokudo1
+          test -c /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+          bash -n tests/connections/identity_silverblue/build_signed_identity_gateway.sh
+          bash -n tests/connections/identity_silverblue/verify_signed_identity_gateway.sh
+          bash -n tests/connections/identity_silverblue/run_official_silverblue_identity.sh
+          bash -n tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh
+          python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
+      - name: Build the exact existing Identity gateway RPM on disposable Fedora 44
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c4b-identity-boot-rpm"
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-boot-rpm,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/build_signed_identity_gateway.sh
+      - name: Independently verify disposable RPM signer is untrusted before isolated import
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-boot-rpm,dst=/input,readonly" \
+            fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/verify_signed_identity_gateway.sh
+      - name: Install ephemeral QEMU and official Silverblue installer prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 150s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 update ||
+            { echo "C4B_ID_BLOCKED // RUNNER_APT_UPDATE"; exit 2; }
+          timeout 360s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 install \
+            -y --no-install-recommends qemu-system-x86 qemu-utils xorriso genisoimage ||
+            { echo "C4B_ID_BLOCKED // RUNNER_APT_INSTALL"; exit 2; }
+      - name: Real official Silverblue boot signed Identity RPM layer and rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=20s 4200s \
+            /usr/bin/bash tests/connections/identity_silverblue/run_official_silverblue_identity.sh \
+              "$RUNNER_TEMP/c4b-identity-boot-rpm"
+      - name: Confirm test did not activate sign-in or production authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
+          node tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs
+          echo "C4B_ID_PASS // PRODUCTION_SIGN_IN_AUTHORITY_NOT_ENABLED"

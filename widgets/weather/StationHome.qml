@@ -27,7 +27,7 @@ Rectangle {
         fixedWeatherOverview && officialAlertSummary.available
     // W18 // Keep metric cards compact as the viewport grows. The saved
     // height belongs to the weather artwork, forecast and their real bars.
-    readonly property real overviewCardRowHeight: Math.max(1, Math.min(
+    readonly property real overviewCardRowHeight: Math.max(55, Math.min(
         88, Math.floor(homeScroll.height * 0.18),
         Math.floor(Math.max(0, homeScroll.height - 164) / 2)))
     readonly property real overviewInstrumentHeight: Math.max(

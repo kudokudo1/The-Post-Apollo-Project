@@ -9,7 +9,7 @@ set -Eeuo pipefail
    -f /src/tests/identity/fixtures/identity_gateway_installed_ci ]] ||
   { echo "C4B_ID_REFUSED // NON_DISPOSABLE_BUILD"; exit 2; }
 
-dnf -y --setopt=install_weak_deps=False install rpm-build rpm-sign gnupg2 python3
+dnf -y --setopt=install_weak_deps=False install rpm-build rpm-sign gnupg2 python3 cpio
 umask 077
 work="$(mktemp -d /tmp/c4b-id-rpm-XXXXXX)"
 trap 'rm -rf -- "$work"' EXIT
@@ -32,6 +32,7 @@ cp /src/tests/connections/identity_silverblue/post-apollo-identity-silverblue-ci
 cp /src/tests/connections/identity_silverblue/signed_identity_gateway.spec "$top/SPECS/"
 
 rpmbuild --define "_topdir $top" --define "_build_id_links none" \
+  --undefine __brp_mangle_shebangs \
   -bb "$top/SPECS/signed_identity_gateway.spec"
 rpmfile="$(find "$top/RPMS/noarch" -maxdepth 1 -type f \
   -name 'post-apollo-identity-silverblue-ci-0.1-*.noarch.rpm' -print -quit)"
@@ -61,6 +62,36 @@ actual="$work/actual"
 rpm -qpl "$rpmfile" | LC_ALL=C sort > "$actual"
 cmp -s "$expected" "$actual" ||
   { echo "C4B_ID_FAIL // RPM_PAYLOAD_NOT_EXACT_ROSTER"; exit 2; }
+
+# The release manifest measures the ORIGINAL Identity DOC files, not an
+# rpmbuild-rewritten shebang or executable bits silently modified by BRP.
+# Extract the actual RPM payload and compare every byte and installed mode.
+# This guards against build-time transformations even if rpm -qpl looks right.
+unpacked="$work/payload"
+mkdir -p "$unpacked"
+( cd "$unpacked" && rpm2cpio "$rpmfile" | cpio -idm --quiet --no-absolute-filenames ) ||
+  { echo "C4B_ID_FAIL // RPM_PAYLOAD_EXTRACTION_REFUSED"; exit 2; }
+prefix="$unpacked/usr/libexec/post-apollo/identity"
+for name in identity-gateway-ci desktop_command_gateway_v0.py \
+  desktop_host_lifecycle_v0.py desktop_context_projection_v0.py \
+  desktop_session_host_v0.py native_loopback_callback_v0.py \
+  private_context_ipc_v0.py signed_command_receipt_v0.py; do
+  if [[ "$name" == identity-gateway-ci ]]; then
+    original="/src/tests/identity/fixtures/identity_gateway_installed_ci"
+  else
+    original="/src/services/identity/$name"
+  fi
+  [[ -f "$prefix/$name" && ! -L "$prefix/$name" ]] &&
+    cmp -s "$original" "$prefix/$name" &&
+    [[ "$(stat -c '%a' "$prefix/$name")" == 555 ]] ||
+    { echo "C4B_ID_FAIL // BUILT_RPM_MUTATED_OR_REMODED_IDENTITY_$name"; exit 2; }
+done
+unit="$unpacked/usr/lib/systemd/system/post-apollo-identity-silverblue-ci.service"
+[[ -f "$unit" && ! -L "$unit" ]] &&
+  cmp -s /src/tests/connections/identity_silverblue/post-apollo-identity-silverblue-ci.service "$unit" &&
+  [[ "$(stat -c '%a' "$unit")" == 644 ]] ||
+  { echo "C4B_ID_FAIL // BUILT_RPM_MUTATED_OR_REMODED_UNIT"; exit 2; }
+echo "C4B_ID_PASS // EXACT_SOURCE_BYTES_AND_MODES_VERIFIED_FROM_REAL_RPM_PAYLOAD"
 
 # Sign the RPM with a disposable, independent build-only GPG key.
 # The Ed25519 release-root enrollment and receipt signer are DIFFERENT

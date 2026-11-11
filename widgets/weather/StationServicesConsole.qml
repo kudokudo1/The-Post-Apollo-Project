@@ -159,7 +159,7 @@ Rectangle {
             id: metrics
             objectName: "services-console-summary-cards"
             width: parent.width
-            height: services.homeCards ? 91 : 65
+            height: services.homeCards ? 99 : 65
             columns: 3
             columnSpacing: 3
             rowSpacing: 3
@@ -169,7 +169,7 @@ Rectangle {
                     id: metricEntry
                     required property var modelData
                     width: Math.max(1,(metrics.width-2*metrics.columnSpacing)/3)
-                    height: services.homeCards ? 44 : 31
+                    height: services.homeCards ? 48 : 31
                     Rectangle {
                         anchors.fill: parent
                         visible: !services.homeCards

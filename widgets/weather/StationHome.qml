@@ -42,6 +42,7 @@ Rectangle {
            - 2 * overviewCardRowHeight)
     readonly property alias overviewViewportItem: homeScroll
     readonly property alias overviewContentItem: homeContent
+    readonly property alias overviewRailItem: weatherOverviewRail
     readonly property alias overviewSummaryItem: weatherOverviewSummary
     readonly property alias overviewSnapshotItem: weatherSnapshotRow
     readonly property alias overviewRelevantItem: weatherRelevantRow

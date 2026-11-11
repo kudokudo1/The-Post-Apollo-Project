@@ -398,7 +398,8 @@ check('decoder_trial: str = "standard"' in script
       "Fast decoder only in bounded persistent AF_UNIX session; CLI fallback is truthful")
 check('function startRecording(requestedDecoderMode)' in live
       and 'requestedDecoderMode === "FAST"' in live
-      and 'decoderModeUsed = fastRequested ? "FAST PENDING" : "STANDARD"' in live
+      and 'decoderModeUsed = responsiveRequested ? "RESPONSIVE PENDING"' in live
+      and 'fastRequested ? "FAST PENDING" : "STANDARD"' in live
       and 'command.push("--decoder-trial", "fast")' in live
       and 'DECODER_FAST_ACTIVE|DECODER_FAST_FALLBACK' in live
       and 'return decoderModeUsed + " // AUDIO "' in live

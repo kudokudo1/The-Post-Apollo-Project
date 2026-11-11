@@ -182,7 +182,9 @@ PanelWindow {
                                    || row.state !== "trashed")) return false;
         const q = archiveSearchText.trim().toLowerCase();
         return !q || (String(row.title) + " " + String(row.source)
-                      + " " + String(row.details) + " " + String(row.id))
+                      + " " + String(row.details) + " " + String(row.id)
+                      + " " + String(row.ownerId || "")
+                      + " " + String(row.resourceId || ""))
                      .toLowerCase().indexOf(q) >= 0;
     })
 

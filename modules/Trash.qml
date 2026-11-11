@@ -56,6 +56,9 @@ PanelWindow {
     // This is real charged DB + journal usage, not an illustrative progress.
     readonly property real archiveCapacityRatio: archiveCapacity && archiveCapacity.diskQuotaBytes > 0 ? Math.min(1, Math.max(0, archiveCapacity.chargedBytes / archiveCapacity.diskQuotaBytes)) : 0
     readonly property real archiveCapacityPercent: archiveCapacityRatio * 100
+    // Tiny nonzero archives should never be mislabeled as 0.00% used.
+    readonly property string archiveCapacityPercentText: archiveCapacityRatio > 0
+        && archiveCapacityPercent < 0.01 ? "<0.01%" : archiveCapacityPercent.toFixed(2) + "%"
     readonly property color archiveCapacityColor: !archiveCapacity ? Colors.cyan
         : archiveCapacityRatio >= 1 ? Colors.red
         : archiveCapacityRatio >= 0.80 ? Colors.orange : Colors.cyan
@@ -2061,7 +2064,7 @@ PanelWindow {
                                     horizontalAlignment: Text.AlignRight
                                     verticalAlignment: Text.AlignVCenter
                                     text: !trashLauncher.archiveCapacity ? "UNAVAILABLE"
-                                        : trashLauncher.archiveCapacityPercent.toFixed(2) + "% USED"
+                                        : trashLauncher.archiveCapacityPercentText + " USED"
                                 }
                             }
                         }

@@ -1734,10 +1734,8 @@ PanelWindow {
                                 color: Colors.yellow
                                 font.pixelSize: 12
                                 verticalAlignment: Text.AlignVCenter
-                                text: "ARCHIVE // INVENTORY // "
-                                      + (trashLauncher.archiveRows.length
-                                         + trashLauncher.researchRows.length
-                                         + trashLauncher.archiveV2Rows.length)
+                                text: "ARCHIVE // " + trashLauncher.archiveFilteredRows.length
+                                      + " VISIBLE"
                             }
                             ActionButton {
                                 width: 92
@@ -1847,7 +1845,16 @@ PanelWindow {
                                     Column {
                                         anchors.fill: parent
                                         anchors.margins: 6
-                                        anchors.rightMargin: 126
+                                        // Non-actionable source/read-only rows
+                                        // should use the width recovered from
+                                        // the absent action column, especially
+                                        // in the compact 420px chassis.
+                                        anchors.rightMargin:
+                                            (modelData.kind === "WEB SCRAPE"
+                                             || modelData.kind === "EVENT HISTORY"
+                                             || modelData.kind === "SAVED RESEARCH"
+                                             || modelData.kind === "SAVED EVENT")
+                                            ? 126 : 6
                                         spacing: 3
 
                                         GohuText {

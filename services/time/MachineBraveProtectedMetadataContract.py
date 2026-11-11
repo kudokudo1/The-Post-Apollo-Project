@@ -28,6 +28,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import MachineBraveSealedVault as vault
 import MachineBraveArchiveAdmissionIntent as admission
+import MachineBraveProcessLease as lifecycle
 
 REQUEST_KIND = "machine-protected-archive-metadata-request-v1"
 RESPONSE_KIND = "machine-protected-archive-metadata-response-v1"
@@ -202,24 +203,29 @@ def handle_once(connection, *, protected_root):
     try:
         connection.settimeout(2.0)
         initial = peer_credentials(connection)
-        raw, request = read_frame(connection)
         if os.geteuid() == 0 or initial.uid == os.geteuid():
             refuse()
-        intent = admission.bind_request(
-            raw, peer_pid=initial.pid,
-            peer_uid=initial.uid, peer_gid=initial.gid)
-        if (intent.action != request["action"] or
-                intent.challenge != request["challenge"]):
-            refuse()
-        if peer_credentials(connection) != initial:
-            refuse()
-        # Even forged 'signed' or 'consented' claims cannot grant entry.
-        # C3e-Y only has synthetic evidence and C5 has no approved
-        # independently verified one-use MACHINE authorization yet.
-        if admission.may_read_metadata(intent):
-            refuse()  # positive path is NOT implemented, even if monkeypatched
+        # Obtain stable task reference FROM THE KERNEL SOCKET before parsing.
+        # Unsupported kernel, dead peer or changed executable => refusal.
+        with lifecycle.capture_socket_peer(connection, peer=initial) as lease:
+            raw, request = read_frame(connection)
+            if not lease.valid() or peer_credentials(connection) != initial:
+                refuse()
+            intent = admission.bind_request(
+                raw, peer_pid=initial.pid,
+                peer_uid=initial.uid, peer_gid=initial.gid)
+            if (intent.action != request["action"] or
+                    intent.challenge != request["challenge"]):
+                refuse()
+            if not lease.valid() or peer_credentials(connection) != initial:
+                refuse()
+            # A living pidfd is a negative lifecycle check only.
+            # Nothing here confers a client, C3e or C5 authorization.
+            if admission.may_read_metadata(intent):
+                refuse()  # no positive path even if monkeypatched
         refuse()
-    except (BrokerRefusal, admission.IntentRefusal, vault.VaultError,
+    except (BrokerRefusal, lifecycle.LifecycleRefusal,
+            admission.IntentRefusal, vault.VaultError,
             OSError, ValueError, TypeError, KeyError, struct.error,
             TimeoutError):
         response = dict(REFUSED)

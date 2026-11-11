@@ -500,6 +500,7 @@ Rectangle {
                     delegate: Rectangle {
                         id: dayCell
                         required property int index
+                        readonly property alias iconHolder: dayArtwork
                         readonly property var entry: panel.dailyRows[index] || ({})
                         readonly property var weatherState: panel.state(entry)
                         readonly property var solarCycle:
@@ -516,6 +517,7 @@ Rectangle {
                             anchors.margins: 2
                             spacing: 3
                             Item {
+                                id: dayArtwork
                                 width: Math.min(44,parent.height)
                                 height: parent.height
                                 Text {

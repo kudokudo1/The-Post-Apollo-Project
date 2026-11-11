@@ -235,6 +235,7 @@ Rectangle {
                         width: (telemetry.width-telemetry.columnSpacing)/2
                         height: Math.max(1,(telemetry.height-telemetry.rowSpacing)/2)
                         readonly property alias meter: readingBar
+                        readonly property alias readoutRow: metricValueRow
                         readonly property bool valid: modelData.key==="air"
                             ? terminal.airReady : terminal.currentReady
                         readonly property real ratio: !terminal.sky ? 0
@@ -251,6 +252,7 @@ Rectangle {
                             color: metric.modelData.accent
                         }
                         Row {
+                            id: metricValueRow
                             anchors.left: parent.left
                             anchors.top: parent.top
                             anchors.topMargin: 11

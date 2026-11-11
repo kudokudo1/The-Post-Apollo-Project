@@ -17,6 +17,15 @@ PanelWindow {
     // record adapters are approved. Only "trash" has destructive authority.
     property string activeMode: "trash"
     readonly property var lifecycleModes: ["cleanup", "archive", "trash", "burn"]
+    // Swipe/Hunt use pointer dragging inside the work area. When the outer
+    // page cannot fit on screen, provide buttons outside that gesture area.
+    readonly property bool cleanupScrollRailVisible:
+        activeMode === "cleanup"
+        && (chassisSize === "compact"
+            || (cameraCleanupController
+                && (cameraCleanupController.cleanupTechnique === "swipe"
+                    || cameraCleanupController.cleanupTechnique === "hunt")
+                && frameHeight < 661))
 
     // The Cleanup UI itself now lives here; CameraW supplies only its
     // established scan, queue, preview and recoverable file operation logic.
@@ -1449,11 +1458,22 @@ PanelWindow {
                 Flickable {
                     id: cleanupPageViewport
                     anchors.fill: parent
+                    // Compact keeps a pinned scroll rail beneath the content.
+                    // Hunt and Swipe retain their own pointer gestures.
+                    anchors.bottomMargin: trashLauncher.cleanupScrollRailVisible ? 29 : 0
                     visible: trashLauncher.activeMode === "cleanup"
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     contentWidth: width
-                    contentHeight: Math.max(height, 525)
+                    // Stacked Batch needs more vertical space than the
+                    // original 525px side-by-side Camera design. The parent
+                    // viewport is bounded; the contents are explicitly
+                    // scrollable instead of falling below the panel frame.
+                    contentHeight: Math.max(height,
+                        trashLauncher.chassisSize === "compact"
+                        && trashLauncher.cameraCleanupController
+                        && trashLauncher.cameraCleanupController.cleanupTechnique === "batch"
+                        ? 650 : 525)
                     interactive: trashLauncher.cameraCleanupController
                                  && trashLauncher.cameraCleanupController.cleanupTechnique
                                     !== "swipe"
@@ -1477,6 +1497,68 @@ PanelWindow {
                             }
                         }
                     }
+                }
+
+                // This is outside the swipe deck and Hunt arena, so the
+                // arrow controls scroll the outer Cleanup page without
+                // stealing gestures or changing Camera's selection data.
+                Row {
+                    id: cleanupCompactScrollRail
+                    anchors.bottom: parent.bottom
+                    width: parent.width
+                    height: 27
+                    spacing: 5
+                    visible: trashLauncher.cleanupScrollRailVisible
+
+                    ActionButton {
+                        width: 66
+                        height: 26
+                        label: "↑ UP"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        available: cleanupPageViewport.contentY > 0
+                        onLeftClicked: cleanupPageViewport.contentY = Math.max(
+                            0, cleanupPageViewport.contentY - 170)
+                    }
+
+                    GohuText {
+                        width: Math.max(20, parent.width - 142)
+                        height: 26
+                        font.pixelSize: 9
+                        color: Colors.yellow
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        text: "SCROLL // "
+                              + Math.round(100 * cleanupPageViewport.contentY
+                                           / Math.max(1, cleanupPageViewport.contentHeight
+                                                      - cleanupPageViewport.height)) + "%"
+                    }
+
+                    ActionButton {
+                        width: 66
+                        height: 26
+                        label: "↓ DOWN"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        available: cleanupPageViewport.contentY
+                                   < cleanupPageViewport.contentHeight
+                                     - cleanupPageViewport.height - 1
+                        onLeftClicked: cleanupPageViewport.contentY = Math.min(
+                            Math.max(0, cleanupPageViewport.contentHeight
+                                        - cleanupPageViewport.height),
+                            cleanupPageViewport.contentY + 170)
+                    }
+                }
+
+                NeonScrollBar {
+                    flickable: cleanupPageViewport
+                    x: cleanupPageViewport.width - width - 1
+                    y: 0
+                    height: cleanupPageViewport.height
+                    geometryMode: "viewport"
+                    handleStyle: "star"
+                    visible: trashLauncher.activeMode === "cleanup"
+                             && scrollable
                 }
 
                 Item {
@@ -1723,7 +1805,9 @@ PanelWindow {
                             color: Colors.yellow
                             font.pixelSize: 9
                             wrapMode: Text.WordWrap
-                            text: "SAVE COPY // WEATHER EVENTS OR DEMO SCRAPES. TRASH / RESTORE / BURN AFFECT ONLY TRASH++ COPIES."
+                            text: trashLauncher.chassisSize === "compact"
+                                  ? "ORIGINALS READ-ONLY // SAVED COPIES MANAGED HERE"
+                                  : "SAVE COPY // WEATHER EVENTS OR DEMO SCRAPES. TRASH / RESTORE / BURN AFFECT ONLY TRASH++ COPIES."
                         }
                     }
                 }
@@ -1749,11 +1833,16 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
-                            height: 34
+                            height: trashLauncher.chassisSize === "compact" ? 18 : 34
                             font.pixelSize: 9
                             color: Colors.cyan
-                            wrapMode: Text.WordWrap
-                            text: "ONE BURN WORKSPACE // file deletion uses GIO; saved copies use their own verified store. Every Burn uses the same confirmation and result screen."
+                            wrapMode: trashLauncher.chassisSize === "compact"
+                                      ? Text.NoWrap : Text.WordWrap
+                            text: trashLauncher.chassisSize === "compact"
+                                  ? "BURN // FILES OR SAVED COPIES // ONE CONFIRMATION"
+                                  : "ONE BURN WORKSPACE // file deletion uses GIO; saved copies use their own verified store. Every Burn uses the same confirmation and result screen."
+                            elide: trashLauncher.chassisSize === "compact"
+                                   ? Text.ElideRight : Text.ElideNone
                         }
 
                         Row {
@@ -1786,7 +1875,9 @@ PanelWindow {
 
                         Item {
                             width: parent.width
-                            height: Math.max(90, researchBurnReview.height - 194)
+                            height: Math.max(60, researchBurnReview.height
+                                             - (trashLauncher.chassisSize === "compact"
+                                                ? 178 : 194))
 
                             ListView {
                                 id: researchBurnList

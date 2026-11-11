@@ -96,21 +96,30 @@ backend="$(find_backend || true)"
 model="$(find_model || true)"
 server="$(find_server || true)"
 
+# Do not start an unknown version without private Unix socket + CPU-only
+# controls. --help never initializes inference or opens a listening socket.
+private_server_compatible() {
+    [[ -n "$model" && -n "$server" ]] || return 1
+    local help_text
+    help_text="$("$server" --help 2>&1 || true)"
+    [[ "$help_text" == *"--host"* && "$help_text" == *"socket"*
+       && "$help_text" == *"--no-gpu"* && "$help_text" == *"--no-context"* ]]
+}
+
 # Read-only capability/model profile; never starts a model or microphone.
 if [[ "${1:-}" == "--profile" ]]; then
     printf 'MODEL // %s\n' "$(basename "${model:-none}")"
     [[ -n "$backend" ]] && printf 'CLI // AVAILABLE\n' || printf 'CLI // UNAVAILABLE\n'
-    [[ -n "$server" ]] && printf 'SESSION // AVAILABLE\n' || printf 'SESSION // UNAVAILABLE\n'
+    if private_server_compatible; then
+        printf 'SESSION // AVAILABLE\n'
+    else
+        printf 'SESSION // UNAVAILABLE\n'
+    fi
     exit 0
 fi
 
 if [[ "${1:-}" == "--session-check" ]]; then
-    [[ -n "$model" && -n "$server" ]] || exit 2
-    # Do not attempt to start an unknown server version without Unix socket
-    # support. --help neither initializes a model nor opens a listener.
-    help_text="$("$server" --help 2>&1 || true)"
-    [[ "$help_text" == *"--host"* && "$help_text" == *"socket"*
-       && "$help_text" == *"--no-gpu"* && "$help_text" == *"--no-context"* ]] || exit 3
+    private_server_compatible || exit 3
     exit 0
 fi
 

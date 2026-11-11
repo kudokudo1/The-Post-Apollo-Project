@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
-import {webcrypto} from "node:crypto";
 import {readFileSync} from "node:fs";
 
-globalThis.crypto=webcrypto;
 const handlers=new Map();
 function elem(id=""){
   const events=new Map();

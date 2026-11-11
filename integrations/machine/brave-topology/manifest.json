@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Post-Apollo MACHINE // Brave Window Inventory (Read-Only Pilot)",
-  "version": "0.3.0",
-  "description": "Normal Brave window counts, opt-in focus and temporary marker-title diagnostic. No existing page URLs, existing titles, page data or restore.",
+  "version": "0.3.1",
+  "description": "Normal Brave counts and opt-in temporary title-marker checks, with in-memory expiry on focus loss. No URLs, persistent identity or restore.",
   "minimum_chrome_version": "110",
   "incognito": "not_allowed",
   "permissions": [],

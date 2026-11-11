@@ -174,6 +174,42 @@ class ShadowTransactionsTests(unittest.TestCase):
         finally:
             c.close()
 
+    def test_external_source_change_refuses_even_with_valid_shadow_owner(self):
+        client = self.client()
+        try:
+            self.begin(client)
+            initial = (self.state / "shadow-alarms-v1.json").read_bytes()
+            # Simulate the current uncoordinated Quickshell FileView writer
+            # changing the real V2 record after shadow initialization.
+            self.saved_doc["alarms"][0]["note"] = "Updated in real Clock"
+            edited_bytes = (json.dumps(self.saved_doc) + "\n").encode()
+            self.alarms.write_bytes(edited_bytes)
+            denied = client.send(op="shadow_view")
+            self.assertEqual(denied["reason"], "SOURCE_CHANGED_OUTSIDE_SHADOW")
+            denied = client.send(op="shadow_tick", revision=0, alarmId=1,
+                                 expectedDueMs=due_ms())
+            self.assertEqual(denied["reason"], "SOURCE_CHANGED_OUTSIDE_SHADOW")
+            self.assertEqual((self.state / "shadow-alarms-v1.json").read_bytes(), initial)
+            self.assertEqual(self.alarms.read_bytes(), edited_bytes)
+            self.assertTrue(client.send(op="release")["ok"])
+        finally:
+            client.close()
+
+    def test_invalid_edit_cannot_corrupt_shadow_document(self):
+        client = self.client()
+        try:
+            self.begin(client)
+            before = (self.state / "shadow-alarms-v1.json").read_bytes()
+            # A one-time alarm with an empty date violates V2 validation.
+            denied = client.send(op="shadow_edit", revision=0, alarmId=1,
+                                 patch={"mode":"once"})
+            self.assertFalse(denied["ok"])
+            self.assertEqual(denied["reason"], "INVALID_SHADOW_OR_REQUEST")
+            self.assertEqual((self.state / "shadow-alarms-v1.json").read_bytes(), before)
+            self.assertTrue(client.send(op="release")["ok"])
+        finally:
+            client.close()
+
     def test_corruption_and_stale_file_revision_refuse_without_overwrite(self):
         c = self.client()
         try:

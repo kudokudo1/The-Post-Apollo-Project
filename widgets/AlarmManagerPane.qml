@@ -928,7 +928,7 @@ Item {
                         labelPixelSize: 9
                         accentColor: Colors.magenta
                         available: !SoundLibraryService.busy
-                            && SoundLibraryService.libraryTones !== null
+                            && SoundLibraryService.tones.length < SoundLibraryService.maxTones
                         onLeftClicked: soundImportDialog.open()
                     }
                     ActionButton {
@@ -1357,10 +1357,17 @@ Item {
         }
         GohuText {
             anchors.centerIn: parent
-            visible: pane.visibleAlarms.length === 0
+            visible: !pane.soundLibraryOpen && pane.visibleAlarms.length === 0
             text: AlarmManagerService.count > 0
                 ? "NO MATCHING ALARMS" : "NO SAVED ALARMS // + NEW"
             font.pixelSize: 11
+            color: Colors.cyan
+        }
+        GohuText {
+            anchors.centerIn: parent
+            visible: pane.soundLibraryOpen && pane.libraryTones.length === 0
+            text: "NO IMPORTED TONES // IMPORT WAV"
+            font.pixelSize: 10
             color: Colors.cyan
         }
     }

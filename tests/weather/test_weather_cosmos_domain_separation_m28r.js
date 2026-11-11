@@ -59,7 +59,7 @@ test("all 14 original SKY sections are partitioned: observatory in COSMOS, terre
     assert.equal(cosmos.visibleFor("sky","cosmos/sky/full",unwanted),false,unwanted);
 });
 
-test("NOW + AIR shows Earth observations and atmosphere; FORECAST shows full hourly + daily + photo light",()=>{
+test("one WEATHER screen shows conditions, air, hourly + daily + photo light",()=>{
   const weatherTabs=workspace.GROUPS.weather;
   const now=weatherTabs.find(x=>x.key==="conditions");
   const forecast=weatherTabs.find(x=>x.key==="forecasts");

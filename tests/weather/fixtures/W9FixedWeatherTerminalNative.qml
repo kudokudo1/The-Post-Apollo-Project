@@ -53,9 +53,9 @@ ShellRoot {
              tempF:52,condition:"Cloudy",weatherCode:2,chanceRain:8},
             {timeLabel:"07 AM",date:"2026-11-11",time:"07:00",
              tempF:51,condition:"Cloudy",weatherCode:3,chanceRain:12},
-            {timeLabel:"02 AM",date:"2026-11-11",time:"02:00",
+            {timeLabel:"10 AM",date:"2026-11-11",time:"10:00",
              tempF:49,condition:"Rain",weatherCode:61,chanceRain:50},
-            {timeLabel:"03 AM",date:"2026-11-11",time:"03:00",
+            {timeLabel:"01 PM",date:"2026-11-11",time:"13:00",
              tempF:48,condition:"Rain",weatherCode:61,chanceRain:60}
         ]
         property var dailyForecast: [

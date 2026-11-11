@@ -44,7 +44,13 @@ ShellRoot {
             {date:"2026-11-11",time:"1200",timeLabel:"12 PM",
              tempF:58,condition:"Cloudy",weatherCode:3,chanceRain:15},
             {date:"2026-11-11",time:"1500",timeLabel:"3 PM",
-             tempF:60,condition:"Thunderstorm",weatherCode:95,chanceRain:40}
+             tempF:60,condition:"Thunderstorm",weatherCode:95,chanceRain:40},
+            {date:"2026-11-11",time:"1800",timeLabel:"6 PM",
+             tempF:58,condition:"Cloudy",weatherCode:3,chanceRain:35},
+            {date:"2026-11-11",time:"2100",timeLabel:"9 PM",
+             tempF:54,condition:"Rain",weatherCode:61,chanceRain:20},
+            {date:"2026-11-12",time:"0000",timeLabel:"12 AM",
+             tempF:49,condition:"Clear",weatherCode:0,chanceRain:0}
         ]
         property var dailyForecast: [
             {date:"2026-11-11",maxTempF:64,minTempF:45,
@@ -82,7 +88,7 @@ ShellRoot {
             return "STILL_PANNING";
         if(summary.height!==164 || !summary.compactInstrument ||
            summary.compactInstrument.currentMeters.count!==4 ||
-           summary.compactInstrument.hourRepeater.count!==3 ||
+           summary.compactInstrument.hourRepeater.count!==6 ||
            summary.compactInstrument.dayRepeater.count!==3)
             return "WEATHER_MIRROR_DATA_LOST";
         if(summary.compactInstrument.hourlyStrip.height<45

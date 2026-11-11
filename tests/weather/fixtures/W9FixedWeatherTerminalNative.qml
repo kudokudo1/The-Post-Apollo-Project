@@ -3,8 +3,8 @@ import QtQuick.Window
 import Quickshell
 import "widgets/weather" as Weather
 
-// W11 // Disposable native test for enlarged current/hourly, compact daily,
-// and full-bleed solar TWILIGHT. No live providers or desktop writes.
+// W12 // Disposable native test for current glyph/meters/wind arrow and
+// balanced hourly/daily sizes, preserving full TWILIGHT.
 ShellRoot {
     id: root
     property int ticks: 0
@@ -14,7 +14,7 @@ ShellRoot {
     function fail(reason) {
         if(finished)return;
         finished=true;
-        console.error("W11_NATIVE_FAIL // "+reason);
+        console.error("W12_NATIVE_FAIL // "+reason);
         Qt.quit();
     }
     QtObject {
@@ -124,19 +124,40 @@ ShellRoot {
                     combined,0,combined.dailyItem.height).y;
                 if(dailyBottom>combined.height)
                     return root.fail("DAILY_OUT_OF_VIEW");
-                if(combined.currentItem.height<65
-                   || combined.hourlyItem.height<=combined.currentItem.height
-                   || combined.hourlyItem.height<95
-                   || combined.dailyItem.height>54)
-                    return root.fail("WEATHER_BAND_PROMINENCE // "
+                if(combined.currentItem.height<69
+                   || combined.hourlyItem.height<78
+                   || combined.hourlyItem.height>=105
+                   || combined.dailyItem.height<56
+                   || combined.dailyItem.height>70)
+                    return root.fail("WEATHER_BAND_BALANCE // "
                         +combined.currentItem.height+" / "
                         +combined.hourlyItem.height+" / "
                         +combined.dailyItem.height);
                 const firstHour=combined.hourRepeater.itemAt(0);
                 if(!firstHour || !firstHour.mainGlyph || !firstHour.rainMeter
-                   || firstHour.mainGlyph.font.pixelSize<48
+                   || firstHour.mainGlyph.font.pixelSize<34
                    || firstHour.rainMeter.height<8)
-                    return root.fail("HOURLY_ARTWORK_OR_BAR_NOT_ENLARGED");
+                    return root.fail("HOURLY_ARTWORK_OR_BAR_LOST");
+
+                const current=combined.currentItem;
+                if(!current.conditionIconItem
+                   || current.conditionIconItem.width<50
+                   || current.temperatureMeterItem.height<8
+                   || current.metricCards.count!==4)
+                    return root.fail("CURRENT_ICON_OR_METERS_MISSING");
+                for(const idx of [0,1,2]) {
+                    const reading=current.metricCards.itemAt(idx);
+                    if(!reading || !reading.dataMeter.visible
+                       || reading.dataMeter.height!==8 || reading.meterRatio<=0)
+                        return root.fail("CURRENT_DATA_BAR_"+idx);
+                }
+                const compass=current.metricCards.itemAt(2).directionArrow;
+                if(!compass.visible || compass.text!=="↑"
+                   || Math.abs(compass.rotation-sky.windAngle("W"))>0.1)
+                    return root.fail("WIND_ARROW_DIRECTION_MISMATCH");
+                const pressure=current.metricCards.itemAt(3);
+                if(pressure.dataMeter.visible)
+                    return root.fail("PRESSURE_SHOULD_NOT_IMPLY_UNSOURCED_METER");
                 host.activeInstrument="twilight";
                 root.phase=1;
                 return;
@@ -179,7 +200,7 @@ ShellRoot {
                    || combined.dailyRows.length!==0)
                     return root.fail("STALE_FORECAST_PRESENT");
                 root.finished=true;
-                console.log("W11_NATIVE_PASS // PROMINENT_WEATHER_AND_FULL_BLEED_TWILIGHT_520X300");
+                console.log("W12_NATIVE_PASS // CURRENT_METERS_WIND_AND_BALANCED_FORECAST_520X300");
                 Qt.quit();
             }
         }

@@ -332,7 +332,8 @@ PanelWindow {
         { name: "LOCATION", key: "LOCATION", symbol: "⌖" },
         { name: "TIME", key: "TIME", symbol: "🕰" },
         { name: "CONNECTIONS", key: "CONNECTIONS", symbol: "⛓" },
-        // Stage 0: navigation only. No input device or lighting writes.
+        // Navigation modes. KEYBOARD now owns startup-policy controls;
+        // MOUSE, ACCESSIBILITY and LIGHTING remain read-only placeholders.
         { name: "KEYBOARD", key: "KEYBOARD", symbol: "⌨" },
         { name: "MOUSE", key: "MOUSE", symbol: "🖱" },
         { name: "ACCESSIBILITY", key: "ACCESSIBILITY", symbol: "♿" },
@@ -1934,6 +1935,21 @@ PanelWindow {
             anchors.bottomMargin: 9
         }
 
+        CpuPlusSettingsKeyboardPane {
+            id: settingsKeyboardControlsPane
+            area: "controls"
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "KEYBOARD"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedStateHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 13
+            anchors.rightMargin: 13
+            anchors.topMargin: 9
+            anchors.bottomMargin: 9
+        }
+
         CpuPlusSettingsConnectionsOverviewPane {
             id: settingsConnectionsOverview
             visible: cpuPlusWindow.selectedModeIndex === 6
@@ -2145,7 +2161,7 @@ PanelWindow {
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? 92
                 : cpuPlusWindow.selectedModeIndex === 6
-                ? 168 : 0
+                ? 88 : 0
 
             visible:
                 cpuPlusWindow.selectedModeIndex === 2
@@ -2190,7 +2206,7 @@ PanelWindow {
                             cpuPlusWindow.selectedModeIndex === 2
                             ? (targetSubModeStrip.width - 4) / 2
                             : cpuPlusWindow.selectedModeIndex === 6
-                             ? (targetSubModeStrip.width - 4) / 2
+                             ? (targetSubModeStrip.width - 12) / 4
                             : (targetSubModeStrip.width - 8) / 3
 
                         height:
@@ -2230,7 +2246,11 @@ PanelWindow {
                                 width:
                                     cpuPlusWindow.selectedModeIndex === 2
                                     && Number(subModeButton.modelData.key) === 0
-                                    ? 48 : 28
+                                    ? 48
+                                    : cpuPlusWindow.selectedModeIndex === 6
+                                      && (String(subModeButton.modelData.key) === "LOCATION"
+                                          || String(subModeButton.modelData.key) === "KEYBOARD")
+                                    ? 36 : 28
 
                                 height: parent.height
 
@@ -2270,7 +2290,11 @@ PanelWindow {
                                     text: String(subModeButton.modelData.symbol || "")
 
                                     font.pixelSize:
-                                        cpuPlusWindow.selectedModeIndex === 3
+                                        cpuPlusWindow.selectedModeIndex === 6
+                                        && (String(subModeButton.modelData.key) === "LOCATION"
+                                            || String(subModeButton.modelData.key) === "KEYBOARD")
+                                        ? 30
+                                        : cpuPlusWindow.selectedModeIndex === 3
                                         ? (
                                               String(subModeButton.modelData.key)
                                               === "ALL" ? 15
@@ -2313,7 +2337,9 @@ PanelWindow {
 
                             GohuText {
                                 anchors.verticalCenter: parent.verticalCenter
-
+                                // Icon-only Settings selector. Keep the name in
+                                // the model for headings, navigation and audits.
+                                visible: cpuPlusWindow.selectedModeIndex !== 6
                                 text: String(modelData.name || "")
                                 font.pixelSize: 8
 
@@ -2371,6 +2397,7 @@ PanelWindow {
         GohuText {
             visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsInputPreviewSelected
+                     && cpuPlusWindow.settingsSubMode !== "KEYBOARD"
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: targetSubModeStrip.bottom
             anchors.topMargin: 27
@@ -2382,12 +2409,28 @@ PanelWindow {
         GohuText {
             visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsInputPreviewSelected
+                     && cpuPlusWindow.settingsSubMode !== "KEYBOARD"
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: targetSubModeStrip.bottom
             anchors.topMargin: 50
             font.pixelSize: 9
             color: Colors.white
             text: "NO DEVICE CHANGES"
+        }
+
+        CpuPlusSettingsKeyboardPane {
+            id: settingsKeyboardSelectionPane
+            area: "status"
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "KEYBOARD"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: targetSubModeStrip.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 10
+            anchors.bottomMargin: 9
         }
 
         CpuPlusSettingsLocationSelectionPane {
@@ -2962,6 +3005,21 @@ PanelWindow {
                 color: Colors.cyan
             }
         }
+        CpuPlusSettingsKeyboardPane {
+            id: settingsKeyboardApplyPane
+            area: "apply"
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "KEYBOARD"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 20
+            anchors.bottomMargin: 10
+        }
+
         CpuPlusSettingsLocationPane {
             id: settingsLocationPane
             registry: PlaceRegistry

@@ -89,6 +89,7 @@ Scope {
     // This is session-only; automatic attempts also have a durable timestamp.
     property double referenceLastAttemptAtMs: 0
     property bool referenceAttemptSucceeded: false
+    property bool referenceAttemptResultSeen: false
     property string referenceFailureMessage: ""
     property double referenceFailureAtMs: 0
 
@@ -244,6 +245,7 @@ Scope {
             return false;
         referenceChecking = true;
         referenceAttemptSucceeded = false;
+        referenceAttemptResultSeen = false;
         if (referenceCheckedAtMs <= 0)
             referenceStatus = "checking";
         // Do not destroy the previous measurement while a new check runs.
@@ -1189,6 +1191,7 @@ Scope {
                 } catch (error) {
                     timeSettings.noteReferenceFailure("REFERENCE RESULT INVALID");
                 }
+                timeSettings.referenceAttemptResultSeen = true;
                 if (timeSettings.autoCheckInFlight) {
                     timeSettings.autoCheckResultSeen = true;
                     timeSettings.completeAutoReferenceIfReady();
@@ -1197,7 +1200,10 @@ Scope {
         }
         onExited: function(code, exitStatus) {
             timeSettings.referenceChecking = false;
-            if (code !== 0)
+            // The process exit may follow a specific Chrony/DNS refusal;
+            // do not replace that useful error with a generic exit message.
+            if (code !== 0 && (!timeSettings.referenceAttemptResultSeen
+                    || timeSettings.referenceAttemptSucceeded))
                 timeSettings.noteReferenceFailure("REFERENCE PROCESS FAILED");
             if (timeSettings.autoCheckInFlight) {
                 timeSettings.autoCheckExited = true;

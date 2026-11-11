@@ -56,6 +56,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertIn("Name:           post-apollo-identity-silverblue-ci", text)
         self.assertIn("BuildArch:      noarch", text)
         self.assertIn("AutoReqProv:    no", text)
+        self.assertIn("%undefine __brp_mangle_shebangs", text)
         payload = {x.strip() for x in text.split("%files\n", 1)[1].splitlines()
                    if x.strip().startswith("/")}
         expected = {PREFIX + name for name in FILES}
@@ -93,7 +94,11 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
                          'rpm -qp --scripts "$rpmfile"',
                          'rpm -qp --triggers "$rpmfile"',
                          "identity-disposable-rpm-public.asc",
-                         "identity-artifact-manifest.sha256"):
+                         "identity-artifact-manifest.sha256",
+                         "--undefine __brp_mangle_shebangs",
+                         'cmp -s "$original" "$prefix/$name"',
+                         "BUILT_RPM_MUTATED_OR_REMODED_IDENTITY_",
+                         "EXACT_SOURCE_BYTES_AND_MODES_VERIFIED_FROM_REAL_RPM_PAYLOAD"):
             self.assertIn(required, script)
         self.assertNotIn("rpm-ostree install", script)
         self.assertNotIn("systemctl enable", script)
@@ -161,8 +166,8 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             "REAL_SILVERBLUE_IDENTITY_RPM_LAYER_REMOVED",
             "TEST_KEYRING_REMOVED_AND_PRODUCTION_DISABLED",
             '[[ "$enabled_state" == static || "$enabled_state" == disabled ]]',
-            'verify_output="$(rpm -V "$pkg" 2>&1)"',
-            "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_DIFFERENCE",
+            'timeout --signal=TERM --kill-after=3s 35s rpm -V "$pkg" >"$verify_file" 2>&1',
+            "C4B_ID_RPM_VERIFY_RC",
             "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_REFUSED",
             '[[ "$observed" =~ ^0:0:555:[1-9][0-9]*$ ]]',
             "C4B_ID_INSTALLED_FILE_OBSERVED",

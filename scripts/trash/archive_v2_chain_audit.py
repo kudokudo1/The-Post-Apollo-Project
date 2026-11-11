@@ -19,7 +19,10 @@ from scripts.trash.archive_v2_index import (
     DB_NAME, STORE_SCHEMA, ReadIndexError, _dir, _private_regular,
 )
 from scripts.trash.archive_v2_location import ArchiveRootError, archive_directory
-from scripts.trash.archive_v2_provenance import ProvenanceError, verify_receipt
+from scripts.trash.archive_v2_provenance import (
+    ALLOWED_OWNERS, HEX_ID, HEX_SHA, IDENTIFIER, MAX_MS,
+    ProvenanceError, verify_receipt,
+)
 
 MAX_RECORDS = 100000
 
@@ -122,6 +125,17 @@ def audit(directory):
                     evidence = verify_receipt(row[1:9], row[9:])
                 except ProvenanceError as exc:
                     raise ChainAuditError(str(exc)) from exc
+                # Validate the metadata of older unattested records too.
+                # V2i's receipt verifier checks these on modern rows.
+                _require(type(row[1]) is str and HEX_ID.fullmatch(row[1])
+                         and row[2] in ALLOWED_OWNERS
+                         and type(row[3]) is str and IDENTIFIER.fullmatch(row[3])
+                         and type(row[4]) is str and IDENTIFIER.fullmatch(row[4])
+                         and type(row[5]) is int and 1 <= row[5] <= MAX_MS
+                         and type(row[6]) is str and len(row[6]) <= 120
+                         and all(c.isprintable() for c in row[6])
+                         and type(row[7]) is str and HEX_SHA.fullmatch(row[7]),
+                         "ARCHIVE_METADATA_INVALID")
                 key = (row[2], row[3])
                 source_keys.add(key)
                 if evidence["state"] == "LEGACY_UNATTESTED":

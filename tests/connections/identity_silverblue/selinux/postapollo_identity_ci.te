@@ -9,6 +9,13 @@ type postapollo_identity_ci_t;
 type postapollo_identity_ci_exec_t;
 init_daemon_domain(postapollo_identity_ci_t, postapollo_identity_ci_exec_t)
 
+# Preserve systemd NoNewPrivileges=true. Fedora's init_nnp_daemon_domain
+# grants only the explicit init_t -> this confined daemon process2
+# nnp_transition gate; it does NOT turn the daemon into an unconfined type.
+# Without this permission the real guest retained init_t despite a labelled
+# executable and a correctly installed SELinux module.
+init_nnp_daemon_domain(postapollo_identity_ci_t)
+
 type postapollo_identity_ci_run_t;
 files_pid_file(postapollo_identity_ci_run_t)
 

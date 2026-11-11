@@ -17,7 +17,7 @@ test("W10 has exactly one StationSky source and only two internal screens",()=>{
  assert.equal((pane.match(/StationSky\s*\{/g)||[]).length,1);
  assert.match(pane,/readonly property var runtimeRows: originalSky\.runtimeRows/);
  assert.match(pane,/weatherService: weatherPane\.weatherService/);
- assert.match(pane,/StationWeatherCombinedPane\s*\{/);
+ assert.match(pane,/StationWeatherInstrumentTerminal\s*\{/);
  assert.match(pane,/sky: originalSky/);
  assert.match(pane,/property string activeInstrument: "weather"/);
  assert.match(pane,/weatherFocus: skyHost\.combined/);

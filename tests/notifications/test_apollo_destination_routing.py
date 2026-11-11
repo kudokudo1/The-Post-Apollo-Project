@@ -32,7 +32,7 @@ assert 'function openApolloNotificationRoute(destination)' in sh
 assert 'hospitalWindow.openReports(String(route.team || ""));' in sh
 assert 'gitWindow.openGithubPullRequest(' in sh
 assert 'cpuPlusWindow.selectThermalSubMode(route.subMode === "fan" ? 1 : 0);' in sh
-assert 'weatherStationWindow.currentView = view;' in sh
+assert 'weatherStationWindow.openNotificationView(view)' in sh
 assert 'notificationsHubWindow.activeFilter = "system";' in sh
 assert 'root.bringAppHere(notificationEntry.sourceId, notificationEntry.source)' in h, (
     "Bring Here stays a separate workspace operation"
@@ -114,8 +114,7 @@ const recorder=name=> (...v)=>{calls.push([name,...v]);return true;};
 const cpu={menuOpen:false,open:recorder('cpu.open'),selectMode:recorder('cpu.mode'),
  selectThermalSubMode:recorder('cpu.thermal'),selectSystemSubMode:recorder('cpu.system')};
 const weather={mainModes:[{id:'ground'},{id:'space'}],open:recorder('weather.open'),
- set currentView(v){calls.push(['weather.view',v])},
- set navigationIndex(v){calls.push(['weather.index',v])}};
+ openNotificationView:recorder('weather.view')};
 const hospital={menuOpen:false,open:recorder('hospital.open'),
  openReports:recorder('hospital.reports'),openReception:recorder('hospital.reception')};
 const git={menuOpen:false,open:recorder('git.open'),

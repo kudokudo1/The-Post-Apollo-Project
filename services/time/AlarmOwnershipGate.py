@@ -222,9 +222,11 @@ def _write_state(root, data):
 
 
 @contextmanager
-def _locked(root):
+def _locked(root, create=False):
     path = root / "gate.lock"
-    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+    if create:
+        flags |= os.O_CREAT
     try:
         fd = os.open(path, flags, 0o600)
         st = os.fstat(fd)
@@ -286,7 +288,7 @@ class OwnershipGate:
         if role not in ROLES or not _nonnegative(ttl_ms, MAX_LEASE_MS) or ttl_ms < 100:
             raise Refused("INVALID_OWNER_REQUEST")
         scope, root = self._snapshot(create=True)
-        with _locked(root):
+        with _locked(root, create=True):
             doc = _read_state(root, scope)
             if self._valid_lease(doc["lease"]):
                 raise Refused("OWNER_ALREADY_ACTIVE")

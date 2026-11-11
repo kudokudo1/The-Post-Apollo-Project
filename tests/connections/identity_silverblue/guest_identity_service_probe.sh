@@ -21,10 +21,16 @@ policy_loaded=0
 policyfile=/var/lib/postapollo-id-ci-assets/postapollo_identity_ci.pp
 dropindir="/run/systemd/system/$unit.d"
 launcher="$base/ci-python3"
+negative_unit=postapollo-identity-ci-net-denial.service
+negative_unit_file="/run/systemd/system/$negative_unit"
+negative_log=/var/tmp/c4b-id-selinux-negative.log
+negative_journal=/var/tmp/c4b-id-selinux-negative-journal.log
 
 cleanup() {
   # The policy and drop-in are VM-only; never let either reach rollback.
+  timeout --signal=TERM --kill-after=2s 12s systemctl stop "$negative_unit" >/dev/null 2>&1 || true
   timeout --signal=TERM --kill-after=2s 12s systemctl stop "$unit" >/dev/null 2>&1 || true
+  rm -f -- "$negative_unit_file"
   rm -f -- "$dropindir/10-disposable-selinux.conf"
   rmdir "$dropindir" 2>/dev/null || true
   systemctl daemon-reload >/dev/null 2>&1 || true
@@ -43,6 +49,7 @@ cleanup() {
         sed 's/^/C4B_ID_SELINUX_UNLOAD_DETAIL \/\/ /' >/dev/ttyS0 || true
     fi
   fi
+  systemctl reset-failed "$negative_unit" >/dev/null 2>&1 || true
   systemctl reset-failed "$unit" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -370,22 +377,58 @@ PY
 chmod 0444 "$denial"
 chcon -t postapollo_identity_ci_run_t "$denial" ||
   fail "SELINUX_NEGATIVE_HELPER_LABEL_REFUSED"
-negative_unit=postapollo-identity-ci-net-denial
-negative_log=/var/tmp/c4b-id-selinux-negative.log
+# A disposable explicit oneshot unit avoids systemd-run --pipe's
+# "Remote peer disconnected" failure while keeping journald as an independent
+# witness for the Python helper. Unlike the installed main gateway unit, this
+# helper intentionally has NO RestrictAddressFamilies, PrivateNetwork, socket
+# seccomp filter, or network namespace. Only SELinux may deny AF_INET creation.
+[[ ! -e "$negative_unit_file" && ! -L "$negative_unit_file" ]] ||
+  fail "SELINUX_NEGATIVE_UNIT_PREEXISTS"
+cat >"$negative_unit_file" <<'CI_ID_NEGATIVE_UNIT'
+[Unit]
+Description=Disposable C4b kernel SELinux network socket refusal proof
+
+[Service]
+Type=oneshot
+User=postapollo-identity-ci
+Group=postapollo-identity-ci
+NoNewPrivileges=true
+ExecStart=/run/postapollo-identity-silverblue-ci-only/ci-python3 -I -B /run/postapollo-identity-silverblue-ci-only/deny-network.py
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=25
+CI_ID_NEGATIVE_UNIT
+chmod 0644 "$negative_unit_file"
+systemctl daemon-reload || fail "SELINUX_NEGATIVE_UNIT_RELOAD_REFUSED"
+printf 'C4B_ID_SELINUX_STAGE // before_independent_negative_unit_start\n' >/dev/ttyS0
 negative_rc=0
-timeout --signal=TERM --kill-after=4s 35s systemd-run --wait --pipe --collect \
-  --unit="$negative_unit" \
-  --property="User=$name" --property="Group=$name" \
-  "$launcher" -I -B "$denial" >"$negative_log" 2>&1 ||
-    negative_rc="$?"
-sed -n '1,30p' "$negative_log" |
-  sed 's/^/C4B_ID_SELINUX_NEGATIVE_DETAIL \/\/ /' >/dev/ttyS0 || true
-[[ "$negative_rc" == 0 ]] &&
-  grep -Fq 'C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE' "$negative_log" ||
+timeout --signal=TERM --kill-after=4s 35s systemctl start "$negative_unit" >"$negative_log" 2>&1 ||
+  negative_rc="$?"
+printf 'C4B_ID_SELINUX_STAGE // after_negative_unit_start rc=%s\n' "$negative_rc" >/dev/ttyS0
+timeout --signal=TERM --kill-after=3s 10s journalctl --sync >/dev/null 2>&1 ||
+  fail "SELINUX_NEGATIVE_JOURNAL_SYNC_REFUSED"
+timeout --signal=TERM --kill-after=3s 15s journalctl -b -u "$negative_unit" \
+  --no-pager -o cat -n 48 >"$negative_journal" 2>&1 ||
+  fail "SELINUX_NEGATIVE_JOURNAL_READ_REFUSED"
+for evidence in "$negative_log" "$negative_journal"; do
+  sed -n '1,30p' "$evidence" |
+    sed 's/^/C4B_ID_SELINUX_NEGATIVE_DETAIL \/\/ /' >/dev/ttyS0 || true
+done
+negative_result="$(systemctl show "$negative_unit" --property=Result --value)" ||
+  fail "SELINUX_NEGATIVE_UNIT_RESULT_UNAVAILABLE"
+[[ "$negative_rc" == 0 && "$negative_result" == success &&
+   "$(grep -Fc 'C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE' "$negative_journal")" == 1 ]] &&
+   ! grep -Fq 'C4B_ID_FAIL //' "$negative_journal" ||
   fail "REAL_ENFORCING_SELINUX_NETWORK_DENIAL_NOT_PROVEN"
 echo "C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE" >/dev/ttyS0
-systemctl reset-failed "$negative_unit.service" >/dev/null 2>&1 || true
-rm -f -- "$denial"
+systemctl stop "$negative_unit" >/dev/null 2>&1 ||
+  fail "SELINUX_NEGATIVE_UNIT_STOP_REFUSED"
+rm -f -- "$negative_unit_file" "$denial" "$negative_log" "$negative_journal"
+systemctl daemon-reload ||
+  fail "SELINUX_NEGATIVE_UNIT_REMOVE_RELOAD_REFUSED"
+systemctl reset-failed "$negative_unit" >/dev/null 2>&1 || true
+[[ ! -e "$negative_unit_file" ]] ||
+  fail "SELINUX_NEGATIVE_UNIT_STILL_PRESENT"
 
 # Verify teardown of the *running* service before rpm-ostree rollback.
 systemctl stop "$unit" || fail "SERVICE_STOP_REFUSED"
@@ -397,7 +440,7 @@ done
   fail "SOCKET_OR_PROCESS_REMAINS_AFTER_STOP"
 cleanup
 trap - EXIT
-[[ ! -e "$base" && ! -e "$dropindir" ]] &&
+[[ ! -e "$base" && ! -e "$dropindir" && ! -e "$negative_unit_file" ]] &&
   ! getent passwd "$name" >/dev/null ||
   fail "TEMPORARY_USER_OR_PRIVATE_KEY_REMAINS"
 if semodule -l | grep -Eq '^postapollo_identity_ci([[:space:]]|$)'; then

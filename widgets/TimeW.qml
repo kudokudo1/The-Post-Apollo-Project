@@ -3482,7 +3482,7 @@ PanelWindow {
                         ModeButton {
                             width: (calcSubModeStrip.width - calcSubModeStrip.spacing) / 2
                             height: parent.height
-                            bordered: false
+                            bordered: true
                             textOnly: true
                             labelText: "CONVERT"
                             labelFontSize: 11
@@ -3494,7 +3494,7 @@ PanelWindow {
                         ModeButton {
                             width: (calcSubModeStrip.width - calcSubModeStrip.spacing) / 2
                             height: parent.height
-                            bordered: false
+                            bordered: true
                             textOnly: true
                             labelText: "MATH"
                             labelFontSize: 11
@@ -3948,7 +3948,7 @@ PanelWindow {
                             ModeButton {
                                 width: (mathTypeStrip.width - mathTypeStrip.spacing) / 2
                                 height: parent.height
-                                bordered: false
+                                bordered: true
                                 textOnly: true
                                 labelText: "ADD / SUB"
                                 labelFontSize: 11
@@ -3959,7 +3959,7 @@ PanelWindow {
                             ModeButton {
                                 width: (mathTypeStrip.width - mathTypeStrip.spacing) / 2
                                 height: parent.height
-                                bordered: false
+                                bordered: true
                                 textOnly: true
                                 labelText: "BETWEEN"
                                 labelFontSize: 11
@@ -4463,7 +4463,7 @@ PanelWindow {
                             width: (toolsSubModeStrip.width
                                     - toolsSubModeStrip.spacing * 2) / 3
                             height: parent.height
-                            bordered: false
+                            bordered: true
                             textOnly: true
                             labelText: "STOPWATCH"
                             labelFontSize: 11
@@ -4479,7 +4479,7 @@ PanelWindow {
                             width: (toolsSubModeStrip.width
                                     - toolsSubModeStrip.spacing * 2) / 3
                             height: parent.height
-                            bordered: false
+                            bordered: true
                             textOnly: true
                             labelText: "COUNTDOWN"
                             labelFontSize: 11
@@ -4495,7 +4495,7 @@ PanelWindow {
                             width: (toolsSubModeStrip.width
                                     - toolsSubModeStrip.spacing * 2) / 3
                             height: parent.height
-                            bordered: false
+                            bordered: true
                             textOnly: true
                             labelText: "ALARM"
                             labelFontSize: 11
@@ -6950,7 +6950,7 @@ PanelWindow {
                         ModeButton {
                             width: (settingsSubModeStrip.width - settingsSubModeStrip.spacing) / 2
                             height: parent.height
-                            bordered: false
+                            bordered: true
                             textOnly: true
                             labelText: "VISUAL TIME"
                             labelFontSize: 11
@@ -6961,7 +6961,7 @@ PanelWindow {
                         ModeButton {
                             width: (settingsSubModeStrip.width - settingsSubModeStrip.spacing) / 2
                             height: parent.height
-                            bordered: false
+                            bordered: true
                             textOnly: true
                             labelText: "SYNC"
                             labelFontSize: 11

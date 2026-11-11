@@ -28,10 +28,25 @@ Item {
     property bool dock24Hour: false
     signal dockFormatRequested(bool use24)
     property bool zonePickerExpanded: false
-    readonly property bool zoneSearchFocused: systemZonePicker.searchFocused
+    readonly property bool zoneSearchFocused:
+        systemZonePicker.searchFocused || compactSettings.zoneSearchFocused
+
+    TimeSettingsCompact {
+        id: compactSettings
+        anchors.fill: parent
+        visible: pane.settingsSection !== "all"
+        settingsSection: pane.settingsSection
+        calibratedPreview: pane.calibratedPreview
+        dock24Hour: pane.dock24Hour
+        dockFormatAvailable: pane.dockFormatAvailable
+        onDockFormatRequested: function(use24) {
+            pane.dockFormatRequested(use24);
+        }
+    }
 
     Flickable {
         id: scroll
+        visible: pane.settingsSection === "all"
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds

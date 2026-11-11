@@ -6,6 +6,7 @@ on:
       - "modules/Clock.qml"
       - "widgets/TimeW.qml"
       - "widgets/TimeSettingsPane.qml"
+      - "widgets/TimeSettingsCompact.qml"
       - "widgets/TimeResyncPopup.qml"
       - "services/time/TimeSettings.qml"
       - "services/time/TimeSettingsPolicy.js"
@@ -16,6 +17,7 @@ on:
       - "tests/time/test_clock_settings_contract.py"
       - "tests/time/test_clock_auto_check_contract.py"
       - "tests/time/test_clock_settings_submodes_contract.py"
+      - "tests/time/test_clock_settings_compact_contract.py"
       - "shell.qml"
       - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
@@ -24,6 +26,7 @@ on:
       - "modules/Clock.qml"
       - "widgets/TimeW.qml"
       - "widgets/TimeSettingsPane.qml"
+      - "widgets/TimeSettingsCompact.qml"
       - "widgets/TimeResyncPopup.qml"
       - "services/time/TimeSettings.qml"
       - "services/time/TimeSettingsPolicy.js"
@@ -34,6 +37,7 @@ on:
       - "tests/time/test_clock_settings_contract.py"
       - "tests/time/test_clock_auto_check_contract.py"
       - "tests/time/test_clock_settings_submodes_contract.py"
+      - "tests/time/test_clock_settings_compact_contract.py"
       - "shell.qml"
       - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
@@ -49,6 +53,7 @@ jobs:
           python3 -m unittest discover -s tests/time -p 'test_clock_resync_popup_contract.py' -v
           python3 -m unittest discover -s tests/time -p 'test_clock_auto_check_contract.py' -v
           python3 -m unittest discover -s tests/time -p 'test_clock_settings_submodes_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_settings_compact_contract.py' -v
       - name: Check bounded visual calibration policy
         run: |
           node <<'JS'

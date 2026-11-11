@@ -201,7 +201,8 @@ Column {
     }
     function selectDecoderMode(value) {
         const svc = root.speechInputService;
-        if (value !== "STANDARD" && value !== "FAST")
+        if (value !== "STANDARD" && value !== "FAST"
+                && value !== "RESPONSIVE")
             return false;
         if (!root.active || !svc || svc.busy || root.otherVoiceBusy
                 || (root.mode !== "SETUP" && root.mode !== "JOB"))
@@ -906,7 +907,7 @@ Column {
         }
     }
 
-    // Explicit, reversible local Whisper A/B mode. Not a provider choice.
+    // Reversible local Whisper speed/accuracy trials, not provider choices.
     // Disabled while any shared Hospital microphone is active.
     Row {
         width: parent.width
@@ -935,10 +936,24 @@ Column {
             onTriggered: root.selectDecoderMode("FAST")
         }
     }
+    // Full-width label so the experiment is readable rather than truncating
+    // three long names into the existing two-button row.
+    HospitalActionButton {
+        width: parent.width
+        height: 27
+        visible: root.mode === "SETUP" || root.mode === "JOB"
+        label: "VOICE // RESPONSIVE TRIAL"
+        accent: root.decoderMode === "RESPONSIVE" ? Colors.magenta : Colors.cyan
+        selectedAction: root.decoderMode === "RESPONSIVE"
+        contentGlowEnabled: false
+        enabledAction: root.active && !!root.speechInputService
+            && !root.speechInputService.busy && !root.otherVoiceBusy
+        onTriggered: root.selectDecoderMode("RESPONSIVE")
+    }
     GohuText {
         width: parent.width
         visible: root.mode === "SETUP" || root.mode === "JOB"
-        text: "STANDARD // CURRENT ACCURACY  |  FAST // ONE DECODER CANDIDATE. Compare words and timing; same CPU/RAM limits."
+        text: "STANDARD // CURRENT ACCURACY  |  FAST // ONE DECODER CANDIDATE  |  RESPONSIVE // ONE EARLIER PHRASE + CATCHUP. Compare words and timing; same model, jobs, CPU and RAM."
         font.pixelSize: 8
         color: Colors.cyan
         wrapMode: Text.Wrap

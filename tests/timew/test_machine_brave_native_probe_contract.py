@@ -20,7 +20,7 @@ legacy = (root / "services/time/MachineCheckpointStore.py").read_text()
 assert manifest["manifest_version"] == 3
 assert manifest["incognito"] == "not_allowed"
 assert manifest["permissions"] == []
-assert manifest["optional_permissions"] == ["nativeMessaging"]
+assert manifest["optional_permissions"] == ["nativeMessaging", "tabs"]
 assert manifest["host_permissions"] == []
 assert not any(k in manifest for k in (
     "background", "content_scripts", "externally_connectable",

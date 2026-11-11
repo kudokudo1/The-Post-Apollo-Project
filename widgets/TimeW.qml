@@ -1915,6 +1915,21 @@ PanelWindow {
             TimeSettings.prepareResync();
     }
 
+    function openNotificationAlarm(alarmId) {
+        // Resolve against saved alarm IDs. Do not create an alarm, interpret
+        // notification titles, or discard a different alarm's unsaved note.
+        if (!Number.isSafeInteger(alarmId) || alarmId <= 0
+                || !AlarmManagerService.findAlarm(alarmId))
+            return false;
+        if (!alarmPlaceholderPane.choose(alarmId))
+            return false;
+        chooseMode(2); // Existing TOOLS tab; ALARM subview is its owner.
+        toolsView = "alarm";
+        if (!menuOpen)
+            menuOpen = true;
+        return true;
+    }
+
     function toggle() {
         menuOpen = !menuOpen;
     }

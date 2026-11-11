@@ -10,6 +10,7 @@ on:
       - 'widgets/weather/StationHome.qml'
       - 'tests/weather/test_weather_w8_unified_terminal.js'
       - 'tests/weather/test_weather_cosmos_domain_separation_m28r.js'
+      - 'tests/weather/test_ground_full_visual_parity_m28q.js'
       - 'tests/weather/test_workspace_landing_w1.js'
       - 'tests/weather/fixtures/W8UnifiedWeatherTerminalNative.qml'
       - '.github/workflows/weather-station-w8-unified-terminal.yml'
@@ -35,6 +36,7 @@ jobs:
           node --test tests/weather/test_weather_subject_panels_m2a.js
           node --test tests/weather/test_weather_subject_panels_m2b.js
           node --test tests/weather/test_weather_cosmos_domain_separation_m28r.js
+          node --test tests/weather/test_ground_full_visual_parity_m28q.js
           node --test tests/weather/test_services_w6_canonical_rollout.js
           node --test tests/weather/test_home_w3_sources_and_history_fit.js
 

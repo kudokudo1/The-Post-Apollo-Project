@@ -77,12 +77,19 @@ class SwayScrollTests(TestCase):
             (self.input_id, "inf", "1.0"),
             (self.input_id, "0", "1.0"),
             (self.input_id, "999", "1.0"),
-            (self.input_id, "1.1", "1.0"),
+            (self.input_id, "1.1;reload", "1.0"),
             (self.input_id, "2.0", "infinity")
         ]:
             with self.assertRaises(control.ScrollControlError):
                 control.apply(identifier, factor, expected)
         self.assertFalse(any(x[1] == "input" for x in self.calls))
+
+    def test_custom_existing_factor_can_be_restored(self):
+        self.factor = 1.337
+        applied = control.apply(self.input_id, "2.0", "1.337")
+        self.assertEqual(applied["before"], 1.337)
+        restored = control.apply(self.input_id, "1.337", "2.0")
+        self.assertAlmostEqual(restored["factor"], 1.337)
 
     def test_noop_never_runs_input_command(self):
         result = control.apply(self.input_id, "1.0", "1.0")

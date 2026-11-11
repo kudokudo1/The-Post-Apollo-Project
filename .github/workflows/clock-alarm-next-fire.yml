@@ -1,0 +1,76 @@
+name: Clock alarm next-fire and real timer smoke test
+
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmManagerPolicy.js"
+      - "services/time/AlarmManagerService.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "tests/time/test_clock_alarm_next_fire_contract.py"
+      - ".github/workflows/clock-alarm-next-fire.yml"
+  push:
+    paths:
+      - "services/time/AlarmManagerPolicy.js"
+      - "services/time/AlarmManagerService.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "tests/time/test_clock_alarm_next_fire_contract.py"
+      - ".github/workflows/clock-alarm-next-fire.yml"
+
+jobs:
+  source-and-real-schedule:
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify visible next firing, date suggestions and no fake alarms
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_alarm_next_fire_contract.py' -v
+      - name: Simulate the actual 4:59 screenshot failure and a real 1-2 minute scheduled ring
+        run: |
+          node <<'JS'
+          const assert=require('node:assert/strict');
+          const fs=require('node:fs'),vm=require('node:vm');
+          const policy={Date,Number,JSON,Array,Object,Math};
+          vm.runInNewContext(fs.readFileSync('services/time/AlarmManagerPolicy.js','utf8')
+            .replace(/^\.pragma library\s*/,''), policy);
+          const now=new Date(2026,10,11,4,58,17).getTime();
+          const startedMinute=new Date(2026,10,11,4,59,19).getTime();
+          assert.equal(policy.suggestedOnceDate(4,59,now),'2026-11-11');
+          assert.equal(policy.suggestedOnceDate(4,59,startedMinute),'2026-11-12');
+          assert.equal(policy.suggestedOnceDate(4,59,0),'');
+          assert.equal(policy.suggestedOnceDate(25,59,now),'');
+          // The screenshot had ONE TIME = Nov 12, so an enabled 4:59 alarm
+          // cannot fire on Nov 11. The result must be overt, not guessed.
+          let doc=policy.create(policy.initialDocument(),now).document;
+          const tomorrow=policy.update(doc,1,{mode:'once',date:'2026-11-12',
+            hour:4,minute:59,weekdays:[],enabled:true},now);
+          assert.equal(tomorrow.ok,true);
+          assert.equal(policy.tick(tomorrow.document,startedMinute).started.length,0);
+          const next=policy.nextOccurrenceMs(tomorrow.document.alarms[0],startedMinute);
+          assert.equal(next,new Date(2026,10,12,4,59).getTime());
+
+          const due=policy.shortTestDueMs(now);
+          assert.ok(due-now>=60000 && due-now<=120000);
+          assert.equal(new Date(due).getSeconds(),0);
+          const when=new Date(due);
+          const created=policy.create(doc,now);
+          assert.equal(created.ok,true);
+          const armed=policy.update(created.document,created.id,{
+            mode:'once',date:policy.dayKey(due),
+            hour:when.getHours(),minute:when.getMinutes(),weekdays:[],
+            enabled:true,keepSaved:false,
+            soundEnabled:true,soundId:'chime',volumePercent:65
+          },now);
+          assert.equal(armed.ok,true);
+          assert.equal(policy.nextOccurrenceMs(armed.document.alarms[1],now),due);
+          assert.equal(policy.tick(armed.document,due-1).started.length,0);
+          const fired=policy.tick(armed.document,due);
+          assert.deepEqual(Array.from(fired.started),[2]);
+          assert.equal(fired.document.alarms[1].ringing,true);
+          assert.equal(fired.document.alarms[1].ringStartedAtMs,due);
+          assert.equal(policy.validDocument(fired.document),true);
+          const stopped=policy.stop(fired.document,2);
+          assert.equal(stopped.ok,true);
+          assert.equal(stopped.document.alarms.length,1);
+          console.log('Alarm screenshot regression and real future timer smoke test: PASS');
+          JS

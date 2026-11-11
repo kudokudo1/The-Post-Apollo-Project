@@ -271,14 +271,14 @@ Rectangle {
                             anchors.left: parent.left
                             anchors.top: parent.top
                             text: metric.modelData.name
-                            font.pixelSize: 10
+                            font.pixelSize: metric.height<40 ? 9 : 10
                             color: metric.modelData.accent
                         }
                         Row {
                             id: metricValueRow
                             anchors.left: parent.left
                             anchors.top: parent.top
-                            anchors.topMargin: 11
+                            anchors.topMargin: metric.height<40 ? 9 : 11
                             spacing: 2
                             GohuText {
                                 objectName: "weather-w14-wind-bearing-arrow"
@@ -308,7 +308,8 @@ Rectangle {
                                       : (metric.valid && terminal.sky.pressureValue>=0
                                          ? terminal.read(terminal.sky.pressureValue," hPa")
                                          : "--")
-                                font.pixelSize: metric.modelData.key==="pressure" ? 11 : 14
+                                font.pixelSize: metric.modelData.key==="pressure" ? 11
+                                                : (metric.height<40 ? 13 : 14)
                                 color: Colors.white
                             }
                         }
@@ -323,7 +324,7 @@ Rectangle {
                                metricValueRow.y+metricValueRow.height
                                +Math.max(2,(metric.height-metricValueRow.y
                                   -metricValueRow.height-height)/2))
-                            height: visible ? 7 : 0
+                            height: visible ? (metric.height<40 ? 6 : 7) : 0
                             color: Colors.black
                             border.width: 1
                             border.color: metric.modelData.accent

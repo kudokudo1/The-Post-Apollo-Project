@@ -138,7 +138,7 @@ Rectangle {
                           : "WAITING FOR OBSERVATION")
                     color: Colors.orange
                     opacity: 1
-                    font.pixelSize: 11
+                    font.pixelSize: 12
                     elide: Text.ElideRight
                 }
                 GohuText {
@@ -170,7 +170,8 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     // Keep the original artwork while making the primary
                     // observation symbol the dominant icon of this band.
-                    width: Math.max(68,Math.min(90,currentPanel.height+12))
+                    width: Math.max(75,Math.min(104,currentPanel.height+16,
+                                     largeCurrent.width*0.50))
                     height: width
                     Text {
                         id: originalConditionGlyph
@@ -316,9 +317,13 @@ Rectangle {
                             visible: metric.modelData.key!=="pressure"
                             anchors.left: parent.left
                             anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            anchors.bottomMargin: 0
-                            height: visible ? 5 : 0
+                            // W19 // A reading meter belongs with its value,
+                            // centered in the free cell space, not as the bottom divider.
+                            y: Math.min(metric.height-height-1,
+                               metricValueRow.y+metricValueRow.height
+                               +Math.max(2,(metric.height-metricValueRow.y
+                                  -metricValueRow.height-height)/2))
+                            height: visible ? 7 : 0
                             color: Colors.black
                             border.width: 1
                             border.color: metric.modelData.accent
@@ -502,19 +507,12 @@ Rectangle {
                                         horizontalAlignment: Text.AlignHCenter
                                         text: terminal.read(hour.entry.tempF,"°F")
                                     }
-                                    GohuText {
-                                        id: hourChance
-                                        width: parent.width
-                                        height: 10
-                                        font.pixelSize: 10
-                                        color: Colors.cyan
-                                        horizontalAlignment: Text.AlignHCenter
-                                        text: terminal.rainChance(hour.entry.chanceRain)
-                                    }
+                                    // W19 // The meter is between temperature and
+                                    // its matching chance, never a tile divider.
                                     Rectangle {
                                         id: hourRain
                                         width: parent.width-6
-                                        height: 4
+                                        height: 6
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         color: Colors.black
                                         border.width: 1
@@ -527,6 +525,15 @@ Rectangle {
                                                    *terminal.fraction(hour.entry.chanceRain))
                                             color: Colors.orange
                                         }
+                                    }
+                                    GohuText {
+                                        id: hourChance
+                                        width: parent.width
+                                        height: 10
+                                        font.pixelSize: 10
+                                        color: Colors.cyan
+                                        horizontalAlignment: Text.AlignHCenter
+                                        text: terminal.rainChance(hour.entry.chanceRain)
                                     }
                                 }
                             }
@@ -593,6 +600,9 @@ Rectangle {
                             WeatherCyclePolicy.artworkFor(dayState,cycle)
                         width: (days.width-6)/3
                         height: days.height
+                        readonly property alias rainMeter: dayRainMeter
+                        readonly property alias temperatureItem: dayTemperature
+                        readonly property alias chanceItem: dayChance
                         Rectangle {
                             visible: index>0
                             x: 0
@@ -637,6 +647,8 @@ Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 0
                             GohuText {
+                                id: dayTemperature
+                                height: 12
                                 text: terminal.dateLabel(day.entry.date)+"  "+
                                       terminal.read(day.entry.maxTempF,"°")
                                       +"/"+terminal.read(day.entry.minTempF,"°F")
@@ -645,7 +657,29 @@ Rectangle {
                                 width: parent.width
                                 elide: Text.ElideRight
                             }
+                            // W19 // Same percentage-to-length scale and ink
+                            // as each hourly rain meter, now for daily peak chance.
+                            Rectangle {
+                                id: dayRainMeter
+                                objectName: "weather-w19-daily-rain-meter"
+                                width: Math.max(0,parent.width-6)
+                                height: 6
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.cyan
+                                Rectangle {
+                                    x: 1
+                                    y: 1
+                                    height: Math.max(0,parent.height-2)
+                                    width: Math.max(0,(parent.width-2)
+                                          *terminal.fraction(day.entry.chanceRain))
+                                    color: Colors.orange
+                                }
+                            }
                             GohuText {
+                                id: dayChance
+                                height: 9
                                 text: terminal.rainChance(day.entry.chanceRain)
                                       +" PEAK RAIN CHANCE"
                                 font.pixelSize: 9

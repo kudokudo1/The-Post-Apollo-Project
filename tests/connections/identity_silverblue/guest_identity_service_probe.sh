@@ -164,7 +164,8 @@ def check_origin(stage):
         if field is None or field.split()[1:]!=[str(value)]*4:
             raise RuntimeError(f"{stage}: kernel service {tag} changed")
     raw=Path(f"/proc/{pid}/cgroup").read_text()
-    if expected_cgroup not in raw.splitlines()[0].split(":")[-1]:
+    groups=[line.split(":",2) for line in raw.splitlines()]
+    if len(groups)!=1 or len(groups[0])!=3 or groups[0][2]!=expected_cgroup:
         raise RuntimeError(f"{stage}: kernel service cgroup changed")
 
 for action in ("BEGIN","STATUS","CANCEL","RECOVER"):

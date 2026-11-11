@@ -1,0 +1,41 @@
+name: TimeW MACHINE Brave title marker window correlation
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineBraveTitleMarkerWitness.py"
+      - "services/time/MachineBraveNativeTitleMarker.py"
+      - "services/time/MachineBraveNativeTitleManifest.py"
+      - "services/time/MachineBraveTitleTrial.py"
+      - "integrations/machine/brave-topology/marker*"
+      - "integrations/machine/brave-topology/open-marker-ui.mjs"
+      - "integrations/machine/brave-topology/popup.html"
+      - "tests/timew/test_machine_brave_title_marker.py"
+      - "tests/timew/test_machine_brave_title_trial.py"
+      - "tests/timew/test_machine_brave_title_marker.mjs"
+      - "docs/timew-machine-brave-title-marker.md"
+      - ".github/workflows/timew-machine-brave-title-marker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  title-marker-prototype:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate exact title, two-read focus and framed native refusal
+        run: python3 -B -I tests/timew/test_machine_brave_title_marker.py
+      - name: Verify disposable-only manifest registration and rollback
+        run: python3 -B -I tests/timew/test_machine_brave_title_trial.py
+      - name: Verify explicit browser test tab and no restore authority
+        run: node tests/timew/test_machine_brave_title_marker.mjs
+      - name: Preserve existing Brave focus and transport isolation
+        run: |
+          python3 -B -I tests/timew/test_machine_brave_focus_witness.py
+          python3 -B -I tests/timew/test_machine_brave_native_focus_observe.py
+          python3 -B -I tests/timew/test_machine_brave_focus_trial.py
+          python3 -B -I tests/timew/test_machine_brave_native_probe_contract.py
+          python3 -B -I tests/timew/test_machine_brave_tab_pattern_contract.py

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import qs.services.time
 import "../components"
 import "../services/time/AlarmManagerPolicy.js" as Policy
@@ -24,11 +25,17 @@ Item {
     property string draftSoundId: "chime"
     property int draftVolume: 60
     property int deleteConfirmId: 0
+    property bool loadingNote: false
+    property bool noteDirty: false
+    property int noteSavePendingId: 0
+    property string noteSavePendingText: ""
+    property string noteFeedback: ""
 
     readonly property bool editingActive:
         alarmSearch.activeFocus || alarmName.activeFocus
         || alarmHour.activeFocus || alarmMinute.activeFocus
         || alarmDate.activeFocus || alarmResumeDate.activeFocus
+        || alarmNote.activeFocus
 
     readonly property var visibleAlarms: {
         const term = alarmSearch.text.toLowerCase().trim();
@@ -47,9 +54,16 @@ Item {
             : "0 / " + visibleAlarms.length
     readonly property var dayNames: ["SUN","MON","TUE","WED","THU","FRI","SAT"]
 
+    function canLeaveNote(id) {
+        if (id === selectedId || (!noteDirty && noteSavePendingId === 0))
+            return true;
+        AlarmManagerService.feedback = "SAVE OR DISCARD NOTE BEFORE CHANGING ALARM";
+        settingsTab = "note";
+        return false;
+    }
     function choose(id) {
         const a = AlarmManagerService.findAlarm(id);
-        if (!a) return;
+        if (!a || !canLeaveNote(id)) return false;
         selectedId = id;
         settingsTab = "schedule";
         deleteConfirmId = 0;
@@ -65,8 +79,64 @@ Item {
         alarmMinute.text = ("0" + a.minute).slice(-2);
         alarmDate.text = a.date || Policy.dateOffset(Date.now(), 1);
         alarmResumeDate.text = a.pausedUntilDate || "";
+        loadingNote = true;
+        alarmNote.text = a.note || "";
+        loadingNote = false;
+        noteDirty = false;
+        noteFeedback = "";
+        return true;
+    }
+    function openNote(id) {
+        if (!choose(id)) return;
+        settingsTab = "note";
+        alarmNote.forceActiveFocus();
+    }
+    function saveNote() {
+        if (!selectedAlarm || !AlarmManagerService.canEdit
+                || noteSavePendingId !== 0) return false;
+        const desired = alarmNote.text.trim();
+        if (desired === (selectedAlarm.note || "")) {
+            noteDirty = false;
+            noteFeedback = "NOTE UNCHANGED";
+            return true;
+        }
+        const id = selectedId;
+        if (!AlarmManagerService.saveAlarmNote(id, alarmNote.text)) {
+            noteFeedback = "NOTE SAVE NOT ACCEPTED";
+            return false;
+        }
+        noteSavePendingId = id;
+        noteSavePendingText = desired;
+        noteDirty = true;
+        noteFeedback = "SAVING // KEEP NOTE OPEN";
+        return true;
+    }
+    function discardNote() {
+        if (noteSavePendingId !== 0 || !selectedAlarm) return;
+        loadingNote = true;
+        alarmNote.text = selectedAlarm.note || "";
+        loadingNote = false;
+        noteDirty = false;
+        noteFeedback = "UNSAVED NOTE DISCARDED";
+    }
+    function settleNoteWrite() {
+        if (noteSavePendingId === 0) return;
+        if (AlarmManagerService.storageState === "ready") {
+            const saved = AlarmManagerService.findAlarm(noteSavePendingId);
+            if (saved && (saved.note || "") === noteSavePendingText) {
+                noteSavePendingId = 0;
+                noteDirty = alarmNote.text.trim() !== noteSavePendingText;
+                noteFeedback = "NOTE SAVED TO ALARM STORE";
+            }
+        } else if (AlarmManagerService.storageState === "error") {
+            noteSavePendingId = 0;
+            noteDirty = true;
+            noteFeedback = "NOTE NOT SAVED // KEEP DRAFT VISIBLE";
+            settingsTab = "note";
+        }
     }
     function create() {
+        if (!canLeaveNote(-1)) return;
         const id = AlarmManagerService.createAlarm();
         if (id > 0) {
             alarmSearch.text = "";
@@ -74,7 +144,7 @@ Item {
         }
     }
     function copySelected() {
-        if (!selectedAlarm) return;
+        if (!selectedAlarm || !canLeaveNote(-1)) return;
         const id = AlarmManagerService.duplicateAlarm(selectedId);
         if (id > 0) {
             alarmSearch.text = "";
@@ -100,10 +170,19 @@ Item {
             enabled: arm ? true : draftEnabled,
             soundEnabled: draftSoundEnabled,
             soundId: draftSoundId,
-            volumePercent: draftVolume
+            volumePercent: draftVolume,
+            note: alarmNote.text.trim()
         };
-        if (AlarmManagerService.saveAlarm(selectedId, patch))
-            choose(selectedId);
+        const hadDraft = noteDirty;
+        if (AlarmManagerService.saveAlarm(selectedId, patch)) {
+            if (hadDraft) {
+                noteSavePendingId = selectedId;
+                noteSavePendingText = alarmNote.text.trim();
+                noteFeedback = "SAVING // KEEP NOTE OPEN";
+            } else {
+                choose(selectedId);
+            }
+        }
     }
     function toggleDay(index) {
         if (draftDays.indexOf(index) >= 0)
@@ -133,15 +212,16 @@ Item {
         choose(rows[idx].id);
         alarmList.positionViewAtIndex(idx, ListView.Contain);
     }
-    function removeSelected() {
-        if (!selectedAlarm) return;
-        if (deleteConfirmId !== selectedId) {
-            deleteConfirmId = selectedId;
+    function removeById(id) {
+        if (!AlarmManagerService.canEdit) return;
+        if (deleteConfirmId !== id) {
+            deleteConfirmId = id;
+            AlarmManagerService.feedback = "CONFIRM DELETE // PRESS RED X AGAIN";
             return;
         }
-        const id = selectedId;
+        if (!canLeaveNote(id === selectedId ? -1 : id)) return;
         deleteConfirmId = 0;
-        if (AlarmManagerService.removeAlarm(id)) {
+        if (AlarmManagerService.removeAlarm(id) && selectedId === id) {
             selectedId = 0;
             if (AlarmManagerService.count)
                 choose(AlarmManagerService.document.alarms[0].id);
@@ -160,6 +240,9 @@ Item {
         function onCountChanged() {
             if (!pane.selectedAlarm && AlarmManagerService.count > 0)
                 pane.choose(AlarmManagerService.document.alarms[0].id);
+        }
+        function onStorageStateChanged() {
+            pane.settleNoteWrite();
         }
     }
 

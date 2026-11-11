@@ -135,6 +135,18 @@ def same_process_checks():
             assert first.pid==os.getpid()
             assert first.uid==os.getuid()
             assert first.gid==os.getgid()
+            assert len(first.uid_fields)==4 and first.uid_fields[1]==actual.uid
+            assert len(first.gid_fields)==4 and first.gid_fields[1]==actual.gid
+            # Changing any pinned real/saved/fs credential is negative even
+            # when the effective socket credential stays unchanged.
+            with patch.object(lifecycle,"_identity",
+                              return_value=replace(first,uid_fields=(
+                                  first.uid_fields[0]+1,*first.uid_fields[1:]))):
+                assert lease.valid() is False
+            with patch.object(lifecycle,"_identity",
+                              return_value=replace(first,gid_fields=(
+                                  first.gid_fields[0]+1,*first.gid_fields[1:]))):
+                assert lease.valid() is False
             # Live process is invalidated on task starttime mismatch
             with patch.object(lifecycle,"_identity",
                               return_value=replace(first,start_ticks=first.start_ticks+1)):

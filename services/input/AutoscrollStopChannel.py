@@ -92,6 +92,18 @@ class StopServer:
             self.close()
             raise
 
+    def healthy(self):
+        if self.sock is None or self.path is None or self.inode is None:
+            return False
+        try:
+            info = self.path.lstat()
+            return (info.st_ino == self.inode
+                    and stat.S_ISSOCK(info.st_mode)
+                    and info.st_uid == os.getuid()
+                    and not (info.st_mode & 0o177))
+        except OSError:
+            return False
+
     def poll(self):
         if self.sock is None:
             return False

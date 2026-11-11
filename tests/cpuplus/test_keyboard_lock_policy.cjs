@@ -22,7 +22,7 @@ assert.equal(doc.num, "on");
 assert.equal(doc.caps, "off");
 assert.equal(p.parse(JSON.stringify(doc)).ok, true);
 for (const raw of ["{}", "bad", "[]", '{"version":2,"num":"on","caps":"off"}',
-    '{"version":1,"num":"remember","caps":"on"}']) {
+    '{"version":1,"num":"bogus","caps":"on"}']) {
     assert.equal(p.parse(raw).ok, false);
 }
 for (const [lock, mode] of [["unknown", "on"], ["caps", "toggle"]])

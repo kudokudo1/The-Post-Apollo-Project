@@ -55,6 +55,13 @@ class ArchiveV2IndexTests(unittest.TestCase):
             self.assertTrue(result["readOnly"])
             self.assertLessEqual(len(result["items"]), indexer.PAGE_SIZE)
             self.assertEqual(result["total"], 57)
+            disk = result["capacity"]
+            self.assertIsInstance(disk, dict)
+            self.assertGreater(disk["databaseBytes"], 0)
+            self.assertGreaterEqual(disk["chargedBytes"], disk["databaseBytes"])
+            self.assertGreater(disk["remainingBytes"], 0)
+            self.assertEqual(disk["capacityState"], "READY")
+            self.assertEqual(disk["diskQuotaBytes"], 768 * 1024 * 1024)
             self.assertNotIn("PRIVATE PAYLOAD", json.dumps(result))
             for item in result["items"]:
                 self.assertEqual(item["kind"], "V2 SNAPSHOT")

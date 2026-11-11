@@ -17,7 +17,8 @@ permissions:
 jobs:
   official-silverblue-identity:
     name: Actual offline KVM Silverblue + signed Identity RPM + two-reboot rollback
-    runs-on: ubuntu-latest
+    # Match the genuine C2v/C4b signed Silverblue VM runner with /dev/kvm.
+    runs-on: ubuntu-24.04
     timeout-minutes: 75
     env:
       POST_APOLLO_ID_SILVERBLUE_CI_ONLY: '1'
@@ -30,8 +31,12 @@ jobs:
           test "$GITHUB_ACTIONS" = true
           test "$RUNNER_ENVIRONMENT" = github-hosted
           test "$GITHUB_ACTOR" = kudokudo1
-          test -c /dev/kvm
-          test -r /dev/kvm && test -w /dev/kvm
+          test -c /dev/kvm || { echo "C4B_ID_BLOCKED // OFFICIAL_VM_KVM_DEVICE_MISSING"; exit 2; }
+          # Exactly the disposable GitHub-hosted KVM setup in the passing
+          # shared C4b workflow. Never performed on the operator machine.
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm ||
+            { echo "C4B_ID_BLOCKED // OFFICIAL_VM_KVM_PERMISSION_REFUSED"; exit 2; }
           bash -n tests/connections/identity_silverblue/build_signed_identity_gateway.sh
           bash -n tests/connections/identity_silverblue/verify_signed_identity_gateway.sh
           bash -n tests/connections/identity_silverblue/run_official_silverblue_identity.sh

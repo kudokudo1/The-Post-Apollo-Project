@@ -415,7 +415,7 @@ Rectangle {
                             GohuText {
                                 id: forecastTime
                                 width: parent.width
-                                height: 11
+                                height: 10
                                 font.pixelSize: 10
                                 color: Colors.yellow
                                 horizontalAlignment: Text.AlignHCenter
@@ -424,7 +424,7 @@ Rectangle {
                             }
                             StationWeatherLineGlyph {
                                 id: hourGlyph
-                                width: Math.min(36,Math.max(22,hour.height-48))
+                                width: Math.min(38,Math.max(28,hour.height-43))
                                 height: width
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 mode: hour.art

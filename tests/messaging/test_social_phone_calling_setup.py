@@ -227,7 +227,7 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('callSetupStatus = "IDLE";', visibility)
         self.assertIn('visible: phonePane.setupState === "CHECKED" && !phonePane.stageWanted', self.ui)
         self.assertIn('WeatherStage.StationChassisCutout {', self.ui)
-        self.assertIn('phoneReadAdapter.conversations : []', self.ui)
+        self.assertIn('phonePane.filteredPhoneConversations : []', self.ui)
         self.assertIn('phoneReadAdapter.messages : []', self.ui)
 
     def test_no_installation_or_device_defaults_ever_enter_our_code(self):

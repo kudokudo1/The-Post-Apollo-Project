@@ -221,8 +221,10 @@ class ArchiveV2IndexTests(unittest.TestCase):
         sidecar.unlink()
         os.chmod(self.root, 0o755)
         try:
+            # A legacy database under a shared parent must remain unreadable
+            # until explicitly relocated by an authorized migration.
             with self.assertRaisesRegex(indexer.ReadIndexError,
-                                        "ARCHIVE_ROOT_UNSAFE"):
+                                        "ARCHIVE_LEGACY_ROOT_UNSAFE"):
                 self.index()
         finally:
             os.chmod(self.root, 0o700)

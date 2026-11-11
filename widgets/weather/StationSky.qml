@@ -643,6 +643,18 @@ Rectangle {
             }
         }
 
+        // W8 // One compact instrument leads both the full WEATHER terminal
+        // and the OVERVIEW. Detailed current/air and original forecast artwork
+        // below are sourced by this same StationSky and shared weatherService.
+        StationWeatherTerminalSummary {
+            objectName: "weather-w8-full-terminal-summary"
+            visible: sky.subjectRoute === "weather/conditions/current"
+            width: skyContent.width
+            height: visible ? 164 : 0
+            compact: false
+            weatherService: sky.weatherService
+        }
+
         // SUN keeps local solar geometry, and offers the physical solar
         // activity and cycle instruments without mixing them with Kp/wind.
         Row {

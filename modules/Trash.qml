@@ -528,6 +528,8 @@ PanelWindow {
                 || reply.copyOnly !== true || !receipt
                 || !/^[0-9a-f]{32}$/.test(receipt.id)
                 || receipt.sourceRevision !== snapshotWitness
+                || receipt.ownerId !== (snapshotSourceKind === "demo"
+                                       ? "demo-scrape" : "weather-events")
                 || !/^[0-9a-f]{64}$/.test(receipt.sha256)
                 || typeof receipt.size !== "number" || receipt.size < 1) {
             snapshotStatus = "STALE // INVALID COPY RECEIPT";
@@ -887,7 +889,10 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!menuOpen) {
-            clearSnapshotArm();
+            // A committed capture must complete even if the user closes
+            // the panel; only previews can be silently discarded.
+            if (!snapshotBusy || snapshotPendingAction !== "capture")
+                clearSnapshotArm();
             burnCommitDelay.stop();
             burnUiStage = "";
             clearConfirmation();

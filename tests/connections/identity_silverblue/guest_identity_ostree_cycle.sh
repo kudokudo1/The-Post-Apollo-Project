@@ -171,6 +171,17 @@ ID_MONITOR
     [[ ! -e "$marker" ]] || fail "SERVICE_MARKER_UNEXPECTEDLY_PRESENT"
     count="$(rpm -ql "$pkg" | grep -E '^/usr/lib(exec)?/' | wc -l)"
     [[ "$count" == 9 ]] || fail "IDENTITY_BOOTED_PAYLOAD_NOT_NINE_FILES"
+    # rpm-ostree may check out immutable /usr files as hardlinks to objects
+    # in its content-addressed OSTree store. A link count >1 is therefore not
+    # evidence of a writable or replaced Identity file. The original RPM
+    # was signature-verified with an isolated keyring before composition;
+    # verify every installed file's size, digest, mode, ownership, and type
+    # against the booted RPM database before accepting this CI boot.
+    verify_output="$(rpm -V "$pkg" 2>&1)" ||
+      { printf 'C4B_ID_RPM_VERIFY_DETAILS // %.1000s\n' "$verify_output"; fail "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_REFUSED"; }
+    [[ -z "$verify_output" ]] ||
+      { printf 'C4B_ID_RPM_VERIFY_DETAILS // %.1000s\n' "$verify_output"; fail "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_DIFFERENCE"; }
+    echo "C4B_ID_PASS // SIGNED_INSTALLED_IDENTITY_RPM_FILE_DIGESTS_AND_MODES"
     for name in identity-gateway-ci desktop_command_gateway_v0.py \
       desktop_host_lifecycle_v0.py desktop_context_projection_v0.py \
       desktop_session_host_v0.py native_loopback_callback_v0.py \
@@ -178,7 +189,10 @@ ID_MONITOR
       path="$prefix/$name"
       [[ -f "$path" && ! -L "$path" ]] ||
         fail "INSTALLED_IDENTITY_MODULE_MISSING"
-      [[ "$(stat -c '%u:%g:%a:%h' "$path")" == "0:0:555:1" ]] ||
+      observed="$(stat -c '%u:%g:%a:%h' "$path")" ||
+        fail "INSTALLED_IDENTITY_MODULE_STAT_REFUSED"
+      printf 'C4B_ID_INSTALLED_FILE_OBSERVED // %s %s\n' "$name" "$observed"
+      [[ "$observed" =~ ^0:0:555:[1-9][0-9]*$ ]] ||
         fail "INSTALLED_IDENTITY_MODULE_MODE_WRONG"
       [[ "$(rpm -qf --qf '%{NAME}' "$path")" == "$pkg" ]] ||
         fail "INSTALLED_IDENTITY_MODULE_PACKAGE_OWNER_WRONG"

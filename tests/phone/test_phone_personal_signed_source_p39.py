@@ -183,8 +183,7 @@ class P39SourceBytesTests(unittest.TestCase):
         self.assertEqual(P39.C3EY_AUDIENCE, Y.AUDIENCE)
         self.assertEqual(P39.C3EY_DOMAIN, Y.DOMAIN)
         self.assertEqual(P39.C3EY_FIELDS, Y.SIGNED_KEYS)
-        self.assertEqual(P39.C3EX_FIELDS, Y.X.SNAPSHOT.intersection(P39.C3EX_FIELDS)
-                         if False else frozenset({"schema", "role", "records"}))
+        self.assertEqual(P39.C3EX_FIELDS, frozenset({"schema", "role", "records"}))
         self.assertEqual(P39.SNAPSHOT_FIELDS, Y.X.SNAPSHOT)
 
     def test_two_real_verified_upstream_signatures_still_deny_production(self):

@@ -90,7 +90,7 @@ def _row(raw):
     _require(owner in ALLOWED_OWNERS, "ARCHIVE_OWNER_UNAUTHORIZED")
     _require(isinstance(rid, str) and RESOURCE_ID.fullmatch(rid) is not None
              and isinstance(revision, str)
-             and HEX_DIGEST.fullmatch(revision) is not None,
+             and RESOURCE_ID.fullmatch(revision) is not None,
              "ARCHIVE_METADATA_INVALID")
     _require(type(captured) is int and 1 <= captured <= 9999999999999,
              "ARCHIVE_METADATA_INVALID")

@@ -1,0 +1,28 @@
+name: TimeW MACHINE synthetic durable receipt crash test
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineBraveFixtureRecoveryJournal.py"
+      - "tests/timew/test_machine_fixture_recovery_journal.py"
+      - "docs/timew-machine-fixture-recovery-journal.md"
+      - ".github/workflows/timew-machine-fixture-recovery-journal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crash-ledger:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fixture-only SQLite FULL transactions, HMAC chain and injected process death
+        run: python3 -B -I tests/timew/test_machine_fixture_recovery_journal.py
+      - name: Existing MACHINE offline plan and deny-only regressions
+        run: |
+          python3 -B -I tests/timew/test_machine_offline_transfer_recovery_contract.py
+          python3 -B -I tests/timew/test_machine_brave_sealed_vault.py
+          python3 -B -I tests/timew/test_machine_brave_archive_admission_intent.py
+          python3 -B -I tests/timew/test_machine_brave_absolute_frame_deadline.py

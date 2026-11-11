@@ -398,7 +398,8 @@ check('decoder_trial: str = "standard"' in script
       "Fast decoder only in bounded persistent AF_UNIX session; CLI fallback is truthful")
 check('function startRecording(requestedDecoderMode)' in live
       and 'requestedDecoderMode === "FAST"' in live
-      and 'decoderModeUsed = fastRequested ? "FAST PENDING" : "STANDARD"' in live
+      and 'decoderModeUsed = responsiveRequested ? "RESPONSIVE PENDING"' in live
+      and 'fastRequested ? "FAST PENDING" : "STANDARD"' in live
       and 'command.push("--decoder-trial", "fast")' in live
       and 'DECODER_FAST_ACTIVE|DECODER_FAST_FALLBACK' in live
       and 'return decoderModeUsed + " // AUDIO "' in live
@@ -414,6 +415,29 @@ check('property string decoderMode: "STANDARD"' in manager
       and 'pilotLiveChunks: 6' in host
       and 'MAX_QUEUE = 2' in script,
       "Surgery opt-in A/B UI is locked while busy; original voice safety limits remain")
+
+# One guarded responsive early-flush trial is separate from the existing
+# fast decoder choice. No extra model jobs, shorter total capture, or
+# cross-surface reuse of the Surgery-only experiment is permitted.
+check('label: "VOICE // RESPONSIVE TRIAL"' in manager
+      and 'root.selectDecoderMode("RESPONSIVE")' in manager
+      and 'value !== "RESPONSIVE"' in manager
+      and 'responsiveRequested = requestedDecoderMode === "RESPONSIVE"' in live
+      and 'command.push("--responsive-partial-trial")' in live
+      and 'RESPONSIVE_TRIAL_ACTIVE|RESPONSIVE_TRIAL_FALLBACK' in live
+      and 'RESPONSIVE_CHUNK_READY|RESPONSIVE_CATCHUP_CHUNK' in live
+      and 'decoderModeUsed = "RESPONSIVE"' in live
+      and 'responsive_partial_trial: bool = False' in script
+      and 'responsive_trial = (responsive_partial_trial' in script
+      and 'not responsive_used' in script
+      and 'recognition_idle.is_set()' in script
+      and 'clips.empty()' in script
+      and 'responsive_catchup_bytes = target - PAUSE_MIN_BYTES' in script
+      and 'responsive_catchup_bytes = 0' in script
+      and 'pilotLiveChunks: 6' in host
+      and 'MAX_QUEUE = 2' in script
+      and 'liveEngine.startRecording()' in reception_voice,
+      "One idle partial rebalances 1.2s + 2.8s without extra jobs or shared mode")
 
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")

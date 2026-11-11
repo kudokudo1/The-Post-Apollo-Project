@@ -119,9 +119,12 @@ Scope {
         }
         const fastRequested = requestedDecoderMode === "FAST"
             && preferPersistentModel && pilotLiveChunks > 0 && !pilotOneChunk;
-        // Never allow a stale FAST choice to carry over from Surgery into
-        // Reception or Intercom, which call this without a mode argument.
-        decoderModeUsed = fastRequested ? "FAST PENDING" : "STANDARD";
+        const responsiveRequested = requestedDecoderMode === "RESPONSIVE"
+            && preferPersistentModel && pilotLiveChunks > 0 && !pilotOneChunk
+            && chunkSeconds === 2;
+        // Surgery mode never leaks to Reception/Intercom default startRecording().
+        decoderModeUsed = responsiveRequested ? "RESPONSIVE PENDING"
+            : fastRequested ? "FAST PENDING" : "STANDARD";
         wasCancelled = false;
         doneSeen = false;
         packetCount = 0;
@@ -152,6 +155,8 @@ Scope {
             command.push("--prefer-persistent");
             if (fastRequested)
                 command.push("--decoder-trial", "fast");
+            if (responsiveRequested)
+                command.push("--responsive-partial-trial");
             if (speechPauseMs > 0)
                 command.push("--speech-pause-ms",
                     String(Math.max(400, Math.min(650, speechPauseMs))));
@@ -234,7 +239,7 @@ Scope {
             // Python emits fixed low-cardinality lifecycle codes. The
             // allowlist prevents untrusted child output reaching the journal.
             const code = String(data.detail || "");
-            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|MODEL_BACKPRESSURE|CAPTURE_STOPPED|CAPTURE_LIMIT_NEAR|CAPTURE_CHUNK_LIMIT|CAPTURE_DURATION_LIMIT|CAPTURE_SILENCE_LIMIT|CAPTURE_SOURCE_ENDED|CAPTURE_USER_STOP|MODEL_EARLY_START|MODEL_SESSION_STARTING|MODEL_SESSION_READY|MODEL_SESSION_UNAVAILABLE|DECODER_FAST_ACTIVE|DECODER_FAST_FALLBACK|PAUSE_CHUNK_READY|SILENT_OVERLAP_SKIPPED|RECORDING_COMPLETED)$/.test(code))
+            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|MODEL_BACKPRESSURE|CAPTURE_STOPPED|CAPTURE_LIMIT_NEAR|CAPTURE_CHUNK_LIMIT|CAPTURE_DURATION_LIMIT|CAPTURE_SILENCE_LIMIT|CAPTURE_SOURCE_ENDED|CAPTURE_USER_STOP|MODEL_EARLY_START|MODEL_SESSION_STARTING|MODEL_SESSION_READY|MODEL_SESSION_UNAVAILABLE|DECODER_FAST_ACTIVE|DECODER_FAST_FALLBACK|RESPONSIVE_TRIAL_ACTIVE|RESPONSIVE_TRIAL_FALLBACK|RESPONSIVE_CHUNK_READY|RESPONSIVE_CATCHUP_CHUNK|PAUSE_CHUNK_READY|SILENT_OVERLAP_SKIPPED|RECORDING_COMPLETED)$/.test(code))
                 return;
             if (lastStage !== code) {
                 lastStage = code;
@@ -243,6 +248,10 @@ Scope {
             if (code === "DECODER_FAST_ACTIVE")
                 decoderModeUsed = "FAST";
             if (code === "DECODER_FAST_FALLBACK")
+                decoderModeUsed = "STANDARD FALLBACK";
+            if (code === "RESPONSIVE_TRIAL_ACTIVE")
+                decoderModeUsed = "RESPONSIVE";
+            if (code === "RESPONSIVE_TRIAL_FALLBACK")
                 decoderModeUsed = "STANDARD FALLBACK";
             if (code === "MODEL_BACKPRESSURE")
                 audioDropped = true;

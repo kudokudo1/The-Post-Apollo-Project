@@ -253,7 +253,7 @@ Rectangle {
                         Row {
                             anchors.left: parent.left
                             anchors.top: parent.top
-                            anchors.topMargin: 9
+                            anchors.topMargin: metric.modelData.key==="pressure" ? 7 : 9
                             spacing: 1
                             GohuText {
                                 visible: metric.modelData.key==="wind"
@@ -266,7 +266,7 @@ Rectangle {
                             }
                             GohuText {
                                 text: metric.modelData.value
-                                font.pixelSize: metric.modelData.key==="pressure" ? 9 : 11
+                                font.pixelSize: metric.modelData.key==="pressure" ? 8 : 11
                                 color: Colors.white
                             }
                         }

@@ -188,7 +188,7 @@ def unseal(master_key: bytes, profile: str, sealed: bytes) -> dict[str, object]:
 
 def _root(path: Path, *, create: bool) -> Path | None:
     """A caller-selected, private directory, never an implicit HOME path."""
-    if type(path) is not Path or not path.is_absolute() or path.name != ROOT_NAME:
+    if not isinstance(path, Path) or not path.is_absolute() or path.name != ROOT_NAME:
         _refuse()
     parent = path.parent
     try:

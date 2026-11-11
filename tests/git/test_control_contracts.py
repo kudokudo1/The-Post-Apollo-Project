@@ -7,6 +7,7 @@ without requiring a running Quickshell session or live GitHub mutations.
 
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -513,6 +514,16 @@ focused_files = [
 
 for file_path in focused_files:
     no_conflict_markers(file_path)
+
+# The toolbox batch contract executes only temporary fake programs. It checks
+# the shell boundary that would otherwise spawn each GitHub CLI call separately.
+batch_tests = subprocess.run(
+    [sys.executable, str(ROOT / "tests/git/test_github_toolbox_batch.py")],
+    capture_output=True, text=True, timeout=20
+)
+if batch_tests.returncode != 0:
+    errors.append("offline GitHub batch contracts failed: "
+                  + batch_tests.stdout + batch_tests.stderr)
 
 if errors:
     print("POST-APOLLO GIT CONTROL CONTRACTS // FAIL")

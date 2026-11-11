@@ -198,12 +198,12 @@ def enable(identifier, expected_method, expected_lock, expected_button):
     dev = find_device(identifier)
     if dev is None:
         raise LockError("DEVICE_UNSUPPORTED")
+    if active(dev):
+        raise LockError("ALREADY_ACTIVE")
     if dev["scroll_method"] != expected_method or dev["scroll_button_lock"] != expected_lock:
         raise LockError("STALE_DEVICE")
     if str(dev["scroll_button"]) != expected_button:
         raise LockError("STALE_DEVICE")
-    if active(dev):
-        raise LockError("ALREADY_ACTIVE")
     snap = {"format": HEADER, "original": fingerprint(dev)}
     save_snapshot(snap)
     try:

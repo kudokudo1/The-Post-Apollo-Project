@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.services.input
 import "KeyboardLedPolicy.js" as Policy
 
 // Opt-in LED BRIGHTNESS proxy, not Sway/XKB lock state. No key events,
@@ -180,7 +181,7 @@ Scope {
     Timer {
         id: periodicSample
         interval: 2200
-        running: ledMonitor.monitoringEnabled
+        running: ledMonitor.monitoringEnabled && ledMonitor.canEdit
         repeat: true
         triggeredOnStart: true
         onTriggered: {

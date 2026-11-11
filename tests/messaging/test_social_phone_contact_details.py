@@ -66,8 +66,8 @@ class PhoneContactDetailsTests(unittest.TestCase):
             "facetime://", "sip:", "sms:", "tel:",
         ):
             self.assertNotIn(forbidden, self.detail)
-        self.assertIn("Photo reported", self.detail.lower().replace("photo reported", "Photo reported")
-                      if False else "text: detail.contact && detail.contact.hasPhoto")
+        self.assertIn("text: detail.contact && detail.contact.hasPhoto", self.detail)
+        self.assertIn("PHOTO REPORTED", self.detail)
 
     def test_three_buttons_are_visible_and_real_actions_have_honest_limits(self):
         self.assertIn('label: "CALL"', self.detail)

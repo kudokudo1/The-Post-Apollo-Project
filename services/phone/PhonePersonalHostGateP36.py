@@ -83,7 +83,9 @@ def _selected(state: ObservedFixture, row: str) -> dict:
     # Exactly one in the CURRENT approved bounded snapshot; ephemeral BlueFerry
     # IDs never leave this function or become metadata keys.
     matches = [c for c in state.cards if c.get("id") == row]
-    if len(matches) != 1:
+    if (len(matches) != 1
+            or matches[0].get("deviceProfileId") != state.profile
+            or matches[0].get("serviceId") != "blueferry"):
         _deny()
     return matches[0]
 

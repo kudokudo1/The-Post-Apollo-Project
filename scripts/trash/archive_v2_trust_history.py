@@ -309,7 +309,8 @@ class TestOwnerTrustHistory:
     def admit_test_copy(self, authority, proof, payload, *,
                         resource_id, source_revision, source_captured_ms,
                         payload_sha256, on_stage=None,
-                        peer_witness_sha256="", request_binding_sha256=""):
+                        peer_witness_sha256="", request_binding_sha256="",
+                        commit_guard=None):
         """Atomically consume a fixture nonce and insert a synthetic copy.
 
         on_stage supports injected exception and abrupt-process-exit tests.
@@ -346,6 +347,8 @@ class TestOwnerTrustHistory:
                "TEST_COPY_SOURCE_INVALID")
         _check(on_stage is None or callable(on_stage),
                "TEST_CRASH_HOOK_INVALID")
+        _check(commit_guard is None or callable(commit_guard),
+               "TEST_COMMIT_GUARD_INVALID")
         _check(type(peer_witness_sha256) is str
                and type(request_binding_sha256) is str
                and ((peer_witness_sha256 == ""
@@ -386,6 +389,11 @@ class TestOwnerTrustHistory:
                      peer_witness_sha256,request_binding_sha256))
                 if on_stage is not None:
                     on_stage("after_copy")
+                # V2p lifetime check is inside the SAME BEGIN IMMEDIATE
+                # transaction. If original peer exited, rollback both the
+                # synthetic nonce and copy before commit.
+                if commit_guard is not None:
+                    commit_guard()
                 db.commit()
                 if on_stage is not None:
                     on_stage("after_commit")

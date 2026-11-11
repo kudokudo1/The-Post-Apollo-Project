@@ -97,6 +97,16 @@ Scope {
     function nextOccurrence(id) {
         return Policy.nextOccurrenceMs(findAlarm(id), nowMs);
     }
+    function lastEventText(id) {
+        const a = findAlarm(id);
+        if (!a) return "NO SELECTED ALARM";
+        if (!a.lastEventKind || a.lastEventKind === "none"
+                || !(a.lastEventAtMs > 0))
+            return "NO FIRING RECORD YET";
+        const stamp = Qt.formatDateTime(
+            new Date(a.lastEventAtMs), "MM/dd h:mm:ss AP");
+        return a.lastEventKind.toUpperCase() + " // " + stamp;
+    }
     function nextText(id) {
         const a = findAlarm(id);
         if (!a) return "NO ALARM";
@@ -214,7 +224,7 @@ Scope {
     // STOP/STOP ALL always silences locally, including when persistence is
     // unhealthy. The UI explicitly warns when the stop could not be saved.
     function stopAlarm(id) {
-        const r = Policy.stop(document, id);
+        const r = Policy.stop(document, id, Date.now());
         if (!r.ok) return false;
         if (!canEdit) {
             document = r.document;
@@ -230,7 +240,7 @@ Scope {
         let next = document, countStopped = 0;
         for (let i = 0; i < document.alarms.length; i++) {
             const id = document.alarms[i].id;
-            const r = Policy.stop(next, id);
+            const r = Policy.stop(next, id, Date.now());
             if (r.ok) { next = r.document; countStopped++; }
         }
         if (countStopped === 0) return false;
@@ -256,6 +266,25 @@ Scope {
         const ok = saveDocument(r.document);
         if (ok) feedback = "SNOOZED // 5 MINUTES";
         return ok;
+    }
+
+    function liveOccurrenceMatches(id, startedMs) {
+        const a = findAlarm(id);
+        return a !== null && a.enabled && a.ringing
+            && Number.isSafeInteger(startedMs)
+            && a.ringStartedAtMs === startedMs
+            && startedMs > 0 && startedMs <= Date.now()
+            && Date.now() - startedMs < Policy.MAX_RING_MS;
+    }
+    function stopOccurrence(id, startedMs) {
+        if (!liveOccurrenceMatches(id, startedMs))
+            return false;
+        return stopAlarm(id);
+    }
+    function snoozeOccurrence(id, startedMs) {
+        if (!liveOccurrenceMatches(id, startedMs))
+            return false;
+        return snoozeAlarm(id);
     }
 
     function previewSound(soundId, volumePercent) {

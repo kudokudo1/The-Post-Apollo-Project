@@ -45,9 +45,10 @@ Scope {
         const seconds = function(ms) {
             return ms < 0 ? "N/A" : (ms / 1000).toFixed(1) + "s";
         };
-        return "FIRST " + seconds(firstTextMs)
+        return "AUDIO " + seconds(audioReadyMs)
             + " // LOAD " + seconds(modelStartupMs)
-            + " // INFER " + seconds(lastInferenceMs)
+            + " // FIRST TEXT " + seconds(firstTextMs)
+            + " // INFER MAX " + seconds(peakInferenceMs)
             + " // QUEUE MAX " + seconds(peakQueueWaitMs);
     }
     property int recordingElapsedSeconds: 0

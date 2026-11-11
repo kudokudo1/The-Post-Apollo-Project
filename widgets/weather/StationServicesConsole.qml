@@ -25,6 +25,14 @@ Rectangle {
     property string selectedServiceId: ""
     property string selectedDirectoryId: ""
 
+    // Expose read-only widget references to native geometry verifiers.
+    // Consumers do not mutate source owners or runtime state through them.
+    readonly property alias headerItem: fixedTop
+    readonly property alias metricsItem: metrics
+    readonly property alias detailItem: detailScroll
+    readonly property alias reportItem: selectedReport
+    readonly property alias directoryHeadingItem: directoryHeading
+
     readonly property var summary: RuntimePolicy.summarizeRows(runtimeRows)
     readonly property var selectedDirectoryRow: {
         for (let i = 0; i < directoryRows.length; i++)

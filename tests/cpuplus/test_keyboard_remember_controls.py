@@ -18,14 +18,16 @@ class RememberUiContract(unittest.TestCase):
         self.assertIn('(capsChoices.width - 3 * capsChoices.spacing) / 4', PANE)
 
     def test_confirm_controls_remember_authority(self):
-        self.assertIn("function prepareApply(savedNum, savedCaps)", SETTINGS)
+        self.assertIn("function prepareApply(savedNum, savedCaps, sampleFresh)", SETTINGS)
         self.assertIn("confirmedSnapshotNum", SETTINGS)
         self.assertIn("confirmedSnapshotCaps", SETTINGS)
         self.assertIn('"apply-policy", document.num, document.caps,', SETTINGS)
         self.assertIn("if (!confirmRequired || !canApply)", SETTINGS)
         self.assertIn("KeyboardLockSettings.prepareApply(", PANE)
-        self.assertIn("KeyboardLedObservation.savedNum", PANE)
-        self.assertIn("KeyboardLedObservation.savedCaps", PANE)
+        self.assertIn("KeyboardLedObservation.currentNum", PANE)
+        self.assertIn("KeyboardLedObservation.currentCaps", PANE)
+        self.assertIn("KeyboardLedObservation.fresh", PANE)
+        self.assertIn("REMEMBER NEEDS A FRESH STABLE LED READING", SETTINGS)
         self.assertIn("NUM REMEMBER REQUIRES A SAVED LED OBSERVATION", SETTINGS)
         self.assertIn("CAPS REMEMBER REQUIRES A SAVED LED OBSERVATION", SETTINGS)
 

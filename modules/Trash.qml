@@ -17,6 +17,15 @@ PanelWindow {
     // record adapters are approved. Only "trash" has destructive authority.
     property string activeMode: "trash"
     readonly property var lifecycleModes: ["cleanup", "archive", "trash", "burn"]
+    // Swipe/Hunt use pointer dragging inside the work area. When the outer
+    // page cannot fit on screen, provide buttons outside that gesture area.
+    readonly property bool cleanupScrollRailVisible:
+        activeMode === "cleanup"
+        && (chassisSize === "compact"
+            || (cameraCleanupController
+                && (cameraCleanupController.cleanupTechnique === "swipe"
+                    || cameraCleanupController.cleanupTechnique === "hunt")
+                && frameHeight < 661))
 
     // The Cleanup UI itself now lives here; CameraW supplies only its
     // established scan, queue, preview and recoverable file operation logic.
@@ -1451,7 +1460,7 @@ PanelWindow {
                     anchors.fill: parent
                     // Compact keeps a pinned scroll rail beneath the content.
                     // Hunt and Swipe retain their own pointer gestures.
-                    anchors.bottomMargin: trashLauncher.chassisSize === "compact" ? 29 : 0
+                    anchors.bottomMargin: trashLauncher.cleanupScrollRailVisible ? 29 : 0
                     visible: trashLauncher.activeMode === "cleanup"
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
@@ -1499,8 +1508,7 @@ PanelWindow {
                     width: parent.width
                     height: 27
                     spacing: 5
-                    visible: trashLauncher.activeMode === "cleanup"
-                             && trashLauncher.chassisSize === "compact"
+                    visible: trashLauncher.cleanupScrollRailVisible
 
                     ActionButton {
                         width: 66
@@ -1797,7 +1805,9 @@ PanelWindow {
                             color: Colors.yellow
                             font.pixelSize: 9
                             wrapMode: Text.WordWrap
-                            text: "SAVE COPY // WEATHER EVENTS OR DEMO SCRAPES. TRASH / RESTORE / BURN AFFECT ONLY TRASH++ COPIES."
+                            text: trashLauncher.chassisSize === "compact"
+                                  ? "ORIGINALS READ-ONLY // SAVED COPIES MANAGED HERE"
+                                  : "SAVE COPY // WEATHER EVENTS OR DEMO SCRAPES. TRASH / RESTORE / BURN AFFECT ONLY TRASH++ COPIES."
                         }
                     }
                 }
@@ -1823,11 +1833,16 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
-                            height: 34
+                            height: trashLauncher.chassisSize === "compact" ? 18 : 34
                             font.pixelSize: 9
                             color: Colors.cyan
-                            wrapMode: Text.WordWrap
-                            text: "ONE BURN WORKSPACE // file deletion uses GIO; saved copies use their own verified store. Every Burn uses the same confirmation and result screen."
+                            wrapMode: trashLauncher.chassisSize === "compact"
+                                      ? Text.NoWrap : Text.WordWrap
+                            text: trashLauncher.chassisSize === "compact"
+                                  ? "BURN // FILES OR SAVED COPIES // ONE CONFIRMATION"
+                                  : "ONE BURN WORKSPACE // file deletion uses GIO; saved copies use their own verified store. Every Burn uses the same confirmation and result screen."
+                            elide: trashLauncher.chassisSize === "compact"
+                                   ? Text.ElideRight : Text.ElideNone
                         }
 
                         Row {
@@ -1860,7 +1875,9 @@ PanelWindow {
 
                         Item {
                             width: parent.width
-                            height: Math.max(90, researchBurnReview.height - 194)
+                            height: Math.max(60, researchBurnReview.height
+                                             - (trashLauncher.chassisSize === "compact"
+                                                ? 178 : 194))
 
                             ListView {
                                 id: researchBurnList

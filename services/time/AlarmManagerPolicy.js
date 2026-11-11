@@ -132,6 +132,24 @@ function create(doc) {
     next.alarms.push(alarm);
     return {ok: true, document: next, id: alarm.id};
 }
+function duplicate(doc, id) {
+    var old = byId(doc, id);
+    if (!old || doc.alarms.length >= MAX_ALARMS
+            || doc.nextId >= Number.MAX_SAFE_INTEGER - 1)
+        return {ok: false, error: "MAX_ALARMS_OR_NOT_FOUND"};
+    var next = cloneDocument(doc), copy = Object.assign({}, old, {
+        id: next.nextId,
+        name: (old.name.slice(0, MAX_NAME_LENGTH - 5) + " COPY"),
+        enabled: false, pausedUntilDate: "", completed: false,
+        lastFiredDay: "", ringing: false, ringStartedAtMs: 0,
+        snoozeUntilMs: 0
+    });
+    next.nextId += 1;
+    next.alarms.push(copy);
+    return validDocument(next)
+        ? {ok: true, document: next, id: copy.id}
+        : {ok: false, error: "INVALID_COPY"};
+}
 function update(doc, id, patch, nowMs) {
     if (!validDocument(doc) || !timestamp(nowMs) || !nowMs
             || !patch || typeof patch !== "object" || Array.isArray(patch))

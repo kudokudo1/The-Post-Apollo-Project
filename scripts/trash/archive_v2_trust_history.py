@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import sqlite3
 import stat
+from urllib.parse import quote
 from uuid import uuid4
 
 FILE_NAME = "trashpp-v2l-test-trust.sqlite3"
@@ -87,6 +88,33 @@ class TestOwnerTrustHistory:
             db.execute("PRAGMA synchronous=FULL")
             db.execute("PRAGMA busy_timeout=5000")
             db.execute("PRAGMA foreign_keys=ON")
+            return db
+        except sqlite3.DatabaseError as exc:
+            raise TrustHistoryError("SOURCE_TRUST_UNAVAILABLE") from exc
+
+    def _connect_readonly(self):
+        """Open the private fixture ledger without enabling any write access."""
+        try:
+            root = self.root.lstat()
+        except OSError as exc:
+            raise TrustHistoryError("SOURCE_TRUST_ROOT_UNAVAILABLE") from exc
+        _check(stat.S_ISDIR(root.st_mode)
+               and root.st_uid == os.geteuid()
+               and root.st_mode & 0o077 == 0,
+               "SOURCE_TRUST_ROOT_UNSAFE")
+        _regular_file(self.path)
+        for suffix in ("-wal", "-shm"):
+            try:
+                (self.root / (FILE_NAME + suffix)).lstat()
+            except FileNotFoundError:
+                continue
+            raise TrustHistoryError("SOURCE_TRUST_UNEXPECTED_SIDECAR")
+        try:
+            uri = ("file:" + quote(str(self.path), safe="/")
+                   + "?mode=ro&cache=private")
+            db = sqlite3.connect(uri, uri=True, timeout=5)
+            db.execute("PRAGMA query_only=ON")
+            db.execute("PRAGMA busy_timeout=5000")
             return db
         except sqlite3.DatabaseError as exc:
             raise TrustHistoryError("SOURCE_TRUST_UNAVAILABLE") from exc
@@ -356,15 +384,15 @@ class TestOwnerTrustHistory:
                 "restoreAllowed": False, "burnAllowed": False}
 
     def inspect_test_admission(self, owner, key, nonce):
-        """Recover a single fixture nonce outcome without reading payload."""
+        """Verify committed fixture bytes without returning payload content."""
         _check(type(owner) is str and ID.fullmatch(owner)
                and type(key) is str and ID.fullmatch(key)
                and type(nonce) is str and NONCE.fullmatch(nonce),
                "TEST_ADMISSION_IDENTITY_INVALID")
-        with closing(self._connect()) as db:
+        with closing(self._connect_readonly()) as db:
             row = db.execute("""SELECT c.proof_sha256,c.authority_sha256,
                 s.snapshot_id,s.proof_sha256,s.authority_sha256,
-                s.payload_sha256,s.resource_id,s.source_revision
+                s.payload_sha256,s.resource_id,s.source_revision,s.payload
                 FROM consumed c LEFT JOIN test_copies s
                   ON s.owner_id=c.owner_id AND s.key_id=c.key_id
                   AND s.nonce=c.nonce
@@ -379,19 +407,23 @@ class TestOwnerTrustHistory:
                     "productionAllowed":False}
         _check(row[0] == row[3] and row[1] == row[4]
                and type(row[2]) is str and len(row[2]) == 32
-               and type(row[5]) is str and SHA.fullmatch(row[5]),
+               and type(row[5]) is str and SHA.fullmatch(row[5])
+               and type(row[8]) is bytes
+               and hashlib.sha256(row[8]).hexdigest() == row[5],
                "TEST_ADMISSION_INTEGRITY_INVALID")
         return {"state":"TEST_COPY_COMMITTED",
                 "snapshotId":row[2], "ownerId":owner,
                 "resourceId":row[6], "sourceRevision":row[7],
                 "proofSha256":row[0], "authoritySha256":row[1],
-                "payloadSha256":row[5], "productionAllowed":False}
+                "payloadSha256":row[5],
+                "payloadIntegrityVerified":True,
+                "productionAllowed":False}
 
     def test_copy_status(self, owner):
         """Read-only counts, never return even synthetic payload."""
         _check(type(owner) is str and ID.fullmatch(owner),
                "SOURCE_TRUST_OWNER_INVALID")
-        with closing(self._connect()) as db:
+        with closing(self._connect_readonly()) as db:
             counts = db.execute("""SELECT
                 (SELECT count(*) FROM test_copies WHERE owner_id=?),
                 (SELECT count(*) FROM consumed WHERE owner_id=?)

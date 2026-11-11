@@ -43,6 +43,19 @@ PanelWindow {
     property string archiveFilter: "all"
     property string archiveSearchText: ""
 
+    // V2 independently stored immutable copies. READ-ONLY page inventory.
+    // This never joins the GIO/legacy managed-copy Burn permissions.
+    property var archiveV2Rows: []
+    property string archiveV2State: "NOT_SCANNED"
+    property bool archiveV2Busy: false
+    property int archiveV2Total: 0
+    property bool archiveV2HasMore: false
+    property string archiveV2NextCursor: ""
+    property int archiveV2Page: 0
+    property var archiveV2Cursors: [""]
+    property int archiveV2PendingPage: -1
+    property string archiveV2PendingCursor: ""
+
     // Trash++-owned local research copies are separate from source records.
     // Finance's original DEMO crawl stays read-only, and Hospital/Weather are
     // never write targets. Revision increments protect concurrent changes.
@@ -145,16 +158,21 @@ PanelWindow {
     readonly property var researchBinRows: researchRows.filter(function(row) {
         return row.state === "trashed";
     })
-    readonly property var archiveFilteredRows: archiveRows.concat(researchRows).filter(function(row) {
+    readonly property var archiveFilteredRows: archiveRows.concat(researchRows)
+        .concat(archiveV2Rows).filter(function(row) {
         const selected = archiveFilter;
+        // V2 copies appear only in ALL and COPIES. Old BIN actions never see them.
+        if (row.kind === "V2 SNAPSHOT"
+                && selected !== "all" && selected !== "copies") return false;
         if (selected === "events" && row.kind !== "EVENT HISTORY") return false;
         if (selected === "dossiers" && row.kind !== "SAVED DOSSIER") return false;
         if (selected === "scrapes" && row.kind !== "WEB SCRAPE") return false;
         if (selected === "hub" && row.kind !== "HUB NOTE"
                                && row.kind !== "HUB TASK") return false;
-        if (selected === "copies" && ((row.kind !== "SAVED RESEARCH"
-                                      && row.kind !== "SAVED EVENT")
-                                      || row.state !== "archived")) return false;
+        if (selected === "copies" && row.kind !== "V2 SNAPSHOT"
+                && ((row.kind !== "SAVED RESEARCH"
+                     && row.kind !== "SAVED EVENT")
+                    || row.state !== "archived")) return false;
         if (selected === "bin" && ((row.kind !== "SAVED RESEARCH"
                                    && row.kind !== "SAVED EVENT")
                                    || row.state !== "trashed")) return false;
@@ -196,6 +214,94 @@ PanelWindow {
         archiveRows = reply.items;
         archiveSources = reply.sources;
         archiveState = "READY";
+    }
+
+    function refreshArchiveV2(targetPage, cursor) {
+        if (!menuOpen || activeMode !== "archive" || archiveV2Busy)
+            return false;
+        const requested = Number(targetPage);
+        const token = String(cursor || "");
+        if (!Number.isInteger(requested) || requested < 0
+                || requested > 9999 || token.length > 64)
+            return false;
+        archiveV2Busy = true;
+        archiveV2State = "SCANNING // READ ONLY";
+        archiveV2PendingPage = requested;
+        archiveV2PendingCursor = token;
+        const args = ["python3", "-I", "-B",
+                      Quickshell.shellPath("scripts/trash/archive_v2_index.py"),
+                      "index", Quickshell.dataDir];
+        if (token !== "")
+            args.push(token);
+        archiveV2Process.exec(args);
+        return true;
+    }
+
+    function pageArchiveV2(direction) {
+        if (archiveV2Busy || !menuOpen || activeMode !== "archive"
+                || (direction !== 1 && direction !== -1))
+            return false;
+        if (direction === 1 && archiveV2HasMore
+                && archiveV2NextCursor !== "")
+            return refreshArchiveV2(archiveV2Page + 1, archiveV2NextCursor);
+        if (direction === -1 && archiveV2Page > 0)
+            return refreshArchiveV2(archiveV2Page - 1,
+                                    archiveV2Cursors[archiveV2Page - 1]);
+        return false;
+    }
+
+    function consumeArchiveV2(raw) {
+        if (!archiveV2Busy)
+            return;
+        archiveV2Busy = false;
+        let reply = null;
+        try { reply = JSON.parse(String(raw || "").trim()); }
+        catch (error) {
+            archiveV2Rows = [];
+            archiveV2State = "STALE // INVALID V2 RESPONSE";
+            return;
+        }
+        if (!reply || reply.ok !== true || reply.kind !== "archive-v2-index"
+                || reply.readOnly !== true || !Array.isArray(reply.items)
+                || reply.items.length > 25 || typeof reply.total !== "number"
+                || !Number.isInteger(reply.total) || reply.total < 0
+                || typeof reply.hasMore !== "boolean"
+                || (reply.hasMore && (typeof reply.nextCursor !== "string"
+                                      || reply.nextCursor.length > 64))) {
+            archiveV2Rows = [];
+            archiveV2State = "STALE // " + String(reply && reply.error
+                                                  || "V2 INDEX UNAVAILABLE");
+            return;
+        }
+        for (let i = 0; i < reply.items.length; i++) {
+            const item = reply.items[i];
+            if (!item || item.kind !== "V2 SNAPSHOT"
+                    || item.copyOnly !== true || item.verified !== false
+                    || item.state !== "archived-v2" || !item.capabilities
+                    || item.capabilities.trash !== false
+                    || item.capabilities.restore !== false
+                    || item.capabilities.burn !== false) {
+                archiveV2Rows = [];
+                archiveV2State = "STALE // V2 PERMISSION ENVELOPE INVALID";
+                return;
+            }
+        }
+        if (archiveV2PendingPage === 0)
+            archiveV2Cursors = [""];
+        else if (archiveV2PendingPage === archiveV2Page + 1) {
+            const next = archiveV2Cursors.slice(0, archiveV2Page + 1);
+            next.push(archiveV2PendingCursor);
+            archiveV2Cursors = next;
+        }
+        archiveV2Page = archiveV2PendingPage;
+        archiveV2PendingPage = -1;
+        archiveV2PendingCursor = "";
+        archiveV2Rows = reply.items;
+        archiveV2Total = reply.total;
+        archiveV2HasMore = reply.hasMore;
+        archiveV2NextCursor = reply.nextCursor || "";
+        archiveV2State = reply.state === "NOT_INSTALLED"
+            ? "NOT INSTALLED // NO V2 COPIES" : "READY // V2 READ ONLY";
     }
 
     function runResearch(action, args) {
@@ -464,6 +570,7 @@ PanelWindow {
                 if (trashLauncher.activeMode === "archive") {
                     trashLauncher.refreshArchive();
                     trashLauncher.refreshResearch();
+                    trashLauncher.refreshArchiveV2(0, "");
                 } else if (trashLauncher.activeMode === "burn"
                            || trashLauncher.activeMode === "trash")
                     trashLauncher.refreshResearch();
@@ -597,6 +704,7 @@ PanelWindow {
                 Qt.callLater(function() {
                     trashLauncher.refreshArchive();
                     trashLauncher.refreshResearch();
+                    trashLauncher.refreshArchiveV2(0, "");
                 });
             else if (activeMode === "burn" || activeMode === "trash")
                 Qt.callLater(function() { trashLauncher.refreshResearch(); });
@@ -818,6 +926,25 @@ PanelWindow {
                 if (trashLauncher.archiveBusy) {
                     trashLauncher.archiveBusy = false;
                     trashLauncher.archiveState = "STALE // INDEX PROCESS FAILED";
+                }
+            });
+        }
+    }
+
+    // Dedicated read-only V2 SQLite metadata page reader. It exposes no
+    // writer verbs and is never routed into GIO/managed-copy Burn.
+    Process {
+        id: archiveV2Process
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: trashLauncher.consumeArchiveV2(this.text)
+        }
+        onExited: function(code, status) {
+            Qt.callLater(function() {
+                if (trashLauncher.archiveV2Busy) {
+                    trashLauncher.archiveV2Busy = false;
+                    trashLauncher.archiveV2Rows = [];
+                    trashLauncher.archiveV2State = "STALE // V2 INDEX PROCESS FAILED";
                 }
             });
         }
@@ -1585,7 +1712,8 @@ PanelWindow {
                                 verticalAlignment: Text.AlignVCenter
                                 text: "ARCHIVE // INVENTORY // "
                                       + (trashLauncher.archiveRows.length
-                                         + trashLauncher.researchRows.length)
+                                         + trashLauncher.researchRows.length
+                                         + trashLauncher.archiveV2Rows.length)
                             }
                             ActionButton {
                                 width: 92
@@ -1595,7 +1723,11 @@ PanelWindow {
                                 labelPixelSize: 10
                                 accentColor: Colors.green
                                 available: !trashLauncher.archiveBusy
-                                onLeftClicked: trashLauncher.refreshArchive()
+                                onLeftClicked: {
+                                    trashLauncher.refreshArchive();
+                                    trashLauncher.refreshResearch();
+                                    trashLauncher.refreshArchiveV2(0, "");
+                                }
                             }
                         }
 
@@ -1608,6 +1740,7 @@ PanelWindow {
                             elide: Text.ElideRight
                             text: trashLauncher.archiveState + " // "
                                 + trashLauncher.researchState + " // "
+                                + "V2:" + trashLauncher.archiveV2State + " // "
                                 + trashLauncher.archiveSources.map(function(v) {
                                     return v.id + ":" + v.state;
                                 }).join(" // ")
@@ -1664,7 +1797,7 @@ PanelWindow {
                         Item {
                             id: archiveEntriesBox
                             width: parent.width
-                            height: Math.max(80, archiveRecordsView.height - 190)
+                            height: Math.max(65, archiveRecordsView.height - 222)
                             ListView {
                                 id: archiveEntriesList
                                 width: parent.width - 17
@@ -1696,7 +1829,12 @@ PanelWindow {
                                             font.pixelSize: 11
                                             color: Colors.white
                                             elide: Text.ElideRight
-                                            text: String(modelData.title || "UNTITLED RECORD")
+                                            text: (modelData.kind === "V2 SNAPSHOT"
+                                                   ? "[V2 COPY] "
+                                                   : modelData.kind === "SAVED RESEARCH"
+                                                     || modelData.kind === "SAVED EVENT"
+                                                   ? "[V1 COPY] " : "[SOURCE] ")
+                                                  + String(modelData.title || "UNTITLED RECORD")
                                         }
                                         GohuText {
                                             width: parent.width
@@ -1792,13 +1930,58 @@ PanelWindow {
                                 anchors.centerIn: parent
                                 visible: !trashLauncher.archiveBusy
                                          && !trashLauncher.researchBusy
+                                         && !trashLauncher.archiveV2Busy
                                          && trashLauncher.archiveFilteredRows.length === 0
                                 color: Colors.cyan
                                 font.pixelSize: 11
                                 text: trashLauncher.archiveRows.length === 0
                                          && trashLauncher.researchRows.length === 0
+                                         && trashLauncher.archiveV2Rows.length === 0
                                       ? "NO ARCHIVED RECORDS FOUND"
                                       : "NO MATCHES // TRY ANOTHER FILTER"
+                            }
+                        }
+
+                        Row {
+                            id: archiveV2PageRail
+                            width: parent.width
+                            height: 26
+                            spacing: 5
+
+                            ActionButton {
+                                width: 67
+                                height: 25
+                                label: "V2 PREV"
+                                labelPixelSize: 9
+                                accentColor: Colors.cyan
+                                available: !trashLauncher.archiveV2Busy
+                                           && trashLauncher.archiveV2Page > 0
+                                onLeftClicked: trashLauncher.pageArchiveV2(-1)
+                            }
+
+                            GohuText {
+                                width: Math.max(40, parent.width - 144)
+                                height: 25
+                                font.pixelSize: 9
+                                color: Colors.cyan
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+                                text: "V2 COPIES // PAGE "
+                                    + (trashLauncher.archiveV2Page + 1)
+                                    + " // " + trashLauncher.archiveV2Total
+                                    + " TOTAL // SEARCH CURRENT PAGE ONLY"
+                            }
+
+                            ActionButton {
+                                width: 67
+                                height: 25
+                                label: "V2 NEXT"
+                                labelPixelSize: 9
+                                accentColor: Colors.cyan
+                                available: !trashLauncher.archiveV2Busy
+                                           && trashLauncher.archiveV2HasMore
+                                onLeftClicked: trashLauncher.pageArchiveV2(1)
                             }
                         }
 

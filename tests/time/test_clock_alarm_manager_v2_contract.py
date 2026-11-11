@@ -230,7 +230,7 @@ class AlarmManagerV2Contracts(unittest.TestCase):
         self.assertIn("function stopAlarm(id)", OWNER)
         self.assertIn('SILENCED LOCALLY // SAVE FAILED', OWNER)
         self.assertIn('saveDocument(next)', OWNER)
-        self.assertIn("Policy.stop(next, id)", OWNER)
+        self.assertIn("Policy.stop(next, id, Date.now())", OWNER)
 
 
 if __name__ == "__main__":

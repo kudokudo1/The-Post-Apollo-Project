@@ -100,8 +100,15 @@ function trashHarness(overrides={}) {
         status:"",
         archiveRefreshCalls:0,
         researchRefreshCalls:0,
+        archiveV2RefreshCalls:0,
         refreshArchive(){ctx.archiveRefreshCalls++;return true;},
         refreshResearch(){ctx.researchRefreshCalls++;return true;},
+        refreshArchiveV2(page,cursor){
+            assert.equal(page,0);
+            assert.equal(cursor,"");
+            ctx.archiveV2RefreshCalls++;
+            return true;
+        },
         Qt:{callLater(fn){fn();}},
         ...overrides
     };
@@ -264,6 +271,7 @@ test("Trash changes mode IN PLACE and does not hand off to Camera window",()=>{
     assert.deepEqual(Array.from(ctx.cameraCleanupController.calls),["batch","swipe","suspend"]);
     assert.equal(ctx.archiveRefreshCalls,1);
     assert.equal(ctx.researchRefreshCalls,1);
+    assert.equal(ctx.archiveV2RefreshCalls,1);
     assert.equal(ctx.menuOpen,true);
 });
 

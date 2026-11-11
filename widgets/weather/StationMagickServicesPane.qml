@@ -14,6 +14,7 @@ Rectangle {
     property var weatherService: null
     property var celestialSource: null
     property real runtimeNowMs: 0
+    readonly property alias dashboard: servicesConsole
 
     readonly property bool forecastSourceReady:
         !!weatherService && !!weatherService.forecastReady

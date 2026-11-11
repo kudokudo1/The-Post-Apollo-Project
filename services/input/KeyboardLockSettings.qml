@@ -214,8 +214,13 @@ Scope {
             previous = installedCaps;
             queuedRememberCaps = "";
         }
-        if (!lockName || value === previous)
+        if (!lockName)
             return;
+        if (value === previous) {
+            // A redundant Num update must not strand a queued Caps update.
+            launchRememberSync();
+            return;
+        }
         if (previous !== "on" && previous !== "off") {
             rememberSuspended = true;
             hostError = "UNSAFE_PREVIOUS_STATE";

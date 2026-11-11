@@ -87,6 +87,12 @@ jobs:
           assert.equal(p.tick(lateArm.document,dueAt+31000).event,'waiting');
           const silent=p.withSound(armed.document,false);
           assert.equal(silent.document.alarm.soundEnabled,false);
+          const louder=p.withVolume(silent.document,90);
+          assert.equal(louder.ok,true);
+          assert.equal(louder.document.alarm.volumePercent,90);
+          assert.equal(p.parse(JSON.stringify(louder.document)).ok,true);
+          assert.equal(p.withVolume(louder.document,110).ok,false);
+          assert.equal(p.withVolume(louder.document,-1).ok,false);
           assert.equal(p.disarm(start.document).document.alarm.enabled,false);
           // No host changes: the policy is pure schedule arithmetic.
           JS

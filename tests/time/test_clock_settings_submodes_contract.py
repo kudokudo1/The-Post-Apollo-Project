@@ -93,7 +93,7 @@ class ClockSettingsSubmodesContracts(unittest.TestCase):
         self.assertIn('labelText: "COUNTDOWN"', TIMEW)
         self.assertIn('labelText: "ALARM"', TIMEW)
         self.assertIn('onTriggered: timew.toolsView = "alarm"', TIMEW)
-        self.assertIn('AlarmPane {', TIMEW)
+        self.assertIn('AlarmManagerPane {', TIMEW)
         alarm = TIMEW.split('id: alarmPlaceholderPane', 1)[1].split(
             'id: stopwatchPane', 1)[0]
         self.assertNotIn('ALARM // PLANNED', alarm)

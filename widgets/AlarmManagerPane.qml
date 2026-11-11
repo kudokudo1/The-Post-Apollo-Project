@@ -4,23 +4,27 @@ import qs.services.time
 import "../components"
 import "../services/time/AlarmManagerPolicy.js" as Policy
 
-// Compact Alarm owner view. Pinned header/search plus a bounded body
-// viewport: scroll the complete editor and its save/delete actions *inside*
-// TimeW. The short alarm list retains its independent scrollbar.
+// CLOCK / TOOLS / ALARM:
+// All editing controls are pinned. SCHEDULE, PAUSE, and SOUND share the same
+// compact control slot. Only the lower saved-alarm list scrolls; PREV/NEXT
+// are owned by TimeW's persistent lower footer, not this list.
 Item {
     id: pane
     clip: true
+
     property int selectedId: 0
-    readonly property var selectedAlarm: Policy.byId(
-        AlarmManagerService.document, selectedId)
+    readonly property var selectedAlarm:
+        Policy.byId(AlarmManagerService.document, selectedId)
+    property string settingsTab: "schedule"
     property string draftMode: "weekly"
-    property var draftDays: [0, 1, 2, 3, 4, 5, 6]
+    property var draftDays: [new Date().getDay()]
     property bool draftKeepSaved: true
     property bool draftEnabled: false
     property bool draftSoundEnabled: true
     property string draftSoundId: "chime"
     property int draftVolume: 60
     property int deleteConfirmId: 0
+
     readonly property bool editingActive:
         alarmSearch.activeFocus || alarmName.activeFocus
         || alarmHour.activeFocus || alarmMinute.activeFocus
@@ -34,12 +38,20 @@ Item {
                 || String(a.id).indexOf(term) >= 0;
         }) : rows;
     }
-    readonly property var days: ["SUN","MON","TUE","WED","THU","FRI","SAT"]
+    readonly property int selectedListIndex: visibleAlarms.findIndex(
+        function(a) { return a.id === selectedId; })
+    readonly property bool canStepSelection: visibleAlarms.length > 1
+    readonly property string selectionLabel:
+        selectedListIndex >= 0
+            ? (selectedListIndex + 1) + " / " + visibleAlarms.length
+            : "0 / " + visibleAlarms.length
+    readonly property var dayNames: ["SUN","MON","TUE","WED","THU","FRI","SAT"]
 
     function choose(id) {
         const a = AlarmManagerService.findAlarm(id);
         if (!a) return;
         selectedId = id;
+        settingsTab = "schedule";
         deleteConfirmId = 0;
         draftMode = a.mode;
         draftDays = a.weekdays.slice();
@@ -53,10 +65,17 @@ Item {
         alarmMinute.text = ("0" + a.minute).slice(-2);
         alarmDate.text = a.date || Policy.dateOffset(Date.now(), 1);
         alarmResumeDate.text = a.pausedUntilDate || "";
-        editorScroll.contentY = 0;
     }
     function create() {
         const id = AlarmManagerService.createAlarm();
+        if (id > 0) {
+            alarmSearch.text = "";
+            choose(id);
+        }
+    }
+    function copySelected() {
+        if (!selectedAlarm) return;
+        const id = AlarmManagerService.duplicateAlarm(selectedId);
         if (id > 0) {
             alarmSearch.text = "";
             choose(id);
@@ -108,9 +127,25 @@ Item {
         const rows = visibleAlarms;
         if (rows.length < 1) return;
         let idx = rows.findIndex(function(a) { return a.id === selectedId; });
+        if (idx < 0)
+            idx = delta > 0 ? -1 : rows.length;
         idx = Math.max(0, Math.min(rows.length - 1, idx + delta));
         choose(rows[idx].id);
         alarmList.positionViewAtIndex(idx, ListView.Contain);
+    }
+    function removeSelected() {
+        if (!selectedAlarm) return;
+        if (deleteConfirmId !== selectedId) {
+            deleteConfirmId = selectedId;
+            return;
+        }
+        const id = selectedId;
+        deleteConfirmId = 0;
+        if (AlarmManagerService.removeAlarm(id)) {
+            selectedId = 0;
+            if (AlarmManagerService.count)
+                choose(AlarmManagerService.document.alarms[0].id);
+        }
     }
     onSelectedAlarmChanged: {
         if (!selectedAlarm && AlarmManagerService.count > 0)
@@ -128,108 +163,525 @@ Item {
         }
     }
 
-    Row {
-        id: headerRow
-        y: 0
-        height: 34
+    Column {
+        id: pinnedControls
         width: pane.width
-        spacing: 6
-        GohuText {
-            width: Math.max(0, headerRow.width - newAlarm.width
-                             - emergencyStop.width - duplicateAlarm.width
-                             - 3 * headerRow.spacing)
-            height: parent.height
-            verticalAlignment: Text.AlignVCenter
-            text: "ALARMS // " + AlarmManagerService.count + " / " + Policy.MAX_ALARMS
-            color: Colors.cyan
-            font.pixelSize: 12
+        spacing: 5
+
+        // SEARCH, NEW, COPY and emergency STOP are one control rail.
+        Row {
+            id: managerCommands
+            width: parent.width
+            height: 32
+            spacing: 5
+
+            TextField {
+                id: alarmSearch
+                width: Math.max(60, managerCommands.width - newAlarm.width
+                                - duplicateAlarm.width - emergencyStop.width
+                                - managerCommands.spacing * 3)
+                height: parent.height
+                placeholderText: "SEARCH ALARMS"
+                placeholderTextColor: Colors.cyan
+                color: Colors.magenta
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.black
+                font.family: "GohuFont 11 Nerd Font Mono"
+                font.pixelSize: 10
+                leftPadding: 5
+                rightPadding: 4
+                background: Rectangle {
+                    color: Colors.black
+                    border.width: 1
+                    border.color: alarmSearch.activeFocus
+                        ? Colors.magenta : Colors.cyan
+                }
+            }
+            ActionButton {
+                id: newAlarm
+                width: 61
+                height: parent.height
+                label: "+ NEW"
+                labelPixelSize: 10
+                accentColor: Colors.orange
+                available: AlarmManagerService.canEdit
+                    && AlarmManagerService.count < Policy.MAX_ALARMS
+                onLeftClicked: pane.create()
+            }
+            ActionButton {
+                id: duplicateAlarm
+                width: 54
+                height: parent.height
+                label: "COPY"
+                labelPixelSize: 10
+                accentColor: Colors.white
+                available: pane.selectedAlarm !== null
+                    && AlarmManagerService.canEdit
+                    && AlarmManagerService.count < Policy.MAX_ALARMS
+                onLeftClicked: pane.copySelected()
+            }
+            ActionButton {
+                id: emergencyStop
+                width: 77
+                height: parent.height
+                label: "STOP ALL"
+                labelPixelSize: 10
+                accentColor: Colors.red
+                available: AlarmManagerService.ringingCount > 0
+                onLeftClicked: AlarmManagerService.stopAll()
+            }
         }
-        ActionButton {
-            id: emergencyStop
-            width: 88
-            height: parent.height
-            label: "STOP ALL"
-            labelPixelSize: 10
-            accentColor: Colors.red
-            available: AlarmManagerService.ringingCount > 0
-            onLeftClicked: AlarmManagerService.stopAll()
-        }
-        ActionButton {
-            id: duplicateAlarm
-            width: 58
-            height: parent.height
-            label: "COPY"
-            labelPixelSize: 10
-            accentColor: Colors.white
-            available: pane.selectedAlarm !== null
-                && AlarmManagerService.canEdit
-                && AlarmManagerService.count < Policy.MAX_ALARMS
-            onLeftClicked: {
-                const id = AlarmManagerService.duplicateAlarm(pane.selectedId);
-                if (id > 0) {
-                    alarmSearch.text = "";
-                    pane.choose(id);
+
+        // HH, MM and NAME remain visible while the list is browsed.
+        Row {
+            id: entryFields
+            width: parent.width
+            height: 48
+            spacing: 6
+            visible: pane.selectedAlarm !== null
+
+            Column {
+                width: 51
+                spacing: 3
+                GohuText {
+                    text: "HOUR"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                }
+                TextField {
+                    id: alarmHour
+                    width: parent.width
+                    height: 32
+                    maximumLength: 2
+                    inputMethodHints: Qt.ImhDigitsOnly
+                    validator: IntValidator { bottom: 0; top: 23 }
+                    color: Colors.magenta
+                    font.pixelSize: 12
+                    background: Rectangle {
+                        color: Colors.black
+                        border.width: 1
+                        border.color: alarmHour.activeFocus
+                            ? Colors.magenta : Colors.cyan
+                    }
+                }
+            }
+            Column {
+                width: 51
+                spacing: 3
+                GohuText {
+                    text: "MIN"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                }
+                TextField {
+                    id: alarmMinute
+                    width: parent.width
+                    height: 32
+                    maximumLength: 2
+                    inputMethodHints: Qt.ImhDigitsOnly
+                    validator: IntValidator { bottom: 0; top: 59 }
+                    color: Colors.magenta
+                    font.pixelSize: 12
+                    background: Rectangle {
+                        color: Colors.black
+                        border.width: 1
+                        border.color: alarmMinute.activeFocus
+                            ? Colors.magenta : Colors.cyan
+                    }
+                }
+            }
+            Column {
+                width: Math.max(0, entryFields.width - 102 - 2 * entryFields.spacing)
+                spacing: 3
+                GohuText {
+                    text: "NAME"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                }
+                TextField {
+                    id: alarmName
+                    width: parent.width
+                    height: 32
+                    maximumLength: Policy.MAX_NAME_LENGTH
+                    placeholderText: "ALARM NAME"
+                    placeholderTextColor: Colors.cyan
+                    color: Colors.magenta
+                    font.pixelSize: 12
+                    background: Rectangle {
+                        color: Colors.black
+                        border.width: 1
+                        border.color: alarmName.activeFocus
+                            ? Colors.magenta : Colors.cyan
+                    }
                 }
             }
         }
-        ActionButton {
-            id: newAlarm
-            width: 77
-            height: parent.height
-            label: "+ NEW"
-            labelPixelSize: 10
-            accentColor: Colors.orange
-            available: AlarmManagerService.canEdit
-                && AlarmManagerService.count < Policy.MAX_ALARMS
-            onLeftClicked: pane.create()
+
+        Row {
+            id: editTabs
+            width: parent.width
+            height: 29
+            spacing: 6
+            visible: pane.selectedAlarm !== null
+            ActionButton {
+                width: (editTabs.width - 2 * editTabs.spacing) / 3
+                height: parent.height
+                label: "SCHEDULE"
+                labelPixelSize: 10
+                selected: pane.settingsTab === "schedule"
+                accentColor: Colors.cyan
+                onLeftClicked: pane.settingsTab = "schedule"
+            }
+            ActionButton {
+                width: (editTabs.width - 2 * editTabs.spacing) / 3
+                height: parent.height
+                label: "PAUSE"
+                labelPixelSize: 10
+                selected: pane.settingsTab === "pause"
+                accentColor: Colors.yellow
+                onLeftClicked: pane.settingsTab = "pause"
+            }
+            ActionButton {
+                width: (editTabs.width - 2 * editTabs.spacing) / 3
+                height: parent.height
+                label: "SOUND"
+                labelPixelSize: 10
+                selected: pane.settingsTab === "sound"
+                accentColor: Colors.magenta
+                onLeftClicked: pane.settingsTab = "sound"
+            }
+        }
+
+        Item {
+            id: editOptions
+            width: parent.width
+            height: 99
+            clip: true
+            visible: pane.selectedAlarm !== null
+
+            // The three editors share the same height. No sound buttons occupy
+            // the schedule page until SOUND is explicitly selected.
+            Column {
+                width: parent.width
+                spacing: 5
+                visible: pane.settingsTab === "schedule"
+                Row {
+                    id: scheduleModes
+                    width: parent.width
+                    height: 29
+                    spacing: 6
+                    ActionButton {
+                        width: (scheduleModes.width - scheduleModes.spacing) / 2
+                        height: parent.height
+                        label: "ONE TIME"
+                        labelPixelSize: 10
+                        selected: pane.draftMode === "once"
+                        accentColor: Colors.cyan
+                        onLeftClicked: pane.draftMode = "once"
+                    }
+                    ActionButton {
+                        width: (scheduleModes.width - scheduleModes.spacing) / 2
+                        height: parent.height
+                        label: "REPEAT / WEEKLY"
+                        labelPixelSize: 10
+                        selected: pane.draftMode === "weekly"
+                        accentColor: Colors.cyan
+                        onLeftClicked: pane.draftMode = "weekly"
+                    }
+                }
+                Row {
+                    id: weekChoices
+                    width: parent.width
+                    height: 30
+                    spacing: 3
+                    visible: pane.draftMode === "weekly"
+                    Repeater {
+                        model: pane.dayNames
+                        delegate: ActionButton {
+                            width: Math.max(0, (weekChoices.width
+                                   - 6 * weekChoices.spacing) / 7)
+                            height: parent.height
+                            label: modelData
+                            labelPixelSize: 9
+                            selected: pane.draftDays.indexOf(index) >= 0
+                            accentColor: Colors.orange
+                            onLeftClicked: pane.toggleDay(index)
+                        }
+                    }
+                }
+                Row {
+                    id: onceDateRow
+                    width: parent.width
+                    height: 30
+                    spacing: 5
+                    visible: pane.draftMode === "once"
+                    ActionButton {
+                        width: 63
+                        height: parent.height
+                        label: "◀ DAY"
+                        labelPixelSize: 9
+                        accentColor: Colors.cyan
+                        onLeftClicked: pane.shiftAlarmDate(-1)
+                    }
+                    TextField {
+                        id: alarmDate
+                        width: Math.max(0, onceDateRow.width - 126
+                                        - 2 * onceDateRow.spacing)
+                        height: parent.height
+                        maximumLength: 10
+                        placeholderText: "YYYY-MM-DD"
+                        placeholderTextColor: Colors.cyan
+                        color: Colors.magenta
+                        font.pixelSize: 11
+                        background: Rectangle {
+                            color: Colors.black
+                            border.width: 1
+                            border.color: alarmDate.activeFocus
+                                ? Colors.magenta : Colors.cyan
+                        }
+                    }
+                    ActionButton {
+                        width: 63
+                        height: parent.height
+                        label: "DAY ▶"
+                        labelPixelSize: 9
+                        accentColor: Colors.cyan
+                        onLeftClicked: pane.shiftAlarmDate(1)
+                    }
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 29
+                    visible: pane.draftMode === "once"
+                    label: pane.draftKeepSaved
+                        ? "KEEP ONE-TIME ALARM SAVED AFTER RINGING"
+                        : "REMOVE ONE-TIME ALARM AFTER RINGING"
+                    labelPixelSize: 10
+                    selected: pane.draftKeepSaved
+                    accentColor: Colors.magenta
+                    onLeftClicked: pane.draftKeepSaved = !pane.draftKeepSaved
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 6
+                visible: pane.settingsTab === "pause"
+                Row {
+                    id: pauseRow
+                    width: parent.width
+                    height: 31
+                    spacing: 6
+                    GohuText {
+                        width: 85
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        text: "RESUME ON"
+                        color: Colors.cyan
+                        font.pixelSize: 10
+                    }
+                    TextField {
+                        id: alarmResumeDate
+                        width: Math.max(0, pauseRow.width - 85 - 84
+                                        - 2 * pauseRow.spacing)
+                        height: parent.height
+                        placeholderText: "YYYY-MM-DD"
+                        placeholderTextColor: Colors.cyan
+                        maximumLength: 10
+                        color: Colors.magenta
+                        font.pixelSize: 11
+                        background: Rectangle {
+                            color: Colors.black
+                            border.width: 1
+                            border.color: alarmResumeDate.activeFocus
+                                ? Colors.magenta : Colors.cyan
+                        }
+                    }
+                    ActionButton {
+                        width: 84
+                        height: parent.height
+                        label: alarmResumeDate.text.trim() === "" ? "RESUME" : "PAUSE"
+                        labelPixelSize: 10
+                        accentColor: Colors.yellow
+                        available: pane.selectedAlarm !== null
+                        onLeftClicked: AlarmManagerService.pauseAlarm(
+                            pane.selectedId, alarmResumeDate.text.trim())
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "PAUSE // ENTER FUTURE YYYY-MM-DD. CLEAR DATE + RESUME."
+                    color: Colors.white
+                    opacity: 0.8
+                    font.pixelSize: 10
+                    wrapMode: Text.Wrap
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 4
+                visible: pane.settingsTab === "sound"
+                Row {
+                    id: soundChoices
+                    width: parent.width
+                    height: 29
+                    spacing: 5
+                    Repeater {
+                        model: ["chime", "soft", "urgent"]
+                        delegate: ActionButton {
+                            width: (soundChoices.width - 2 * soundChoices.spacing) / 3
+                            height: parent.height
+                            label: modelData.toUpperCase()
+                            labelPixelSize: 10
+                            selected: pane.draftSoundId === modelData
+                            accentColor: Colors.magenta
+                            onLeftClicked: pane.draftSoundId = modelData
+                        }
+                    }
+                }
+                Row {
+                    id: volumeRow
+                    width: parent.width
+                    height: 29
+                    spacing: 5
+                    ActionButton {
+                        width: 69
+                        height: parent.height
+                        label: "-10 VOL"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        onLeftClicked: pane.draftVolume =
+                            Math.max(0, pane.draftVolume - 10)
+                    }
+                    GohuText {
+                        width: Math.max(0, volumeRow.width - 138
+                                          - 2 * volumeRow.spacing)
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        horizontalAlignment: Text.AlignHCenter
+                        text: "VOLUME // " + pane.draftVolume + "%"
+                        color: Colors.white
+                        font.pixelSize: 11
+                    }
+                    ActionButton {
+                        width: 69
+                        height: parent.height
+                        label: "+10 VOL"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        onLeftClicked: pane.draftVolume =
+                            Math.min(100, pane.draftVolume + 10)
+                    }
+                }
+                Row {
+                    id: soundOptions
+                    width: parent.width
+                    height: 29
+                    spacing: 5
+                    ActionButton {
+                        width: (soundOptions.width - soundOptions.spacing) / 2
+                        height: parent.height
+                        label: pane.draftSoundEnabled ? "SOUND // ON" : "SOUND // OFF"
+                        labelPixelSize: 10
+                        selected: pane.draftSoundEnabled
+                        accentColor: Colors.cyan
+                        onLeftClicked: pane.draftSoundEnabled =
+                            !pane.draftSoundEnabled
+                    }
+                    ActionButton {
+                        width: (soundOptions.width - soundOptions.spacing) / 2
+                        height: parent.height
+                        label: "TEST SOUND"
+                        labelPixelSize: 10
+                        accentColor: Colors.orange
+                        onLeftClicked: AlarmManagerService.previewSound(
+                            pane.draftSoundId, pane.draftVolume)
+                    }
+                }
+            }
+        }
+
+        Row {
+            id: editorActions
+            width: parent.width
+            height: 33
+            spacing: 6
+            visible: pane.selectedAlarm !== null
+            ActionButton {
+                width: (editorActions.width - 2 * editorActions.spacing) / 3
+                height: parent.height
+                label: "SAVE"
+                labelPixelSize: 11
+                accentColor: Colors.cyan
+                available: AlarmManagerService.canEdit
+                onLeftClicked: pane.apply(false)
+            }
+            ActionButton {
+                width: (editorActions.width - 2 * editorActions.spacing) / 3
+                height: parent.height
+                label: "SAVE + ARM"
+                labelPixelSize: 11
+                accentColor: Colors.orange
+                available: AlarmManagerService.canEdit
+                onLeftClicked: pane.apply(true)
+            }
+            ActionButton {
+                width: (editorActions.width - 2 * editorActions.spacing) / 3
+                height: parent.height
+                label: pane.deleteConfirmId === pane.selectedId
+                    ? "CONFIRM DELETE" : "DELETE"
+                labelPixelSize: 10
+                accentColor: Colors.red
+                available: AlarmManagerService.canEdit
+                onLeftClicked: pane.removeSelected()
+            }
+        }
+
+        Row {
+            id: ringActions
+            width: parent.width
+            height: 29
+            spacing: 6
+            visible: pane.selectedAlarm !== null && pane.selectedAlarm.ringing
+            ActionButton {
+                width: (ringActions.width - ringActions.spacing) / 2
+                height: parent.height
+                label: "STOP ALARM"
+                labelPixelSize: 11
+                accentColor: Colors.red
+                onLeftClicked: AlarmManagerService.stopAlarm(pane.selectedId)
+            }
+            ActionButton {
+                width: (ringActions.width - ringActions.spacing) / 2
+                height: parent.height
+                label: "SNOOZE // 5M"
+                labelPixelSize: 11
+                accentColor: Colors.yellow
+                onLeftClicked: AlarmManagerService.snoozeAlarm(pane.selectedId)
+            }
+        }
+
+        GohuText {
+            width: parent.width
+            height: 17
+            text: "STATUS // " + AlarmManagerService.feedback
+            color: AlarmManagerService.storageError
+                   ? Colors.orange : Colors.cyan
+            font.pixelSize: 10
+            elide: Text.ElideRight
         }
     }
 
-    TextField {
-        id: alarmSearch
-        y: headerRow.y + headerRow.height + 8
-        width: pane.width
-        height: 30
-        placeholderText: "SEARCH SAVED ALARMS"
-        placeholderTextColor: Colors.cyan
-        color: Colors.magenta
-        selectionColor: Colors.magenta
-        selectedTextColor: Colors.black
-        font.family: "GohuFont 11 Nerd Font Mono"
-        font.pixelSize: 11
-        background: Rectangle {
-            color: Colors.black
-            border.width: 1
-            border.color: alarmSearch.activeFocus ? Colors.magenta : Colors.cyan
-        }
-    }
-
+    // Only saved alarms scroll. The navigation controls live in TimeW's
+    // bottom footer, outside this clipped list and outside scroll content.
     Item {
-        id: alarmBodyFrame
-        y: alarmSearch.y + alarmSearch.height + 8
+        id: listFrame
+        y: pinnedControls.y + pinnedControls.implicitHeight + 5
         width: pane.width
         height: Math.max(0, pane.height - y)
         clip: true
 
-        Flickable {
-            id: alarmViewport
-            anchors.fill: parent
-            anchors.rightMargin: alarmPageRail.crossExtent + 5
-            contentWidth: width
-            contentHeight: alarmFlow.implicitHeight
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-            interactive: contentHeight > height
-
-            Column {
-                id: alarmFlow
-                width: alarmViewport.width
-                spacing: 8
-
-    Item {
-        id: listFrame
-        width: alarmFlow.width
-        height: 155
         ListView {
             id: alarmList
             anchors {
@@ -241,17 +693,19 @@ Item {
             }
             clip: true
             spacing: 4
-            model: pane.visibleAlarms
-            interactive: contentHeight > height
             boundsBehavior: Flickable.StopAtBounds
+            interactive: contentHeight > height
+            model: pane.visibleAlarms
+
             delegate: Row {
                 id: entry
                 width: alarmList.width
-                height: 37
+                height: 35
                 spacing: 5
                 readonly property var rowAlarm: modelData
                 ActionButton {
-                    width: Math.max(0, entry.width - toggleAlarm.width - entry.spacing)
+                    width: Math.max(0, entry.width - toggleAlarm.width
+                                    - entry.spacing)
                     height: parent.height
                     selected: pane.selectedId === entry.rowAlarm.id
                     labelHorizontalAlignment: Text.AlignLeft
@@ -274,7 +728,8 @@ Item {
                     label: entry.rowAlarm.enabled ? "ON" : "OFF"
                     selected: entry.rowAlarm.enabled
                     labelPixelSize: 10
-                    accentColor: entry.rowAlarm.enabled ? Colors.orange : Colors.cyan
+                    accentColor: entry.rowAlarm.enabled
+                        ? Colors.orange : Colors.cyan
                     available: AlarmManagerService.canEdit
                     onLeftClicked: {
                         const nextState = !entry.rowAlarm.enabled;
@@ -286,523 +741,15 @@ Item {
                 }
             }
         }
+
         NeonScrollBar {
             id: listRail
             flickable: alarmList
             accountForContentOrigin: true
             geometryMode: "viewport"
             x: listFrame.width - width - 3
-            y: alarmList.y
-            height: alarmList.height
-            handleStyle: "star"
-            railColor: Colors.cyan
-            handleColor: Colors.magenta
-            handleBorderColor: Colors.magenta
-            railGlowColor: Colors.white
-            containGlow: true
-            visible: scrollable
-        }
-    }
-
-    Row {
-        id: panRow
-        width: alarmFlow.width
-        height: 27
-        spacing: 8
-        ActionButton {
-            width: (panRow.width - panRow.spacing) / 2
-            height: parent.height
-            label: "◀ PREVIOUS"
-            labelPixelSize: 10
-            accentColor: Colors.white
-            available: pane.visibleAlarms.length > 1
-            onLeftClicked: pane.stepSelection(-1)
-        }
-        ActionButton {
-            width: (panRow.width - panRow.spacing) / 2
-            height: parent.height
-            label: "NEXT ▶"
-            labelPixelSize: 10
-            accentColor: Colors.white
-            available: pane.visibleAlarms.length > 1
-            onLeftClicked: pane.stepSelection(1)
-        }
-    }
-
-    GohuText {
-        width: alarmFlow.width
-        text: pane.selectedAlarm
-            ? "EDIT // #" + pane.selectedId + " // "
-              + AlarmManagerService.nextText(pane.selectedId)
-            : "SELECT AN ALARM OR PRESS + NEW"
-        color: Colors.cyan
-        font.pixelSize: 11
-        wrapMode: Text.Wrap
-    }
-
-    Item {
-        id: editorFrame
-        width: alarmFlow.width
-        // The outer alarm viewport owns scrolling through the editor,
-        // including actions below it. Do not fix this at 264px.
-        height: editorContent.implicitHeight
-        visible: pane.selectedAlarm !== null
-        Flickable {
-            id: editorScroll
-            anchors {
-                top: parent.top
-                bottom: parent.bottom
-                left: parent.left
-                right: parent.right
-                rightMargin: editorRail.crossExtent + 6
-            }
-            contentWidth: width
-            contentHeight: editorContent.implicitHeight
-            clip: true
-            // Scrolling is delegated to the bounded outer alarm viewport,
-            // avoiding two wheel consumers over the editor.
-            interactive: false
-            boundsBehavior: Flickable.StopAtBounds
-            Column {
-                id: editorContent
-                width: editorScroll.width
-                spacing: 8
-                Row {
-                    id: entryFields
-                    width: parent.width
-                    height: 56
-                    spacing: 6
-                    Column {
-                        width: 51
-                        spacing: 4
-                        GohuText {
-                            text: "HOUR"
-                            color: Colors.cyan
-                            font.pixelSize: 10
-                        }
-                        TextField {
-                            id: alarmHour
-                            width: parent.width
-                            height: 33
-                            maximumLength: 2
-                            inputMethodHints: Qt.ImhDigitsOnly
-                            validator: IntValidator {bottom: 0; top: 23}
-                            color: Colors.magenta
-                            font.pixelSize: 12
-                            background: Rectangle {
-                                color: Colors.black
-                                border.width: 1
-                                border.color: alarmHour.activeFocus
-                                    ? Colors.magenta : Colors.cyan
-                            }
-                        }
-                    }
-                    Column {
-                        width: 60
-                        spacing: 4
-                        GohuText {
-                            text: "MIN"
-                            color: Colors.cyan
-                            font.pixelSize: 10
-                        }
-                        TextField {
-                            id: alarmMinute
-                            width: parent.width
-                            height: 33
-                            maximumLength: 2
-                            inputMethodHints: Qt.ImhDigitsOnly
-                            validator: IntValidator {bottom: 0; top: 59}
-                            color: Colors.magenta
-                            font.pixelSize: 12
-                            background: Rectangle {
-                                color: Colors.black
-                                border.width: 1
-                                border.color: alarmMinute.activeFocus
-                                    ? Colors.magenta : Colors.cyan
-                            }
-                        }
-                    }
-                    Column {
-                        width: Math.max(0, entryFields.width - 111 - 2 * entryFields.spacing)
-                        spacing: 4
-                        GohuText {
-                            text: "NAME"
-                            color: Colors.cyan
-                            font.pixelSize: 10
-                        }
-                        TextField {
-                            id: alarmName
-                            width: parent.width
-                            height: 33
-                            maximumLength: Policy.MAX_NAME_LENGTH
-                            placeholderText: "ALARM NAME"
-                            placeholderTextColor: Colors.cyan
-                            color: Colors.magenta
-                            font.pixelSize: 12
-                            background: Rectangle {
-                                color: Colors.black
-                                border.width: 1
-                                border.color: alarmName.activeFocus
-                                    ? Colors.magenta : Colors.cyan
-                            }
-                        }
-                    }
-                }
-                Row {
-                    id: scheduleModes
-                    width: parent.width
-                    height: 33
-                    spacing: 7
-                    ActionButton {
-                        width: (scheduleModes.width - scheduleModes.spacing) / 2
-                        height: parent.height
-                        label: "ONE TIME"
-                        labelPixelSize: 11
-                        selected: pane.draftMode === "once"
-                        accentColor: Colors.cyan
-                        onLeftClicked: pane.draftMode = "once"
-                    }
-                    ActionButton {
-                        width: (scheduleModes.width - scheduleModes.spacing) / 2
-                        height: parent.height
-                        label: "REPEAT / WEEKLY"
-                        labelPixelSize: 11
-                        selected: pane.draftMode === "weekly"
-                        accentColor: Colors.cyan
-                        onLeftClicked: pane.draftMode = "weekly"
-                    }
-                }
-                Row {
-                    width: parent.width
-                    height: 33
-                    visible: pane.draftMode === "weekly"
-                    spacing: 3
-                    Repeater {
-                        model: pane.days
-                        delegate: ActionButton {
-                            width: Math.floor((editorContent.width - 6 * 3) / 7)
-                            height: 33
-                            label: modelData
-                            labelPixelSize: 9
-                            selected: pane.draftDays.indexOf(index) >= 0
-                            accentColor: Colors.orange
-                            onLeftClicked: pane.toggleDay(index)
-                        }
-                    }
-                }
-                Row {
-                    id: onceDateRow
-                    width: parent.width
-                    height: 33
-                    visible: pane.draftMode === "once"
-                    spacing: 8
-                    GohuText {
-                        width: 116
-                        height: parent.height
-                        verticalAlignment: Text.AlignVCenter
-                        text: "DATE // YYYY-MM-DD"
-                        color: Colors.cyan
-                        font.pixelSize: 10
-                    }
-                    TextField {
-                        id: alarmDate
-                        width: Math.max(0, onceDateRow.width - 116 - onceDateRow.spacing)
-                        height: parent.height
-                        maximumLength: 10
-                        color: Colors.magenta
-                        font.pixelSize: 12
-                        background: Rectangle {
-                            color: Colors.black
-                            border.width: 1
-                            border.color: alarmDate.activeFocus
-                                ? Colors.magenta : Colors.cyan
-                        }
-                    }
-                }
-                Row {
-                    id: dateNudgeRow
-                    width: parent.width
-                    height: 29
-                    visible: pane.draftMode === "once"
-                    spacing: 6
-                    ActionButton {
-                        width: (dateNudgeRow.width - 2 * dateNudgeRow.spacing) / 3
-                        height: parent.height
-                        label: "◀ DAY"
-                        labelPixelSize: 10
-                        accentColor: Colors.cyan
-                        onLeftClicked: pane.shiftAlarmDate(-1)
-                    }
-                    ActionButton {
-                        width: (dateNudgeRow.width - 2 * dateNudgeRow.spacing) / 3
-                        height: parent.height
-                        label: "TODAY"
-                        labelPixelSize: 10
-                        accentColor: Colors.orange
-                        onLeftClicked: alarmDate.text = Policy.dayKey(Date.now())
-                    }
-                    ActionButton {
-                        width: (dateNudgeRow.width - 2 * dateNudgeRow.spacing) / 3
-                        height: parent.height
-                        label: "DAY ▶"
-                        labelPixelSize: 10
-                        accentColor: Colors.cyan
-                        onLeftClicked: pane.shiftAlarmDate(1)
-                    }
-                }
-                Row {
-                    id: keepRow
-                    width: parent.width
-                    height: 29
-                    visible: pane.draftMode === "once"
-                    spacing: 7
-                    ActionButton {
-                        width: parent.width
-                        height: parent.height
-                        label: pane.draftKeepSaved
-                            ? "KEEP SAVED AFTER COMPLETION // YES"
-                            : "DELETE AFTER COMPLETION // YES"
-                        labelPixelSize: 10
-                        selected: pane.draftKeepSaved
-                        accentColor: Colors.magenta
-                        onLeftClicked: pane.draftKeepSaved = !pane.draftKeepSaved
-                    }
-                }
-                Row {
-                    id: pauseRow
-                    width: parent.width
-                    height: 33
-                    spacing: 7
-                    GohuText {
-                        width: 66
-                        height: parent.height
-                        verticalAlignment: Text.AlignVCenter
-                        text: "RESUME ON"
-                        font.pixelSize: 10
-                        color: Colors.cyan
-                    }
-                    TextField {
-                        id: alarmResumeDate
-                        width: Math.max(0, pauseRow.width - 66 - 87
-                                        - 2 * pauseRow.spacing)
-                        height: parent.height
-                        placeholderText: "YYYY-MM-DD"
-                        placeholderTextColor: Colors.cyan
-                        maximumLength: 10
-                        color: Colors.magenta
-                        font.pixelSize: 11
-                        background: Rectangle {
-                            color: Colors.black
-                            border.width: 1
-                            border.color: alarmResumeDate.activeFocus
-                                ? Colors.magenta : Colors.cyan
-                        }
-                    }
-                    ActionButton {
-                        width: 87
-                        height: parent.height
-                        label: alarmResumeDate.text.trim() === "" ? "RESUME" : "PAUSE"
-                        labelPixelSize: 10
-                        accentColor: Colors.yellow
-                        available: pane.selectedAlarm !== null
-                        onLeftClicked: {
-                            AlarmManagerService.pauseAlarm(
-                                pane.selectedId, alarmResumeDate.text.trim());
-                        }
-                    }
-                }
-                GohuText {
-                    width: parent.width
-                    text: "SOUND // EACH ALARM HAS ITS OWN TONE + VOLUME"
-                    color: Colors.cyan
-                    font.pixelSize: 10
-                }
-                Row {
-                    id: soundChoices
-                    width: parent.width
-                    height: 31
-                    spacing: 5
-                    Repeater {
-                        model: ["chime", "soft", "urgent"]
-                        delegate: ActionButton {
-                            width: (soundChoices.width - 2 * soundChoices.spacing) / 3
-                            height: parent.height
-                            label: modelData.toUpperCase()
-                            labelPixelSize: 10
-                            selected: pane.draftSoundId === modelData
-                            accentColor: Colors.magenta
-                            onLeftClicked: pane.draftSoundId = modelData
-                        }
-                    }
-                }
-                Row {
-                    id: volumeRow
-                    width: parent.width
-                    height: 31
-                    spacing: 6
-                    ActionButton {
-                        width: 68
-                        height: parent.height
-                        label: "-10 VOL"
-                        labelPixelSize: 10
-                        accentColor: Colors.cyan
-                        onLeftClicked: pane.draftVolume = Math.max(0,pane.draftVolume-10)
-                    }
-                    GohuText {
-                        width: Math.max(0, volumeRow.width - 136
-                                          - 2 * volumeRow.spacing)
-                        height: parent.height
-                        verticalAlignment: Text.AlignVCenter
-                        horizontalAlignment: Text.AlignHCenter
-                        text: pane.draftVolume + "%"
-                        color: Colors.white
-                        font.pixelSize: 11
-                    }
-                    ActionButton {
-                        width: 68
-                        height: parent.height
-                        label: "+10 VOL"
-                        labelPixelSize: 10
-                        accentColor: Colors.cyan
-                        onLeftClicked: pane.draftVolume = Math.min(100,pane.draftVolume+10)
-                    }
-                }
-                Row {
-                    id: soundOptions
-                    width: parent.width
-                    height: 31
-                    spacing: 6
-                    ActionButton {
-                        width: (soundOptions.width - soundOptions.spacing) / 2
-                        height: parent.height
-                        label: pane.draftSoundEnabled ? "SOUND // ON" : "SOUND // OFF"
-                        labelPixelSize: 10
-                        selected: pane.draftSoundEnabled
-                        accentColor: Colors.cyan
-                        onLeftClicked: pane.draftSoundEnabled = !pane.draftSoundEnabled
-                    }
-                    ActionButton {
-                        width: (soundOptions.width - soundOptions.spacing) / 2
-                        height: parent.height
-                        label: "TEST SOUND"
-                        labelPixelSize: 10
-                        accentColor: Colors.orange
-                        onLeftClicked: AlarmManagerService.previewSound(
-                            pane.draftSoundId, pane.draftVolume)
-                    }
-                }
-            }
-        }
-        NeonScrollBar {
-            id: editorRail
-            flickable: editorScroll
-            accountForContentOrigin: true
-            geometryMode: "viewport"
-            x: editorFrame.width - width - 3
-            y: editorScroll.y
-            height: editorScroll.height
-            handleStyle: "star"
-            railColor: Colors.cyan
-            handleColor: Colors.magenta
-            handleBorderColor: Colors.magenta
-            railGlowColor: Colors.white
-            containGlow: true
-            visible: scrollable
-        }
-    }
-
-    Row {
-        id: editorActions
-        width: alarmFlow.width
-        height: 34
-        spacing: 6
-        visible: pane.selectedAlarm !== null
-        ActionButton {
-            width: (editorActions.width - 2 * editorActions.spacing) / 3
-            height: parent.height
-            label: "SAVE"
-            labelPixelSize: 11
-            accentColor: Colors.cyan
-            available: AlarmManagerService.canEdit
-            onLeftClicked: pane.apply(false)
-        }
-        ActionButton {
-            width: (editorActions.width - 2 * editorActions.spacing) / 3
-            height: parent.height
-            label: "SAVE + ARM"
-            labelPixelSize: 11
-            accentColor: Colors.orange
-            available: AlarmManagerService.canEdit
-            onLeftClicked: pane.apply(true)
-        }
-        ActionButton {
-            width: (editorActions.width - 2 * editorActions.spacing) / 3
-            height: parent.height
-            label: pane.deleteConfirmId === pane.selectedId ? "CONFIRM DELETE" : "DELETE"
-            labelPixelSize: 10
-            accentColor: Colors.red
-            available: AlarmManagerService.canEdit
-            onLeftClicked: {
-                if (pane.deleteConfirmId !== pane.selectedId) {
-                    pane.deleteConfirmId = pane.selectedId;
-                    return;
-                }
-                const id = pane.selectedId;
-                pane.deleteConfirmId = 0;
-                if (AlarmManagerService.removeAlarm(id))
-                    pane.selectedId = 0;
-            }
-        }
-    }
-    Row {
-        id: ringActions
-        width: alarmFlow.width
-        height: 31
-        spacing: 6
-        visible: pane.selectedAlarm !== null && pane.selectedAlarm.ringing
-        ActionButton {
-            width: (ringActions.width - ringActions.spacing) / 2
-            height: parent.height
-            label: "STOP ALARM"
-            labelPixelSize: 11
-            accentColor: Colors.red
-            onLeftClicked: AlarmManagerService.stopAlarm(pane.selectedId)
-        }
-        ActionButton {
-            width: (ringActions.width - ringActions.spacing) / 2
-            height: parent.height
-            label: "SNOOZE // 5M"
-            labelPixelSize: 11
-            accentColor: Colors.yellow
-            onLeftClicked: AlarmManagerService.snoozeAlarm(pane.selectedId)
-        }
-    }
-    GohuText {
-        width: alarmFlow.width
-        text: "STATUS // " + AlarmManagerService.feedback
-        color: AlarmManagerService.storageError ? Colors.orange : Colors.cyan
-        font.pixelSize: 10
-        wrapMode: Text.Wrap
-    }
-    GohuText {
-        width: alarmFlow.width
-        text: "STORE // " + AlarmManagerService.storageState.toUpperCase()
-            + "    AUDIO // " + AlarmManagerService.audioState
-        color: Colors.white
-        font.pixelSize: 10
-        wrapMode: Text.Wrap
-    }
-            }
-        }
-
-        NeonScrollBar {
-            id: alarmPageRail
-            flickable: alarmViewport
-            accountForContentOrigin: true
-            geometryMode: "viewport"
-            x: alarmBodyFrame.width - width - 3
             y: 0
-            height: alarmBodyFrame.height
+            height: listFrame.height
             handleStyle: "star"
             railColor: Colors.cyan
             handleColor: Colors.magenta
@@ -810,6 +757,14 @@ Item {
             railGlowColor: Colors.white
             containGlow: true
             visible: scrollable
+        }
+        GohuText {
+            anchors.centerIn: parent
+            visible: pane.visibleAlarms.length === 0
+            text: AlarmManagerService.count > 0
+                ? "NO MATCHING ALARMS" : "NO SAVED ALARMS // + NEW"
+            font.pixelSize: 11
+            color: Colors.cyan
         }
     }
 }

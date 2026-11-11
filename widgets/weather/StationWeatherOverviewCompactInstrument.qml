@@ -224,8 +224,13 @@ Rectangle {
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 1
                     width: parent.width
+                    // W21 // At compact size, visibility moves next to
+                    // FEELS rather than colliding with the pressure value.
                     text: panel.currentReady
                         ? "FEELS "+panel.reading(panel.weatherService.feelsLikeF,"°F")
+                          +(nowBand.height<65
+                            ? " // VIS "+panel.reading(panel.weatherService.visibilityMiles," MI")
+                            : "")
                         : "FEELS --"
                     font.pixelSize: 9
                     color: Colors.yellow
@@ -262,19 +267,20 @@ Rectangle {
                             anchors.top: parent.top
                             text: metric.modelData.label
                             color: metric.modelData.color
-                            font.pixelSize: 8
+                            font.pixelSize: metric.height<26 ? 7 : 8
                         }
                         Row {
                             id: metricReadoutRow
                             anchors.left: parent.left
                             anchors.top: parent.top
-                            anchors.topMargin: (metric.modelData.key==="pressure" ? 7 : 9)
-                                               + Math.min(24,panel.expansion * 0.10)
+                            anchors.topMargin: metric.height<26 ? 8
+                                : (metric.modelData.key==="pressure" ? 7 : 9)
+                                  + Math.min(24,panel.expansion * 0.10)
                             spacing: 1
                             GohuText {
                                 visible: metric.modelData.key==="wind"
                                 text: "↑"
-                                font.pixelSize: 11
+                                font.pixelSize: metric.height<26 ? 8 : 11
                                 width: visible ? 10 : 0
                                 color: Colors.yellow
                                 rotation: panel.currentReady
@@ -282,8 +288,9 @@ Rectangle {
                             }
                             GohuText {
                                 text: metric.modelData.value
-                                font.pixelSize: (metric.modelData.key==="pressure" ? 8 : 11)
-                                                + Math.min(3,panel.expansion * 0.02)
+                                font.pixelSize: metric.height<26 ? 8
+                                    : (metric.modelData.key==="pressure" ? 8 : 11)
+                                      + Math.min(3,panel.expansion * 0.02)
                                 color: Colors.white
                             }
                         }
@@ -315,6 +322,7 @@ Rectangle {
                         }
                         GohuText {
                             visible: metric.modelData.key==="pressure"
+                                     && metric.height>=26
                             anchors.bottom: parent.bottom
                             text: panel.currentReady
                                 ? "VIS "+panel.reading(panel.weatherService.visibilityMiles," MI")

@@ -18,6 +18,10 @@ import struct
 from scripts.trash.archive_v2_broker_handoff import (
     BrokerHandoffError, admit_peer_bound_fixture,
 )
+from scripts.trash.archive_v2_peer_evidence import inspect_fixture_peer
+from scripts.trash.archive_v2_peer_lifecycle import (
+    PeerLeaseError, pin_fixture_peer,
+)
 from scripts.trash.archive_v2_owner_trust import OwnerTrustError
 from scripts.trash.archive_v2_peer_evidence import BrokerPeerError
 from scripts.trash.archive_v2_signed_capture import SignedCaptureError
@@ -145,6 +149,7 @@ def _safe_reply(result):
             "sourceProcessVerified":False,
             "humanConsentVerified":False,
             "archiveCopyAuthorized":False,
+            "peerLifetimeCheckedBeforeCommit":True,
             "captureAllowed":False,
             "restoreAllowed":False,
             "burnAllowed":False,
@@ -171,23 +176,31 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
             _require(type(peer_policy) is dict
                      and packet["ownerId"] == peer_policy.get("ownerId"),
                      "BROKER_OWNER_PEER_MISMATCH")
-            admitted = admit_peer_bound_fixture(
-                connection, peer_policy,
-                packet["signedManifest"], pinned_test_root,
-                packet["signedClaim"], ledger=ledger,
-                owner_id=packet["ownerId"],
-                resource_id=packet["resourceId"],
-                source_revision=packet["sourceRevision"],
-                source_captured_ms=packet["sourceCapturedAtMs"],
-                payload=payload, now_ms=now_ms)
+            # Pin the original connected process with a kernel pidfd.
+            # Fail-closed if pidfd is unsupported or the peer exits before
+            # the nonce+synthetic copy transaction commits.
+            witness = inspect_fixture_peer(connection, peer_policy)
+            with pin_fixture_peer(connection, witness) as lifetime:
+                lifetime.require_alive()
+                admitted = admit_peer_bound_fixture(
+                    connection, peer_policy,
+                    packet["signedManifest"], pinned_test_root,
+                    packet["signedClaim"], ledger=ledger,
+                    owner_id=packet["ownerId"],
+                    resource_id=packet["resourceId"],
+                    source_revision=packet["sourceRevision"],
+                    source_captured_ms=packet["sourceCapturedAtMs"],
+                    payload=payload, now_ms=now_ms,
+                    commit_guard=lifetime.require_alive,
+                    expected_peer_witness_sha256=witness["peerWitnessSha256"])
             _require(admitted["captureAllowed"] is False
                      and admitted["productionAllowed"] is False
                      and admitted["sourceProcessVerified"] is False,
                      "BROKER_UNEXPECTED_PRIVILEGE")
             result = _safe_reply(admitted)
         except (FixtureWireError, BrokerHandoffError, BrokerPeerError,
-                SignedCaptureError, OwnerTrustError, TrustHistoryError,
-                AtomicAdmissionError) as exc:
+                PeerLeaseError, SignedCaptureError, OwnerTrustError,
+                TrustHistoryError, AtomicAdmissionError) as exc:
             code = str(exc)
             result = {"ok":False, "error":code if SAFE_CODE.fullmatch(code)
                       else "BROKER_REQUEST_REFUSED"}

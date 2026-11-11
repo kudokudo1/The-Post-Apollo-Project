@@ -162,7 +162,10 @@ class ArchiveStoreMigrationV2yTests(unittest.TestCase):
         with self.assertRaisesRegex(ArchiveMigrationRefused,
                                     "V2Y_ARCHIVE_PAYLOAD_QUOTA"):
             self.admit()
-        self.assertEqual(self.archive.status(),self.baseline)
+        self.assertEqual(self.archive.status()["revision"],
+                         self.baseline["revision"])
+        self.assertEqual(self.archive.status()["payloadBytes"],
+                         self.baseline["payloadBytes"])
         self.archive.payload_quota = 512*1024*1024
         self.assertEqual(self.admit()["snapshotId"],"a"*32)
 

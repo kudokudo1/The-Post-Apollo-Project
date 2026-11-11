@@ -141,6 +141,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             self.assertIn(line, script)
         self.assertIn("iso_sha=9ccec9b075a0a4358a7209b2667156aaeeec3a6a3c8d71cada45b57fca9b4682", c2v)
         self.assertEqual(script.count("-nic none"), 2, "Installer AND actual persistent boot must remain offline")
+        self.assertIn("RPM_VERIFY_RC|RPM_VERIFY_DETAIL", script)
         self.assertIn("test -c /dev/kvm", (ROOT / ".github/workflows/connections-identity-silverblue-real-boot.yml").read_text())
         self.assertNotIn("/tests/connections/c2v_silverblue/", script)
         self.assertNotIn("source " + str(ROOT / "tests/connections/c2v_silverblue"), script)
@@ -168,6 +169,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             '[[ "$enabled_state" == static || "$enabled_state" == disabled ]]',
             'timeout --signal=TERM --kill-after=3s 35s rpm -V "$pkg" >"$verify_file" 2>&1',
             "C4B_ID_RPM_VERIFY_RC",
+            "C4B_ID_RPM_VERIFY_DETAIL",
             "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_REFUSED",
             '[[ "$observed" =~ ^0:0:555:[1-9][0-9]*$ ]]',
             "C4B_ID_INSTALLED_FILE_OBSERVED",

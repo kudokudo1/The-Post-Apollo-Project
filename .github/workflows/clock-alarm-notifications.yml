@@ -1,0 +1,131 @@
+name: Clock alarm scoped notifications
+
+on:
+  pull_request:
+    paths:
+      - "services/notifications/ClockAlarmNotificationPolicy.js"
+      - "services/notifications/ClockAlarmNotificationProducer.qml"
+      - "services/notifications/ApolloNotificationRoute.js"
+      - "services/notifications/qmldir"
+      - "services/time/AlarmManagerService.qml"
+      - "widgets/TimeW.qml"
+      - "shell.qml"
+      - "tests/notifications/test_clock_alarm_notification_contract.py"
+      - ".github/workflows/clock-alarm-notifications.yml"
+  push:
+    paths:
+      - "services/notifications/ClockAlarmNotificationPolicy.js"
+      - "services/notifications/ClockAlarmNotificationProducer.qml"
+      - "services/notifications/ApolloNotificationRoute.js"
+      - "services/notifications/qmldir"
+      - "services/time/AlarmManagerService.qml"
+      - "widgets/TimeW.qml"
+      - "shell.qml"
+      - "tests/notifications/test_clock_alarm_notification_contract.py"
+      - ".github/workflows/clock-alarm-notifications.yml"
+
+jobs:
+  verify-alarm-scope:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Source boundary and no-focus contracts
+        run: python3 -m unittest discover -s tests/notifications -p 'test_clock_alarm_notification_contract.py' -v
+      - name: Per-alarm resource DND, BLOCK, event identity and navigation tests
+        run: |
+          node <<'JS'
+          const fs = require('fs'), vm = require('vm'), assert = require('assert/strict');
+          function load(path) {
+            const scope = {};
+            vm.runInNewContext(fs.readFileSync(path, 'utf8')
+              .replace(/^\.pragma library\s*/, ''), scope);
+            return scope;
+          }
+          const alarm=load('services/notifications/ClockAlarmNotificationPolicy.js');
+          const policy=load('services/notifications/NotificationScopePolicy.js');
+          const route=load('services/notifications/ApolloNotificationRoute.js');
+          const base={
+            id:1,name:'Morning',hour:7,minute:30,mode:'weekly',
+            weekdays:[1,3,5],date:'',soundId:'soft',soundEnabled:true,
+            favorite:false,note:'Private reminder not for notification history',
+            ringing:true,ringStartedAtMs:1794400200000
+          };
+          const a=alarm.payload(base,base.ringStartedAtMs);
+          const b=alarm.payload({...base,id:2},base.ringStartedAtMs);
+          assert.ok(a && b);
+          assert.equal(a.sourceId,'clock-alarm');
+          assert.equal(a.category,'internal');
+          assert.equal(a.severity,'warning');
+          assert.equal(a.context.origin,'apollo');
+          assert.equal(a.context.domain,'system');
+          assert.equal(a.context.eventType,'alarm-rang');
+          assert.equal(a.context.resourceId,'alarm-1');
+          assert.equal(b.context.resourceId,'alarm-2');
+          assert.equal(a.context.resourceLabel,'Morning');
+          assert.equal(a.context.scheduleMode,'weekly');
+          assert.equal(a.context.weekdays.join(','),'1,3,5');
+          assert.equal(a.message.includes('MON WED FRI'),true);
+          assert.equal(JSON.stringify(a).includes('Private reminder'),false);
+          assert.equal(a.id,'apollo-clock-alarm-1-'+base.ringStartedAtMs);
+          assert.equal(alarm.payload({...base,ringing:false},base.ringStartedAtMs),null);
+          assert.equal(alarm.payload({...base,ringStartedAtMs:111},base.ringStartedAtMs),null);
+          assert.equal(alarm.payload({...base,id:'1'},base.ringStartedAtMs),null);
+          assert.equal(alarm.payload({...base,name:'Bad\nTitle'},base.ringStartedAtMs),null);
+
+          const oneTime=alarm.payload({...base,mode:'once',date:'2026-11-11',
+            weekdays:[]},base.ringStartedAtMs);
+          assert.ok(oneTime);
+          assert.equal(oneTime.context.localDate,'2026-11-11');
+          assert.equal(oneTime.message.includes('ONE TIME // 2026-11-11'),true);
+          // Snoozed re-ring: new occurrence event, same alarm resource key.
+          const later=alarm.payload({...base,ringStartedAtMs:base.ringStartedAtMs+300000},
+            base.ringStartedAtMs+300000);
+          assert.notEqual(later.id,a.id);
+          assert.equal(later.context.resourceId,a.context.resourceId);
+          // Rename does not change policy keys or destination.
+          const renamed=alarm.payload({...base,name:'Early morning'},
+            base.ringStartedAtMs);
+          assert.equal(renamed.id,a.id);
+          assert.equal(renamed.context.resourceId,a.context.resourceId);
+          assert.equal(renamed.context.resourceLabel,'Early morning');
+
+          const options=e=>policy.scopeOptionsFor(e,'clock-alarm','');
+          const sa=options(a), sb=options(b);
+          function entry(scopes,kind) {return scopes.find(x=>x.kind===kind)}
+          assert.ok(entry(sa,'app') && entry(sa,'event') && entry(sa,'resource'));
+          assert.ok(entry(sa,'resourceEvent'));
+          assert.equal(entry(sa,'app').key,entry(sb,'app').key);
+          assert.equal(entry(sa,'event').key,entry(sb,'event').key);
+          assert.notEqual(entry(sa,'resource').key,entry(sb,'resource').key);
+          assert.notEqual(entry(sa,'resourceEvent').key,entry(sb,'resourceEvent').key);
+          assert.equal(entry(sa,'resource').key,entry(options(renamed),'resource').key);
+
+          // DND, ZZ, BLOCK and favorites all use the same scope options.
+          const alarmOneKey=entry(sa,'resource').key;
+          const enabledRules=new Set([alarmOneKey]);
+          const isUnderPolicy=e=>options(e).some(o=>enabledRules.has(o.key));
+          assert.equal(isUnderPolicy(a),true);
+          assert.equal(isUnderPolicy(b),false);
+          enabledRules.clear(); enabledRules.add(entry(sa,'app').key);
+          assert.equal(isUnderPolicy(a),true);
+          assert.equal(isUnderPolicy(b),true);
+          enabledRules.clear(); enabledRules.add(entry(sa,'event').key);
+          assert.equal(isUnderPolicy(a),true);
+          assert.equal(isUnderPolicy(b),true);
+
+          // Event ID and resource witnesses must agree. No title parsing.
+          const ra=route.routeFor(a);
+          assert.ok(ra);
+          assert.equal(ra.widget,'time');
+          assert.equal(ra.view,'alarm');
+          assert.equal(ra.alarmId,1);
+          assert.equal(alarm.destinationId(a),1);
+          assert.equal(route.routeFor(b).alarmId,2);
+          assert.equal(route.routeFor({...a,title:'renamed!'}).alarmId,1);
+          assert.equal(route.routeFor({...a,context:{...a.context,alarmId:2}}),null);
+          assert.equal(route.routeFor({...a,context:{...a.context,resourceId:'alarm-2'}}),null);
+          assert.equal(route.routeFor({...a,id:'spoof'}),null);
+          assert.equal(route.routeFor({...a,sourceId:'browser'}),null);
+          assert.equal(route.routeFor({...a,context:{...a.context,eventType:'alarm-stopped'}}),null);
+          console.log('CLOCK alarm exact resource DND/Block/ZZ/favorite and destination tests: PASS');
+          JS

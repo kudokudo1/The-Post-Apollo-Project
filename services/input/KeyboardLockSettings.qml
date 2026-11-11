@@ -144,18 +144,25 @@ Scope {
                 hostStatus = "installed";
                 installedNum = String(reply.num || "");
                 installedCaps = String(reply.caps || "");
+                hostRememberNum = reply.remember_num === true;
+                hostRememberCaps = reply.remember_caps === true;
                 hostError = "";
+                rememberSuspended = false;
                 feedback = "SWAY FILE INSTALLED // EFFECTIVE NEXT SWAY START";
             } else if (status === "not_installed") {
                 hostStatus = "not_installed";
                 installedNum = "";
                 installedCaps = "";
+                hostRememberNum = false;
+                hostRememberCaps = false;
                 hostError = "";
                 feedback = "SWAY FILE NOT YET INSTALLED";
             } else {
                 hostStatus = "unavailable";
                 installedNum = "";
                 installedCaps = "";
+                hostRememberNum = false;
+                hostRememberCaps = false;
                 hostError = String(reply.code || "HOST_UNAVAILABLE");
                 feedback = "SWAY STARTUP FILE UNAVAILABLE";
             }

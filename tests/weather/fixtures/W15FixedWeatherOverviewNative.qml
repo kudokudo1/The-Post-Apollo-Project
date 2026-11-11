@@ -4,19 +4,19 @@ import QtQuick.Window
 import Quickshell
 import "widgets/weather" as Weather
 
-// W15 // Synthetic only, offscreen. Inspect original card geometry and
-// header-only route selection at real 440x275 and 520x300 station sizes.
+// W16 // Synthetic-only native test of one continuous WEATHER OVERVIEW.
+// Both Snapshot and Auto rows must fit at 440x275 AND 520x300 without panning.
 ShellRoot {
     id: root
     property int phase: 0
     property int ticks: 0
     property bool finished: false
-    property bool capturedNow: false
-    property bool capturedAuto: false
+    property bool capturedCompact: false
+    property bool capturedWide: false
     function fail(message) {
         if(finished)return;
         finished=true;
-        console.error("W15_OVERVIEW_NATIVE_FAIL // "+message);
+        console.error("W16_OVERVIEW_NATIVE_FAIL // "+message);
         Qt.quit();
     }
     QtObject {
@@ -44,7 +44,7 @@ ShellRoot {
             {date:"2026-11-11",time:"1200",timeLabel:"12 PM",
              tempF:58,condition:"Cloudy",weatherCode:3,chanceRain:15},
             {date:"2026-11-11",time:"1500",timeLabel:"3 PM",
-             tempF:60,condition:"Rain",weatherCode:61,chanceRain:40}
+             tempF:60,condition:"Thunderstorm",weatherCode:95,chanceRain:40}
         ]
         property var dailyForecast: [
             {date:"2026-11-11",maxTempF:64,minTempF:45,
@@ -52,7 +52,7 @@ ShellRoot {
             {date:"2026-11-12",maxTempF:61,minTempF:46,
              weatherCode:3,condition:"Cloudy",chanceRain:35},
             {date:"2026-11-13",maxTempF:62,minTempF:49,
-             weatherCode:61,condition:"Rain",chanceRain:70}
+             weatherCode:95,condition:"Thunderstorm",chanceRain:70}
         ]
     }
     Window {
@@ -76,21 +76,31 @@ ShellRoot {
         const snap=overview.overviewSnapshotItem;
         const autoCards=overview.overviewRelevantItem;
         if(!scroll || !content || !summary || !snap || !autoCards)
-            return "FIXED_ITEMS_MISSING";
+            return "ONE_PAGE_ITEMS_MISSING";
         if(scroll.interactive || scroll.contentHeight>scroll.height+1
            || Math.abs(scroll.contentY)>1)
             return "STILL_PANNING";
         if(summary.height!==158)
-            return "WEATHER_SUMMARY_MODIFIED";
+            return "WEATHER_SUMMARY_CHANGED";
+        if(!snap.visible || !autoCards.visible)
+            return "CARD_GROUPS_NOT_BOTH_VISIBLE";
         if(content.implicitHeight>scroll.height+1)
-            return "CONTENT_CLIPPED "+content.implicitHeight
+            return "ONE_PAGE_CLIPPED "+content.implicitHeight
                 +" > "+scroll.height;
-        if(snap.visible && autoCards.visible)
-            return "DOUBLE_GROUP_VISIBLE";
-        if(snap.visible && snap.height<110)
-            return "SNAPSHOT_BOX_TOO_SHORT "+snap.height;
-        if(autoCards.visible && autoCards.height<110)
-            return "AUTO_BOX_TOO_SHORT "+autoCards.height;
+        if(snap.height<55 || autoCards.height<55)
+            return "CARDS_TOO_SMALL "+snap.height+"/"+autoCards.height;
+        if(summary.glyph(95,"Thunderstorm")!=="⚡︎")
+            return "THUNDERBOLT_CODEPOINT_WRONG";
+        for(const group of [snap,autoCards]) {
+            for(let i=0;i<group.children.length;i++) {
+                const c=group.children[i];
+                if(!c || !c.overviewDense || !c.contentItem)continue;
+                const contentHeight=c.contentItem.childrenRect.height;
+                if(contentHeight>c.contentItem.height+2)
+                    return "DENSE_CARD_TEXT_OVERFLOW "+contentHeight
+                       +" / "+c.contentItem.height;
+            }
+        }
         return "";
     }
     Timer {
@@ -105,45 +115,32 @@ ShellRoot {
             const error=root.checkFit();
             if(error!=="")return root.fail(error);
             if(root.phase===0) {
-                if(!overview.overviewSnapshotItem.visible)
-                    return root.fail("SNAPSHOT_NOT_DEFAULT");
-                if(!root.capturedNow) {
-                    root.capturedNow=true;
+                if(!root.capturedCompact) {
+                    root.capturedCompact=true;
                     window.contentItem.grabToImage(function(image) {
-                        if(image && image.saveToFile("/tmp/weather-w15-overview-now.png"))
-                            console.log("W15_OVERVIEW_NOW_CAPTURED");
-                    },Qt.size(880,550));
-                    return;
-                }
-                overview.overviewPage="relevant";
-                root.phase=1;
-                return;
-            }
-            if(root.phase===1) {
-                if(!overview.overviewRelevantItem.visible ||
-                   overview.overviewSnapshotItem.visible)
-                    return root.fail("AUTO_GROUP_NOT_SWITCHED");
-                if(!root.capturedAuto) {
-                    root.capturedAuto=true;
-                    window.contentItem.grabToImage(function(image) {
-                        if(image && image.saveToFile("/tmp/weather-w15-overview-auto.png"))
-                            console.log("W15_OVERVIEW_AUTO_CAPTURED");
+                        if(image && image.saveToFile("/tmp/weather-w16-overview-compact.png"))
+                            console.log("W16_OVERVIEW_COMPACT_CAPTURED");
                     },Qt.size(880,550));
                     return;
                 }
                 window.width=520;
                 window.height=300;
-                overview.overviewPage="snapshot";
-                root.phase=2;
+                root.phase=1;
                 return;
             }
-            if(root.phase===2) {
+            if(root.phase===1) {
                 if(window.width!==520 || overview.overviewSnapshotItem.width<500)
                     return root.fail("LARGE_VIEW_NOT_RESIZED");
-                if(overview.overviewViewportItem.contentHeight>300)
-                    return root.fail("LARGE_OVERVIEW_SCROLL");
+                if(!root.capturedWide) {
+                    root.capturedWide=true;
+                    window.contentItem.grabToImage(function(image) {
+                        if(image && image.saveToFile("/tmp/weather-w16-overview-wide.png"))
+                            console.log("W16_OVERVIEW_WIDE_CAPTURED");
+                    },Qt.size(1040,600));
+                    return;
+                }
                 root.finished=true;
-                console.log("W15_OVERVIEW_NATIVE_PASS // TWO_SIZES_NO_PAN_INTACT_CARD_GROUPS");
+                console.log("W16_OVERVIEW_NATIVE_PASS // BOTH_CARD_GROUPS_NO_PAN_440_520");
                 Qt.quit();
             }
         }

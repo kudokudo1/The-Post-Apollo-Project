@@ -21,6 +21,7 @@ on:
       - 'tests/weather/test_weather_w17_overview_mirror.js'
       - 'tests/weather/test_weather_w18_space_allocation.js'
       - 'tests/weather/test_weather_w19_rain_meter_grammar.js'
+      - 'tests/weather/test_weather_w20_visual_hierarchy.js'
       - 'tests/weather/test_weather_w10_three_band_solar.js'
       - 'widgets/weather/StationSky.qml'
       - 'tests/weather/test_weather_w9_fixed_paged_terminal.js'
@@ -56,6 +57,7 @@ jobs:
           node --test tests/weather/test_weather_w17_overview_mirror.js
           node --test tests/weather/test_weather_w18_space_allocation.js
           node --test tests/weather/test_weather_w19_rain_meter_grammar.js
+          node --test tests/weather/test_weather_w20_visual_hierarchy.js
           node --test tests/weather/test_weather_w8_unified_terminal.js
           node --test tests/weather/test_weather_subject_panels_m2a.js
           node --test tests/weather/test_weather_subject_panels_m2b.js
@@ -101,6 +103,7 @@ jobs:
           cat "$work/native.log"
           test "$rc" -eq 0
           grep -F "W14_NATIVE_PASS // TWO_SIZE_LINE_GLYPH_INSTRUMENT_520_440" "$work/native.log"
+          grep -F "W20_NATIVE_PASS // GIANT_CURRENT_ARTWORK_520_380" "$work/native.log"
           if grep -E 'W14_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi
@@ -136,7 +139,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: weather-w14-visual-preview
-          path: /tmp/weather-w14-visual-preview.png
+          path: |
+            /tmp/weather-w14-visual-preview.png
+            /tmp/weather-w20-current-hero-tall.png
           if-no-files-found: warn
           retention-days: 14
       - name: Upload 440x275 compact visual preview

@@ -21,8 +21,12 @@ Rectangle {
         sky.weatherService.forecastReady && sky.dailyForecast
         ? sky.dailyForecast : []
     readonly property real budget: Math.max(1,height-19-12-8)
-    readonly property real currentHeight: Math.max(1,Math.round(budget*0.37))
-    readonly property real hourlyHeight: Math.max(1,Math.round(budget*0.45))
+    // W20 // Give the primary current condition a real HERO-sized area.
+    // Keep at least 84px for the hourly readings and 41px for the daily
+    // panel (including date, rain bar and peak chance). Artwork stays SKY.
+    readonly property real hourlyHeight: Math.max(84,Math.round(budget*0.33))
+    readonly property real currentHeight: Math.max(1,Math.min(
+        Math.round(budget*0.57),budget-hourlyHeight-33))
     // W19 // Existing inter-band padding occupied eight precious pixels in
     // compact WEATHER. Each band has its own divider, so reclaim that space
     // for the three-day rain bar without reducing NOW or hourly instruments.
@@ -127,7 +131,7 @@ Rectangle {
             Item {
                 id: largeCurrent
                 x: 7
-                width: parent.width*0.45-9
+                width: parent.width*0.56-9
                 height: parent.height
                 SecondaryText {
                     id: currentLabel
@@ -151,7 +155,7 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     text: terminal.currentReady
                           ? terminal.read(terminal.sky.weatherService.tempF,"°F") : "--°F"
-                    font.pixelSize: 37
+                    font.pixelSize: 43
                     color: Colors.orange
                 }
                 SafeDropShadow {
@@ -173,14 +177,17 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     // Keep the original artwork while making the primary
                     // observation symbol the dominant icon of this band.
-                    width: Math.max(75,Math.min(104,currentPanel.height+16,
-                                     largeCurrent.width*0.50))
+                    // W20 // Remove the 104px cap and the old 50%-width
+                    // squeeze; the icon is the primary visual landmark.
+                    width: Math.max(86,Math.min(180,currentPanel.height+8,
+                                     largeCurrent.width*0.72))
                     height: width
                     Text {
                         id: originalConditionGlyph
                         anchors.centerIn: parent
                         text: terminal.sky ? terminal.sky.conditionState.icon : "?"
-                        font.pixelSize: Math.max(78,mainWeatherIcon.width+8)
+                        font.pixelSize: Math.min(178,Math.max(116,
+                                         mainWeatherIcon.width * 1.13))
                         color: terminal.sky
                                ? terminal.sky.iconColor(terminal.sky.conditionState.color)
                                : Colors.orange
@@ -192,7 +199,7 @@ Rectangle {
                         anchors.centerIn: parent
                         width: parent.width
                         height: parent.height
-                        scale: 1.14
+                        scale: 1.24
                         mode: terminal.sky ? terminal.sky.currentCelestialMode : "moon"
                         weatherKind: terminal.sky
                                      ? WeatherCyclePolicy.nightKind(terminal.sky.conditionState)
@@ -231,7 +238,7 @@ Rectangle {
             }
 
             Rectangle {
-                x: parent.width*0.45
+                x: parent.width*0.56
                 width: 1
                 y: 7
                 height: parent.height-14
@@ -241,8 +248,8 @@ Rectangle {
 
             Grid {
                 id: telemetry
-                x: parent.width*0.45+7
-                width: parent.width*0.55-10
+                x: parent.width*0.56+7
+                width: parent.width*0.44-10
                 height: parent.height
                 columns: 2
                 rowSpacing: 2

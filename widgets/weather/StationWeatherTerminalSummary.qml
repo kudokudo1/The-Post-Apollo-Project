@@ -1,6 +1,5 @@
 import QtQuick
 import "../../components"
-import "../../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
 
 // W8 // One read-only weather terminal instrument shared by the complete
 // WEATHER workspace and its OVERVIEW. It never owns providers, timers, or
@@ -10,6 +9,13 @@ Rectangle {
     objectName: "weather-w8-terminal-summary"
     property var weatherService: null
     property bool compact: false
+    // W15 // Header-only navigation for the fixed WEATHER OVERVIEW.
+    // Content, meters, headings, icons and box geometry below are unchanged.
+    property bool overviewNavigation: false
+    property string overviewSelection: "snapshot"
+    property bool overviewHasAlert: false
+    signal overviewSelectionRequested(string selection)
+
     // Read-only geometry for native visual-fit verification.
     readonly property alias currentMetricItem: metricRow
     readonly property alias hourlyItem: hourlyRow
@@ -55,6 +61,22 @@ Rectangle {
             && String(value).trim() !== "" && isFinite(n)
             && n>-900 && n<200 ? Math.round(n)+"°F" : "--°F";
     }
+    function glyph(weatherCode, condition) {
+        const n=Number(weatherCode);
+        const label=String(condition||"").toLowerCase();
+        if(weatherCode === null || weatherCode === undefined
+           || String(weatherCode).trim()==="")
+            return label.indexOf("rain")>=0 ? "☂"
+              : label.indexOf("sun")>=0 || label.indexOf("clear")>=0 ? "☀"
+              : label.indexOf("cloud")>=0 ? "☁" : "◌";
+        if(n === 0) return "☀";
+        if(n<=3) return "☁";
+        if(n===45 || n===48) return "≋";
+        if((n>=51 && n<=67) || (n>=80 && n<=82)) return "☂";
+        if((n>=71 && n<=77) || (n>=85 && n<=86)) return "❄";
+        if(n>=95) return "⚡";
+        return "◌";
+    }
     readonly property var metrics: [
         {label:"CONDITIONS",value:conditionsReady
              ? temp(weatherService.tempF) : "--°F",
@@ -86,16 +108,20 @@ Rectangle {
             height: 14
             spacing: 3
             GohuText {
-                width: Math.max(1,parent.width*0.63)
+                width: Math.max(1,parent.width
+                      *(terminal.overviewNavigation ? 0.52 : 0.63))
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
-                text: "WEATHER // CURRENT + AIR + FORECAST"
+                text: terminal.overviewNavigation
+                      ? "WEATHER // OVERVIEW"
+                      : "WEATHER // CURRENT + AIR + FORECAST"
                 color: Colors.cyan
                 font.pixelSize: 11
                 elide: Text.ElideRight
             }
             QuietText {
-                width: Math.max(1,parent.width*0.35)
+                visible: !terminal.overviewNavigation
+                width: visible ? Math.max(1,parent.width*0.35) : 0
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignRight
@@ -106,6 +132,36 @@ Rectangle {
                 color: terminal.conditionsReady ? Colors.cyan : Colors.orange
                 font.pixelSize: 8
                 elide: Text.ElideRight
+            }
+            Row {
+                id: overviewHeaderPages
+                objectName: "weather-w15-overview-header-selector"
+                visible: terminal.overviewNavigation
+                width: visible ? Math.max(1,parent.width*0.48-6) : 0
+                height: parent.height
+                spacing: 2
+                Repeater {
+                    model: [
+                        {key:"snapshot",label:"NOW"},
+                        {key:"relevant",label:"AUTO"},
+                        {key:"alerts",label:"ALERT"}
+                    ]
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: Math.max(1,(overviewHeaderPages.width-4)/3)
+                        height: 13
+                        label: modelData.label
+                        labelPixelSize: 8
+                        contentPadding: 0
+                        accentColor: modelData.key==="alerts"
+                                     ? Colors.orange : Colors.cyan
+                        selected: terminal.overviewSelection===modelData.key
+                        available: modelData.key!=="alerts" ||
+                                   terminal.overviewHasAlert
+                        onClicked: terminal.overviewSelectionRequested(
+                            modelData.key)
+                    }
+                }
             }
         }
 
@@ -183,8 +239,6 @@ Rectangle {
                 delegate: Item {
                     required property int index
                     readonly property var sample: terminal.hourlySamples[index] || {}
-                    readonly property var cycle:
-                        WeatherCyclePolicy.forecast(sample.date,sample.time,terminal.dailySamples)
                     width: Math.max(1,(hourlyRow.width-6)/3)
                     height: hourlyRow.height
                     Rectangle {
@@ -198,14 +252,14 @@ Rectangle {
                         anchors.fill: parent
                         anchors.margins: 2
                         spacing: 3
-                        StationWeatherLineGlyph {
+                        // W15: restore the pre-W14 OVERVIEW weather glyph.
+                        GohuText {
                             width: 27
                             height: 27
-                            mode: cycle.solar==="night" ? "night-weather" : "weather"
-                            condition: sample.condition || ""
-                            weatherCode: sample.weatherCode
-                            moonPhase: cycle.moonPhase
-                            ink: Colors.orange
+                            verticalAlignment: Text.AlignVCenter
+                            text: terminal.glyph(sample.weatherCode,sample.condition)
+                            font.pixelSize: 18
+                            color: Colors.yellow
                         }
                         Column {
                             width: Math.max(1,parent.width-30)
@@ -261,8 +315,6 @@ Rectangle {
                 delegate: Item {
                     required property int index
                     readonly property var sample: terminal.dailySamples[index] || {}
-                    readonly property var cycle:
-                        WeatherCyclePolicy.atLocal(sample.date,720,terminal.dailySamples)
                     width: Math.max(1,(dailyRow.width-6)/3)
                     height: dailyRow.height
                     Rectangle {
@@ -276,14 +328,13 @@ Rectangle {
                         anchors.fill: parent
                         anchors.margins: 2
                         spacing: 3
-                        StationWeatherLineGlyph {
+                        GohuText {
                             width: 27
                             height: 27
-                            mode: "weather"
-                            condition: sample.condition || ""
-                            weatherCode: sample.weatherCode
-                            moonPhase: cycle.moonPhase
-                            ink: Colors.magenta
+                            verticalAlignment: Text.AlignVCenter
+                            text: terminal.glyph(sample.weatherCode,sample.condition)
+                            font.pixelSize: 18
+                            color: Colors.yellow
                         }
                         Column {
                             width: Math.max(1,parent.width-30)

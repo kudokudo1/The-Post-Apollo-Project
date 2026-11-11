@@ -241,6 +241,16 @@ ShellRoot {
                         return root.fail("NARROW_METRIC_OVERLAP_"+idx+" // "
                             +valueBottom+" > "+barTop);
                 }
+                const region=first.instrumentRegion;
+                const centered=first.readingStack;
+                const stackY=centered.mapToItem(region,0,0).y;
+                const centerError=Math.abs(stackY
+                    +centered.height/2-region.height/2);
+                if(centerError>1.5 ||
+                   region.y < first.timeItem.height-1 ||
+                   first.rainMeter.height!==4)
+                    return root.fail("W15_HOURLY_STACK_NOT_CENTERED // "
+                        +centerError+" / "+region.y);
                 if(!root.narrowPreviewRequested) {
                     root.narrowPreviewRequested=true;
                     window.contentItem.grabToImage(function(image){

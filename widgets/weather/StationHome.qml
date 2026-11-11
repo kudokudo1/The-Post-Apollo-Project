@@ -19,6 +19,15 @@ Rectangle {
     // archive in a compact single viewport without wheel scrolling.
     readonly property bool compactHistory:
         subjectRoute === "" && workspaceSection === "history"
+    // W15 // Non-panning, full-display WEATHER OVERVIEW route only.
+    readonly property bool fixedWeatherOverview:
+        subjectRoute === "weather/overview"
+    property string overviewPage: "snapshot"
+    readonly property alias overviewViewportItem: homeScroll
+    readonly property alias overviewContentItem: homeContent
+    readonly property alias overviewSummaryItem: weatherOverviewSummary
+    readonly property alias overviewSnapshotItem: weatherSnapshotRow
+    readonly property alias overviewRelevantItem: weatherRelevantRow
     readonly property bool sourcesWorkspace:
         subjectRoute === "" && (workspaceSection === "sources"
             || workspaceSection === "runtime" || workspaceSection === "health")
@@ -45,6 +54,13 @@ Rectangle {
         if (homeScroll) homeScroll.contentY = 0;
     }
     onSubjectRouteChanged: {
+        if (homeScroll)
+            homeScroll.contentY = 0;
+        if (fixedWeatherOverview)
+            overviewPage = officialAlertSummary.available
+                           ? "alerts" : "snapshot";
+    }
+    onOverviewPageChanged: {
         if (homeScroll)
             homeScroll.contentY = 0;
     }
@@ -952,9 +968,9 @@ Rectangle {
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        interactive: !home.compactHistory
+        interactive: !home.compactHistory && !home.fixedWeatherOverview
         contentWidth: width
-        contentHeight: Math.max(
+        contentHeight: home.fixedWeatherOverview ? height : Math.max(
             height,
             homeContent.y + homeContent.implicitHeight
                 + (home.compactHistory ? 4 : 24)
@@ -963,13 +979,16 @@ Rectangle {
         Column {
             id: homeContent
             objectName: "home-w3-content-column"
-            x: 24
-            y: home.compactHistory ? 5 : 24
-            width: Math.max(0, homeScroll.width - 48)
-            spacing: home.compactHistory ? 3 : 14
+            x: home.fixedWeatherOverview ? 3 : 24
+            y: home.fixedWeatherOverview ? 0
+               : (home.compactHistory ? 5 : 24)
+            width: Math.max(0, homeScroll.width
+                            -(home.fixedWeatherOverview ? 6 : 48))
+            spacing: home.fixedWeatherOverview ? 0
+                     : (home.compactHistory ? 3 : 14)
 
         Row {
-            visible: home.sectionVisible("header")
+            visible: home.sectionVisible("header") && !home.fixedWeatherOverview
             width: parent.width
             height: home.compactHistory ? 22 : 28
 
@@ -1009,12 +1028,19 @@ Rectangle {
         // the exact instrument leading its combined WEATHER terminal.
         // HOME/OVERVIEW and CLASSIC HOME never gain this extra weather bay.
         StationWeatherTerminalSummary {
+            id: weatherOverviewSummary
             objectName: "weather-w8-overview-terminal-summary"
             visible: home.subjectRoute === "weather/overview"
             width: parent.width
             height: visible ? 158 : 0
             compact: true
             weatherService: home.weatherService
+            overviewNavigation: home.fixedWeatherOverview
+            overviewSelection: home.overviewPage
+            overviewHasAlert: home.officialAlertSummary.available
+            onOverviewSelectionRequested: function(page) {
+                home.overviewPage = page;
+            }
         }
 
         StationSectionDivider {
@@ -1036,10 +1062,13 @@ Rectangle {
             spacing: 8
             visible: home.officialAlertSummary.available
                      && home.sectionVisible("alerts")
+                     && (!home.fixedWeatherOverview
+                         || home.overviewPage==="alerts")
 
             StationSectionDivider {
                 width: parent.width
                 title: "OFFICIAL ALERT // NWS"
+                visible: !home.fixedWeatherOverview
             }
 
             Rectangle {
@@ -1191,14 +1220,20 @@ Rectangle {
 
         StationSectionDivider {
             visible: home.sectionVisible("snapshot")
+                     && !home.fixedWeatherOverview
             width: parent.width
             title: "SNAPSHOT // NOW"
         }
 
         Row {
+            id: weatherSnapshotRow
             visible: home.sectionVisible("snapshot")
+                     && (!home.fixedWeatherOverview
+                         || home.overviewPage==="snapshot")
             width: parent.width
-            height: 118
+            height: home.fixedWeatherOverview
+                    ? Math.max(1,Math.min(118,homeScroll.height-159))
+                    : 118
             spacing: 12
 
             StationHomeMetricCard {
@@ -1619,14 +1654,20 @@ Rectangle {
 
         StationSectionDivider {
             visible: home.sectionVisible("relevant")
+                     && !home.fixedWeatherOverview
             width: parent.width
             title: "AUTO // RELEVANT"
         }
 
         Row {
+            id: weatherRelevantRow
             visible: home.sectionVisible("relevant")
+                     && (!home.fixedWeatherOverview
+                         || home.overviewPage==="relevant")
             width: parent.width
-            height: 118
+            height: home.fixedWeatherOverview
+                    ? Math.max(1,Math.min(118,homeScroll.height-159))
+                    : 118
             spacing: 12
 
             Repeater {
@@ -1702,6 +1743,7 @@ Rectangle {
             width: parent.width
             spacing: 6
             visible: home.sectionVisible("relevant")
+                     && !home.fixedWeatherOverview
                      && home.homeFavoritesStore
                      && home.pinnedCardRows.length > 0
             GohuText {
@@ -1741,6 +1783,7 @@ Rectangle {
         QuietText {
             width: parent.width
             visible: home.sectionVisible("relevant")
+                     && !home.fixedWeatherOverview
                      && home.homeFavoritesStore
                      && (home.homeFavoritesStore.storageState === "error"
                          || home.homeFavoritesStore.storageState === "unsupported")
@@ -1759,5 +1802,6 @@ Rectangle {
         handleStyle: "star"
         geometryHost: home
         visible: scrollable && !home.compactHistory
+                 && !home.fixedWeatherOverview
     }
 }

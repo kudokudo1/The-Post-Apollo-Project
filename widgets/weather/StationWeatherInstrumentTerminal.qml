@@ -161,25 +161,44 @@ Rectangle {
                     requestedVisible: terminal.currentReady
                     z: -1
                 }
-                StationWeatherLineGlyph {
+                // W15 // Reuse the exact pre-W14 StationSky glyph family.
+                // Keep this instrument's size/position, not the W14 Canvas art.
+                Item {
                     id: mainWeatherIcon
-                    objectName: "weather-w14-current-line-symbol"
+                    objectName: "weather-w15-original-current-icon"
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.max(54,Math.min(78,currentPanel.height-7))
                     height: width
-                    mode: terminal.sky ? terminal.sky.currentCelestialMode : "weather"
-                    condition: terminal.currentReady
-                               ? terminal.sky.weatherService.condition : ""
-                    weatherCode: terminal.currentReady
-                                 ? terminal.sky.weatherService.weatherCode : null
-                    weatherKind: terminal.sky
-                                 ? WeatherCyclePolicy.nightKind(terminal.sky.conditionState)
-                                 : "clear"
-                    moonPhase: terminal.sky ? terminal.sky.skyCycle.moonPhase : "unknown"
-                    ink: terminal.sky
-                         ? terminal.sky.iconColor(terminal.sky.conditionState.color)
-                         : Colors.orange
+                    Text {
+                        id: originalConditionGlyph
+                        anchors.centerIn: parent
+                        text: terminal.sky ? terminal.sky.conditionState.icon : "?"
+                        font.pixelSize: Math.max(50,mainWeatherIcon.width)
+                        color: terminal.sky
+                               ? terminal.sky.iconColor(terminal.sky.conditionState.color)
+                               : Colors.orange
+                        visible: !terminal.currentReady || !terminal.sky
+                                 || terminal.sky.currentCelestialMode==="weather"
+                    }
+                    WeatherCelestialGlyph {
+                        id: originalCelestialGlyph
+                        anchors.centerIn: parent
+                        width: parent.width
+                        height: parent.height
+                        mode: terminal.sky ? terminal.sky.currentCelestialMode : "moon"
+                        weatherKind: terminal.sky
+                                     ? WeatherCyclePolicy.nightKind(terminal.sky.conditionState)
+                                     : "clear"
+                        solar: terminal.sky ? terminal.sky.skyCycle.solar : "day"
+                        moonPhase: terminal.sky
+                                   ? terminal.sky.skyCycle.moonPhase : "unknown"
+                        ink: terminal.sky
+                             ? terminal.sky.iconColor(terminal.sky.conditionState.color)
+                             : Colors.orange
+                        visible: terminal.currentReady && terminal.sky
+                                 && terminal.sky.currentCelestialMode!=="weather"
+                    }
                 }
                 SafeDropShadow {
                     anchors.fill: mainWeatherIcon
@@ -389,6 +408,10 @@ Rectangle {
                         readonly property alias glyph: hourGlyph
                         readonly property alias rainMeter: hourRain
                         readonly property alias timeItem: forecastTime
+                        readonly property alias instrumentRegion: hourInstrumentRegion
+                        readonly property alias readingStack: hourInstrumentStack
+                        readonly property alias temperatureItem: hourTemperature
+                        readonly property alias chanceItem: hourChance
                         width: (hourTimeline.width-5)/6
                         height: hourTimeline.height
 
@@ -408,14 +431,15 @@ Rectangle {
                             border.width: 1
                             border.color: Colors.magenta
                         }
-                        Column {
+                        Item {
                             anchors.fill: parent
                             anchors.leftMargin: 3
                             anchors.rightMargin: 3
-                            spacing: 0
-
+                            // The date/time owns the top; the instrument is
+                            // vertically centered in all remaining space.
                             GohuText {
                                 id: forecastTime
+                                anchors.top: parent.top
                                 width: parent.width
                                 height: 10
                                 font.pixelSize: 10
@@ -424,49 +448,82 @@ Rectangle {
                                 text: terminal.dateLabel(hour.entry.date)+" "+
                                       String(hour.entry.timeLabel||"--")
                             }
-                            StationWeatherLineGlyph {
-                                id: hourGlyph
-                                width: Math.min(38,Math.max(28,hour.height-43))
-                                height: width
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                mode: hour.art
-                                weatherKind: WeatherCyclePolicy.nightKind(hour.forecastState)
-                                condition: hour.entry.condition||""
-                                weatherCode: hour.entry.weatherCode
-                                moonPhase: hour.cycle.moonPhase
-                                ink: terminal.ink(hour.entry)
-                            }
-                            GohuText {
+                            Item {
+                                id: hourInstrumentRegion
+                                objectName: "weather-w15-centered-hour-region"
+                                anchors.top: forecastTime.bottom
+                                anchors.bottom: parent.bottom
                                 width: parent.width
-                                height: 16
-                                font.pixelSize: 16
-                                color: Colors.white
-                                horizontalAlignment: Text.AlignHCenter
-                                text: terminal.read(hour.entry.tempF,"°F")
-                            }
-                            GohuText {
-                                width: parent.width
-                                height: 10
-                                font.pixelSize: 10
-                                color: Colors.cyan
-                                horizontalAlignment: Text.AlignHCenter
-                                text: terminal.rainChance(hour.entry.chanceRain)
-                            }
-                            Rectangle {
-                                id: hourRain
-                                width: parent.width-6
-                                height: 4
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                color: Colors.black
-                                border.width: 1
-                                border.color: Colors.cyan
-                                Rectangle {
-                                    x: 1
-                                    y: 1
-                                    height: Math.max(0,parent.height-2)
-                                    width: Math.max(0,(parent.width-2)
-                                           *terminal.fraction(hour.entry.chanceRain))
-                                    color: Colors.orange
+                                Column {
+                                    id: hourInstrumentStack
+                                    objectName: "weather-w15-centered-hour-stack"
+                                    anchors.centerIn: parent
+                                    width: parent.width
+                                    // Compact slots need the whole existing
+                                    // glyph/reading/meter group, not overflow.
+                                    spacing: hourInstrumentRegion.height<75 ? 0 : 2
+                                    Item {
+                                        id: hourGlyph
+                                        objectName: "weather-w15-original-hour-icon"
+                                        width: Math.max(28,Math.min(38,
+                                               hourInstrumentRegion.height-41))
+                                        height: width
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: hour.forecastState.icon
+                                            font.pixelSize: Math.max(34,hourGlyph.width)
+                                            color: terminal.ink(hour.entry)
+                                            visible: hour.art==="weather"
+                                        }
+                                        WeatherCelestialGlyph {
+                                            anchors.centerIn: parent
+                                            width: parent.width
+                                            height: parent.height
+                                            mode: hour.art
+                                            weatherKind: WeatherCyclePolicy.nightKind(
+                                                hour.forecastState)
+                                            solar: hour.cycle.solar
+                                            moonPhase: hour.cycle.moonPhase
+                                            ink: terminal.ink(hour.entry)
+                                            visible: hour.art!=="weather"
+                                        }
+                                    }
+                                    GohuText {
+                                        id: hourTemperature
+                                        width: parent.width
+                                        height: 16
+                                        font.pixelSize: 16
+                                        color: Colors.white
+                                        horizontalAlignment: Text.AlignHCenter
+                                        text: terminal.read(hour.entry.tempF,"°F")
+                                    }
+                                    GohuText {
+                                        id: hourChance
+                                        width: parent.width
+                                        height: 10
+                                        font.pixelSize: 10
+                                        color: Colors.cyan
+                                        horizontalAlignment: Text.AlignHCenter
+                                        text: terminal.rainChance(hour.entry.chanceRain)
+                                    }
+                                    Rectangle {
+                                        id: hourRain
+                                        width: parent.width-6
+                                        height: 4
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        color: Colors.black
+                                        border.width: 1
+                                        border.color: Colors.cyan
+                                        Rectangle {
+                                            x: 1
+                                            y: 1
+                                            height: Math.max(0,parent.height-2)
+                                            width: Math.max(0,(parent.width-2)
+                                                   *terminal.fraction(hour.entry.chanceRain))
+                                            color: Colors.orange
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -540,20 +597,32 @@ Rectangle {
                             color: Colors.magenta
                             opacity: 0.6
                         }
-                        StationWeatherLineGlyph {
+                        Item {
                             id: dayGlyph
-                            objectName: "weather-w14-daily-line-icon"
+                            objectName: "weather-w15-original-daily-icon"
                             width: Math.max(20,Math.min(30,day.height))
                             height: width
                             anchors.left: parent.left
                             anchors.leftMargin: 4
                             anchors.verticalCenter: parent.verticalCenter
-                            mode: day.art
-                            weatherKind: WeatherCyclePolicy.nightKind(day.dayState)
-                            condition: day.entry.condition||""
-                            weatherCode: day.entry.weatherCode
-                            moonPhase: day.cycle.moonPhase
-                            ink: terminal.ink(day.entry)
+                            Text {
+                                anchors.centerIn: parent
+                                text: day.dayState.icon
+                                font.pixelSize: dayGlyph.width
+                                color: terminal.ink(day.entry)
+                                visible: day.art==="weather"
+                            }
+                            WeatherCelestialGlyph {
+                                anchors.centerIn: parent
+                                width: parent.width
+                                height: parent.height
+                                mode: day.art
+                                weatherKind: WeatherCyclePolicy.nightKind(day.dayState)
+                                solar: day.cycle.solar
+                                moonPhase: day.cycle.moonPhase
+                                ink: terminal.ink(day.entry)
+                                visible: day.art!=="weather"
+                            }
                         }
                         Column {
                             anchors.left: dayGlyph.right

@@ -77,12 +77,17 @@ class V2ArchiveUiContractTests(unittest.TestCase):
         self.assertNotIn('trashLauncher.armResearchBurn(trashLauncher.archiveV2Rows', QML)
 
     def test_reader_is_separate_from_source_writers(self):
+        self.assertIn('verify_receipt(', INDEX)
+        self.assertIn('LEGACY // NO RECEIPT', INDEX)
+        self.assertIn('PAYLOAD NOT VERIFIED', INDEX)
+        self.assertIn('"provenance": provenance', INDEX)
+        self.assertNotIn('from scripts.trash.archive_store_v2', INDEX)
         self.assertIn('mode=ro&cache=private', INDEX)
         self.assertIn('PRAGMA query_only=ON', INDEX)
         self.assertIn('READ_ONLY_INDEX_ONLY', INDEX)
         self.assertIn('PAGE_SIZE = 25', INDEX)
         self.assertIn('MAX_QUERY_LENGTH = 80', INDEX)
-        self.assertIn('instr(lower(display_label), ?)', INDEX)
+        self.assertIn('instr(lower(s.display_label), ?)', INDEX)
         self.assertIn('db.execute("BEGIN")', INDEX)
         self.assertIn('NOT_INSTALLED', INDEX)
         self.assertNotIn('def save(', INDEX)

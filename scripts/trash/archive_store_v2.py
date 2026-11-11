@@ -20,6 +20,9 @@ from scripts.trash.archive_v2_capacity import (
     CapacityError, DEFAULT_DISK_QUOTA, MAX_DISK_QUOTA,
     MIN_DISK_QUOTA, capacity,
 )
+from scripts.trash.archive_v2_provenance import (
+    ProvenanceError, RECEIPT_SCHEMA, create_receipt, verify_receipt,
+)
 
 DB_NAME = "trashpp-archive-v2.sqlite3"
 SCHEMA = "post-apollo.trash-archive.v2a"
@@ -169,6 +172,29 @@ class ArchiveStore:
                         payload BLOB NOT NULL,
                         UNIQUE(owner_id,resource_id,source_revision)
                     )""")
+                    # V2i is an additive, in-place migration: old rows
+                    # default to 0 (no receipt) and are never retroactively
+                    # stamped as having witnessed source provenance.
+                    columns = {col[1] for col in
+                               db.execute("PRAGMA table_info(snapshots)")}
+                    if "provenance_required" not in columns:
+                        db.execute("""ALTER TABLE snapshots ADD COLUMN
+                            provenance_required INTEGER NOT NULL DEFAULT 0
+                            CHECK(provenance_required IN (0,1))""")
+                    db.execute("""CREATE TABLE IF NOT EXISTS snapshot_receipts (
+                        snapshot_id TEXT PRIMARY KEY
+                            REFERENCES snapshots(id),
+                        owner_id TEXT NOT NULL,
+                        resource_id TEXT NOT NULL,
+                        source_revision TEXT NOT NULL,
+                        source_captured_ms INTEGER NOT NULL,
+                        archived_ms INTEGER NOT NULL,
+                        display_label TEXT NOT NULL,
+                        payload_sha256 TEXT NOT NULL,
+                        previous_receipt_sha256 TEXT NOT NULL,
+                        receipt_sha256 TEXT NOT NULL UNIQUE,
+                        receipt_schema TEXT NOT NULL
+                    )""")
                     db.execute("""CREATE INDEX IF NOT EXISTS
                         idx_archive_page ON snapshots(captured_ms DESC,id DESC)""")
                     db.execute("""INSERT OR IGNORE INTO archive_meta
@@ -235,12 +261,50 @@ class ArchiveStore:
                 _require(bytes_now is not None, "ARCHIVE_SCHEMA_UNAVAILABLE")
                 _require(bytes_now[0] + len(payload) <= self.payload_quota,
                          "ARCHIVE_PAYLOAD_QUOTA")
+                previous = db.execute("""SELECT r.receipt_sha256
+                    FROM snapshot_receipts r JOIN snapshots s
+                      ON s.id=r.snapshot_id
+                    WHERE s.owner_id=? AND s.resource_id=?
+                    ORDER BY s.rowid DESC LIMIT 1""",
+                    (owner_id, resource_id)).fetchone()
+                if previous is not None:
+                    # Refuse chaining from corrupted local evidence.
+                    ancestor = db.execute("""SELECT s.id,s.owner_id,s.resource_id,
+                        s.source_revision,s.captured_ms,s.display_label,s.sha256,
+                        s.provenance_required,
+                        r.snapshot_id,r.owner_id,r.resource_id,r.source_revision,
+                        r.source_captured_ms,r.archived_ms,r.display_label,
+                        r.payload_sha256,r.previous_receipt_sha256,
+                        r.receipt_sha256,r.receipt_schema
+                        FROM snapshot_receipts r JOIN snapshots s
+                          ON s.id=r.snapshot_id
+                        WHERE r.receipt_sha256=?""", (previous[0],)).fetchone()
+                    _require(ancestor is not None, "SNAPSHOT_PROVENANCE_INVALID")
+                    try:
+                        verify_receipt(ancestor[:8], ancestor[8:])
+                    except ProvenanceError as exc:
+                        raise ArchiveError(str(exc)) from exc
+                archived_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+                receipt = create_receipt(
+                    sid, owner_id, resource_id, source_revision, captured_ms,
+                    archived_ms, display_label, digest,
+                    previous[0] if previous else "")
                 db.execute("""INSERT INTO snapshots
                     (id,owner_id,resource_id,source_revision,captured_ms,
-                     display_label,sha256,payload)
-                    VALUES(?,?,?,?,?,?,?,?)""",
+                     display_label,sha256,payload,provenance_required)
+                    VALUES(?,?,?,?,?,?,?,?,1)""",
                     (sid, owner_id, resource_id, source_revision, captured_ms,
                      display_label, digest, payload))
+                db.execute("""INSERT INTO snapshot_receipts
+                    (snapshot_id,owner_id,resource_id,source_revision,
+                     source_captured_ms,archived_ms,display_label,
+                     payload_sha256,previous_receipt_sha256,
+                     receipt_sha256,receipt_schema)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                    (sid,owner_id,resource_id,source_revision,captured_ms,
+                     archived_ms,display_label,digest,
+                     receipt["previousReceiptHash"],receipt["receiptSha256"],
+                     RECEIPT_SCHEMA))
                 db.execute("""UPDATE archive_meta
                     SET revision=revision+1,payload_bytes=payload_bytes+?
                     WHERE id=1""", (len(payload),))
@@ -265,7 +329,13 @@ class ArchiveStore:
                 raise
         return {"id": sid, "sha256": digest, "size": len(payload),
                 "ownerId": owner_id, "resourceId": resource_id,
-                "sourceRevision": source_revision}
+                "sourceRevision": source_revision,
+                "provenance": {"state": "RECEIPT_MATCHED",
+                               "sourceCapturedAtMs": captured_ms,
+                               "archivedAtMs": archived_ms,
+                               "receiptSha256": receipt["receiptSha256"],
+                               "previousReceiptHash": receipt["previousReceiptHash"],
+                               "authentication": "UNSIGNED_LOCAL"}}
 
     def status(self):
         with closing(self._connect()) as db:
@@ -313,10 +383,22 @@ class ArchiveStore:
                  and HEX_ID.fullmatch(snapshot_id) is not None,
                  "INVALID_SNAPSHOT_ID")
         with closing(self._connect()) as db:
-            row = db.execute("SELECT payload,sha256 FROM snapshots WHERE id=?",
-                             (snapshot_id,)).fetchone()
+            row = db.execute("""SELECT s.id,s.owner_id,s.resource_id,
+                s.source_revision,s.captured_ms,s.display_label,s.sha256,
+                s.provenance_required,s.payload,
+                r.snapshot_id,r.owner_id,r.resource_id,r.source_revision,
+                r.source_captured_ms,r.archived_ms,r.display_label,
+                r.payload_sha256,r.previous_receipt_sha256,
+                r.receipt_sha256,r.receipt_schema
+                FROM snapshots s LEFT JOIN snapshot_receipts r
+                  ON r.snapshot_id=s.id WHERE s.id=?""",
+                (snapshot_id,)).fetchone()
         _require(row is not None, "SNAPSHOT_NOT_FOUND")
-        data, digest = row
+        try:
+            verify_receipt(row[:8], row[9:])
+        except ProvenanceError as exc:
+            raise ArchiveError(str(exc)) from exc
+        data, digest = row[8], row[6]
         _require(hashlib.sha256(data).hexdigest() == digest,
                  "SNAPSHOT_INTEGRITY_FAILED")
         return bytes(data)
@@ -327,11 +409,23 @@ class ArchiveStore:
             check = db.execute("PRAGMA quick_check").fetchone()
             _require(check == ("ok",), "ARCHIVE_DATABASE_CORRUPT")
             count, total = 0, 0
-            for data, digest in db.execute("SELECT payload,sha256 FROM snapshots"):
-                _require(hashlib.sha256(data).hexdigest() == digest,
+            for record in db.execute("""SELECT s.id,s.owner_id,
+                s.resource_id,s.source_revision,s.captured_ms,s.display_label,
+                s.sha256,s.provenance_required,s.payload,
+                r.snapshot_id,r.owner_id,r.resource_id,r.source_revision,
+                r.source_captured_ms,r.archived_ms,r.display_label,
+                r.payload_sha256,r.previous_receipt_sha256,
+                r.receipt_sha256,r.receipt_schema
+                FROM snapshots s LEFT JOIN snapshot_receipts r
+                  ON r.snapshot_id=s.id"""):
+                try:
+                    verify_receipt(record[:8], record[9:])
+                except ProvenanceError as exc:
+                    raise ArchiveError(str(exc)) from exc
+                _require(hashlib.sha256(record[8]).hexdigest() == record[6],
                          "SNAPSHOT_INTEGRITY_FAILED")
                 count += 1
-                total += len(data)
+                total += len(record[8])
             row = db.execute(
                 "SELECT payload_bytes FROM archive_meta WHERE id=1"
             ).fetchone()

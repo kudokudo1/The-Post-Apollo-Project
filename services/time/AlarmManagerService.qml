@@ -27,6 +27,11 @@ Scope {
     property bool migrationRequested: false
     property double nowMs: Date.now()
     property double lastSchedulerTickMs: 0
+    // A timer gap is observable after sleep, machine load or shell pause,
+    // but is NOT evidence that this process ran while suspended or stopped.
+    property double lastRecoveryAtMs: 0
+    property double lastRecoveryGapMs: 0
+    property string lastRecoveryText: "NOT CHECKED"
     // SoundEffect.playing only describes the Qt backend, not the speakers.
     // An IDLE value must be restored after previews, stops and unloading.
     property string audioState: "IDLE"
@@ -360,7 +365,22 @@ Scope {
     }
     function checkDue() {
         if (!canEdit) return;
-        const r = Policy.tick(document, nowMs);
+        // Sample wall time HERE, not from a potentially stale 1s Timer
+        // property. FileView restore also calls this path on startup.
+        const prior = lastSchedulerTickMs;
+        manager.nowMs = Date.now();
+        manager.lastSchedulerTickMs = manager.nowMs;
+        const restarting = prior === 0;
+        const gapMs = prior > 0 ? manager.nowMs - prior : 0;
+        const resumedAfterGap = gapMs > 5000;
+        const r = Policy.tick(document, manager.nowMs);
+        if (restarting || resumedAfterGap) {
+            lastRecoveryAtMs = manager.nowMs;
+            lastRecoveryGapMs = resumedAfterGap ? gapMs : 0;
+            lastRecoveryText = (restarting ? "RESTART" : "TIMER GAP")
+                + " // " + r.started.length + " RANG"
+                + " // " + r.missed.length + " MISSED";
+        }
         if (!r.changed) {
             if (firstSoundAlarm && !audioLoader.active)
                 syncSound();
@@ -378,6 +398,8 @@ Scope {
             }
             else if (r.missed.length)
                 feedback = "MISSED // " + r.missed.length + " ALARM(S)";
+        } else if (restarting || resumedAfterGap) {
+            lastRecoveryText = "RECOVERY SAVE REFUSED // NO DURABLE RESULT";
         }
     }
 
@@ -385,11 +407,7 @@ Scope {
         interval: 1000
         running: true
         repeat: true
-        onTriggered: {
-            manager.nowMs = Date.now();
-            manager.lastSchedulerTickMs = manager.nowMs;
-            manager.checkDue();
-        }
+        onTriggered: manager.checkDue()
     }
     Timer {
         id: previewTimer

@@ -18,6 +18,8 @@ repo="$(cd "$(dirname "$0")/../../.." && pwd)"
 artifact_dir="$1"
 runtime_dir="$2"
 [[ -f "$runtime_dir/identity-python3-cryptography-f44.rpm" &&
+   -r "$runtime_dir/identity-python3-cffi-f44.rpm" &&
+   -r "$runtime_dir/identity-python3-pycparser-f44.rpm" &&
    -r "$runtime_dir/identity-fedora44-runtime-public.asc" &&
    -r "$runtime_dir/identity-fedora44-runtime-manifest.sha256" ]] ||
   { echo "C4B_ID_BLOCKED // VERIFIED_OFFLINE_CRYPTO_RUNTIME_MISSING"; exit 2; }

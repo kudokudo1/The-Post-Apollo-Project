@@ -261,6 +261,32 @@ class ArchiveStoreMigrationV2yTests(unittest.TestCase):
             TestArchiveStoreAdmissionV2y(self.archive)
         self.assertEqual(self.archive.read_verified(self.old["id"]),OLD_PAYLOAD)
 
+    def test_lookalike_table_without_nonce_uniqueness_or_fk_refused(self):
+        columns = """snapshot_id TEXT PRIMARY KEY {reference},
+            owner_id TEXT NOT NULL,key_id TEXT NOT NULL,
+            nonce TEXT NOT NULL,proof_sha256 TEXT NOT NULL,
+            signed_receipt_sha256 TEXT NOT NULL,
+            external_floor_sha256 TEXT NOT NULL,
+            signed_claim BLOB NOT NULL,signature_b64 TEXT NOT NULL
+            {unique}"""
+        for reference, unique in (
+            ("REFERENCES snapshots(id)", ""),
+            ("", ", UNIQUE(owner_id,key_id,nonce)"),
+        ):
+            with self.subTest(reference=reference,unique=unique):
+                with sqlite3.connect(self.root/DB_NAME) as db:
+                    db.execute("DROP TABLE fixture_signed_admissions")
+                    statement = columns.format(reference=reference,
+                                               unique=unique)
+                    db.execute("CREATE TABLE fixture_signed_admissions("
+                               + statement + ")")
+                with self.assertRaisesRegex(
+                        ArchiveMigrationRefused,
+                        "V2Y_ADMISSION_SCHEMA_UNSUPPORTED"):
+                    TestArchiveStoreAdmissionV2y(self.archive)
+                self.assertEqual(
+                    self.archive.read_verified(self.old["id"]),OLD_PAYLOAD)
+
     def test_no_live_archive_writer_or_production_activation(self):
         from scripts.trash import archive_v2y_archive_schema_rehearsal as module
         source=Path(module.__file__).read_text("utf-8")

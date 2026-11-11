@@ -5,6 +5,7 @@ This process has exactly one verb: index. It never creates an Archive database,
 replays destructive actions, reads original owner sources, or returns payloads.
 Its index is metadata-only and does not claim full payload integrity.
 """
+from contextlib import closing
 from datetime import datetime, timezone
 import json
 import os
@@ -144,7 +145,7 @@ def index(directory, cursor="", query=""):
     # A hot rollback journal that requires write recovery fails closed.
     uri = "file:" + quote(str(database), safe="/") + "?mode=ro&cache=private"
     try:
-        with sqlite3.connect(uri, uri=True, timeout=1) as db:
+        with closing(sqlite3.connect(uri, uri=True, timeout=1)) as db:
             db.execute("PRAGMA query_only=ON")
             db.execute("PRAGMA busy_timeout=1000")
             # Pin the count and page to one read transaction. A source

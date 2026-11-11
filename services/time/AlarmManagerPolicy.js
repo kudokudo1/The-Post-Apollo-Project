@@ -330,10 +330,11 @@ function dueKey(a, nowMs) {
 }
 
 // Select at most the latest unprocessed weekly occurrence from a previous
-// local day. This avoids replay storms after a long shutdown or sleep.
+// local day. This avoids replay storms after a long shutdown or sleep
+// while preserving the two-minute grace across local midnight.
 // Without a durable arming timestamp, we cannot infer whether a legacy
 // alarm was armed on previous days: initialize that baseline on first tick.
-function latestMissedWeeklyDue(a, nowMs, pausedThroughDate) {
+function latestUnprocessedWeeklyDue(a, nowMs, pausedThroughDate) {
     if (a.mode !== "weekly" || !a.enabled || a.completed
             || !timestamp(a.armedAtMs) || a.armedAtMs === 0
             || a.armedAtMs > nowMs)
@@ -347,8 +348,8 @@ function latestMissedWeeklyDue(a, nowMs, pausedThroughDate) {
                 || key === a.lastFiredDay
                 || due + MAX_LATE_MS < a.armedAtMs)
             continue;
-        // This is already past the two-minute grace window, so it MUST
-        // be a MISSED receipt, never a delayed sound or new alarm popup.
+        // The latest candidate may still be inside the two-minute grace
+        // when a 23:59 alarm resumes just after midnight. Caller decides.
         return due;
     }
     return 0;
@@ -369,7 +370,7 @@ function tick(doc, nowMs) {
         }
         // Host clock may move backwards during resync. Never replay a
         // supposedly armed occurrence before the arm operation happened.
-        if (a.armedAtMs > nowMs) return;
+        if (a.armedAtMs > nowMs && !a.ringing) return;
         if (a.ringing) {
             if (nowMs >= a.ringStartedAtMs
                     && nowMs - a.ringStartedAtMs < MAX_RING_MS) return;
@@ -420,14 +421,27 @@ function tick(doc, nowMs) {
         var due = dueKey(a, nowMs);
         if (due === "" || a.lastFiredDay === due
                 || nowMs < dayAt(today, a.hour, a.minute)) {
-            var previous = latestMissedWeeklyDue(a, nowMs, pausedThroughDate);
+            var previous = latestUnprocessedWeeklyDue(
+                a, nowMs, pausedThroughDate);
             if (previous > 0) {
                 a.lastProcessedDueMs = previous;
-                a.lastEventKind = "missed";
-                a.lastEventAtMs = nowMs;
-                a.lastMissedAtMs = nowMs;
                 a.lastExpectedAtMs = previous;
-                missed.push(a.id); changed = true;
+                a.lastEventAtMs = nowMs;
+                if (nowMs - previous <= MAX_LATE_MS) {
+                    // The scheduled local day can be yesterday even though
+                    // the ringing grace period is still active at midnight.
+                    a.lastFiredDay = dayKey(previous);
+                    a.ringing = true;
+                    a.ringStartedAtMs = nowMs;
+                    a.lastEventKind = "fired";
+                    a.lastFiredAtMs = nowMs;
+                    started.push(a.id);
+                } else {
+                    a.lastEventKind = "missed";
+                    a.lastMissedAtMs = nowMs;
+                    missed.push(a.id);
+                }
+                changed = true;
             }
             return;
         }
@@ -478,6 +492,19 @@ function nextOccurrenceMs(a, nowMs) {
             && (a.pausedUntilDate === ""
                 || a.date >= a.pausedUntilDate) ? due : 0;
     }
+    // A previous local day's 23:59 occurrence may remain genuinely due
+    // after midnight. Show the same result that tick() will act on.
+    var yesterday = dateOffset(nowMs, -1);
+    var yesterdayDue = dayAt(yesterday, a.hour, a.minute);
+    if (a.weekdays.indexOf(new Date(yesterdayDue).getDay()) >= 0
+            && a.armedAtMs > 0 && a.armedAtMs <= nowMs
+            && yesterdayDue + MAX_LATE_MS >= a.armedAtMs
+            && a.lastFiredDay !== yesterday
+            && yesterdayDue > a.lastProcessedDueMs
+            && nowMs >= yesterdayDue
+            && nowMs - yesterdayDue <= MAX_LATE_MS
+            && (a.pausedUntilDate === "" || yesterday >= a.pausedUntilDate))
+        return yesterdayDue;
     var start = nowMs;
     if (a.pausedUntilDate !== "" && a.pausedUntilDate > dayKey(nowMs))
         start = dayAt(a.pausedUntilDate, 0, 0);

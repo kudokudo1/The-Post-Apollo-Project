@@ -46,8 +46,10 @@ class ContactListFourLineStarRefreshTests(unittest.TestCase):
         self.assertIn("elide: Text.ElideRight", preview)
         address_book = self.phone.split("id: phoneAddressBook", 1)[1].split(
             "id: emptyPhoneContacts", 1)[0]
-        self.assertIn("color: Colors.orange", address_book)
-        self.assertIn("color: Colors.cyan", address_book)
+        self.assertIn("color: addressBookRow.isSelected ? Colors.black : Colors.orange",
+                      address_book)
+        self.assertIn("color: addressBookRow.isSelected ? Colors.black : Colors.cyan",
+                      address_book)
 
     def test_star_scrollbar_reuses_shared_component_only_in_contact_list(self):
         self.assertIn('handleStyle: "star"', self.contact)

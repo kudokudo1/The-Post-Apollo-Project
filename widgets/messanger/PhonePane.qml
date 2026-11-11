@@ -909,6 +909,26 @@ Rectangle {
         callsPendingDial = "";
     }
 
+    // A MAKE CALL row is not a dial command. Re-resolve the exact number
+    // from the current, authorized contact snapshot, then open the existing
+    // CALLS review/confirmation UI. Never use ephemeral IDs as recipients.
+    function openSelectedContactForNumber(raw) {
+        var card = selectedPhoneContactCard;
+        if (!visible || selectedSection !== "CONTACTS" || card === null
+                || card.hasAddressDetails !== true
+                || !Array.isArray(card.phoneNumbers)
+                || typeof raw !== "string"
+                || card.phoneNumbers.indexOf(raw) < 0)
+            return;
+        var number = contactPrimaryDialNumber({ primary: raw });
+        if (number === "")
+            return;
+        selectedSection = "CALLS";
+        phoneDialInput.text = number;
+        callsConfirmDial = false;
+        callsPendingDial = "";
+    }
+
     function openSelectedContactMessages() {
         if (!visible || selectedSection !== "CONTACTS"
                 || selectedPhoneContactCard === null)
@@ -2797,6 +2817,9 @@ Rectangle {
         contact: phonePane.selectedPhoneContactCard
         canPrepareCall: phonePane.contactPrimaryDialNumber(contact) !== ""
         onCallRequested: phonePane.openSelectedContactForCall()
+        onCallNumberRequested: function(number) {
+            phonePane.openSelectedContactForNumber(number);
+        }
         onMessageRequested: phonePane.openSelectedContactMessages()
     }
 

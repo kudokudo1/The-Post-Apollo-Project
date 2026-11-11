@@ -112,7 +112,7 @@ def verify_fixture_service_grant(
     _need(type(service_files) is PinnedFixtureServiceFiles,
           "SERVICE_GRANT_FILES_REQUIRED")
     _need(type(signed_manifest) is dict
-          and set(signed_manifest) == ("manifest", "signatureB64")
+          and set(signed_manifest) == {"manifest", "signatureB64"}
           and type(signed_manifest["manifest"]) is dict,
           "SERVICE_GRANT_MANIFEST_INVALID")
     grant = signed_grant["grant"]

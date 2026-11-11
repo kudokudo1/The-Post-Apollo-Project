@@ -231,14 +231,17 @@ function tick(doc, nowMs) {
     if (!validDocument(doc) || !timestamp(nowMs) || !nowMs)
         return {changed: false, document: doc, started: [], expired: [], missed: []};
     var next = cloneDocument(doc), started = [], expired = [], missed = [];
+    var removedAfterExpiry = [];
     var changed = false, today = dayKey(nowMs);
     next.alarms.forEach(function(a) {
         if (!a.enabled) return;
         if (a.ringing) {
             if (nowMs >= a.ringStartedAtMs
                     && nowMs - a.ringStartedAtMs < MAX_RING_MS) return;
-            if (a.mode === "once") finishOnce(a);
-            else { a.ringing = false; a.ringStartedAtMs = 0; }
+            if (a.mode === "once") {
+                finishOnce(a);
+                if (!a.keepSaved) removedAfterExpiry.push(a.id);
+            } else { a.ringing = false; a.ringStartedAtMs = 0; }
             expired.push(a.id); changed = true; return;
         }
         if (a.snoozeUntilMs > 0) {
@@ -274,6 +277,11 @@ function tick(doc, nowMs) {
         a.ringStartedAtMs = nowMs;
         started.push(a.id); changed = true;
     });
+    if (removedAfterExpiry.length) {
+        next.alarms = next.alarms.filter(function(a) {
+            return removedAfterExpiry.indexOf(a.id) < 0;
+        });
+    }
     return {changed: changed, document: changed ? next : doc,
             started: started, expired: expired, missed: missed};
 }

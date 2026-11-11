@@ -69,7 +69,7 @@ def build_fake_runtime(root: Path):
         import json, os, pathlib, socketserver, sys
         from http.server import BaseHTTPRequestHandler
         if "--help" in sys.argv:
-            print("--host unix socket path ending .sock")
+            print("--host unix socket path ending .sock --no-gpu --no-context")
             sys.exit(0)
         path = sys.argv[sys.argv.index("--host") + 1]
         assert path.startswith("/") and path.endswith(".sock")

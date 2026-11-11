@@ -237,6 +237,20 @@ class ArchiveV2IndexTests(unittest.TestCase):
                                     "ARCHIVE_INDEX_UNAVAILABLE"):
             self.index()
 
+    def test_sqlite_transient_journal_mode_is_private_root_scoped(self):
+        store = self.make_archive()
+        journal = self.root / (indexer.DB_NAME + "-journal")
+        journal.write_bytes(b"synthetic")
+        journal.chmod(0o644)
+        self.assertTrue(indexer._private_regular(
+            journal, require_private_mode=False))
+        with self.assertRaisesRegex(indexer.ReadIndexError,
+                                    "ARCHIVE_FILE_UNSAFE"):
+            indexer._private_regular(journal)
+        journal.unlink()
+        self.assertEqual(self.index()["total"], 0)
+        self.assertEqual(store.verify()["items"], 0)
+
     def test_only_read_only_index_cli_action(self):
         for verb in ("burn", "delete", "migrate", "save", "restore"):
             out = io.StringIO()

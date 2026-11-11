@@ -1,4 +1,6 @@
 import QtQuick
+import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
 import qs.components
 import "../services/hospital"
 import "../services/hospital/HospitalWorkforceManagerPolicy.js" as ManagementPolicy
@@ -7,14 +9,24 @@ import "../services/hospital/HospitalWorkforceStaffingPolicy.js" as StaffingPoli
 import "../services/hospital/HospitalFirstBedVerificationPolicy.js" as BedPolicy
 import "../services/hospital/HospitalGitHubOwnerPolicy.js" as GitHubOwnerPolicy
 import "../services/hospital/HospitalConversationIntakePolicy.js" as ConversationIntakePolicy
+import "../services/hospital/HospitalDictationTextPolicy.js" as DictationTextPolicy
 
 // Collapsible content inside SURGERY → SHOW WORKERS, not a new Hospital route.
-// All writes require a separate operator REVIEW and CONFIRM. No AI turns.
+// All writes require a separate operator REVIEW and CONFIRM.
+// Optional model-only draft proposals are NOT agent/worker turns.
 Column {
     id: root
     property bool active: false
     property var doctorService: null
     property var providerService: null
+    property var speechInputService: null
+    property bool otherVoiceBusy: false
+    // One active microphone for long-form fields; no auto submit or save.
+    property string dictationField: ""
+    property string dictationMode: ""
+    property string dictationOriginalText: ""
+    property string dictationFeedbackField: ""
+    property string dictationFeedback: ""
     property var rooms: []
     property var sessions: []
     property var knownBeds: []
@@ -40,7 +52,8 @@ Column {
                 return entry.label === "USED IN HOSPITAL";
             }).slice(0, 3)
     property string mode: "WORKER"
-    // Conversation-style local starter draft; no model or PX invocation.
+    // Offline starter or explicitly requested model-only draft.
+    // Neither path may save Room/Worker/Job records or invoke PX.
     property var intakeDraft: ({})
     property string intakeSource: ""
     property string workerRole: "INT"
@@ -175,6 +188,132 @@ Column {
     spacing: 8
     visible: active
 
+    function voiceAreaForKey(key) {
+        if (key === "intake") return intakeBriefField;
+        if (key === "goal") return jobGoalField;
+        if (key === "constraints") return jobConstraintsField;
+        if (key === "done") return jobDoneField;
+        if (key === "checklist") return jobChecklistField;
+        return null;
+    }
+    function toggleDictation(key) {
+        const svc = root.speechInputService;
+        const field = root.voiceAreaForKey(key);
+        if (!root.active || !svc || !field || !key
+                || (root.mode !== "SETUP" && root.mode !== "JOB"))
+            return false;
+        if (svc.recording) {
+            if (root.dictationField !== key)
+                return false;
+            const stopping = svc.stopRecording(false);
+            if (stopping)
+                root.dictationFeedback = "STOPPED // TRANSCRIBING LOCALLY // NO SUBMIT";
+            return stopping;
+        }
+        if (svc.busy || root.otherVoiceBusy) {
+            root.dictationFeedbackField = key;
+            root.dictationFeedback = "MIC BUSY // WAIT FOR THE OTHER RECORDING";
+            return false;
+        }
+        root.dictationField = key;
+        root.dictationMode = root.mode;
+        // A live mic locks just this editor until STOP; CANCEL restores the
+        // exact pre-recording text without losing an unrelated form's values.
+        root.dictationOriginalText = field.value;
+        root.dictationFeedbackField = key;
+        root.dictationFeedback = "STARTING MICROPHONE // LOCAL TRANSCRIPTION";
+        const started = svc.startRecording();
+        if (!started) {
+            root.dictationField = "";
+            root.dictationMode = "";
+            root.dictationFeedback = String(
+                svc.lastError || "MIC UNAVAILABLE // CHECK LOCAL WHISPER AND PIPEWIRE"
+            ).slice(0, 180);
+        }
+        return started;
+    }
+    function cancelDictation() {
+        const target = root.dictationField;
+        const field = root.voiceAreaForKey(target);
+        if (root.speechInputService && root.speechInputService.busy)
+            root.speechInputService.cancel();
+        if (field && root.speechInputService
+                && root.speechInputService.liveStreaming === true)
+            field.value = root.dictationOriginalText;
+        root.dictationField = "";
+        root.dictationMode = "";
+        root.dictationOriginalText = "";
+        if (target) {
+            root.dictationFeedbackField = target;
+            root.dictationFeedback = "DICTATION CANCELLED // ORIGINAL TEXT PRESERVED";
+        }
+    }
+    function acceptLivePhrase(text) {
+        const key = root.dictationField;
+        const field = root.voiceAreaForKey(key);
+        if (!root.active || !field || root.mode !== root.dictationMode
+                || (key === "intake" ? root.mode !== "SETUP" : root.mode !== "JOB"))
+            return false;
+        const result = DictationTextPolicy.appendTranscription(
+            field.value, text, field.voiceMaxLength);
+        root.dictationFeedbackField = key;
+        if (!result.accepted) {
+            if (result.reason.indexOf("TEXT LIMIT") >= 0
+                    && root.speechInputService.recording)
+                root.speechInputService.stopRecording(false);
+            root.dictationFeedback = result.reason;
+            return false;
+        }
+        field.value = result.text;
+        root.dictationFeedback = "LIVE TEXT // EDIT AFTER STOP // NEVER AUTO SUBMITTED";
+        return true;
+    }
+    function finishLiveDictation() {
+        if (!root.dictationField)
+            return;
+        const key = root.dictationField;
+        const field = root.voiceAreaForKey(key);
+        root.dictationField = "";
+        root.dictationMode = "";
+        root.dictationOriginalText = "";
+        root.dictationFeedbackField = key;
+        const voice = root.speechInputService;
+        const reason = voice ? String(voice.captureStopReason || "") : "";
+        if (voice && voice.audioDropped)
+            root.dictationFeedback = "AUDIO SKIPPED // MODEL TOO SLOW // REVIEW MISSING WORDS";
+        else if (reason === "CAPTURE_CHUNK_LIMIT")
+            root.dictationFeedback = "SAFETY STOP // CHUNK LIMIT // TAP MIC TO CONTINUE";
+        else if (reason === "CAPTURE_DURATION_LIMIT")
+            root.dictationFeedback = "SAFETY STOP // TIME LIMIT // TAP MIC TO CONTINUE";
+        else if (reason === "CAPTURE_SOURCE_ENDED")
+            root.dictationFeedback = "MIC SOURCE ENDED // REVIEW TRANSCRIPT";
+        else
+            root.dictationFeedback = "LIVE TRANSCRIPT READY // REVIEW BEFORE SUBMIT";
+        if (field) field.focusEditorAtEnd();
+    }
+    function acceptDictation(text) {
+        const key = root.dictationField;
+        const startedMode = root.dictationMode;
+        root.dictationField = "";
+        root.dictationMode = "";
+        const field = root.voiceAreaForKey(key);
+        if (!root.active || !field
+                || startedMode !== root.mode
+                || (key !== "intake" && startedMode !== "JOB")
+                || (key === "intake" && startedMode !== "SETUP"))
+            return false;
+        const result = DictationTextPolicy.appendTranscription(
+            field.value, text, field.voiceMaxLength);
+        root.dictationFeedbackField = key;
+        root.dictationFeedback = result.reason;
+        if (!result.accepted)
+            return false;
+        // Append to the CURRENT field text. Concurrent user typing is kept.
+        // This is not a form submit, job approval or AI request.
+        field.value = result.text;
+        field.focusEditorAtEnd();
+        return true;
+    }
     function makeId(prefix) {
         return prefix + "-" + Date.now().toString(36)
             + "-" + Math.floor(Math.random() * 0x7fffffff).toString(36)
@@ -255,11 +394,14 @@ Column {
         return true;
     }
     function applyRoomSuggestions() {
+        // The active Floor's GitHub origin takes priority over account login.
+        // Keep any explicit manual edits until the user chooses CURRENT REPO
+        // or successfully creates a Room and starts a new form.
         const proposed = GitHubOwnerPolicy.suggestion(root.suggestedRepository,
             githubOwner.login);
-        if (!root.roomOwnerManuallyEdited && proposed.owner)
+        if (!root.roomOwnerManuallyEdited)
             roomOwnerField.value = proposed.owner;
-        if (!root.roomRepositoryManuallyEdited && proposed.repository)
+        if (!root.roomRepositoryManuallyEdited)
             roomRepoField.value = proposed.repository;
     }
     function useOwnGitHub() {
@@ -286,15 +428,16 @@ Column {
     function useCurrentPatient() {
         const current = root.currentPatientRepository;
         if (!current.owner || !current.repository) {
-            root.outcome = "CURRENT PATIENT UNAVAILABLE // SELECT A GITHUB REPOSITORY";
+            root.outcome = "CURRENT FLOOR REPO UNAVAILABLE // SELECT A GITHUB REPOSITORY";
             return;
         }
-        roomOwnerField.value = current.owner;
-        roomRepoField.value = current.repository;
-        root.roomOwnerManuallyEdited = true;
-        root.roomRepositoryManuallyEdited = true;
+        // Re-enter automatic mode explicitly, including when the user was
+        // previously editing a repository owned by another GitHub account.
+        root.roomOwnerManuallyEdited = false;
+        root.roomRepositoryManuallyEdited = false;
+        root.applyRoomSuggestions();
         root.disarm();
-        root.outcome = "CURRENT PATIENT SELECTED // " + root.selectedGitHubRepository;
+        root.outcome = "CURRENT FLOOR REPO SELECTED // " + root.selectedGitHubRepository;
     }
     function selectMode(value) {
         if (mode === value) return;
@@ -522,6 +665,8 @@ Column {
     onActiveChanged: {
         disarm();
         if (!active)
+            cancelDictation();
+        if (!active)
             invalidateIntake();
         if (!active)
             bedProbe.invalidate();
@@ -532,6 +677,10 @@ Column {
                 if (!githubOwner.loaded && !githubOwner.reading)
                     githubOwner.refresh();
             });
+    }
+    onModeChanged: {
+        if (root.dictationField && root.mode !== root.dictationMode)
+            cancelDictation();
     }
     onSuggestedRepositoryChanged: {
         if (active && mode === "ROOM")
@@ -545,6 +694,31 @@ Column {
     onRegistryErrorChanged: disarm()
     onStaffingPlanChanged: staffingReviewKey = ""
     onAssignmentListVerifiedChanged: activationArmKey = ""
+
+    Connections {
+        target: root.speechInputService
+        function onTranscriptionReady(text, submitRequested) {
+            // Legacy post-STOP recorder fallback, never a form submission.
+            if (!root.speechInputService
+                    || root.speechInputService.liveStreaming !== true)
+                root.acceptDictation(text);
+        }
+        function onLiveTextReady(text) {
+            root.acceptLivePhrase(text);
+        }
+        function onLiveFinished() {
+            root.finishLiveDictation();
+        }
+        function onVoiceError(message) {
+            if (!root.dictationField)
+                return;
+            const messageText = String(message || "LOCAL DICTATION FAILED").slice(0,180);
+            const fieldKey = root.dictationField;
+            root.cancelDictation();
+            root.dictationFeedbackField = fieldKey;
+            root.dictationFeedback = messageText;
+        }
+    }
 
     Connections {
         target: root.doctorService
@@ -577,12 +751,14 @@ Column {
                 root.outcome = "AI PROPOSAL HOLD // " + aiIntake.lastError;
                 return;
             }
-            // No authority flows from model text: fields remain a draft and
-            // existing REVIEW / CONFIRM buttons are the only record writers.
+            // An untrusted model supplies text to the existing editors only.
+            // Each Room, Worker and Assignment still needs human REVIEW/SAVE.
             if (result.permissions !== "READ"
                     || ["INT", "NRS", "DOC"].indexOf(result.role) < 0
                     || result.writesHospital !== false
-                    || result.launchesProvider !== false) {
+                    || result.launchesProvider !== false
+                    || result.activatesAssignment !== false
+                    || result.authorityVerified !== false) {
                 root.outcome = "AI PROPOSAL REFUSED // INVALID PERMISSIONS";
                 return;
             }
@@ -608,6 +784,11 @@ Column {
             root.selectedRoomId = String((room || {}).id || "");
             root.roomId = root.makeId("room");
             roomNameField.value = "";
+            // Start the NEXT Room in this same Floor with a fresh auto-fill.
+            // Only reset after the previous Room is confirmed as created.
+            root.roomOwnerManuallyEdited = false;
+            root.roomRepositoryManuallyEdited = false;
+            root.applyRoomSuggestions();
             root.rosterRefreshRequested();
         }
     }
@@ -734,6 +915,8 @@ Column {
         ManagerArea {
             id: intakeBriefField
             caption: "YOUR INSTRUCTIONS // WHAT IS THIS AI WORKING ON?"
+            voiceKey: "intake"
+            voiceMaxLength: 4000
             editHeight: 156
             onEdited: root.invalidateIntake()
         }
@@ -906,16 +1089,100 @@ Column {
                 border.width: 1
                 border.color: root.selectedDoctorId === String(modelData.id || "")
                     ? Colors.magenta : Colors.blue
-                GohuText {
+                Row {
                     anchors.fill: parent
                     anchors.margins: 5
-                    font.pixelSize: 9
-                    text: String(modelData.name || modelData.id || "")
-                        + " // " + String(modelData.role || "")
-                        + " // " + String(modelData.status || "")
-                    color: Colors.white
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
+                    spacing: 0
+                    clip: true
+
+                    // Worker display names and details are orange, while
+                    // slash dividers stay white with the SAME orange glow.
+                    GohuText {
+                        id: workerNameLabel
+                        text: String(modelData.name || modelData.id || "")
+                        font.pixelSize: 9
+                        color: Colors.orange
+                        width: Math.max(0, Math.min(implicitWidth,
+                            parent.width - workerSepOne.implicitWidth
+                                - workerRoleLabel.implicitWidth
+                                - workerSepTwo.implicitWidth
+                                - workerStatusLabel.implicitWidth))
+                        height: parent.height
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: workerSepOne
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: workerRoleLabel
+                        text: String(modelData.role || "")
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: workerSepTwo
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: workerStatusLabel
+                        text: String(modelData.status || "")
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
                 }
                 MouseArea {
                     anchors.fill: parent
@@ -961,6 +1228,17 @@ Column {
         ManagerField {id:roomNameField; caption:"ROOM NAME"}
         GohuText {
             width: parent.width
+            text: "CURRENT FLOOR REPOSITORY // "
+                + (root.currentPatientRepository.owner
+                    ? root.suggestedRepository
+                    : "NOT DETECTED // SELECT OR ENTER MANUALLY")
+                + "\nOwner and project auto-fill together when available."
+            font.pixelSize: 9
+            color: root.currentPatientRepository.owner ? Colors.cyan : Colors.orange
+            wrapMode: Text.WrapAnywhere
+        }
+        GohuText {
+            width: parent.width
             text: "GITHUB OWNER = the account or organization hosting the repository. NOT the worker, Doctor or person assigned the job."
             font.pixelSize: 9
             color: Colors.cyan
@@ -989,7 +1267,7 @@ Column {
             HospitalActionButton {
                 width: (parent.width - 6) / 2
                 height: 29
-                label: "USE PATIENT"
+                label: "USE CURRENT REPO"
                 accent: Colors.cyan
                 contentGlowEnabled: false
                 enabledAction: !!root.currentPatientRepository.owner
@@ -1111,10 +1389,10 @@ Column {
             wrapMode: Text.WrapAnywhere
         }
         ManagerField {id:jobTitleField; caption:"JOB TITLE"}
-        ManagerArea {id:jobGoalField; caption:"GOAL"}
-        ManagerArea {id:jobConstraintsField; caption:"CONSTRAINTS / FILE OWNERSHIP"}
-        ManagerArea {id:jobDoneField; caption:"DEFINITION OF DONE"}
-        ManagerArea {id:jobChecklistField; caption:"CHECKLIST"}
+        ManagerArea {id:jobGoalField; caption:"GOAL"; voiceKey:"goal"; voiceMaxLength:4000}
+        ManagerArea {id:jobConstraintsField; caption:"CONSTRAINTS / FILE OWNERSHIP"; voiceKey:"constraints"; voiceMaxLength:4000}
+        ManagerArea {id:jobDoneField; caption:"DEFINITION OF DONE"; voiceKey:"done"; voiceMaxLength:4000}
+        ManagerArea {id:jobChecklistField; caption:"CHECKLIST"; voiceKey:"checklist"; voiceMaxLength:4000}
         ManagerField {id:jobPermissionsField; caption:"PERMISSIONS"; Component.onCompleted:value="READ"}
         GohuText {
             width: parent.width
@@ -1409,16 +1687,97 @@ Column {
                 border.width: 1
                 border.color: root.selectedStaffDoctorId
                     === String(modelData.id || "") ? Colors.magenta : Colors.blue
-                GohuText {
+                Row {
                     anchors.fill: parent
                     anchors.margins: 5
-                    text: String(modelData.name || modelData.id || "WORKER")
-                        + " // " + String(modelData.role || "NO ROLE")
-                        + " // " + String(modelData.status || "UNKNOWN")
-                    color: Colors.white
-                    font.pixelSize: 9
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
+                    spacing: 0
+                    clip: true
+                    GohuText {
+                        id: staffWorkerName
+                        text: String(modelData.name || modelData.id || "WORKER")
+                        width: Math.max(0, Math.min(implicitWidth,
+                            parent.width - staffSepOne.implicitWidth
+                                - staffRole.implicitWidth
+                                - staffSepTwo.implicitWidth
+                                - staffStatus.implicitWidth))
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: staffSepOne
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: staffRole
+                        text: String(modelData.role || "NO ROLE")
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: staffSepTwo
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                    GohuText {
+                        id: staffStatus
+                        text: String(modelData.status || "UNKNOWN")
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 9
+                            opacity: 0.5
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
                 }
                 MouseArea {
                     anchors.fill: parent
@@ -1657,10 +2016,8 @@ Column {
         width: root.width
         spacing: 3
         height: 43
-        GohuText {
-            text: managerField.caption
-            color: Colors.blue
-            font.pixelSize: 9
+        ManagerCaption {
+            caption: managerField.caption
             height: 12
             width: parent.width
         }
@@ -1669,13 +2026,19 @@ Column {
             height: 28
             color: Colors.black
             border.width: 1
-            border.color: Colors.magenta
+            border.color: Colors.orange
             TextInput {
                 id: input
                 anchors.fill: parent
                 anchors.leftMargin: 7
                 anchors.rightMargin: 7
-                color: Colors.white
+                color: Colors.magenta
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.black
+                cursorDelegate: Rectangle {
+                    width: 2
+                    color: Colors.orange
+                }
                 font.family: "GohuFont 11 Nerd Font Mono"
                 font.pixelSize: 10
                 selectByMouse: true
@@ -1687,40 +2050,212 @@ Column {
         }
     }
 
+    // Shared headers with slightly larger blue labels. Each "/" is normalized
+    // to a white "//" token with the SAME cyan glow as the blue label.
+    // The caption's existing height is retained so form gaps do not grow.
+    component ManagerCaption: Row {
+        id: managerCaption
+        property string caption: ""
+        readonly property var parts: String(caption || "")
+            .replace(/\s*\/+\s*/g, " // ")
+            .split(/( \/\/ )/)
+            .filter(function(part) { return part.length > 0; })
+        width: root.width
+        height: 12
+        spacing: 0
+        clip: true
+        Repeater {
+            model: managerCaption.parts
+            GohuText {
+                required property string modelData
+                text: modelData
+                width: implicitWidth
+                height: managerCaption.height
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: 10
+                color: modelData.indexOf("/") >= 0 ? Colors.white : Colors.blue
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    radius: 5
+                    samples: 9
+                    opacity: 0.55
+                    color: Colors.cyan
+                    transparentBorder: true
+                }
+            }
+        }
+    }
+
+    // Local live dictation appears inside its own input box, rather than in
+    // the label row. No separate popup, form submit or worker command.
     component ManagerArea: Column {
         id: managerArea
         property string caption: ""
         property alias value: edit.text
         property int editHeight: 79
+        property string voiceKey: ""
+        property int voiceMaxLength: 4000
+        readonly property bool voiceActive:
+            !!voiceKey && root.dictationField === voiceKey
+        readonly property bool showVoiceLine:
+            !!voiceKey && (voiceActive
+                || root.dictationFeedbackField === voiceKey)
         signal edited()
         width: root.width
         spacing: 3
-        height: editHeight + 15
-        GohuText {
-            text: managerArea.caption
-            color: Colors.blue
-            font.pixelSize: 9
-            height: 12
-            width: parent.width
+        height: editHeight + 18 + (showVoiceLine ? 15 : 0)
+
+        function focusEditorAtEnd() {
+            edit.cursorPosition = edit.text.length;
+            edit.forceActiveFocus();
         }
+
+        ManagerCaption {
+            caption: managerArea.caption
+            width: parent.width
+            height: 12
+        }
+
         Rectangle {
+            id: editorFrame
             width: parent.width
             height: managerArea.editHeight
             color: Colors.black
             border.width: 1
-            border.color: Colors.magenta
+            border.color: Colors.orange
+
             TextEdit {
                 id: edit
                 anchors.fill: parent
                 anchors.margins: 6
-                color: Colors.white
+                anchors.rightMargin: managerArea.voiceKey
+                    ? (managerArea.voiceActive && root.speechInputService
+                        && root.speechInputService.busy ? 100 : 42) : 6
+                color: Colors.magenta
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.black
+                cursorDelegate: Rectangle {
+                    width: 2
+                    color: Colors.orange
+                }
                 font.family: "GohuFont 11 Nerd Font Mono"
                 font.pixelSize: 10
                 wrapMode: TextEdit.Wrap
+                textFormat: TextEdit.PlainText
                 selectByMouse: true
+                // During live dictation the pending text is visible and
+                // recoverable by CANCEL. Editing resumes immediately at STOP.
+                readOnly: managerArea.voiceActive
+                    && root.speechInputService
+                    && root.speechInputService.liveStreaming === true
                 onTextChanged: managerArea.edited()
                 clip: true
             }
+
+            // Open rule: selected yellow fill, magenta icon/border/glow.
+            // Idle mirrors Reception: green talking-person with Omnitrix glow;
+            // hover follows the orange/selected interaction grammar.
+            Rectangle {
+                id: micAction
+                anchors.right: parent.right
+                anchors.rightMargin: 7
+                anchors.verticalCenter: parent.verticalCenter
+                readonly property bool canAct:
+                    root.active && !!root.speechInputService
+                    && (managerArea.voiceActive
+                        && root.speechInputService.recording
+                        || (!root.speechInputService.busy && !root.otherVoiceBusy))
+                width: managerArea.voiceKey ? 30 : 0
+                height: 28
+                visible: !!managerArea.voiceKey
+                color: managerArea.voiceActive || micMouse.containsMouse
+                    ? Colors.yellow : Colors.dark
+                border.width: managerArea.voiceActive || micMouse.containsMouse
+                    ? 2 : 1
+                border.color: managerArea.voiceActive || micMouse.containsMouse
+                    ? Colors.magenta : Colors.omnitrix
+                opacity: canAct || managerArea.voiceActive ? 1.0 : 0.45
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 4
+                    z: -1
+                    opacity: managerArea.voiceActive || micMouse.containsMouse
+                        ? 0.55 : 0.34
+                    color: managerArea.voiceActive || micMouse.containsMouse
+                        ? Colors.magenta : Colors.omnitrix
+                }
+                GohuText {
+                    anchors.centerIn: parent
+                    anchors.verticalCenterOffset: 1
+                    text: "🗣︎"
+                    font.pixelSize: 20
+                    color: managerArea.voiceActive || micMouse.containsMouse
+                        ? Colors.magenta : Colors.omnitrix
+                    layer.enabled: true
+                    layer.effect: DropShadow {
+                        radius: 6
+                        samples: 9
+                        opacity: 0.60
+                        color: managerArea.voiceActive || micMouse.containsMouse
+                            ? Colors.magenta : Colors.omnitrix
+                        transparentBorder: true
+                    }
+                }
+                MouseArea {
+                    id: micMouse
+                    anchors.fill: parent
+                    enabled: micAction.canAct
+                    hoverEnabled: true
+                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: root.toggleDictation(managerArea.voiceKey)
+                }
+            }
+            HospitalActionButton {
+                id: cancelAction
+                anchors.right: micAction.left
+                anchors.rightMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                visible: managerArea.voiceActive && !!root.speechInputService
+                    && root.speechInputService.busy
+                width: visible ? 58 : 0
+                height: 28
+                label: "CANCEL"
+                accent: Colors.red
+                contentGlowEnabled: false
+                onTriggered: root.cancelDictation()
+            }
+        }
+
+        GohuText {
+            width: parent.width
+            height: managerArea.showVoiceLine ? 12 : 0
+            visible: managerArea.showVoiceLine
+            text: managerArea.voiceActive && root.speechInputService
+                && root.speechInputService.recording
+                ? (root.speechInputService.audioDropped
+                    ? "LIVE // AUDIO SKIPPED // MODEL FALLING BEHIND"
+                    : root.speechInputService.safetyLimitSoon
+                      ? "LIVE // SAFETY LIMIT SOON // FINISH PHRASE"
+                      : "LIVE " + root.speechInputService.recordingElapsedLabel
+                          + " // PRESS MIC TO STOP")
+                : managerArea.voiceActive && root.speechInputService
+                    && (root.speechInputService.stopping
+                        || root.speechInputService.transcribing)
+                ? (root.speechInputService.captureStopReason === "CAPTURE_CHUNK_LIMIT"
+                    ? "SAFETY AUTO-STOP // FINISHING LAST CHUNK"
+                    : root.speechInputService.audioDropped
+                      ? "MODEL BEHIND // SOME AUDIO WAS SKIPPED"
+                      : "LOCAL WHISPER // FINISHING // NO SUBMISSION")
+                : (managerArea.voiceActive && root.speechInputService
+                    && root.dictationFeedback === "LIVE TRANSCRIPT READY // REVIEW BEFORE SUBMIT"
+                    && root.speechInputService.timingSummary.length > 0
+                    ? "REVIEW TEXT // " + root.speechInputService.timingSummary
+                    : root.dictationFeedback)
+            color: managerArea.voiceActive ? Colors.magenta : Colors.orange
+            font.pixelSize: 8
+            elide: Text.ElideRight
         }
     }
+
 }

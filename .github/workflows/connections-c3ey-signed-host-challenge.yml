@@ -1,0 +1,85 @@
+name: Connections C3e-Y signed complete Identity host evidence and issued challenge (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eYSignedHostChallenge.py"
+      - "tests/connections/test_connections_c3ey_signed_host_challenge.py"
+      - "tests/connections/c3e_release_trust/C3eXIdentityRunningEvidence.py"
+      - "services/identity/signed_command_receipt_v0.py"
+      - ".github/workflows/connections-c3ey-signed-host-challenge.yml"
+      - "docs/connections-c3ey-signed-host-challenge.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  root-local-signed-full-record-and-one-use-challenge:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned public-key verification dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Syntax and deny-only static security gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eYSignedHostChallenge.py \
+            tests/connections/test_connections_c3ey_signed_host_challenge.py
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path("tests/connections/c3e_release_trust/C3eYSignedHostChallenge.py").read_text()
+          broker = Path("services/connections/ConnectionsBroker.qml").read_text()
+          status = Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          for field in ("externalIssuerCustodyVerified", "externalRollbackResistanceVerified",
+                        "independentHostOriginVerified", "hostAuthenticated",
+                        "c5HumanConsentVerified", "canBeginSignIn", "canApprove",
+                        "credentialActionsEnabled", "productionAuthority"):
+              assert '"' + field + '": False' in src or (
+                  field in ("hostAuthenticated", "c5HumanConsentVerified",
+                            "canBeginSignIn", "canApprove", "credentialActionsEnabled",
+                            "productionAuthority")
+                  and "**X.NEGATIVE" in src)
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "readonly property bool hostAuthenticated: false" in status
+          assert "not independently authenticated" in Path(
+              "docs/connections-c3ey-signed-host-challenge.md").read_text()
+          print("C3EY_PASS // NO_LIVE_HOST_CREDENTIAL_OR_AUTHORITY_PATH")
+          PY
+      - name: Root-isolated issued challenge, full Ed25519 witness and replay adversarial regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python_bin="$(command -v python3)"
+          test -x "$python_bin"
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true "$python_bin" -B \
+            tests/connections/test_connections_c3ey_signed_host_challenge.py
+          echo "C3EY_PASS // FULL_RECORD_SIGNATURE_AND_EXACTLY_ONCE_ROOT_LOCAL_CONSUMPTION_IN_CI"
+      - name: Preserve earlier C3e-X full denial and process-origin consistency contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ex_identity_running_evidence.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          echo "C3EY_PASS // C3EX_AND_C2N_DENY_ONLY_REGRESSIONS"
+      - name: Test-only limitation is unambiguous
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "not externally rollback-resistant" docs/connections-c3ey-signed-host-challenge.md
+          grep -Fq '"externalRollbackResistanceVerified": False' tests/connections/c3e_release_trust/C3eYSignedHostChallenge.py
+          grep -Fq '"independentHostOriginVerified": False' tests/connections/c3e_release_trust/C3eYSignedHostChallenge.py
+          echo "C3EY_LIMITATION // CI_ROOT_LOCAL_LEDGER_IS_NOT_INDEPENDENT_HOST_ATTESTATION"

@@ -71,7 +71,7 @@ test("Kitty and home session lifetimes and source owners remain intact",()=>{
   assert.match(station,/WeatherServices\.WeatherHistoryService\s*\{/);
   assert.match(navigator,/showNewsMentionsOnEarth\(payload\)/);
   assert.match(navigator,/active: browser\.visible/);
-  assert.match(surface,/workspaceSection: surface\.homeSection === "overview"/);
+  assert.match(surface,/workspaceSection: surface\.homeSection/);
   for(const x of [surface,rail]) {
     for(const token of ["FileView {","Process {","WeatherServices.","swaymsg","StationTerminal {"])
       assert.ok(!x.includes(token),"unexpected new owner "+token);

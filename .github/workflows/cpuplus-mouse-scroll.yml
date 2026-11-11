@@ -1,0 +1,71 @@
+name: CPU++ Mouse & Touchpad / Real Sway Scroll
+
+on:
+  pull_request:
+    paths:
+      - "services/input/SwayScrollControl.py"
+      - "services/input/SwayScrollSettings.qml"
+      - "services/input/MouseScrollPolicy.js"
+      - "services/input/qmldir"
+      - "services/input/ZellijScrollConfig.py"
+      - "services/input/ZellijScrollSettings.qml"
+      - "widgets/cpuplus/CpuPlusSettingsZellijScrollPane.qml"
+      - "tests/cpuplus/test_zellij_scroll_config.py"
+      - "tests/cpuplus/test_zellij_scroll_ui.py"
+      - "services/input/KittyScrollConfig.py"
+      - "services/input/KittyScrollSettings.qml"
+      - "widgets/cpuplus/CpuPlusSettingsKittyScrollPane.qml"
+      - "tests/cpuplus/test_kitty_scroll_config.py"
+      - "tests/cpuplus/test_kitty_scroll_ui.py"
+      - "widgets/cpuplus/CpuPlusSettingsMouseScrollPane.qml"
+      - "widgets/CpuPlusW.qml"
+      - "tests/cpuplus/test_mouse_scroll_mount_contract.py"
+      - "tests/cpuplus/test_sway_scroll_controller.py"
+      - "tests/cpuplus/test_mouse_scroll_policy.cjs"
+      - "tests/cpuplus/test_mouse_scroll_controls.py"
+      - "tests/cpuplus/fixtures/MouseScrollNative.qml"
+      - "scripts/cpuplus/verify_mouse_scroll_native.sh"
+      - ".github/workflows/cpuplus-mouse-scroll.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify fake Sway device discovery, set, and rollback
+        run: python3 tests/cpuplus/test_sway_scroll_controller.py
+      - name: Verify UI authority and no silent startup effects
+        run: python3 tests/cpuplus/test_mouse_scroll_controls.py
+      - name: Verify Kitty optional config, backup, fragment and symlink safety
+        run: python3 tests/cpuplus/test_kitty_scroll_config.py
+      - name: Verify independent wheel/touchpad UI gates
+        run: python3 tests/cpuplus/test_kitty_scroll_ui.py
+      - name: Verify Zellij managed KDL config, backup and stale write refusal
+        run: python3 tests/cpuplus/test_zellij_scroll_config.py
+      - name: Verify Zellij per-option UI and safe terminal routing
+        run: python3 tests/cpuplus/test_zellij_scroll_ui.py
+      - name: Verify CPU++ three-bay integration and reserved-category guards
+        run: python3 tests/cpuplus/test_mouse_scroll_mount_contract.py
+      - name: Verify persisted scroll choice policy
+        run: node tests/cpuplus/test_mouse_scroll_policy.cjs
+
+  native-quickshell:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 15
+    steps:
+      - name: Install disposable Quickshell and Xvfb dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg python3 coreutils findutils xorg-x11-server-Xvfb
+      - uses: actions/checkout@v4
+      - name: Native three-bay QML stage/cancel smoke
+        run: bash scripts/cpuplus/verify_mouse_scroll_native.sh

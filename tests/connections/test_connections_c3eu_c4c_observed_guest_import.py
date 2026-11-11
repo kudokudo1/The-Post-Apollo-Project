@@ -8,6 +8,7 @@ UART artifact was retrieved. This consumer explicitly REFUSES production use.
 from __future__ import annotations
 
 import ast
+import hashlib
 from copy import deepcopy
 import importlib.util
 import json
@@ -15,6 +16,7 @@ from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "tests/connections/c3e_release_trust/C3eUObservedGuestImport.py"
@@ -245,6 +247,114 @@ class C3eUC4cImportContract(unittest.TestCase):
         self.assertEqual(self.report["schema"], U.SCHEMA)
         self.assertIs(self.check()["installedGuestMeasured"],False)
         self.assertFalse(self.check()["evidenceCryptographicallyAttested"])
+
+
+    def test_19_actual_silverblue_artifact_source_matched_diagnostic_only(self):
+        # REAL artifact: C4b signed Fedora Silverblue exact-head CI
+        # https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42894509754
+        # artifact id 13800918170; ZIP SHA256 ac083f693ac139058b22ea9dd2b0e37767a04f0c30e17fc45de3fdfce599c7a9.
+        # This is a canonical reconstruction of the artifact's ONE diagnostic
+        # guest line; the matching line SHA256 pins its exact 819 bytes.
+        # It is NOT signed C3e-Q evidence or independent PID/interpreter/RPM attestation.
+        guest = {**self.report,
+                 "signed_rpm_sha256": "8b9c9e7cd11ae225b85102a8df35ac4053abe08ea7b9a9553b5325e8567174d9",
+                 "signed_script_sha256": "1bc6cc2030efc08f873bc8f73a9644d869482e3e70c6553a108ade9d97441ce5",
+                 "running_script_sha256": "1bc6cc2030efc08f873bc8f73a9644d869482e3e70c6553a108ade9d97441ce5",
+                 "interpreter_sha256": "40850fe1e2df0c14378c12bfaa02b5cda35619e09a8ee50ca3cf2bdb36fc019f",
+                 "service_pid": 2857, "dbus_owner_pid": 2857,
+                 "process_start_ticks": "1235",
+                 "service_uid": 992, "service_gid": 995}
+        raw = self.line(value=guest)
+        self.assertEqual(len(raw), 819)
+        self.assertEqual(
+            hashlib.sha256(raw).hexdigest(),
+            "e3fa68a28a3160262632785d656855fa62a079dbf8e95c0d4e1e76aa5da44bb9")
+        # This is the one pin independently reproducible from the tracked
+        # repository bytes at CI head fe1f1d0c. All other "pins" below are
+        # replayed guest values solely to exercise C3e-U schema compatibility.
+        src = (ROOT / "tests/connections/c2r_selinux_domain/C2rStatusHost.py")
+        independent_script_sha = hashlib.sha256(src.read_bytes()).hexdigest()
+        self.assertEqual(independent_script_sha, guest["signed_script_sha256"])
+        assert_only_format_pins = {
+            "independent_signed_rpm_sha256": guest["signed_rpm_sha256"],
+            "independent_signed_script_sha256": independent_script_sha,
+            "independent_interpreter_sha256": guest["interpreter_sha256"],
+            "expected_service_pid": guest["service_pid"],
+            "expected_start_ticks": guest["process_start_ticks"],
+            "expected_service_uid": guest["service_uid"],
+            "expected_service_gid": guest["service_gid"],
+        }
+        result = U.inspect(report_line=raw, **assert_only_format_pins)
+        self.assertTrue(result["c4cSchemaCompatible"])
+        self.assertTrue(result["reportMatchesSuppliedIndependentPins"])
+        self.assertTrue(result["reportSourceIsGuestSelfObservation"])
+        self.assertFalse(result["installedGuestMeasured"])
+        for key in U.DENY_FLAGS:
+            self.assertIs(result[key], False)
+        # A separately provided differing RPM/interpreter/process pin must
+        # still reject the otherwise well-formed real artifact.
+        for k, value, refusal in (
+            ("independent_signed_rpm_sha256", "f"*64,
+             "C4C_SIGNED_ARTIFACT_OR_RUNNING_BYTES_PIN_MISMATCH"),
+            ("independent_interpreter_sha256", "f"*64,
+             "C4C_SIGNED_ARTIFACT_OR_RUNNING_BYTES_PIN_MISMATCH"),
+            ("expected_service_pid", guest["service_pid"] + 1,
+             "C4C_SYSTEMD_DBUS_PROCESS_PIN_MISMATCH"),
+        ):
+            with self.subTest(k=k):
+                with self.assertRaisesRegex(U.Refused, refusal):
+                    U.inspect(report_line=raw,
+                              **{**assert_only_format_pins, k: value})
+
+
+    def test_20_noncanonical_guest_report_bytes_refused(self):
+        # The guest's actual writer uses sorted compact ASCII JSON. Equivalent
+        # JSON with whitespace, reordered keys or ASCII escape variants must
+        # not masquerade as the same exact byte-level diagnostic report.
+        canonical = self.line().rstrip(b"\n")
+        cases = (
+            U.PREFIX + json.dumps(self.report,
+                                  separators=(",", ":")).encode() + b"\n",
+            U.PREFIX + json.dumps(self.report,
+                                  sort_keys=True).encode() + b"\n",
+            canonical.replace(b'"schema":', b'"\\u0073chema":') + b"\n",
+            canonical + b" \n",
+        )
+        self.assertEqual(len(cases), len(set(cases)))
+        for raw in cases:
+            with self.subTest(raw=raw[:70]):
+                self.refuse("C4C_REPORT_NONCANONICAL_REFUSED", raw=raw)
+
+    def test_21_deep_json_recursion_fails_closed_with_bounded_refusal(self):
+        # Python versions can differ on whether this deep payload parses or
+        # trips the recursion limit. Either outcome must be a normal refusal.
+        deep = U.PREFIX + b"[" * 1200 + b"0" + b"]" * 1200 + b"\n"
+        self.assertLess(len(deep), U.MAX_LINE)
+        with self.assertRaises(U.Refused) as caught:
+            self.check(raw=deep)
+        self.assertIn(str(caught.exception),
+                      ("C4C_REPORT_JSON_REFUSED", "C4C_REPORT_SHAPE_REFUSED"))
+        # Independently force the parser's recursion exception to prove that
+        # the decoder maps it to its bounded fail-closed diagnostic result.
+        with patch.object(U.json, "loads", side_effect=RecursionError("nested")):
+            self.refuse("C4C_REPORT_JSON_REFUSED", raw=self.line())
+        args = [
+            sys.executable, "-B", str(SOURCE),
+            "--rpm-sha256", self.rpm,
+            "--script-sha256", self.script,
+            "--interpreter-sha256", self.python,
+            "--service-pid", "9881", "--start-ticks", "111337",
+            "--service-uid", "997", "--service-gid", "997",
+        ]
+        result = subprocess.run(
+            args, input=deep, capture_output=True, timeout=8)
+        self.assertEqual(result.returncode, 3, result.stderr)
+        self.assertEqual(result.stderr, b"")
+        receipt = json.loads(result.stdout)
+        self.assertIn(receipt["refused"],
+                      ("C4C_REPORT_JSON_REFUSED", "C4C_REPORT_SHAPE_REFUSED"))
+        for key in U.DENY_FLAGS:
+            self.assertFalse(receipt[key])
 
 
 if __name__=="__main__":

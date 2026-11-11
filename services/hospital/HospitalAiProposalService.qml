@@ -50,6 +50,7 @@ Scope {
         root.busy = true;
         // The API key is read only by the Python child from its existing
         // environment. It is never sent to QML or included in command args.
+        requestWatchdog.restart();
         modelProcess.exec(["python3",
             Quickshell.shellDir + "/services/hospital/hospital_ai_proposal_client.py"]);
         return true;
@@ -96,15 +97,37 @@ Scope {
         root.finished(data);
     }
 
+    Timer {
+        id: requestWatchdog
+        interval: 25000
+        repeat: false
+        onTriggered: {
+            if (!root.busy)
+                return;
+            // An unresponsive HTTPS or stdin child may not hold the UI.
+            // Fail closed and revoke this one request; no auto-retry.
+            root.lastError = "AI REQUEST TIMED OUT // USE LOCAL STARTER DRAFT";
+            root.pendingKey = "";
+            root.busy = false;
+            if (modelProcess.running)
+                modelProcess.running = false;
+        }
+    }
+
     Process {
         id: modelProcess
         stdinEnabled: true
         onStarted: {
-            if (root.pendingKey) {
+            if (root.pendingKey && root.busy) {
                 modelProcess.write(JSON.stringify({
                     brief: root.pendingBrief,
                     requestKey: root.pendingKey
                 }) + "\n");
+            } else {
+                // If the operator edited/cancelled before the process started,
+                // always release the Python readline() with invalid input.
+                // It exits without sending anything to OpenAI.
+                modelProcess.write("{}\n");
             }
         }
         stdout: StdioCollector {
@@ -121,6 +144,7 @@ Scope {
             }
         }
         onExited: function(code, status) {
+            requestWatchdog.stop();
             root.exitCode = Number(code);
             root.exitDone = true;
             root.maybeFinish();

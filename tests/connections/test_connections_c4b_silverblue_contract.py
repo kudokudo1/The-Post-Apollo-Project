@@ -18,6 +18,8 @@ SIGNED_C3D_RPM_SPEC = (ROOT / "tests/connections/c3d_provenance/signed-status.sp
 POLICY_GATE = (ROOT / "tests/connections/c4b_silverblue/guest_signed_policy_gate.sh")
 POLICY_BUILDER = (ROOT / "tests/connections/c4b_silverblue/build_signed_composed_policy.sh")
 POLICY_SPEC = (ROOT / "tests/connections/c4b_silverblue/signed-compose-policy.spec")
+C4D_CAPTURE = (ROOT / "tests/connections/c4b_silverblue/capture_guest_observation.py")
+C4D_TESTS = (ROOT / "tests/connections/test_connections_c4d_guest_observation_export.py")
 
 
 class C4bContracts(unittest.TestCase):
@@ -392,6 +394,47 @@ class C4bContracts(unittest.TestCase):
         self.assertNotIn("systemctl enable", python_body)
         self.assertNotIn("subprocess.Popen", python_body)
         self.assertNotIn("os.system(", python_body)
+
+    def test_052_actual_single_guest_uart_artifact_requires_two_real_boots(self):
+        # No C2v controller source change or synthetic substitute for QEMU.
+        workflow = WORKFLOW.read_text()
+        capture = C4D_CAPTURE.read_text()
+        self.assertTrue(C4D_TESTS.is_file())
+        self.assertIn(
+            'python3 -B tests/connections/test_connections_c4d_guest_observation_export.py',
+            workflow)
+        self.assertIn(
+            'python3 -B tests/connections/c4b_silverblue/capture_guest_observation.py',
+            workflow)
+        self.assertIn('C4B_OBSERVED.txt', workflow)
+        self.assertIn('original-c2v-result', workflow)
+        self.assertIn('timeout 3550s bash tests/connections/c2v_silverblue/boot_official_silverblue.sh', workflow)
+        self.assertIn('wait "$observer_pid"', workflow)
+        self.assertIn('[[ "$vm_rc" == 0 ]]', workflow)
+        self.assertIn('[[ "$observer_rc" == 0 && -s "$evidence/C4B_OBSERVED.txt" ]]', workflow)
+        self.assertIn('Upload only one deny-only guest observation after full real rollback', workflow)
+        self.assertIn('uses: actions/upload-artifact@v4', workflow)
+        self.assertIn('if-no-files-found: error', workflow)
+        self.assertIn('retention-days: 3', workflow)
+        self.assertLess(workflow.index('[[ "$vm_rc" == 0 ]]'),
+                        workflow.index('uses: actions/upload-artifact@v4'))
+        self.assertNotIn('C4B_OBSERVED // ', workflow)
+        self.assertIn('C4B_OBSERVED // ', capture)
+        self.assertIn('c2v-silverblue-*', capture)
+        self.assertIn('guest-serial.log', capture)
+        self.assertIn('MAX_LINE = 2048', capture)
+        self.assertIn('ORIGINAL_TWO_BOOT_LIFECYCLE_DID_NOT_PASS', capture)
+        self.assertIn('CONFLICTING_GUEST_OBSERVATIONS', capture)
+        self.assertIn('DUPLICATE_OBSERVATION_FIELD', capture)
+        self.assertIn('OBSERVATION_CLAIMS_AUTHORITY', capture)
+        self.assertIn('NO_REAL_GUEST_OBSERVATION_CAPTURED', capture)
+        self.assertIn('C2V_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER', capture)
+        self.assertIn('os.O_NOFOLLOW', capture)
+        self.assertIn('os.O_EXCL', capture)
+        self.assertIn('C4D_LIMITATION // UNSIGNED_GUEST_LOG_NOT_REMOTE_ATTESTATION', capture)
+        self.assertNotIn('subprocess.run(', capture)
+        self.assertNotIn('curl ', capture)
+        self.assertNotIn('secret-tool ', capture)
 
     def test_05_fully_disposable_ci_and_production_deny_only(self):
         workflow = WORKFLOW.read_text()

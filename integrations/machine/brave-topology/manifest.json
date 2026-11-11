@@ -1,17 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "Post-Apollo MACHINE // Brave Window Inventory (Read-Only Pilot)",
-  "version": "0.2.0",
-  "description": "Explicit local-only browser window counts; optional user-granted transport-only native host probe. No titles, URLs, tab capture or restore.",
+  "name": "Post-Apollo MACHINE // Brave Session Recovery Pilot",
+  "version": "0.5.1",
+  "description": "Opt-in Brave encrypted tab save and authenticated redacted snapshot review in disposable trial; no restore.",
   "minimum_chrome_version": "110",
   "incognito": "not_allowed",
   "permissions": [],
   "host_permissions": [],
   "action": {
-    "default_title": "MACHINE // Inspect Brave windows locally",
+    "default_title": "MACHINE // Brave window diagnostics and sealed save pilot",
     "default_popup": "popup.html"
   },
   "optional_permissions": [
-    "nativeMessaging"
+    "nativeMessaging",
+    "tabs"
   ]
 }

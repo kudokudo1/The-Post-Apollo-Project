@@ -51,6 +51,14 @@ check('stdoutText.length > 24000' in qml
       and 'data.ready !== true' in qml
       and 'result: ' not in qml,
       "Reject stale, oversize or invalid responses")
+check('id: requestWatchdog' in qml
+      and 'interval: 25000' in qml
+      and 'requestWatchdog.restart()' in qml
+      and 'requestWatchdog.stop()' in qml
+      and 'modelProcess.running = false' in qml
+      and 'modelProcess.write("{}\\n")' in qml,
+      "A stale pre-start request receives invalid stdin and hung requests time out")
+
 check('OPENAI_API_KEY' in client
       and 'ENDPOINT = "https://api.openai.com/v1/responses"' in client
       and '"tools": []' in client

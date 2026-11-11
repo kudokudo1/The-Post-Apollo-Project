@@ -6,12 +6,21 @@ on:
       - "modules/Clock.qml"
       - "widgets/TimeW.qml"
       - "widgets/TimeSettingsPane.qml"
+      - "widgets/TimeSettingsCompact.qml"
       - "widgets/TimeResyncPopup.qml"
       - "services/time/TimeSettings.qml"
       - "services/time/TimeSettingsPolicy.js"
+      - "services/time/TimeAutoCheckPolicy.js"
+      - "components/SelectorDial.qml"
       - "services/time/TimeHostControl.py"
       - "services/time/qmldir"
       - "tests/time/test_clock_settings_contract.py"
+      - "tests/time/test_clock_auto_check_contract.py"
+      - "tests/time/test_clock_settings_submodes_contract.py"
+      - "tests/time/test_clock_settings_compact_contract.py"
+      - "tests/time/test_clock_auto_event_triggers_contract.py"
+      - "tests/time/test_clock_auto_check_dedup_contract.py"
+      - "shell.qml"
       - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
   push:
@@ -19,12 +28,21 @@ on:
       - "modules/Clock.qml"
       - "widgets/TimeW.qml"
       - "widgets/TimeSettingsPane.qml"
+      - "widgets/TimeSettingsCompact.qml"
       - "widgets/TimeResyncPopup.qml"
       - "services/time/TimeSettings.qml"
       - "services/time/TimeSettingsPolicy.js"
+      - "services/time/TimeAutoCheckPolicy.js"
+      - "components/SelectorDial.qml"
       - "services/time/TimeHostControl.py"
       - "services/time/qmldir"
       - "tests/time/test_clock_settings_contract.py"
+      - "tests/time/test_clock_auto_check_contract.py"
+      - "tests/time/test_clock_settings_submodes_contract.py"
+      - "tests/time/test_clock_settings_compact_contract.py"
+      - "tests/time/test_clock_auto_event_triggers_contract.py"
+      - "tests/time/test_clock_auto_check_dedup_contract.py"
+      - "shell.qml"
       - "tests/time/test_clock_resync_popup_contract.py"
       - ".github/workflows/clock-time-settings-contracts.yml"
 
@@ -37,6 +55,11 @@ jobs:
         run: |
           python3 -m unittest discover -s tests/time -p 'test_clock_settings_contract.py' -v
           python3 -m unittest discover -s tests/time -p 'test_clock_resync_popup_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_auto_check_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_settings_submodes_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_settings_compact_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_auto_event_triggers_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_auto_check_dedup_contract.py' -v
       - name: Check bounded visual calibration policy
         run: |
           node <<'JS'
@@ -50,13 +73,102 @@ jobs:
           assert.equal(policy.initialDocument().displayOffsetMs, 0);
           assert.equal(policy.validOffset(300000), true);
           assert.equal(policy.validOffset(-300000), true);
-          assert.equal(policy.validOffset(300001), false);
+          assert.equal(policy.validOffset(3600000), true);
+          assert.equal(policy.validOffset(86400000), true);
+          assert.equal(policy.validOffset(86400001), false);
           assert.equal(policy.validOffset(1.5), false);
           assert.equal(policy.withOffset(policy.initialDocument(), 1500).ok, true);
-          assert.equal(policy.withOffset(policy.initialDocument(), 500000).ok, false);
+          assert.equal(policy.withOffset(policy.initialDocument(), 500000).ok, true);
+          assert.equal(policy.withOffset(policy.initialDocument(), 86400001).ok, false);
           assert.equal(policy.adjustedEpochMs(1000, 1500), 2500);
           assert.equal(policy.formatOffset(-1250), '-1.250s');
+          assert.equal(policy.formatOffset(3600000), '+1h 0m 0.000s');
           assert.equal(policy.parse(JSON.stringify({version:1,displayOffsetMs:0})).ok,true);
           assert.equal(policy.parse(JSON.stringify({version:2,displayOffsetMs:0})).ok,false);
           assert.equal(policy.parse('not json').ok,false);
+          JS
+      - name: Validate durable reference cadence and bounded day/hour rules
+        run: |
+          node <<'JS'
+          const assert = require('assert/strict');
+          const fs = require('fs');
+          const vm = require('vm');
+          const raw = fs.readFileSync('services/time/TimeAutoCheckPolicy.js', 'utf8');
+          const p = {};
+          vm.runInNewContext(raw.replace(/^\.pragma library\s*/, ''), p);
+          const first = p.initialDocument();
+          assert.equal(first.enabled, false);
+          assert.equal(first.intervalHours, 6);
+          assert.equal(p.validHours(1), true);
+          assert.equal(p.validHours(168), true);
+          for (const bad of [0, 169, -1, 1.5, NaN, Infinity, '6']) {
+            assert.equal(p.validHours(bad), false);
+          }
+          assert.equal(p.parse(JSON.stringify(first)).ok, true);
+          assert.equal(p.parse(JSON.stringify({...first, intervalHours:169})).ok, false);
+          assert.equal(p.parse(JSON.stringify({...first, version:2})).ok, false);
+          assert.equal(p.parse('null').ok, false);
+          assert.equal(p.parse('bad-json').ok, false);
+          const enabled = p.withSchedule(first, true, 168).document;
+          assert.equal(p.isDue(enabled, 1000000, 0), true);
+          const stamped = p.withAttempt(enabled, 1000000).document;
+          assert.equal(p.isDue(stamped, 1000000 + 167*3600000, 0), false);
+          assert.equal(p.isDue(stamped, 1000000 + 168*3600000, 0), true);
+          assert.equal(p.nextDueAtMs(stamped, 0), 1000000 + 168*3600000);
+          assert.equal(p.isDue(stamped, 999999, 0), true); // clock jumped back
+          assert.equal(p.isDue(p.withSchedule(stamped, false, 168).document, 1000000 + 168*3600000, 0), false);
+          assert.equal(p.withSchedule(first, true, 2.2).ok, false);
+          // New event switches do not invalidate existing v1 preferences.
+          const legacy = {version: 1, enabled: true, intervalHours: 6, lastAttemptAtMs: 100};
+          const migrated = p.parse(JSON.stringify(legacy));
+          assert.equal(migrated.ok, true);
+          assert.equal(migrated.document.checkOnReload, true);
+          assert.equal(migrated.document.checkOnClockOpen, true);
+          const reloadOff = p.withTrigger(migrated.document, "checkOnReload", false);
+          assert.equal(reloadOff.ok, true);
+          assert.equal(reloadOff.document.checkOnReload, false);
+          assert.equal(reloadOff.document.checkOnClockOpen, true);
+          assert.equal(reloadOff.document.intervalHours, 6);
+          assert.equal(reloadOff.document.lastAttemptAtMs, 100);
+          assert.equal(p.triggerEnabled(reloadOff.document, "reload"), false);
+          assert.equal(p.triggerEnabled(reloadOff.document, "clock-open"), true);
+          assert.equal(p.triggerEnabled(reloadOff.document, "interval"), true);
+          assert.equal(p.triggerEnabled(p.withSchedule(reloadOff.document, false, 6).document, "clock-open"), false);
+          assert.equal(p.withSchedule(reloadOff.document, true, 24).document.checkOnReload, false);
+          assert.equal(p.withAttempt(reloadOff.document, 500).document.checkOnReload, false);
+          assert.equal(p.parse(JSON.stringify(reloadOff.document)).document.checkOnReload, false);
+          assert.equal(p.parse(JSON.stringify({...legacy, checkOnClockOpen: null})).ok, false);
+          assert.equal(p.parse(JSON.stringify({...legacy, checkOnReload: "on"})).ok, false);
+          assert.equal(p.withTrigger(legacy, "unknown", true).ok, false);
+          assert.equal(p.withTrigger(legacy, "checkOnReload", "yes").ok, false);
+          // A completed automatic or manual attempt quiets ALL automatic
+          // triggers, including failures. Explicit CHECK TIME remains manual.
+          const t = 1_700_000_000_000;
+          const hourly = p.withSchedule(first, true, 1).document;
+          assert.equal(p.MIN_AUTOMATIC_GAP_MS, 15*60*1000);
+          assert.equal(p.canStartAutomaticCheck(hourly, "reload", t, 0, 0), true);
+          assert.equal(p.canStartAutomaticCheck(hourly, "clock-open", t, 0, 0), true);
+          const afterReload = p.withAttempt(hourly, t).document;
+          for (const reason of ["reload", "clock-open", "interval"]) {
+            assert.equal(p.canStartAutomaticCheck(afterReload, reason, t+1, t, 0), false);
+            assert.equal(p.canStartAutomaticCheck(afterReload, reason, t+14*60*1000, 0, 0), false);
+          }
+          assert.equal(p.canStartAutomaticCheck(afterReload, "clock-open", t+15*60*1000, 0, 0), true);
+          assert.equal(p.canStartAutomaticCheck(afterReload, "interval", t+15*60*1000, 0, 0), false);
+          assert.equal(p.canStartAutomaticCheck(afterReload, "interval", t+60*60*1000, 0, 0), true);
+          // Even with no auto attempt, a recent manual CHECK TIME suppresses
+          // an immediate Clock-open, reload or scheduled duplicate.
+          assert.equal(p.canStartAutomaticCheck(hourly, "clock-open", t, 0, t-60*1000), false);
+          assert.equal(p.canStartAutomaticCheck(hourly, "reload", t, 0, t-60*1000), false);
+          assert.equal(p.canStartAutomaticCheck(hourly, "interval", t, 0, t-60*1000), false);
+          assert.equal(p.canStartAutomaticCheck(hourly, "clock-open", t, 0, t-15*60*1000), true);
+          // Restart uses the saved attempt time even when no in-memory offset
+          // is available. Failure does not wipe the durable cooldown.
+          assert.equal(p.canStartAutomaticCheck(afterReload, "reload", t+1000, 0, 0), false);
+          assert.equal(p.canStartAutomaticCheck(afterReload, "clock-open", t+1000, 0, 0), false);
+          assert.equal(p.canStartAutomaticCheck(hourly, "clock-open", t, t-1000, 0), false);
+          assert.equal(p.canStartAutomaticCheck(p.withSchedule(afterReload, false, 1).document,
+                                               "clock-open", t+2*60*60*1000, 0, 0), false);
+          assert.equal(p.canStartAutomaticCheck(afterReload, "invalid", t+2*60*60*1000, 0, 0), false);
+          assert.equal(p.canStartAutomaticCheck(hourly, "clock-open", NaN, 0, 0), false);
           JS

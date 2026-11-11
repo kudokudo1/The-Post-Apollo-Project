@@ -50,7 +50,7 @@ class SocialPhoneProjectionContractTests(unittest.TestCase):
         pane = (ROOT / "widgets/messanger/PhonePane.qml").read_text()
         self.assertIn("    ContactList {", pane)
         self.assertIn("    ChatFeed {", pane)
-        self.assertIn("phoneReadAdapter.conversations : []", pane)
+        self.assertIn("phonePane.filteredPhoneConversations : []", pane)
         self.assertIn("phoneReadAdapter.messages : []", pane)
         self.assertIn("sendEnabled: false", pane)
         self.assertNotIn("BlueFerrySocialProjection.py", pane)

@@ -395,7 +395,7 @@ Item {
             y: clockRow.y + clockReadout.y + clockReadout.height - 1
             width: clockReadout.width
             height: 2
-            color: Colors.yellow
+            color: clockButton.open ? Colors.magenta : Colors.yellow
             visible: TimeSettings.dockTimeUnderlined(clock.date.getTime())
             z: 3
         }
@@ -409,7 +409,7 @@ Item {
             verticalOffset: 0
             radius: 7
             samples: 15
-            color: Colors.yellow
+            color: clockButton.open ? Colors.magenta : Colors.yellow
             opacity: 0.7
             requestedVisible: timeDifferenceUnderline.visible
             transparentBorder: true

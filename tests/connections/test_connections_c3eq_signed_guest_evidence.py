@@ -14,6 +14,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 SOURCE = Path(__file__).resolve().parent / "c3e_release_trust/C3eQSignedGuestEvidence.py"
 spec = importlib.util.spec_from_file_location("c3eq", SOURCE)
@@ -219,6 +220,62 @@ class C3eQSignedEvidenceTests(unittest.TestCase):
                       (q / "ConnectionsRequestStatus.qml").read_text())
         self.assertNotIn("C3eQSignedGuestEvidence", (
             q / "ConnectionsBroker.qml").read_text())
+
+
+    def test_21_signed_noncanonical_json_variants_refused(self):
+        # A valid GPG signature is necessary, not sufficient. The signed
+        # evidence document itself must be the exact canonical wire format.
+        canonical = json.dumps(self.data, sort_keys=True,
+                               separators=(",", ":")).encode("ascii")
+        cases = (
+            json.dumps(self.data, sort_keys=True).encode("ascii"),
+            json.dumps(self.data, separators=(",", ":")).encode("ascii"),
+            canonical.replace(b'"schema":', b'"\\u0073chema":'),
+            canonical + b" ",
+        )
+        self.assertEqual(len(set(cases)), len(cases))
+        for variant in cases:
+            with self.subTest(variant=variant[:100]):
+                self.issuer = Q.OneUseTestChallenge(self.challenge)
+                self._sign(raw=variant)
+                self._refuse("EVIDENCE_NONCANONICAL_JSON_REFUSED")
+                self.assertFalse(self.issuer.consumed)
+
+    def test_22_deep_json_and_parser_recursion_always_refuse(self):
+        # Nested JSON under 4096 bytes may be rejected during parsing or at
+        # shape validation depending on interpreter recursion depth.
+        nested = b"[" * 1200 + b"0" + b"]" * 1200
+        self.assertLess(len(nested), Q.MAX_EVIDENCE)
+        self._sign(raw=nested)
+        with self.assertRaises(Q.Refused) as err:
+            self._verify()
+        self.assertIn(str(err.exception),
+                      ("EVIDENCE_JSON_INVALID", "EVIDENCE_SHAPE_REFUSED"))
+        self.assertFalse(self.issuer.consumed)
+
+        # Force the precise error path rather than assuming a given Python
+        # recursion threshold, and require a controlled deny-only failure.
+        self._sign()
+        with mock.patch.object(Q.json, "loads",
+                               side_effect=RecursionError("nested")):
+            self._refuse("EVIDENCE_JSON_INVALID")
+        self.assertFalse(self.issuer.consumed)
+
+    def test_23_noncanonical_signed_and_expected_start_ticks_refused(self):
+        for value in ("000991337", "٩٩١٣٣٧", "0", "1" * 25):
+            with self.subTest(report=value):
+                self.issuer = Q.OneUseTestChallenge(self.challenge)
+                self.data["process_start_ticks"] = value
+                self._sign()
+                self._refuse("PROCESS_START_TICKS_INVALID")
+                self.assertFalse(self.issuer.consumed)
+        self.data["process_start_ticks"] = "991337"
+        self._sign()
+        for expected in ("000991337", "٩٩١٣٣٧", "0", "1" * 25):
+            with self.subTest(expected=expected):
+                self._refuse("INDEPENDENT_PROCESS_PIN_INVALID",
+                             expected_start_ticks=expected)
+        self.assertFalse(self.issuer.consumed)
 
 
 if __name__ == "__main__":

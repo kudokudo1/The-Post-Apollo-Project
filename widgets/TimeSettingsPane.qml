@@ -4,7 +4,7 @@ import qs.services.time
 import "../components"
 
 // Settings UI only. All mutations are delegated to one reusable service.
-// No duplicate clock, timezone engine, config writer, or background sync.
+// No duplicate clock, timezone engine, or privileged host correction path.
 Item {
     id: pane
     property bool panelVisible: visible
@@ -20,14 +20,40 @@ Item {
     property bool showHostDiagnostics: true
     property bool showResyncDiagnostics: true
     property bool showReferenceExplanation: true
+    // Clock owns the schedule control; shared CPU++ basics remain unchanged.
+    property bool showAutoTimeCheck: showClockPreview
+    // "all" preserves shared CPU++ behavior; Clock selects visual or sync.
+    property string settingsSection: "all" // all | visual | sync
+    property bool dockFormatAvailable: false
+    property bool dock24Hour: false
+    signal dockFormatRequested(bool use24)
     property bool zonePickerExpanded: false
-    readonly property bool zoneSearchFocused: systemZonePicker.searchFocused
+    readonly property bool zoneSearchFocused:
+        systemZonePicker.searchFocused || compactSettings.zoneSearchFocused
+
+    TimeSettingsCompact {
+        id: compactSettings
+        anchors.fill: parent
+        visible: pane.settingsSection !== "all"
+        settingsSection: pane.settingsSection
+        calibratedPreview: pane.calibratedPreview
+        dock24Hour: pane.dock24Hour
+        dockFormatAvailable: pane.dockFormatAvailable
+        onDockFormatRequested: function(use24) {
+            pane.dockFormatRequested(use24);
+        }
+    }
 
     Flickable {
         id: scroll
+        visible: pane.settingsSection === "all"
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        // Let the dial own its scroll wheel and drag gestures. Return normal
+        // menu scrolling as soon as the pointer leaves the dial.
+        interactive: !(pane.showAutoTimeCheck && autoCheckDial.interactive
+                       && (autoCheckDial.pointerOverDial || autoCheckDial.dragging))
         contentWidth: width
         contentHeight: Math.max(height, body.y + body.implicitHeight + 8)
 
@@ -37,6 +63,12 @@ Item {
             y: 3
             width: Math.max(0, scroll.width - 8)
             spacing: 12
+
+            Column {
+                id: visualSettingsContent
+                width: parent.width
+                spacing: 12
+                visible: pane.settingsSection !== "sync"
 
             GohuText {
                 text: "DISPLAY // LOCAL CALIBRATION"
@@ -57,6 +89,37 @@ Item {
                 font.pixelSize: 12
                 color: Colors.cyan
             }
+            Row {
+                width: parent.width
+                height: visible ? 34 : 0
+                spacing: 6
+                visible: pane.showClockPreview && pane.dockFormatAvailable
+                GohuText {
+                    width: Math.max(0, parent.width - 132 - 2 * parent.spacing)
+                    height: parent.height
+                    verticalAlignment: Text.AlignVCenter
+                    text: "DOCK // FORMAT"
+                    color: Colors.cyan
+                    font.pixelSize: 11
+                }
+                TimeActionButton {
+                    actionRole: "time"
+                    width: 66
+                    height: 32
+                    label: "12H"
+                    selected: !pane.dock24Hour
+                    onLeftClicked: pane.dockFormatRequested(false)
+                }
+                TimeActionButton {
+                    actionRole: "time"
+                    width: 66
+                    height: 32
+                    label: "24H"
+                    selected: pane.dock24Hour
+                    onLeftClicked: pane.dockFormatRequested(true)
+                }
+            }
+
             GohuText {
                 width: parent.width
                 wrapMode: Text.WordWrap
@@ -66,22 +129,25 @@ Item {
             }
 
             Row {
+                id: fullOffsetControls
                 width: parent.width
                 height: 33
                 spacing: 4
 
                 Repeater {
                     model: [
+                        { label: "-1H", delta: -3600000 },
                         { label: "-1M", delta: -60000 },
                         { label: "-1S", delta: -1000 },
                         { label: "RESET", delta: 0, reset: true },
                         { label: "+1S", delta: 1000 },
-                        { label: "+1M", delta: 60000 }
+                        { label: "+1M", delta: 60000 },
+                        { label: "+1H", delta: 3600000 }
                     ]
                     TimeActionButton {
                         required property var modelData
                         actionRole: modelData.reset ? "cancel" : "time"
-                        width: (scroll.width - 8 - 16) / 5
+                        width: (fullOffsetControls.width - 6 * fullOffsetControls.spacing) / 7
                         height: 32
                         label: modelData.label
                         labelPixelSize: 9
@@ -311,6 +377,14 @@ Item {
                 color: Colors.orange
                 font.pixelSize: 11
             }
+            }
+
+            Column {
+                id: syncSettingsContent
+                width: parent.width
+                spacing: 12
+                visible: pane.settingsSection !== "visual"
+
             GohuText {
                 width: parent.width
                 visible: pane.showHostDiagnostics
@@ -350,9 +424,162 @@ Item {
                 opacity: 0.6
             }
 
+            // Shared Radio/Git encoder, opt-in bounded hourly ratchet.
+            // Range is 1..168 hours (one week), with exact day landmarks.
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: pane.showAutoTimeCheck
+                GohuText {
+                    width: parent.width
+                    text: "AUTO // REFERENCE CHECK INTERVAL"
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                }
+                Row {
+                    width: parent.width
+                    height: 166
+                    spacing: 6
+                    SelectorDial {
+                        id: autoCheckDial
+                        width: 136
+                        height: 160
+                        labelText: "INTERVAL"
+                        selectorMode: "continuous"
+                        minimumValue: 1
+                        maximumValue: 168
+                        valueStep: 1
+                        valueDecimals: 0
+                        snapContinuousToStep: true
+                        numericDetentInterval: 6
+                        numericDetentOrigin: 0
+                        showNumericDetentTicks: true
+                        options: ["1H", "1D", "2D", "3D", "4D", "5D", "6D", "7D"]
+                        numericReferenceValues: [1, 24, 48, 72, 96, 120, 144, 168]
+                        currentValue: TimeSettings.autoCheckIntervalHours
+                        readoutText: Math.round(previewNumericValue) + "H"
+                        accentColor: Colors.cyan
+                        markerColor: Colors.orange
+                        interactive: TimeSettings.autoCheckCanEdit
+                        onValueRequested: function(hours) {
+                            TimeSettings.setAutoCheckIntervalHours(Math.round(hours));
+                        }
+                    }
+                    Column {
+                        width: Math.max(0, parent.width - autoCheckDial.width - parent.spacing)
+                        spacing: 8
+                        GohuText {
+                            width: parent.width
+                            text: "EVERY // " + TimeSettings.autoCheckIntervalHours + " HOURS"
+                            color: Colors.yellow
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "MAX // 168H // 7 DAYS"
+                            color: Colors.white
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
+                        Row {
+                            width: parent.width
+                            height: 34
+                            spacing: 6
+                            TimeActionButton {
+                                width: pane.settingsSection === "all"
+                                       ? parent.width : (parent.width - parent.spacing) / 2
+                                height: 34
+                                actionRole: "sync"
+                                label: TimeSettings.autoCheckEnabled
+                                       ? "AUTO CHECK ON" : "AUTO CHECK OFF"
+                                labelPixelSize: 9
+                                selected: TimeSettings.autoCheckEnabled
+                                available: TimeSettings.autoCheckCanEdit
+                                onLeftClicked: {
+                                    TimeSettings.setAutoCheckEnabled(
+                                        !TimeSettings.autoCheckEnabled);
+                                }
+                            }
+                            TimeActionButton {
+                                id: resyncDialButton
+                                width: (parent.width - parent.spacing) / 2
+                                height: 34
+                                visible: pane.settingsSection !== "all"
+                                actionRole: "sync"
+                                label: "⟳ RESYNC"
+                                labelPixelSize: 10
+                                available: pane.showResyncTrigger
+                                           && TimeSettings.resyncStatus !== "working"
+                                           && !TimeSettings.resyncAuthPending
+                                onLeftClicked: TimeSettings.prepareResync()
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "6H DETENTS // NO WRAP"
+                            color: Colors.cyan
+                            font.pixelSize: 9
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "LAST CHECK // "
+                          + (TimeSettings.autoCheckLastAttemptAtMs > 0
+                             ? Qt.formatDateTime(
+                                 new Date(TimeSettings.autoCheckLastAttemptAtMs),
+                                 "yyyy-MM-dd HH:mm")
+                             : "NEVER")
+                    color: Colors.white
+                    font.pixelSize: 10
+                }
+                GohuText {
+                    width: parent.width
+                    text: "NEXT // "
+                          + (!TimeSettings.autoCheckEnabled ? "OFF"
+                             : TimeSettings.autoCheckNextDueAtMs > 0
+                             ? Qt.formatDateTime(
+                                 new Date(TimeSettings.autoCheckNextDueAtMs),
+                                 "yyyy-MM-dd HH:mm")
+                             : "DUE NOW")
+                    color: Colors.white
+                    font.pixelSize: 10
+                }
+                GohuText {
+                    width: parent.width
+                    text: "STATUS // " + TimeSettings.autoCheckResult
+                    color: Colors.yellow
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    visible: TimeSettings.autoCheckErrorCode !== ""
+                    width: parent.width
+                    text: "STORAGE // " + TimeSettings.autoCheckErrorCode
+                    color: Colors.orange
+                    font.pixelSize: 10
+                }
+                GohuText {
+                    width: parent.width
+                    text: "Automatic checks contact configured Chrony/NTP sources while Quickshell is running. They may see your IP. Checks NEVER set Linux time; host NTP maintains automatic correction. One-shot RESYNC still requires confirmation and Polkit."
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 2
+                    color: Colors.cyan
+                    opacity: 0.6
+                }
+            }
+
             Row {
                 width: parent.width
-                height: 32
+                visible: pane.settingsSection === "all"
+                height: visible ? 32 : 0
                 spacing: 6
 
                 GohuText {
@@ -538,7 +765,15 @@ Item {
                 font.pixelSize: 9
                 color: Colors.white
             }
+            }
         }
+    }
+
+    onSettingsSectionChanged: {
+        scroll.contentY = 0;
+        zonePickerExpanded = false;
+        if (settingsSection === "sync" && panelVisible)
+            TimeSettings.refreshHostStatus();
     }
 
     onPanelVisibleChanged: {

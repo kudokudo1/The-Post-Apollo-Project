@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "TimeSettingsPolicy.js" as Policy
+import "TimeAutoCheckPolicy.js" as AutoCheck
 import "WorldZoneSearch.js" as ZoneSearch
 import "WorldFavoritesPolicy.js" as Favorites
 
@@ -27,6 +28,40 @@ Scope {
     property var pendingDocument: null
     property var queuedDocument: null
 
+    // Durable, independent auto-reference preference. Never reuses the
+    // display-calibration v1 document or privileged RESYNC confirmation flow.
+    readonly property string autoCheckStoragePath:
+        Quickshell.dataDir + "/time-auto-check-v1.json"
+    property string autoCheckStorageState: "loading"
+    property string autoCheckErrorCode: ""
+    property var autoCheckDocument: AutoCheck.initialDocument()
+    property var autoCheckPendingDocument: null
+    property var autoCheckQueuedDocument: null
+    property double autoLastStartedAtMs: 0
+    // One reload-trigger per instantiated Quickshell service, not per save.
+    property bool autoCheckReloadHandled: false
+    property bool autoCheckOpenPendingWhileLoading: false
+    property bool autoCheckInFlight: false
+    property bool autoCheckResultSeen: false
+    property bool autoCheckExited: false
+    property bool autoCheckExitOk: false
+    property string autoCheckResult: "NO AUTOMATIC MEASUREMENT"
+    readonly property bool autoCheckEnabled:
+        !!autoCheckDocument.enabled
+    readonly property int autoCheckIntervalHours:
+        Number(autoCheckDocument.intervalHours || 6)
+    readonly property bool autoCheckOnReload:
+        autoCheckDocument.checkOnReload !== false
+    readonly property bool autoCheckOnClockOpen:
+        autoCheckDocument.checkOnClockOpen !== false
+    readonly property double autoCheckLastAttemptAtMs:
+        Math.max(autoLastStartedAtMs, Number(autoCheckDocument.lastAttemptAtMs || 0))
+    readonly property double autoCheckNextDueAtMs:
+        AutoCheck.nextDueAtMs(autoCheckDocument, autoLastStartedAtMs)
+    readonly property bool autoCheckCanEdit:
+        autoCheckStorageState === "ready" || autoCheckStorageState === "empty"
+        || autoCheckStorageState === "saving"
+
     readonly property int displayOffsetMs:
         queuedDocument !== null ? Number(queuedDocument.displayOffsetMs)
         : pendingDocument !== null ? Number(pendingDocument.displayOffsetMs)
@@ -49,6 +84,9 @@ Scope {
     property double referenceUncertaintyMs: 0
     property string referenceSource: "NONE"
     property double referenceCheckedAtMs: 0
+    // Tracks manual checks and post-RESYNC verification as well as AUTO.
+    // This is session-only; automatic attempts also have a durable timestamp.
+    property double referenceLastAttemptAtMs: 0
     property bool postResyncVerificationPending: false
     readonly property int referenceMaxAgeMs: 15 * 60 * 1000
     readonly property int referenceWarningThresholdMs: 1000
@@ -171,11 +209,141 @@ Scope {
         referenceCheckedAtMs = 0;
         referenceUncertaintyMs = 0;
         referenceSource = "NONE";
+        referenceLastAttemptAtMs = Date.now();
         referenceProcess.exec([
             "python3", "-B", "-I",
             Quickshell.shellPath("services/time/TimeHostControl.py"), "measure"
         ]);
         return true;
+    }
+
+    function writeAutoCheck(next) {
+        autoCheckPendingDocument = next;
+        autoCheckStorageState = "saving";
+        autoCheckFile.setText(JSON.stringify(next, null, 2) + "\n");
+    }
+
+    function saveAutoCheck(next) {
+        if (!autoCheckCanEdit)
+            return false;
+        if (autoCheckPendingDocument !== null)
+            autoCheckQueuedDocument = next;
+        else
+            writeAutoCheck(next);
+        return true;
+    }
+
+    function setAutoCheckEnabled(enabled) {
+        if (!autoCheckCanEdit || typeof enabled !== "boolean")
+            return false;
+        const base = autoCheckQueuedDocument || autoCheckPendingDocument
+                     || autoCheckDocument;
+        const next = AutoCheck.withSchedule(base, enabled, base.intervalHours);
+        if (!next.ok)
+            return false;
+        return saveAutoCheck(next.document);
+    }
+
+    function setAutoCheckIntervalHours(hours) {
+        if (!autoCheckCanEdit)
+            return false;
+        const base = autoCheckQueuedDocument || autoCheckPendingDocument
+                     || autoCheckDocument;
+        const next = AutoCheck.withSchedule(base, base.enabled, Number(hours));
+        if (!next.ok)
+            return false;
+        return saveAutoCheck(next.document);
+    }
+
+    function setAutoCheckTrigger(name, enabled) {
+        if (!autoCheckCanEdit || typeof enabled !== "boolean")
+            return false;
+        const base = autoCheckQueuedDocument || autoCheckPendingDocument
+                     || autoCheckDocument;
+        const next = AutoCheck.withTrigger(base, name, enabled);
+        if (!next.ok)
+            return false;
+        return saveAutoCheck(next.document);
+    }
+
+    function checkOnClockOpened() {
+        if (autoCheckStorageState === "loading") {
+            autoCheckOpenPendingWhileLoading = true;
+            return false;
+        }
+        return maybeAutoCheckTime("clock-open");
+    }
+
+    function maybeAutoCheckTime(trigger) {
+        const reason = trigger || "interval";
+        // Use the latest accepted edit, so a toggle immediately suppresses
+        // its trigger even while its atomic save is still in flight.
+        const active = autoCheckQueuedDocument || autoCheckPendingDocument
+                       || autoCheckDocument;
+        if (!autoCheckCanEdit || !AutoCheck.triggerEnabled(active, reason)
+                || autoCheckInFlight || referenceChecking || authSessionActive
+                || resyncAuthPending || resyncProcess.running)
+            return false;
+        const now = Date.now();
+        if (!AutoCheck.canStartAutomaticCheck(active, reason, now,
+                                              autoLastStartedAtMs,
+                                              referenceLastAttemptAtMs))
+            return false;
+        if (!checkTimeAccuracy())
+            return false;
+        autoLastStartedAtMs = now;
+        autoCheckInFlight = true;
+        autoCheckResultSeen = false;
+        autoCheckExited = false;
+        autoCheckExitOk = false;
+        autoCheckResult = "CHECKING // " + reason.toUpperCase()
+                          + " // CONFIGURED CHRONY REFERENCE";
+        const next = AutoCheck.withAttempt(active, now);
+        if (next.ok && !saveAutoCheck(next.document))
+            autoCheckErrorCode = "SCHEDULE_NOT_SAVED";
+        return true;
+    }
+
+    function completeAutoReferenceIfReady() {
+        if (!autoCheckInFlight || !autoCheckExited
+                || (!autoCheckResultSeen && autoCheckExitOk))
+            return;
+        autoResultDeadline.stop();
+        autoCheckInFlight = false;
+        // Keep the measured deviation and its uncertainty visible instead
+        // of repeating an uninformative OUT OF SYNC label on every open.
+        // No second Chrony request is made to format a cached result.
+        const offset = (referenceOffsetMs / 1000).toFixed(3) + "S";
+        const uncertainty = (referenceUncertaintyMs / 1000).toFixed(3) + "S";
+        autoCheckResult = !autoCheckExitOk
+                          || referenceStatus !== "measured"
+                          ? "UNAVAILABLE // " + referenceMessage
+                          : referenceIsOutOfSync(Date.now())
+                          ? "OUT OF SYNC // OFFSET " + offset
+                            + " // UNCERTAINTY " + uncertainty
+                          : "MEASURED // OFFSET " + offset
+                            + " // UNCERTAINTY " + uncertainty;
+    }
+
+    Timer {
+        // A minute-level wakeup avoids a week-long timer being lost to reload.
+        // Last attempt is saved separately to survive Quickshell restarts.
+        interval: 60 * 1000
+        running: true
+        repeat: true
+        onTriggered: timeSettings.maybeAutoCheckTime()
+    }
+
+    Timer {
+        id: autoResultDeadline
+        interval: 3000
+        repeat: false
+        onTriggered: {
+            if (timeSettings.autoCheckInFlight) {
+                timeSettings.autoCheckExitOk = false;
+                timeSettings.completeAutoReferenceIfReady();
+            }
+        }
     }
 
     property var hostInfo: ({ status: "unavailable", timezone: "UNKNOWN",
@@ -634,6 +802,76 @@ Scope {
     }
 
     FileView {
+        id: autoCheckFile
+        path: timeSettings.autoCheckStoragePath
+        watchChanges: false
+        atomicWrites: true
+        blockWrites: false
+        printErrors: false
+
+        onLoaded: {
+            if (timeSettings.autoCheckStorageState === "saving")
+                return;
+            const parsed = AutoCheck.parse(autoCheckFile.text());
+            if (!parsed.ok) {
+                timeSettings.autoCheckStorageState =
+                    parsed.reason === "UNSUPPORTED_VERSION" ? "unsupported" : "error";
+                timeSettings.autoCheckErrorCode = parsed.reason;
+                return;
+            }
+            timeSettings.autoCheckDocument = parsed.document;
+            timeSettings.autoCheckStorageState = "ready";
+            timeSettings.autoCheckErrorCode = "";
+            if (!timeSettings.autoCheckReloadHandled) {
+                timeSettings.autoCheckReloadHandled = true;
+                Qt.callLater(function() {
+                    if (timeSettings.autoCheckOpenPendingWhileLoading) {
+                        timeSettings.autoCheckOpenPendingWhileLoading = false;
+                        timeSettings.checkOnClockOpened();
+                    }
+                    // Trigger once per Quickshell service load. The standard
+                    // due check remains active independently of this toggle.
+                    timeSettings.maybeAutoCheckTime("reload");
+                    timeSettings.maybeAutoCheckTime();
+                });
+            } else {
+                Qt.callLater(timeSettings.maybeAutoCheckTime);
+            }
+        }
+        onLoadFailed: function(error) {
+            if (timeSettings.autoCheckStorageState === "saving")
+                return;
+            timeSettings.autoCheckStorageState =
+                error === FileViewError.FileNotFound ? "empty" : "error";
+            timeSettings.autoCheckErrorCode =
+                error === FileViewError.FileNotFound ? "" : "SCHEDULE_LOAD_FAILED";
+        }
+        onSaved: {
+            if (timeSettings.autoCheckStorageState !== "saving"
+                    || timeSettings.autoCheckPendingDocument === null)
+                return;
+            const saved = timeSettings.autoCheckPendingDocument;
+            const queued = timeSettings.autoCheckQueuedDocument;
+            timeSettings.autoCheckDocument = saved;
+            timeSettings.autoCheckPendingDocument = null;
+            timeSettings.autoCheckQueuedDocument = null;
+            timeSettings.autoCheckErrorCode = "";
+            if (queued !== null && JSON.stringify(queued) !== JSON.stringify(saved))
+                timeSettings.writeAutoCheck(queued);
+            else {
+                timeSettings.autoCheckStorageState = "ready";
+                Qt.callLater(timeSettings.maybeAutoCheckTime);
+            }
+        }
+        onSaveFailed: function(error) {
+            timeSettings.autoCheckPendingDocument = null;
+            timeSettings.autoCheckQueuedDocument = null;
+            timeSettings.autoCheckStorageState = "error";
+            timeSettings.autoCheckErrorCode = "SCHEDULE_SAVE_FAILED";
+        }
+    }
+
+    FileView {
         id: settingsFile
         path: timeSettings.storagePath
         watchChanges: false
@@ -736,6 +974,10 @@ Scope {
                     timeSettings.referenceStatus = "unavailable";
                     timeSettings.referenceMessage = "REFERENCE RESULT INVALID";
                 }
+                if (timeSettings.autoCheckInFlight) {
+                    timeSettings.autoCheckResultSeen = true;
+                    timeSettings.completeAutoReferenceIfReady();
+                }
             }
         }
         onExited: function(code, exitStatus) {
@@ -743,6 +985,13 @@ Scope {
             if (code !== 0) {
                 timeSettings.referenceStatus = "unavailable";
                 timeSettings.referenceMessage = "REFERENCE PROCESS FAILED";
+            }
+            if (timeSettings.autoCheckInFlight) {
+                timeSettings.autoCheckExited = true;
+                timeSettings.autoCheckExitOk = code === 0;
+                timeSettings.completeAutoReferenceIfReady();
+                if (timeSettings.autoCheckInFlight)
+                    autoResultDeadline.restart();
             }
         }
     }

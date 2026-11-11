@@ -15,6 +15,12 @@ Rectangle {
 
     // Optional WEATHER subject route. Empty keeps the exact CLASSIC page.
     property string subjectRoute: ""
+    // W9 // Only the main WEATHER screen uses these fixed instrument pages.
+    // Original forecast artwork, current metrics and deep links stay intact.
+    property string weatherFocus: ""
+    readonly property real focusedContentHeight:
+        skyContent.y + skyContent.implicitHeight + 12
+    readonly property alias visualScroll: skyScroll
     // M30-A overview consumes the existing SKY observation service without
     // rendering a second complete scroll surface. CLASSIC defaults unchanged.
     property bool sourceOnly: false
@@ -27,6 +33,13 @@ Rectangle {
     readonly property var eclipseObservation: eclipseService
     readonly property var issObservation: issPassService
     function sectionVisible(section) {
+        if (subjectRoute === "weather/conditions/current"
+                && weatherFocus !== "") {
+            if (section === "header") return true;
+            if (weatherFocus === "now")
+                return section === "current" || section === "atmosphere";
+            return section === weatherFocus;
+        }
         return SubjectPanelPolicy.visibleFor("sky",subjectRoute,section)
             || CosmosPanelPolicy.visibleFor("sky",subjectRoute,section);
     }
@@ -34,6 +47,9 @@ Rectangle {
     onSubjectRouteChanged: {
         if (skyScroll)
             skyScroll.contentY = 0;
+    }
+    onWeatherFocusChanged: {
+        if (skyScroll) skyScroll.contentY = 0;
     }
 
     property var weatherService: null
@@ -586,6 +602,8 @@ Rectangle {
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        // W9 // Fixed main WEATHER screens do not expose vertical scrolling.
+        interactive: sky.weatherFocus === ""
         contentWidth: width
         contentHeight: Math.max(height, skyContent.y + skyContent.implicitHeight + 12)
 
@@ -641,6 +659,19 @@ Rectangle {
                 font.pixelSize: 12
                 color: sky.weatherReady ? Colors.cyan : Colors.orange
             }
+        }
+
+        // W8 // One compact instrument leads both the full WEATHER terminal
+        // and the OVERVIEW. Detailed current/air and original forecast artwork
+        // below are sourced by this same StationSky and shared weatherService.
+        StationWeatherTerminalSummary {
+            objectName: "weather-w8-full-terminal-summary"
+            visible: sky.subjectRoute === "weather/conditions/current"
+                     && sky.weatherFocus === ""
+            width: skyContent.width
+            height: visible ? 164 : 0
+            compact: false
+            weatherService: sky.weatherService
         }
 
         // SUN keeps local solar geometry, and offers the physical solar
@@ -3609,5 +3640,6 @@ Rectangle {
         handleStyle: "star"
         geometryHost: sky
         visible: !sky.sourceOnly && scrollable
+                 && sky.weatherFocus === ""
     }
 }

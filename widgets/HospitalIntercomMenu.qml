@@ -186,6 +186,13 @@ Rectangle {
                 submitRequested
             );
         }
+        function onLiveTextReady(text) {
+            root.acceptVoiceTranscript(text, false);
+        }
+        function onTranscriptionFinished(submitRequested) {
+            if (submitRequested)
+                root.sendCurrent();
+        }
     }
 
     onVisibleChanged: {
@@ -534,9 +541,13 @@ Rectangle {
 
             verticalAlignment: TextInput.AlignVCenter
             clip: true
-            color: Colors.white
+            color: Colors.magenta
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
+            cursorDelegate: Rectangle {
+                width: 2
+                color: Colors.orange
+            }
             font.pixelSize: 11
             enabled:
                 !root.speechInputService.stopping
@@ -617,7 +628,7 @@ Rectangle {
         anchors {
             right: micButton.left
             top: transcriptFrame.bottom
-            rightMargin: 6
+            rightMargin: 4
             topMargin: 8
         }
 
@@ -694,57 +705,34 @@ Rectangle {
     Rectangle {
         id: micButton
 
+        readonly property bool voiceSelected: root.speechInputService.busy
+
         anchors {
             right: voiceCancelButton.left
             top: transcriptFrame.bottom
-            rightMargin: voiceCancelButton.visible ? 6 : 0
+            // Always leave a gap to SEND even when CANCEL has zero width.
+            rightMargin: 6
             topMargin: 8
         }
 
         width: 42
         height: 42
-        color:
-            micMouse.pressed
-            ? Colors.black
-            : Colors.dark
-        border.width:
-            root.speechInputService.recording
-            || micMouse.containsMouse
-            ? 2 : 1
-        border.color:
-            root.speechInputService.recording
-            ? Colors.omnitrix
-            : root.speechInputService.stopping
-              || root.speechInputService.transcribing
-            ? Colors.orange
-            : micMouse.containsMouse
-            ? Colors.orange
-            : Colors.omnitrix
+        color: micButton.voiceSelected ? Colors.yellow : Colors.dark
+        border.width: micButton.voiceSelected || micMouse.containsMouse ? 2 : 1
+        border.color: micButton.voiceSelected ? Colors.magenta
+            : micMouse.containsMouse ? Colors.orange : Colors.omnitrix
 
         RectangularShadow {
             anchors.fill: parent
             spread: 4
             z: -1
-            opacity:
-                root.speechInputService.stopping
-                  || root.speechInputService.transcribing
-                ? 0.24
-                : micMouse.containsMouse
-                ? 0.48 : 0.34
-            color:
-                root.speechInputService.stopping
-                  || root.speechInputService.transcribing
-                ? Colors.orange
-                : micMouse.containsMouse
-                ? Colors.orange
-                : Colors.omnitrix
+            opacity: micButton.voiceSelected ? 0.55
+                : micMouse.containsMouse ? 0.48 : 0.34
+            color: micButton.voiceSelected ? Colors.magenta
+                : micMouse.containsMouse ? Colors.orange : Colors.omnitrix
         }
 
-        opacity:
-            root.speechInputService.stopping
-            || root.speechInputService.transcribing
-            ? 0.55
-            : root.speechInputService.backendReady
+        opacity: micButton.voiceSelected || root.speechInputService.backendReady
             ? 1.0 : 0.48
 
         GohuText {
@@ -752,12 +740,8 @@ Rectangle {
             anchors.verticalCenterOffset: 1
             text: "🗣︎"
             font.pixelSize: 22
-            color:
-                root.speechInputService.recording
-                ? Colors.omnitrix
-                : micMouse.containsMouse
-                ? Colors.orange
-                : Colors.omnitrix
+            color: micButton.voiceSelected ? Colors.magenta
+                : micMouse.containsMouse ? Colors.orange : Colors.omnitrix
         }
 
         MouseArea {

@@ -46,6 +46,8 @@ PanelWindow {
     // Presentation choice is local to TimeW; it does not change the Clock
     // dock or Hub preference. The Hub helper is pure and owns no clock tick.
     property bool use24Hour: true
+    // Shell provides the actual dock Clock instance for the 12/24H switch.
+    property var dockClock: null
     // Keep raw system time unchanged for Hub / legacy TimeW contracts.
     readonly property var localTimeSnapshot:
         LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)
@@ -398,6 +400,7 @@ PanelWindow {
         && !countdownHoursField.activeFocus
         && !countdownMinutesField.activeFocus
         && !countdownSecondsField.activeFocus
+        && !alarmPlaceholderPane.editingActive
         && !machineMarkerInput.activeFocus
         && !converterDateInput.activeFocus && !converterTimeInput.activeFocus
     property string worldLookupZone: ""
@@ -519,6 +522,7 @@ PanelWindow {
 
     // TOOLS subview selection is local and does not affect the other modes.
     property string toolsView: "stopwatch"
+    property string settingsView: "visual"
 
     // COUNTDOWN // up to eight independent, named session-local timers.
     // One monotonic ElapsedTimer supplies timestamps for all records.
@@ -830,6 +834,35 @@ PanelWindow {
     }
     readonly property string machineUtcNow:
         MachineTimelinePolicy.utcStamp(localClock.date.getTime())
+
+    // MACHINE: operator-pasted, tab-count-only recognition hint.
+    // No browser IPC into the widget, no verified Sway link, no checkpoint write.
+    property string machineBraveTabDraft: ""
+    readonly property var machineBraveTabCountsPreview:
+        machineParseBraveTabCounts(machineBraveTabDraft)
+
+    function machineParseBraveTabCounts(text) {
+        if (typeof text !== "string" || text.length > 256)
+            return null;
+        const raw = text.trim();
+        if (!raw.length)
+            return [];
+        const parts = raw.split(/\s*\/\/\s*/);
+        if (parts.length > 64)
+            return null;
+        let total = 0;
+        const counts = [];
+        for (const part of parts) {
+            if (!/^(0|[1-9]\d{0,3})$/.test(part))
+                return null;
+            const n = Number(part);
+            if (n > 2048 || total + n > 8192)
+                return null;
+            total += n;
+            counts.push(n);
+        }
+        return counts;
+    }
 
     // MACHINE v2: SAVE captures and persists without a preview prerequisite.
     // CUSTOMIZE is a separate explicit, capture-bound inspection transaction.
@@ -1886,6 +1919,21 @@ PanelWindow {
         menuOpen = !menuOpen;
     }
 
+    function openNotificationAlarm(alarmId) {
+        // Resolve against saved alarm IDs. Do not create an alarm, interpret
+        // notification titles, or discard a different alarm's unsaved note.
+        if (!Number.isSafeInteger(alarmId) || alarmId <= 0
+                || !AlarmManagerService.findAlarm(alarmId))
+            return false;
+        if (!alarmPlaceholderPane.choose(alarmId))
+            return false;
+        chooseMode(2); // Existing TOOLS tab; ALARM subview is its owner.
+        toolsView = "alarm";
+        if (!menuOpen)
+            menuOpen = true;
+        return true;
+    }
+
     function chooseMode(index) {
         if (index >= 0 && index < modes.length) {
             selectedModeIndex = index;
@@ -1914,6 +1962,9 @@ PanelWindow {
             dismissResyncPopup();
         }
         if (menuOpen) {
+            // Actual Clock opening (dock or keyboard), never on close.
+            // Runs only when the saved AUTO master and CLOCK OPEN option allow.
+            TimeSettings.checkOnClockOpened();
             Qt.callLater(restoreKeyboardFocus);
             if (selectedMode === "tools") {
                 refreshStopwatch();
@@ -3450,7 +3501,9 @@ PanelWindow {
                         ModeButton {
                             width: (calcSubModeStrip.width - calcSubModeStrip.spacing) / 2
                             height: parent.height
-                            bordered: false
+                            bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                             textOnly: true
                             labelText: "CONVERT"
                             labelFontSize: 11
@@ -3462,7 +3515,9 @@ PanelWindow {
                         ModeButton {
                             width: (calcSubModeStrip.width - calcSubModeStrip.spacing) / 2
                             height: parent.height
-                            bordered: false
+                            bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                             textOnly: true
                             labelText: "MATH"
                             labelFontSize: 11
@@ -3916,7 +3971,9 @@ PanelWindow {
                             ModeButton {
                                 width: (mathTypeStrip.width - mathTypeStrip.spacing) / 2
                                 height: parent.height
-                                bordered: false
+                                bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                                 textOnly: true
                                 labelText: "ADD / SUB"
                                 labelFontSize: 11
@@ -3927,7 +3984,9 @@ PanelWindow {
                             ModeButton {
                                 width: (mathTypeStrip.width - mathTypeStrip.spacing) / 2
                                 height: parent.height
-                                bordered: false
+                                bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                                 textOnly: true
                                 labelText: "BETWEEN"
                                 labelFontSize: 11
@@ -4429,9 +4488,11 @@ PanelWindow {
 
                         ModeButton {
                             width: (toolsSubModeStrip.width
-                                    - toolsSubModeStrip.spacing) / 2
+                                    - toolsSubModeStrip.spacing * 2) / 3
                             height: parent.height
-                            bordered: false
+                            bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                             textOnly: true
                             labelText: "STOPWATCH"
                             labelFontSize: 11
@@ -4445,9 +4506,11 @@ PanelWindow {
 
                         ModeButton {
                             width: (toolsSubModeStrip.width
-                                    - toolsSubModeStrip.spacing) / 2
+                                    - toolsSubModeStrip.spacing * 2) / 3
                             height: parent.height
-                            bordered: false
+                            bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
                             textOnly: true
                             labelText: "COUNTDOWN"
                             labelFontSize: 11
@@ -4458,6 +4521,35 @@ PanelWindow {
                                 timew.refreshCountdowns();
                             }
                         }
+
+                        ModeButton {
+                            width: (toolsSubModeStrip.width
+                                    - toolsSubModeStrip.spacing * 2) / 3
+                            height: parent.height
+                            bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
+                            textOnly: true
+                            labelText: "ALARM"
+                            labelFontSize: 11
+                            idlePrimaryColor: timew.semanticColor
+                            selected: timew.toolsView === "alarm"
+                            onTriggered: timew.toolsView = "alarm"
+                        }
+                    }
+
+                    AlarmManagerPane {
+                        id: alarmPlaceholderPane
+                        visible: timew.selectedMode === "tools"
+                                 && timew.toolsView === "alarm"
+                        width: parent.width
+                        // Same bounded content budget as the other TIMEW
+                        // secondary screens. Never size the pane from its
+                        // full editor/list content.
+                        // Reserve space for PREVIOUS/NEXT in the shared
+                        // bottom TimeW footer, outside the alarm list.
+                        height: Math.max(0, 505 - toolsSubModeStrip.height
+                                        - parent.spacing - 24)
                     }
 
                     Column {
@@ -5188,6 +5280,62 @@ PanelWindow {
                             width: parent.width
                             text: "GEOMETRY SAVE // BROWSER TABS + EXACT RESTORE STILL IN DEVELOPMENT"
                             color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+
+                        // Manually copy the browser-side signature here if desired.
+                        // This is a visual hint only, never a Sway window match,
+                        // a stored tab list, or a prerequisite to SAVE/RESTORE.
+                        GohuText {
+                            width: parent.width
+                            text: "BRAVE // TAB COUNT PREVIEW"
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                        }
+                        TextField {
+                            id: machineBraveTabInput
+                            width: parent.width
+                            height: 32
+                            maximumLength: 256
+                            text: timew.machineBraveTabDraft
+                            placeholderText: "PASTE COUNT PATTERN // 2 // 5 // 6"
+                            color: Colors.magenta
+                            placeholderTextColor: Colors.cyan
+                            selectionColor: Colors.magenta
+                            selectedTextColor: Colors.black
+                            font.family: "GohuFont 11 Nerd Font Mono"
+                            font.pixelSize: 11
+                            leftPadding: 8
+                            rightPadding: 8
+                            cursorDelegate: Rectangle {
+                                width: 2
+                                color: Colors.orange
+                            }
+                            background: Rectangle {
+                                color: Colors.black
+                                border.width: 1
+                                border.color: machineBraveTabInput.activeFocus
+                                              ? Colors.magenta : Colors.cyan
+                            }
+                            onTextEdited: timew.machineBraveTabDraft = text
+                        }
+                        MachineBraveTabPattern {
+                            width: parent.width
+                            counts: timew.machineBraveTabCountsPreview || []
+                            labelColor: Colors.cyan
+                            separatorColor: Colors.white
+                            numberColor: Colors.orange
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineBraveTabCountsPreview === null
+                                  ? "INVALID COUNTS // USE 2 // 5 // 6"
+                                  : timew.machineBraveTabCountsPreview.length > 0
+                                    ? "BROWSER LIST ORDER // UNLINKED // NOT SAVED"
+                                    : "NO BRAVE COUNTS ENTERED // UNLINKED"
+                            color: timew.machineBraveTabCountsPreview === null
+                                   ? Colors.orange : Colors.cyan
                             font.pixelSize: 10
                             wrapMode: Text.Wrap
                         }
@@ -6813,12 +6961,54 @@ PanelWindow {
                         }
                     }
 
+                    Row {
+                        id: settingsSubModeStrip
+                        visible: timew.selectedMode === "settings"
+                        width: parent.width
+                        height: 34
+                        spacing: 6
+                        ModeButton {
+                            width: (settingsSubModeStrip.width - settingsSubModeStrip.spacing) / 2
+                            height: parent.height
+                            bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
+                            textOnly: true
+                            labelText: "VISUAL TIME"
+                            labelFontSize: 11
+                            idlePrimaryColor: timew.semanticColor
+                            selected: timew.settingsView === "visual"
+                            onTriggered: timew.settingsView = "visual"
+                        }
+                        ModeButton {
+                            width: (settingsSubModeStrip.width - settingsSubModeStrip.spacing) / 2
+                            height: parent.height
+                            bordered: true
+                            // The open submode follows the shared magenta halo.
+                            perimeterGlowColor: selected ? Colors.magenta : Colors.orange
+                            textOnly: true
+                            labelText: "SYNC"
+                            labelFontSize: 11
+                            idlePrimaryColor: timew.semanticColor
+                            selected: timew.settingsView === "sync"
+                            onTriggered: timew.settingsView = "sync"
+                        }
+                    }
+
                     TimeSettingsPane {
                         id: clockSettingsPane
                         width: parent.width
-                        height: 505
+                        height: 505 - settingsSubModeStrip.height - parent.spacing
                         visible: timew.selectedMode === "settings"
+                        settingsSection: timew.settingsView
+                        showResyncTrigger: true
                         calibratedPreview: timew.clockReadoutText
+                        dockFormatAvailable: timew.dockClock !== null
+                        dock24Hour: timew.dockClock ? timew.dockClock.is24Hour : false
+                        onDockFormatRequested: function(use24) {
+                            if (timew.dockClock !== null)
+                                timew.dockClock.is24Hour = use24;
+                        }
                     }
 
                     AngelPane {
@@ -6829,6 +7019,43 @@ PanelWindow {
                         currentEpochMs: localClock.date.getTime()
                     }
 
+                    Row {
+                        id: alarmFooterNavigation
+                        visible: timew.selectedMode === "tools"
+                                 && timew.toolsView === "alarm"
+                        width: parent.width
+                        height: 28
+                        spacing: 6
+                        ActionButton {
+                            width: 102
+                            height: parent.height
+                            label: "◀ PREVIOUS"
+                            labelPixelSize: 10
+                            accentColor: Colors.white
+                            available: alarmPlaceholderPane.canStepSelection
+                            onLeftClicked: alarmPlaceholderPane.stepSelection(-1)
+                        }
+                        GohuText {
+                            width: Math.max(0, alarmFooterNavigation.width
+                                            - 204 - 2 * alarmFooterNavigation.spacing)
+                            height: parent.height
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            text: "ALARMS // " + alarmPlaceholderPane.selectionLabel
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                        }
+                        ActionButton {
+                            width: 102
+                            height: parent.height
+                            label: "NEXT ▶"
+                            labelPixelSize: 10
+                            accentColor: Colors.white
+                            available: alarmPlaceholderPane.canStepSelection
+                            onLeftClicked: alarmPlaceholderPane.stepSelection(1)
+                        }
+                    }
+
                     GohuText {
                         // The floating result sheet owns this space while it
                         // is open; the footer must not overlap its entries.
@@ -6836,6 +7063,8 @@ PanelWindow {
                                    && timew.worldSearchPopupOpen)
                                  && !(timew.selectedMode === "calc"
                                       && timew.activeConverterDropdown !== "")
+                                 && !(timew.selectedMode === "tools"
+                                      && timew.toolsView === "alarm")
                         text: timew.selectedMode === "clock"
                               ? "LOCAL + WORLD // LIVE // CALC HAS CONVERTER"
                               : timew.selectedMode === "calc"
@@ -6843,7 +7072,8 @@ PanelWindow {
                               : timew.selectedMode === "machine"
                               ? "MACHINE // LOCAL CHECKPOINTS"
                               : timew.selectedMode === "settings"
-                              ? "SETTINGS // DISPLAY OFFSET + SYSTEM STATUS"
+                              ? (timew.settingsView === "sync" ? "SETTINGS // REFERENCE + RESYNC"
+                                 : "SETTINGS // VISUAL TIME + TIMEZONE")
                               : timew.selectedMode === "tools"
                               ? "TOOLS // STOPWATCH + COUNTDOWN // MONOTONIC"
                               : "ANGEL // EXPLICIT JOURNAL // LOCAL ONLY"
@@ -6854,19 +7084,20 @@ PanelWindow {
             }
         }
 
-        // Above the mode strip and page; anchored to the ⟳ header control.
-        // The popover calls the same TimeSettings actions as SETTINGS below.
+        // Above the mode strip, directly below the rightmost ⟳ and ×
+        // header controls. Right-align to ×, not to ⟳, so the popup stays
+        // visually attached to the full control pair instead of floating
+        // towards the middle. Outside-click detection maps the actual bounds.
         TimeResyncPopup {
             id: resyncPopup
             z: 100
             visible: timew.menuOpen && timew.resyncPopupOpen
-            x: {
-                const at = syncButton.mapToItem(timewFrame, 0, 0);
-                return Math.max(8, Math.min(timewFrame.width - width - 8,
-                                            at.x + syncButton.width - width));
-            }
-            y: syncButton.mapToItem(timewFrame, 0, 0).y
-               + syncButton.height + 7
+
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+
+            y: closeButton.mapToItem(timewFrame, 0, 0).y + closeButton.height + 25
+
             onCloseRequested: timew.dismissResyncPopup()
         }
     }

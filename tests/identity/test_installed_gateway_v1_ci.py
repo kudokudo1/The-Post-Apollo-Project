@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from unittest.mock import patch
 import pwd
 import secrets
 import shutil
@@ -34,6 +35,9 @@ sys.path.insert(0, str(ROOT / "services" / "identity"))
 
 from desktop_command_gateway_v0 import KernelPeer, COMMAND_SOCKET, _peer
 from desktop_signed_command_client_v0 import SignedIdentityCommandClient
+from installed_command_adapter_v1 import (
+    InstalledIdentityCommandAdapterV1, NativeAdapterRefused,
+)
 from installed_gateway_witness_v1 import (
     DOMAIN, PACKAGE, PREFIX, REQUIRED_FILES, ROLE, SCHEMA, InstalledGatewayWitness,
     WitnessRefused, canonical as installed_canonical,
@@ -286,6 +290,17 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
                 and self.witness.consistent(p)),
         )
 
+    def _strict_adapter(self, *, key=None, origin=None, witness=None,
+                        trust=None, seat=None):
+        return InstalledIdentityCommandAdapterV1(
+            socket_path=self.runtime / COMMAND_SOCKET,
+            pinned_host_public_key=key or self.signer.public_key(),
+            origin_probe=origin if origin is not None else self.origin,
+            installed_witness=witness if witness is not None else self.witness,
+            trusted_server_peer=trust or (lambda peer: peer == self.peer),
+            active_seat=seat or (lambda: True),
+        )
+
     def _signed_denial(self, action):
         nonce = secrets.token_urlsafe(32)
         rid = None if action == "BEGIN" else "CI_NO_LOGIN_REQUEST_01234567"
@@ -444,15 +459,109 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
             witness_signed(mutated)
         self.assertTrue(self.witness.consistent(self.peer))
 
+    def test_f_native_adapter_mandatory_composite_trust_and_revocation(self):
+        # Actual installed signed gateway, not a fake status transport.
+        client = self._strict_adapter()
+        self.assertEqual(client.begin().phase, "UNAVAILABLE")
+        self.assertFalse(client.faulted)
+        self.assertFalse(hasattr(client, "hostAuthenticated"))
+        self.assertFalse(hasattr(client, "canConnectProvider"))
+        # Missing witnesses or a different receipt key cannot construct an
+        # installed-native adapter, even when the caller has a valid socket.
+        for missing in ("origin_probe", "installed_witness",
+                        "trusted_server_peer", "active_seat"):
+            args = dict(
+                socket_path=self.runtime / COMMAND_SOCKET,
+                pinned_host_public_key=self.signer.public_key(),
+                origin_probe=self.origin, installed_witness=self.witness,
+                trusted_server_peer=lambda peer: peer == self.peer,
+                active_seat=lambda: True,
+            )
+            args[missing] = None
+            with self.subTest(missing=missing), self.assertRaises(NativeAdapterRefused):
+                InstalledIdentityCommandAdapterV1(**args)
+        with self.assertRaises(NativeAdapterRefused):
+            self._strict_adapter(key=Ed25519PrivateKey.generate().public_key())
+        # Unlike the experimental primitive, the adapter exposes no optional
+        # bypass switch for installed-origin trust.
+        with self.assertRaises(TypeError):
+            InstalledIdentityCommandAdapterV1(
+                socket_path=self.runtime / COMMAND_SOCKET,
+                pinned_host_public_key=self.signer.public_key(),
+                origin_probe=self.origin, installed_witness=self.witness,
+                trusted_server_peer=lambda peer: True,
+                active_seat=lambda: True,
+                enrolled_origin_consistent=lambda peer: True,
+            )
+        with self.assertRaises(ReceiptRejected):
+            self._strict_adapter(seat=lambda: False).begin()
+        with self.assertRaises(ReceiptRejected):
+            self._strict_adapter(trust=lambda peer: False).begin()
+        # A validly signed package whose independent cgroup witness no longer
+        # matches is not permitted to issue even BEGIN.
+        mismatched = InstalledGatewayWitness(
+            signed_release=self.release,
+            release_signature=self.release_sig,
+            pinned_release_root=self.root.public_key(),
+            minimum_epoch=2, minimum_sequence=7,
+            expected_pid=self.pid, expected_start_ticks=self.ticks,
+            expected_uid=self.uid, expected_gid=self.gid,
+            expected_cgroup=self.cgroup + "-different", expected_lsm=self.lsm,
+            expected_receipt_key_sha256=_key_digest(self.signer),
+            expected_package_file=self.deb,
+        )
+        denied = self._strict_adapter(witness=mismatched)
+        with self.assertRaises(ReceiptRejected):
+            denied.begin()
+        self.assertTrue(denied.faulted)
+        self.assertFalse((self.runtime / "identity-display-v0.sock").exists())
+
+    def test_g_native_adapter_rejects_trust_loss_after_signed_reply(self):
+        # Exercise the real installed service and its signed UNAVAILABLE
+        # response. These gates initially approve the connected peer, then
+        # revoke it during the same transaction before the client can accept
+        # the reply. The native client must fault rather than return a phase.
+        def approve_once():
+            count = [0]
+            def gate(*_args):
+                count[0] += 1
+                return count[0] == 1
+            return gate
+
+        seat_lost = self._strict_adapter(seat=approve_once())
+        with self.assertRaises(ReceiptRejected):
+            seat_lost.begin()
+        self.assertTrue(seat_lost.faulted)
+
+        peer_lost = self._strict_adapter(trust=approve_once())
+        with self.assertRaises(ReceiptRejected):
+            peer_lost.begin()
+        self.assertTrue(peer_lost.faulted)
+
+        # The installed witness is also rechecked after the signed receipt,
+        # rather than trusting a one-time launch-time observation.
+        with patch.object(self.witness, "consistent",
+                          side_effect=[True, False]) as inspect_witness:
+            witness_lost = self._strict_adapter()
+            with self.assertRaises(ReceiptRejected):
+                witness_lost.begin()
+            self.assertTrue(witness_lost.faulted)
+            self.assertEqual(inspect_witness.call_count, 2)
+        self.assertFalse((self.runtime / "identity-display-v0.sock").exists())
+        self.assertTrue(self.witness.consistent(self.peer))
+
     def test_z_restart_and_receipt_key_rotation_require_new_enrollment(self):
         previous_pid = self.pid
         old_witness = self.witness
         old_origin = self.origin
         old_key = self.signer
         old_client = self._client()
+        old_strict_adapter = self._strict_adapter()
         self._stop_service()
         self.assertFalse(old_witness.consistent(self.peer))
-        self.signer = Ed25519PrivateKey.generate()
+        # _refresh_observers is a classmethod: rotate the class-owned signer
+        # used by independent enrollment, not an instance shadow attribute.
+        type(self).signer = Ed25519PrivateKey.generate()
         self._write_signer(self.signer)
         self._start_service("rotated")
         self.assertNotEqual(self.pid, previous_pid)
@@ -463,6 +572,9 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
         self.assertFalse(old_origin.consistent(new_peer))
         with self.assertRaises(ReceiptRejected):
             old_client.begin()
+        with self.assertRaises(ReceiptRejected):
+            old_strict_adapter.begin()
+        self.assertTrue(old_strict_adapter.faulted)
         # New receipt from installed gateway is also rejected by old key,
         # even if an attacker supplies an approval-looking JSON envelope.
         nonce = secrets.token_urlsafe(32)
@@ -483,6 +595,7 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
         self.assertTrue(self.witness.consistent(new_peer))
         self.assertTrue(self.origin.consistent(new_peer))
         self.assertEqual(self._client().begin().phase, "UNAVAILABLE")
+        self.assertEqual(self._strict_adapter().begin().phase, "UNAVAILABLE")
         self.assertFalse((self.runtime / "identity-display-v0.sock").exists())
 
 

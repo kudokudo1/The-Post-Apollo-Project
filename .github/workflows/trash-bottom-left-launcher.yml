@@ -35,10 +35,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+      - name: Install vetted Ed25519 verifier for isolated V2k fixture tests
+        run: python3 -m pip install 'cryptography>=44,<48'
       - name: Verify Trash launcher, scoped GIO adapter, and deletion safeguards
         run: python3 -m unittest discover -s tests/trash -p 'test_*.py' -v
       - name: Verify Camera Cleanup handoff preserves shared queue and authority
         run: node --test tests/trash/test_camera_cleanup_handoff.cjs
+      - name: Verify V2 pilot snapshots require preview, confirmation and owner scope
+        run: node --test tests/trash/test_archive_snapshot_state.cjs
+      - name: Verify capacity bar tracks actual read-only SQLite storage measurements
+        run: node --test tests/trash/test_archive_capacity_bar.cjs
+      - name: Verify on-demand provenance chain audit UI and unsigned result safety
+        run: node --test tests/trash/test_archive_chain_state.cjs
       - name: Verify two-click Burn state machine never deletes on first click
         run: node --test tests/trash/test_burn_copy_two_click.cjs
       - name: Verify managed-bin-only Burn All and unified Trash filters

@@ -71,6 +71,20 @@ try:
     near(bar.property("reservedExtent"), 14, "normal bar reservation")
     near(bar.property("width"), 10, "normal bar viewport width")
     near(bar.property("height"), 140, "vertical track height excluding 5px endpoints")
+    # CPU++ Stage 1: rounded thumb may be shorter without changing its
+    # position mapping or the default appearance of other consumers.
+    assert bar.property("maximumBarHandleHeight") == 0
+    assert inner.setProperty("contentHeight", 300)
+    app.processEvents()
+    assert bar.setProperty("maximumBarHandleHeight", 42)
+    app.processEvents()
+    near(bar.activeHandleExtent(), 42, "bounded rounded thumb")
+    assert bar.setProperty("maximumBarHandleHeight", 0)
+    app.processEvents()
+    near(bar.activeHandleExtent(), 70, "legacy proportional thumb is opt-out")
+    assert inner.setProperty("contentHeight", 600)
+    app.processEvents()
+    near(bar.activeHandleExtent(), 35, "reset after cap check")
     assert bar.property("scrollable") is True
     assert bar.property("visible") is True
     assert outer.property("contentY") == 0

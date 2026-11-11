@@ -19,7 +19,11 @@ SOURCE = SERVICE.read_text(encoding="utf-8")
 
 
 def embedded_pull_script():
-    marker = "pullsProcess.exec(["
+    # The service may wrap the same Bash payload with a single Toolbox
+    # session to prevent one Podman execution per gh fallback.
+    marker = ("pullsProcess.exec(GitHubBatch.wrap("
+              if "pullsProcess.exec(GitHubBatch.wrap(" in SOURCE
+              else "pullsProcess.exec([")
     assert SOURCE.count(marker) == 1, "Pull process contract changed"
     block = SOURCE.split(marker, 1)[1].split('].join("\\n")', 1)[0]
     assert '            [\n' in block, "Expected embedded shell argument array"

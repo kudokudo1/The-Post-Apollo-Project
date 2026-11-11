@@ -5,6 +5,11 @@ Item {
     id: dialRoot
 
     property string labelText: "SELECT"
+    // Shared hardware-label defaults: numeric markings must be readable even
+    // on the smaller Radio navigation encoder. Other dials may override.
+    property int numericLabelPixelSize: 10
+    property int textLabelPixelSize: 8
+    property int readoutPixelSize: 11
     property var options: []
     property var displayOptions: []
     // "discrete" preserves the accepted Git behavior. "continuous" exposes
@@ -23,6 +28,17 @@ Item {
     property real maximumValue: 100
     property real currentValue: 0
     property real valueStep: 1
+    // Opt-in bounded hour-like ratchet, without changing existing dial modes.
+    property bool snapContinuousToStep: false
+    // Optional major detents anchored at numericDetentOrigin, preserving the
+    // true minimum as a separate endpoint (1H then 6H, 12H ... 168H).
+    // A zero interval preserves the existing valueStep behavior.
+    property real numericDetentInterval: 0
+    property real numericDetentOrigin: 0
+    property bool showNumericDetentTicks: false
+    // Exact positions for sparse reference labels such as 24H / 48H / 168H.
+    property var numericReferenceValues: []
+    property real continuousDragRawAngle: -90
     property int valueDecimals: 2
     property int currentIndex: 0
     readonly property real previewNumericValue: selectorMode === "continuous"
@@ -47,6 +63,9 @@ Item {
     property int completionPulseCount: 3
     property int feedbackPulsePhase: 0
     property bool dialHovered: false
+    // Full footprint, not just the 90px knob: lets enclosing Flickables
+    // relinquish wheel/drag interaction whenever the pointer is on the dial.
+    readonly property bool pointerOverDial: dialHoverHandler.hovered
     property int hoveredOptionIndex: -1
     readonly property bool rotating: dragging || motionActive
     readonly property real ringGlowStrength: !interactive ? 0.10
@@ -88,6 +107,26 @@ Item {
     opacity: interactive ? 1.0 : 0.42
     Behavior on opacity { NumberAnimation { duration: 125 } }
 
+    HoverHandler {
+        id: dialHoverHandler
+    }
+
+    // Handle wheel events across the *entire* dial, including numeric labels.
+    // No automatic property rotation; each wheel tick uses existing steps.
+    WheelHandler {
+        target: null
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: function(event) {
+            if (!dialRoot.interactive || event.angleDelta.y === 0)
+                return;
+            dialRoot.forceActiveFocus();
+            dialRoot.stepIndex(event.angleDelta.y > 0 ? -1 : 1);
+            if (dialRoot.keyboardHost)
+                dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
+            event.accepted = true;
+        }
+    }
+
     onLoadingStateChanged: {
         feedbackTimer.stop();
         feedbackPulsePhase = 0;
@@ -116,9 +155,17 @@ Item {
         }
     }
 
+    function isOptionActive(index) {
+        if (selectorMode !== "continuous")
+            return index === indicatedIndex;
+        // The continuous mode has no currentIndex. Track the actual pointer
+        // angle instead, so day labels light up when the handle reaches them.
+        return Math.abs(visualAngle - angleForIndex(index)) <= 3.5;
+    }
+
     function optionGlowStrength(index) {
-        if (index === indicatedIndex)
-            return rotating ? 1.0 : dialHovered ? 0.92 : 0.78;
+        if (isOptionActive(index))
+            return 1.0;
         return index === hoveredOptionIndex ? 0.76 : 0.22;
     }
 
@@ -145,6 +192,22 @@ Item {
         return Number(Math.max(minimumValue, Math.min(maximumValue, value)).toFixed(decimals));
     }
 
+    function steppedValue(value) {
+        const clamped = Math.max(minimumValue, Math.min(maximumValue, Number(value)));
+        const major = Number(numericDetentInterval);
+        const useMajor = Number.isFinite(major) && major > 0;
+        const step = useMajor ? major : Math.max(0.000001, Number(valueStep));
+        const origin = useMajor ? Number(numericDetentOrigin) : minimumValue;
+        const snapped = origin + Math.round((clamped - origin) / step) * step;
+        // Always retain both hard endpoints, even if they are not multiples
+        // of the detent interval. Never wrap back through the unused arc.
+        const endpoint = Math.abs(clamped - minimumValue) <= Math.abs(clamped - snapped)
+                         ? minimumValue : snapped;
+        const upper = Math.abs(clamped - maximumValue) < Math.abs(clamped - endpoint)
+                      ? maximumValue : endpoint;
+        return Math.max(minimumValue, Math.min(maximumValue, upper));
+    }
+
     function finishFreePosition() {
         const mode = selectorMode;
         const target = boundedAngle(visualAngle);
@@ -156,7 +219,11 @@ Item {
         motionActive = false;
         previewIndex = -1;
         if (mode === "continuous") {
-            const value = reportedValue(valueForAngle(target));
+            const value = reportedValue(
+                snapContinuousToStep ? steppedValue(valueForAngle(target))
+                                     : valueForAngle(target));
+            if (snapContinuousToStep)
+                visualAngle = angleForValue(value);
             if (value !== reportedValue(currentValue))
                 valueRequested(value);
         } else if (mode === "zones" && optionCount() > 0) {
@@ -185,6 +252,10 @@ Item {
     function angleForIndex(index) {
         const count = optionCount();
         if (selectorMode === "continuous") {
+            if (numericReferenceValues
+                    && numericReferenceValues.length === count
+                    && Number.isFinite(Number(numericReferenceValues[index])))
+                return angleForValue(Number(numericReferenceValues[index]));
             // Optional labels are reference marks across the numeric range.
             return arcStartAngle + boundedSweep * (count <= 1 ? 0 : index / (count - 1));
         }
@@ -316,7 +387,8 @@ Item {
     function requestNumericValue(value) {
         if (selectorMode !== "continuous" || !interactive || dragging)
             return;
-        const next = Math.max(minimumValue, Math.min(maximumValue, Number(value)));
+        const bounded = Math.max(minimumValue, Math.min(maximumValue, Number(value)));
+        const next = snapContinuousToStep ? steppedValue(bounded) : bounded;
         const destination = angleForValue(next);
         stopMotion();
         pendingNumeric = true;
@@ -334,7 +406,9 @@ Item {
             return;
         if (selectorMode === "continuous") {
             const base = pendingNumeric ? pendingNumericValue : currentValue;
-            requestNumericValue(base + Number(delta) * Math.max(0.000001, valueStep));
+            const interval = numericDetentInterval > 0
+                             ? numericDetentInterval : Math.max(0.000001, valueStep);
+            requestNumericValue(base + Number(delta) * interval);
         } else {
             requestIndex((pendingIndex >= 0 ? pendingIndex : currentIndex) + Number(delta));
         }
@@ -803,6 +877,58 @@ Item {
             }
         }
 
+        // Six-hour tactile detents get understated cyan marks, not 28
+        // competing labels. Where a DAY number exists, its label replaces
+        // the tick. This feature is opt-in for the Clock interval dial.
+        Repeater {
+            model: dialRoot.selectorMode === "continuous"
+                   && dialRoot.showNumericDetentTicks
+                   && dialRoot.numericDetentInterval > 0
+                   ? Math.max(0, Math.floor(
+                       (dialRoot.maximumValue - dialRoot.numericDetentOrigin)
+                       / dialRoot.numericDetentInterval))
+                   : 0
+
+            delegate: Item {
+                id: detentTick
+                required property int index
+                readonly property real numericValue:
+                    dialRoot.numericDetentOrigin
+                    + (index + 1) * dialRoot.numericDetentInterval
+                readonly property real angle: dialRoot.angleForValue(numericValue)
+                readonly property real radians: angle * Math.PI / 180
+                readonly property real radiusFromCenter: 51
+                readonly property bool active:
+                    Math.abs(dialRoot.previewNumericValue - numericValue) < 0.1
+
+                visible: numericValue >= dialRoot.minimumValue
+                         && numericValue <= dialRoot.maximumValue
+                         && (!dialRoot.numericReferenceValues
+                             || dialRoot.numericReferenceValues.indexOf(numericValue) < 0)
+
+                width: 6
+                height: 6
+                x: dialStage.width / 2 + Math.cos(radians) * radiusFromCenter - width / 2
+                y: dialStage.height / 2 + Math.sin(radians) * radiusFromCenter - height / 2
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 2
+                    height: 5
+                    rotation: detentTick.angle - 90
+                    color: detentTick.active ? Colors.orange : dialRoot.labelColor
+                    opacity: detentTick.active ? 1.0 : 0.66
+                    layer.enabled: detentTick.active
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: Colors.orange
+                        shadowOpacity: 0.95
+                        shadowBlur: 0.82
+                    }
+                }
+            }
+        }
+
         // Each printed position is itself a direct-jump control.
         Repeater {
             model: dialRoot.optionCount()
@@ -816,8 +942,8 @@ Item {
                 readonly property real labelRadius: 48
                 readonly property real radians: labelAngle * Math.PI / 180
 
-                width: 38
-                height: 16
+                width: 42
+                height: 18
 
                 x: dialStage.width / 2
                    + Math.cos(radians) * labelRadius
@@ -829,25 +955,31 @@ Item {
                 GohuText {
                     anchors.centerIn: parent
                     text: dialRoot.optionDisplay(index)
-                    font.pixelSize: dialRoot.optionCount() > 4 ? 6 : 7
-                    color: index === dialRoot.indicatedIndex
-                           ? dialRoot.markerColor
+                    font.pixelSize:
+                        /^[+-]?\d/.test(dialRoot.optionDisplay(index))
+                        ? dialRoot.numericLabelPixelSize
+                        : dialRoot.textLabelPixelSize
+                    color: dialRoot.isOptionActive(index)
+                           ? (dialRoot.selectorMode === "continuous"
+                              ? Colors.orange : dialRoot.markerColor)
                            : dialRoot.labelColor
 
                     layer.enabled: true
                     layer.effect: MultiEffect {
                         shadowEnabled: true
-                        shadowColor: optionMark.index === dialRoot.indicatedIndex
-                                     ? dialRoot.markerColor
+                        shadowColor: dialRoot.isOptionActive(optionMark.index)
+                                     ? (dialRoot.selectorMode === "continuous"
+                                        ? Colors.orange : dialRoot.markerColor)
                                      : dialRoot.labelColor
                         shadowOpacity: dialRoot.optionGlowStrength(optionMark.index)
-                        shadowBlur: optionMark.index === dialRoot.indicatedIndex ? 0.85 : 0.46
+                        shadowBlur: dialRoot.isOptionActive(optionMark.index) ? 0.95 : 0.46
                     }
                 }
 
                 MouseArea {
                     anchors.fill: parent
                     anchors.margins: -4
+                    preventStealing: true
                     enabled: dialRoot.interactive
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -885,6 +1017,8 @@ Item {
         MouseArea {
             id: rotaryMouse
 
+            // Flickable must never steal a rotation midway through a drag.
+            preventStealing: true
             anchors.centerIn: parent
             width: 90
             height: 90
@@ -924,9 +1058,18 @@ Item {
                 const angle = dialRoot.pointerAngle(mouse.x, mouse.y, width, height);
                 const delta = dialRoot.normalizeDelta(angle - dialRoot.lastPointerAngle);
 
-                dialRoot.visualAngle = dialRoot.selectorMode === "discrete"
-                    ? dialRoot.visualAngle + delta
-                    : dialRoot.boundedAngle(dialRoot.visualAngle + delta);
+                if (dialRoot.selectorMode === "continuous"
+                        && dialRoot.snapContinuousToStep) {
+                    dialRoot.continuousDragRawAngle = dialRoot.boundedAngle(
+                        dialRoot.continuousDragRawAngle + delta);
+                    dialRoot.visualAngle = dialRoot.angleForValue(
+                        dialRoot.steppedValue(dialRoot.valueForAngle(
+                            dialRoot.continuousDragRawAngle)));
+                } else {
+                    dialRoot.visualAngle = dialRoot.selectorMode === "discrete"
+                        ? dialRoot.visualAngle + delta
+                        : dialRoot.boundedAngle(dialRoot.visualAngle + delta);
+                }
                 dialRoot.lastPointerAngle = angle;
                 const now = Date.now();
                 const elapsed = now - dialRoot.lastMoveTime;
@@ -955,6 +1098,7 @@ Item {
                 dialRoot.angularVelocity = 0;
                 dialRoot.lastMoveTime = Date.now();
                 dialRoot.dragging = true;
+                dialRoot.continuousDragRawAngle = dialRoot.visualAngle;
                 dialRoot.dragDetentIndex = dialRoot.currentIndex;
                 dialRoot.previewIndex = dialRoot.selectorMode === "continuous"
                     ? -1 : dialRoot.currentIndex;
@@ -979,7 +1123,11 @@ Item {
                 const atBound = dialRoot.selectorMode !== "discrete"
                     && (dialRoot.visualAngle <= dialRoot.arcStartAngle
                         || dialRoot.visualAngle >= dialRoot.arcStartAngle + dialRoot.boundedSweep);
-                if (!atBound && recentlyMoving
+                if (dialRoot.selectorMode === "continuous"
+                        && dialRoot.snapContinuousToStep) {
+                    // Hourly physical detents, no flick overshoot or wraparound.
+                    dialRoot.finishFreePosition();
+                } else if (!atBound && recentlyMoving
                         && Math.abs(dialRoot.angularVelocity) >= dialRoot.flickThreshold) {
                     dialRoot.inertial = true;
                     inertiaTimer.start();
@@ -1000,19 +1148,6 @@ Item {
 
                 if (dialRoot.keyboardHost)
                     dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
-            }
-
-            onWheel: function(wheel) {
-                if (wheel.angleDelta.y === 0)
-                    return;
-
-                dialRoot.forceActiveFocus();
-                dialRoot.stepIndex(wheel.angleDelta.y > 0 ? -1 : 1);
-
-                if (dialRoot.keyboardHost)
-                    dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
-
-                wheel.accepted = true;
             }
         }
 
@@ -1048,8 +1183,8 @@ Item {
         text: dialRoot.readoutText
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
-        font.pixelSize: 8
+        font.pixelSize: dialRoot.readoutPixelSize
         color: dialRoot.interactive ? Colors.white : Colors.orange
-        opacity: dialRoot.interactive ? 0.82 : 0.72
+        opacity: dialRoot.interactive ? 1.0 : 0.78
     }
 }

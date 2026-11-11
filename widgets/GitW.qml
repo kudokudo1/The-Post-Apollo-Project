@@ -1850,6 +1850,10 @@ PanelWindow {
     function showGithubControl() {
         root.workflowMenuOpen = false;
         root.githubView = "control";
+        // Returning to the control dashboard may require one snapshot after
+        // time spent in other GitHub pages. Respect the existing fresh cache.
+        if (root.menuOpen && root.activePage === "github")
+            root.ensureGithubSnapshot();
     }
 
     function showGithubLibrary() {
@@ -2847,9 +2851,16 @@ PanelWindow {
     Timer {
         interval: 15000
         repeat: true
+        // The dashboard needs live workflows/runs; Issues, PRs, Profile,
+        // Projects and Library already have their own explicit readers.
+        // Polling the dashboard behind those pages overloaded Toolbox.
         running: root.menuOpen && root.activePage === "github"
+            && root.githubView === "control"
 
-        onTriggered: githubService.refresh()
+        onTriggered: {
+            if (!githubService.refreshing)
+                githubService.refresh();
+        }
     }
 
     component SectionLabel: GohuText {

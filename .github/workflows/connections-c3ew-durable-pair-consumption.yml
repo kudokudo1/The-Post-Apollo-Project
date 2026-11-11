@@ -1,0 +1,77 @@
+name: Connections C3e-W durable CI pair-before-consume (deny only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eWDurablePairConsumption.py"
+      - "tests/connections/test_connections_c3ew_durable_pair_consumption.py"
+      - "tests/connections/c3e_release_trust/C3eVSignedGuestDiagnosticPair.py"
+      - "tests/connections/c3e_release_trust/C3eRDurableChallengeLedger.py"
+      - "tests/connections/c3e_release_trust/C3eQSignedGuestEvidence.py"
+      - "tests/connections/c3e_release_trust/C3eUObservedGuestImport.py"
+      - ".github/workflows/connections-c3ew-durable-pair-consumption.yml"
+      - "docs/connections-c3ew-durable-pair-consumption.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  root-local-ci-only-pair-and-consume:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Source syntax and never authorize production
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v gpg
+          sudo -n id -u | grep -qx 0
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eWDurablePairConsumption.py \
+            tests/connections/test_connections_c3ew_durable_pair_consumption.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/c3e_release_trust/C3eWDurablePairConsumption.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          request=Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          for k in ("signedGuestOriginAuthenticated", "hostAuthenticated",
+                    "canApprove", "credentialActionsEnabled", "productionAuthority"):
+              assert '"' + k + '": False' in source
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "readonly property bool hostAuthenticated: false" in request
+          print("C3EW_PASS // ROOT_LOCAL_CI_ONLY_NEVER_CREDENTIAL_AUTHORITY")
+          PY
+      - name: Bounded paired statement then durable issued challenge consumption
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true python3 -B tests/connections/test_connections_c3ew_durable_pair_consumption.py
+          echo "C3EW_PASS // PAIR_FIRST_NONCONSUMING_FAILURE_SINGLE_DURABLE_CI_COMMIT"
+      - name: Preserve V Q U source and signed regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3ev_signed_guest_diagnostic_pair.py
+          python3 -B tests/connections/test_connections_c3eq_signed_guest_evidence.py
+          python3 -B tests/connections/test_connections_c3eu_c4c_observed_guest_import.py
+          echo "C3EW_PASS // V_Q_U_DIAGNOSTIC_SOURCE_COMPATIBLE"
+      - name: Retain existing root-local R restart and concurrent replay contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true python3 -B tests/connections/test_connections_c3er_durable_challenge_ledger.py
+          echo "C3EW_PASS // R_ROOT_CI_LEDGER_REPLAY_REFUSAL"
+      - name: Preserve honest nonproduction limitations
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "not independently rollback-resistant" docs/connections-c3ew-durable-pair-consumption.md
+          grep -Fq '"externalRollbackResistanceVerified": False' tests/connections/c3e_release_trust/C3eWDurablePairConsumption.py
+          grep -Fq '"productionAuthority": False' tests/connections/c3e_release_trust/C3eWDurablePairConsumption.py
+          echo "C3EW_LIMITATION // TEST_CHALLENGE_CONSUMED_IS_NOT_HOST_AUTHENTICATION"

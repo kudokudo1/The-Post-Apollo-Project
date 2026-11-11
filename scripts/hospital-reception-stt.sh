@@ -61,8 +61,81 @@ find_backend() {
     return 1
 }
 
+# The server is optional. Its model is loaded once per active mic session,
+# using a Unix-domain socket in a private 0700 directory (no TCP port).
+find_server() {
+    if [[ -n "${POST_APOLLO_STT_SERVER_BIN:-}" ]]; then
+        command -v "${POST_APOLLO_STT_SERVER_BIN}" 2>/dev/null || {
+            [[ -x "${POST_APOLLO_STT_SERVER_BIN}" ]] && printf '%s\n' "${POST_APOLLO_STT_SERVER_BIN}"
+        }
+        return
+    fi
+
+    local detected
+    detected="$(command -v whisper-server 2>/dev/null || true)"
+    if [[ -n "$detected" ]]; then
+        printf '%s\n' "$detected"
+        return 0
+    fi
+
+    local candidate
+    for candidate in \
+        "$HOME/.local/bin/whisper-server" \
+        "$HOME/Projects/whisper.cpp/build/bin/whisper-server" \
+        "/usr/local/bin/whisper-server" \
+        "/usr/bin/whisper-server"; do
+        if [[ -x "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
 backend="$(find_backend || true)"
 model="$(find_model || true)"
+server="$(find_server || true)"
+
+# Do not start an unknown version without private Unix socket + CPU-only
+# controls. --help never initializes inference or opens a listening socket.
+private_server_compatible() {
+    [[ -n "$model" && -n "$server" ]] || return 1
+    local help_text
+    help_text="$("$server" --help 2>&1 || true)"
+    # whisper-server defaults no_context=true and does NOT expose -nc.
+    # Require supported controls only; never accept a TCP-only binary.
+    [[ "$help_text" == *"--host"* && "$help_text" == *"socket"*
+       && "$help_text" == *"--no-gpu"* ]]
+}
+
+# Read-only capability/model profile; never starts a model or microphone.
+if [[ "${1:-}" == "--profile" ]]; then
+    printf 'MODEL // %s\n' "$(basename "${model:-none}")"
+    [[ -n "$backend" ]] && printf 'CLI // AVAILABLE\n' || printf 'CLI // UNAVAILABLE\n'
+    if private_server_compatible; then
+        printf 'SESSION // AVAILABLE\n'
+    else
+        printf 'SESSION // UNAVAILABLE\n'
+    fi
+    exit 0
+fi
+
+if [[ "${1:-}" == "--session-check" ]]; then
+    private_server_compatible || exit 3
+    exit 0
+fi
+
+if [[ "${1:-}" == "--session" ]]; then
+    socket_path="${2:-}"
+    [[ "${POST_APOLLO_STT_SAFE_MODE:-}" == "1" ]] || exit 70
+    private_server_compatible || exit 3
+    [[ "$socket_path" == /*.sock ]] || exit 64
+    [[ -d "$(dirname "$socket_path")" ]] || exit 66
+    # Local-only server, GPU disabled, one server process/worker. No ffmpeg
+    # conversion and no network-facing TCP listener, even on localhost.
+    exec "$server" -m "$model" --host "$socket_path" \
+        -ng -t 2 -p 1 -l en -nt
+fi
 
 if [[ "${1:-}" == "--check" ]]; then
     if [[ -z "$backend" ]]; then
@@ -96,7 +169,14 @@ if [[ -z "$model" ]]; then
     exit 2
 fi
 
-exec "$backend" \
+# Limit Whisper CPU worker threads and avoid GPU driver paths for the
+# incident-isolated live microphone process. The guard sets this flag.
+safe_args=()
+if [[ "${POST_APOLLO_STT_SAFE_MODE:-}" == "1" ]]; then
+    safe_args=(-ng -t 2)
+fi
+
+exec "$backend" "${safe_args[@]}" \
     -m "$model" \
     -f "$audio" \
     -l en \

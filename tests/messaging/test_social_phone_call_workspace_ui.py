@@ -99,7 +99,7 @@ class CallWorkspaceUiTests(unittest.TestCase):
             'id: phoneContactList',
             'id: phoneAddressBook',
             'sendEnabled: false',
-            'phoneReadAdapter.conversations : []',
+            'phonePane.filteredPhoneConversations : []',
             'phoneReadAdapter.messages : []',
             'emptyConversationLabel:',
             'id: personalReadBar',

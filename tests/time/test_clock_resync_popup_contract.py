@@ -81,6 +81,46 @@ class TimeResyncPopupContracts(unittest.TestCase):
         self.assertIn("TimeSettings.cancelResync();", TIMEW)
         self.assertIn("width: 308", POPUP)
         self.assertIn("height: 320", POPUP)
+   
+    def test_popup_is_right_anchored_beneath_both_header_buttons(self):
+        placement = TIMEW.split("TimeResyncPopup {", 1)[1].split(
+            "onCloseRequested:", 1
+        )[0]
+
+        self.assertIn("anchors.right: parent.right", placement)
+        self.assertIn("anchors.rightMargin: 14", placement)
+        self.assertIn(
+            "y: closeButton.mapToItem(timewFrame, 0, 0).y", placement
+        )
+        self.assertIn("+ closeButton.height + 25", placement)
+
+        self.assertNotIn("x: {", placement)
+        self.assertNotIn("rightEdge - width", placement)
+
+        # Preserve outside-click dismissal.
+        self.assertIn(
+            "resyncPopup.mapToItem(timewFrame, 0, 0)", TIMEW
+        )
+        self.assertIn("if (!onTrigger && !onPopup)", TIMEW)
+
+    def test_popup_owns_glowing_border_and_background(self):
+        self.assertIn('import "../components"', POPUP)
+        self.assertIn("WindowPanelFrame {", POPUP)
+        self.assertIn("fillColor: Colors.black", POPUP)
+        self.assertIn("fillOpacity: 1.0", POPUP)
+        self.assertIn("borderColor: Colors.yellow", POPUP)
+        self.assertIn("borderWidth: 1", POPUP)
+        self.assertIn("glowVisible: true", POPUP)
+        self.assertIn("glowColor: Colors.yellow", POPUP)
+        self.assertIn("closeGlowSpread: 6", POPUP)
+        self.assertIn("closeGlowOpacity: 0.46", POPUP)
+        self.assertIn("wideGlowSpread: 13", POPUP)
+        self.assertIn("wideGlowOpacity: 0.18", POPUP)
+        self.assertIn("clipContent: true", POPUP)
+        self.assertNotIn("RectangularShadow {", POPUP)
+        # No new subprocesses or clock writers may enter a visual-only patch.
+        self.assertNotIn("Process {", POPUP)
+        self.assertNotIn("pkexec", POPUP)
 
     def test_original_settings_and_host_security_owner_unchanged(self):
         self.assertIn('label: "CONFIRM RESYNC"', SETTINGS)

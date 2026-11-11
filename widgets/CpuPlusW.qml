@@ -331,8 +331,24 @@ PanelWindow {
     readonly property var settingsSubModes: [
         { name: "LOCATION", key: "LOCATION", symbol: "⌖" },
         { name: "TIME", key: "TIME", symbol: "🕰" },
-        { name: "CONNECTIONS", key: "CONNECTIONS", symbol: "⛓" }
+        { name: "CONNECTIONS", key: "CONNECTIONS", symbol: "⛓" },
+        // Navigation modes. KEYBOARD now owns startup-policy controls;
+        // MOUSE, ACCESSIBILITY and LIGHTING remain read-only placeholders.
+        { name: "KEYBOARD", key: "KEYBOARD", symbol: "⌨" },
+        { name: "MOUSE", key: "MOUSE", symbol: "🖱" },
+        { name: "ACCESSIBILITY", key: "ACCESSIBILITY", symbol: "♿" },
+        { name: "LIGHTING", key: "LIGHTING", symbol: "✦" }
     ]
+    readonly property bool settingsInputPreviewSelected:
+        settingsSubMode === "KEYBOARD"
+        || settingsSubMode === "MOUSE"
+        || settingsSubMode === "ACCESSIBILITY"
+        || settingsSubMode === "LIGHTING"
+    readonly property string settingsInputPreviewTitle:
+        settingsSubMode === "MOUSE" ? "MOUSE & TOUCHPAD"
+        : settingsSubMode === "LIGHTING" ? "LIGHTING / RGB"
+        : settingsSubMode === "ACCESSIBILITY" ? "ACCESSIBILITY"
+        : "KEYBOARD"
 
     // Rail-face animation state, matching AppControl's FAVORITES behavior.
     property bool favoritesFaceClickPulse: false
@@ -1412,8 +1428,10 @@ PanelWindow {
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? "SYSTEM MONITOR"
                 : cpuPlusWindow.selectedModeIndex === 6
-                ? (cpuPlusWindow.settingsSubMode === "TIME"
-                   ? "TIME // BASIC CONTROLS"
+                ? (cpuPlusWindow.settingsInputPreviewSelected
+                   ? cpuPlusWindow.settingsInputPreviewTitle + " // OVERVIEW"
+                   : cpuPlusWindow.settingsSubMode === "TIME"
+                     ? "TIME // BASIC CONTROLS"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                      ? "CONNECTIONS // OVERVIEW"
                      : "SHARED CONTEXT // "
@@ -1749,8 +1767,10 @@ PanelWindow {
                     : cpuPlusWindow.selectedModeIndex === 3
                     ? "SYSTEM STATE"
                     : cpuPlusWindow.selectedModeIndex === 6
-                    ? (cpuPlusWindow.settingsSubMode === "TIME"
-                       ? "CLOCK // CONTROL"
+                    ? (cpuPlusWindow.settingsInputPreviewSelected
+                       ? cpuPlusWindow.settingsInputPreviewTitle + " // STATUS"
+                       : cpuPlusWindow.settingsSubMode === "TIME"
+                         ? "CLOCK // CONTROL"
                        : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                          ? "SHARED // STATUS" : "LOCATION // EXPLORE")
                     : cpuPlusWindow.selectedModeIndex === 4
@@ -1827,6 +1847,8 @@ PanelWindow {
                            || cpuPlusWindow.settingsSubMode === "LOCATION"))
                      && cpuPlusWindow.selectedModeIndex !== 5
                      && cpuPlusWindow.selectedModeIndex !== 4
+                     && !(cpuPlusWindow.selectedModeIndex === 6
+                          && cpuPlusWindow.settingsInputPreviewSelected)
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom
@@ -1910,6 +1932,38 @@ PanelWindow {
             anchors.leftMargin: 11
             anchors.rightMargin: 11
             anchors.topMargin: 8
+            anchors.bottomMargin: 9
+        }
+
+        // Mouse scroll factor lives in the left/overview bay. No scrollbar
+        // host or unrelated Settings mode changes are introduced here.
+        CpuPlusSettingsMouseScrollPane {
+            id: settingsMouseScrollFactorPane
+            area: "factor"
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "MOUSE"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedStateHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 13
+            anchors.rightMargin: 13
+            anchors.topMargin: 9
+            anchors.bottomMargin: 9
+        }
+
+        CpuPlusSettingsKeyboardPane {
+            id: settingsKeyboardControlsPane
+            area: "controls"
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "KEYBOARD"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedStateHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 13
+            anchors.rightMargin: 13
+            anchors.topMargin: 9
             anchors.bottomMargin: 9
         }
 
@@ -2064,8 +2118,10 @@ PanelWindow {
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? "SYSTEM TARGET"
                 : cpuPlusWindow.selectedModeIndex === 6
-                ? (cpuPlusWindow.settingsSubMode === "TIME"
-                   ? "TIME // ACTIVE"
+                ? (cpuPlusWindow.settingsInputPreviewSelected
+                   ? cpuPlusWindow.settingsInputPreviewTitle + " // SELECT"
+                   : cpuPlusWindow.settingsSubMode === "TIME"
+                     ? "TIME // ACTIVE"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                      ? "CONNECTIONS // SOURCES" : "LOCATION // SAVED")
                 : cpuPlusWindow.selectedModeIndex === 4
@@ -2122,7 +2178,7 @@ PanelWindow {
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? 92
                 : cpuPlusWindow.selectedModeIndex === 6
-                ? 52 : 0
+                ? 88 : 0
 
             visible:
                 cpuPlusWindow.selectedModeIndex === 2
@@ -2167,7 +2223,7 @@ PanelWindow {
                             cpuPlusWindow.selectedModeIndex === 2
                             ? (targetSubModeStrip.width - 4) / 2
                             : cpuPlusWindow.selectedModeIndex === 6
-                             ? (targetSubModeStrip.width - 8) / 3
+                             ? (targetSubModeStrip.width - 12) / 4
                             : (targetSubModeStrip.width - 8) / 3
 
                         height:
@@ -2207,7 +2263,11 @@ PanelWindow {
                                 width:
                                     cpuPlusWindow.selectedModeIndex === 2
                                     && Number(subModeButton.modelData.key) === 0
-                                    ? 48 : 28
+                                    ? 48
+                                    : cpuPlusWindow.selectedModeIndex === 6
+                                      && (String(subModeButton.modelData.key) === "LOCATION"
+                                          || String(subModeButton.modelData.key) === "KEYBOARD")
+                                    ? 36 : 28
 
                                 height: parent.height
 
@@ -2247,7 +2307,11 @@ PanelWindow {
                                     text: String(subModeButton.modelData.symbol || "")
 
                                     font.pixelSize:
-                                        cpuPlusWindow.selectedModeIndex === 3
+                                        cpuPlusWindow.selectedModeIndex === 6
+                                        && (String(subModeButton.modelData.key) === "LOCATION"
+                                            || String(subModeButton.modelData.key) === "KEYBOARD")
+                                        ? 30
+                                        : cpuPlusWindow.selectedModeIndex === 3
                                         ? (
                                               String(subModeButton.modelData.key)
                                               === "ALL" ? 15
@@ -2290,7 +2354,9 @@ PanelWindow {
 
                             GohuText {
                                 anchors.verticalCenter: parent.verticalCenter
-
+                                // Icon-only Settings selector. Keep the name in
+                                // the model for headings, navigation and audits.
+                                visible: cpuPlusWindow.selectedModeIndex !== 6
                                 text: String(modelData.name || "")
                                 font.pixelSize: 8
 
@@ -2342,6 +2408,65 @@ PanelWindow {
                     }
                 }
             }
+        }
+
+        // Unimplemented input categories only. KEYBOARD and MOUSE own live
+        // three-bay control panes; ACCESSIBILITY and LIGHTING stay reserved.
+        GohuText {
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsInputPreviewSelected
+                     && cpuPlusWindow.settingsSubMode !== "KEYBOARD"
+                     && cpuPlusWindow.settingsSubMode !== "MOUSE"
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: targetSubModeStrip.bottom
+            anchors.topMargin: 27
+            font.pixelSize: 11
+            color: Colors.cyan
+            text: "SECTION RESERVED"
+        }
+
+        GohuText {
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsInputPreviewSelected
+                     && cpuPlusWindow.settingsSubMode !== "KEYBOARD"
+                     && cpuPlusWindow.settingsSubMode !== "MOUSE"
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: targetSubModeStrip.bottom
+            anchors.topMargin: 50
+            font.pixelSize: 9
+            color: Colors.white
+            text: "NO DEVICE CHANGES"
+        }
+
+        // Device list and live observed scroll factor use middle/select bay.
+        CpuPlusSettingsMouseScrollPane {
+            id: settingsMouseScrollDevicePane
+            area: "devices"
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "MOUSE"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: targetSubModeStrip.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 10
+            anchors.bottomMargin: 9
+        }
+
+        CpuPlusSettingsKeyboardPane {
+            id: settingsKeyboardSelectionPane
+            area: "status"
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "KEYBOARD"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: targetSubModeStrip.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 10
+            anchors.bottomMargin: 9
         }
 
         CpuPlusSettingsLocationSelectionPane {
@@ -2880,8 +3005,10 @@ PanelWindow {
             anchors.topMargin: 16
 
             text: cpuPlusWindow.selectedModeIndex === 6
-                  ? (cpuPlusWindow.settingsSubMode === "TIME"
-                     ? "TIME // ADVANCED"
+                  ? (cpuPlusWindow.settingsInputPreviewSelected
+                     ? cpuPlusWindow.settingsInputPreviewTitle + " // CONTROL"
+                     : cpuPlusWindow.settingsSubMode === "TIME"
+                       ? "TIME // ADVANCED"
                      : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                        ? "CONNECTIONS // ACCESS" : "LOCATION // EDIT HOME")
                   : cpuPlusWindow.selectedModeIndex === 4
@@ -2914,6 +3041,38 @@ PanelWindow {
                 color: Colors.cyan
             }
         }
+        // All live Sway input mutations remain behind this exact-device
+        // two-click confirmation in the right/control bay.
+        CpuPlusSettingsMouseScrollPane {
+            id: settingsMouseScrollApplyPane
+            area: "apply"
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "MOUSE"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 20
+            anchors.bottomMargin: 10
+        }
+
+        CpuPlusSettingsKeyboardPane {
+            id: settingsKeyboardApplyPane
+            area: "apply"
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "KEYBOARD"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 20
+            anchors.bottomMargin: 10
+        }
+
         CpuPlusSettingsLocationPane {
             id: settingsLocationPane
             registry: PlaceRegistry

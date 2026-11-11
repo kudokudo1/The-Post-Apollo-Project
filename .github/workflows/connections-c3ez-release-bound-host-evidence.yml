@@ -1,0 +1,87 @@
+name: Connections C3e-Z signed release and complete host evidence pairing (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eZReleaseBoundHostEvidence.py"
+      - "tests/connections/test_connections_c3ez_release_bound_host_evidence.py"
+      - "tests/connections/c3e_release_trust/C3eYSignedHostChallenge.py"
+      - "tests/connections/c3e_release_trust/C3eXIdentityRunningEvidence.py"
+      - "services/identity/silverblue_release_candidate_v1.py"
+      - ".github/workflows/connections-c3ez-release-bound-host-evidence.yml"
+      - "docs/connections-c3ez-release-bound-host-evidence.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  root-only-synthetic-release-and-host-consistency:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact public-key verification dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Source syntax, no authorization paths or new owner writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eZReleaseBoundHostEvidence.py \
+            tests/connections/test_connections_c3ez_release_bound_host_evidence.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/c3e_release_trust/C3eZReleaseBoundHostEvidence.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          status=Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          for name in ("independentlyEnrolledReleaseRoot", "independentlyEnrolledWitnessKey",
+                       "independentlyEnrolledReceiptKey", "installedHostEvidenceAuthenticated",
+                       "externalChallengeCustodyVerified", "externalRollbackResistanceVerified",
+                       "c5HumanConsentVerified", "hostAuthenticated", "canBeginSignIn",
+                       "credentialActionsEnabled", "productionAuthority"):
+              assert '"' + name + '": False' in source
+          assert "**Y.X.NEGATIVE" in source
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "readonly property bool hostAuthenticated: false" in status
+          assert "not independently authenticated" in Path(
+              "docs/connections-c3ez-release-bound-host-evidence.md").read_text()
+          print("C3EZ_PASS // RELEASE_VALIDATION_NEVER_PROMOTES_HOST_CREDENTIALS_OR_C5")
+          PY
+      - name: Root-private preissued challenge + separate release/witness/receipt key CI regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python_bin="$(command -v python3)"
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true "$python_bin" -B \
+            tests/connections/test_connections_c3ez_release_bound_host_evidence.py
+          echo "C3EZ_PASS // SIGNED_RELEASE_AND_FULL_HOST_WITNESS_BOUND_BEFORE_ONE_USE_CI_COMMIT"
+      - name: Preserve existing Identity candidate, C3e-X and C3e-Y denial-only regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest discover -s tests/identity \
+            -p 'test_silverblue_release_candidate_v1.py' -v
+          python3 -B tests/connections/test_connections_c3ex_identity_running_evidence.py
+          sudo -n env GITHUB_ACTIONS=true "$(command -v python3)" -B \
+            tests/connections/test_connections_c3ey_signed_host_challenge.py
+          echo "C3EZ_PASS // IDENTITY_C3EX_C3EY_COMPATIBILITY_PRESERVED"
+      - name: Deny-only production boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "not externally rollback-resistant" \
+            docs/connections-c3ez-release-bound-host-evidence.md
+          grep -Fq '"productionAuthority": False' \
+            tests/connections/c3e_release_trust/C3eZReleaseBoundHostEvidence.py
+          echo "C3EZ_LIMITATION // CALLER_PINNED_SYNTHETIC_RELEASE_IS_NOT_REAL_HOST_AUTHENTICATION"

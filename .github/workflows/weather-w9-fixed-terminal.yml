@@ -1,0 +1,158 @@
+name: Weather Station W17 compact OVERVIEW mirrors full WEATHER instruments
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationWeatherSubjectPane.qml'
+      - 'widgets/weather/StationWeatherCombinedPane.qml'
+      - 'widgets/weather/StationWeatherInstrumentTerminal.qml'
+      - 'widgets/weather/StationWeatherLineGlyph.qml'
+      - 'widgets/weather/StationWeatherTerminalSummary.qml'
+      - 'widgets/weather/StationWeatherOverviewCompactInstrument.qml'
+      - 'widgets/weather/StationHome.qml'
+      - 'widgets/weather/StationHomeMetricCard.qml'
+      - 'widgets/weather/StationWeatherTwilightGrid.qml'
+      - 'tests/weather/test_weather_w11_prominence.js'
+      - 'tests/weather/test_weather_w12_current_meters.js'
+      - 'tests/weather/test_weather_w13_centered_meters.js'
+      - 'tests/weather/test_weather_w14_instrument_visual.js'
+      - 'tests/weather/test_weather_w15_original_icons_fixed_overview.js'
+      - 'tests/weather/test_weather_w16_one_page_icons.js'
+      - 'tests/weather/test_weather_w17_overview_mirror.js'
+      - 'tests/weather/test_weather_w18_space_allocation.js'
+      - 'tests/weather/test_weather_w10_three_band_solar.js'
+      - 'widgets/weather/StationSky.qml'
+      - 'tests/weather/test_weather_w9_fixed_paged_terminal.js'
+      - 'widgets/weather/StationCosmosVisualInstruments.qml'
+      - 'tests/weather/fixtures/W9FixedWeatherTerminalNative.qml'
+      - 'tests/weather/fixtures/W15FixedWeatherOverviewNative.qml'
+      - '.github/workflows/weather-w9-fixed-terminal.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  source-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: W14 icon grammar, forecast context and source continuity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/weather/test_weather_w9_fixed_paged_terminal.js
+          node --test tests/weather/test_weather_w10_three_band_solar.js
+          node --test tests/weather/test_weather_w11_prominence.js
+          node --test tests/weather/test_weather_w12_current_meters.js
+          node --test tests/weather/test_weather_w13_centered_meters.js
+          node --test tests/weather/test_weather_w14_instrument_visual.js
+          node --test tests/weather/test_weather_w15_original_icons_fixed_overview.js
+          node --test tests/weather/test_weather_w16_one_page_icons.js
+          node --test tests/weather/test_weather_w17_overview_mirror.js
+          node --test tests/weather/test_weather_w18_space_allocation.js
+          node --test tests/weather/test_weather_w8_unified_terminal.js
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+          node --test tests/weather/test_weather_subject_panels_m2b.js
+          node --test tests/weather/test_weather_cosmos_domain_separation_m28r.js
+          node --test tests/weather/test_workspace_landing_w1.js
+
+  native-fixed-layout:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:unstable
+    timeout-minutes: 12
+    steps:
+      - name: Install disposable Quickshell
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git quickshell qt6-qpa-plugins \
+            qml6-module-qtquick-effects qml6-module-qtquick-dialogs \
+            qml6-module-qt5compat-graphicaleffects coreutils findutils
+      - uses: actions/checkout@v4
+      - name: Native W15 original icons and center-aligned forecast at 520x300 and 440x275
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(pwd)"
+          work="$(mktemp -d /tmp/weather-w9.XXXXXXXX)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -m 700 "$work/home" "$work/runtime" "$work/cache" "$work/config"
+          mkdir -p "$work/config/widgets"
+          cp -a "$root/components" "$work/config/components"
+          cp -a "$root/widgets/weather" "$work/config/widgets/weather"
+          cp -a "$root/widgets/tasks" "$work/config/widgets/tasks"
+          cp -a "$root/services" "$work/config/services"
+          cp "$root/tests/weather/fixtures/W9FixedWeatherTerminalNative.qml" "$work/config/shell.qml"
+          rc=0
+          timeout --signal=TERM --kill-after=3s 40s \
+            env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
+            XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            quickshell --no-color -p "$work/config/shell.qml" \
+            > "$work/native.log" 2>&1 || rc=$?
+          cat "$work/native.log"
+          test "$rc" -eq 0
+          grep -F "W14_NATIVE_PASS // TWO_SIZE_LINE_GLYPH_INSTRUMENT_520_440" "$work/native.log"
+          if grep -E 'W14_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+            exit 1
+          fi
+      - name: Native W17 mirrored WEATHER and both lower card rows fit without scrolling
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(pwd)"
+          work="$(mktemp -d /tmp/weather-w15-overview.XXXXXXXX)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -m 700 "$work/home" "$work/runtime" "$work/cache" "$work/config"
+          mkdir -p "$work/config/widgets"
+          cp -a "$root/components" "$work/config/components"
+          cp -a "$root/widgets/weather" "$work/config/widgets/weather"
+          cp -a "$root/widgets/tasks" "$work/config/widgets/tasks"
+          cp -a "$root/services" "$work/config/services"
+          cp "$root/tests/weather/fixtures/W15FixedWeatherOverviewNative.qml" "$work/config/shell.qml"
+          rc=0
+          timeout --signal=TERM --kill-after=3s 40s \
+            env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
+            XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            quickshell --no-color -p "$work/config/shell.qml" \
+            > "$work/native.log" 2>&1 || rc=$?
+          cat "$work/native.log"
+          test "$rc" -eq 0
+          grep -F "W16_OVERVIEW_NATIVE_PASS // BOTH_CARD_GROUPS_NO_PAN_440_520" "$work/native.log"
+          if grep -E 'W16_OVERVIEW_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+            exit 1
+          fi
+      - name: Upload optional native WEATHER visual preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-w14-visual-preview
+          path: /tmp/weather-w14-visual-preview.png
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload 440x275 compact visual preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-w14-compact-preview
+          path: /tmp/weather-w14-compact-preview.png
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload native W16 single-page overview previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-w17-mirrored-overview
+          path: |
+            /tmp/weather-w17-overview-compact.png
+            /tmp/weather-w17-overview-wide.png
+            /tmp/weather-w18-overview-tall.png
+          if-no-files-found: warn
+          retention-days: 14

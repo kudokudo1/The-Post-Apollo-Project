@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "GitHubToolboxBatch.js" as GitHubBatch
 
 Scope {
     id: root
@@ -579,9 +580,7 @@ Scope {
         pullsStdout = "";
         pullsStderr = "";
 
-        pullsProcess.exec([
-            "bash",
-            "-lc",
+        pullsProcess.exec(GitHubBatch.wrap(
             [
                 'set -eo pipefail',
                 'repo="$1"',
@@ -630,7 +629,7 @@ Scope {
                 '    fi',
                 "    jq -nc --argjson number \"$number\" --argjson checkEvidence \"$check_evidence\" --argjson checkEvidenceLoaded \"$need_checks\" --arg checkEvidenceError \"$check_error\" --argjson checkSuites \"$suites\" --arg suiteError \"$suite_error\" --argjson reviewEvidence \"$review_evidence\" --argjson reviewEvidenceLoaded \"$need_reviews\" --arg reviewEvidenceError \"$review_error\" --argjson reviewRequestCount \"$review_request_count\" --argjson reviewRequestEvidenceLoaded \"$need_reviews\" --arg reviewRequestError \"$review_request_error\" '{number:$number,checkEvidence:$checkEvidence,checkEvidenceLoaded:$checkEvidenceLoaded,checkEvidenceError:$checkEvidenceError,checkSuites:$checkSuites,suiteError:$suiteError,reviewEvidence:$reviewEvidence,reviewEvidenceLoaded:$reviewEvidenceLoaded,reviewEvidenceError:$reviewEvidenceError,reviewRequestCount:$reviewRequestCount,reviewRequestEvidenceLoaded:$reviewRequestEvidenceLoaded,reviewRequestError:$reviewRequestError}' > \"$tmpdir/detail-$number.json\"",
                 '  ) &',
-                '  while [ "$(jobs -rp | wc -l)" -ge 8 ]; do',
+                '  while [ "$(jobs -rp | wc -l)" -ge 2 ]; do',
                 '    wait -n || true',
                 '  done',
                 'done < "$tmpdir/fallback.ndjson"',
@@ -643,8 +642,8 @@ Scope {
                 '# cleanup handled by EXIT trap',
             ].join("\n"),
             "pa-github-pulls-graphql",
-            cleanRepo
-        ]);
+            [cleanRepo]
+        ));
         pullsWatchdog.restart();
         return true;
     }

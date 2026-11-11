@@ -31,6 +31,11 @@ def new_root():
     return Path(init_trial()["trial_root"])
 
 
+def native_dir(root):
+    return (root / "xdg-config" / "BraveSoftware" / "Brave-Browser"
+            / "NativeMessagingHosts")
+
+
 # Every write is in a unique, private /tmp fixture, not the user's profile.
 # A caller-defined TMPDIR must never redirect trial writes into HOME.
 old_tmp = os.environ.get("TMPDIR")
@@ -50,19 +55,22 @@ try:
     profile = root / "profile"
     assert root.stat().st_mode & 0o077 == 0
     assert profile.stat().st_mode & 0o077 == 0
+    assert (root / "xdg-config").stat().st_mode & 0o077 == 0
     assert (root / MARKER).is_file()
-    assert not (profile / "NativeMessagingHosts").exists()
+    assert not native_dir(root).exists()
     refused(lambda: verify_trial(str(root)))
     for invalid in ("", "z" * 32, EXT_ID[:-1], "../" + EXT_ID,
                     EXT_ID + "\n", None, 123):
         refused(lambda identifier=invalid: register_trial(str(root), identifier))
-        assert not (profile / "NativeMessagingHosts").exists()
+        assert not native_dir(root).exists()
         assert not (root / HOST_FILE).exists()
 
     result = register_trial(str(root), EXT_ID)
     assert result["status"] == "disposable_trial_registration_verified"
     assert result["brave_user_data_dir"] == str(profile)
-    assert result["registration_scoped_to_disposable_profile"] is True
+    assert result["registration_scoped_to_disposable_trial"] is True
+    assert result["brave_xdg_config_home"] == str(root / "xdg-config")
+    assert result["native_host_manifest"] == str(native_dir(root) / HOST_MANIFEST)
     assert result["host_source_matches_repo"] is True
     for key in ("browser_launched_by_tool", "local_transport_tested",
                 "extension_origin_authenticated", "window_identity_verified",
@@ -70,7 +78,7 @@ try:
         assert result[key] is False
     assert result["safe_actions"] == []
     host = root / HOST_FILE
-    native = profile / "NativeMessagingHosts"
+    native = native_dir(root)
     manifest_file = native / HOST_MANIFEST
     assert host.is_file() and os.access(host, os.X_OK)
     assert host.stat().st_mode & 0o077 == 0
@@ -127,6 +135,7 @@ try:
     (root / "profile").symlink_to(other, target_is_directory=True)
     refused(lambda: register_trial(str(root), EXT_ID))
     assert not (other / "NativeMessagingHosts").exists()
+    assert not native_dir(root).exists()
 finally:
     shutil.rmtree(root)
 
@@ -142,8 +151,46 @@ root = new_root()
 try:
     (root / HOST_FILE).symlink_to("/dev/null")
     refused(lambda: register_trial(str(root), EXT_ID))
-    assert not (root / "profile" / "NativeMessagingHosts").exists()
+    assert not native_dir(root).exists()
 finally:
+    shutil.rmtree(root)
+
+# Refuse a symlinked nested XDG directory without writing outside trial.
+root = new_root()
+try:
+    (root / "xdg-config" / "BraveSoftware").symlink_to(
+        "/tmp", target_is_directory=True)
+    refused(lambda: register_trial(str(root), EXT_ID))
+    assert not (root / HOST_FILE).exists()
+finally:
+    shutil.rmtree(root)
+
+# A browser may have created the first two XDG folders; honor private ones.
+root = new_root()
+try:
+    existing = root / "xdg-config" / "BraveSoftware" / "Brave-Browser"
+    existing.parent.mkdir(mode=0o700)
+    existing.mkdir(mode=0o700)
+    assert register_trial(str(root), EXT_ID)["status"] == "disposable_trial_registration_verified"
+    assert native_dir(root).is_dir()
+finally:
+    shutil.rmtree(root)
+
+# Abort a failed manifest write without leaving a half-registered native host.
+root = new_root()
+original_write = trial._write_exclusive
+def fail_manifest(path, contents, mode):
+    if path.name == HOST_MANIFEST:
+        raise OSError("injected manifest write failure")
+    return original_write(path, contents, mode)
+try:
+    trial._write_exclusive = fail_manifest
+    refused(lambda: register_trial(str(root), EXT_ID))
+    assert not (root / HOST_FILE).exists()
+    assert not native_dir(root).exists()
+    assert not (root / "xdg-config" / "BraveSoftware").exists()
+finally:
+    trial._write_exclusive = original_write
     shutil.rmtree(root)
 
 # A nested, non-temp, or ordinary user profile path is out of scope.
@@ -165,10 +212,15 @@ try:
     assert created["status"] == "disposable_trial_initialized"
     assert created["registration_present"] is False
     assert created["browser_launched_by_tool"] is False
-    assert not (cli_root / "profile" / "NativeMessagingHosts").exists()
+    assert (cli_root / "xdg-config").is_dir()
+    assert not native_dir(cli_root).exists()
     registered = cli_call("register", str(cli_root), EXT_ID)
     assert registered.returncode == 0 and not registered.stderr
-    assert json.loads(registered.stdout)["status"] == "disposable_trial_registration_verified"
+    registered_data = json.loads(registered.stdout)
+    assert registered_data["status"] == "disposable_trial_registration_verified"
+    assert registered_data["native_host_manifest"] == str(native_dir(cli_root) / HOST_MANIFEST)
+    assert native_dir(cli_root).is_dir()
+    assert not (cli_root / "profile" / "NativeMessagingHosts").exists()
     verified = cli_call("verify", str(cli_root))
     assert verified.returncode == 0 and not verified.stderr
     assert json.loads(verified.stdout) == json.loads(registered.stdout)

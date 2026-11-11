@@ -19,6 +19,7 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    readonly property bool receptionistVoiceBusy: speechInputService.busy
     property bool keyboardActive: true
     property bool keyboardLock: false
     property bool relationshipFocusModeActive: false
@@ -2255,6 +2256,8 @@ PanelWindow {
 
             if (intercomSpeechInputService.busy)
                 intercomSpeechInputService.cancel();
+            if (workforceSpeechInputService.busy)
+                workforceSpeechInputService.cancel();
 
             root.leaveRoomControls();
             root.leaveBedControls();
@@ -2542,6 +2545,10 @@ PanelWindow {
 
     HospitalSpeechInputService {
         id: speechInputService
+        liveStreaming: true
+        liveEngine: workforceSpeechInputService
+        otherVoiceBusy: intercomSpeechInputService.busy
+            || workforceSpeechInputService.busy
 
         onVoiceError: function(message) {
             receptionistService.append(
@@ -2553,7 +2560,35 @@ PanelWindow {
 
     HospitalSpeechInputService {
         id: intercomSpeechInputService
+        liveStreaming: true
+        liveEngine: workforceSpeechInputService
+        otherVoiceBusy: speechInputService.busy
+            || workforceSpeechInputService.busy
         audioFileName: "hospital-intercom-voice.wav"
+    }
+
+    // Reception, Intercom and Manage all use the SAME owner/process, instead
+    // of independent nested workers competing for CPU, PipeWire and Whisper.
+    // Front-desk wrappers retain their own UI/submit state; no parallel mics.
+    HospitalLiveDictationService {
+        id: workforceSpeechInputService
+        // Operator observed no host crash with the one-chunk trial, but it
+        // auto-closed capture before the first partial could appear.
+        // Continue recording across guarded sequential Whisper chunks; the
+        // pilot remains limited to 6 model jobs and 25s of recorded PCM.
+        // Keep the standalone service fail-closed by default.
+        safetyHold: false
+        pilotOneChunk: false
+        pilotLiveChunks: 6
+        // Prefer one CPU-only private Unix-socket model per recording.
+        // If whisper-server is absent, retain prior guarded CLI inference.
+        preferPersistentModel: true
+        // Natural phrase pauses may flush one guarded chunk early while
+        // continuous speech retains the previous two-second cadence.
+        speechPauseMs: 450
+        chunkSeconds: 2
+        firstChunkMs: 1400
+        maxPackets: 48
     }
 
     HospitalRemoteWatcher {
@@ -6375,6 +6410,9 @@ PanelWindow {
                         && root.workforceManagerExpanded
                     doctorService: doctorService
                     providerService: providerService
+                    speechInputService: workforceSpeechInputService
+                    otherVoiceBusy: root.receptionistVoiceBusy
+                        || intercomSpeechInputService.busy
                     rooms: responsibilityService.durableRooms
                     sessions: responsibilityService.durableSessions
                     knownBeds: floorService.allBeds
@@ -6385,7 +6423,10 @@ PanelWindow {
                     registryError: responsibilityService.graphError
                     registryBusy: responsibilityService.graphLoading
                         || doctorService.refreshing
-                    suggestedRepository: patientService.repository
+                    // Prefer the active Git Floor's origin, available before
+                    // the asynchronous Patient refresh; preserve Patient fallback.
+                    suggestedRepository: githubService.repoSlug
+                        || patientService.repository
                     onDiscoverBedsRequested: {
                         // Only refresh the existing read-only Git floor scan.
                         // No branch switch, worktree creation or Room mutation.

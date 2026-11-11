@@ -34,7 +34,9 @@ var SUBJECTS = [
       {id:"aqi",label:"AQI + WEATHER"},
       {id:"marine",label:"MARINE + WAVES"},
       {id:"coastal",label:"PRESSURE + WATER LEVEL"},
-      {id:"rivers",label:"PRECIP + RIVER STAGE"}]}]}
+      {id:"rivers",label:"PRECIP + RIVER STAGE"}]}]},
+    {id:"services",label:"SERVICES",children:[
+      {id:"health",label:"LIVE WEATHER SERVICE HEALTH"}]}
   ]},
   {id:"cosmos",label:"COSMOS",sections:[
     {id:"overview",label:"OVERVIEW"},
@@ -143,7 +145,9 @@ var SUBJECTS = [
     {id:"divination",label:"DIVINATION",children:[
       {id:"tarot",label:"TAROT"}, {id:"symbolism",label:"SYMBOLISM"}]},
     {id:"grimoire",label:"GRIMOIRE",children:[
-      {id:"references",label:"REFERENCES"}, {id:"journal",label:"JOURNAL"}]}
+      {id:"references",label:"REFERENCES"}, {id:"journal",label:"JOURNAL"}]},
+    {id:"services",label:"SERVICES",children:[
+      {id:"health",label:"SOURCE AND INSTRUMENT DOSSIER"}]}
   ]},
   {id:"tools",label:"TOOLS",sections:[
     {id:"overview",label:"OVERVIEW"},

@@ -1,0 +1,26 @@
+name: TimeW MACHINE live-style host focus cycle
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineBraveHostFocusCycle.py"
+      - "tests/timew/test_machine_brave_host_focus_cycle.py"
+      - "docs/timew-machine-brave-live-host-focus-cycle.md"
+      - ".github/workflows/timew-machine-host-focus-cycle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-host-cycle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify six bounded Sway reads and zero browser pairing authority
+        run: python3 -B -I tests/timew/test_machine_brave_host_focus_cycle.py
+      - name: Preserve existing Sway single-focus and browser/Sway pairing regressions
+        run: python3 -B -I tests/timew/test_machine_brave_focus_witness.py
+      - name: Preserve fail-closed A/B/A review
+        run: python3 -B -I tests/timew/test_machine_brave_focus_sequence_review.py

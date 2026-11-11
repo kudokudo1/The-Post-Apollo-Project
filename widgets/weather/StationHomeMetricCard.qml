@@ -8,6 +8,17 @@ Rectangle {
     property string valueText: "--"
     property string detailText: ""
     property string footerText: ""
+    // W3 // All existing readings; compact presentation is HISTORY-only.
+    property bool compact: false
+    // W16 // Weather OVERVIEW alone can show both existing card groups in
+    // one compact viewport. Does not alter HISTORY or regular HOME cards.
+    property bool overviewDense: false
+    readonly property real overviewExtra: Math.max(0, height - 55)
+    readonly property alias contentItem: standardCardContents
+    // Only canonical HOME SERVICES uses this fit-safe two-row instrument.
+    property bool servicesCompact: false
+    readonly property alias compactFooterItem: servicesFooter
+    readonly property alias compactBodyItem: servicesCompactText
 
     property color accentColor: Colors.cyan
     property color valueColor: Colors.white
@@ -25,17 +36,20 @@ Rectangle {
     signal pinRequested()
 
     color: Colors.black
+    clip: true
     border.width: 1
     border.color: Colors.cyan
 
     Column {
+        id: standardCardContents
+        visible: !card.servicesCompact
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 5
+        anchors.margins: card.overviewDense ? 1 + Math.min(3,Math.floor(card.overviewExtra / 11)) : (card.compact ? 4 : 10)
+        spacing: card.overviewDense ? 0 + Math.min(3,Math.floor(card.overviewExtra / 11)) : (card.compact ? 1 : 5)
 
         GohuText {
             text: card.title
-            font.pixelSize: 10
+            font.pixelSize: card.overviewDense ? 8 + Math.min(2,Math.floor(card.overviewExtra / 16)) : (card.compact ? 9 : 10)
             color: card.accentColor
             width: parent.width - (card.pinEnabled ? 32 : 0)
             elide: Text.ElideRight
@@ -43,7 +57,7 @@ Rectangle {
 
         GohuText {
             text: card.valueText
-            font.pixelSize: 20
+            font.pixelSize: card.overviewDense ? 13 + Math.min(5,Math.floor(card.overviewExtra / 6)) : (card.compact ? 15 : 20)
             color: card.valueColor
             elide: Text.ElideRight
             width: parent.width
@@ -51,7 +65,7 @@ Rectangle {
 
         QuietText {
             text: card.detailText
-            font.pixelSize: 10
+            font.pixelSize: card.overviewDense ? 7 + Math.min(2,Math.floor(card.overviewExtra / 12)) : (card.compact ? 8 : 10)
             elide: Text.ElideRight
             width: parent.width
             visible: text.length > 0
@@ -78,7 +92,7 @@ Rectangle {
 
         QuietText {
             text: card.footerText
-            font.pixelSize: 9
+            font.pixelSize: card.overviewDense ? 7 + Math.min(2,Math.floor(card.overviewExtra / 12)) : (card.compact ? 8 : 9)
             elide: Text.ElideRight
             width: parent.width
             visible: text.length > 0
@@ -90,6 +104,61 @@ Rectangle {
             elide: Text.ElideRight
             width: parent.width
             visible: text.length > 0
+        }
+    }
+
+    // At 48px, four vertically stacked Gohu/Quiet text items can extend
+    // outside the painted card. Keep the service label and status side by
+    // side, with the detail and LAST SUCCESS on dedicated bounded rows.
+    Column {
+        id: servicesCompactText
+        objectName: "home-services-compact-text"
+        visible: card.servicesCompact
+        anchors.fill: parent
+        anchors.margins: 3
+        spacing: 1
+        Row {
+            width: parent.width
+            height: 15
+            spacing: 3
+            GohuText {
+                width: Math.max(1,parent.width * 0.54)
+                height: parent.height
+                verticalAlignment: Text.AlignVCenter
+                text: card.title
+                font.pixelSize: 9
+                color: card.accentColor
+                elide: Text.ElideRight
+            }
+            GohuText {
+                width: Math.max(1,parent.width * 0.44)
+                height: parent.height
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignRight
+                text: card.valueText
+                font.pixelSize: 10
+                color: card.valueColor
+                elide: Text.ElideRight
+            }
+        }
+        QuietText {
+            width: parent.width
+            height: 11
+            verticalAlignment: Text.AlignVCenter
+            text: card.detailText
+            font.pixelSize: 8
+            elide: Text.ElideRight
+        }
+        QuietText {
+            id: servicesFooter
+            objectName: "home-services-last-success-footer"
+            width: parent.width
+            height: 11
+            verticalAlignment: Text.AlignVCenter
+            text: card.footerText
+            font.pixelSize: 8
+            color: Colors.cyan
+            elide: Text.ElideRight
         }
     }
 

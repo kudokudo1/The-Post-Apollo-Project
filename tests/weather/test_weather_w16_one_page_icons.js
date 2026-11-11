@@ -1,0 +1,63 @@
+"use strict";
+const test=require("node:test");
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const read=n=>fs.readFileSync("widgets/weather/"+n,"utf8");
+const home=read("StationHome.qml");
+const summary=read("StationWeatherTerminalSummary.qml");
+const card=read("StationHomeMetricCard.qml");
+const terminal=read("StationWeatherInstrumentTerminal.qml");
+
+test("W16 preserves original weather artwork but enlarges current, hour, day and overview glyphs",()=>{
+ assert.match(terminal,/terminal\.sky\.conditionState\.icon/);
+ assert.match(terminal,/hour\.forecastState\.icon/);
+ assert.match(terminal,/day\.dayState\.icon/);
+ assert.match(terminal,/WeatherCelestialGlyph\s*\{/);
+ assert.match(terminal,/width: Math\.max\(68,Math\.min\(90,currentPanel\.height\+12\)\)/);
+ assert.match(terminal,/font\.pixelSize: Math\.max\(78,mainWeatherIcon\.width\+8\)/);
+ assert.match(terminal,/font\.pixelSize: Math\.max\(40,hourGlyph\.width\+7\)/);
+ assert.match(terminal,/font\.pixelSize: Math\.max\(34,dayGlyph\.width\+5\)/);
+ assert.match(summary,/font\.pixelSize: 25/);
+ assert.equal((summary.match(/font\.pixelSize: 25/g)||[]).length,2);
+ assert.doesNotMatch(terminal,/StationWeatherLineGlyph\s*\{/);
+ assert.doesNotMatch(summary,/StationWeatherLineGlyph\s*\{/);
+});
+test("W16 OVERVIEW uses the EXACT U+26A1 U+FE0E text-style lightning bolt",()=>{
+ const match=summary.match(/if\(n>=95\) return "([^"]+)";/);
+ assert.ok(match,"no thunderstorm glyph");
+ assert.equal(match[1],String.fromCodePoint(0x26a1,0xfe0e));
+ assert.notEqual(match[1],"⚡");
+});
+test("W16 one-page OVERVIEW shows original Snapshot and AUTO rows simultaneously",()=>{
+ assert.match(home,/id: weatherSnapshotRow/);
+ assert.match(home,/id: weatherRelevantRow/);
+ assert.match(home,/visible: home\.sectionVisible\("snapshot"\)/);
+ assert.match(home,/visible: home\.sectionVisible\("relevant"\)/);
+ assert.doesNotMatch(home,/overviewPage|overviewSelectionRequested/);
+ assert.doesNotMatch(summary,/overviewHeaderPages|overviewSelectionRequested/);
+ assert.match(home,/overviewCardRowHeight/);
+ assert.match(home,/overviewInstrumentHeight/);
+ assert.match(home,/overviewDense: home\.fixedWeatherOverview/);
+ assert.match(home,/compact: home\.fixedWeatherOverview/);
+ assert.match(card,/property bool overviewDense: false/);
+ assert.match(card,/card\.overviewDense \? 1/);
+ assert.match(card,/card\.overviewDense \? 0/);
+ assert.equal((home.match(/title: "CURRENT WEATHER"/g)||[]).length,1);
+ assert.equal((home.match(/title: "NEXT HOURS"/g)||[]).length,1);
+ assert.equal((home.match(/title: "AIR QUALITY"/g)||[]).length,1);
+ assert.match(home,/model: home\.watchItems/);
+ assert.match(home,/onPinRequested:/);
+});
+test("W16 keeps normal overview still; rare NWS alerts retain full detail by allowing scrolling only then",()=>{
+ assert.match(home,/readonly property bool overviewRequiresScroll:/);
+ assert.match(home,/fixedWeatherOverview && officialAlertSummary\.available/);
+ assert.match(home,/!home\.fixedWeatherOverview\s+\|\| home\.overviewRequiresScroll/);
+ assert.match(home,/!home\.overviewRequiresScroll \? height : Math\.max/);
+ assert.match(home,/visible: home\.officialAlertSummary\.available/);
+ assert.match(home,/height: 108/);
+ assert.match(home,/visible: scrollable && !home\.compactHistory/);
+ assert.match(home,/home\.overviewRequiresScroll/);
+ assert.match(summary,/height: 164/);
+ assert.match(card,/height: 7/);
+ assert.match(card,/property real meterValue: 0/);
+});

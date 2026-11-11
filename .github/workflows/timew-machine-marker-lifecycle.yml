@@ -1,0 +1,33 @@
+name: TimeW MACHINE marker candidate lifetime
+
+on:
+  pull_request:
+    paths:
+      - "integrations/machine/brave-topology/marker.mjs"
+      - "integrations/machine/brave-topology/marker-lifecycle.mjs"
+      - "integrations/machine/brave-topology/marker.html"
+      - "tests/timew/test_machine_brave_marker_lifecycle.mjs"
+      - "tests/timew/test_machine_brave_marker_lifecycle_ui.mjs"
+      - "docs/timew-machine-brave-marker-lifecycle.md"
+      - ".github/workflows/timew-machine-marker-lifecycle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  marker-lifecycle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify in-memory candidate state and explicit revalidation
+        run: node tests/timew/test_machine_brave_marker_lifecycle.mjs
+      - name: Verify live-style browser events and stale native reply invalidation
+        run: node tests/timew/test_machine_brave_marker_lifecycle_ui.mjs
+      - name: Preserve nonce, browser self-close and no new permissions
+        run: node tests/timew/test_machine_brave_title_marker.mjs
+      - name: Preserve native Sway title and disposable registration refusal
+        run: |
+          python3 -B -I tests/timew/test_machine_brave_title_marker.py
+          python3 -B -I tests/timew/test_machine_brave_title_trial.py

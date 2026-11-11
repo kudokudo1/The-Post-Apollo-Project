@@ -107,8 +107,9 @@ Rectangle {
             visible: surface.activeFamily === "home"
                      && surface.homeSection !== "magick"
             subjectRoute: ""
-            workspaceSection: surface.homeSection === "overview"
-                              ? "" : surface.homeSection
+            // Explicit OVERVIEW keeps legacy unscoped CLASSIC behavior
+            // separate from the focused HOME workspace route.
+            workspaceSection: surface.homeSection
             weatherService: surface.weatherService
             spaceService: surface.spaceService
             nwsAlertSource: surface.nwsAlertSource

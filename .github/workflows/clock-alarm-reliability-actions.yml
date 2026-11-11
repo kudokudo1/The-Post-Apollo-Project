@@ -1,0 +1,124 @@
+name: Clock alarm reliability and live popup controls
+
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmManagerPolicy.js"
+      - "services/time/AlarmManagerService.qml"
+      - "services/notifications/ClockAlarmNotificationActionPolicy.js"
+      - "services/notifications/ClockAlarmNotificationActions.qml"
+      - "services/notifications/qmldir"
+      - "modules/Notifications.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "tests/time/test_clock_alarm_reliability_popup_actions_contract.py"
+      - ".github/workflows/clock-alarm-reliability-actions.yml"
+  push:
+    paths:
+      - "services/time/AlarmManagerPolicy.js"
+      - "services/time/AlarmManagerService.qml"
+      - "services/notifications/ClockAlarmNotificationActionPolicy.js"
+      - "services/notifications/ClockAlarmNotificationActions.qml"
+      - "services/notifications/qmldir"
+      - "modules/Notifications.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "tests/time/test_clock_alarm_reliability_popup_actions_contract.py"
+      - ".github/workflows/clock-alarm-reliability-actions.yml"
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source and no-focus popup integration contracts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_alarm_reliability_popup_actions_contract.py' -v
+      - name: Exercise same-minute ring, missed-weekly receipt and stale-popup refusal
+        run: |
+          node <<'JS'
+          const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+          function load(path){
+            const x={};
+            vm.runInNewContext(fs.readFileSync(path,'utf8').replace(/^\.pragma library\s*/,''),x);
+            return x;
+          }
+          const p=load('services/time/AlarmManagerPolicy.js');
+          const action=load('services/notifications/ClockAlarmNotificationActionPolicy.js');
+          const notify=load('services/notifications/ClockAlarmNotificationPolicy.js');
+          const when=(h,m,s=0)=>new Date(2026,10,11,h,m,s,0).getTime();
+          const before=when(6,39,30),due=when(6,40),after=when(6,40,5);
+          let doc=p.create(p.initialDocument(),before).document;
+          let edit=p.update(doc,1,{hour:6,minute:40,weekdays:[3],enabled:true},before);
+          assert.equal(edit.ok,true);doc=edit.document;
+          assert.equal(p.nextOccurrenceMs(doc.alarms[0],before),due);
+          assert.equal(p.tick(doc,due-1).started.length,0);
+          const fired=p.tick(doc,after);
+          assert.deepEqual(Array.from(fired.started),[1]);
+          assert.equal(fired.document.alarms[0].lastEventKind,'fired');
+          assert.equal(fired.document.alarms[0].lastFiredAtMs,after);
+          assert.equal(fired.document.alarms[0].lastExpectedAtMs,due);
+          assert.equal(p.tick(fired.document,after+1).started.length,0);
+          const entry=notify.payload(fired.document.alarms[0],after);
+          assert.ok(entry);
+          assert.equal(action.liveOccurrence(entry,fired.document.alarms[0],after+500).alarmId,1);
+          assert.equal(action.validAction('stop'),true);
+          assert.equal(action.validAction('snooze'),true);
+          assert.equal(action.validAction('delete'),false);
+          assert.equal(action.liveOccurrence({...entry,id:'forged'},fired.document.alarms[0],after+500),null);
+          assert.equal(action.liveOccurrence({...entry,context:{...entry.context,alarmId:2}},
+            fired.document.alarms[0],after+500),null);
+          assert.equal(action.liveOccurrence({...entry,context:{...entry.context,resourceId:'alarm-2'}},
+            fired.document.alarms[0],after+500),null);
+          assert.equal(action.liveOccurrence(entry,{...fired.document.alarms[0],ringStartedAtMs:after+1},
+            after+500),null);
+          assert.equal(action.liveOccurrence(entry,fired.document.alarms[0],after+16*60000),null);
+          const stopped=p.stop(fired.document,1,after+1300).document;
+          assert.equal(stopped.alarms[0].lastEventKind,'stopped');
+          assert.equal(stopped.alarms[0].lastFiredAtMs,after);
+          assert.equal(action.liveOccurrence(entry,stopped.alarms[0],after+1500),null);
+          assert.equal(p.tick(stopped,after+2000).started.length,0);
+          // Re-enable the same weekday after already having rung: no double fire.
+          const disabled=p.update(stopped,1,{enabled:false},after+2100).document;
+          const again=p.update(disabled,1,{enabled:true},after+2200);
+          assert.equal(again.ok,true);
+          assert.equal(again.document.alarms[0].lastFiredDay,'2026-11-11');
+          assert.equal(p.tick(again.document,after+2400).started.length,0);
+          // A newly armed same-minute time is legitimately due now.
+          const mid=when(6,40,30);
+          let same=p.create(p.initialDocument(),mid).document;
+          same=p.update(same,1,{hour:6,minute:40,weekdays:[3],enabled:true},mid).document;
+          assert.equal(same.alarms[0].lastFiredDay,'');
+          assert.equal(p.nextOccurrenceMs(same.alarms[0],mid),due);
+          assert.deepEqual(Array.from(p.tick(same,mid+1000).started),[1]);
+          // But if 2-minute grace elapsed, save the missed event and don't ring.
+          let miss=p.create(p.initialDocument(),before).document;
+          miss=p.update(miss,1,{hour:6,minute:40,weekdays:[3],enabled:true},before).document;
+          const late=when(6,43);
+          const missed=p.tick(miss,late);
+          assert.deepEqual(Array.from(missed.missed),[1]);
+          assert.equal(missed.document.alarms[0].lastFiredDay,'2026-11-11');
+          assert.equal(missed.document.alarms[0].lastEventKind,'missed');
+          assert.equal(missed.document.alarms[0].lastMissedAtMs,late);
+          assert.equal(missed.document.alarms[0].lastExpectedAtMs,due);
+          assert.equal(p.tick(missed.document,late+1000).missed.length,0);
+          const persisted=p.parse(JSON.stringify(missed.document));
+          assert.equal(persisted.ok,true);
+          assert.equal(persisted.document.alarms[0].lastMissedAtMs,late);
+          // Existing V2 records lacking new receipts remain valid, default in RAM.
+          const old=JSON.parse(JSON.stringify(miss));
+          ['lastEventKind','lastEventAtMs','lastExpectedAtMs',
+           'lastFiredAtMs','lastMissedAtMs'].forEach(key=>delete old.alarms[0][key]);
+          const migrated=p.parse(JSON.stringify(old));
+          assert.equal(migrated.ok,true);
+          assert.equal(migrated.document.alarms[0].lastEventKind,'none');
+          assert.equal(migrated.document.alarms[0].lastFiredAtMs,0);
+          // Snooze creates a new occurrence. The original alert is now stale.
+          const snoozed=p.snooze(fired.document,1,after+1000).document;
+          assert.equal(snoozed.alarms[0].lastEventKind,'snoozed');
+          assert.equal(action.liveOccurrence(entry,snoozed.alarms[0],after+1200),null);
+          const wake=p.tick(snoozed,after+301000);
+          assert.equal(wake.started.length,1);
+          assert.ok(wake.document.alarms[0].ringStartedAtMs>after);
+          assert.equal(action.liveOccurrence(entry,wake.document.alarms[0],after+301000),null);
+          console.log('Alarm occurrence receipts, same-minute, missed-weekly, exact STOP/SNOOZE witness: PASS');
+          JS

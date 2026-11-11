@@ -14,6 +14,9 @@ Rectangle {
     property var weatherService: null
     // One source owned by the persistent SUBJECTS navigator, not this pane.
     property var celestialSource: null
+    readonly property bool servicesRoute:
+        subjectRoute === "magick/services/health"
+    readonly property alias servicesView: magickServicesView
     readonly property bool showCelestial:
         MagickPolicy.visualForRoute(subjectRoute)
     readonly property bool standaloneAstrology:
@@ -36,7 +39,7 @@ Rectangle {
     readonly property bool journalRoute:
         subjectRoute === "magick/grimoire/journal"
     readonly property bool independentScreen:
-        standaloneAstrology || lensesLanding || tarotRoute ||
+        servicesRoute || standaloneAstrology || lensesLanding || tarotRoute ||
         timingRoute || symbolismRoute || journalRoute
     // Supplied by the existing Station root; no independent clock.
     property real runtimeNowMs: 0
@@ -107,6 +110,7 @@ Rectangle {
         anchors.bottomMargin: magickPane.standaloneAstrology ? 8
                               : magickPane.lensesLanding ? 0 : 8
         color: Colors.black
+        visible: !magickPane.servicesRoute
         border.width: magickPane.lensesLanding ? 0 : 1
         border.color: Colors.magenta
         clip: true
@@ -115,7 +119,8 @@ Rectangle {
             anchors.fill: parent
             anchors.margins: magickPane.standaloneAstrology ? 3
                              : magickPane.lensesLanding ? 0 : 4
-            active: magickPane.visible && magickPane.kind === "reference"
+            active: magickPane.visible && !magickPane.servicesRoute
+                    && magickPane.kind === "reference"
             sourceComponent: magickPane.standaloneAstrology
                              ? standaloneAstrologyReference
                              : magickPane.lensesLanding
@@ -141,6 +146,16 @@ Rectangle {
                              : magickPane.primaryObservation !== ""
                                ? singleReference : unimplemented
         }
+    }
+
+    StationMagickServicesPane {
+        id: magickServicesView
+        objectName: "magick-w7-services-host"
+        anchors.fill: parent
+        visible: magickPane.servicesRoute
+        weatherService: magickPane.weatherService
+        celestialSource: magickPane.celestialSource
+        runtimeNowMs: magickPane.runtimeNowMs
     }
 
     // M30-F // Standalone, non-scrolling ASTROLOGY. The original rich

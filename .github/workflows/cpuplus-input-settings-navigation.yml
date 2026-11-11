@@ -1,0 +1,63 @@
+name: CPU++ Input Settings Navigation and Keyboard Lock Startup
+
+on:
+  pull_request:
+    paths:
+      - "widgets/CpuPlusW.qml"
+      - "widgets/cpuplus/CpuPlusSettingsKeyboardPane.qml"
+      - "services/input/**"
+      - "scripts/cpuplus/verify_keyboard_lock_native.sh"
+      - "tests/cpuplus/fixtures/KeyboardLockNative.qml"
+      - "tests/cpuplus/test_cpuplus_input_category_navigation.py"
+      - "tests/cpuplus/test_keyboard_lock_*.py"
+      - "tests/cpuplus/test_keyboard_remember_*.py"
+      - "tests/cpuplus/test_keyboard_lock_policy.cjs"
+      - "tests/cpuplus/test_keyboard_led_*.py"
+      - "tests/cpuplus/test_keyboard_led_policy.cjs"
+      - ".github/workflows/cpuplus-input-settings-navigation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify seven Settings routes and icon-only design
+        run: python3 tests/cpuplus/test_cpuplus_input_category_navigation.py
+      - name: Verify keyboard startup UI and explicit confirmation
+        run: python3 tests/cpuplus/test_keyboard_lock_controls.py
+      - name: Verify isolated Sway file writer safety and reversibility
+        run: python3 tests/cpuplus/test_keyboard_lock_startup.py
+      - name: Verify saved keyboard policy format
+        run: node tests/cpuplus/test_keyboard_lock_policy.cjs
+      - name: Verify opt-in Remember startup authorization and CAS safety
+        run: python3 tests/cpuplus/test_keyboard_remember_startup.py
+      - name: Verify four modes and baseline transition gating
+        run: python3 tests/cpuplus/test_keyboard_remember_controls.py
+      - name: Verify fake-sysfs LED proxy refusal and ambiguity
+        run: python3 tests/cpuplus/test_keyboard_led_probe.py
+      - name: Verify LED evidence boundary and explicit UI copy
+        run: python3 tests/cpuplus/test_keyboard_led_contract.py
+      - name: Verify persisted LED observation schema
+        run: node tests/cpuplus/test_keyboard_led_policy.cjs
+
+  native-quickshell:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 15
+    steps:
+      - name: Install disposable Quickshell / Xvfb smoke dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg python3 coreutils findutils \
+            xorg-x11-server-Xvfb
+      - uses: actions/checkout@v4
+      - name: Real QML startup, independent lock saves, no Sway write
+        run: bash scripts/cpuplus/verify_keyboard_lock_native.sh

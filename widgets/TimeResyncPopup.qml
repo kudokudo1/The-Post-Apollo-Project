@@ -5,7 +5,7 @@ import "../components"
 // Clock's top ⟳ menu. This is presentation only: the existing shared
 // TimeSettings service owns confirmation, authorization, diagnostics and
 // reference checks. Merely opening this menu never changes Linux time.
-Rectangle {
+WindowPanelFrame {
     id: popup
 
     signal closeRequested()
@@ -13,10 +13,20 @@ Rectangle {
     width: 308
     height: 320
     radius: 0
-    color: Colors.black
-    border.width: 1
-    border.color: Colors.yellow
-    clip: true
+    // Original RESYNC yellow identity: its own border and two-stage halo.
+    // Keep the dark opaque background and top-right control anchoring.
+    // The popup is presentation-only; no TimeSettings behavior changes.
+    fillColor: Colors.black
+    fillOpacity: 1.0
+    borderColor: Colors.yellow
+    borderWidth: 1
+    glowVisible: true
+    glowColor: Colors.yellow
+    closeGlowSpread: 6
+    closeGlowOpacity: 0.46
+    wideGlowSpread: 13
+    wideGlowOpacity: 0.18
+    clipContent: true
 
     Column {
         anchors.fill: parent

@@ -81,10 +81,22 @@ def _decode(raw):
     try:
         doc = json.loads(raw[len(PREFIX):].decode("utf-8"),
                          object_pairs_hook=_unique)
-    except (ValueError, UnicodeError):
+    except (ValueError, UnicodeError, RecursionError):
+        # A bounded byte count does not itself bound JSON nesting depth.
         deny("C4C_REPORT_JSON_REFUSED")
     if type(doc) is not dict or set(doc) != FIELDS:
         deny("C4C_REPORT_SHAPE_REFUSED")
+    # The C4c producer emits sorted, compact ASCII JSON. Alternate spellings
+    # (extra spaces, reordered keys, escaped ASCII) are not the exact report
+    # bytes that were created in the signed-process guest. Refuse them rather
+    # than accepting several byte representations of one diagnostic claim.
+    try:
+        canonical = json.dumps(doc, sort_keys=True, separators=(",", ":"),
+                               ensure_ascii=True, allow_nan=False).encode("ascii")
+    except (ValueError, TypeError, RecursionError):
+        deny("C4C_REPORT_NONCANONICAL_REFUSED")
+    if raw[len(PREFIX):] != canonical:
+        deny("C4C_REPORT_NONCANONICAL_REFUSED")
     return doc
 
 

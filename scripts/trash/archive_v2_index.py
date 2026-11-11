@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""Trash++ V2c: bounded, read-only SQLite copy index for the Archive UI.
+
+This process has exactly one verb: index. It never creates an Archive database,
+replays destructive actions, reads original owner sources, or returns payloads.
+Its index is metadata-only and does not claim full payload integrity.
+"""
+from contextlib import closing
+from datetime import datetime, timezone
+import json
+import os
+from pathlib import Path
+import re
+import sqlite3
+import stat
+import sys
+from urllib.parse import quote
+
+# Python -I omits the script directory. Import only the installed app-root
+# location policy, not the Archive writer or source mutation modules.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.trash.archive_v2_location import ArchiveRootError, archive_directory
+from scripts.trash.archive_v2_capacity import CapacityError, capacity
+from scripts.trash.archive_v2_provenance import ProvenanceError, verify_receipt
+
+DB_NAME = "trashpp-archive-v2.sqlite3"
+STORE_SCHEMA = "post-apollo.trash-archive.v2a"
+PAGE_SIZE = 25
+MAX_QUERY_LENGTH = 80
+MAX_DIRECTORY_ARG = 4096
+CURSOR = re.compile(r"^([1-9][0-9]{0,12}):([0-9a-f]{32})$")
+HEX_ID = re.compile(r"^[0-9a-f]{32}$")
+HEX_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+RESOURCE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+ALLOWED_OWNERS = {"demo-scrape", "weather-events"}
+
+
+class ReadIndexError(Exception):
+    pass
+
+
+def _require(condition, code):
+    if not condition:
+        raise ReadIndexError(code)
+
+
+def _private_regular(path, require_private_mode=True):
+    try:
+        entry = path.lstat()
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise ReadIndexError("ARCHIVE_UNAVAILABLE") from exc
+    _require(stat.S_ISREG(entry.st_mode)
+             and entry.st_uid == os.geteuid()
+             and entry.st_nlink == 1
+             and (not require_private_mode or entry.st_mode & 0o077 == 0),
+             "ARCHIVE_FILE_UNSAFE")
+    return True
+
+
+def _dir(directory):
+    _require(isinstance(directory, str)
+             and directory.startswith("/")
+             and ".." not in Path(directory).parts
+             and "\x00" not in directory
+             and len(directory) <= MAX_DIRECTORY_ARG, "INVALID_DATA_DIRECTORY")
+    path = Path(directory)
+    try:
+        entry = path.lstat()
+    except OSError as exc:
+        raise ReadIndexError("ARCHIVE_ROOT_UNAVAILABLE") from exc
+    _require(stat.S_ISDIR(entry.st_mode)
+             and entry.st_uid == os.geteuid()
+             and entry.st_mode & 0o077 == 0, "ARCHIVE_ROOT_UNSAFE")
+    return path
+
+
+def _cursor(value):
+    if value == "":
+        return None
+    _require(isinstance(value, str), "INVALID_PAGE_CURSOR")
+    match = CURSOR.fullmatch(value)
+    _require(match is not None and 1 <= int(match.group(1)) <= 9999999999999,
+             "INVALID_PAGE_CURSOR")
+    return int(match.group(1)), match.group(2)
+
+
+def _query(value):
+    _require(isinstance(value, str) and len(value) <= MAX_QUERY_LENGTH
+             and all(c.isprintable() for c in value), "INVALID_SEARCH_QUERY")
+    return value.strip()
+
+
+def _response(items, count, next_cursor=None, state="READY", query="",
+              storage=None):
+    return {"ok": True, "kind": "archive-v2-index", "readOnly": True,
+            "schema": STORE_SCHEMA, "state": state, "total": count,
+            "items": items, "hasMore": next_cursor is not None,
+            "nextCursor": next_cursor, "pageSize": PAGE_SIZE, "query": query,
+            "capacity": storage}
+
+
+def _row(raw):
+    _require(isinstance(raw, (tuple, list)) and len(raw) == 20,
+             "ARCHIVE_METADATA_INVALID")
+    sid, owner, rid, revision, captured, label, checksum, size = raw[:8]
+    _require(isinstance(sid, str) and HEX_ID.fullmatch(sid) is not None,
+             "ARCHIVE_METADATA_INVALID")
+    _require(owner in ALLOWED_OWNERS, "ARCHIVE_OWNER_UNAUTHORIZED")
+    _require(isinstance(rid, str) and RESOURCE_ID.fullmatch(rid) is not None
+             and isinstance(revision, str)
+             and RESOURCE_ID.fullmatch(revision) is not None,
+             "ARCHIVE_METADATA_INVALID")
+    _require(type(captured) is int and 1 <= captured <= 9999999999999,
+             "ARCHIVE_METADATA_INVALID")
+    _require(isinstance(label, str) and len(label) <= 120
+             and all(c.isprintable() for c in label)
+             and isinstance(checksum, str)
+             and HEX_DIGEST.fullmatch(checksum) is not None
+             and type(size) is int and 1 <= size <= 8 * 1024 * 1024,
+             "ARCHIVE_METADATA_INVALID")
+    try:
+        provenance = verify_receipt(
+            (sid, owner, rid, revision, captured, label, checksum, raw[8]),
+            raw[9:])
+    except ProvenanceError as exc:
+        raise ReadIndexError(str(exc)) from exc
+    when = datetime.fromtimestamp(captured / 1000, timezone.utc)
+    source_label = ("WEATHER // V2 COPY" if owner == "weather-events"
+                    else "RESEARCH // V2 COPY")
+    provenance_note = ("RECEIPT " + provenance["receiptSha256"][:10]
+                       if provenance["state"] == "RECEIPT_MATCHED"
+                       else "LEGACY // NO RECEIPT")
+    return {"id": sid, "ownerId": owner, "resourceId": rid,
+            "sourceRevision": revision, "provenance": provenance,
+            "kind": "V2 SNAPSHOT",
+            "source": source_label, "title": label or "UNTITLED COPY",
+            "recordedAtMs": captured, "recordedAt": when.strftime("%Y-%m-%d %H:%M UTC"),
+            "state": "archived-v2", "copyOnly": True, "verified": False,
+            "details": f"{size} BYTES // {provenance_note} // PAYLOAD NOT VERIFIED",
+            "capabilities": {"inspect": True, "saveCopy": False,
+                             "archive": False, "trash": False,
+                             "restore": False, "burn": False}}
+
+
+def index(directory, cursor="", query=""):
+    page_after = _cursor(cursor)
+    needle = _query(query)
+    try:
+        selected = archive_directory(directory, create=False)
+    except ArchiveRootError as exc:
+        raise ReadIndexError(str(exc)) from exc
+    if selected is None:
+        return _response([], 0, state="NOT_INSTALLED", query=needle)
+    root = _dir(str(selected))
+    database = root / DB_NAME
+    if not _private_regular(database):
+        return _response([], 0, state="NOT_INSTALLED", query=needle)
+    # V2a deliberately uses DELETE rollback journals, not WAL. Refuse any
+    # unexpected sidecar before SQLite opens the database.
+    for suffix in ("-wal", "-shm"):
+        try:
+            (root / (DB_NAME + suffix)).lstat()
+        except FileNotFoundError:
+            continue
+        raise ReadIndexError("ARCHIVE_UNEXPECTED_SIDECAR")
+    # Parent root is private; check journal type/owner/link but avoid
+    # racing SQLite's transient rollback-journal file permissions.
+    _private_regular(root / (DB_NAME + "-journal"), require_private_mode=False)
+    try:
+        storage = capacity(root)
+    except CapacityError as exc:
+        raise ReadIndexError(str(exc)) from exc
+    # SQLite URI mode=ro prevents creation or modification of this database.
+    # A hot rollback journal that requires write recovery fails closed.
+    uri = "file:" + quote(str(database), safe="/") + "?mode=ro&cache=private"
+    try:
+        with closing(sqlite3.connect(uri, uri=True, timeout=1)) as db:
+            db.execute("PRAGMA query_only=ON")
+            db.execute("PRAGMA busy_timeout=1000")
+            # Pin the count and page to one read transaction. A source
+            # insertion between queries must not fabricate a stale total.
+            db.execute("BEGIN")
+            meta = db.execute("SELECT schema_id FROM archive_meta WHERE id=1").fetchone()
+            _require(meta == (STORE_SCHEMA,), "ARCHIVE_SCHEMA_UNSUPPORTED")
+            columns = {row[1] for row in db.execute("PRAGMA table_info(snapshots)")}
+            has_flag = "provenance_required" in columns
+            has_receipts = db.execute("""SELECT 1 FROM sqlite_master
+                WHERE type='table' AND name='snapshot_receipts'""").fetchone() is not None
+            # A partially upgraded database is unsafe. An entirely legacy
+            # V2a store can still be listed without fabricating receipts.
+            _require(has_flag == has_receipts, "ARCHIVE_PROVENANCE_SCHEMA_INVALID")
+            if has_flag:
+                from_clause = (" FROM snapshots s LEFT JOIN snapshot_receipts r"
+                               " ON r.snapshot_id=s.id")
+                receipt_cols = (
+                    ",s.provenance_required,r.snapshot_id,r.owner_id,"
+                    "r.resource_id,r.source_revision,r.source_captured_ms,"
+                    "r.archived_ms,r.display_label,r.payload_sha256,"
+                    "r.previous_receipt_sha256,r.receipt_sha256,r.receipt_schema"
+                )
+            else:
+                from_clause = " FROM snapshots s"
+                receipt_cols = ",0," + ",".join(["NULL"] * 11)
+            # Literal substring matching via parameter binding. Unlike LIKE,
+            # '%' and '_' remain literal characters. SQLite's built-in lower()
+            # is ASCII-case-insensitive; non-ASCII case folding is not promised.
+            search_clause = (
+                "(instr(lower(s.display_label), ?) > 0 "
+                "OR instr(lower(s.resource_id), ?) > 0 "
+                "OR instr(lower(s.owner_id), ?) > 0)"
+            )
+            search_params = (needle.lower(),) * 3
+            filters = [search_clause] if needle else []
+            if page_after:
+                filters.append("(s.captured_ms,s.id) < (?,?)")
+            where = " WHERE " + " AND ".join(filters) if filters else ""
+            count_where = " WHERE " + search_clause if needle else ""
+            total = db.execute(
+                "SELECT count(*) FROM snapshots s" + count_where,
+                search_params if needle else ()
+            ).fetchone()[0]
+            params = ((search_params if needle else ())
+                      + (page_after if page_after else ())
+                      + (PAGE_SIZE + 1,))
+            records = db.execute(
+                "SELECT s.id,s.owner_id,s.resource_id,s.source_revision,"
+                "s.captured_ms,s.display_label,s.sha256,length(s.payload)"
+                + receipt_cols + from_clause
+                + where + " ORDER BY s.captured_ms DESC,s.id DESC LIMIT ?",
+                params
+            ).fetchall()
+            # Refuse an entire page if a metadata row is malformed. Showing
+            # only a valid subset could falsely imply an exhaustive index.
+            selected = [_row(record) for record in records[:PAGE_SIZE]]
+            if len(records) > PAGE_SIZE:
+                # Validate the look-ahead row too so a broken next page cannot
+                # be silently advertised as healthy.
+                _row(records[PAGE_SIZE])
+            has_more = len(records) > PAGE_SIZE
+            last = selected[-1] if has_more else None
+            next_cursor = (str(last["recordedAtMs"]) + ":" + last["id"]
+                           if last else None)
+            return _response(selected, total, next_cursor, query=needle,
+                             storage=storage)
+    except sqlite3.Error as exc:
+        raise ReadIndexError("ARCHIVE_INDEX_UNAVAILABLE") from exc
+
+
+def main(argv):
+    try:
+        if len(argv) not in (3, 4, 5) or argv[1] != "index":
+            raise ReadIndexError("READ_ONLY_INDEX_ONLY")
+        result = index(argv[2], argv[3] if len(argv) >= 4 else "",
+                       argv[4] if len(argv) == 5 else "")
+    except ReadIndexError as exc:
+        result = {"ok": False, "error": str(exc)}
+    except Exception:
+        result = {"ok": False, "error": "ARCHIVE_INDEX_FAILED"}
+    print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+    return 0 if result["ok"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

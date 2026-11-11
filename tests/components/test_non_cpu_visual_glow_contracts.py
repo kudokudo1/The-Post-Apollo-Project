@@ -114,11 +114,11 @@ assert "font.pixelSize: 11" not in clock
 assert "font.pixelSize: 17" not in clock
 assert "font.pixelSize: 20" in clock
 assert "color: Colors.magenta" not in clock
-# Only the newly added reference-deviation underline is yellow. The existing
-# clock glyph sources must retain their 12h cyan / 24h orange identities.
+# Only the reference-deviation underline switches yellow (closed) to magenta
+# (open). The original eight clock glyph sources retain their own colors.
 glyph_region, warning_region = clock.split("// Underline exactly the readout cluster", 1)
 assert "color: Colors.yellow" not in glyph_region
-assert "color: Colors.yellow" in warning_region
+assert warning_region.count("color: clockButton.open ? Colors.magenta : Colors.yellow") == 2
 
 print("Non-CPU sampled-glow structural contracts: PASS")
 

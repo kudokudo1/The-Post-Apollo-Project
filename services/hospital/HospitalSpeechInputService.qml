@@ -7,6 +7,12 @@ Scope {
 
     property string voiceState: "checking"
     property bool backendReady: false
+    // Opt-in for Reception/Intercom; keeps legacy recording as a fallback.
+    property bool liveStreaming: false
+    // Host-owned single local recorder/recognizer shared with working Manage.
+    // No extra nested microphone process or Whisper instance per front desk.
+    property var liveEngine: null
+    property bool otherVoiceBusy: false
     property string backendStatus: "CHECKING"
     property string lastError: ""
     property string lastTranscript: ""
@@ -60,6 +66,8 @@ Scope {
         vadEnabled && vadAvailable
 
     signal transcriptionReady(string text, bool submitRequested)
+    signal liveTextReady(string text)
+    signal transcriptionFinished(bool submitRequested)
     signal voiceError(string message)
 
     function compactError(value) {
@@ -128,6 +136,11 @@ Scope {
     function startRecording() {
         if (busy)
             return false;
+        if (otherVoiceBusy) {
+            lastError = "MIC BUSY // ANOTHER HOSPITAL VOICE INPUT IS ACTIVE";
+            voiceError(lastError);
+            return false;
+        }
 
         if (!backendReady) {
             probe();
@@ -146,6 +159,35 @@ Scope {
         recordingElapsedSeconds = 0;
         recordingClock.restart();
         voiceState = "recording";
+
+        if (liveStreaming) {
+            // No persistent Reception WAV and no stop-before-inference path.
+            // The already used Manage helper owns and reaps its PipeWire child.
+            if (!liveEngine || !liveEngine.backendReady) {
+                if (liveEngine)
+                    liveEngine.probe();
+                recordingClock.stop();
+                voiceState = "idle";
+                lastError = "LOCAL LIVE MICROPHONE UNAVAILABLE // CHECK PIPEWIRE AND WHISPER";
+                voiceError(lastError);
+                return false;
+            }
+            // The shared Manage worker must use this front-desk VAD policy
+            // only for the owning recording; it is reset on finish/cancel.
+            liveEngine.vadActive = vadActive;
+            liveEngine.vadSpeechThreshold = vadSpeechThreshold;
+            liveEngine.vadSilenceMs = vadSilenceMs;
+            liveEngine.vadMinimumSpeechMs = vadMinimumSpeechMs;
+            if (!liveEngine.startRecording()) {
+                liveEngine.vadActive = false;
+                recordingClock.stop();
+                voiceState = "idle";
+                lastError = liveEngine.lastError || "LOCAL LIVE MICROPHONE REFUSED";
+                voiceError(lastError);
+                return false;
+            }
+            return true;
+        }
 
         recordProcess.command =
             vadActive
@@ -185,6 +227,16 @@ Scope {
         stopRequested = true;
         recordingClock.stop();
         voiceState = "stopping";
+        if (liveStreaming) {
+            if (!liveEngine || !liveEngine.stopRecording(false)) {
+                voiceState = "recording";
+                stopRequested = false;
+                submitAfterTranscription = false;
+                recordingClock.restart();
+                return false;
+            }
+            return true;
+        }
         recordProcess.running = false;
         return true;
     }
@@ -208,6 +260,11 @@ Scope {
         recordingStartedAt = 0;
         recordingElapsedSeconds = 0;
 
+        if (liveStreaming && busy && liveEngine) {
+            liveEngine.cancel();
+            liveEngine.vadActive = false;
+        }
+
         if (recordProcess.running) {
             recorderCancelled = true;
             recordProcess.running = false;
@@ -226,6 +283,55 @@ Scope {
     Component.onCompleted: {
         probe();
         probeVad();
+    }
+
+    // The live worker has no submission authority. Phrases go straight to
+    // the editor; only a separate user SEND/ASK action may dispatch them.
+    Connections {
+        target: root.liveEngine
+        ignoreUnknownSignals: true
+
+        function onLiveTextReady(text) {
+            // Only the front desk currently owning the single microphone
+            // may forward words. Manage and the other desk never receive them.
+            if (!root.liveStreaming || !root.busy)
+                return;
+            root.lastTranscript = String(text || "");
+            root.liveTextReady(text);
+        }
+        function onCaptureStopped() {
+            // The first phrase may already be visible, but the microphone
+            // has auto-closed at the bounded trial limit. Keep forwarding
+            // remaining partials while Whisper finishes its guarded queue.
+            if (!root.liveStreaming || !root.recording)
+                return;
+            root.recordingClock.stop();
+            root.voiceState = "transcribing";
+        }
+        function onLiveFinished() {
+            if (!root.liveStreaming || !root.busy)
+                return;
+            const shouldSubmit = root.submitAfterTranscription;
+            root.submitAfterTranscription = false;
+            root.stopRequested = false;
+            root.recordingClock.stop();
+            root.recordingStartedAt = 0;
+            root.recordingElapsedSeconds = 0;
+            root.voiceState = root.backendReady ? "idle" : "unavailable";
+            root.liveEngine.vadActive = false;
+            root.transcriptionFinished(shouldSubmit);
+        }
+        function onVoiceError(message) {
+            if (!root.liveStreaming || !root.busy)
+                return;
+            root.recordingClock.stop();
+            root.stopRequested = false;
+            root.submitAfterTranscription = false;
+            root.voiceState = root.backendReady ? "idle" : "unavailable";
+            root.lastError = String(message || "LOCAL LIVE DICTATION FAILED");
+            root.liveEngine.vadActive = false;
+            root.voiceError(root.lastError);
+        }
     }
 
     Timer {

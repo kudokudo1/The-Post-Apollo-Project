@@ -580,6 +580,44 @@ ShellRoot {
                 root.fail("U9F_OPEN_ROW_PALETTE");return;
             }
             console.log("U9F_PASS // OPEN_YELLOW_MAGENTA_ROW");
+            // CPU++ Stage 1 // Inspect ACTUAL QML mounting/geometry, not
+            // merely source strings or an assumed parent hierarchy.
+            const rails=[
+                {host:dossier,viewport:dossier.collectionScrollArea,
+                    bar:dossier.collectionScrollIndicator},
+                {host:dossier,viewport:dossier.dossierScrollArea,
+                    bar:dossier.dossierScrollIndicator},
+                {host:selector,viewport:selector.listScrollArea,
+                    bar:selector.listScrollIndicator}
+            ];
+            for(const entry of rails) {
+                const v=entry.viewport,bar=entry.bar;
+                if(!bar || !v || bar.parent!==v.parent
+                        || bar.parent===entry.host
+                        || bar.geometryHost!==v
+                        || bar.handleStyle!=="bar"
+                        || bar.maximumBarHandleHeight!==42
+                        || !bar.boxSideGeometry
+                        || bar.activeHandleExtent()>42.1) {
+                    root.fail("CPU_SCROLL_STAGE1_MOUNT_OR_STYLE");return;
+                }
+                // Compare in ONE coordinate system: wrapper-local bar.x
+                // is not directly comparable to pane-local viewport y.
+                const origin=v.mapToItem(entry.host,0,0);
+                const rendered=bar.mapToItem(entry.host,0,0);
+                if(Math.abs(rendered.x-(origin.x+v.width-bar.width-4))>1.1
+                        || Math.abs(rendered.y-(origin.y+2))>1.1
+                        || Math.abs(bar.height-Math.max(0,v.height-4))>1.1) {
+                    console.log("CPU_SCROLL_STAGE1_DIAG // "
+                        +String(v.objectName || "unnamed")
+                        +" origin="+origin.x+","+origin.y
+                        +" rendered="+rendered.x+","+rendered.y
+                        +" barSize="+bar.width+","+bar.height
+                        +" viewportSize="+v.width+","+v.height);
+                    root.fail("CPU_SCROLL_STAGE1_OUTSIDE_OWN_VIEWPORT");return;
+                }
+            }
+            console.log("CPU_SCROLL_STAGE1_PASS // 3_BOUNDED_FAVORITES_RAILS");
             // U9g // Recreate the actual hidden/shown selector lifecycle
             // BEFORE the click script begins. This catches stale colored
             // wash on inactive icon filters after menu re-entry.

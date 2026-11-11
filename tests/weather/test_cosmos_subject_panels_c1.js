@@ -288,7 +288,7 @@ test("C4 physical SUN activity and SPACE instruments have real native destinatio
   assert.equal(cosmos.needsSource("cosmos/sun/cycle","cycle"),true);
   const spaceTab=workspace.GROUPS.cosmos.find(x=>x.key==="space-weather");
   assert.equal(spaceTab.path,"cosmos/space-weather/overview");
-  assert.equal(spaceTab.label,"SPACE");
+  assert.equal(spaceTab.label,"SERVICES");
   assert.equal(workspace.selectedGroup("cosmos/space-weather/full"),"space-weather");
   assert.equal(workspace.selectedGroup("cosmos/sun/activity"),"sun");
   assert.ok(pane.includes("id: spaceHubComponent"));

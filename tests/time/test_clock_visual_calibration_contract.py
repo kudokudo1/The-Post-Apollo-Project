@@ -100,7 +100,7 @@ class ClockVisualCalibrationTests(unittest.TestCase):
     def test_underline_spans_time_cluster_not_icon_and_uses_evidence(self):
         self.assertIn("width: clockReadout.width", CLOCK)
         self.assertIn("x: clockRow.x + clockReadout.x", CLOCK)
-        self.assertIn("color: Colors.yellow", CLOCK)
+        self.assertEqual(CLOCK.count("color: clockButton.open ? Colors.magenta : Colors.yellow"), 2)
         self.assertIn("TimeSettings.dockTimeUnderlined(clock.date.getTime())", CLOCK)
         self.assertIn("displayDeviationActive", SERVICE)
         self.assertIn("hasFreshReference(nowEpochMs)", SERVICE)

@@ -4,6 +4,7 @@ import Quickshell.Io
 import "../../components"
 import "../weather" as WeatherStage
 import "../../services/messaging/adapters" as PhoneAdapters
+import "PhoneDirectorySearch.js" as DirectorySearch
 
 // PHONE stays in Social. CONNECT PHONE performs an explicit read-only check
 // of existing provider observations; no pairing, permission or link is granted.
@@ -15,6 +16,27 @@ Rectangle {
     clip: true
 
     property string selectedSection: "MESSAGES"
+    // Search is a local, ephemeral filter of the already approved snapshot,
+    // not an API call. Keep separate CONTACTS and MESSAGES queries.
+    property string contactSearchQuery: ""
+    property string messageSearchQuery: ""
+    readonly property var filteredPhoneConversations: {
+        if (!visible || !personalApproved || personalNeedsExplicitReload
+                || personalReadStatus !== "LOCAL_SNAPSHOT"
+                || !phoneReadAdapter.active)
+            return [];
+        return DirectorySearch.filterConversations(
+            phoneReadAdapter.conversations, messageSearchQuery);
+    }
+    readonly property var filteredPhoneContacts: {
+        if (!visible || !personalApproved || personalNeedsExplicitReload
+                || personalReadStatus !== "LOCAL_SNAPSHOT"
+                || !phoneReadAdapter.active)
+            return [];
+        return DirectorySearch.filterContacts(
+            phoneReadAdapter.contactCards, contactSearchQuery);
+    }
+    readonly property var contactDirectoryRows: DirectorySearch.contactDirectoryRows(filteredPhoneContacts)
     // Remembered Personal preference, not Identity Center authorization.
     property string personalReadStatus: "NOT_STARTED"
     property string personalReadOperation: ""
@@ -31,6 +53,23 @@ Rectangle {
     property bool personalNeedsExplicitReload: false
     // The QML tree must exist before lifecycle handlers reference children.
     property bool personalReadUiReady: false
+    // Selection is an opaque key into only the current authorized local
+    // contact snapshot. Never persist it or merge it with SMS thread IDs.
+    property string selectedPhoneContactId: ""
+    readonly property var selectedPhoneContactCard: {
+        if (!visible || selectedSection !== "CONTACTS"
+                || !personalApproved || personalNeedsExplicitReload
+                || personalReadStatus !== "LOCAL_SNAPSHOT"
+                || !phoneReadAdapter.active
+                || selectedPhoneContactId === "")
+            return null;
+        var cards = phoneReadAdapter.contactCards;
+        for (var i = 0; i < cards.length; ++i) {
+            if (String(cards[i].id) === selectedPhoneContactId)
+                return cards[i];
+        }
+        return null;
+    }
     Component.onCompleted: personalReadUiReady = true
     // A local Social identity is a display selector, never an auth grant.
     property string activeSocialIdentityId: ""
@@ -40,6 +79,9 @@ Rectangle {
         if (personalReadProcess.running)
             personalReadProcess.running = false;
         phoneReadAdapter.forgetHostView();
+        selectedPhoneContactId = "";
+        contactSearchQuery = "";
+        messageSearchQuery = "";
         personalApproved = false;
         personalPermissionOpen = false;
         personalNeedsExplicitReload = true;
@@ -125,11 +167,21 @@ Rectangle {
             refreshPhoneAudioControls();
             return;
         }
-        if (callPrerequisiteCheck !== "CHECKED"
-                || callPrerequisiteReport.state !== "PACKAGE_NOT_INSTALLED"
-                || callPrerequisiteReport.package !== "NOT_INSTALLED"
-                || callPrerequisiteReport.serviceLoad !== "not-found")
+        if (callPrerequisiteCheck !== "CHECKED")
             return;
+        if (callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED") {
+            if (callPrerequisiteReport.package !== "NOT_INSTALLED"
+                    || callPrerequisiteReport.serviceLoad !== "not-found")
+                return;
+        } else if (callPrerequisiteReport.state !== "SERVICE_STOPPED"
+                   && callPrerequisiteReport.state !== "AUDIO_PATH_UNVERIFIED") {
+            return;
+        } else if (callPrerequisiteReport.serviceLoad !== "loaded"
+                   || (callPrerequisiteReport.serviceActive !== "active"
+                       && callPrerequisiteReport.serviceActive !== "inactive")
+                   || callPrerequisiteReport.package === "NOT_INSTALLED") {
+            return;
+        }
         if (!stageHoleValid) {
             // Never launch a terminal behind an unusably small Social panel.
             callSetupStatus = "STAGE_BAY_TOO_SMALL";
@@ -150,7 +202,7 @@ Rectangle {
             return "Opening the oFono installer in PHONE...";
         if (callSetupStatus === "STAGED_TERMINAL_REQUESTED"
                 || callSetupStatus === "STAGED_TERMINAL_EXISTING")
-            return "Fedora's interactive installer runs in the PHONE terminal below. Use FOCUS TERMINAL if typing fails; after the command finishes, the terminal closes automatically. An active transaction is never killed by closing PHONE. Social has not assumed installation succeeded.";
+            return "Fedora's interactive installer runs in the PHONE terminal for missing oFono. Once installed, guided systemd and WirePlumber HFP setup uses the same PHONE terminal. Use FOCUS TERMINAL if typing fails; after the command finishes, the terminal closes automatically. An active transaction is never killed by closing PHONE. Social has not assumed installation succeeded or calling is ready.";
         if (callSetupStatus === "GUI_OPEN_REQUESTED")
             return "A native PackageKit installer was requested. Review and approve it there, then choose CHECK AGAIN. No installation was confirmed by Social.";
         if (callSetupStatus === "RECHECKING")
@@ -158,7 +210,9 @@ Rectangle {
         if (callSetupStatus === "INSTALL_NOT_CONFIRMED")
             return "oFono is still reported missing. On Silverblue, an rpm-ostree install is not active until a separately approved reboot. Check rpm-ostree status before retrying setup. No audio changes were made by Social.";
         if (callSetupStatus === "FOLLOWUP_REQUIRED")
-            return "Package check completed. The next step is shown below. CHECK AGAIN updates the existing service and call statuses without changing audio. On Silverblue, complete the separate reboot before expecting oFono to appear.";
+            return "Setup session ended. CHECK AGAIN refreshes prerequisites. Silverblue requires a separate reboot after package installation; service and HFP changes require separate confirmations.";
+        if (callSetupStatus === "READY_TO_CONTINUE")
+            return "oFono is installed. FINISH CALLING SETUP reviews service, user D-Bus access and the WirePlumber HFP backend. Each change needs a separate confirmation; CALLS ON PC remains a separate opt-in.";
         if (callSetupStatus === "STAGE_BAY_TOO_SMALL")
             return "PHONE is too small for an interactive installer. Enlarge the Social panel and try SET UP CALLING again. No external window was opened.";
         if (callSetupStatus === "TERMINAL_UNAVAILABLE")
@@ -184,12 +238,13 @@ Rectangle {
 
     // Explain the existing sanitized statuses without claiming verified audio.
     function callProgressText() {
-        if (callSetupStatus !== "FOLLOWUP_REQUIRED"
+        if ((callSetupStatus !== "FOLLOWUP_REQUIRED"
+                && callSetupStatus !== "READY_TO_CONTINUE")
                 || callPrerequisiteCheck !== "CHECKED")
             return "";
         var stage = callPrerequisiteReport.state;
         if (stage === "SERVICE_STOPPED")
-            return "oFono is installed, but its system service is stopped. It needs separately approved system-audio setup; PHONE will not start it automatically.";
+            return "oFono is installed but stopped. FINISH CALLING SETUP can request a one-time, separately approved service start; nothing starts automatically.";
         if (stage === "SERVICE_FAILED" || stage === "SERVICE_MASKED")
             return "oFono's service needs system-audio repair before calling. Your existing phone pairing and media settings remain untouched.";
         if (stage === "SERVICE_UNIT_MISSING" || stage === "INSPECTION_UNAVAILABLE")
@@ -246,7 +301,7 @@ Rectangle {
         if (state === "SERVICE_FAILED")
             return "The oFono service exists but failed to start. The system audio setup needs repair. No changes were made.";
         if (state === "SERVICE_STOPPED")
-            return "oFono is installed as a service but is stopped. It must be started through an approved system setup before calls can use this computer.";
+            return "oFono is installed as a service but is stopped. FINISH CALLING SETUP offers a reviewed, one-time system service start.";
         if (state === "SERVICE_STARTING")
             return "oFono is changing state. Wait until it is stable and check again. No audio changes were made.";
         if (state === "DBUS_NAME_MISSING")
@@ -567,8 +622,27 @@ Rectangle {
         stageProcess.running = true;
     }
 
+    // A tab change already refreshes Personal content below. Clicking the
+    // currently selected MESSAGES tab should also request a fresh one-shot
+    // authorized snapshot. Never prompt for new consent, unlock storage,
+    // re-pair, or start concurrent reads just because a tab was clicked.
+    function refreshMessagesTabOnRepeat() {
+        if (!visible || !personalReadUiReady
+                || selectedSection !== "MESSAGES"
+                || personalPermissionOpen || personalRevokeProcess.running)
+            return;
+        if (personalReadProcess.running || personalStatusProcess.running)
+            return; // An in-flight one-shot is already the latest attempt.
+        if (personalApproved && !personalNeedsExplicitReload)
+            loadPersonalSnapshot();
+        else
+            checkPersonalApproval(!personalNeedsExplicitReload, false);
+    }
+
     onSelectedSectionChanged: {
         if (!personalReadUiReady) return;
+        if (selectedSection !== "CONTACTS")
+            selectedPhoneContactId = "";
         if (selectedSection !== "DEVICE") closeStagedSetup();
         if (selectedSection !== "CALLS") {
             callsWorkspaceGeneration += 1;
@@ -688,6 +762,9 @@ Rectangle {
             if (phoneStorageUnlockProcess.running)
                 phoneStorageUnlockProcess.running = false;
             phoneReadAdapter.forgetHostView();
+            selectedPhoneContactId = "";
+            contactSearchQuery = "";
+            messageSearchQuery = "";
             personalPermissionOpen = false;
             personalApproved = false;
         }
@@ -707,6 +784,7 @@ Rectangle {
             personalPermissionOpen = false;
             personalApproved = false;
             phoneReadAdapter.forgetHostView();
+            selectedPhoneContactId = "";
             selectedSection = "MESSAGES";
             setupState = "NOT STARTED";
             setupReport = ({});
@@ -804,6 +882,61 @@ Rectangle {
             waiting = waiting || liveCalls[i].state === "waiting";
         }
         return active && waiting;
+    }
+
+    // Contact actions operate only on the current, approved Personal snapshot.
+    // A contact's primary value is a display field, not a trusted SMS thread
+    // identity or authority to dial. Never auto-place a call from CONTACTS.
+    function contactPrimaryDialNumber(card) {
+        if (!card || typeof card.primary !== "string")
+            return "";
+        var raw = card.primary.trim();
+        if (!/^[+]?[0-9 ()-]{3,32}$/.test(raw))
+            return "";
+        var normalized = raw.replace(/[ ()-]/g, "");
+        return /^[+]?[0-9]{3,18}$/.test(normalized) ? normalized : "";
+    }
+
+    function openSelectedContactForCall() {
+        var number = contactPrimaryDialNumber(selectedPhoneContactCard);
+        if (!visible || selectedSection !== "CONTACTS" || number === "")
+            return;
+        // Existing CALLS workspace still checks backend READY and requires
+        // REVIEW OUTGOING CALL, then a separate CONFIRM CALL.
+        selectedSection = "CALLS";
+        phoneDialInput.text = number;
+        callsConfirmDial = false;
+        callsPendingDial = "";
+    }
+
+    // A MAKE CALL row is not a dial command. Re-resolve the exact number
+    // from the current, authorized contact snapshot, then open the existing
+    // CALLS review/confirmation UI. Never use ephemeral IDs as recipients.
+    function openSelectedContactForNumber(raw) {
+        var card = selectedPhoneContactCard;
+        if (!visible || selectedSection !== "CONTACTS" || card === null
+                || card.hasAddressDetails !== true
+                || !Array.isArray(card.phoneNumbers)
+                || typeof raw !== "string"
+                || card.phoneNumbers.indexOf(raw) < 0)
+            return;
+        var number = contactPrimaryDialNumber({ primary: raw });
+        if (number === "")
+            return;
+        selectedSection = "CALLS";
+        phoneDialInput.text = number;
+        callsConfirmDial = false;
+        callsPendingDial = "";
+    }
+
+    function openSelectedContactMessages() {
+        if (!visible || selectedSection !== "CONTACTS"
+                || selectedPhoneContactCard === null)
+            return;
+        // There is no stable, authorized contacts-to-SMS conversation key
+        // in the BlueFerry projection. Never guess a matching thread, send
+        // an SMS or silently grant Messages read permission.
+        selectedSection = "MESSAGES";
     }
 
     function refreshCallsWorkspace() {
@@ -1093,6 +1226,7 @@ Rectangle {
     function revokePersonalAccess() {
         if (!visible || personalRevokeProcess.running)
             return;
+        selectedPhoneContactId = "";
         personalReadGeneration += 1;
         if (personalReadProcess.running)
             personalReadProcess.running = false;
@@ -1108,6 +1242,7 @@ Rectangle {
     }
 
     function clearPersonalView() {
+        selectedPhoneContactId = "";
         phoneReadAdapter.forgetHostView();
         personalReadStatus = "VIEW_CLEARED";
     }
@@ -1878,7 +2013,8 @@ Rectangle {
                     if (phonePane.callSetupStatus === "RECHECKING") {
                         phonePane.callSetupStatus = r.state === "PACKAGE_NOT_INSTALLED"
                                                     ? "INSTALL_NOT_CONFIRMED"
-                                                    : "FOLLOWUP_REQUIRED";
+                                                    : ["SERVICE_STOPPED", "AUDIO_PATH_UNVERIFIED"].indexOf(r.state) >= 0
+                                                      ? "READY_TO_CONTINUE" : "FOLLOWUP_REQUIRED";
                     }
                 } catch (error) {
                     phonePane.callPrerequisiteReport = ({});
@@ -2168,7 +2304,13 @@ Rectangle {
                     labelMinimumPixelSize: 8
                     accentColor: Colors.cyan
                     selected: phonePane.selectedSection === modelData
-                    onTriggered: phonePane.selectedSection = modelData
+                    onTriggered: {
+                        if (modelData === "MESSAGES"
+                                && phonePane.selectedSection === "MESSAGES")
+                            phonePane.refreshMessagesTabOnRepeat();
+                        else
+                            phonePane.selectedSection = modelData;
+                    }
                 }
             }
         }
@@ -2362,58 +2504,248 @@ Rectangle {
         }
     }
 
+    // Fixed search, outside both scrolling lists. Only locally filter the
+    // current, authorized in-memory snapshot. BlueFerry 0.9.1's legacy
+    // contact list may be only its first 100 rows; no global search claim.
+    Rectangle {
+        id: phoneListSearchBar
+        anchors.top: personalReadBar.bottom
+        anchors.left: parent.left
+        width: Math.min(200, Math.max(135, phonePane.width * 0.30))
+        height: visible ? 56 : 0
+        visible: phonePane.selectedSection === "MESSAGES"
+                 || phonePane.selectedSection === "CONTACTS"
+        color: Colors.dark
+        border.width: 1
+        border.color: Colors.cyan
+        z: 6
+
+        Text {
+            id: phoneSearchIcon
+            anchors.left: parent.left
+            anchors.leftMargin: 8
+            anchors.top: parent.top
+            anchors.topMargin: 11
+            text: "⌕"
+            color: Colors.cyan
+            font.pixelSize: 18
+        }
+        TextInput {
+            id: phoneContactsSearch
+            visible: phonePane.selectedSection === "CONTACTS"
+            anchors.left: phoneSearchIcon.right
+            anchors.leftMargin: 5
+            anchors.right: parent.right
+            anchors.rightMargin: 7
+            anchors.top: parent.top
+            anchors.topMargin: 10
+            height: 23
+            text: phonePane.contactSearchQuery
+            color: Colors.magenta
+            font.pixelSize: 11
+            clip: true
+            maximumLength: 128
+            selectByMouse: true
+            cursorDelegate: Rectangle {
+                width: 2
+                height: phoneContactsSearch.font.pixelSize + 2
+                color: Colors.orange
+            }
+            onTextChanged: {
+                phonePane.contactSearchQuery = text;
+                phonePane.selectedPhoneContactId = "";
+            }
+        }
+        TextInput {
+            id: phoneMessagesSearch
+            visible: phonePane.selectedSection === "MESSAGES"
+            anchors.left: phoneSearchIcon.right
+            anchors.leftMargin: 5
+            anchors.right: parent.right
+            anchors.rightMargin: 7
+            anchors.top: parent.top
+            anchors.topMargin: 10
+            height: 23
+            text: phonePane.messageSearchQuery
+            color: Colors.magenta
+            font.pixelSize: 11
+            clip: true
+            maximumLength: 128
+            selectByMouse: true
+            cursorDelegate: Rectangle {
+                width: 2
+                height: phoneMessagesSearch.font.pixelSize + 2
+                color: Colors.orange
+            }
+            onTextChanged: {
+                phonePane.messageSearchQuery = text;
+                if (phonePane.personalReadUiReady && phoneContactList)
+                    phoneContactList.clearSelection();
+            }
+        }
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 8
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 5
+            width: parent.width - 16
+            text: phonePane.selectedSection === "CONTACTS"
+                  ? (phonePane.contactSearchQuery.length > 0
+                     ? "FILTERING LOADED CONTACTS"
+                     : "SEARCH LOADED CONTACTS")
+                  : (phonePane.messageSearchQuery.length > 0
+                     ? "FILTERING CONVERSATIONS"
+                     : "SEARCH CONVERSATIONS")
+            textFormat: Text.PlainText
+            font.pixelSize: 8
+            color: Colors.orange
+            elide: Text.ElideRight
+        }
+        Text {
+            anchors.left: phoneContactsSearch.left
+            anchors.top: phoneContactsSearch.top
+            text: "Search contacts..."
+            font.pixelSize: 11
+            color: Colors.white
+            opacity: 0.55
+            visible: phoneContactsSearch.visible && phoneContactsSearch.text.length === 0
+        }
+        Text {
+            anchors.left: phoneMessagesSearch.left
+            anchors.top: phoneMessagesSearch.top
+            text: "Search messages..."
+            font.pixelSize: 11
+            color: Colors.white
+            opacity: 0.55
+            visible: phoneMessagesSearch.visible && phoneMessagesSearch.text.length === 0
+        }
+    }
+
     ContactList {
         id: phoneContactList
-        anchors.top: personalReadBar.bottom
+        anchors.top: phoneListSearchBar.bottom
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         width: Math.min(200, Math.max(135, phonePane.width * 0.30))
         visible: phonePane.selectedSection === "MESSAGES"
         conversations: phonePane.selectedSection === "MESSAGES"
-                       ? phoneReadAdapter.conversations : []
+                       ? phonePane.filteredPhoneConversations : []
         keyboardFocused: false
+        phonePreviewMode: true // Preserve four-line native Social conversation previews.
         onContactClicked: {
             if (selectedConversation && phonePane.selectedSection === "MESSAGES")
                 phoneReadAdapter.loadMessages(String(selectedConversation.id));
         }
     }
 
-    // Contact cards are address book rows, not fake conversation threads.
+    // CONTACTS: one local, alphabetically sorted projection of currently
+    // loaded cards. A-Z/# headers scroll WITH rows; search stays pinned.
+    // No backend paging or stable contact identity is implied by grouping.
     ListView {
         id: phoneAddressBook
         anchors.fill: phoneContactList
         visible: phonePane.selectedSection === "CONTACTS"
         clip: true
-        model: phoneReadAdapter.contactCards
-        delegate: Rectangle {
+        model: phonePane.contactDirectoryRows
+        spacing: 2
+        delegate: Item {
+            id: directoryRow
             required property var modelData
             width: phoneAddressBook.width
-            height: 58
-            color: Colors.dark
-            border.width: 1
-            border.color: Colors.cyan
-            Column {
+            readonly property bool isHeading: modelData.kind === "heading"
+            height: isHeading ? 36 : 64
+            Rectangle {
+                id: directoryHeading
                 anchors.fill: parent
-                anchors.margins: 8
-                spacing: 5
+                visible: directoryRow.isHeading
+                color: Colors.dark
                 Text {
-                    width: parent.width
-                    text: modelData.displayNameInProfile || "Unnamed contact"
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -3
+                    text: directoryRow.modelData.letter || "#"
                     textFormat: Text.PlainText
-                    color: Colors.white
-                    font.pixelSize: 11
-                    elide: Text.ElideRight
+                    color: Colors.magenta
+                    font.bold: true
+                    font.pixelSize: 15
                 }
-                Text {
-                    width: parent.width
-                    text: modelData.primary || ""
-                    textFormat: Text.PlainText
-                    color: Colors.cyan
-                    font.pixelSize: 9
-                    elide: Text.ElideRight
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    anchors.bottom: parent.bottom
+                    height: 2
+                    color: Colors.magenta
+                }
+            }
+            Rectangle {
+                id: addressBookRow
+                anchors.fill: parent
+                visible: !directoryRow.isHeading
+                readonly property var card: directoryRow.isHeading
+                                             ? null : directoryRow.modelData.card
+                readonly property bool isSelected: card !== null
+                                                   && phonePane.selectedPhoneContactId
+                                                      === String(card.id)
+                color: isSelected ? Colors.yellow : Colors.dark
+                border.width: 1
+                border.color: isSelected ? Colors.orange : Colors.cyan
+                clip: true
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 5
+                    Text {
+                        width: parent.width
+                        height: 19
+                        text: addressBookRow.card
+                              ? (addressBookRow.card.displayNameInProfile || "Unnamed contact") : ""
+                        textFormat: Text.PlainText
+                        color: addressBookRow.isSelected ? Colors.black : Colors.orange
+                        font.pixelSize: 11
+                        wrapMode: Text.NoWrap
+                        maximumLineCount: 1
+                        clip: true
+                        elide: Text.ElideRight
+                    }
+                    Text {
+                        width: parent.width
+                        height: 16
+                        text: addressBookRow.card ? (addressBookRow.card.primary || "") : ""
+                        textFormat: Text.PlainText
+                        color: addressBookRow.isSelected ? Colors.black : Colors.cyan
+                        font.pixelSize: 9
+                        wrapMode: Text.NoWrap
+                        maximumLineCount: 1
+                        clip: true
+                        elide: Text.ElideRight
+                    }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        if (addressBookRow.card !== null
+                                && phonePane.personalApproved
+                                && phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                                && !phonePane.personalNeedsExplicitReload)
+                            phonePane.selectedPhoneContactId = String(addressBookRow.card.id);
+                    }
                 }
             }
         }
+    }
+
+    // The separate PHONE address book uses the same star handle style as
+    // native message lists. Viewport geometry keeps it on the narrow sidebar,
+    // rather than mounting to the large right-side conversation pane.
+    NeonScrollBar {
+        flickable: phoneAddressBook
+        geometryMode: "viewport"
+        handleStyle: "star"
+        accountForContentOrigin: true
+        visible: phoneAddressBook.visible && scrollable
     }
 
     // No invented people or unapproved phone numbers. The real ContactList
@@ -2421,9 +2753,9 @@ Rectangle {
     Text {
         id: emptyPhoneContacts
         visible: phonePane.selectedSection === "CONTACTS"
-                 ? phoneReadAdapter.contactCards.length === 0
+                 ? phonePane.filteredPhoneContacts.length === 0
                  : phonePane.selectedSection === "MESSAGES"
-                   && phoneReadAdapter.conversations.length === 0
+                   && phonePane.filteredPhoneConversations.length === 0
         anchors.top: phoneContactList.top
         anchors.topMargin: 108
         anchors.left: phoneContactList.left
@@ -2431,12 +2763,18 @@ Rectangle {
         anchors.margins: 10
         z: 4
         text: phonePane.selectedSection === "CONTACTS"
-              ? (phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
-                 ? "NO CONTACT CARDS RETURNED"
-                 : "NO PHONE CONTACTS YET")
-              : (phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
-                 ? "NO CONVERSATIONS RETURNED"
-                 : "NO PHONE CHATS YET")
+              ? (phonePane.contactSearchQuery.trim().length > 0
+                 && phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                 ? "NO MATCHES IN LOADED CONTACTS"
+                 : phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                   ? "NO CONTACT CARDS RETURNED"
+                   : "NO PHONE CONTACTS YET")
+              : (phonePane.messageSearchQuery.trim().length > 0
+                 && phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                 ? "NO MATCHES IN LOADED CONVERSATIONS"
+                 : phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                   ? "NO CONVERSATIONS RETURNED"
+                   : "NO PHONE CHATS YET")
         color: Colors.white
         opacity: 0.8
         font.family: "GohuFont 11 Nerd Font Mono"
@@ -2467,6 +2805,22 @@ Rectangle {
                                 : phoneReadAdapter.conversations.length > 0
                                   ? "SELECT A PHONE CONVERSATION"
                                   : "PHONE NOT LINKED"
+    }
+
+    // CONTACTS is a read-only address-book workspace. Its selected detail
+    // screen uses only the currently visible, approved, validated card fields.
+    // No guessed phone/email records, SMS join, FaceTime provider or call dial.
+    PhoneContactDetail {
+        id: phoneContactDetail
+        anchors.fill: phoneChatFeed
+        z: 5
+        contact: phonePane.selectedPhoneContactCard
+        canPrepareCall: phonePane.contactPrimaryDialNumber(contact) !== ""
+        onCallRequested: phonePane.openSelectedContactForCall()
+        onCallNumberRequested: function(number) {
+            phonePane.openSelectedContactForNumber(number);
+        }
+        onMessageRequested: phonePane.openSelectedContactMessages()
     }
 
     // Informative, content-free status on the existing MESSAGES/CONTACTS pane.
@@ -3369,12 +3723,17 @@ Rectangle {
                         height: 36
                         visible: phonePane.callPrerequisiteCheck === "CHECKED"
                                  && (phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
-                                     || phonePane.callSetupStatus === "FOLLOWUP_REQUIRED")
+                                     || phonePane.callPrerequisiteReport.state === "SERVICE_STOPPED"
+                                     || phonePane.callPrerequisiteReport.state === "AUDIO_PATH_UNVERIFIED"
+                                     || phonePane.callSetupStatus === "FOLLOWUP_REQUIRED"
+                                     || phonePane.callSetupStatus === "READY_TO_CONTINUE")
                         label: phonePane.callSetupStatus === "GUI_OPEN_REQUESTED"
                                || phonePane.callSetupStatus === "FOLLOWUP_REQUIRED"
                                ? "CHECK AGAIN"
                                : phonePane.callSetupStatus === "INSTALL_NOT_CONFIRMED"
-                                 ? "RETRY SETUP" : "SET UP CALLING"
+                                 ? "RETRY SETUP"
+                                 : phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
+                                   ? "SET UP CALLING" : "FINISH CALLING SETUP"
                         labelPixelSize: 10
                         accentColor: Colors.magenta
                         interactive: !callSetupProcess.running
@@ -3389,6 +3748,16 @@ Rectangle {
                         visible: installCallingSupport.visible
                                  && phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
                         text: "Only oFono. Review and confirm the Fedora package transaction inside PHONE. Social never approves it automatically. Silverblue stages a new deployment; reboot is a separate action, never automatic."
+                        color: Colors.white
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: installCallingSupport.visible
+                                 && phonePane.callPrerequisiteReport.state !== "PACKAGE_NOT_INSTALLED"
+                        text: "For an installed oFono service on systemd + WirePlumber 0.5+, review each step in the PHONE terminal. Setup never silently starts a service, overwrites HFP settings or enables calls. Other Linux package managers need their own installer."
                         color: Colors.white
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap
@@ -3493,14 +3862,14 @@ Rectangle {
                     visible: phonePane.stageWanted || phonePane.stageState === "UNAVAILABLE" || phonePane.stageState === "FINISHED"
                     text: phonePane.stageState === "ALIGNED"
                           ? (phonePane.stagePurpose === "OFONO"
-                             ? "OFONO INSTALL // TERMINAL BELOW"
+                             ? "CALLING SETUP // TERMINAL BELOW"
                              : "BLUEFERRY SETUP // TERMINAL BELOW")
                           : phonePane.stageState === "FINISHED"
                           ? "Terminal closed. Checking the latest provider and package status..."
                           : phonePane.stageState === "UNAVAILABLE"
                           ? "Stage placement could not be verified. The terminal may remain external; no phone or audio change was made by Social."
                           : phonePane.stagePurpose === "OFONO"
-                          ? "Placing Fedora's interactive installer inside PHONE. Review its transaction and confirmation."
+                          ? "Placing the calling setup terminal inside PHONE. Review each change and approve it separately."
                           : "Placing BlueFerry's terminal inside the PHONE workspace..."
                     color: Colors.orange
                     font.pixelSize: 10

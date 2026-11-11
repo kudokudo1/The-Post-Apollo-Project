@@ -78,11 +78,9 @@ test("E3 removes duplicate live runtime/source racks only from pinned EARTH MAP"
   assert.match(discovery,/model: stationDiscovery\.plannedSources/);
   assert.match(earth,/runtimeRows: earthLoader\.item \? earthLoader\.item\.runtimeRows : \[\]/);
   assert.match(earth,/sourceRows: earthLoader\.item \? earthLoader\.item\.plannedSources : \[\]/);
-  assert.match(services,/LIVE FEED \/\/ RUNTIME/);
-  assert.match(services,/LIVE FEED \/\/ CURRENT SOURCE REPORTS/);
-  assert.match(services,/RuntimePolicy\.rowAgeLabel\(/);
-  assert.match(services,/RuntimePolicy\.rowStateLabel\(/);
-  assert.match(services,/RuntimePolicy\.cadenceLabel\(/);
+  assert.match(services,/StationServicesConsole\s*\{/);
+  assert.match(services,/statusScope: "EARTH \/\/ MAP"/);
+
   assert.match(fixture,/rack\.visible \|\| sources\.visible/);
 });
 

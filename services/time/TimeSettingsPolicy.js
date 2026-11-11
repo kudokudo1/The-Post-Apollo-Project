@@ -3,7 +3,7 @@
 // Display-only calibration. Never changes Linux time, UTC, timezone, or DST.
 // Persist milliseconds so fractional-second visual corrections are possible.
 var VERSION = 1;
-var MAX_OFFSET_MS = 300000;
+var MAX_OFFSET_MS = 24 * 60 * 60 * 1000;
 
 function initialDocument() {
     return { version: VERSION, displayOffsetMs: 0 };
@@ -49,5 +49,15 @@ function formatOffset(offsetMs) {
     if (!validOffset(offsetMs)) return "INVALID";
     if (offsetMs === 0) return "0.000s";
     var sign = offsetMs < 0 ? "-" : "+";
-    return sign + (Math.abs(offsetMs) / 1000).toFixed(3) + "s";
+    var absolute = Math.abs(offsetMs);
+    if (absolute >= 3600000) {
+        var hours = Math.floor(absolute / 3600000);
+        var remainder = absolute % 3600000;
+        return sign + hours + "h " + Math.floor(remainder / 60000) + "m "
+               + ((remainder % 60000) / 1000).toFixed(3) + "s";
+    }
+    if (absolute >= 60000)
+        return sign + Math.floor(absolute / 60000) + "m "
+               + ((absolute % 60000) / 1000).toFixed(3) + "s";
+    return sign + (absolute / 1000).toFixed(3) + "s";
 }

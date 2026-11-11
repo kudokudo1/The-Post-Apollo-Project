@@ -26,6 +26,10 @@ Rectangle {
     // window while hiding only the native contact contents.
     property bool discordMode: false
 
+    // Shared contact-list presentation for PHONE and other native Social
+    // conversations. Retain the opt-out property for legacy compact consumers.
+    property bool phonePreviewMode: true
+
     signal contactClicked
 
     // ============================================================
@@ -327,9 +331,11 @@ Rectangle {
             required property int index
 
             width: conversationList.width
-            height: 66
+            height: contactRoot.phonePreviewMode ? 116 : 66
 
             radius: 0
+            // Preserve the existing outer glow; clip both text items below,
+            // not the entire delegate, so long previews cannot touch neighbors.
             clip: false
 
             // ====================================================
@@ -374,6 +380,11 @@ Rectangle {
                 }
 
                 text: modelData.displayNameInProfile || modelData.nickname || modelData.id || "UNKNOWN"
+                textFormat: contactRoot.phonePreviewMode ? Text.PlainText : Text.AutoText
+                height: contactRoot.phonePreviewMode ? 22 : implicitHeight
+                clip: contactRoot.phonePreviewMode
+                maximumLineCount: contactRoot.phonePreviewMode ? 1 : 2147483647
+                wrapMode: Text.NoWrap
 
                 elide: Text.ElideRight
 
@@ -381,7 +392,10 @@ Rectangle {
 
                 font.pixelSize: 15
 
-                color: contactButton.isPressed ? Colors.black : contactButton.isHovered ? Colors.orange : contactButton.isSelected ? Colors.orange : Colors.cyan
+                // Orange name is the ordinary contact-list identity color.
+                // On a yellow selected/hovered row, black preserves contrast.
+                color: contactButton.isPressed || contactButton.isHovered
+                       || contactButton.isSelected ? Colors.black : Colors.orange
 
                 z: 2
 
@@ -419,7 +433,18 @@ Rectangle {
                     bottomMargin: 9
                 }
 
-                text: modelData.lastMessage ? modelData.lastMessage : ""
+                // All native Social lists show a bounded visual excerpt.
+                // Original provider message content is not modified. Collapse
+                // newlines and whitespace before wrapping within four lines.
+                text: contactRoot.phonePreviewMode
+                      ? String(modelData.lastMessage || "").replace(/\s+/g, " ").trim()
+                      : (modelData.lastMessage ? modelData.lastMessage : "")
+                textFormat: contactRoot.phonePreviewMode ? Text.PlainText : Text.AutoText
+                height: contactRoot.phonePreviewMode ? 64 : implicitHeight
+                clip: contactRoot.phonePreviewMode
+                wrapMode: contactRoot.phonePreviewMode
+                          ? Text.WrapAtWordBoundaryOrAnywhere : Text.NoWrap
+                maximumLineCount: contactRoot.phonePreviewMode ? 4 : 2147483647
 
                 elide: Text.ElideRight
 
@@ -427,9 +452,12 @@ Rectangle {
 
                 font.pixelSize: 11
 
-                color: contactButton.isPressed ? Colors.black : contactButton.isHovered ? Colors.orange : contactButton.isSelected ? Colors.orange : Colors.white
+                // Cyan preview in its normal state; use black on the yellow
+                // hover/selection background for readable contrast.
+                color: contactButton.isPressed || contactButton.isHovered
+                       || contactButton.isSelected ? Colors.black : Colors.cyan
 
-                opacity: contactButton.isPressed ? 1.0 : 0.70
+                opacity: 1.0
 
                 z: 2
             }
@@ -493,6 +521,8 @@ Rectangle {
     }
     NeonScrollBar {
         flickable: conversationList
+        handleStyle: "star" // Use the shared star, not a new scrollbar renderer.
+        accountForContentOrigin: true // ListView origin moves as row count changes.
         visible: conversationList.visible && scrollable
     }
 }

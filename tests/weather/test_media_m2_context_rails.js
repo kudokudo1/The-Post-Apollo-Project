@@ -51,7 +51,7 @@ test("M2 MEDIA overview/watch/creators keep global nav; SERVICES uses its own he
     assert.ok(media.includes("StationMediaServicesPane {"));
     assert.match(media,/embeddedHeader: true/);
     assert.match(services,/property bool embeddedHeader: false/);
-    assert.match(services,/visible: !services\.embeddedHeader/);
+    assert.match(services,/embeddedHeader: services\.embeddedHeader/);
     for(const x of ["OVERVIEW","NEWS","WATCH","RADIO","CREATORS","SERVICES"])
         assert.ok(header.includes('label:"'+x+'"'));
     assert.match(media,/onRouteRequested: function\(path\)/);

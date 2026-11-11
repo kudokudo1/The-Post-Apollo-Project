@@ -1,0 +1,30 @@
+name: TimeW MACHINE Brave tab-count signature
+
+on:
+  pull_request:
+    paths:
+      - "integrations/machine/brave-topology/**"
+      - "widgets/MachineBraveTabPattern.qml"
+      - "widgets/TimeW.qml"
+      - "tests/timew/test_machine_brave_tab_pattern_contract.py"
+      - "tests/timew/test_machine_brave_tab_pattern.mjs"
+      - ".github/workflows/timew-machine-brave-tab-pattern.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tab-count-grammar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify canonical colors and no browser/session authority
+        run: python3 -B -I tests/timew/test_machine_brave_tab_pattern_contract.py
+      - name: Check QML parser and real Brave tab-count projection
+        run: node tests/timew/test_machine_brave_tab_pattern.mjs
+      - name: Preserve Brave privacy and topology contracts
+        run: |
+          python3 -B -I tests/timew/test_machine_brave_topology_contract.py
+          node tests/timew/test_machine_brave_topology.mjs

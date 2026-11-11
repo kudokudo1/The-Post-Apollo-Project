@@ -17,6 +17,15 @@ PanelWindow {
     // record adapters are approved. Only "trash" has destructive authority.
     property string activeMode: "trash"
     readonly property var lifecycleModes: ["cleanup", "archive", "trash", "burn"]
+    // Swipe/Hunt use pointer dragging inside the work area. When the outer
+    // page cannot fit on screen, provide buttons outside that gesture area.
+    readonly property bool cleanupScrollRailVisible:
+        activeMode === "cleanup"
+        && (chassisSize === "compact"
+            || (cameraCleanupController
+                && (cameraCleanupController.cleanupTechnique === "swipe"
+                    || cameraCleanupController.cleanupTechnique === "hunt")
+                && frameHeight < 661))
 
     // The Cleanup UI itself now lives here; CameraW supplies only its
     // established scan, queue, preview and recoverable file operation logic.
@@ -33,6 +42,57 @@ PanelWindow {
     property string archiveState: "NOT_SCANNED"
     property string archiveFilter: "all"
     property string archiveSearchText: ""
+
+    // V2 independently stored immutable copies. READ-ONLY page inventory.
+    // This never joins the GIO/legacy managed-copy Burn permissions.
+    property var archiveV2Rows: []
+    property string archiveV2State: "NOT_SCANNED"
+    property bool archiveV2Busy: false
+    property int archiveV2Total: 0
+    // V2h reports real file footprint and the fixed copy budget, never a
+    // deletion permission or an estimate from payload length alone.
+    property var archiveCapacity: null
+    // Only confirmed read-only SQLite capacity measurements drive the bar.
+    // This is real charged DB + journal usage, not an illustrative progress.
+    readonly property real archiveCapacityRatio: archiveCapacity && archiveCapacity.diskQuotaBytes > 0 ? Math.min(1, Math.max(0, archiveCapacity.chargedBytes / archiveCapacity.diskQuotaBytes)) : 0
+    readonly property real archiveCapacityPercent: archiveCapacityRatio * 100
+    // Tiny nonzero archives should never be mislabeled as 0.00% used.
+    readonly property string archiveCapacityPercentText: archiveCapacityRatio > 0
+        && archiveCapacityPercent < 0.01 ? "<0.01%" : archiveCapacityPercent.toFixed(2) + "%"
+    readonly property color archiveCapacityColor: !archiveCapacity ? Colors.cyan
+        : archiveCapacityRatio >= 1 ? Colors.red
+        : archiveCapacityRatio >= 0.80 ? Colors.orange : Colors.cyan
+    readonly property string archiveCapacityUsedText: !archiveCapacity ? "UNKNOWN"
+        : archiveCapacity.chargedBytes < 1048576
+        ? (archiveCapacity.chargedBytes / 1024).toFixed(1) + " KiB"
+        : (archiveCapacity.chargedBytes / 1048576).toFixed(2) + " MiB"
+    property bool archiveV2HasMore: false
+    property string archiveV2NextCursor: ""
+    property int archiveV2Page: 0
+    property var archiveV2Cursors: [""]
+    property int archiveV2PendingPage: -1
+    property string archiveV2PendingCursor: ""
+    property string archiveV2AppliedQuery: ""
+    property string archiveV2PendingQuery: ""
+    // V2j: intentionally on-demand. A complete metadata-chain audit can be
+    // expensive; it must never be mislabeled as payload or signed verification.
+    property bool archiveChainBusy: false
+    property var archiveChainReport: null
+    property string archiveChainState: "NOT AUDITED"
+
+    // Only the two allowlisted source-row pilots can make a V2 snapshot.
+    // Preview reads the owner and returns a witness; the second explicit
+    // click revalidates that witness and writes only an independent copy.
+    property bool snapshotBusy: false
+    property string snapshotPendingAction: ""
+    property string snapshotRecordId: ""
+    property string snapshotSourceKind: ""
+    property string snapshotIdentifier: ""
+    property string snapshotTimestamp: ""
+    property string snapshotWitness: ""
+    property string snapshotStatus: "IDLE"
+    readonly property bool archiveV2QueryDirty:
+        archiveSearchText.trim() !== archiveV2AppliedQuery
 
     // Trash++-owned local research copies are separate from source records.
     // Finance's original DEMO crawl stays read-only, and Hospital/Weather are
@@ -55,23 +115,110 @@ PanelWindow {
     property bool researchBurnLoadComplete: false
     property real researchBurnLoadProgress: 0
 
+    // One Burn view + one confirmation + one post-operation receipt.
+    // System files remain GIO-owned; copies remain managed-store-owned.
+    property string burnFilter: "all" // all | files | records | events | research
+    property string burnUiStage: "" // "" | clicked | working | result | error
+    property var burnReceiptItems: []
+    property int burnReceiptCount: 0
+    property int burnReceiptRequested: 0
+    property bool burnReceiptVerified: false
+    property string burnReceiptMessage: ""
+    property string burnReceiptScope: ""
+    readonly property bool burnConfirmationOpen:
+        confirmMode !== "" || researchBurnId !== "" || burnUiStage !== ""
+    readonly property var burnDisplayRows: {
+        const fileRows = (burnFilter === "all" || burnFilter === "files")
+            ? items.map(function(row) {
+                return {entryType:"file", title:row.name, name:row.name,
+                        original:row.original, uri:row.uri,
+                        originLabel:row.originLabel};
+            }) : [];
+        const copyRows = researchBinRows.filter(function(row) {
+            return burnFilter !== "files"
+                   && (burnFilter !== "events" || row.kind === "SAVED EVENT")
+                   && (burnFilter !== "research" || row.kind === "SAVED RESEARCH");
+        }).map(function(row) {
+            return {entryType:"record", title:row.title, record:row,
+                    originLabel:row.source + " // " + row.recordedAt};
+        });
+        return fileRows.concat(copyRows);
+    }
+
+    function showBurnReceipt(payload, scope, attempted) {
+        // Accept only an explicit backend outcome, never a guessed success.
+        const list = payload && Array.isArray(payload.burnedItems)
+            ? payload.burnedItems : [];
+        burnReceiptItems = list.slice(0, 2500).map(function(row) {
+            return {name:String(row.name || "UNNAMED"),
+                    kind:String(row.kind || "UNKNOWN"),
+                    source:String(row.source || row.original || "")};
+        });
+        burnReceiptCount = burnReceiptItems.length;
+        burnReceiptRequested = attempted;
+        burnReceiptVerified = payload && payload.verified === true
+                              && payload.partial !== true
+                              && burnReceiptCount === attempted;
+        burnReceiptScope = scope;
+        burnReceiptMessage = burnReceiptVerified
+            ? "BURN VERIFIED // " + burnReceiptCount + " ITEMS"
+            : "PARTIAL OR UNVERIFIED // "
+              + burnReceiptCount + " CONFIRMED OF " + attempted;
+        burnUiStage = "result";
+        activeMode = "burn";
+    }
+
+    function failBurnReceipt(message) {
+        burnReceiptVerified = false;
+        burnReceiptMessage = "NOT CONFIRMED // "
+                             + String(message || "BACKEND UNAVAILABLE");
+        burnUiStage = "error";
+        activeMode = "burn";
+    }
+
+    function dismissBurnReceipt() {
+        if (burnUiStage === "working" || burnUiStage === "clicked")
+            return false;
+        burnCommitDelay.stop();
+        clearConfirmation();
+        clearResearchBurn();
+        burnUiStage = "";
+        burnReceiptItems = [];
+        burnReceiptCount = 0;
+        burnReceiptRequested = 0;
+        burnReceiptVerified = false;
+        burnReceiptMessage = "";
+        burnReceiptScope = "";
+        activeMode = "burn";
+        return true;
+    }
+
     readonly property var researchBinRows: researchRows.filter(function(row) {
         return row.state === "trashed";
     })
-    readonly property var archiveFilteredRows: archiveRows.concat(researchRows).filter(function(row) {
+    readonly property var archiveFilteredRows: archiveRows.concat(researchRows)
+        .concat(archiveV2QueryDirty ? [] : archiveV2Rows).filter(function(row) {
         const selected = archiveFilter;
+        // V2 copies appear only in ALL and COPIES. Old BIN actions never see them.
+        if (row.kind === "V2 SNAPSHOT"
+                && selected !== "all" && selected !== "copies") return false;
         if (selected === "events" && row.kind !== "EVENT HISTORY") return false;
         if (selected === "dossiers" && row.kind !== "SAVED DOSSIER") return false;
         if (selected === "scrapes" && row.kind !== "WEB SCRAPE") return false;
-        if (selected === "copies" && ((row.kind !== "SAVED RESEARCH"
-                                      && row.kind !== "SAVED EVENT")
-                                      || row.state !== "archived")) return false;
+        if (selected === "hub" && row.kind !== "HUB NOTE"
+                               && row.kind !== "HUB TASK") return false;
+        if (selected === "copies" && row.kind !== "V2 SNAPSHOT"
+                && ((row.kind !== "SAVED RESEARCH"
+                     && row.kind !== "SAVED EVENT")
+                    || row.state !== "archived")) return false;
         if (selected === "bin" && ((row.kind !== "SAVED RESEARCH"
                                    && row.kind !== "SAVED EVENT")
                                    || row.state !== "trashed")) return false;
         const q = archiveSearchText.trim().toLowerCase();
         return !q || (String(row.title) + " " + String(row.source)
-                      + " " + String(row.details) + " " + String(row.id))
+                      + " " + String(row.details) + " " + String(row.id)
+                      + " " + String(row.ownerId || "")
+                      + " " + String(row.resourceId || ""))
                      .toLowerCase().indexOf(q) >= 0;
     })
 
@@ -109,8 +256,192 @@ PanelWindow {
         archiveState = "READY";
     }
 
+    function refreshArchiveV2(targetPage, cursor, query) {
+        if (!menuOpen || activeMode !== "archive"
+                || archiveV2Busy || archiveChainBusy)
+            return false;
+        // The index may have changed since the last full audit.
+        archiveChainReport = null;
+        archiveChainState = "NOT AUDITED";
+        const requested = Number(targetPage);
+        const token = String(cursor || "");
+        const needle = typeof query === "string"
+            ? query.trim() : archiveV2AppliedQuery;
+        if (!Number.isInteger(requested) || requested < 0
+                || requested > 9999 || token.length > 64
+                || needle.length > 80 || /[\u0000-\u001f\u007f]/.test(needle)) {
+            archiveV2State = "INVALID SEARCH // MAX 80 CHARACTERS";
+            return false;
+        }
+        archiveV2Busy = true;
+        archiveV2State = "SEARCHING // READ ONLY";
+        archiveV2PendingPage = requested;
+        archiveV2PendingCursor = token;
+        archiveV2PendingQuery = needle;
+        // The final argument is a parameterized search string, never SQL or
+        // an arbitrary path. Blank cursor and query are explicit arguments.
+        archiveV2Process.exec([
+            "python3", "-I", "-B",
+            Quickshell.shellPath("scripts/trash/archive_v2_index.py"),
+            "index", Quickshell.dataDir, token, needle
+        ]);
+        return true;
+    }
+
+    function auditArchiveChain() {
+        if (!menuOpen || activeMode !== "archive" || archiveChainBusy
+                || snapshotBusy || archiveV2Busy || researchBusy || busy)
+            return false;
+        archiveChainBusy = true;
+        archiveChainReport = null;
+        archiveChainState = "AUDITING // READ ONLY";
+        archiveChainProcess.exec([
+            "python3", "-I", "-B",
+            Quickshell.shellPath("scripts/trash/archive_v2_chain_audit.py"),
+            "audit", Quickshell.dataDir
+        ]);
+        return true;
+    }
+
+    function consumeArchiveChain(raw) {
+        if (!archiveChainBusy)
+            return;
+        archiveChainBusy = false;
+        let reply = null;
+        try { reply = JSON.parse(String(raw || "").trim()); }
+        catch (error) {
+            archiveChainReport = null;
+            archiveChainState = "FAILED // INVALID AUDIT RESPONSE";
+            return;
+        }
+        if (!reply || reply.ok !== true || reply.kind !== "archive-v2-chain-audit"
+                || reply.readOnly !== true || reply.payloadVerified !== false
+                || reply.authentication !== "UNSIGNED_LOCAL"
+                || reply.completeness !== "DATABASE_LOCAL_ONLY"
+                || ["NOT_INSTALLED", "EMPTY", "LEGACY_ONLY", "CHAIN_CONSISTENT"]
+                    .indexOf(reply.state) < 0
+                || !Number.isInteger(reply.snapshotCount) || reply.snapshotCount < 0
+                || !Number.isInteger(reply.receiptCount) || reply.receiptCount < 0
+                || !Number.isInteger(reply.legacyCount) || reply.legacyCount < 0
+                || !Number.isInteger(reply.sourceCount) || reply.sourceCount < 0
+                || reply.snapshotCount !== reply.receiptCount + reply.legacyCount
+                || reply.sourceCount > reply.snapshotCount
+                || (reply.state === "NOT_INSTALLED" && reply.snapshotCount !== 0)
+                || (reply.state === "EMPTY" && reply.snapshotCount !== 0)
+                || (reply.state === "LEGACY_ONLY"
+                    && (reply.receiptCount !== 0 || reply.snapshotCount === 0))
+                || (reply.state === "CHAIN_CONSISTENT" && reply.receiptCount === 0)) {
+            archiveChainReport = null;
+            const code = reply && typeof reply.error === "string"
+                && /^[A-Z0-9_]{1,80}$/.test(reply.error)
+                ? reply.error : "CHAIN_AUDIT_REFUSED";
+            archiveChainState = "FAILED // " + code;
+            return;
+        }
+        archiveChainReport = reply;
+        archiveChainState = reply.state === "CHAIN_CONSISTENT"
+            ? "LOCAL CHAIN CONSISTENT // UNSIGNED"
+            : reply.state === "LEGACY_ONLY"
+            ? "LEGACY ONLY // NO RECEIPTS"
+            : reply.state === "EMPTY" ? "EMPTY ARCHIVE // NO RECEIPTS"
+            : "NO ARCHIVE DATABASE";
+    }
+
+    function pageArchiveV2(direction) {
+        if (archiveV2Busy || archiveV2QueryDirty
+                || !menuOpen || activeMode !== "archive"
+                || (direction !== 1 && direction !== -1))
+            return false;
+        if (direction === 1 && archiveV2HasMore
+                && archiveV2NextCursor !== "")
+            return refreshArchiveV2(archiveV2Page + 1, archiveV2NextCursor,
+                                    archiveV2AppliedQuery);
+        if (direction === -1 && archiveV2Page > 0)
+            return refreshArchiveV2(archiveV2Page - 1,
+                                    archiveV2Cursors[archiveV2Page - 1],
+                                    archiveV2AppliedQuery);
+        return false;
+    }
+
+    function consumeArchiveV2(raw) {
+        if (!archiveV2Busy)
+            return;
+        archiveV2Busy = false;
+        let reply = null;
+        try { reply = JSON.parse(String(raw || "").trim()); }
+        catch (error) {
+            archiveV2Rows = [];
+            archiveCapacity = null;
+            archiveV2State = "STALE // INVALID COPY INDEX RESPONSE";
+            return;
+        }
+        if (!reply || reply.ok !== true || reply.kind !== "archive-v2-index"
+                || reply.readOnly !== true
+                || reply.query !== archiveV2PendingQuery
+                || !Array.isArray(reply.items)
+                || reply.items.length > 25 || typeof reply.total !== "number"
+                || !Number.isInteger(reply.total) || reply.total < 0
+                || typeof reply.hasMore !== "boolean"
+                || (reply.hasMore && (typeof reply.nextCursor !== "string"
+                                      || reply.nextCursor.length > 64))
+                || (reply.capacity !== null
+                    && (!reply.capacity
+                        || !Number.isInteger(reply.capacity.chargedBytes)
+                        || reply.capacity.chargedBytes < 0
+                        || !Number.isInteger(reply.capacity.diskQuotaBytes)
+                        || reply.capacity.diskQuotaBytes < 1
+                        || !Number.isInteger(reply.capacity.remainingBytes)
+                        || reply.capacity.remainingBytes < 0
+                        || ["READY", "FULL"].indexOf(
+                            reply.capacity.capacityState) < 0))) {
+            archiveV2Rows = [];
+            archiveCapacity = null;
+            archiveV2State = "STALE // " + String(reply && reply.error
+                                                  || "COPY INDEX UNAVAILABLE");
+            return;
+        }
+        for (let i = 0; i < reply.items.length; i++) {
+            const item = reply.items[i];
+            if (!item || item.kind !== "V2 SNAPSHOT"
+                    || item.copyOnly !== true || item.verified !== false
+                    || item.state !== "archived-v2" || !item.capabilities
+                    || item.capabilities.trash !== false
+                    || item.capabilities.restore !== false
+                    || item.capabilities.burn !== false) {
+                archiveV2Rows = [];
+                archiveCapacity = null;
+                archiveV2State = "STALE // COPY PERMISSIONS INVALID";
+                return;
+            }
+        }
+        if (archiveV2PendingPage === 0)
+            archiveV2Cursors = [""];
+        else if (archiveV2PendingPage === archiveV2Page + 1) {
+            const next = archiveV2Cursors.slice(0, archiveV2Page + 1);
+            next.push(archiveV2PendingCursor);
+            archiveV2Cursors = next;
+        }
+        archiveV2Page = archiveV2PendingPage;
+        archiveV2PendingPage = -1;
+        archiveV2PendingCursor = "";
+        archiveV2AppliedQuery = archiveV2PendingQuery;
+        archiveV2PendingQuery = "";
+        archiveV2Rows = reply.items;
+        archiveCapacity = reply.capacity;
+        archiveV2Total = reply.total;
+        archiveV2HasMore = reply.hasMore;
+        archiveV2NextCursor = reply.nextCursor || "";
+        archiveV2State = reply.state === "NOT_INSTALLED"
+            ? "NO READ-ONLY COPIES INSTALLED"
+            : archiveV2AppliedQuery !== ""
+            ? "READY // SEARCHED ALL COPIES" : "READY // READ ONLY";
+    }
+
     function runResearch(action, args) {
-        if (!menuOpen || researchBusy || researchBurnId !== ""
+        if (!menuOpen || researchBusy
+                || (researchBurnId !== ""
+                    && !(burnUiStage === "working"
+                         && ["burn", "burn-all"].indexOf(action) >= 0))
                 || (activeMode !== "archive" && activeMode !== "burn"
                     && !(activeMode === "trash"
                          && ["list", "restore", "burn"].indexOf(action) >= 0)))
@@ -148,6 +479,8 @@ PanelWindow {
         try { payload = JSON.parse(String(raw || "").trim()); }
         catch (error) {
             researchState = "STALE // INVALID MANAGED RESPONSE";
+            if (action === "burn" || action === "burn-all")
+                failBurnReceipt(researchState);
             return;
         }
         if (!payload || payload.ok !== true
@@ -158,6 +491,8 @@ PanelWindow {
                 || typeof payload.binDigest !== "string") {
             researchState = "STALE // " + String(payload && payload.error
                                                 || "RESEARCH STORE UNAVAILABLE");
+            if (action === "burn" || action === "burn-all")
+                failBurnReceipt(researchState);
             return;
         }
         researchRows = payload.items;
@@ -166,8 +501,150 @@ PanelWindow {
         researchBinDigest = payload.binDigest;
         researchState = action === "list" ? "READY // SAVED RESEARCH"
                                          : action.toUpperCase() + " // COMPLETE";
-        if (action === "burn" || action === "burn-all")
-            clearResearchBurn();
+        if (action === "burn" || action === "burn-all") {
+            const expected = researchBurnScope === "all"
+                             ? researchBurnCount : 1;
+            showBurnReceipt(payload, researchBurnScope === "all"
+                            ? "MANAGED COPIES // ALL" : "MANAGED COPY",
+                            expected);
+        }
+    }
+
+    function snapshotSource(row) {
+        if (!row || !row.id || !row.capabilities
+                || row.capabilities.saveCopy !== true)
+            return null;
+        const found = archiveRows.find(function(item) {
+            return item.id === row.id && item.kind === row.kind
+                   && item.ownerId === row.ownerId;
+        });
+        if (!found)
+            return null;
+        if (row.kind === "WEB SCRAPE" && found.ownerId === "demo-scrape"
+                && row.sourceUrl === found.sourceUrl
+                && row.sourceObservedAt === found.sourceObservedAt
+                && typeof row.sourceUrl === "string"
+                && typeof row.sourceObservedAt === "string")
+            return {kind:"demo", id:String(row.sourceUrl),
+                    stamp:String(row.sourceObservedAt)};
+        if (row.kind === "EVENT HISTORY" && found.ownerId === "weather-events"
+                && row.sourceEventKey === found.sourceEventKey
+                && row.sourceLastCapturedAtMs === found.sourceLastCapturedAtMs
+                && typeof row.sourceEventKey === "string"
+                && typeof row.sourceLastCapturedAtMs === "number")
+            return {kind:"weather", id:String(row.sourceEventKey),
+                    stamp:String(row.sourceLastCapturedAtMs)};
+        return null;
+    }
+
+    function clearSnapshotArm() {
+        snapshotRecordId = "";
+        snapshotSourceKind = "";
+        snapshotIdentifier = "";
+        snapshotTimestamp = "";
+        snapshotWitness = "";
+    }
+
+    function requestSnapshot(row) {
+        if (!menuOpen || activeMode !== "archive" || snapshotBusy
+                || busy || researchBusy || archiveBusy || archiveChainBusy
+                || confirmMode !== ""
+                || researchBurnId !== "" || burnUiStage !== "")
+            return false;
+        const source = snapshotSource(row);
+        if (!source)
+            return false;
+        const confirming = snapshotRecordId === String(row.id)
+                           && snapshotSourceKind === source.kind
+                           && snapshotIdentifier === source.id
+                           && snapshotTimestamp === source.stamp
+                           && /^[0-9a-f]{64}$/.test(snapshotWitness);
+        if (!confirming) {
+            clearSnapshotArm();
+            snapshotRecordId = String(row.id);
+            snapshotSourceKind = source.kind;
+            snapshotIdentifier = source.id;
+            snapshotTimestamp = source.stamp;
+        }
+        snapshotBusy = true;
+        snapshotPendingAction = confirming ? "capture" : "preview";
+        snapshotStatus = confirming ? "SAVING // IMMUTABLE COPY"
+                                    : "CHECKING // SOURCE REVISION";
+        const args = ["python3", "-I", "-B",
+            Quickshell.shellPath("scripts/trash/archive_v2_capture_cli.py"),
+            snapshotPendingAction, Quickshell.dataDir, source.kind,
+            source.id, source.stamp];
+        if (confirming)
+            args.push(snapshotWitness);
+        snapshotCaptureProcess.exec(args);
+        return true;
+    }
+
+    function consumeSnapshot(raw) {
+        if (!snapshotBusy)
+            return;
+        const action = snapshotPendingAction;
+        snapshotBusy = false;
+        snapshotPendingAction = "";
+        let reply = null;
+        try { reply = JSON.parse(String(raw || "").trim()); }
+        catch (error) {
+            snapshotStatus = "STALE // INVALID SNAPSHOT RECEIPT";
+            clearSnapshotArm();
+            return;
+        }
+        if (!reply || reply.ok !== true || reply.sourceKind !== snapshotSourceKind) {
+            snapshotStatus = "COPY REFUSED // " + String(reply && reply.error
+                                                       || "SOURCE UNAVAILABLE");
+            clearSnapshotArm();
+            return;
+        }
+        if (action === "preview") {
+            const preview = reply.preview;
+            if (reply.kind !== "snapshot-preview-v2" || reply.readOnly !== true
+                    || !preview || !/^[0-9a-f]{64}$/.test(preview.sourceRevision)
+                    || preview.ownerId !== (snapshotSourceKind === "demo"
+                                           ? "demo-scrape" : "weather-events")) {
+                snapshotStatus = "STALE // INVALID SOURCE PREVIEW";
+                clearSnapshotArm();
+                return;
+            }
+            // Navigating away or closing the panel revokes the preview.
+            if (!menuOpen || activeMode !== "archive"
+                    || archiveRows.findIndex(function(r) {
+                        return r.id === snapshotRecordId
+                               && snapshotSource(r) !== null;
+                    }) < 0) {
+                snapshotStatus = "IDLE";
+                clearSnapshotArm();
+                return;
+            }
+            snapshotWitness = preview.sourceRevision;
+            snapshotStatus = "SOURCE CHECKED // CLICK CONFIRM COPY";
+            return;
+        }
+        const receipt = reply.receipt;
+        if (action !== "capture" || reply.kind !== "snapshot-captured-v2"
+                || reply.copyOnly !== true || !receipt
+                || !/^[0-9a-f]{32}$/.test(receipt.id)
+                || receipt.sourceRevision !== snapshotWitness
+                || receipt.ownerId !== (snapshotSourceKind === "demo"
+                                       ? "demo-scrape" : "weather-events")
+                || !/^[0-9a-f]{64}$/.test(receipt.sha256)
+                || typeof receipt.size !== "number" || receipt.size < 1) {
+            snapshotStatus = "STALE // INVALID COPY RECEIPT";
+            clearSnapshotArm();
+            return;
+        }
+        snapshotStatus = "SAVED // INDEPENDENT READ-ONLY COPY";
+        clearSnapshotArm();
+        if (menuOpen && activeMode === "archive")
+            Qt.callLater(function() {
+                if (trashLauncher.menuOpen
+                        && trashLauncher.activeMode === "archive")
+                    trashLauncher.refreshArchiveV2(
+                        0, "", trashLauncher.archiveSearchText.trim());
+            });
     }
 
     function saveDemoCopy(row) {
@@ -224,7 +701,7 @@ PanelWindow {
 
     function armResearchBurn(row) {
         if (!menuOpen || researchBusy || busy || confirmMode !== ""
-                || researchBurnId !== ""
+                || researchBurnId !== "" || burnUiStage !== ""
                 || !row || (row.kind !== "SAVED RESEARCH"
                             && row.kind !== "SAVED EVENT")
                 || row.state !== "trashed"
@@ -240,13 +717,14 @@ PanelWindow {
         researchBurnClickArmed = false;
         researchBurnLoadComplete = false;
         researchBurnLoadProgress = 0;
+        activeMode = "burn";
         return true;
     }
 
     function armResearchBurnAll() {
         if (!menuOpen || activeMode !== "burn" || researchBusy || busy
                 || confirmMode !== "" || researchBurnId !== ""
-                || researchBinCount < 1
+                || burnUiStage !== "" || researchBinCount < 1
                 || researchBinCount !== researchBinRows.length
                 || researchBinDigest.length !== 64)
             return false;
@@ -264,10 +742,14 @@ PanelWindow {
     }
 
     function advanceResearchBurn() {
-        if (!researchBurnId || !researchBurnPointerRelocated
-                || confirmMode !== ""
-                || researchBurnRevision !== researchRevision
-                || researchBusy || busy)
+        const isFile = confirmMode === "item" || confirmMode === "all";
+        const isCopy = researchBurnId !== "";
+        if (burnUiStage !== "" || (!isFile && !isCopy)
+                || !researchBurnPointerRelocated || researchBusy || busy
+                || (isCopy && researchBurnRevision !== researchRevision)
+                || (isFile && confirmMode === "all"
+                    && (confirmRevision !== revision
+                        || confirmCount !== total)))
             return false;
         if (!researchBurnClickArmed) {
             researchBurnClickArmed = true;
@@ -278,12 +760,17 @@ PanelWindow {
         }
         if (!researchBurnLoadComplete)
             return false;
-        return confirmResearchBurn();
+        // Display the clicked magenta feedback first. Deletion starts only
+        // after a separate short, visible feedback interval.
+        burnUiStage = "clicked";
+        burnCommitDelay.restart();
+        return true;
     }
 
     function confirmResearchBurn() {
         if (!researchBurnId || !researchBurnPointerRelocated
                 || !researchBurnClickArmed || !researchBurnLoadComplete
+                || burnUiStage !== "working"
                 || researchBurnRevision !== researchRevision
                 || researchBusy || busy)
             return false;
@@ -297,7 +784,6 @@ PanelWindow {
             const rev = researchBurnRevision;
             const count = researchBurnCount;
             const digest = researchBurnDigest;
-            clearResearchBurn();
             return runResearch("burn-all", [
                 String(rev), String(count), digest,
                 "BURN_ALL_MANAGED_COPIES_CONFIRMED"
@@ -310,7 +796,6 @@ PanelWindow {
             return false;
         const id = researchBurnId;
         const rev = researchBurnRevision;
-        clearResearchBurn();
         return runResearch("burn", [
             id, String(rev), "BURN_SAVED_COPY_CONFIRMED"
         ]);
@@ -335,8 +820,8 @@ PanelWindow {
 
     function setMode(nextMode) {
         const requested = String(nextMode || "");
-        if (busy || researchBusy || confirmMode !== ""
-                || researchBurnId !== ""
+        if (busy || researchBusy || snapshotBusy || confirmMode !== ""
+                || researchBurnId !== "" || burnUiStage !== ""
                 || lifecycleModes.indexOf(requested) < 0)
             return false;
         if (requested === "cleanup" && activeMode !== "cleanup") {
@@ -349,12 +834,18 @@ PanelWindow {
         if (activeMode === "cleanup" && requested !== "cleanup"
                 && cameraCleanupController)
             cameraCleanupController.suspendHostedCleanup();
+        if (requested !== "archive") {
+            clearSnapshotArm();
+            snapshotStatus = "IDLE";
+        }
         activeMode = requested;
         if (menuOpen)
             Qt.callLater(function() {
                 if (trashLauncher.activeMode === "archive") {
                     trashLauncher.refreshArchive();
                     trashLauncher.refreshResearch();
+                    trashLauncher.refreshArchiveV2(0, "",
+                                                   trashLauncher.archiveSearchText.trim());
                 } else if (trashLauncher.activeMode === "burn"
                            || trashLauncher.activeMode === "trash")
                     trashLauncher.refreshResearch();
@@ -381,7 +872,8 @@ PanelWindow {
     readonly property bool burnWarning:
         confirmMode !== "" || pendingAction === "burn"
         || pendingAction === "burn-all" || researchBurnId !== ""
-        || researchPending === "burn"
+        || researchPending === "burn" || researchPending === "burn-all"
+        || burnUiStage !== ""
 
     function stepChassis(direction) {
         const index = chassisSizes.indexOf(chassisSize);
@@ -470,6 +962,9 @@ PanelWindow {
     }
 
     function toggle() {
+        if (burnUiStage === "clicked" || burnUiStage === "working"
+                || burnUiStage === "result" || burnUiStage === "error")
+            return false;
         menuOpen = !menuOpen;
         clearConfirmation();
         clearResearchBurn();
@@ -484,6 +979,8 @@ PanelWindow {
                 Qt.callLater(function() {
                     trashLauncher.refreshArchive();
                     trashLauncher.refreshResearch();
+                    trashLauncher.refreshArchiveV2(0, "",
+                                                   trashLauncher.archiveSearchText.trim());
                 });
             else if (activeMode === "burn" || activeMode === "trash")
                 Qt.callLater(function() { trashLauncher.refreshResearch(); });
@@ -492,6 +989,13 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!menuOpen) {
+            // A committed capture must complete even if the user closes
+            // the panel; only previews can be silently discarded.
+            if (!snapshotBusy || snapshotPendingAction !== "capture")
+                clearSnapshotArm();
+            burnCommitDelay.stop();
+            burnUiStage = "";
+            clearConfirmation();
             clearResearchBurn();
             if (cameraCleanupController)
                 cameraCleanupController.suspendHostedCleanup();
@@ -532,14 +1036,17 @@ PanelWindow {
         catch (error) {
             lastError = true;
             status = "TRASH // INVALID BACKEND RESPONSE";
+            if (action === "burn" || action === "burn-all")
+                failBurnReceipt(status);
             return;
         }
         if (!payload || payload.ok !== true) {
             lastError = true;
             status = "TRASH // " + String(payload && payload.error
                                               || "BACKEND_UNAVAILABLE");
-            // Keep the current queue for inspection; a failed operation never
-            // implies items were restored or permanently deleted.
+            // A failed operation never implies items were deleted.
+            if (action === "burn" || action === "burn-all")
+                failBurnReceipt(status);
             return;
         }
         if (action === "index" || action === "index-live") {
@@ -558,18 +1065,20 @@ PanelWindow {
             if (action === "index" || changed)
                 status = receipt || ("TRASH // " + total + " ITEMS");
         } else {
-            receipt = action === "restore"
-                    ? "RESTORED // " + String(payload.name || "")
-                    : action === "burn"
-                    ? "BURNED // " + String(payload.name || "")
-                    : "BURN ALL // COMPLETE";
+            if (action === "burn" || action === "burn-all") {
+                const expected = action === "burn" ? 1 : confirmCount;
+                showBurnReceipt(payload, action === "burn"
+                                ? "SYSTEM TRASH // FILE" : "SYSTEM TRASH // ALL",
+                                expected);
+                receipt = burnReceiptMessage;
+            } else {
+                receipt = "RESTORED // " + String(payload.name || "");
+            }
             status = receipt;
-            clearConfirmation();
-            // One refresh after an explicit operation; never a background
-            // polling timer and never a second destructive action.
+            // Refresh inventory WITHOUT dismissing the confirmed result.
             Qt.callLater(function() {
                 if (trashLauncher.menuOpen && !trashLauncher.busy)
-                    trashLauncher.refresh();
+                    trashLauncher.refresh(false, true);
             });
         }
     }
@@ -581,38 +1090,57 @@ PanelWindow {
     }
 
     function armBurn(item) {
-        if (busy || !item) return;
+        if (!menuOpen || busy || researchBusy || !item
+                || confirmMode !== "" || researchBurnId !== ""
+                || burnUiStage !== "")
+            return false;
         clearConfirmation();
+        clearResearchBurn();
         confirmMode = "item";
         confirmUri = String(item.uri);
         confirmOriginal = String(item.original);
         confirmName = String(item.name);
+        activeMode = "burn";
+        return true;
     }
 
     function armBurnAll() {
-        if (busy || total < 1 || revision.length !== 64) return;
+        if (!menuOpen || activeMode !== "burn" || burnFilter !== "files"
+                || busy || researchBusy || total < 1 || revision.length !== 64
+                || confirmMode !== "" || researchBurnId !== ""
+                || burnUiStage !== "")
+            return false;
         clearConfirmation();
+        clearResearchBurn();
         confirmMode = "all";
         confirmRevision = revision;
         confirmCount = total;
         burnAllPointerRelocated = false;
+        return true;
     }
 
     function confirmBurn() {
-        if (busy) return;
+        if (busy || researchBusy || burnUiStage !== "working"
+                || !researchBurnPointerRelocated
+                || !researchBurnClickArmed || !researchBurnLoadComplete)
+            return false;
         if (confirmMode === "item" && confirmUri) {
-            run("burn", ["burn", confirmUri, confirmOriginal, "BURN_CONFIRMED"]);
-        } else if (confirmMode === "all" && confirmCount > 0
-                   && burnAllPointerRelocated
-                   && activeMode === "trash"
-                   && confirmRevision === revision
-                   && confirmCount === total) {
-            // Pointer must arrive at the remote confirmation target. Backend
-            // independently revalidates the count/revision before emptying.
-            run("burn-all", ["burn-all", confirmRevision,
-                             String(confirmCount), "BURN_ALL_CONFIRMED"]);
+            return run("burn", ["burn", confirmUri, confirmOriginal,
+                                "BURN_CONFIRMED"]);
         }
+        if (confirmMode === "all" && confirmCount > 0
+                && activeMode === "burn"
+                && confirmRevision === revision
+                && confirmCount === total) {
+            // Same spatial/two-click modal as managed-copy Burn. GIO
+            // independently revalidates count and revision.
+            return run("burn-all", ["burn-all", confirmRevision,
+                                    String(confirmCount),
+                                    "BURN_ALL_CONFIRMED"]);
+        }
+        return false;
     }
+
 
     IpcHandler {
         target: "trash"
@@ -683,6 +1211,65 @@ PanelWindow {
         }
     }
 
+    // Dedicated read-only V2 SQLite metadata page reader. It exposes no
+    // writer verbs and is never routed into GIO/managed-copy Burn.
+    Process {
+        id: archiveV2Process
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: trashLauncher.consumeArchiveV2(this.text)
+        }
+        onExited: function(code, status) {
+            Qt.callLater(function() {
+                if (trashLauncher.archiveV2Busy) {
+                    trashLauncher.archiveV2Busy = false;
+                    trashLauncher.archiveV2Rows = [];
+                    trashLauncher.archiveCapacity = null;
+                    trashLauncher.archiveV2State = "STALE // COPY INDEX PROCESS FAILED";
+                }
+            });
+        }
+    }
+
+    // V2j: separate metadata-only global audit, no payload or write verbs.
+    Process {
+        id: archiveChainProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: trashLauncher.consumeArchiveChain(this.text)
+        }
+        onExited: function(code, status) {
+            Qt.callLater(function() {
+                if (trashLauncher.archiveChainBusy) {
+                    trashLauncher.archiveChainBusy = false;
+                    trashLauncher.archiveChainReport = null;
+                    trashLauncher.archiveChainState =
+                        "FAILED // CHAIN AUDIT PROCESS";
+                }
+            });
+        }
+    }
+
+    // Separate allowlisted copy-only process. It cannot invoke GIO Trash,
+    // managed V1 Burn, or source deletion. Preview is a read-only verb.
+    Process {
+        id: snapshotCaptureProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: trashLauncher.consumeSnapshot(this.text)
+        }
+        onExited: function(code, status) {
+            Qt.callLater(function() {
+                if (trashLauncher.snapshotBusy) {
+                    trashLauncher.snapshotBusy = false;
+                    trashLauncher.snapshotPendingAction = "";
+                    trashLauncher.clearSnapshotArm();
+                    trashLauncher.snapshotStatus = "STALE // COPY PROCESS FAILED";
+                }
+            });
+        }
+    }
+
     // First remote click visibly loads before the destructive second click.
     NumberAnimation {
         id: researchBurnArmAnimation
@@ -696,6 +1283,24 @@ PanelWindow {
             if (trashLauncher.researchBurnId !== ""
                     && trashLauncher.researchBurnClickArmed)
                 trashLauncher.researchBurnLoadComplete = true;
+        }
+    }
+
+    // The second click gets a visible magenta feedback pulse before the
+    // actual subprocess begins. Cancelling or closing never commits.
+    Timer {
+        id: burnCommitDelay
+        interval: 420
+        repeat: false
+        onTriggered: {
+            if (!trashLauncher.menuOpen || trashLauncher.burnUiStage !== "clicked")
+                return;
+            trashLauncher.burnUiStage = "working";
+            const accepted = trashLauncher.confirmMode !== ""
+                ? trashLauncher.confirmBurn()
+                : trashLauncher.confirmResearchBurn();
+            if (!accepted)
+                trashLauncher.failBurnReceipt("STALE OR UNAVAILABLE BURN TARGET");
         }
     }
 
@@ -715,6 +1320,8 @@ PanelWindow {
                     trashLauncher.researchBusy = false;
                     trashLauncher.researchPending = "";
                     trashLauncher.researchState = "STALE // RESEARCH PROCESS FAILED";
+                    if (action === "burn" || action === "burn-all")
+                        trashLauncher.failBurnReceipt(trashLauncher.researchState);
                 }
             });
         }
@@ -736,6 +1343,8 @@ PanelWindow {
                     trashLauncher.busy = false;
                     trashLauncher.lastError = true;
                     trashLauncher.status = "TRASH // BACKEND PROCESS UNAVAILABLE";
+                    if (action === "burn" || action === "burn-all")
+                        trashLauncher.failBurnReceipt(trashLauncher.status);
                 }
             });
         }
@@ -1272,64 +1881,17 @@ PanelWindow {
                     color: Colors.cyan
                     font.pixelSize: 10
                     verticalAlignment: Text.AlignVCenter
-                    text: "RESTORE // RECOVERABLE"
+                    text: "RESTORE HERE // BURN IN ONE WORKSPACE"
                 }
 
                 ActionButton {
                     width: 117
                     height: 32
-                    label: "BURN ALL"
-                    labelPixelSize: 11
+                    label: "OPEN BURN"
+                    labelPixelSize: 10
                     accentColor: Colors.red
-                    destructive: true
-                    available: !trashLauncher.busy && trashLauncher.total > 0
-                               && trashLauncher.revision.length === 64
-                    onLeftClicked: trashLauncher.armBurnAll()
-                }
-            }
-
-            Rectangle {
-                width: parent.width
-                height: trashLauncher.confirmMode === "item" ? 40 : 0
-                visible: trashLauncher.confirmMode === "item"
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.red
-
-                Row {
-                    anchors.fill: parent
-                    anchors.margins: 4
-                    spacing: 5
-
-                    GohuText {
-                        width: parent.width - 179
-                        height: parent.height
-                        color: Colors.yellow
-                        font.pixelSize: 10
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
-                        text: "BURN // " + trashLauncher.confirmName
-                    }
-
-                    ActionButton {
-                        width: 71
-                        height: 29
-                        label: "CANCEL"
-                        labelPixelSize: 9
-                        accentColor: Colors.cyan
-                        onLeftClicked: trashLauncher.clearConfirmation()
-                    }
-
-                    ActionButton {
-                        width: 98
-                        height: 29
-                        label: "CONFIRM BURN"
-                        labelPixelSize: 9
-                        accentColor: Colors.red
-                        destructive: true
-                        available: !trashLauncher.busy
-                        onLeftClicked: trashLauncher.confirmBurn()
-                    }
+                    available: !trashLauncher.busy && !trashLauncher.researchBusy
+                    onLeftClicked: trashLauncher.setMode("burn")
                 }
             }
 
@@ -1345,11 +1907,22 @@ PanelWindow {
                 Flickable {
                     id: cleanupPageViewport
                     anchors.fill: parent
+                    // Compact keeps a pinned scroll rail beneath the content.
+                    // Hunt and Swipe retain their own pointer gestures.
+                    anchors.bottomMargin: trashLauncher.cleanupScrollRailVisible ? 29 : 0
                     visible: trashLauncher.activeMode === "cleanup"
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     contentWidth: width
-                    contentHeight: Math.max(height, 525)
+                    // Stacked Batch needs more vertical space than the
+                    // original 525px side-by-side Camera design. The parent
+                    // viewport is bounded; the contents are explicitly
+                    // scrollable instead of falling below the panel frame.
+                    contentHeight: Math.max(height,
+                        trashLauncher.chassisSize === "compact"
+                        && trashLauncher.cameraCleanupController
+                        && trashLauncher.cameraCleanupController.cleanupTechnique === "batch"
+                        ? 650 : 525)
                     interactive: trashLauncher.cameraCleanupController
                                  && trashLauncher.cameraCleanupController.cleanupTechnique
                                     !== "swipe"
@@ -1375,6 +1948,68 @@ PanelWindow {
                     }
                 }
 
+                // This is outside the swipe deck and Hunt arena, so the
+                // arrow controls scroll the outer Cleanup page without
+                // stealing gestures or changing Camera's selection data.
+                Row {
+                    id: cleanupCompactScrollRail
+                    anchors.bottom: parent.bottom
+                    width: parent.width
+                    height: 27
+                    spacing: 5
+                    visible: trashLauncher.cleanupScrollRailVisible
+
+                    ActionButton {
+                        width: 66
+                        height: 26
+                        label: "↑ UP"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        available: cleanupPageViewport.contentY > 0
+                        onLeftClicked: cleanupPageViewport.contentY = Math.max(
+                            0, cleanupPageViewport.contentY - 170)
+                    }
+
+                    GohuText {
+                        width: Math.max(20, parent.width - 142)
+                        height: 26
+                        font.pixelSize: 9
+                        color: Colors.yellow
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        text: "SCROLL // "
+                              + Math.round(100 * cleanupPageViewport.contentY
+                                           / Math.max(1, cleanupPageViewport.contentHeight
+                                                      - cleanupPageViewport.height)) + "%"
+                    }
+
+                    ActionButton {
+                        width: 66
+                        height: 26
+                        label: "↓ DOWN"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        available: cleanupPageViewport.contentY
+                                   < cleanupPageViewport.contentHeight
+                                     - cleanupPageViewport.height - 1
+                        onLeftClicked: cleanupPageViewport.contentY = Math.min(
+                            Math.max(0, cleanupPageViewport.contentHeight
+                                        - cleanupPageViewport.height),
+                            cleanupPageViewport.contentY + 170)
+                    }
+                }
+
+                NeonScrollBar {
+                    flickable: cleanupPageViewport
+                    x: cleanupPageViewport.width - width - 1
+                    y: 0
+                    height: cleanupPageViewport.height
+                    geometryMode: "viewport"
+                    handleStyle: "star"
+                    visible: trashLauncher.activeMode === "cleanup"
+                             && scrollable
+                }
+
                 Item {
                     id: archiveRecordsView
                     anchors.fill: parent
@@ -1390,14 +2025,26 @@ PanelWindow {
                             height: 28
                             spacing: 8
                             GohuText {
-                                width: parent.width - 100
+                                width: Math.max(80, parent.width - 200)
                                 height: parent.height
                                 color: Colors.yellow
                                 font.pixelSize: 12
                                 verticalAlignment: Text.AlignVCenter
-                                text: "ARCHIVE // INVENTORY // "
-                                      + (trashLauncher.archiveRows.length
-                                         + trashLauncher.researchRows.length)
+                                elide: Text.ElideRight
+                                text: "ARCHIVE // " + trashLauncher.archiveFilteredRows.length
+                                      + " VISIBLE"
+                            }
+                            ActionButton {
+                                width: 90
+                                height: 27
+                                label: trashLauncher.archiveChainBusy
+                                       ? "AUDITING" : "VERIFY CHAIN"
+                                labelPixelSize: 9
+                                accentColor: Colors.magenta
+                                available: !trashLauncher.archiveChainBusy
+                                           && !trashLauncher.archiveV2Busy
+                                           && !trashLauncher.snapshotBusy
+                                onLeftClicked: trashLauncher.auditArchiveChain()
                             }
                             ActionButton {
                                 width: 92
@@ -1407,8 +2054,145 @@ PanelWindow {
                                 labelPixelSize: 10
                                 accentColor: Colors.green
                                 available: !trashLauncher.archiveBusy
-                                onLeftClicked: trashLauncher.refreshArchive()
+                                           && !trashLauncher.archiveChainBusy
+                                onLeftClicked: {
+                                    trashLauncher.refreshArchive();
+                                    trashLauncher.refreshResearch();
+                                    trashLauncher.refreshArchiveV2(0, "",
+                                                   trashLauncher.archiveSearchText.trim());
+                                }
                             }
+                        }
+
+                        // V2h capacity display: actual charged SQLite DB +
+                        // rollback-journal footprint, never a fake time/step
+                        // animation. No mutation, buttons or deletion controls.
+                        Item {
+                            id: archiveCapacityGauge
+                            width: parent.width
+                            height: trashLauncher.chassisSize === "compact" ? 52 : 66
+
+                            Row {
+                                id: archiveCapacityHeader
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                height: trashLauncher.chassisSize === "compact" ? 16 : 20
+                                spacing: 6
+
+                                GohuText {
+                                    id: archiveCapacityTitle
+                                    width: Math.max(95, parent.width * 0.39)
+                                    height: parent.height
+                                    font.pixelSize: trashLauncher.chassisSize === "compact" ? 11 : 14
+                                    color: Colors.yellow
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                    text: "ARCHIVE // CAPACITY"
+                                }
+                                GohuText {
+                                    width: Math.max(0, parent.width
+                                        - archiveCapacityHeader.spacing
+                                        - archiveCapacityTitle.width)
+                                    height: parent.height
+                                    font.pixelSize: trashLauncher.chassisSize === "compact" ? 10 : 13
+                                    color: trashLauncher.archiveCapacityColor
+                                    horizontalAlignment: Text.AlignRight
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                    text: !trashLauncher.archiveCapacity
+                                        ? "NOT MEASURED"
+                                        : trashLauncher.archiveCapacityUsedText
+                                          + " / "
+                                          + (trashLauncher.archiveCapacity.diskQuotaBytes
+                                             / 1048576).toFixed(0) + " MiB"
+                                }
+                            }
+
+                            Rectangle {
+                                id: archiveCapacityTrack
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: archiveCapacityHeader.bottom
+                                anchors.topMargin: 4
+                                height: trashLauncher.chassisSize === "compact" ? 15 : 20
+                                radius: 0
+                                color: Colors.dark
+                                border.width: 1
+                                border.color: trashLauncher.archiveCapacityColor
+                                clip: true
+
+                                Rectangle {
+                                    id: archiveCapacityFill
+                                    x: 1
+                                    y: 1
+                                    height: Math.max(0, parent.height - 2)
+                                    // Zero means zero. Real usage drives every
+                                    // pixel; no artificial minimum fill width.
+                                    width: Math.max(0, (parent.width - 2) * trashLauncher.archiveCapacityRatio)
+                                    color: trashLauncher.archiveCapacityColor
+                                    radius: 0
+                                }
+                            }
+
+                            Row {
+                                id: archiveCapacityFooter
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: archiveCapacityTrack.bottom
+                                anchors.topMargin: 3
+                                height: trashLauncher.chassisSize === "compact" ? 13 : 17
+                                spacing: 4
+
+                                GohuText {
+                                    id: archiveCapacityRemaining
+                                    width: parent.width * 0.64
+                                    height: parent.height
+                                    color: trashLauncher.archiveCapacityColor
+                                    font.pixelSize: trashLauncher.chassisSize === "compact" ? 10 : 12
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                    text: !trashLauncher.archiveCapacity
+                                        ? "NO DISK INVENTORY"
+                                        : (trashLauncher.archiveCapacity.remainingBytes
+                                           / 1048576).toFixed(2) + " MiB REMAINING"
+                                }
+                                GohuText {
+                                    width: parent.width - archiveCapacityRemaining.width
+                                           - archiveCapacityFooter.spacing
+                                    height: parent.height
+                                    color: trashLauncher.archiveCapacityColor
+                                    font.pixelSize: trashLauncher.chassisSize === "compact" ? 10 : 12
+                                    horizontalAlignment: Text.AlignRight
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: !trashLauncher.archiveCapacity ? "UNAVAILABLE"
+                                        : trashLauncher.archiveCapacityPercentText + " USED"
+                                }
+                            }
+                        }
+
+                        GohuText {
+                            id: archiveChainAuditStatus
+                            width: parent.width
+                            height: 23
+                            font.pixelSize: trashLauncher.chassisSize === "compact" ? 10 : 12
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                            color: trashLauncher.archiveChainState.indexOf("FAILED") === 0
+                                   ? Colors.red
+                                   : trashLauncher.archiveChainReport
+                                     && trashLauncher.archiveChainReport.state
+                                        === "CHAIN_CONSISTENT"
+                                   ? Colors.green : Colors.orange
+                            text: "CHAIN // " + trashLauncher.archiveChainState
+                                  + (trashLauncher.archiveChainReport
+                                     ? " // " + trashLauncher.archiveChainReport.receiptCount
+                                       + " RECEIPTS // "
+                                       + trashLauncher.archiveChainReport.legacyCount
+                                       + " LEGACY // "
+                                       + trashLauncher.archiveChainReport.sourceCount
+                                       + " SOURCES // PAYLOAD NOT CHECKED"
+                                     : "")
                         }
 
                         GohuText {
@@ -1420,9 +2204,23 @@ PanelWindow {
                             elide: Text.ElideRight
                             text: trashLauncher.archiveState + " // "
                                 + trashLauncher.researchState + " // "
+                                + "COPIES:" + trashLauncher.archiveV2State + " // "
                                 + trashLauncher.archiveSources.map(function(v) {
                                     return v.id + ":" + v.state;
                                 }).join(" // ")
+                        }
+
+                        GohuText {
+                            id: snapshotCopyStatus
+                            width: parent.width
+                            height: 17
+                            visible: trashLauncher.snapshotStatus !== "IDLE"
+                            font.pixelSize: 9
+                            color: trashLauncher.snapshotStatus.indexOf("REFUSED") >= 0
+                                   || trashLauncher.snapshotStatus.indexOf("STALE") === 0
+                                   ? Colors.red : Colors.green
+                            elide: Text.ElideRight
+                            text: "SNAPSHOT // " + trashLauncher.snapshotStatus
                         }
 
                         TextField {
@@ -1432,9 +2230,11 @@ PanelWindow {
                             color: Colors.white
                             font.pixelSize: 10
                             placeholderTextColor: Colors.cyan
-                            placeholderText: "FIND RECORDS // SAVED COPIES // BIN"
+                            placeholderText: "SEARCH ARCHIVE // PRESS ENTER"
                             text: trashLauncher.archiveSearchText
                             onTextChanged: trashLauncher.archiveSearchText = text
+                            onAccepted: trashLauncher.refreshArchiveV2(
+                                0, "", trashLauncher.archiveSearchText.trim())
                             background: Rectangle {
                                 color: Colors.dark
                                 border.width: 1
@@ -1455,12 +2255,13 @@ PanelWindow {
                                     {id:"events", label:"EVENTS"},
                                     {id:"dossiers", label:"DOSSIERS"},
                                     {id:"scrapes", label:"SCRAPES"},
+                                    {id:"hub", label:"HUB"},
                                     {id:"copies", label:"COPIES"},
                                     {id:"bin", label:"BIN"}
                                 ]
                                 ActionButton {
                                     required property var modelData
-                                    width: (archiveFilterRow.width - 20) / 6
+                                    width: (archiveFilterRow.width - 24) / 7
                                     height: 26
                                     label: modelData.label
                                     labelPixelSize: 9
@@ -1475,7 +2276,13 @@ PanelWindow {
                         Item {
                             id: archiveEntriesBox
                             width: parent.width
-                            height: Math.max(80, archiveRecordsView.height - 190)
+                            // The live capacity gauge occupies the top rail,
+                            // so reduce only the scrollable records area.
+                            // Compact hides its redundant old bottom disclaimer.
+                            height: Math.max(trashLauncher.chassisSize === "compact"
+                                ? 50 : 65, archiveRecordsView.height
+                                - (trashLauncher.snapshotStatus === "IDLE" ? 241 : 258)
+                                - (trashLauncher.chassisSize === "compact" ? 34 : 76))
                             ListView {
                                 id: archiveEntriesList
                                 width: parent.width - 17
@@ -1498,7 +2305,16 @@ PanelWindow {
                                     Column {
                                         anchors.fill: parent
                                         anchors.margins: 6
-                                        anchors.rightMargin: 126
+                                        // Non-actionable source/read-only rows
+                                        // should use the width recovered from
+                                        // the absent action column, especially
+                                        // in the compact 420px chassis.
+                                        anchors.rightMargin:
+                                            (modelData.kind === "WEB SCRAPE"
+                                             || modelData.kind === "EVENT HISTORY"
+                                             || modelData.kind === "SAVED RESEARCH"
+                                             || modelData.kind === "SAVED EVENT")
+                                            ? 126 : 6
                                         spacing: 3
 
                                         GohuText {
@@ -1507,7 +2323,12 @@ PanelWindow {
                                             font.pixelSize: 11
                                             color: Colors.white
                                             elide: Text.ElideRight
-                                            text: String(modelData.title || "UNTITLED RECORD")
+                                            text: (modelData.kind === "V2 SNAPSHOT"
+                                                   ? "[READ-ONLY COPY] "
+                                                   : modelData.kind === "SAVED RESEARCH"
+                                                     || modelData.kind === "SAVED EVENT"
+                                                   ? "[MANAGED COPY] " : "[SOURCE] ")
+                                                  + String(modelData.title || "UNTITLED RECORD")
                                         }
                                         GohuText {
                                             width: parent.width
@@ -1573,6 +2394,32 @@ PanelWindow {
                                         }
 
                                         ActionButton {
+                                            id: saveSnapshotButton
+                                            width: parent.width
+                                            height: 28
+                                            visible: (modelData.kind === "WEB SCRAPE"
+                                                      || modelData.kind === "EVENT HISTORY")
+                                                     && modelData.capabilities
+                                                     && modelData.capabilities.saveCopy === true
+                                            label: trashLauncher.snapshotRecordId
+                                                   === String(modelData.id)
+                                                   && trashLauncher.snapshotWitness !== ""
+                                                   ? "CONFIRM COPY" : "SAVE SNAPSHOT"
+                                            labelPixelSize: 9
+                                            accentColor: trashLauncher.snapshotRecordId
+                                                         === String(modelData.id)
+                                                         && trashLauncher.snapshotWitness !== ""
+                                                         ? Colors.green : Colors.magenta
+                                            available: !trashLauncher.snapshotBusy
+                                                       && !trashLauncher.researchBusy
+                                                       && !trashLauncher.archiveBusy
+                                                       && !trashLauncher.busy
+                                                       && trashLauncher.confirmMode === ""
+                                                       && trashLauncher.burnUiStage === ""
+                                            onLeftClicked: trashLauncher.requestSnapshot(modelData)
+                                        }
+
+                                        ActionButton {
                                             width: parent.width
                                             height: 29
                                             visible: (modelData.kind === "SAVED RESEARCH"
@@ -1603,23 +2450,79 @@ PanelWindow {
                                 anchors.centerIn: parent
                                 visible: !trashLauncher.archiveBusy
                                          && !trashLauncher.researchBusy
+                                         && !trashLauncher.archiveV2Busy
                                          && trashLauncher.archiveFilteredRows.length === 0
                                 color: Colors.cyan
                                 font.pixelSize: 11
                                 text: trashLauncher.archiveRows.length === 0
                                          && trashLauncher.researchRows.length === 0
+                                         && trashLauncher.archiveV2Rows.length === 0
                                       ? "NO ARCHIVED RECORDS FOUND"
                                       : "NO MATCHES // TRY ANOTHER FILTER"
                             }
                         }
 
+                        Row {
+                            id: archiveV2PageRail
+                            width: parent.width
+                            height: 26
+                            spacing: 5
+
+                            ActionButton {
+                                width: 67
+                                height: 25
+                                label: "PREVIOUS"
+                                labelPixelSize: 9
+                                accentColor: Colors.cyan
+                                available: !trashLauncher.archiveV2Busy
+                                           && !trashLauncher.archiveV2QueryDirty
+                                           && trashLauncher.archiveV2Page > 0
+                                onLeftClicked: trashLauncher.pageArchiveV2(-1)
+                            }
+
+                            GohuText {
+                                width: Math.max(40, parent.width - 144)
+                                height: 25
+                                font.pixelSize: 9
+                                color: Colors.cyan
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+                                // This rail pages only independently stored
+                                // READ-ONLY copies. Source and managed-copy
+                                // rows stay visible above across every page.
+                                text: trashLauncher.archiveV2QueryDirty
+                                    ? "PRESS ENTER TO SEARCH ALL COPIES"
+                                    : "READ-ONLY COPIES // PAGE "
+                                      + (trashLauncher.archiveV2Page + 1)
+                                      + " // " + trashLauncher.archiveV2Total
+                                      + (trashLauncher.archiveV2AppliedQuery === ""
+                                         ? " SAVED" : " MATCHES")
+                            }
+
+                            ActionButton {
+                                width: 67
+                                height: 25
+                                label: "NEXT"
+                                labelPixelSize: 9
+                                accentColor: Colors.cyan
+                                available: !trashLauncher.archiveV2Busy
+                                           && !trashLauncher.archiveV2QueryDirty
+                                           && trashLauncher.archiveV2HasMore
+                                onLeftClicked: trashLauncher.pageArchiveV2(1)
+                            }
+                        }
+
                         GohuText {
+                            visible: trashLauncher.chassisSize !== "compact"
                             width: parent.width
                             height: 24
                             color: Colors.yellow
                             font.pixelSize: 9
                             wrapMode: Text.WordWrap
-                            text: "SAVE COPY // WEATHER EVENTS OR DEMO SCRAPES. TRASH / RESTORE / BURN AFFECT ONLY TRASH++ COPIES."
+                            text: trashLauncher.chassisSize === "compact"
+                                  ? "ORIGINALS READ-ONLY // SAVED COPIES MANAGED HERE"
+                                  : "SAVE COPY // WEATHER EVENTS OR DEMO SCRAPES. TRASH / RESTORE / BURN AFFECT ONLY TRASH++ COPIES."
                         }
                     }
                 }
@@ -1631,59 +2534,112 @@ PanelWindow {
 
                     Column {
                         anchors.fill: parent
-                        anchors.margins: 9
-                        spacing: 9
+                        anchors.margins: 8
+                        spacing: 7
 
                         GohuText {
                             width: parent.width
-                            height: 28
+                            height: 24
                             font.pixelSize: 13
                             color: Colors.yellow
-                            text: "BURN // SAVED COPY BIN // "
-                                  + trashLauncher.researchBinRows.length
+                            text: "BURN // " + trashLauncher.total + " FILES // "
+                                  + trashLauncher.researchBinRows.length + " COPIES"
                         }
+
                         GohuText {
                             width: parent.width
-                            height: 43
-                            wrapMode: Text.WordWrap
-                            font.pixelSize: 10
+                            height: trashLauncher.chassisSize === "compact" ? 18 : 34
+                            font.pixelSize: 9
                             color: Colors.cyan
-                            text: "Burn requires a separate confirmation. Only trashed, Trash++-owned Weather EVENT or DEMO RESEARCH copies appear here. Original Weather archives, Hospital and Finance records remain protected."
+                            wrapMode: trashLauncher.chassisSize === "compact"
+                                      ? Text.NoWrap : Text.WordWrap
+                            text: trashLauncher.chassisSize === "compact"
+                                  ? "BURN // FILES OR SAVED COPIES // ONE CONFIRMATION"
+                                  : "ONE BURN WORKSPACE // file deletion uses GIO; saved copies use their own verified store. Every Burn uses the same confirmation and result screen."
+                            elide: trashLauncher.chassisSize === "compact"
+                                   ? Text.ElideRight : Text.ElideNone
+                        }
+
+                        Row {
+                            id: burnSourceFilters
+                            width: parent.width
+                            height: 27
+                            spacing: 4
+                            Repeater {
+                                model: [
+                                    {id:"all", label:"ALL"},
+                                    {id:"files", label:"FILES"},
+                                    {id:"records", label:"COPIES"},
+                                    {id:"events", label:"EVENTS"},
+                                    {id:"research", label:"RESEARCH"}
+                                ]
+                                ActionButton {
+                                    required property var modelData
+                                    width: (burnSourceFilters.width - 16) / 5
+                                    height: 27
+                                    label: modelData.label
+                                    labelPixelSize: 9
+                                    accentColor: modelData.id === "files"
+                                                 ? Colors.cyan : Colors.magenta
+                                    selected: trashLauncher.burnFilter === modelData.id
+                                    available: trashLauncher.burnUiStage === ""
+                                    onLeftClicked: trashLauncher.burnFilter = modelData.id
+                                }
+                            }
                         }
 
                         Item {
                             width: parent.width
-                            height: Math.max(100, researchBurnReview.height - 145)
+                            height: Math.max(60, researchBurnReview.height
+                                             - (trashLauncher.chassisSize === "compact"
+                                                ? 178 : 194))
 
                             ListView {
                                 id: researchBurnList
                                 width: parent.width - 14
                                 height: parent.height
                                 clip: true
-                                spacing: 6
+                                spacing: 5
                                 boundsBehavior: Flickable.StopAtBounds
-                                model: trashLauncher.researchBinRows
+                                model: trashLauncher.burnDisplayRows
 
                                 delegate: Rectangle {
                                     required property var modelData
                                     width: researchBurnList.width
-                                    height: 64
+                                    height: 59
                                     color: Colors.dark
                                     radius: 0
                                     border.width: 1
-                                    border.color: Colors.orange
+                                    border.color: modelData.entryType === "file"
+                                                  ? Colors.green : Colors.orange
 
-                                    GohuText {
+                                    Column {
                                         anchors.left: parent.left
-                                        anchors.leftMargin: 7
+                                        anchors.leftMargin: 6
                                         anchors.right: burnCopyButton.left
                                         anchors.rightMargin: 8
                                         anchors.verticalCenter: parent.verticalCenter
-                                        font.pixelSize: 10
-                                        color: Colors.white
-                                        elide: Text.ElideRight
-                                        text: String(modelData.title)
-                                              + " // " + String(modelData.recordedAt)
+                                        spacing: 4
+
+                                        GohuText {
+                                            width: parent.width
+                                            height: 18
+                                            font.pixelSize: 10
+                                            color: Colors.white
+                                            elide: Text.ElideMiddle
+                                            text: (modelData.entryType === "file"
+                                                   ? "[FILE] " : "[COPY] ")
+                                                  + String(modelData.title)
+                                        }
+
+                                        GohuText {
+                                            width: parent.width
+                                            height: 16
+                                            font.pixelSize: 9
+                                            color: Colors.cyan
+                                            elide: Text.ElideMiddle
+                                            text: String(modelData.originLabel || "")
+                                        }
                                     }
 
                                     ActionButton {
@@ -1693,13 +2649,19 @@ PanelWindow {
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: 105
                                         height: 33
-                                        label: "BURN COPY"
-                                        labelPixelSize: 9
+                                        label: "BURN"
+                                        labelPixelSize: 10
                                         accentColor: Colors.red
                                         destructive: true
-                                        available: !trashLauncher.researchBusy
-                                                   && trashLauncher.researchBurnId === ""
-                                        onLeftClicked: trashLauncher.armResearchBurn(modelData)
+                                        available: !trashLauncher.busy
+                                                   && !trashLauncher.researchBusy
+                                                   && !trashLauncher.burnConfirmationOpen
+                                        onLeftClicked: {
+                                            if (modelData.entryType === "file")
+                                                trashLauncher.armBurn(modelData);
+                                            else
+                                                trashLauncher.armResearchBurn(modelData.record);
+                                        }
                                     }
                                 }
                             }
@@ -1715,10 +2677,10 @@ PanelWindow {
 
                             GohuText {
                                 anchors.centerIn: parent
-                                visible: trashLauncher.researchBinRows.length === 0
+                                visible: trashLauncher.burnDisplayRows.length === 0
                                 color: Colors.cyan
                                 font.pixelSize: 11
-                                text: "NO MANAGED COPIES PENDING PURGE"
+                                text: "NOTHING IN THIS BURN FILTER"
                             }
                         }
 
@@ -1726,37 +2688,58 @@ PanelWindow {
                             width: parent.width
                             height: 32
                             spacing: 8
-
                             ActionButton {
-                                width: Math.max(128, parent.width - 150)
+                                width: Math.max(128, parent.width - 151)
                                 height: 32
                                 label: "VIEW TRASH"
                                 labelPixelSize: 10
                                 accentColor: Colors.green
-                                onLeftClicked: {
-                                    trashLauncher.trashViewFilter = "records";
-                                    trashLauncher.setMode("trash");
-                                }
+                                available: trashLauncher.burnUiStage === ""
+                                           && !trashLauncher.burnConfirmationOpen
+                                onLeftClicked: trashLauncher.setMode("trash")
                             }
 
-                            // Separate from GIO's existing SYSTEM TRASH
-                            // BURN ALL, which remains on the Trash page.
+                            // One Burn All control. Its scope comes from the
+                            // selected filter; there is no combined backend
+                            // that silently grants authority over both stores.
                             ActionButton {
                                 id: burnAllManagedCopiesButton
-                                width: 142
+                                width: 143
                                 height: 32
-                                label: "BURN ALL COPIES"
-                                labelPixelSize: 9
+                                label: "BURN ALL"
+                                labelPixelSize: 10
                                 accentColor: Colors.red
                                 destructive: true
-                                available: !trashLauncher.researchBusy
-                                           && !trashLauncher.busy
-                                           && trashLauncher.researchBurnId === ""
-                                           && trashLauncher.researchBinCount > 0
-                                           && trashLauncher.researchBinCount
-                                              === trashLauncher.researchBinRows.length
-                                onLeftClicked: trashLauncher.armResearchBurnAll()
+                                available: !trashLauncher.busy
+                                           && !trashLauncher.researchBusy
+                                           && !trashLauncher.burnConfirmationOpen
+                                           && (trashLauncher.burnFilter === "files"
+                                               ? trashLauncher.total > 0
+                                                 && trashLauncher.revision.length === 64
+                                               : trashLauncher.burnFilter === "records"
+                                                 && trashLauncher.researchBinCount > 0
+                                                 && trashLauncher.researchBinCount
+                                                    === trashLauncher.researchBinRows.length)
+                                onLeftClicked: {
+                                    if (trashLauncher.burnFilter === "files")
+                                        trashLauncher.armBurnAll();
+                                    else if (trashLauncher.burnFilter === "records")
+                                        trashLauncher.armResearchBurnAll();
+                                }
                             }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            height: 23
+                            font.pixelSize: 9
+                            color: Colors.yellow
+                            wrapMode: Text.WordWrap
+                            text: trashLauncher.burnFilter === "files"
+                                  ? "BURN ALL // SYSTEM TRASH ONLY"
+                                  : trashLauncher.burnFilter === "records"
+                                  ? "BURN ALL // MANAGED COPIES ONLY"
+                                  : "BURN ALL // CHOOSE FILES OR COPIES FOR EXACT SCOPE"
                         }
                     }
                 }
@@ -1773,138 +2756,8 @@ PanelWindow {
             }
         }
 
-        // BURN ALL has its own displaced confirmation surface. It is NOT
-        // the little inline BURN row: repeating the click at the original
-        // lower-right button coordinate must never invoke Gio empty.
-        Rectangle {
-            id: burnAllConfirmMenu
-            anchors.fill: parent
-            z: 90
-            visible: trashLauncher.confirmMode === "all"
-            color: Colors.black
-            radius: 0
-            border.width: 2
-            border.color: Colors.orange
-
-            // Prevent a click through the overlay to the original BURN ALL
-            // button or the rest of the file action controls.
-            MouseArea {
-                anchors.fill: parent
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                onClicked: function(mouse) { mouse.accepted = true; }
-            }
-
-            Column {
-                width: Math.min(parent.width - 30, 355)
-                anchors.centerIn: parent
-                spacing: 15
-
-                GohuText {
-                    width: parent.width
-                    font.pixelSize: 18
-                    color: Colors.red
-                    horizontalAlignment: Text.AlignHCenter
-                    text: "⚠︎ BURN ALL // FINAL REVIEW"
-                }
-
-                Rectangle {
-                    width: parent.width
-                    height: 2
-                    color: Colors.orange
-                }
-
-                GohuText {
-                    width: parent.width
-                    font.pixelSize: 12
-                    color: Colors.yellow
-                    wrapMode: Text.WordWrap
-                    text: "SCOPE // SYSTEM TRASH (INCLUDING OTHER MOUNTS)"
-                }
-
-                GohuText {
-                    width: parent.width
-                    font.pixelSize: 14
-                    color: Colors.white
-                    wrapMode: Text.WordWrap
-                    text: "ITEMS TO DESTROY // " + trashLauncher.confirmCount
-                }
-
-                GohuText {
-                    width: parent.width
-                    font.pixelSize: 11
-                    color: Colors.cyan
-                    wrapMode: Text.WordWrap
-                    text: "This permanently empties the existing Linux Trash. It does NOT purge Hospital, Finance or other future record stores. The backend will recheck item count and inventory revision."
-                }
-
-                GohuText {
-                    width: parent.width
-                    font.pixelSize: 11
-                    color: Colors.orange
-                    wrapMode: Text.WordWrap
-                    text: "MOVE YOUR POINTER TO THE SEPARATE CONFIRM BUTTON. REPEATING THE ORIGINAL CLICK CANNOT BURN."
-                }
-
-                Row {
-                    width: parent.width
-                    height: 43
-                    spacing: 12
-
-                    // The destructive action is topologically away from the
-                    // original bottom-right BURN ALL button. It can only be
-                    // armed by actual pointer arrival at this left-side area.
-                    Item {
-                        id: burnAllRemoteTarget
-                        width: Math.max(145, parent.width - 131)
-                        height: 43
-
-                        HoverHandler {
-                            id: burnAllArrival
-                            onHoveredChanged: {
-                                if (hovered && trashLauncher.confirmMode === "all")
-                                    trashLauncher.burnAllPointerRelocated = true;
-                            }
-                        }
-
-                        ActionButton {
-                            id: confirmAllRemoteButton
-                            anchors.fill: parent
-                            label: trashLauncher.burnAllPointerRelocated
-                                   ? "CONFIRM BURN ALL" : "MOVE HERE TO ARM"
-                            labelPixelSize: 10
-                            accentColor: Colors.red
-                            destructive: true
-                            available: trashLauncher.confirmMode === "all"
-                                       && !trashLauncher.busy
-                                       && trashLauncher.burnAllPointerRelocated
-                                       && trashLauncher.confirmCount > 0
-                                       && trashLauncher.confirmCount === trashLauncher.total
-                                       && trashLauncher.confirmRevision === trashLauncher.revision
-                            onLeftClicked: trashLauncher.confirmBurn()
-                        }
-                    }
-
-                    ActionButton {
-                        id: cancelAllBurnButton
-                        width: 119
-                        height: 43
-                        label: "CANCEL // SAFE"
-                        labelPixelSize: 10
-                        accentColor: Colors.cyan
-                        onLeftClicked: trashLauncher.clearConfirmation()
-                    }
-                }
-
-                GohuText {
-                    width: parent.width
-                    font.pixelSize: 10
-                    color: Colors.green
-                    text: "CANCEL RETURNS TO TRASH // NOTHING IS DELETED"
-                    wrapMode: Text.WordWrap
-                }
-            }
-        }
-
+        // All GIO file and managed-copy Burns share the single modal below.
+        // Their backends and verified inventories remain strictly separate.
         // This modal is a separate, distant target from the per-row BURN
         // action. It only authorizes deleting an already-trashed, locally
         // managed demo research COPY, never any source-owned original.
@@ -1912,7 +2765,7 @@ PanelWindow {
             id: managedResearchBurnConfirm
             anchors.fill: parent
             z: 95
-            visible: trashLauncher.researchBurnId !== ""
+            visible: trashLauncher.burnConfirmationOpen
             color: Colors.black
             radius: 0
             border.width: 2
@@ -1925,16 +2778,20 @@ PanelWindow {
             }
 
             Column {
+                id: burnReviewContent
                 anchors.centerIn: parent
                 width: Math.min(parent.width - 30, 360)
                 spacing: 14
+                visible: trashLauncher.burnUiStage !== "result"
+                         && trashLauncher.burnUiStage !== "error"
 
                 GohuText {
                     width: parent.width
                     font.pixelSize: 17
-                    text: trashLauncher.researchBurnScope === "all"
-                          ? "BURN ALL COPIES // FINAL REVIEW"
-                          : "BURN SAVED COPY // FINAL REVIEW"
+                    text: (trashLauncher.researchBurnScope === "all"
+                           || trashLauncher.confirmMode === "all")
+                          ? "BURN ALL // FINAL REVIEW"
+                          : "BURN ITEM // FINAL REVIEW"
                     color: Colors.red
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
@@ -1950,9 +2807,12 @@ PanelWindow {
                     width: parent.width
                     font.pixelSize: 11
                     color: Colors.yellow
-                    text: trashLauncher.researchBurnScope === "all"
-                          ? "SCOPE // MANAGED BIN ONLY // "
-                            + trashLauncher.researchBurnCount + " COPIES"
+                    text: trashLauncher.confirmMode === "all"
+                          ? "SCOPE // SYSTEM TRASH // " + trashLauncher.confirmCount + " FILES"
+                          : trashLauncher.confirmMode === "item"
+                          ? "SCOPE // ONE SYSTEM TRASH FILE"
+                          : trashLauncher.researchBurnScope === "all"
+                          ? "SCOPE // MANAGED BIN // " + trashLauncher.researchBurnCount + " COPIES"
                           : "SCOPE // ONE TRASH++ MANAGED COPY"
                     wrapMode: Text.WordWrap
                 }
@@ -1962,7 +2822,11 @@ PanelWindow {
                     font.pixelSize: 13
                     color: Colors.white
                     elide: Text.ElideRight
-                    text: trashLauncher.researchBurnTitle
+                    text: trashLauncher.confirmMode === "all"
+                          ? trashLauncher.confirmCount + " SYSTEM TRASH FILES"
+                          : trashLauncher.confirmMode === "item"
+                          ? trashLauncher.confirmName
+                          : trashLauncher.researchBurnTitle
                 }
 
                 GohuText {
@@ -1970,10 +2834,14 @@ PanelWindow {
                     font.pixelSize: 11
                     color: Colors.cyan
                     wrapMode: Text.WordWrap
-                    text: trashLauncher.researchBurnScope === "all"
+                    text: trashLauncher.confirmMode === "all"
+                          ? "This empties Linux Trash across mounts, but never managed copies or source-owned Weather, Hospital or Finance records. GIO rechecks the full index revision."
+                          : trashLauncher.confirmMode === "item"
+                          ? "This permanently removes ONE verified Linux Trash file. Managed copies and source records remain untouched."
+                          : trashLauncher.researchBurnScope === "all"
                           ? "This destroys ONLY " + trashLauncher.researchBurnCount
-                            + " trashed Trash++ managed copies. Active archived copies, GIO system Trash, original Weather events, demo scrapes, Hospital and Finance records are NOT affected. The backend rechecks bin count, revision and record-ID digest."
-                          : "This permanently deletes ONE saved copy from Trash++'s record store. Original Weather events, demo scrape exports, Hospital and Finance records remain untouched. The backend rechecks identity and revision."
+                            + " trashed managed copies. Linux Trash and active copies remain untouched. The backend rechecks count, revision and digest."
+                          : "This permanently deletes ONE managed copy. Original Weather events, research sources, Hospital and Finance records remain untouched."
                 }
 
                 GohuText {
@@ -1997,55 +2865,138 @@ PanelWindow {
                         HoverHandler {
                             id: managedResearchArrival
                             onHoveredChanged: {
-                                if (hovered && trashLauncher.researchBurnId !== "")
+                                if (hovered && trashLauncher.burnConfirmationOpen
+                                        && trashLauncher.burnUiStage === "")
                                     trashLauncher.researchBurnPointerRelocated = true;
                             }
                         }
 
-                        // Full-chassis progress fills the ENTIRE button
-                        // from left to right, behind its readable label.
-                        // The action shell remains a normal live button even
-                        // before the first click.
-                        Rectangle {
-                            id: researchBurnLoadFill
-                            x: 2
-                            y: 2
-                            width: Math.max(0, parent.width - 4)
-                                   * trashLauncher.researchBurnLoadProgress
-                            height: Math.max(0, parent.height - 4)
-                            color: Colors.orange
-                            opacity: 0.72
-                            radius: 0
-                            visible: trashLauncher.researchBurnClickArmed
-                        }
-
+                        // Keep the regular ActionButton chassis opaque black
+                        // in idle, hover, pressed AND fully-armed states.
+                        // Progress lives in its rich content slot so it draws
+                        // above the black button fill, not behind an opaque
+                        // overlay. White and clipped black labels ensure that
+                        // text stays readable while orange crosses each glyph.
                         ActionButton {
                             id: confirmManagedResearchBurn
                             anchors.fill: parent
-                            label: !trashLauncher.researchBurnPointerRelocated
-                                   ? "MOVE HERE TO ARM"
-                                   : !trashLauncher.researchBurnClickArmed
-                                   ? "CLICK TO ARM"
-                                   : !trashLauncher.researchBurnLoadComplete
-                                   ? "LOADING SAFETY..."
-                                   : "CLICK AGAIN // BURN"
-                            labelPixelSize: 10
+                            label: ""
                             accentColor: Colors.red
                             destructive: true
+
+                            idleFillColor: Colors.black
+                            hoverFillColor: Colors.black
+                            pressedFillColor: Colors.black
+                            selectedFillColor: Colors.black
+                            keyboardSelectedFillColor: Colors.black
+
                             idleBorderWidth: 2
+                            hoverBorderWidth: 2
+                            pressedBorderWidth: 2
                             idleBorderColor: Colors.red
-                            idleFillColor: "transparent"
-                            hoverFillColor: "transparent"
-                            pressedFillColor: "transparent"
-                            contentGlowIdleOpacity: 0.36
-                            softGlowIdleOpacity: 0.33
-                            wideGlowEnabled: true
-                            wideGlowIdleOpacity: 0.13
-                            available: !trashLauncher.researchBusy
-                                       && trashLauncher.researchBurnId !== ""
-                                       && trashLauncher.researchBurnRevision
-                                          === trashLauncher.researchRevision
+                            hoverBorderColor: Colors.red
+                            pressedBorderColor: Colors.red
+                            keyboardSelectedBorderColor: Colors.red
+
+                            // Opaque black in idle. A brief magenta halo marks
+                            // the committed click before irreversible backend IO.
+                            selected: trashLauncher.burnUiStage === "clicked"
+                            selectedBorderWidth: 2
+                            selectedBorderColor: Colors.magenta
+                            contentGlowEnabled: false
+                            softGlowEnabled: false
+                            wideGlowEnabled: trashLauncher.burnUiStage === "clicked"
+                            wideGlowSelectedOpacity: 0.36
+                            selectedWideGlowColor: Colors.magenta
+                            unavailableOpacity: 1.0
+                            available: !trashLauncher.busy
+                                       && !trashLauncher.researchBusy
+                                       && trashLauncher.burnUiStage === ""
+                                       && trashLauncher.burnConfirmationOpen
+                                       && (trashLauncher.confirmMode !== ""
+                                           || trashLauncher.researchBurnRevision
+                                              === trashLauncher.researchRevision)
                             onLeftClicked: trashLauncher.advanceResearchBurn()
+
+                            Item {
+                                id: researchBurnFace
+                                anchors.fill: parent
+                                // Keep the full orange fill at 100% after
+                                // arming completes. Only the second click
+                                // transitions to the magenta feedback stage.
+                                readonly property bool loading:
+                                    trashLauncher.researchBurnClickArmed
+                                    && trashLauncher.burnUiStage === ""
+                                readonly property string displayedLabel:
+                                    trashLauncher.burnUiStage === "clicked"
+                                    ? "CONFIRMING..."
+                                    : trashLauncher.burnUiStage === "working"
+                                    ? "BURNING..."
+                                    : !trashLauncher.researchBurnPointerRelocated
+                                    ? "MOVE HERE TO ARM"
+                                    : !trashLauncher.researchBurnClickArmed
+                                    ? "CLICK TO ARM"
+                                    : !trashLauncher.researchBurnLoadComplete
+                                    ? "LOADING SAFETY..."
+                                    : "CLICK AGAIN // BURN"
+
+                                // Fill the entire button during loading AND
+                                // hold orange when armed, with the centered
+                                // text black through the clipped label layer.
+                                // The second click switches to magenta feedback.
+                                Rectangle {
+                                    id: researchBurnLoadFill
+                                    x: 2
+                                    y: 2
+                                    width: Math.max(0, parent.width - 4)
+                                           * trashLauncher.researchBurnLoadProgress
+                                    height: Math.max(0, parent.height - 4)
+                                    color: Colors.orange
+                                    radius: 0
+                                    visible: researchBurnFace.loading
+                                }
+
+                                GohuText {
+                                    id: researchBurnLabelWhite
+                                    anchors.centerIn: parent
+                                    width: Math.max(0, parent.width - 12)
+                                    height: parent.height
+                                    font.pixelSize: 10
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                    color: Colors.white
+                                    text: researchBurnFace.displayedLabel
+                                }
+
+                                // Black text is revealed over exactly the
+                                // portion where the orange fill has passed.
+                                // The white label stays visible elsewhere.
+                                Item {
+                                    id: researchBurnLabelClip
+                                    x: researchBurnLoadFill.x
+                                    y: researchBurnLoadFill.y
+                                    width: researchBurnLoadFill.width
+                                    height: researchBurnLoadFill.height
+                                    clip: true
+                                    visible: researchBurnFace.loading
+
+                                    GohuText {
+                                        x: researchBurnLabelWhite.x
+                                           - researchBurnLabelClip.x
+                                        y: researchBurnLabelWhite.y
+                                           - researchBurnLabelClip.y
+                                        width: researchBurnLabelWhite.width
+                                        height: researchBurnLabelWhite.height
+                                        font.pixelSize: 10
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                        elide: Text.ElideRight
+                                        color: Colors.black
+                                        text: researchBurnFace.displayedLabel
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -2056,7 +3007,8 @@ PanelWindow {
                         label: "CANCEL // SAFE"
                         labelPixelSize: 10
                         accentColor: Colors.cyan
-                        onLeftClicked: trashLauncher.clearResearchBurn()
+                        available: trashLauncher.burnUiStage === ""
+                        onLeftClicked: trashLauncher.dismissBurnReceipt()
                     }
                 }
 
@@ -2064,8 +3016,124 @@ PanelWindow {
                     width: parent.width
                     font.pixelSize: 10
                     color: Colors.green
-                    text: "CANCEL RETURNS TO YOUR RECORDS // NOTHING IS BURNED"
+                    text: "CANCEL RETURNS TO BURN // NO DELETION"
                     wrapMode: Text.WordWrap
+                }
+            }
+
+            // Stays here until DONE. Every listed name came from the actual
+            // successful backend result, never a guessed input selection.
+            Column {
+                id: burnResultContent
+                anchors.centerIn: parent
+                width: Math.min(parent.width - 30, 370)
+                spacing: 10
+                visible: trashLauncher.burnUiStage === "result"
+                         || trashLauncher.burnUiStage === "error"
+
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 17
+                    horizontalAlignment: Text.AlignHCenter
+                    color: trashLauncher.burnReceiptVerified
+                           ? Colors.green : Colors.orange
+                    wrapMode: Text.WordWrap
+                    text: trashLauncher.burnUiStage === "error"
+                          ? "BURN // VERIFICATION FAILED"
+                          : trashLauncher.burnReceiptVerified
+                          ? "BURN // VERIFIED RESULT"
+                          : "BURN // PARTIAL OR UNVERIFIED"
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 2
+                    color: Colors.orange
+                }
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 11
+                    color: Colors.yellow
+                    wrapMode: Text.WordWrap
+                    text: trashLauncher.burnReceiptScope
+                          + " // " + trashLauncher.burnReceiptCount
+                          + " CONFIRMED OF " + trashLauncher.burnReceiptRequested
+                }
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 11
+                    color: trashLauncher.burnReceiptVerified
+                           ? Colors.cyan : Colors.orange
+                    wrapMode: Text.WordWrap
+                    text: trashLauncher.burnReceiptMessage
+                }
+
+                Item {
+                    width: parent.width
+                    height: Math.max(85, Math.min(210, trashMenu.height - 245))
+                    ListView {
+                        id: burnReceiptList
+                        anchors.fill: parent
+                        clip: true
+                        spacing: 4
+                        boundsBehavior: Flickable.StopAtBounds
+                        model: trashLauncher.burnReceiptItems
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: burnReceiptList.width
+                            height: 45
+                            color: Colors.dark
+                            radius: 0
+                            border.width: 1
+                            border.color: Colors.cyan
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                spacing: 2
+                                GohuText {
+                                    width: parent.width
+                                    height: 16
+                                    font.pixelSize: 10
+                                    color: Colors.white
+                                    elide: Text.ElideMiddle
+                                    text: String(modelData.name)
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    height: 15
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                    elide: Text.ElideMiddle
+                                    text: String(modelData.kind)
+                                          + " // " + String(modelData.source)
+                                }
+                            }
+                        }
+                    }
+                    NeonScrollBar {
+                        flickable: burnReceiptList
+                        x: parent.width - width
+                        height: parent.height
+                        geometryMode: "viewport"
+                        handleStyle: "star"
+                        visible: scrollable
+                    }
+                    GohuText {
+                        anchors.centerIn: parent
+                        visible: trashLauncher.burnReceiptItems.length === 0
+                        font.pixelSize: 10
+                        color: Colors.orange
+                        text: "NO DELETIONS VERIFIED // REVIEW STATUS ABOVE"
+                    }
+                }
+
+                ActionButton {
+                    id: burnReceiptDone
+                    width: parent.width
+                    height: 40
+                    label: "DONE // RETURN TO BURN"
+                    labelPixelSize: 11
+                    accentColor: Colors.green
+                    onLeftClicked: trashLauncher.dismissBurnReceipt()
                 }
             }
         }

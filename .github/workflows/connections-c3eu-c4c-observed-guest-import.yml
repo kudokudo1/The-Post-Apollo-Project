@@ -57,10 +57,20 @@ jobs:
           python3 -B tests/connections/test_connections_c3eq_signed_guest_evidence.py
           python3 -B tests/connections/test_connections_c3b_origin.py
           echo "C3EU_PASS // C4B_Q_AND_C3B_REGRESSIONS_PRESERVED"
-      - name: Refuse remote-attestation claims
+      - name: Refuse remote-attestation claims despite exact real guest artifact replay
         shell: bash
         run: |
           set -euo pipefail
-          grep -Fq 'not authenticated C4c guest evidence' docs/connections-c3eu-c4c-observed-guest-import.md
-          grep -Fq 'actual real guest UART JSON is not exported' docs/connections-c3eu-c4c-observed-guest-import.md
-          echo "C3EU_LIMITATION // INPUT_FIXTURE_COMPATIBLE_NOT_ATTESTED_OR_ARTIFACT_RECEIVED"
+          python3 - <<'PY'
+          from pathlib import Path
+          doc = Path("docs/connections-c3eu-c4c-observed-guest-import.md").read_text()
+          for required in (
+              "artifact 13800918170",
+              "guest self-observation",
+              "not independently pinned RPM/interpreter/PID evidence",
+              "e3fa68a28a3160262632785d656855fa62a079dbf8e95c0d4e1e76aa5da44bb9",
+              "PRODUCTION // HOLD",
+          ):
+              assert required in doc, f"Missing C3e-U evidence boundary: {required}"
+          print("C3EU_LIMITATION // ACTUAL_GUEST_RECORD_ONLY_DIAGNOSTIC_NOT_ATTESTED")
+          PY

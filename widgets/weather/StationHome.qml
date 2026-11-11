@@ -15,9 +15,38 @@ Rectangle {
     // Empty route preserves original CLASSIC HOME.
     property string subjectRoute: ""
     property string workspaceSection: ""
+    // HOME W3 // HISTORY retains both chart relationships and the seven-day
+    // archive in a compact single viewport without wheel scrolling.
+    readonly property bool compactHistory:
+        subjectRoute === "" && workspaceSection === "history"
+    // W16 // WEATHER OVERVIEW: summary and BOTH full-width card groups.
+    // Only an actual NWS alert may need extra vertical room.
+    readonly property bool fixedWeatherOverview:
+        subjectRoute === "weather/overview"
+    readonly property bool overviewRequiresScroll:
+        fixedWeatherOverview && officialAlertSummary.available
+    // W18 // Keep metric cards compact as the viewport grows. The saved
+    // height belongs to the weather artwork, forecast and their real bars.
+    readonly property real overviewCardRowHeight: Math.max(55, Math.min(
+        88, Math.floor(homeScroll.height * 0.18),
+        Math.floor(Math.max(0, homeScroll.height - 164) / 2)))
+    readonly property real overviewInstrumentHeight: Math.max(
+        0, homeScroll.height - 2 * overviewCardRowHeight)
+    readonly property alias overviewViewportItem: homeScroll
+    readonly property alias overviewContentItem: homeContent
+    readonly property alias overviewSummaryItem: weatherOverviewSummary
+    readonly property alias overviewSnapshotItem: weatherSnapshotRow
+    readonly property alias overviewRelevantItem: weatherRelevantRow
+    readonly property bool sourcesWorkspace:
+        subjectRoute === "" && (workspaceSection === "sources"
+            || workspaceSection === "runtime" || workspaceSection === "health")
     function sectionVisible(section) {
         if (subjectRoute === "" && workspaceSection !== "") {
             if (section === "header") return true;
+            if (workspaceSection === "overview")
+                return section !== "runtime" && section !== "health";
+            if (sourcesWorkspace)
+                return section === "runtime" || section === "health";
             if (workspaceSection === "auto")
                 return section === "relevant" || section === "alerts";
             if (workspaceSection === "quick")
@@ -26,8 +55,6 @@ Rectangle {
                 return section === "snapshot" || section === "alerts";
             if (workspaceSection === "history")
                 return section === "history" || section === "relations";
-            if (workspaceSection === "runtime") return section === "runtime";
-            if (workspaceSection === "health") return section === "health";
             return false;
         }
         return SubjectPanelPolicy.visibleFor("home", subjectRoute, section);
@@ -913,34 +940,68 @@ Rectangle {
 
     color: Colors.black
 
+    // W6 // Final HOME SERVICES uses the same fixed terminal dashboard.
+    // The original HOME content stays intact for other workspaces and CLASSIC.
+    // The six source-health cards retain their original title/state/details.
+    StationServicesConsole {
+        id: homeServices
+        objectName: "home-w6-services-console"
+        anchors.fill: parent
+        visible: home.sourcesWorkspace
+        familyLabel: "HOME"
+        statusScope: "HOME // CORE SOURCES"
+        runtimeRows: home.runtimeRows
+        homeCards: true
+        customCards: home.sourceHealthRows.map(function(row) {
+            return {
+                label: row.title,
+                value: row.state,
+                detail: row.detail,
+                footer: row.footer,
+                color: home.healthAccent(row.accent)
+            };
+        })
+    }
+
     Flickable {
         id: homeScroll
+        objectName: "home-w3-content-scroll"
+        visible: !home.sourcesWorkspace
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        interactive: !home.compactHistory
+                     && (!home.fixedWeatherOverview
+                         || home.overviewRequiresScroll)
         contentWidth: width
-        contentHeight: Math.max(
+        contentHeight: home.fixedWeatherOverview
+                       && !home.overviewRequiresScroll ? height : Math.max(
             height,
-            homeContent.y + homeContent.implicitHeight + 24
+            homeContent.y + homeContent.implicitHeight
+                + (home.compactHistory ? 4 : 24)
         )
 
         Column {
             id: homeContent
-            x: 24
-            y: 24
-            width: Math.max(0, homeScroll.width - 48)
-            spacing: 14
+            objectName: "home-w3-content-column"
+            x: home.fixedWeatherOverview ? 3 : 24
+            y: home.fixedWeatherOverview ? 0
+               : (home.compactHistory ? 5 : 24)
+            width: Math.max(0, homeScroll.width
+                            -(home.fixedWeatherOverview ? 6 : 48))
+            spacing: home.fixedWeatherOverview ? 0
+                     : (home.compactHistory ? 3 : 14)
 
         Row {
-            visible: home.sectionVisible("header")
+            visible: home.sectionVisible("header") && !home.fixedWeatherOverview
             width: parent.width
-            height: 28
+            height: home.compactHistory ? 22 : 28
 
             GohuText {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: home.subjectRoute === ""
                 text: "⌂  HOME"
-                font.pixelSize: 24
+                font.pixelSize: home.compactHistory ? 19 : 24
                 color: Colors.magenta
             }
 
@@ -959,14 +1020,38 @@ Rectangle {
 
             GohuText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: home.subjectRoute.indexOf("weather/history/") === 0
-                      ? "WEATHER HISTORY" : "AUTO SNAPSHOT"
+                text: home.compactHistory
+                      || home.subjectRoute.indexOf("weather/history/") === 0
+                      ? "WEATHER HISTORY"
+                      : home.sourcesWorkspace ? "SOURCE DIRECTORY" : "AUTO SNAPSHOT"
                 font.pixelSize: 12
                 color: Colors.orange
             }
         }
 
+        // W8 // The WEATHER overview starts with a live read-only version of
+        // the exact instrument leading its combined WEATHER terminal.
+        // HOME/OVERVIEW and CLASSIC HOME never gain this extra weather bay.
+        StationWeatherTerminalSummary {
+            id: weatherOverviewSummary
+            objectName: "weather-w8-overview-terminal-summary"
+            visible: home.subjectRoute === "weather/overview"
+            width: parent.width
+            height: visible ? home.overviewInstrumentHeight : 0
+            compact: true
+            weatherService: home.weatherService
+            runtimeNowMs: home.runtimeNowMs
+        }
+
+        StationSectionDivider {
+            objectName: "home-w3-sources-title"
+            visible: home.sourcesWorkspace
+            width: parent.width
+            title: "SOURCES // LIVE RUNTIME + PROVIDER HEALTH"
+        }
+
         StationRuntimeRack {
+            objectName: "home-w3-sources-runtime"
             visible: home.sectionVisible("runtime")
             width: parent.width
             rows: home.runtimeRows
@@ -981,6 +1066,7 @@ Rectangle {
             StationSectionDivider {
                 width: parent.width
                 title: "OFFICIAL ALERT // NWS"
+                visible: !home.fixedWeatherOverview
             }
 
             Rectangle {
@@ -1076,18 +1162,25 @@ Rectangle {
         }
 
         StationSectionDivider {
-            visible: home.sectionVisible("relations")
+            visible: home.sectionVisible("relations") && !home.compactHistory
             width: parent.width
             title: "LIVE HISTORY // AQI RELATIONSHIPS"
         }
 
         Row {
+            objectName: "home-w3-history-relations"
             visible: home.sectionVisible("relations")
             width: parent.width
+            // Keep W3 non-scrolling minimum while using spare height on larger screens.
+            height: home.compactHistory
+                    ? Math.max(72, Math.min(108, home.height - 188))
+                    : 188
             spacing: 12
 
             WeatherTrendInspector {
                 width: (parent.width - 12) / 2
+                height: parent.height
+                compact: home.compactHistory
                 title: "AQI ↔ HUMIDITY"
                 leftLabel: "AQI"
                 rightLabel: "HUMIDITY %"
@@ -1105,6 +1198,8 @@ Rectangle {
 
             WeatherTrendInspector {
                 width: (parent.width - 12) / 2
+                height: parent.height
+                compact: home.compactHistory
                 title: "AQI ↔ WIND"
                 leftLabel: "AQI"
                 rightLabel: "WIND MPH"
@@ -1123,19 +1218,24 @@ Rectangle {
 
         StationSectionDivider {
             visible: home.sectionVisible("snapshot")
+                     && !home.fixedWeatherOverview
             width: parent.width
             title: "SNAPSHOT // NOW"
         }
 
         Row {
+            id: weatherSnapshotRow
             visible: home.sectionVisible("snapshot")
             width: parent.width
-            height: 118
-            spacing: 12
+            height: home.fixedWeatherOverview
+                    ? home.overviewCardRowHeight : 118
+            spacing: home.fixedWeatherOverview ? 4 : 12
 
             StationHomeMetricCard {
-                width: (parent.width - 24) / 3
+                width: (parent.width - parent.spacing*2) / 3
                 height: parent.height
+                compact: home.fixedWeatherOverview
+                overviewDense: home.fixedWeatherOverview
 
                 title: "CURRENT WEATHER"
                 valueText:
@@ -1160,8 +1260,10 @@ Rectangle {
             }
 
             StationHomeMetricCard {
-                width: (parent.width - 24) / 3
+                width: (parent.width - parent.spacing*2) / 3
                 height: parent.height
+                compact: home.fixedWeatherOverview
+                overviewDense: home.fixedWeatherOverview
 
                 title: "NEXT HOURS"
                 valueText:
@@ -1196,8 +1298,10 @@ Rectangle {
             }
 
             StationHomeMetricCard {
-                width: (parent.width - 24) / 3
+                width: (parent.width - parent.spacing*2) / 3
                 height: parent.height
+                compact: home.fixedWeatherOverview
+                overviewDense: home.fixedWeatherOverview
 
                 title: "AIR QUALITY"
                 valueText:
@@ -1233,12 +1337,14 @@ Rectangle {
         }
 
         Column {
+            objectName: "home-w3-history-archive"
             visible: home.sectionVisible("history")
             width: parent.width
-            spacing: 9
+            spacing: home.compactHistory ? 3 : 9
 
             Row {
                 width: parent.width
+                height: home.compactHistory ? 12 : implicitHeight
                 spacing: 12
 
                 SecondaryText {
@@ -1277,13 +1383,15 @@ Rectangle {
             }
 
             Row {
+                objectName: "home-w3-history-summary-cards"
                 width: parent.width
-                height: 104
+                height: home.compactHistory ? 58 : 104
                 spacing: 12
 
                 StationHomeMetricCard {
                     width: (parent.width - 24) / 3
                     height: parent.height
+                    compact: home.compactHistory
                     title: "YESTERDAY // SAME HOUR"
                     valueText: home.historySameHour
                                ? home.historyTemp(home.historySameHour.tempF)
@@ -1313,6 +1421,7 @@ Rectangle {
                 StationHomeMetricCard {
                     width: (parent.width - 24) / 3
                     height: parent.height
+                    compact: home.compactHistory
                     title: "7-DAY TEMP RANGE"
                     valueText: home.historyReady
                                ? home.historyTemp(home.historySummary.maxHighF)
@@ -1334,6 +1443,7 @@ Rectangle {
                 StationHomeMetricCard {
                     width: (parent.width - 24) / 3
                     height: parent.height
+                    compact: home.compactHistory
                     title: "PRECIP // 7 DAYS"
                     valueText: home.historyReady
                                ? home.historyPrecip(
@@ -1363,8 +1473,9 @@ Rectangle {
 
             Row {
                 id: historyDailyRow
+                objectName: "home-w3-history-daily-cards"
                 width: parent.width
-                height: 66
+                height: home.compactHistory ? 35 : 66
                 spacing: 6
 
                 Repeater {
@@ -1383,14 +1494,14 @@ Rectangle {
 
                         Column {
                             anchors.fill: parent
-                            anchors.margins: 5
-                            spacing: 3
+                            anchors.margins: home.compactHistory ? 2 : 5
+                            spacing: home.compactHistory ? 1 : 3
 
                             SecondaryText {
                                 width: parent.width
                                 horizontalAlignment: Text.AlignHCenter
                                 text: home.historyDateLabel(modelData.date)
-                                font.pixelSize: 9
+                                font.pixelSize: home.compactHistory ? 8 : 9
                             }
 
                             GohuText {
@@ -1399,7 +1510,7 @@ Rectangle {
                                 text: home.historyTemp(modelData.maxTempF)
                                       + " / "
                                       + home.historyTemp(modelData.minTempF)
-                                font.pixelSize: 10
+                                font.pixelSize: home.compactHistory ? 9 : 10
                                 color: Colors.white
                             }
 
@@ -1410,7 +1521,7 @@ Rectangle {
                                       + home.historyPrecip(
                                           modelData.precipitationIn
                                         )
-                                font.pixelSize: 8
+                                font.pixelSize: home.compactHistory ? 7 : 8
                             }
                         }
                     }
@@ -1517,6 +1628,7 @@ Rectangle {
         Grid {
             visible: home.sectionVisible("health")
             id: sourceHealthGrid
+            objectName: "home-w3-sources-health"
             width: parent.width
             columns: 3
             columnSpacing: 12
@@ -1543,15 +1655,18 @@ Rectangle {
 
         StationSectionDivider {
             visible: home.sectionVisible("relevant")
+                     && !home.fixedWeatherOverview
             width: parent.width
             title: "AUTO // RELEVANT"
         }
 
         Row {
+            id: weatherRelevantRow
             visible: home.sectionVisible("relevant")
             width: parent.width
-            height: 118
-            spacing: 12
+            height: home.fixedWeatherOverview
+                    ? home.overviewCardRowHeight : 118
+            spacing: home.fixedWeatherOverview ? 4 : 12
 
             Repeater {
                 model: home.watchItems
@@ -1573,6 +1688,8 @@ Rectangle {
                             home.watchItems.length
                         )
                     height: parent.height
+                    compact: home.fixedWeatherOverview
+                    overviewDense: home.fixedWeatherOverview
 
                     title: modelData.title
                     valueText: modelData.value
@@ -1598,10 +1715,11 @@ Rectangle {
                     meterValue: modelData.meterValue
                     meterFillColor:
                         home.sourceMeterFill(modelData.source)
-                    provenanceText: home.homeFavoritesStore
-                        ? CardProvenance.provenance(
-                            modelData, home.sourceHealthRows
-                          ) : ""
+                    provenanceText: home.fixedWeatherOverview ? ""
+                        : home.homeFavoritesStore
+                          ? CardProvenance.provenance(
+                                modelData, home.sourceHealthRows
+                            ) : ""
                     pinEnabled: !!home.homeFavoritesStore
                     pinned: home.homeFavoritesStore
                         ? home.homeFavoritesStore.cardKeys.indexOf(
@@ -1626,6 +1744,7 @@ Rectangle {
             width: parent.width
             spacing: 6
             visible: home.sectionVisible("relevant")
+                     && !home.fixedWeatherOverview
                      && home.homeFavoritesStore
                      && home.pinnedCardRows.length > 0
             GohuText {
@@ -1665,11 +1784,14 @@ Rectangle {
         QuietText {
             width: parent.width
             visible: home.sectionVisible("relevant")
+                     && !home.fixedWeatherOverview
                      && home.homeFavoritesStore
                      && (home.homeFavoritesStore.storageState === "error"
                          || home.homeFavoritesStore.storageState === "unsupported")
-            text: "HOME BOOKMARKS UNAVAILABLE // FILE PRESERVED // "
-                  + home.homeFavoritesStore.errorCode
+            text: home.homeFavoritesStore
+                  ? "HOME BOOKMARKS UNAVAILABLE // FILE PRESERVED // "
+                    + home.homeFavoritesStore.errorCode
+                  : ""
             wrapMode: Text.WordWrap
             font.pixelSize: 10
         }
@@ -1680,6 +1802,8 @@ Rectangle {
         flickable: homeScroll
         handleStyle: "star"
         geometryHost: home
-        visible: scrollable
+        visible: scrollable && !home.compactHistory
+                 && (!home.fixedWeatherOverview
+                     || home.overviewRequiresScroll)
     }
 }

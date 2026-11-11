@@ -25,7 +25,8 @@ const plain = x => JSON.parse(JSON.stringify(x));
 
 test("M2b preserves its original 30 routes plus M28-Q full GROUND visual destination", () => {
   // Original 31 WEATHER deep routes remain as compatibility destinations.
-  const routes = Object.keys(env.ROUTES).filter(x=>x.startsWith("weather/"));
+  const routes = Object.keys(env.ROUTES).filter(x=>x.startsWith("weather/")
+    && !x.startsWith("weather/services/"));
   assert.equal(routes.length,31);
   assert.equal(new Set(routes).size,31);
   assert.equal(routes.filter(x=>x!=="weather/ground/full").length,30,

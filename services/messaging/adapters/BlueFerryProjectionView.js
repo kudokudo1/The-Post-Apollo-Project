@@ -150,6 +150,34 @@ function contactsView(payload, profileId) {
                 || !countValue(card.emailCount, 10000)
                 || typeof card.hasPhoto !== "boolean")
             return null;
+        // Older display projections can omit these optional detail keys.
+        // A newer snapshot provides bounded arrays only if the provider
+        // actually included every address in this contacts.read page.
+        var available = card.hasAddressDetails === true;
+        if (card.hasAddressDetails !== undefined
+                && typeof card.hasAddressDetails !== "boolean")
+            return null;
+        var phones = card.phoneNumbers === undefined ? [] : card.phoneNumbers;
+        var emails = card.emailAddresses === undefined ? [] : card.emailAddresses;
+        if (!Array.isArray(phones) || !Array.isArray(emails)
+                || phones.length > 64 || emails.length > 64
+                || (available
+                    ? (phones.length !== card.phoneCount
+                       || emails.length !== card.emailCount)
+                    : (phones.length !== 0 || emails.length !== 0)))
+            return null;
+        for (var n = 0; n < phones.length; n++)
+            if (!safeText(phones[n], 254, false))
+                return null;
+        for (var m = 0; m < emails.length; m++)
+            if (!safeText(emails[m], 254, false))
+                return null;
+        if (available) {
+            var primary = phones.length > 0 ? phones[0]
+                        : emails.length > 0 ? emails[0] : "";
+            if (card.primary !== primary)
+                return null;
+        }
         ids[card.id] = true;
         rows.push({
             id: card.id,
@@ -159,7 +187,10 @@ function contactsView(payload, profileId) {
             primary: card.primary,
             phoneCount: card.phoneCount,
             emailCount: card.emailCount,
-            hasPhoto: card.hasPhoto
+            hasPhoto: card.hasPhoto,
+            hasAddressDetails: available,
+            phoneNumbers: phones.slice(0),
+            emailAddresses: emails.slice(0)
         });
     }
     return rows;

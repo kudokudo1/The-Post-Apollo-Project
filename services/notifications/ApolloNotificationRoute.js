@@ -15,6 +15,24 @@ function routeFor(entry) {
         ? entry.context : {};
     const event = text(ctx.eventType);
 
+    // Clock alarms use the stored resource ID and occurrence witness, not
+    // the user-editable title. An old notification can only open a still-
+    // existing saved alarm; TimeW itself checks that identity again.
+    if (id === "clock-alarm" && event === "alarm-rang") {
+        const alarmId = ctx.alarmId;
+        const startedMs = ctx.ringStartedAtMs;
+        if (Number.isSafeInteger(alarmId) && alarmId > 0
+                && alarmId <= 2147483647
+                && Number.isSafeInteger(startedMs) && startedMs > 0
+                && text(ctx.resourceId) === "alarm-" + alarmId
+                && text(ctx.origin) === "apollo"
+                && text(ctx.domain) === "system"
+                && text(entry.id) === "apollo-clock-alarm-" + alarmId
+                                     + "-" + startedMs)
+            return { widget: "time", view: "alarm", alarmId: alarmId };
+        return null;
+    }
+
     if (id === "cpu-plus" && event === "hardware-thermal-limit")
         return { widget: "cpu", mode: "thermal", subMode: "temp" };
     if (id === "cpu-plus-fan-health"

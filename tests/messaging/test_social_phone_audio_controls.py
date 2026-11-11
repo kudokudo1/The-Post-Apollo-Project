@@ -30,7 +30,7 @@ class PhoneAudioUiTests(unittest.TestCase):
         self.assertEqual(self.qml.count('id: connectPhoneAction'), 1)
         self.assertIn('    ContactList {', self.qml)
         self.assertIn('    ChatFeed {', self.qml)
-        self.assertIn('phoneReadAdapter.conversations : []', self.qml)
+        self.assertIn('phonePane.filteredPhoneConversations : []', self.qml)
         self.assertIn('phoneReadAdapter.messages : []', self.qml)
         self.assertIn('sendEnabled: false', self.qml)
         self.assertIn('model: ["DEVICE", "CALLS", "MESSAGES", "CONTACTS"]', self.qml)

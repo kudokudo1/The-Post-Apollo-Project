@@ -28,7 +28,7 @@ class WorldFavoritesIntegrationContracts(unittest.TestCase):
         self.assertEqual(TIMEW.count("FileView {"), 0)
         self.assertNotIn("FileView {", POLICY)
         self.assertNotIn("FileView {", WORLD_SEARCH)
-        self.assertIn("MAX_OFFSET_MS = 300000", TIME_POLICY)
+        self.assertIn("MAX_OFFSET_MS = 24 * 60 * 60 * 1000", TIME_POLICY)
 
     def test_rapid_clicks_coalesce_without_overlapping_writes(self):
         self.assertIn("worldFavoritePendingDocument", SERVICE)

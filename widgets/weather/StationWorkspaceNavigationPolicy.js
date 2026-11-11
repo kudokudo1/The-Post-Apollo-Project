@@ -19,16 +19,15 @@ var GROUPS = {
         {label:"QUICK",path:"home/quick",key:"quick"},
         {label:"SNAPSHOT",path:"home/snapshot",key:"snapshot"},
         {label:"HISTORY",path:"home/history",key:"history"},
-        {label:"RUNTIME",path:"home/runtime",key:"runtime"},
-        {label:"SOURCES",path:"home/health",key:"health"},
-        {label:"MAGICK",path:"home/magick",key:"magick"}
+        {label:"MAGICK",path:"home/magick",key:"magick"},
+        {label:"SERVICES",path:"home/health",key:"sources"}
     ],
     weather:[
         {label:"OVERVIEW",path:"weather/overview",key:"overview"},
-        {label:"NOW + AIR",path:"weather/conditions/current",key:"conditions"},
-        {label:"FORECAST",path:"weather/forecasts/hourly",key:"forecasts"},
+        {label:"WEATHER",path:"weather/conditions/current",key:"conditions"},
         {label:"HAZARDS",path:"weather/hazards/alerts",key:"hazards"},
-        {label:"HISTORY",path:"weather/history/historical-forecast",key:"history"}
+        {label:"HISTORY",path:"weather/history/historical-forecast",key:"history"},
+        {label:"SERVICES",path:"weather/services/health",key:"services"}
     ],
     cosmos:[
         {label:"OVERVIEW",path:"cosmos/overview",key:"overview"},
@@ -37,7 +36,7 @@ var GROUPS = {
         // Observatory only: terrestrial weather belongs to WEATHER.
         {label:"ASTRONOMY",path:"cosmos/planets-stars/celestial-fix",key:"sky"},
         {label:"EVENTS",path:"cosmos/events/overview",key:"events"},
-        {label:"SPACE",path:"cosmos/space-weather/overview",key:"space-weather"}
+        {label:"SERVICES",path:"cosmos/space-weather/overview",key:"space-weather"}
     ],
     earth:[
         {label:"OVERVIEW",path:"earth/overview",key:"overview"},
@@ -60,7 +59,8 @@ var GROUPS = {
         {label:"LENSES",path:"magick/planetary/correspondences",key:"lenses"},
         {label:"ASTROLOGY",path:"magick/astrology/charts",key:"astrology"},
         {label:"DIVINATION",path:"magick/divination/tarot",key:"divination"},
-        {label:"GRIMOIRE",path:"magick/grimoire/references",key:"grimoire"}
+        {label:"GRIMOIRE",path:"magick/grimoire/references",key:"grimoire"},
+        {label:"SERVICES",path:"magick/services/health",key:"services"}
     ],
     tools:[
         {label:"OVERVIEW",path:"tools/overview",key:"overview"},
@@ -87,7 +87,10 @@ function tabsFor(path) {
 function homeSectionFor(path) {
     if (familyFor(path)!=="home") return "";
     var key=String(path||"").split("/")[1]||"overview";
-    var allowed=["overview","auto","quick","snapshot","history","runtime","health","magick"];
+    // Old HOME/RUNTIME and HOME/HEALTH bookmarks remain valid, but both
+    // now open the same final SOURCES screen. No saved routes are deleted.
+    if (key==="runtime" || key==="health") return "sources";
+    var allowed=["overview","auto","quick","snapshot","history","magick"];
     return allowed.indexOf(key)>=0?key:"overview";
 }
 function isHomeRoute(path) {
@@ -102,6 +105,11 @@ function selectedGroup(path) {
             if(groups[j].path===path) return groups[j].key;
     }
     var group=tokens[1]||"overview";
+    if (family==="home" && (group==="runtime" || group==="health"))
+        return "sources";
+    // W8 // historical forecast deep links highlight the combined WEATHER
+    // terminal instead of an obsolete bottom FORECAST button.
+    if(family==="weather" && group==="forecasts") return "conditions";
     // All original map / event / geography / investigation deep links
     // belong to the one consolidated MAP / EVENTS tab.
     if(family==="earth" && ["maps","geography","geology",

@@ -1,0 +1,43 @@
+name: Social PHONE P37 Dual Signed Trust Contract (DENY-ONLY)
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhonePersonalSignedTrustP37.py'
+      - 'tests/phone/test_phone_personal_signed_trust_p37.py'
+      - 'MODEL/contracts/social-phone-p37-signed-trust-contract-v0.md'
+      - '.github/workflows/social-phone-p37-signed-trust-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhonePersonalSignedTrustP37.py'
+      - 'tests/phone/test_phone_personal_signed_trust_p37.py'
+      - '.github/workflows/social-phone-p37-signed-trust-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  signed-host-consent-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out unchanged production sources
+        uses: actions/checkout@v4
+      - name: Set up isolated Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Ed25519 verifier only on disposable GitHub runner
+        run: python -m pip install --disable-pip-version-check 'cryptography==50.0.2'
+      - name: Compile signed receipt consumer and adversarial tests
+        run: |
+          python -m py_compile services/phone/PhonePersonalSignedTrustP37.py tests/phone/test_phone_personal_signed_trust_p37.py
+      - name: Verify deny-only dual signature contract
+        run: |
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_signed_trust_p37.py' -v
+      - name: Recheck previous no-production trust and vault boundaries
+        run: |
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_host_gate_p36.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_contact_vault.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_contact_identity.py' -v

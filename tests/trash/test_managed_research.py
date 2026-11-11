@@ -110,6 +110,10 @@ class ManagedResearchTests(unittest.TestCase):
         second = self.run_action("trash", rid, 3)
         self.assertEqual(second["revision"], 4)
         burnt = self.run_action("burn", rid, 4, "BURN_SAVED_COPY_CONFIRMED")
+        self.assertTrue(burnt["verified"])
+        self.assertEqual(burnt["burnedCount"], 1)
+        self.assertEqual(burnt["burnedItems"][0]["name"], "Demo quote crawl")
+        self.assertEqual(burnt["burnedItems"][0]["kind"], "SAVED RESEARCH")
         self.assertEqual(burnt["total"], 0)
         self.assertEqual(burnt["revision"], 5)
         self.assertEqual(self.run_action("list")["total"], 0)
@@ -280,6 +284,12 @@ class ManagedResearchTests(unittest.TestCase):
                 self.assertEqual(self.run_action("list")["revision"], 5)
 
         cleaned = burn_all()
+        self.assertTrue(cleaned["verified"])
+        self.assertEqual(cleaned["burnedCount"], 2)
+        self.assertEqual({x["kind"] for x in cleaned["burnedItems"]},
+                         {"SAVED EVENT", "SAVED RESEARCH"})
+        self.assertEqual({x["name"] for x in cleaned["burnedItems"]},
+                         {"Earthquake test marker", "Demo quote crawl"})
         self.assertEqual(cleaned["result"], "BURN-ALL")
         self.assertEqual(cleaned["binCount"], 0)
         self.assertEqual(cleaned["total"], 1)

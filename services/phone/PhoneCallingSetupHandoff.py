@@ -102,15 +102,28 @@ def open_support(
             or evidence.get("contentAccessEnabled") is not False
             or evidence.get("hfpVerified") is not False):
         return _result("DIAGNOSIS_UNAVAILABLE")
-    if (evidence.get("state") != "PACKAGE_NOT_INSTALLED"
-            or evidence.get("package") != "NOT_INSTALLED"
-            or evidence.get("serviceLoad") != "not-found"):
+    package_needed = (
+        evidence.get("state") == "PACKAGE_NOT_INSTALLED"
+        and evidence.get("package") == "NOT_INSTALLED"
+        and evidence.get("serviceLoad") == "not-found"
+    )
+    # Service and WirePlumber configuration use a distro-neutral path.
+    # Non-RPM distros may report package UNKNOWN, but a loaded systemd
+    # unit is sufficient evidence of an installed oFono service.
+    hfp_needed = (
+        evidence.get("state") in ("SERVICE_STOPPED", "AUDIO_PATH_UNVERIFIED")
+        and evidence.get("serviceLoad") == "loaded"
+        and evidence.get("serviceActive") in ("active", "inactive")
+        and evidence.get("package") != "NOT_INSTALLED"
+    )
+    if not (package_needed or hfp_needed):
         return _result("NOT_APPLICABLE")
-    try:
-        if is_fedora() is not True:
+    if package_needed:
+        try:
+            if is_fedora() is not True:
+                return _result("UNSUPPORTED_HOST")
+        except Exception:
             return _result("UNSUPPORTED_HOST")
-    except Exception:
-        return _result("UNSUPPORTED_HOST")
 
     try:
         atomic = _ostree_host() if is_ostree is None else is_ostree()
@@ -133,12 +146,14 @@ def open_support(
     pkexec = trusted_program("pkexec", find=find)
     dnf5 = trusted_dnf5(find=find)
     python = trusted_program("python3", find=find)
-    session_script = Path(__file__).with_name("PhoneOfonoInstallSession.py")
+    session_script = Path(__file__).with_name(
+        "PhoneOfonoInstallSession.py" if package_needed else "PhoneHfpSetupSession.py"
+    )
     # Fedora minimalist/Sway installs may omit PackageKit's pkcon client.
     # The alternate is a *user-authorized* Polkit + DNF5 transaction in the
     # SAME embedded foot terminal, never an automatic installation.
-    backend_ready = bool(pkcon or (pkexec and dnf5))
-    if atomic:
+    backend_ready = True if hfp_needed else bool(pkcon or (pkexec and dnf5))
+    if package_needed and atomic:
         # Never fall back to mutable-host DNF/PackageKit on Silverblue.
         backend_ready = bool(trusted_program("rpm-ostree", find=find))
     if not (foot and python and session_script.is_file()):
@@ -165,7 +180,8 @@ def open_support(
     try:
         launcher(
             [foot, "--app-id", INSTALL_APP_ID, "-e", python,
-             str(session_script), "--interactive-ofono"],
+             str(session_script),
+             "--interactive-ofono" if package_needed else "--interactive-hfp"],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

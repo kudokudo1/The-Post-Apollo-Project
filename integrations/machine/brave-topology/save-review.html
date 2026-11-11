@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MACHINE // Sealed Brave session review</title>
+  <style>
+    :root{color-scheme:dark;font-family:"GohuFont 11 Nerd Font Mono",monospace;background:#1b0623;color:#dcf3fa}
+    *{box-sizing:border-box} main{max-width:900px;margin:24px auto;padding:22px;border:1px solid #55cfca}
+    h1{color:#ed981a;font-size:21px} h2{font-size:13px;color:#c74ec7;margin:15px 0 6px}
+    p{font-size:12px;line-height:1.6} button{border:1px solid #ed981a;color:#ed981a;background:#10031a;
+      padding:11px 12px;margin:6px 8px 6px 0;font:inherit;cursor:pointer}
+    button:disabled{opacity:.45;cursor:default}button:focus-visible{outline:2px solid #c74ec7}
+    input[type=text],input[type=password]{display:block;width:100%;max-width:600px;background:#10031a;color:#dcf3fa;
+      padding:10px;border:1px solid #55cfca;font:inherit}input[type=checkbox]{accent-color:#c74ec7}
+    label{display:block;font-size:12px;margin:12px 0 5px;color:#55cfca}
+    ol{padding:0;list-style:none;max-height:250px;overflow-y:auto}
+    li{border:1px solid #55cfca;margin:6px 0;padding:9px;font-size:12px}
+    li label{display:flex;align-items:center;gap:9px;margin:0;color:#dcf3fa}
+    .danger{color:#ed981a}.explanation{color:#55cfca}
+    .stage{border-top:1px solid #c74ec7;padding-top:12px;margin-top:18px}
+    #save-status{font-size:12px;color:#55cfca;min-height:20px}
+    #save-result{color:#ed981a;font-size:12px;overflow-wrap:anywhere}
+  </style>
+</head>
+<body><main>
+<h1>MACHINE // SEALED BRAVE SAVE</h1>
+<p class="danger">DISPOSABLE BRAVE PILOT ONLY // NO RESTORE // NO MONITOR REBINDING</p>
+<p>Select individual tabs from this one normal Brave window. URLs and your
+password are used only in this extension page to build an encrypted snapshot.
+The native host receives ciphertext, never plaintext addresses or your password.</p>
+<section class="stage">
+  <h2>1 // LOAD ONE WINDOW</h2>
+  <button type="button" id="load-save-tabs">LOAD CURRENT WINDOW TABS ONCE</button>
+  <p>Optional tab and local-host permissions must already be granted in the MACHINE popup.</p>
+  <ol id="save-tab-list" aria-label="Individual Brave tabs available for encrypted save"></ol>
+  <label><input id="allow-sensitive-save" type="checkbox">
+     ALLOW EXPLICIT SELECTION OF QUERY / FRAGMENT URLS (MAY CONTAIN SECRETS)</label>
+  <p class="explanation">Every tab starts unselected. Internal pages and credential-bearing URLs are excluded.
+  No tab contents, history, passwords or cookies are read.</p>
+</section>
+<section class="stage">
+  <h2>2 // LABEL AND ENCRYPT</h2>
+  <label for="save-window-label">WINDOW LABEL // RECOGNITION ONLY</label>
+  <input id="save-window-label" type="text" maxlength="48" value="BRAVE WINDOW" autocomplete="off">
+  <label for="save-passphrase">ENCRYPTION PASSPHRASE // 16+ CHARACTERS</label>
+  <input id="save-passphrase" type="password" autocomplete="new-password" spellcheck="false">
+  <label for="save-passphrase-confirm">CONFIRM ENCRYPTION PASSPHRASE</label>
+  <input id="save-passphrase-confirm" type="password" autocomplete="new-password" spellcheck="false">
+  <label><input id="confirm-sealed-save" type="checkbox">
+     I EXPLICITLY AUTHORIZE SAVING ONLY THE CHECKED TABS INTO THE ISOLATED TEST VAULT</label>
+  <p class="danger">There is no password recovery yet. Losing this passphrase means losing access to these encrypted tabs.
+  The vault is limited to the disposable /tmp trial and may disappear after a restart.</p>
+  <button type="button" id="save-sealed-tabs">ENCRYPT AND SAVE CHECKED TABS ONCE</button>
+  <p id="save-status" role="status" aria-live="polite">NOTHING SAVED</p>
+  <p id="save-result" aria-label="Saved snapshot record reference"></p>
+</section>
+<section class="stage">
+  <button type="button" id="close-save-review">CLOSE THIS SAVE REVIEW TAB</button>
+  <p>Closing this page forgets the preview. Any already submitted save may still finish.
+  No restoration or automatic browser-window movement is enabled.</p>
+</section>
+</main><script type="module" src="save-review.mjs"></script></body></html>

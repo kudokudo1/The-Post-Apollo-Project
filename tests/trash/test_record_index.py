@@ -58,6 +58,38 @@ def crawl_doc():
     }]
 
 
+def hub_notes_doc():
+    return {
+        "version": 1, "nextId": 3,
+        "notes": [{
+            "id": "n2", "title": "Garden notes",
+            "body": "PRIVATE BODY // keep out of Trash inventory",
+            "revision": 4,
+            "createdAtMs": 1760000000000,
+            "updatedAtMs": 1760002000000,
+        }],
+    }
+
+
+def hub_todo_doc():
+    return {
+        "version": 3, "nextId": 3, "nextProjectId": 2,
+        "projects": [{
+            "id": "p1", "name": "Home",
+            "createdAtMs": 1760000000000,
+            "updatedAtMs": 1760000000000,
+        }],
+        "tasks": [{
+            "id": "t2", "title": "Review receipts", "done": False,
+            "createdAtMs": 1760000000000,
+            "updatedAtMs": 1760003000000,
+            "priority": "medium",
+            "description": "PRIVATE TASK DESCRIPTION // do not export",
+            "dueDate": "2026-11-30", "projectId": "p1",
+        }],
+    }
+
+
 class RecordIndexTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -84,7 +116,7 @@ class RecordIndexTests(unittest.TestCase):
         self.assertEqual(result["kind"], "record-index")
         self.assertEqual(result["total"], 3)
         self.assertEqual([s["state"] for s in result["sources"]],
-                         ["READY", "READY", "READY"])
+                         ["READY", "READY", "READY", "EMPTY", "EMPTY"])
         rows = {x["kind"]: x for x in result["items"]}
         self.assertEqual(rows["EVENT HISTORY"]["title"], "Earthquake test marker")
         self.assertIn("2 SNAPSHOTS", rows["EVENT HISTORY"]["details"])
@@ -111,7 +143,7 @@ class RecordIndexTests(unittest.TestCase):
         result = indexer.index(str(self.data), self.home)
         self.assertEqual(result["total"], 0)
         self.assertEqual([s["state"] for s in result["sources"]],
-                         ["EMPTY", "EMPTY", "EMPTY"])
+                         ["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"])
 
     def test_each_source_failure_isolated_and_never_erases_other_rows(self):
         self.save(self.data / "weather-event-archive-v1.json", event_doc())
@@ -169,6 +201,119 @@ class RecordIndexTests(unittest.TestCase):
                                  "INVALID_SOURCE_SCHEMA")
                 self.assertEqual(result["total"], 0)
 
+    def test_hub_notes_and_tasks_are_read_only_metadata_only(self):
+        notes_path = self.data / "apollo-hub-notes-v1.json"
+        tasks_path = self.data / "apollo-hub-todo-v1.json"
+        self.save(notes_path, hub_notes_doc())
+        self.save(tasks_path, hub_todo_doc())
+        old_notes = notes_path.read_bytes()
+        old_tasks = tasks_path.read_bytes()
+        result = indexer.index(str(self.data), self.home)
+        self.assertEqual(result["total"], 2)
+        self.assertEqual(result["resourceContract"], indexer.RESOURCE_CONTRACT)
+        self.assertEqual([s["state"] for s in result["sources"]],
+                         ["EMPTY", "EMPTY", "EMPTY", "READY", "READY"])
+        rows = {row["kind"]: row for row in result["items"]}
+        self.assertEqual(rows["HUB NOTE"]["id"], "hub-note:n2")
+        self.assertEqual(rows["HUB NOTE"]["ownerId"], "apollo-hub-notes")
+        self.assertEqual(rows["HUB NOTE"]["title"], "Garden notes")
+        self.assertEqual(rows["HUB TASK"]["id"], "hub-task:t2")
+        self.assertEqual(rows["HUB TASK"]["ownerId"], "apollo-hub-todo")
+        self.assertIn("OPEN", rows["HUB TASK"]["details"])
+        for row in rows.values():
+            self.assertEqual(row["resourceContract"], indexer.RESOURCE_CONTRACT)
+            self.assertEqual(row["resourceId"], row["id"])
+            self.assertEqual(row["retention"], "SOURCE OWNED // READ ONLY")
+            self.assertTrue(row["capabilities"]["inspect"])
+            self.assertFalse(row["capabilities"]["saveCopy"])
+            for action in ("archive", "trash", "restore", "burn"):
+                self.assertFalse(row["capabilities"][action])
+        serial = json.dumps(result)
+        self.assertNotIn("PRIVATE BODY", serial)
+        self.assertNotIn("PRIVATE TASK DESCRIPTION", serial)
+        self.assertNotIn("apollo-hub-notes-v1.json", serial)
+        self.assertNotIn("apollo-hub-todo-v1.json", serial)
+        self.assertEqual(notes_path.read_bytes(), old_notes)
+        self.assertEqual(tasks_path.read_bytes(), old_tasks)
+
+    def test_existing_event_and_demo_copy_permissions_are_explicit(self):
+        self.save(self.data / "weather-event-archive-v1.json", event_doc())
+        self.save(self.crawl_path, crawl_doc())
+        data = indexer.index(str(self.data), self.home)
+        self.assertEqual({r["kind"] for r in data["items"]},
+                         {"EVENT HISTORY", "WEB SCRAPE"})
+        self.assertTrue(all(r["capabilities"]["saveCopy"] for r in data["items"]))
+        self.assertTrue(all(r["capabilities"]["burn"] is False for r in data["items"]))
+
+    def test_hub_future_schema_malformed_record_and_stale_ids_fail_closed(self):
+        notes_path = self.data / "apollo-hub-notes-v1.json"
+        for edit in (
+            lambda d: d.update(version=44),
+            lambda d: d["notes"][0].update(id="n999"),
+            lambda d: d["notes"][0].update(body="broken" + chr(0) + "control"),
+            lambda d: d["notes"].append(dict(d["notes"][0])),
+        ):
+            doc = hub_notes_doc()
+            edit(doc)
+            self.save(notes_path, doc)
+            result = indexer.index(str(self.data), self.home)
+            self.assertEqual(result["sources"][3]["state"],
+                             "INVALID_SOURCE_SCHEMA")
+            self.assertEqual(result["total"], 0)
+
+    def test_hub_todo_versions_and_invalid_project_refs(self):
+        tasks_path = self.data / "apollo-hub-todo-v1.json"
+        self.save(tasks_path, hub_todo_doc())
+        result = indexer.index(str(self.data), self.home)
+        self.assertEqual(result["total"], 1)
+        invalid = hub_todo_doc()
+        invalid["tasks"][0]["projectId"] = "p999"
+        self.save(tasks_path, invalid)
+        result = indexer.index(str(self.data), self.home)
+        self.assertEqual(result["sources"][4]["state"], "INVALID_SOURCE_SCHEMA")
+        old = hub_todo_doc()
+        old["version"] = 1
+        old["tasks"][0] = {
+            "id": "t2", "title": "Legacy task", "done": True,
+            "createdAtMs": 1760000000000, "updatedAtMs": 1760003000000,
+        }
+        old.pop("nextProjectId")
+        old.pop("projects")
+        self.save(tasks_path, old)
+        rows = indexer.index(str(self.data), self.home)["items"]
+        self.assertEqual(rows[0]["title"], "Legacy task")
+        self.assertIn("DONE", rows[0]["details"])
+
+    def test_new_source_symlinks_and_oversize_fail_without_following(self):
+        secret = self.root / "unrelated-notes.json"
+        self.save(secret, hub_notes_doc())
+        notes_path = self.data / "apollo-hub-notes-v1.json"
+        notes_path.symlink_to(secret)
+        tasks_path = self.data / "apollo-hub-todo-v1.json"
+        self.save(tasks_path, hub_todo_doc())
+        result = indexer.index(str(self.data), self.home)
+        self.assertEqual(result["sources"][3]["state"], "SOURCE_UNREADABLE")
+        self.assertEqual(result["sources"][4]["state"], "READY")
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(secret.read_bytes(), json.dumps(hub_notes_doc()).encode())
+        tasks_path.write_bytes(b"x" * (indexer.MAX_HUB_DOC_BYTES + 1))
+        result = indexer.index(str(self.data), self.home)
+        self.assertEqual(result["sources"][4]["state"],
+                         "SOURCE_UNSAFE_OR_OVERSIZE")
+        self.assertEqual(result["total"], 0)
+
+    def test_unlisted_hospital_and_finance_records_never_discovered(self):
+        self.save(self.data / "hospital-room-evidence.json",
+                  {"reports": [{"title": "PROTECTED PRIVATE EVIDENCE"}]})
+        self.save(self.data / "finance-transaction-v1.json",
+                  {"transactions": [{"title": "PROTECTED FINANCE"}]})
+        result = indexer.index(str(self.data), self.home)
+        self.assertEqual(result["total"], 0)
+        self.assertEqual(len(result["sources"]), 5)
+        self.assertNotIn("PROTECTED", json.dumps(result))
+        self.assertFalse(any(row["capabilities"].get("burn")
+                             for row in result["items"]))
+
     def test_only_index_cli_action_exposed(self):
         for args in (["record_index.py", "burn", str(self.data)],
                      ["record_index.py", "delete", str(self.data)],
@@ -190,7 +335,7 @@ class RecordIndexTests(unittest.TestCase):
     def test_index_is_not_an_arbitrary_directory_scanner(self):
         with self.assertRaises(indexer.IndexErrorSafe):
             indexer.index("../../home", self.home)
-        # This implementation opens exactly three source filenames; it has
+        # This implementation opens only five fixed, approved source filenames; it has
         # neither traversal nor a mutating syscall.
         source = SCRIPT.read_text()
         for unsafe in ("subprocess.run(", "shutil.rmtree(", "os.unlink(",

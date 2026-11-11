@@ -12,20 +12,37 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 provider = (ROOT / "services/github/GitHubAttentionProvider.qml").read_text()
-start = provider.index("        const args = [", provider.index("    function refresh(values)"))
+start = provider.index(
+    "        const args = GitHubBatch.wrap("
+    if "        const args = GitHubBatch.wrap(" in provider
+    else "        const args = [",
+    provider.index("    function refresh(values)")
+)
 end = provider.index("        refreshProcess.exec(args);", start)
 js_body = provider[start:end] + "\n        return args;\n"
+# Evaluate the real imported batch helper in an isolated Node VM rather than
+# replacing it with a fake. This retains the existing generated Bash test.
+batch_helper = ROOT / "services/github/GitHubToolboxBatch.js"
 node = (
-    "const fn = new Function('targets', 'maxPullRequestsPerRepository', "
+    "const fs=require('fs'); const vm=require('vm');\n"
+    + "const GitHubBatch={};\n"
+    + "vm.runInNewContext(fs.readFileSync("
+    + json.dumps(str(batch_helper))
+    + ", 'utf8').replace(/^\\.pragma library\\s*/, ''), GitHubBatch);\n"
+    + "const fn = new Function('targets', 'maxPullRequestsPerRepository', 'GitHubBatch', "
     + json.dumps(js_body) + ");\n"
-    + "process.stdout.write(JSON.stringify(fn(['kudokudo1/fixture'], 10)));\n"
+    + "process.stdout.write(JSON.stringify(fn(['kudokudo1/fixture'], 10, GitHubBatch)));\n"
 )
 built = subprocess.run(["node", "-e", node], capture_output=True, text=True, check=True)
 args = json.loads(built.stdout)
 assert args[:2] == ["bash", "-lc"], args[:2]
 assert args[3] == "pa-github-attention"
-assert args[5] == "kudokudo1/fixture"
-script = args[2]
+assert args[6] == "kudokudo1/fixture"
+script = args[4]
+# The outer runner and the original evidence-producing inner script must both
+# be valid Bash. No real Toolbox is run by the fixture's plain fake gh.
+subprocess.run(["bash", "-n", "-c", args[2]], check=True,
+               capture_output=True, text=True)
 assert "\nfor repo in \"$@\"; do\n" in script, "shell commands must be separated by actual newlines"
 subprocess.run(["bash", "-n", "-c", script], check=True, capture_output=True, text=True)
 

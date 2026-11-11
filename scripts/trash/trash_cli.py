@@ -137,8 +137,27 @@ def item_action(action, uri, original, confirmation=""):
     if result.returncode != 0:
         raise TrashError(("GIO_RESTORE_FAILED: " if action == "restore"
                           else "GIO_BURN_FAILED: ") + _error_text(result.stderr))
-    return {"ok": True, "kind": action, "name": row["name"],
-            "message": "RESTORED" if action == "restore" else "BURNED"}
+    response = {"ok": True, "kind": action, "name": row["name"],
+                "message": "RESTORED" if action == "restore" else "BURNED"}
+    if action == "burn":
+        # The receipt names only an item verified absent after successful GIO
+        # removal. A failed verification is reported as uncertain, never
+        # falsely claimed as a confirmed deletion.
+        try:
+            _, after = inventory()
+            confirmed = not any(item["uri"] == row["uri"]
+                                and item["original"] == row["original"]
+                                for item in after)
+        except TrashError:
+            confirmed = False
+        response["verified"] = confirmed
+        response["burnedItems"] = (
+            [{"kind": "SYSTEM FILE", "name": row["name"],
+              "original": row["original"]}] if confirmed else []
+        )
+        if not confirmed:
+            response["message"] = "BURN_SENT_VERIFICATION_UNAVAILABLE"
+    return response
 
 
 def burn_all(revision, count, confirmation):
@@ -155,8 +174,26 @@ def burn_all(revision, count, confirmation):
     result = _run([gio, "trash", "--empty"], timeout=ACTION_TIMEOUT)
     if result.returncode != 0:
         raise TrashError("GIO_EMPTY_FAILED: " + _error_text(result.stderr))
+    # Preserve the exact pre-operation, revision-validated inventory as the
+    # candidate set. A second read determines which candidates are actually
+    # absent. New trash entries do not count as failed burns.
+    try:
+        _, after = inventory()
+        remaining = {(item["uri"], item["original"]) for item in after}
+        verified = True
+    except TrashError:
+        remaining = {(item["uri"], item["original"]) for item in rows}
+        verified = False
+    gone = [row for row in rows
+            if (row["uri"], row["original"]) not in remaining]
+    burned = [{"kind": "SYSTEM FILE", "name": row["name"],
+               "original": row["original"]} for row in gone]
     return {"ok": True, "kind": "burn-all", "count": len(rows),
-            "message": "BURN_ALL_COMPLETED"}
+            "burnedCount": len(burned), "burnedItems": burned,
+            "remainingCount": len(rows) - len(gone),
+            "verified": verified, "partial": not verified or len(gone) != len(rows),
+            "message": ("BURN_ALL_VERIFIED" if verified and len(gone) == len(rows)
+                        else "BURN_ALL_PARTIAL_OR_UNVERIFIED")}
 
 
 def main(argv):

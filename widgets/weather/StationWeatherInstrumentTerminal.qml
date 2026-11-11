@@ -190,8 +190,10 @@ Rectangle {
                         anchors.centerIn: parent
                         text: terminal.sky ? terminal.sky.conditionState.icon : "?"
                         // W21 // Grow the *drawn symbol*, not its empty box.
-                        font.pixelSize: Math.min(220,Math.max(124,
-                                         mainWeatherIcon.width * 1.38))
+                        // W21 fit correction // The painted symbol should
+                        // dominate NOW without escaping its shorter band.
+                        font.pixelSize: Math.min(185,Math.max(91,
+                                         currentPanel.height * 1.33))
                         color: terminal.sky
                                ? terminal.sky.iconColor(terminal.sky.conditionState.color)
                                : Colors.orange

@@ -474,6 +474,8 @@ Item {
                 hoverContentGlowColor: Colors.magenta
                 hoverSoftGlowColor: Colors.magenta
                 selectedBorderColor: Colors.magenta
+                selectedForegroundColor: Colors.cyan
+                hoverForegroundColor: Colors.cyan
                 selectedSoftGlowColor: Colors.magenta
                 onLeftClicked: pane.settingsTab = "sound"
             }
@@ -901,14 +903,14 @@ Item {
             delegate: Row {
                 id: entry
                 width: alarmList.width
-                height: 35
-                spacing: 3
+                height: 40
+                spacing: 2
                 readonly property var rowAlarm: modelData
 
                 // FAVORITE is always the far-left action, like Angel.
                 ActionButton {
                     id: favoriteAlarm
-                    width: 27
+                    width: 24
                     height: parent.height
                     label: "★"
                     labelPixelSize: 13
@@ -927,7 +929,7 @@ Item {
                 // ON/OFF precedes the alarm selection, not after it.
                 ActionButton {
                     id: toggleAlarm
-                    width: 35
+                    width: 31
                     height: parent.height
                     label: entry.rowAlarm.enabled ? "ON" : "OFF"
                     selected: entry.rowAlarm.enabled
@@ -954,9 +956,11 @@ Item {
                     labelHorizontalAlignment: Text.AlignLeft
                     contentPadding: 4
                     labelPixelSize: 10
+                    // Two lines keep the alarm's name readable in TimeW's
+                    // narrow, five-action compact rows.
                     label: ("0" + entry.rowAlarm.hour).slice(-2) + ":"
-                        + ("0" + entry.rowAlarm.minute).slice(-2) + " // "
-                        + entry.rowAlarm.name
+                        + ("0" + entry.rowAlarm.minute).slice(-2)
+                        + "\n" + entry.rowAlarm.name
                         + (entry.rowAlarm.ringing ? " RING" : "")
                         + (entry.rowAlarm.completed ? " DONE" : "")
                     accentColor: entry.rowAlarm.ringing ? Colors.magenta
@@ -967,7 +971,7 @@ Item {
                 // NOTE is always immediately left of the delete action.
                 ActionButton {
                     id: noteAlarm
-                    width: 27
+                    width: 24
                     height: parent.height
                     label: entry.rowAlarm.note ? "✎" : "+"
                     labelPixelSize: 13
@@ -982,7 +986,7 @@ Item {
                 // DELETE is always furthest right. Two clicks are required.
                 ActionButton {
                     id: deleteAlarm
-                    width: 27
+                    width: 24
                     height: parent.height
                     label: pane.deleteConfirmId === entry.rowAlarm.id
                         ? "!" : "×"

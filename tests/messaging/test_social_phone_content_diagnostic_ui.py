@@ -52,7 +52,10 @@ class PhoneContentDiagnosticUiTests(unittest.TestCase):
     def test_existing_components_are_still_empty_and_send_disabled(self):
         self.assertIn("    ContactList {", self.ui)
         self.assertIn("    ChatFeed {", self.ui)
-        self.assertIn("phoneReadAdapter.conversations : []", self.ui)
+        self.assertIn("phonePane.filteredPhoneConversations : []", self.ui)
+        self.assertIn("DirectorySearch.filterConversations(", self.ui)
+        self.assertIn("phoneReadAdapter.conversations, messageSearchQuery", self.ui)
+        self.assertIn("!personalApproved || personalNeedsExplicitReload", self.ui)
         self.assertIn("phoneReadAdapter.messages : []", self.ui)
         self.assertIn("sendEnabled: false", self.ui)
         self.assertNotIn('conversations: phonePane.contentDiagnostic', self.ui)

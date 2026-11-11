@@ -13,6 +13,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -267,6 +268,32 @@ class C3eYSignedHostChallengeTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIs(flag,False)
 
+
+    def test_21_caller_list_and_pins_cannot_change_signed_snapshot_during_check(self):
+        original = Y.X.inspect_running_denials
+        pinned_frames = tuple(self.pair.frames)
+        pinned_measurements = dict(self.pair.expected)
+
+        def replace_after_signature(*, evidence_line, signed_receipts,
+                                    independently_pinned_receipt_key,
+                                    independently_measured):
+            # Deliberately alter the original caller objects AFTER the
+            # statement's full-record signature and hashes were checked.
+            self.pair.frames[0] = b"malicious caller-replaced receipt"
+            self.pair.expected["pid"] = 999999
+            self.assertIs(type(signed_receipts), tuple)
+            self.assertEqual(signed_receipts, pinned_frames)
+            self.assertIsNot(independently_measured, self.pair.expected)
+            self.assertEqual(independently_measured, pinned_measurements)
+            return original(
+                evidence_line=evidence_line, signed_receipts=signed_receipts,
+                independently_pinned_receipt_key=independently_pinned_receipt_key,
+                independently_measured=independently_measured)
+
+        with mock.patch.object(Y.X, "inspect_running_denials",
+                               side_effect=replace_after_signature):
+            self.assertTrue(self.verify()["completeHostRecordSignatureVerifiedInCI"])
+        self.assertEqual(self.state()[0], "consumed")
 
 if __name__=="__main__":
     unittest.main(verbosity=2)

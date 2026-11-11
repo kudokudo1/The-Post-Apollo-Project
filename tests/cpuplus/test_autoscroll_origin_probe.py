@@ -63,6 +63,9 @@ class OriginInventoryTests(unittest.TestCase):
         self.assertTrue(check["zwlr_virtual_pointer_manager_v1"])
         empty = probe.parse_protocols("interface: 'wl_compositor'\n")
         self.assertFalse(empty["zwlr_layer_shell_v1"])
+        mention = probe.parse_protocols(
+            "description mentions zwlr_layer_shell_v1, not advertised\n")
+        self.assertFalse(mention["zwlr_layer_shell_v1"])
 
     def test_complete_readonly_inventory_leaves_runtime_off(self):
         calls = []
@@ -73,8 +76,8 @@ class OriginInventoryTests(unittest.TestCase):
             if argv == ["swaymsg", "-t", "get_seats"]:
                 return '[{"name":"seat0","focus":31}]'
             if argv == ["wayland-info"]:
-                return ("zwlr_layer_shell_v1\n"
-                        "zwlr_virtual_pointer_manager_v1\n")
+                return ("interface: 'zwlr_layer_shell_v1', version: 4\n"
+                        "interface: 'zwlr_virtual_pointer_manager_v1', version: 2\n")
             raise AssertionError("unexpected command")
         with patch.dict(os.environ, {"SWAYSOCK": "/tmp/fake-sway",
                                      "WAYLAND_DISPLAY": "wayland-test"}),patch.object(

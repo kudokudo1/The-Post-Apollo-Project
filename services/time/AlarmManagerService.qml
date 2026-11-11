@@ -26,7 +26,12 @@ Scope {
     property bool migrationRequested: false
     property double nowMs: Date.now()
     property double lastSchedulerTickMs: 0
-    property string audioState: "NOT REQUESTED"
+    // SoundEffect.playing only describes the Qt backend, not the speakers.
+    // An IDLE value must be restored after previews, stops and unloading.
+    property string audioState: "IDLE"
+    property int lastFiredAlarmId: 0
+    property double lastFiredAtMs: 0
+    property string notificationOutcome: "NO RING YET"
     property bool previewing: false
     property string previewSoundId: "chime"
     property int previewVolume: 60
@@ -280,9 +285,11 @@ Scope {
                        : firstSoundAlarm ? firstSoundAlarm.volumePercent : 60;
         if (sourceId === "") {
             audioLoader.active = false;
+            audioState = "IDLE";
             return;
         }
         if (!audioLoader.active) {
+            audioState = "QT STARTING";
             audioLoader.active = true;
             return;
         }
@@ -294,6 +301,18 @@ Scope {
                 audioLoader.item.start();
         }
     }
+    function reportRingOccurrence(alarmId, startedMs) {
+        lastFiredAlarmId = alarmId;
+        lastFiredAtMs = startedMs;
+        notificationOutcome = "DELIVERY PENDING";
+        alarmFired(alarmId, startedMs);
+    }
+    function reportNotificationOutcome(alarmId, startedMs, outcome) {
+        // Reject stale or unrelated responses when multiple alarms ring.
+        if (alarmId !== lastFiredAlarmId || startedMs !== lastFiredAtMs)
+            return;
+        notificationOutcome = String(outcome || "NO DELIVERY RESULT");
+    }
     function announceRestoredRinging() {
         if (!canEdit) return;
         const now = Date.now();
@@ -304,7 +323,7 @@ Scope {
             if (a.ringing && a.ringStartedAtMs > 0
                     && a.ringStartedAtMs <= now
                     && now - a.ringStartedAtMs < Policy.MAX_RING_MS)
-                alarmFired(a.id, a.ringStartedAtMs);
+                reportRingOccurrence(a.id, a.ringStartedAtMs);
         }
     }
     function checkDue() {
@@ -321,7 +340,7 @@ Scope {
                 for (let i = 0; i < r.started.length; i++) {
                     const row = Policy.byId(document, r.started[i]);
                     if (row && row.ringing)
-                        alarmFired(row.id, row.ringStartedAtMs);
+                        reportRingOccurrence(row.id, row.ringStartedAtMs);
                 }
                 feedback = "RINGING // " + r.started.length + " ALARM(S)";
             }
@@ -369,7 +388,14 @@ Scope {
         target: audioLoader.item
         ignoreUnknownSignals: true
         function onFailed(message) { manager.audioState = message; }
-        function onPlaying() { manager.audioState = "PLAYING"; }
+        function onPlaying() {
+            // A backend-playing state does NOT prove an unmuted audible sink.
+            manager.audioState = "QT PLAYING";
+        }
+        function onStopped() {
+            if (manager.audioState === "QT PLAYING")
+                manager.audioState = "QT STOPPED";
+        }
     }
 
     FileView {

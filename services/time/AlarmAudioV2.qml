@@ -10,6 +10,7 @@ Item {
     property bool requested: false
     signal failed(string message)
     signal playing()
+    signal stopped()
 
     SoundEffect {
         id: effect
@@ -29,6 +30,8 @@ Item {
         onPlayingChanged: {
             if (playing)
                 audio.playing();
+            else
+                audio.stopped();
         }
     }
 

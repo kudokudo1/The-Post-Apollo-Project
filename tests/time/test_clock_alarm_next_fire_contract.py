@@ -32,14 +32,15 @@ class AlarmNextFireContracts(unittest.TestCase):
         self.assertIn('label: "TEST // 1-2 MIN"', PANE)
         self.assertIn("AlarmManagerService.createShortTestAlarm(selectedId)", PANE)
         self.assertIn("const r = Policy.tick(document, nowMs);", SERVICE)
-        self.assertIn("alarmFired(row.id, row.ringStartedAtMs)", SERVICE)
+        self.assertIn("reportRingOccurrence(row.id, row.ringStartedAtMs)", SERVICE)
         self.assertIn("NotificationsService.pushRich(event)", NOTICE)
         self.assertNotIn("alarmFired(", PANE)
 
     def test_saved_next_fire_and_diagnostics_are_visible(self):
         self.assertIn('text: "SAVED NEXT // " + AlarmManagerService.nextText(pane.selectedId)', PANE)
         self.assertIn('text: "TICK // " + (AlarmManagerService.lastSchedulerTickMs > 0', PANE)
-        self.assertIn('new Date(AlarmManagerService.lastSchedulerTickMs).toLocaleTimeString()', PANE)
+        self.assertIn('Qt.formatDateTime(', PANE)
+        self.assertIn('new Date(AlarmManagerService.lastSchedulerTickMs)', PANE)
         self.assertIn("AlarmManagerService.audioState", PANE)
         self.assertIn('text: "STATUS // " + AlarmManagerService.feedback', PANE)
         self.assertIn("manager.lastSchedulerTickMs = manager.nowMs;", SERVICE)

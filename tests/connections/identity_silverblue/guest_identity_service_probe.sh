@@ -160,9 +160,9 @@ def read_kernel_lsm(path):
     # the label; Python's str.strip() does NOT. Normalize only a single
     # terminal NUL, reject embedded NULs, control newlines or bad encoding.
     raw=path.read_bytes()
-    if raw.endswith(b"\\x00"):
+    if raw.endswith(b"\x00"):
         raw=raw[:-1]
-    if not raw or b"\\x00" in raw or b"\\n" in raw:
+    if not raw or b"\x00" in raw or b"\n" in raw:
         raise RuntimeError("malformed kernel SELinux context bytes")
     return raw.decode("ascii")
 

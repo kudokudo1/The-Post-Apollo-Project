@@ -9,6 +9,12 @@ Rectangle {
     id: panel
     objectName: "weather-w10-three-band-terminal"
     property var sky: null
+    readonly property alias currentItem: currentBand
+    readonly property alias hourlyItem: hourlyBand
+    readonly property alias dailyItem: dailyBand
+    readonly property alias hourRepeater: hourlyRepeater
+    readonly property alias dayRepeater: dayRepeater
+    readonly property alias footerItem: statusFooter
     color: Colors.black
     clip: true
 
@@ -242,6 +248,7 @@ Rectangle {
                 anchors.margins: 3
                 spacing: 2
                 Repeater {
+                    id: hourlyRepeater
                     model: Math.min(6,panel.hourlyRows.length)
                     delegate: Rectangle {
                         id: hourCell
@@ -363,6 +370,7 @@ Rectangle {
                 anchors.margins: 3
                 spacing: 3
                 Repeater {
+                    id: dayRepeater
                     model: Math.min(3,panel.dailyRows.length)
                     delegate: Rectangle {
                         id: dayCell
@@ -460,6 +468,7 @@ Rectangle {
         }
 
         QuietText {
+            id: statusFooter
             height: 11
             width: parent.width
             font.pixelSize: 8

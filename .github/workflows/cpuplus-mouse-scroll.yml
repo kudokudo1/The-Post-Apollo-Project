@@ -7,6 +7,13 @@ on:
       - "services/input/SwayScrollSettings.qml"
       - "services/input/MouseScrollPolicy.js"
       - "services/input/qmldir"
+      - "services/input/SwayScrollLock.py"
+      - "services/input/ScrollModeSettings.qml"
+      - "services/input/UniversalAutoscrollPolicy.js"
+      - "widgets/cpuplus/CpuPlusSettingsScrollModePane.qml"
+      - "tests/cpuplus/test_sway_scroll_lock.py"
+      - "tests/cpuplus/test_universal_autoscroll_policy.cjs"
+      - "tests/cpuplus/test_scroll_mode_ui.py"
       - "services/input/ZellijScrollConfig.py"
       - "services/input/ZellijScrollSettings.qml"
       - "widgets/cpuplus/CpuPlusSettingsZellijScrollPane.qml"
@@ -48,6 +55,12 @@ jobs:
         run: python3 tests/cpuplus/test_zellij_scroll_config.py
       - name: Verify Zellij per-option UI and safe terminal routing
         run: python3 tests/cpuplus/test_zellij_scroll_ui.py
+      - name: Verify real Sway Scroll Lock exact-device apply and snapshot recovery
+        run: python3 tests/cpuplus/test_sway_scroll_lock.py
+      - name: Verify Windows-like autoscroll anchor/velocity and stop engine
+        run: node tests/cpuplus/test_universal_autoscroll_policy.cjs
+      - name: Verify CPU++ Scroll Mode routing and no unverified global injection
+        run: python3 tests/cpuplus/test_scroll_mode_ui.py
       - name: Verify CPU++ three-bay integration and reserved-category guards
         run: python3 tests/cpuplus/test_mouse_scroll_mount_contract.py
       - name: Verify persisted scroll choice policy

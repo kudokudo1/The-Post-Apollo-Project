@@ -68,6 +68,34 @@ ShellRoot {
             if (SwayScrollSettings.applying || SwayScrollSettings.confirmationRequired) {
                 root.fail("UNAUTHORIZED_APPLY");return;
             }
+            if (root.phase === 3) {
+                if (ScrollModeSettings.busy)
+                    return;
+                if (!ScrollModeSettings.modePage) {
+                    root.fail("MODE_PAGE_MISSING");return;
+                }
+                ScrollModeSettings.hostStatus = "ready";
+                ScrollModeSettings.devices = [
+                    {identifier:"111:222:Test_Mouse",name:"Test Mouse",
+                     scroll_method:"none",scroll_button_lock:"disabled",
+                     scroll_button:0}
+                ];
+                if (!ScrollModeSettings.chooseDevice("111:222:Test_Mouse")
+                        || !ScrollModeSettings.chooseMode("lock")
+                        || !ScrollModeSettings.prepare()
+                        || ScrollModeSettings.pendingAction !== "enable") {
+                    root.fail("SCROLL_LOCK_STAGING_FAILED");return;
+                }
+                ScrollModeSettings.cancel();
+                if (!ScrollModeSettings.chooseMode("auto")
+                        || ScrollModeSettings.canPrepare
+                        || ScrollModeSettings.confirm()) {
+                    root.fail("UNSAFE_AUTOSCROLL_ACTIVATION");return;
+                }
+                root.done = true;
+                console.log("SCROLL_MODE_NATIVE_PASS // LOCK_CANCEL_AND_AUTOSCROLL_GATED");
+                return;
+            }
             if (root.phase === 2) {
                 if (ZellijScrollSettings.busy)
                     return;
@@ -79,8 +107,13 @@ ShellRoot {
                         || ZellijScrollSettings.confirmRequired) {
                     root.fail("ZELLIJ_STAGE_OR_PERMISSION"); return;
                 }
-                root.done = true;
                 console.log("ZELLIJ_NATIVE_PASS // STAGED_NO_CONFIG_WRITE");
+                root.phase = 3;
+                if (!ZellijScrollSettings.close()
+                        || !KittyScrollSettings.chooseMode(false)
+                        || !ScrollModeSettings.openModePage()) {
+                    root.fail("SCROLL_MODE_ROUTE_REFUSED");return;
+                }
                 return;
             }
             if (root.phase === 1) {

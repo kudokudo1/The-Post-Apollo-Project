@@ -20,6 +20,7 @@ Item {
     Flickable {
         id: scroll
         visible: !KittyScrollSettings.terminalMode
+                 && !ScrollModeSettings.modePage
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -43,6 +44,14 @@ Item {
                     font.pixelSize: 12
                     color: Colors.cyan
                     wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 34
+                    label: "MIDDLE-CLICK // SCROLL MODES"
+                    labelPixelSize: 10
+                    available: !SwayScrollSettings.busy
+                    onLeftClicked: ScrollModeSettings.openModePage()
                 }
                 ActionButton {
                     width: parent.width
@@ -286,10 +295,17 @@ Item {
         anchors.fill: parent
         area: mousePane.area
         visible: KittyScrollSettings.terminalMode
+                 && !ScrollModeSettings.modePage
+    }
+    CpuPlusSettingsScrollModePane {
+        anchors.fill: parent
+        area: mousePane.area
+        visible: ScrollModeSettings.modePage
     }
     NeonScrollBar {
         flickable: scroll
         visible: mousePane.panelVisible
-                 && !KittyScrollSettings.terminalMode && scrollable
+                 && !KittyScrollSettings.terminalMode
+                 && !ScrollModeSettings.modePage && scrollable
     }
 }

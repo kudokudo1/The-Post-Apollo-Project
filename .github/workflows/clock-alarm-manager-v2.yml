@@ -167,6 +167,12 @@ jobs:
           assert.equal(capacity.alarms.length,100);
           assert.equal(p.create(capacity).ok,false);
           assert.equal(p.remove(capacity,50).document.alarms.length,99);
+          const cloned=p.duplicate(doc,1);
+          assert.equal(cloned.ok,true);
+          assert.equal(cloned.document.alarms.length,doc.alarms.length+1);
+          assert.equal(p.byId(cloned.document,cloned.id).enabled,false);
+          assert.equal(p.byId(cloned.document,cloned.id).soundId,'soft');
+          assert.equal(p.duplicate(capacity,1).ok,false);
           assert.equal(p.parse(JSON.stringify({...capacity,nextId:1})).ok,false);
           assert.equal(p.parse(JSON.stringify({...capacity,alarms:[
             capacity.alarms[0],capacity.alarms[0]]})).ok,false);

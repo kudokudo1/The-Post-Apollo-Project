@@ -332,6 +332,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                     continue
 
     def recognize():
+        nonlocal first_text_ready
         while not cancelled.is_set():
             try:
                 chunk = clips.get(timeout=0.2)
@@ -357,7 +358,6 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 halt_child()
                 break
             if phrase:
-                nonlocal first_text_ready
                 if not first_text_ready:
                     first_text_ready = True
                     send("stage", detail="FIRST_TEXT_READY")

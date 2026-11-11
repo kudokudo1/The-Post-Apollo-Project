@@ -177,10 +177,17 @@ ID_MONITOR
     # was signature-verified with an isolated keyring before composition;
     # verify every installed file's size, digest, mode, ownership, and type
     # against the booted RPM database before accepting this CI boot.
-    verify_output="$(rpm -V "$pkg" 2>&1)" ||
-      { printf 'C4B_ID_RPM_VERIFY_DETAILS // %.1000s\n' "$verify_output"; fail "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_REFUSED"; }
-    [[ -z "$verify_output" ]] ||
-      { printf 'C4B_ID_RPM_VERIFY_DETAILS // %.1000s\n' "$verify_output"; fail "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_DIFFERENCE"; }
+    verify_file=/var/tmp/id-ci-booted-rpm-verify.log
+    verify_rc=0
+    # Durable bounded diagnostics before a deliberate poweroff. Last failure
+    # left an empty captured value and no readable rpm -V refusal specifics.
+    timeout --signal=TERM --kill-after=3s 35s rpm -V "$pkg" >"$verify_file" 2>&1 ||
+      verify_rc="$?"
+    if [[ "$verify_rc" != 0 || -s "$verify_file" ]]; then
+      printf 'C4B_ID_RPM_VERIFY_RC // %s\n' "$verify_rc" >/dev/ttyS0
+      sed -n '1,24p' "$verify_file" >/dev/ttyS0 || true
+      fail "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_REFUSED"
+    fi
     echo "C4B_ID_PASS // SIGNED_INSTALLED_IDENTITY_RPM_FILE_DIGESTS_AND_MODES"
     for name in identity-gateway-ci desktop_command_gateway_v0.py \
       desktop_host_lifecycle_v0.py desktop_context_projection_v0.py \

@@ -481,5 +481,27 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertNotIn('setenforce 0', probe)
 
 
+    def test_16_selinux_module_list_failure_is_serial_visible_and_fail_closed(self):
+        probe = (AREA / "guest_identity_service_probe.sh").read_text()
+        host = (AREA / "run_official_silverblue_identity.sh").read_text()
+        self.assertIn("printf 'C4B_ID_FAIL // IDENTITY_SERVICE_%s", probe)
+        self.assertIn('"$1" >/dev/ttyS0 || true', probe)
+        for token in (
+            'module_list=/var/tmp/c4b-id-selinux-module-list.log',
+            'timeout --signal=TERM --kill-after=3s 25s semodule -l',
+            'C4B_ID_SELINUX_STAGE // module_list_rc=%s',
+            'C4B_ID_SELINUX_MODULE_DETAIL',
+            'COMPILED_SELINUX_MODULE_LIST_REFUSED',
+            'COMPILED_SELINUX_MODULE_NOT_ACTIVE',
+            'C4B_ID_SELINUX_STAGE // module_name_verified',
+            'C4B_ID_SELINUX_STAGE // enforcing_state=%.40s',
+        ):
+            self.assertIn(token, probe)
+        self.assertIn('SELINUX_STAGE|SELINUX_MODULE_DETAIL|SELINUX_LOAD_DETAIL', host)
+        self.assertIn("grep -Eq '^postapollo_identity_ci([[:space:]]|$)'", probe)
+        self.assertLess(probe.index('semodule -i "$policyfile"'), probe.index('module_list=/var/tmp'))
+        self.assertLess(probe.index('module_name_verified'), probe.index('DEDICATED_TEST_SELINUX_MODULE_LOADED_ENFORCING'))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

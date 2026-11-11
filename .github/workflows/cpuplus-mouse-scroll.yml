@@ -8,6 +8,8 @@ on:
       - "services/input/MouseScrollPolicy.js"
       - "services/input/qmldir"
       - "widgets/cpuplus/CpuPlusSettingsMouseScrollPane.qml"
+      - "widgets/CpuPlusW.qml"
+      - "tests/cpuplus/test_mouse_scroll_mount_contract.py"
       - "tests/cpuplus/test_sway_scroll_controller.py"
       - "tests/cpuplus/test_mouse_scroll_policy.cjs"
       - "tests/cpuplus/test_mouse_scroll_controls.py"
@@ -28,6 +30,8 @@ jobs:
         run: python3 tests/cpuplus/test_sway_scroll_controller.py
       - name: Verify UI authority and no silent startup effects
         run: python3 tests/cpuplus/test_mouse_scroll_controls.py
+      - name: Verify CPU++ three-bay integration and reserved-category guards
+        run: python3 tests/cpuplus/test_mouse_scroll_mount_contract.py
       - name: Verify persisted scroll choice policy
         run: node tests/cpuplus/test_mouse_scroll_policy.cjs
 

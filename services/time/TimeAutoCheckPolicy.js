@@ -20,8 +20,21 @@ function validTimestamp(value) {
 }
 
 function initialDocument() {
+    // The master AUTO switch remains opt-in. When enabled, trigger
+    // preferences default ON for reload/open but are independently mutable.
     return { version: VERSION, enabled: false, intervalHours: 6,
-             lastAttemptAtMs: 0 };
+             lastAttemptAtMs: 0, checkOnReload: true,
+             checkOnClockOpen: true };
+}
+
+function validOptionalTrigger(value) {
+    return value === undefined || typeof value === "boolean";
+}
+
+function normalizedTrigger(doc, name) {
+    // Existing v1 documents have no trigger keys. Treat omitted keys as ON
+    // without destructive migration or silently resetting the saved interval.
+    return doc[name] === undefined ? true : doc[name];
 }
 
 function parse(raw) {
@@ -33,12 +46,16 @@ function parse(raw) {
     if (doc.version !== VERSION)
         return { ok: false, reason: "UNSUPPORTED_VERSION" };
     if (typeof doc.enabled !== "boolean" || !validHours(doc.intervalHours)
-            || !validTimestamp(doc.lastAttemptAtMs))
+            || !validTimestamp(doc.lastAttemptAtMs)
+            || !validOptionalTrigger(doc.checkOnReload)
+            || !validOptionalTrigger(doc.checkOnClockOpen))
         return { ok: false, reason: "INVALID_SCHEDULE" };
     return { ok: true, document: {
         version: VERSION, enabled: doc.enabled,
         intervalHours: doc.intervalHours,
-        lastAttemptAtMs: doc.lastAttemptAtMs
+        lastAttemptAtMs: doc.lastAttemptAtMs,
+        checkOnReload: normalizedTrigger(doc, "checkOnReload"),
+        checkOnClockOpen: normalizedTrigger(doc, "checkOnClockOpen")
     }};
 }
 
@@ -48,8 +65,21 @@ function withSchedule(doc, enabled, hours) {
     return { ok: true, document: {
         version: VERSION, enabled: enabled, intervalHours: hours,
         lastAttemptAtMs: doc && validTimestamp(doc.lastAttemptAtMs)
-                         ? doc.lastAttemptAtMs : 0
+                         ? doc.lastAttemptAtMs : 0,
+        checkOnReload: doc ? normalizedTrigger(doc, "checkOnReload") : true,
+        checkOnClockOpen: doc ? normalizedTrigger(doc, "checkOnClockOpen") : true
     }};
+}
+
+function withTrigger(doc, name, enabled) {
+    if (!doc || (name !== "checkOnReload" && name !== "checkOnClockOpen")
+            || typeof enabled !== "boolean")
+        return { ok: false, reason: "INVALID_TRIGGER" };
+    var next = withSchedule(doc, doc.enabled, doc.intervalHours);
+    if (!next.ok)
+        return next;
+    next.document[name] = enabled;
+    return next;
 }
 
 function withAttempt(doc, nowMs) {
@@ -57,8 +87,20 @@ function withAttempt(doc, nowMs) {
         return { ok: false, reason: "INVALID_TIMESTAMP" };
     return { ok: true, document: {
         version: VERSION, enabled: doc.enabled,
-        intervalHours: doc.intervalHours, lastAttemptAtMs: nowMs
+        intervalHours: doc.intervalHours, lastAttemptAtMs: nowMs,
+        checkOnReload: normalizedTrigger(doc, "checkOnReload"),
+        checkOnClockOpen: normalizedTrigger(doc, "checkOnClockOpen")
     }};
+}
+
+function triggerEnabled(doc, trigger) {
+    if (!doc || !doc.enabled)
+        return false;
+    if (trigger === "reload")
+        return normalizedTrigger(doc, "checkOnReload");
+    if (trigger === "clock-open")
+        return normalizedTrigger(doc, "checkOnClockOpen");
+    return trigger === "interval";
 }
 
 function isDue(doc, nowMs, lastStartedAtMs) {

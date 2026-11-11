@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import MachineBraveSealedVault as vault
 import MachineBraveArchiveAdmissionIntent as admission
 import MachineBraveProcessLease as lifecycle
+import MachineBraveRequestCancellation as cancellation
 
 REQUEST_KIND = "machine-protected-archive-metadata-request-v1"
 RESPONSE_KIND = "machine-protected-archive-metadata-response-v1"
@@ -208,23 +209,30 @@ def handle_once(connection, *, protected_root):
         # Obtain stable task reference FROM THE KERNEL SOCKET before parsing.
         # Unsupported kernel, dead peer or changed executable => refusal.
         with lifecycle.capture_socket_peer(connection, peer=initial) as lease:
-            raw, request = read_frame(connection)
-            if not lease.valid() or peer_credentials(connection) != initial:
-                refuse()
-            intent = admission.bind_request(
-                raw, peer_pid=initial.pid,
-                peer_uid=initial.uid, peer_gid=initial.gid)
-            if (intent.action != request["action"] or
-                    intent.challenge != request["challenge"]):
-                refuse()
-            if not lease.valid() or peer_credentials(connection) != initial:
-                refuse()
-            # A living pidfd is a negative lifecycle check only.
-            # Nothing here confers a client, C3e or C5 authorization.
-            if admission.may_read_metadata(intent):
-                refuse()  # no positive path even if monkeypatched
+            # Capture kernel session context before consuming a request.
+            # No positive rights even if it stays unchanged.
+            guard = cancellation.begin(connection, lease)
+            try:
+                raw, request = read_frame(connection)
+                if not guard.valid() or peer_credentials(connection) != initial:
+                    refuse()
+                intent = admission.bind_request(
+                    raw, peer_pid=initial.pid,
+                    peer_uid=initial.uid, peer_gid=initial.gid)
+                if (intent.action != request["action"] or
+                        intent.challenge != request["challenge"]):
+                    refuse()
+                if not guard.valid() or peer_credentials(connection) != initial:
+                    refuse()
+                # Cancellation/session context is negative evidence only.
+                # Signed C3e host and one-use C5 consent remain absent.
+                if admission.may_read_metadata(intent):
+                    refuse()  # no positive path even if monkeypatched
+            finally:
+                guard.cancel()
         refuse()
     except (BrokerRefusal, lifecycle.LifecycleRefusal,
+            cancellation.CancelledRequest,
             admission.IntentRefusal, vault.VaultError,
             OSError, ValueError, TypeError, KeyError, struct.error,
             TimeoutError):

@@ -1,0 +1,31 @@
+name: TimeW MACHINE offline archive manager
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineBraveOfflineArchiveManager.py"
+      - "tests/timew/test_machine_brave_offline_archive_manager.py"
+      - "docs/timew-machine-brave-offline-archive-manager.md"
+      - ".github/workflows/timew-machine-brave-offline-archive-manager.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archive-manager:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Synthetic private archive list inspect and digest-guarded delete
+        run: python3 -B -I tests/timew/test_machine_brave_offline_archive_manager.py
+      - name: Existing offline archive source verification and consent refusal
+        run: python3 -B -I tests/timew/test_machine_brave_offline_archive.py
+      - name: Synthetic browser AES-GCM archive and decrypt roundtrip
+        run: node tests/timew/test_machine_brave_offline_archive_crypto.mjs
+      - name: Preserve sealed vault and read-back privacy contracts
+        run: |
+          python3 -B -I tests/timew/test_machine_brave_sealed_vault.py
+          node tests/timew/test_machine_brave_sealed_readback.mjs
+          python3 -B -I tests/timew/test_machine_brave_session_recovery_contract.py

@@ -103,30 +103,44 @@ Scope {
     }
 
     function disarm() {
-        if (!canEdit) return false;
         const result = AlarmPolicy.disarm(document);
         if (!result.ok) return false;
         stopAudio();
+        if (!canEdit) {
+            document = result.document; // emergency local silence, not durable
+            feedback = "DISARMED HERE // STORAGE FAILED // REPAIR STORE";
+            return false;
+        }
         const accepted = saveDocument(result.document);
         feedback = accepted ? "ALARM DISARMED" : "SAVE FAILED";
         return accepted;
     }
 
     function stopRinging() {
-        if (!canEdit || !ringing) return false;
+        if (!ringing) return false;
         const result = AlarmPolicy.stop(document);
         if (!result.ok) return false;
-        stopAudio();
+        stopAudio(); // emergency silence must never depend on a filesystem save
+        if (!canEdit) {
+            document = result.document;
+            feedback = "SILENCED HERE // STORAGE FAILED // MAY REPEAT ON RELOAD";
+            return false;
+        }
         const accepted = saveDocument(result.document);
         feedback = accepted ? "ALARM STOPPED // DAILY SCHEDULE RETAINED" : "SAVE FAILED";
         return accepted;
     }
 
     function snoozeRinging() {
-        if (!canEdit || !ringing) return false;
+        if (!ringing) return false;
         const result = AlarmPolicy.snooze(document, Date.now());
         if (!result.ok) return false;
         stopAudio();
+        if (!canEdit) {
+            document = result.document;
+            feedback = "SNOOZED HERE // STORAGE FAILED // NOT DURABLE";
+            return false;
+        }
         const accepted = saveDocument(result.document);
         feedback = accepted ? "SNOOZED // 5 MINUTES" : "SAVE FAILED";
         return accepted;

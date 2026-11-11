@@ -1,0 +1,20 @@
+name: CPU++ Input Settings Stage 0 Navigation
+
+on:
+  pull_request:
+    paths:
+      - "widgets/CpuPlusW.qml"
+      - "tests/cpuplus/test_cpuplus_input_category_navigation.py"
+      - ".github/workflows/cpuplus-input-settings-navigation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify settings category navigation without device writes
+        run: python3 tests/cpuplus/test_cpuplus_input_category_navigation.py

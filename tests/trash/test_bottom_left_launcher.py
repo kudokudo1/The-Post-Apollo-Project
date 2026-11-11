@@ -248,6 +248,20 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertNotIn("remove-worktree", TRASH)
         self.assertNotIn("finance-write-transaction", TRASH)
 
+    def test_universal_resource_hub_filter_is_read_only(self):
+        self.assertIn('{id:"hub", label:"HUB"}', TRASH)
+        self.assertIn('selected === "hub"', TRASH)
+        self.assertIn('row.kind !== "HUB NOTE"', TRASH)
+        self.assertIn('row.kind !== "HUB TASK"', TRASH)
+        self.assertIn('width: (archiveFilterRow.width - 24) / 7', TRASH)
+        self.assertIn('model: trashLauncher.archiveFilteredRows', TRASH)
+        # Only the two separately-owned, previously approved sources may
+        # offer SAVE COPY. No Hub note or task can ever hit that click path.
+        self.assertIn('visible: modelData.kind === "WEB SCRAPE"', TRASH)
+        self.assertIn('|| modelData.kind === "EVENT HISTORY"', TRASH)
+        self.assertNotIn('modelData.kind === "HUB TASK"\n', TRASH)
+        self.assertNotIn('modelData.kind === "HUB NOTE"\n', TRASH)
+
     def test_archive_is_real_source_owned_read_only_inventory(self):
         self.assertIn('property var archiveRows: []', TRASH)
         self.assertIn('property var archiveSources: []', TRASH)

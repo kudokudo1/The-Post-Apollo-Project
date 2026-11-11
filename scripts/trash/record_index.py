@@ -6,6 +6,7 @@ operation. Source stores remain sole writers and retention authorities.
 """
 import json
 import os
+import re
 from pathlib import Path
 import stat
 import sys
@@ -13,7 +14,16 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 MAX_DATA_DIR_ARG = 4096
-MAX_ROWS = 350
+MAX_ROWS = 650
+MAX_HUB_DOC_BYTES = 1048576
+RESOURCE_CONTRACT = "post-apollo.trash-resource.v1"
+RESOURCE_OWNERS = {
+    "EVENT HISTORY": "weather-events",
+    "SAVED DOSSIER": "weather-dossiers",
+    "WEB SCRAPE": "demo-scrape",
+    "HUB NOTE": "apollo-hub-notes",
+    "HUB TASK": "apollo-hub-todo",
+}
 MAX_EVENT_DOC_BYTES = 8 * 1024 * 1024
 MAX_DOSSIER_DOC_BYTES = 2500000
 MAX_CRAWL_DOC_BYTES = 262144
@@ -23,6 +33,8 @@ SOURCES = (
     ("weather-events", "WEATHER // EVENT ARCHIVE", "weather-event-archive-v1.json", MAX_EVENT_DOC_BYTES),
     ("weather-dossiers", "WEATHER // DOSSIER ARCHIVE", "weather-dossier-archive-v1.json", MAX_DOSSIER_DOC_BYTES),
     ("demo-scrape", "RESEARCH // DEMO SCRAPES", "crawl-records.json", MAX_CRAWL_DOC_BYTES),
+    ("hub-notes", "HUB // NOTES", "apollo-hub-notes-v1.json", MAX_HUB_DOC_BYTES),
+    ("hub-todos", "HUB // TO-DO", "apollo-hub-todo-v1.json", MAX_HUB_DOC_BYTES),
 )
 SOURCE_IDS = {"gdacs", "usgs", "eonet", "firms"}
 
@@ -87,12 +99,18 @@ def _row(source, identity, title, ms, details, kind):
         "id": _text(identity, 260),
         "source": source,
         "kind": kind,
+        "resourceContract": RESOURCE_CONTRACT,
+        "ownerId": RESOURCE_OWNERS[kind],
+        "resourceId": _text(identity, 260),
         "title": _text(title, 150) or "UNTITLED RECORD",
         "recordedAtMs": ms,
         "recordedAt": _datetime(ms),
         "details": _text(details, 210),
         "capabilities": {
             "inspect": True,
+            # This is a separate, existing validated copy operation.
+            # Other owners have not delegated copy or deletion authority.
+            "saveCopy": kind in ("EVENT HISTORY", "WEB SCRAPE"),
             "archive": False,
             "trash": False,
             "restore": False,
@@ -100,6 +118,139 @@ def _row(source, identity, title, ms, details, kind):
         },
         "retention": "SOURCE OWNED // READ ONLY",
     }
+
+
+def _integer(value, minimum, maximum):
+    return type(value) is int and minimum <= value <= maximum
+
+
+def _local_id(value, prefix):
+    return (isinstance(value, str) and
+            re.fullmatch(prefix + r"[1-9][0-9]*", value) is not None
+            and len(value) <= 12 and int(value[1:]) <= 1000000000)
+
+
+def _local_title(value, limit):
+    return (isinstance(value, str) and 1 <= len(value) <= limit
+            and value.strip() == value
+            and all(ord(char) >= 32 and ord(char) != 127 for char in value))
+
+
+def _local_description(value, maximum):
+    return (isinstance(value, str) and len(value) <= maximum
+            and all(ord(ch) not in list(range(0, 9)) + [11, 12, 127]
+                    and not 14 <= ord(ch) <= 31 for ch in value))
+
+
+def _hub_notes_rows(doc):
+    """B8 owner inventory: metadata only, never note body or write access."""
+    if (not isinstance(doc, dict) or type(doc.get("version")) is not int
+            or doc["version"] != 1
+            or not _integer(doc.get("nextId"), 1, 1000000000)
+            or not isinstance(doc.get("notes"), list)
+            or len(doc["notes"]) > 100):
+        raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
+    seen = set()
+    highest = 0
+    rows = []
+    for note in doc["notes"]:
+        if (not isinstance(note, dict)
+                or not _local_id(note.get("id"), "n")
+                or not _local_title(note.get("title"), 120)
+                or not _local_description(note.get("body"), 8192)
+                or not _integer(note.get("revision"), 1, 1000000000)
+                or not _integer(note.get("createdAtMs"), 1, 9000000000000)
+                or not _integer(note.get("updatedAtMs"),
+                                note["createdAtMs"], 9000000000000)
+                or note["id"] in seen):
+            raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
+        seen.add(note["id"])
+        highest = max(highest, int(note["id"][1:]))
+        rows.append(_row("HUB // NOTES", "hub-note:" + note["id"],
+                         note["title"], note["updatedAtMs"],
+                         "NOTE " + note["id"] + " // REV " + str(note["revision"]),
+                         "HUB NOTE"))
+    if highest >= doc["nextId"]:
+        raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
+    return rows
+
+
+def _hub_due_date(value):
+    if value is None:
+        return True
+    if not isinstance(value, str) or re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value) is None:
+        return False
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").strftime("%Y-%m-%d") == value
+    except ValueError:
+        return False
+
+
+def _hub_todo_rows(doc):
+    """B7 owner inventory: bounded title, identity, dates only, no drafts."""
+    if (not isinstance(doc, dict) or type(doc.get("version")) is not int
+            or doc["version"] not in (1, 2, 3)
+            or not _integer(doc.get("nextId"), 1, 1000000000)
+            or not isinstance(doc.get("tasks"), list)
+            or len(doc["tasks"]) > 200):
+        raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
+    version = doc["version"]
+    project_ids = set()
+    if version == 3:
+        projects = doc.get("projects")
+        if (not isinstance(projects, list) or len(projects) > 30
+                or not _integer(doc.get("nextProjectId"), 1, 1000000000)):
+            raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
+        max_project = 0
+        project_names = set()
+        for project in projects:
+            if (not isinstance(project, dict)
+                    or not _local_id(project.get("id"), "p")
+                    or not _local_title(project.get("name"), 64)
+                    or not _integer(project.get("createdAtMs"), 1, 9000000000000)
+                    or not _integer(project.get("updatedAtMs"),
+                                    project["createdAtMs"], 9000000000000)
+                    or project["id"] in project_ids
+                    or project["name"].lower() in project_names):
+                raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
+            project_ids.add(project["id"])
+            project_names.add(project["name"].lower())
+            max_project = max(max_project, int(project["id"][1:]))
+        if max_project >= doc["nextProjectId"]:
+            raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
+    rows = []
+    seen = set()
+    highest = 0
+    for task in doc["tasks"]:
+        if (not isinstance(task, dict)
+                or not _local_id(task.get("id"), "t")
+                or not _local_title(task.get("title"), 160)
+                or type(task.get("done")) is not bool
+                or not _integer(task.get("createdAtMs"), 1, 9000000000000)
+                or not _integer(task.get("updatedAtMs"),
+                                task["createdAtMs"], 9000000000000)
+                or task["id"] in seen):
+            raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
+        if version >= 2 and (
+                task.get("priority") not in ("none", "low", "medium",
+                                             "high", "urgent")
+                or not _local_description(task.get("description"), 2000)
+                or not _hub_due_date(task.get("dueDate"))):
+            raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
+        if version == 3 and task.get("projectId") is not None and (
+                not isinstance(task.get("projectId"), str)
+                or task["projectId"] not in project_ids):
+            raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
+        seen.add(task["id"])
+        highest = max(highest, int(task["id"][1:]))
+        rows.append(_row("HUB // TO-DO", "hub-task:" + task["id"],
+                         task["title"], task["updatedAtMs"],
+                         "TASK " + task["id"] + " // "
+                         + ("DONE" if task["done"] else "OPEN"),
+                         "HUB TASK"))
+    if highest >= doc["nextId"]:
+        raise IndexErrorSafe("INVALID_SOURCE_SCHEMA")
+    return rows
 
 
 def _event_rows(doc):
@@ -215,8 +366,11 @@ def _crawl_rows(doc):
 def _source_path(data_dir, home_dir, source):
     if source == "demo-scrape":
         return home_dir / ".local/share/post-apollo/finance-crawler/crawl-records.json"
-    filename = SOURCES[0][2] if source == "weather-events" else SOURCES[1][2]
-    return data_dir / filename
+    # Never turn a source ID into an arbitrary filesystem path.
+    allowed = {source_id: filename for source_id, _, filename, _ in SOURCES}
+    if source not in allowed:
+        raise IndexErrorSafe("UNKNOWN_OWNER")
+    return data_dir / allowed[source]
 
 
 def index(data_dir, home_dir=None):
@@ -234,9 +388,18 @@ def index(data_dir, home_dir=None):
             if doc is None:
                 sources.append({"id": key, "label": label, "state": "EMPTY", "count": 0})
                 continue
-            items = (_event_rows(doc) if key == "weather-events"
-                     else _dossier_rows(doc) if key == "weather-dossiers"
-                     else _crawl_rows(doc))
+            if key == "weather-events":
+                items = _event_rows(doc)
+            elif key == "weather-dossiers":
+                items = _dossier_rows(doc)
+            elif key == "demo-scrape":
+                items = _crawl_rows(doc)
+            elif key == "hub-notes":
+                items = _hub_notes_rows(doc)
+            elif key == "hub-todos":
+                items = _hub_todo_rows(doc)
+            else:
+                raise IndexErrorSafe("UNKNOWN_OWNER")
             entries.extend(items)
             sources.append({"id": key, "label": label, "state": "READY", "count": len(items)})
         except IndexErrorSafe as exc:
@@ -245,6 +408,7 @@ def index(data_dir, home_dir=None):
         raise IndexErrorSafe("INDEX_CAPACITY_EXCEEDED")
     entries.sort(key=lambda r: (-r["recordedAtMs"], r["source"], r["id"]))
     return {"ok": True, "kind": "record-index", "readOnly": True,
+            "resourceContract": RESOURCE_CONTRACT,
             "total": len(entries), "items": entries, "sources": sources}
 
 

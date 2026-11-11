@@ -150,6 +150,8 @@ PanelWindow {
         if (selected === "events" && row.kind !== "EVENT HISTORY") return false;
         if (selected === "dossiers" && row.kind !== "SAVED DOSSIER") return false;
         if (selected === "scrapes" && row.kind !== "WEB SCRAPE") return false;
+        if (selected === "hub" && row.kind !== "HUB NOTE"
+                               && row.kind !== "HUB TASK") return false;
         if (selected === "copies" && ((row.kind !== "SAVED RESEARCH"
                                       && row.kind !== "SAVED EVENT")
                                       || row.state !== "archived")) return false;
@@ -1641,12 +1643,13 @@ PanelWindow {
                                     {id:"events", label:"EVENTS"},
                                     {id:"dossiers", label:"DOSSIERS"},
                                     {id:"scrapes", label:"SCRAPES"},
+                                    {id:"hub", label:"HUB"},
                                     {id:"copies", label:"COPIES"},
                                     {id:"bin", label:"BIN"}
                                 ]
                                 ActionButton {
                                     required property var modelData
-                                    width: (archiveFilterRow.width - 20) / 6
+                                    width: (archiveFilterRow.width - 24) / 7
                                     height: 26
                                     label: modelData.label
                                     labelPixelSize: 9

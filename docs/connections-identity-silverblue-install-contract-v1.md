@@ -17,6 +17,8 @@ This **does not reuse C4d's fake Connections status host**. It packages the *act
 - `build_signed_identity_gateway.sh`: guarded GitHub-only Fedora 44 RPM builder; disposable OpenPGP key signs package. Only public-key/fingerprint, signed RPM and hashes leave the builder. Never uploads a private release root or receipt signer.
 - `verify_signed_identity_gateway.sh`: a **separate fresh Fedora container** creates its own RPM database, requires that the package signature be untrusted **before** explicit public key import, then verifies the package signature and exact role with no scriptlets. This establishes CI package signature correctness, *not* independent operator production key custody.
 - `test_identity_signed_rpm_contract.py`: exact source roster, service start-gate and negative release/authority contracts. The CI workflow checks these and builds/verifies the RPM. No package is installed on the operator's Fedora machine.
+- `release_manifest_ci.py` + `test_identity_release_manifest_ci.py`: separate ephemeral **Ed25519 release root** in the GitHub controller signs canonical purpose/role-scoped RPM SHA-256, the complete eight-module **plus systemd unit** SHA-256 roster, release epoch/sequence test floors, and a *distinct* disposable receipt-signing public-key fingerprint. Root and receipt private keys exist only in process memory; the RPM builder never receives them. The verifier rejects duplicate/noncanonical JSON, missing/extra module, wrong root, mismatched receipt key, modified package bytes and old floors. All returned authority flags are false. The public test root is **not operator-enrolled production custody**; a successful test proves only release-envelope mechanics.
+
 
 The existing `installed_gateway_witness_v1.py` is **Ubuntu dpkg-specific** and cannot authenticate this RPM. Identity DOC must not route this test witness into `InstalledIdentityCommandAdapterV1` or enable sign-in merely because an RPM signature is valid.
 
@@ -37,7 +39,7 @@ GitHub Actions only: open the dedicated C4b Identity Silverblue draft PR and ins
 
 ## VERIFY
 
-**Phase 1 acceptance:** exact-head source/adversarial contracts PASS, real Fedora 44 RPM build with original eight modules and inert unit, OpenPGP signature untrusted-before/imported-after in separate RPM DB, no pre/post scripts or new credentials, no private signing key exported.
+**Phase 1 acceptance:** exact-head source/adversarial contracts PASS, real Fedora 44 RPM build with original eight modules and inert unit, OpenPGP signature untrusted-before/imported-after in separate RPM DB, separate synthetic Ed25519 release-root signature over exact RPM+module+receipt-key public fingerprint with negative signature/key/floor/roster tests, no pre/post scripts or new credentials, no private signing key exported.
 
 **Not tested yet:** official Silverblue installation, protected signed release root and receipt-key custody, actual service socket/SELinux/process/seat identity, two reboots, rollback and absence, signed negative receipts with all peer/seat/intent callbacks denied. These remain Phase 2+ requirements.
 

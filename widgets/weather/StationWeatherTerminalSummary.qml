@@ -14,11 +14,11 @@ Rectangle {
     readonly property alias hourlyItem: hourlyRow
     readonly property alias dailyItem: dailyRow
     readonly property bool conditionsReady:
-        !!weatherService && weatherService.ready === true
+        Boolean(weatherService && weatherService.ready)
     readonly property bool forecastReady:
-        !!weatherService && weatherService.forecastReady === true
+        Boolean(weatherService && weatherService.forecastReady)
     readonly property bool airReady:
-        !!weatherService && weatherService.aqiReady === true
+        Boolean(weatherService && weatherService.aqiReady)
     readonly property var hourlySamples:
         forecastReady && weatherService.hourlyForecast
         && typeof weatherService.hourlyForecast.length === "number"

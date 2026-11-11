@@ -80,7 +80,7 @@ Item {
             id: body
             x: 4
             y: 7
-            width: Math.max(0, locationScroll.width - 13)
+            width: Math.max(0, locationScroll.width - 24)
             spacing: 12
 
             GohuText {
@@ -274,9 +274,10 @@ Item {
 
     NeonScrollBar {
         flickable: locationScroll
-        x: parent.width - width
-        y: 0
-        height: parent.height
+        mountingParent: locationPane
+        geometryHost: locationScroll
+        handleStyle: "bar"
+        maximumBarHandleHeight: 42
         visible: scrollable
     }
 }

@@ -55,7 +55,7 @@ Item {
             id: locationBody
             x: 3
             y: 8
-            width: Math.max(0,selectedPlacesScroll.width-13)
+            width: Math.max(0,selectedPlacesScroll.width-24)
             spacing: 10
 
             GohuText {
@@ -120,13 +120,14 @@ Item {
         }
     }
 
+    // Saved places have their own bounded track under the pinned
+    // finder. Do not use the height of the entire location selector.
     NeonScrollBar {
         flickable: selectedPlacesScroll
-        x: parent.width-width
-        // The saved-places rail begins beneath the pinned query;
-        // it never overlays or scrolls the FIND PLACE header.
-        y: selectedPlacesScroll.y
-        height: selectedPlacesScroll.height
+        mountingParent: locationSelection
+        geometryHost: selectedPlacesScroll
+        handleStyle: "bar"
+        maximumBarHandleHeight: 42
         visible: scrollable
     }
 }

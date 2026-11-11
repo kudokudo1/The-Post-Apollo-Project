@@ -44,7 +44,7 @@ Item {
             id: locationBody
             x: 4
             y: 7
-            width: Math.max(0,overviewScroll.width-14)
+            width: Math.max(0,overviewScroll.width-24)
             spacing: 12
 
             // Header above this bay now shows SHARED CONTEXT + current
@@ -68,11 +68,14 @@ Item {
         }
     }
 
+    // CPU++ stage 1 // The compact rounded indicator stays centered
+    // in the right reserved track; its geometry follows the visible box.
     NeonScrollBar {
         flickable: overviewScroll
-        x: parent.width-width
-        y: 0
-        height: parent.height
+        mountingParent: locationOverview
+        geometryHost: overviewScroll
+        handleStyle: "bar"
+        maximumBarHandleHeight: 42
         visible: scrollable
     }
 }

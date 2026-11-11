@@ -25,6 +25,12 @@ Item {
     property alias categoryRowRepeater: categoryRowsRepeater
     property alias dossierGroupItems: dossierGroupRepeater
     property alias dossierScrollArea: dossierScroll
+    property alias collectionScrollArea: collectionScroll
+    property alias listScrollArea: listScroll
+    // Read-only visual test handles; scrollbar ownership remains internal.
+    property alias collectionScrollIndicator: collectionScrollTrack
+    property alias dossierScrollIndicator: dossierScrollTrack
+    property alias listScrollIndicator: listScrollTrack
     property alias collapseAllControl: collapseAllButton
     property alias searchQuery: favoritesSearchInput.text
     property alias collectionGroupItems: collectionGroupRepeater
@@ -233,17 +239,22 @@ Item {
                 font.pixelSize: 11
                 elide: Text.ElideRight
             }
-            Flickable {
-                id: collectionScroll
+            // A Column only positions this one wrapper, never the rail.
+            Item {
+                id: collectionViewportHost
                 width: parent.width
                 height: Math.max(0,collectionSection.height-19)
+                Flickable {
+                    id: collectionScroll
+                    width: parent.width
+                    height: parent.height
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 contentWidth: width
                 contentHeight: collectionRows.implicitHeight
                 Column {
                     id: collectionRows
-                    width: collectionScroll.width
+                    width: Math.max(0,collectionScroll.width-24)
                     spacing: 3
                     Repeater {
                         id: collectionGroupRepeater
@@ -399,13 +410,28 @@ Item {
                         }
                     }
                 }
+                }
+                NeonScrollBar {
+                    id: collectionScrollTrack
+                    flickable: collectionScroll
+                    mountingParent: collectionViewportHost
+                    geometryHost: collectionScroll
+                    handleStyle: "bar"
+                    maximumBarHandleHeight: 42
+                    visible: pane.area==="overview" && scrollable
+                }
             }
         }
 
-        Flickable {
-            id: dossierScroll
+        // Index list owns an independent wrapped scroll area.
+        Item {
+            id: dossierViewportHost
             width: parent.width
             height: Math.max(0,overview.height-75-collectionSection.height-5)
+            Flickable {
+                id: dossierScroll
+            width: parent.width
+            height: parent.height
             clip: true
             contentWidth: width
             contentHeight: dossierRows.implicitHeight
@@ -413,7 +439,7 @@ Item {
 
             Column {
                 id: dossierRows
-                width: dossierScroll.width
+                width: Math.max(0,dossierScroll.width-24)
                 spacing: 5
                 Repeater {
                     id: dossierGroupRepeater
@@ -542,6 +568,16 @@ Item {
                     wrapMode: Text.WordWrap
                     font.pixelSize: 10
                 }
+            }
+            }
+            NeonScrollBar {
+                id: dossierScrollTrack
+                flickable: dossierScroll
+                mountingParent: dossierViewportHost
+                geometryHost: dossierScroll
+                handleStyle: "bar"
+                maximumBarHandleHeight: 42
+                visible: pane.area==="overview" && scrollable
             }
         }
     }
@@ -852,10 +888,14 @@ Item {
             font.pixelSize: 11
         }
 
-        Flickable {
-            id: listScroll
+        Item {
+            id: listViewportHost
             width: parent.width
             height: Math.max(0,selector.height-categoryFilterFlow.height-favoritesSearchBar.height-129)
+            Flickable {
+                id: listScroll
+                width: parent.width
+                height: parent.height
             clip: true
             contentWidth: width
             contentHeight: listRows.implicitHeight
@@ -863,7 +903,7 @@ Item {
 
             Column {
                 id: listRows
-                width: listScroll.width
+                width: Math.max(0,listScroll.width-24)
                 spacing: 5
                 Repeater {
                     id: savedItemRows
@@ -1012,6 +1052,16 @@ Item {
                     wrapMode: Text.WordWrap
                     font.pixelSize: 10
                 }
+            }
+            }
+            NeonScrollBar {
+                id: listScrollTrack
+                flickable: listScroll
+                mountingParent: listViewportHost
+                geometryHost: listScroll
+                handleStyle: "bar"
+                maximumBarHandleHeight: 42
+                visible: pane.area==="selector" && scrollable
             }
         }
         // Secondary source/menu filters remain pinned below the scrollable

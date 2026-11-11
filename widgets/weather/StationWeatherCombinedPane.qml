@@ -532,12 +532,14 @@ Rectangle {
                             }
                             Column {
                                 width: Math.max(1,parent.width-49)
-                                height: parent.height
+                                height: Math.min(parent.height,34)
+                                anchors.verticalCenter: parent.verticalCenter
                                 spacing: 1
                                 GohuText {
                                     width: parent.width
                                     height: 10
                                     font.pixelSize: 9
+                                    horizontalAlignment: Text.AlignHCenter
                                     elide: Text.ElideRight
                                     text: String(dayCell.entry.date||"--").slice(5)
                                           +"  "+panel.reading(dayCell.entry.maxTempF,"°")
@@ -548,6 +550,7 @@ Rectangle {
                                     width: parent.width
                                     height: 9
                                     font.pixelSize: 7
+                                    horizontalAlignment: Text.AlignHCenter
                                     elide: Text.ElideRight
                                     text: "SUN "+String(dayCell.entry.sunrise||"--")
                                           +" → "+String(dayCell.entry.sunset||"--")
@@ -560,6 +563,7 @@ Rectangle {
                                         width: Math.min(44,parent.width*0.42)
                                         height: parent.height
                                         font.pixelSize: 8
+                                        horizontalAlignment: Text.AlignHCenter
                                         text: panel.rainLabel(dayCell.entry.chanceRain)
                                         color: Colors.cyan
                                         elide: Text.ElideRight

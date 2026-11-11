@@ -193,7 +193,7 @@ Rectangle {
                         // W21 fit correction // The painted symbol should
                         // dominate NOW without escaping its shorter band.
                         font.pixelSize: Math.min(185,Math.max(91,
-                                         currentPanel.height * 1.33))
+                                         currentPanel.height * 1.22))
                         color: terminal.sky
                                ? terminal.sky.iconColor(terminal.sky.conditionState.color)
                                : Colors.orange

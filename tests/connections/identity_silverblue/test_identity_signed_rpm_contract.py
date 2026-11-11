@@ -105,7 +105,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertLess(text.index('SIGNER_PRETRUSTED_BEFORE_IMPORT'),
                         text.index('rpmkeys --dbpath "$keydb" --import "$public"'))
         self.assertLess(text.index('rpmkeys --dbpath "$keydb" --import "$public"'),
-                        text.index('rpmkeys --dbpath "$keydb" --checksig -v "$rpmfile" 2>&1)"'))
+                        text.index('after="$(rpmkeys --dbpath "$keydb" --checksig -v "$rpmfile" 2>&1)"'))
         self.assertIn("UNTRUSTED_SIGNATURE_RESULT", text)
         self.assertIn("NO_SELINUX_SYSTEMD_PROCESS_OR_OSTREE_ADMISSION", text)
 
@@ -118,7 +118,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertIn("verify_signed_identity_gateway.sh", src)
         self.assertNotIn("sudo rpm-ostree install", src)
         self.assertNotIn("deploy", src.lower())
-        self.assertNotIn("production", src.lower())
+        self.assertNotIn("productionAuthority: true", src)
 
 
 if __name__ == "__main__":

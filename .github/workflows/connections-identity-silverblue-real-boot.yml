@@ -113,6 +113,13 @@ jobs:
           test "$GITHUB_ACTOR" = kudokudo1
           test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm ||
             { echo "C4B_ID_BLOCKED // HOST_KVM_NOT_AVAILABLE_FOR_CONTAINER"; exit 2; }
+          # Capture the VM's already-visible stdout/stderr only on this
+          # disposable runner; publish a *bounded, prefix-filtered* excerpt
+          # rather than exposing the complete build/VM transcript as an artifact.
+          vm_raw="$RUNNER_TEMP/c4b-identity-vm-full-ci.log"
+          vm_evidence="$RUNNER_TEMP/c4b-identity-vm-guest-markers.log"
+          : >"$vm_evidence"
+          set +e
           timeout --signal=TERM --kill-after=20s 4200s \
             docker run --rm \
               --device=/dev/kvm \
@@ -144,7 +151,23 @@ jobs:
                 echo "C4B_ID_PASS // FEDORA44_SIGNED_QEMU_TOOLING_READY"
                 /usr/bin/bash /src/tests/connections/identity_silverblue/run_official_silverblue_identity.sh \
                   /evidence/rpm /evidence/crypto /evidence/selinux
-              '
+              ' 2>&1 | tee "$vm_raw"
+          vm_rc="${PIPESTATUS[0]}"
+          set -e
+          if [[ -s "$vm_raw" ]]; then
+            LC_ALL=C grep -aE 'C4B_ID_(PASS|FAIL|BLOCKED|STAGE|SELINUX_[A-Z_]+|SERVICE_[A-Z_]+)' "$vm_raw" |
+              tail -n 180 >"$vm_evidence" || true
+          fi
+          printf 'C4B_ID_VM_PROCESS_EXIT // %s\n' "$vm_rc" >>"$vm_evidence"
+          exit "$vm_rc"
+      - name: Preserve bounded real-guest C4b marker evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: c4b-identity-silverblue-guest-markers
+          path: ${{ runner.temp }}/c4b-identity-vm-guest-markers.log
+          if-no-files-found: warn
+          retention-days: 1
       - name: Confirm test did not activate sign-in or production authority
         shell: bash
         run: |

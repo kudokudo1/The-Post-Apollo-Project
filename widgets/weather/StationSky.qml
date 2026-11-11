@@ -20,6 +20,7 @@ Rectangle {
     property string weatherFocus: ""
     readonly property real focusedContentHeight:
         skyContent.y + skyContent.implicitHeight + 12
+    readonly property alias visualScroll: skyScroll
     // M30-A overview consumes the existing SKY observation service without
     // rendering a second complete scroll surface. CLASSIC defaults unchanged.
     property bool sourceOnly: false

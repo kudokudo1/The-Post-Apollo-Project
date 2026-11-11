@@ -10,6 +10,7 @@ import "UniversalAutoscrollPolicy.js" as Auto
 Scope {
     id: settings
 
+    property bool modePage: false
     property string stagedMode: "off" // off, lock, auto
     property string hostStatus: "unchecked"
     property string hostError: ""
@@ -38,6 +39,18 @@ Scope {
         for (let i=0;i<devices.length;i++)
             if (devices[i].identifier === identifier) return devices[i];
         return null;
+    }
+    function openModePage() {
+        if (busy) return false;
+        modePage = true;
+        inspect();
+        return true;
+    }
+    function closeModePage() {
+        if (busy) return false;
+        modePage = false;
+        pendingAction = "";
+        return true;
     }
     function chooseDevice(id) {
         if (busy || !findDevice(id)) return false;

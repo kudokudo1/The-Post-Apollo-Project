@@ -112,6 +112,9 @@ Rectangle {
     // W18 // Expand the three original WEATHER bands into reclaimed space.
     // At compact 164px the original artwork/positions remain unchanged.
     readonly property real expansion: Math.max(0, height - 164)
+    // W20 // Hold NOW and three-day bands at their W19 tall-view sizes;
+    // spend any newly available Overview height on the six-hour forecast.
+    readonly property real anchoredExpansion: Math.min(160, expansion)
     height: 164
     color: Colors.dark
     // Parent StationWeatherTerminalSummary already draws the outer frame.
@@ -152,7 +155,7 @@ Rectangle {
             id: nowBand
             objectName: "weather-w17-current-instrument"
             width: parent.width
-            height: 52 + panel.expansion * 0.50
+            height: 52 + panel.anchoredExpansion * 0.50
             Rectangle {
                 width: 3
                 height: parent.height-2
@@ -346,7 +349,7 @@ Rectangle {
             id: hourStrip
             objectName: "weather-w17-six-hour-timeline"
             width: parent.width
-            height: 45 + panel.expansion * 0.33
+            height: 45 + panel.expansion - panel.anchoredExpansion * 0.67
             spacing: 1
             Repeater {
                 id: hourRepeater
@@ -481,7 +484,7 @@ Rectangle {
             id: dayStrip
             objectName: "weather-w17-three-day-strip"
             width: parent.width
-            height: 24 + panel.expansion * 0.17
+            height: 24 + panel.anchoredExpansion * 0.17
             spacing: 3
             Repeater {
                 id: dayRepeater

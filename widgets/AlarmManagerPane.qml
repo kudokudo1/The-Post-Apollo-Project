@@ -253,12 +253,20 @@ Item {
         return true;
     }
     function openFilePicker() {
+        // A lazy Loader can be active while its Item is still loading.
+        // That is not a missing file chooser and must not show ERROR.
+        if (soundImportLoader.status === Loader.Error) {
+            SoundLibraryService.feedback = "FILE PICKER UNAVAILABLE";
+            return;
+        }
         if (!soundImportLoader.active) {
+            SoundLibraryService.feedback = "FILE PICKER LOADING";
             soundImportLoader.active = true;
         } else if (soundImportLoader.item) {
+            SoundLibraryService.feedback = "FILE PICKER OPEN // SELECT WAV/MP3";
             soundImportLoader.item.openChooser();
         } else {
-            SoundLibraryService.feedback = "FILE PICKER UNAVAILABLE";
+            SoundLibraryService.feedback = "FILE PICKER LOADING";
         }
     }
     function openLibrary() {
@@ -368,10 +376,15 @@ Item {
                 SoundLibraryService.importAudio(
                     url, pane.importNameFromUrl(url));
             });
+            item.cancelled.connect(function() {
+                if (!SoundLibraryService.busy)
+                    SoundLibraryService.feedback = "IMPORT CANCELLED";
+            });
+            SoundLibraryService.feedback = "FILE PICKER OPEN // SELECT WAV/MP3";
             item.openChooser();
         }
         onStatusChanged: {
-            if (status === Loader.Error)
+            if (status === Loader.Error && active)
                 SoundLibraryService.feedback = "FILE PICKER UNAVAILABLE";
         }
     }

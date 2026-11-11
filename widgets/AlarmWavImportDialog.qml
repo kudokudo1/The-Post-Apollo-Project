@@ -6,6 +6,7 @@ import QtQuick.Dialogs
 Item {
     id: pickerHost
     signal fileSelected(string fileUrl)
+    signal cancelled()
     function openChooser() { wavPicker.open(); }
     FileDialog {
         id: wavPicker
@@ -13,5 +14,6 @@ Item {
         fileMode: FileDialog.OpenFile
         nameFilters: ["Sound files (*.wav *.mp3)", "WAV audio (*.wav)", "MP3 audio (*.mp3)"]
         onAccepted: pickerHost.fileSelected(selectedFile.toString())
+        onRejected: pickerHost.cancelled()
     }
 }

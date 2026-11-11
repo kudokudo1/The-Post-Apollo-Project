@@ -87,6 +87,37 @@ class SoundLibraryHostTests(unittest.TestCase):
         self.assertEqual(removed["tones"], [])
         self.assertFalse(target.exists())
 
+    def test_standard_44100_stereo_25_second_alarm_import(self):
+        # A common downloaded sound-effect format: 16-bit stereo 44.1kHz.
+        # Previously it failed with UNSUPPORTED_WAV_PCM, even though the
+        # 25-second, ~4.4 MB file is well inside the audio-size limit.
+        sample = self.base / "mixkit-retro-game-emergency-alarm-1000.wav"
+        make_wav(sample, duration=25, rate=44100, channels=2)
+        before = sample.read_bytes()
+        self.assertGreater(len(before), 4_000_000)
+        self.assertLess(len(before), 8 * 1024 * 1024)
+        result = run_host(self.base, "import",
+                          source=sample.as_uri(),
+                          name="mixkit-retro-game-emergency-alarm")
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["status"], "imported")
+        self.assertEqual(len(result["tones"]), 1)
+        tone = result["tones"][0]
+        self.assertEqual(tone["seconds"], 25.0)
+        managed = Path(tone["url"].removeprefix("file://"))
+        self.assertEqual(managed.read_bytes(), before)
+        with wave.open(str(managed), "rb") as w:
+            self.assertEqual(w.getframerate(), 44100)
+            self.assertEqual(w.getnchannels(), 2)
+            self.assertEqual(w.getsampwidth(), 2)
+            self.assertEqual(w.getnframes(), 25 * 44100)
+        self.assertEqual(sample.read_bytes(), before)
+        duplicate = run_host(self.base, "import",
+                             source=sample.as_uri(), name="Second name")
+        self.assertTrue(duplicate["ok"], duplicate)
+        self.assertEqual(duplicate["status"], "already-imported")
+        self.assertEqual(len(run_host(self.base, "list")["tones"]), 1)
+
     def test_reject_non_wav_symlink_wrong_format_and_bad_uri(self):
         for uri in ["https://example.com/steal.wav", "file://remote/share.wav",
                     "file:///tmp/sound.mp3", "data:audio/wav;base64,AAAA"]:
@@ -133,6 +164,15 @@ class SoundLibraryHostTests(unittest.TestCase):
         self.assertIn("active: false", UI)
         self.assertIn('source: "AlarmWavImportDialog.qml"', UI)
         self.assertIn('onLeftClicked: pane.openFilePicker()', UI)
+        self.assertIn('FILE PICKER LOADING', UI)
+        self.assertIn('FILE PICKER OPEN // SELECT WAV/MP3', UI)
+        self.assertIn('status === Loader.Error && active', UI)
+        self.assertIn('item.cancelled.connect(', UI)
+        self.assertIn('onRejected: pickerHost.cancelled()', PICKER)
+        self.assertIn('SOUND LIBRARY // BUSY // RETRY', SERVICE)
+        self.assertIn('SOUND LIBRARY // INVALID TONE NAME', SERVICE)
+        self.assertIn('ALLOWED_RATES = (24000, 44100, 48000)',
+                      HOST.read_text())
         self.assertIn('import QtQuick.Dialogs', PICKER)
         self.assertIn('Sound files (*.wav *.mp3)', PICKER)
         self.assertIn('MP3 audio (*.mp3)', PICKER)

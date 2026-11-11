@@ -33,8 +33,14 @@ Scope {
         return match ? match.name : "";
     }
     function start(operation, extra) {
-        if (busy || ["list","import","rename","delete"].indexOf(operation) < 0)
+        if (busy) {
+            feedback = "SOUND LIBRARY // BUSY // RETRY";
             return false;
+        }
+        if (["list","import","rename","delete"].indexOf(operation) < 0) {
+            feedback = "SOUND LIBRARY // INVALID OPERATION";
+            return false;
+        }
         busy = true;
         feedback = operation.toUpperCase() + " // WORKING";
         selectedImportedId = "";
@@ -57,8 +63,10 @@ Scope {
             feedback = "SOUND LIBRARY // CHOOSE WAV OR MP3";
             return false;
         }
-        if (!validName(displayName))
+        if (!validName(displayName)) {
+            feedback = "SOUND LIBRARY // INVALID TONE NAME";
             return false;
+        }
         return start("import", {source: url, name: displayName});
     }
     // Preserve older call sites; WAV and MP3 now share one safe import lane.

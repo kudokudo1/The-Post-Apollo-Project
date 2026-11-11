@@ -35,6 +35,9 @@ from scripts.trash.archive_v2_origin_checkpoint import (
     FixtureOriginError, measure_fixture_origin,
     verify_fixture_checkpoint,
 )
+from scripts.trash.archive_v2_systemd_manager_fixture import (
+    ManagerOriginError, SyntheticPidfdManager, inspect_fixture_manager_origin,
+)
 from scripts.trash.archive_v2_owner_trust import OwnerTrustError
 from scripts.trash.archive_v2_peer_evidence import BrokerPeerError
 from scripts.trash.archive_v2_signed_capture import SignedCaptureError
@@ -168,6 +171,9 @@ def _safe_reply(result):
             "serviceReleaseSha256":result["serviceReleaseSha256"],
             "originWitnessSha256":result["originWitnessSha256"],
             "checkpointSha256":result["checkpointSha256"],
+            "managerWitnessSha256":result["managerWitnessSha256"],
+            "managerFixtureMatchedBeforeCommit":
+                bool(result["managerWitnessSha256"]),
             "cgroupObservedBeforeCommit":bool(result["originWitnessSha256"]),
             "externalCheckpointChecked":bool(result["checkpointSha256"]),
             "systemdUnitVerified":False,
@@ -187,7 +193,8 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
                               signed_service_release=None,
                               service_release_history=None,
                               origin_policy=None,
-                              signed_checkpoint=None, checkpoint_root=None):
+                              signed_checkpoint=None, checkpoint_root=None,
+                              manager_fixture=None, manager_policy=None):
     """Handle ONE framed request and reply; no loop, listener or live keys.
 
     A successful result admits a TEST ledger copy only. All failures produce
@@ -216,6 +223,12 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
                 origin_digest = origin_evidence["originWitnessSha256"]
             else:
                 origin_digest = ""
+            _require((manager_fixture is None and manager_policy is None)
+                     or (type(manager_fixture) is SyntheticPidfdManager
+                         and type(manager_policy) is dict
+                         and origin_policy is not None
+                         and service_files is not None),
+                     "MANAGER_FIXTURE_COMPONENTS_REQUIRED")
             _require((signed_checkpoint is None and checkpoint_root is None)
                      or (signed_checkpoint is not None
                          and checkpoint_root is not None
@@ -273,6 +286,16 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
                 checkpoint_digest = ""
             with pin_fixture_peer(connection, witness) as lifetime:
                 lifetime.require_alive()
+                if manager_fixture is not None:
+                    manager_evidence = inspect_fixture_manager_origin(
+                        lifetime, manager_fixture, manager_policy,
+                        service_files=service_files,
+                        origin_policy=origin_policy,
+                        origin_witness_sha256=origin_digest,
+                        expected_owner=packet["ownerId"])
+                    manager_digest = manager_evidence["managerWitnessSha256"]
+                else:
+                    manager_digest = ""
                 def before_fixture_commit():
                     lifetime.require_alive()
                     if service_files is not None:
@@ -297,6 +320,15 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
                             grant_sha256=grant_digest, now_ms=now_ms)
                         _require(checked_release["releaseSha256"] == release_digest,
                                  "BROKER_RELEASE_CHANGED")
+                    if manager_fixture is not None:
+                        latest_manager = inspect_fixture_manager_origin(
+                            lifetime, manager_fixture, manager_policy,
+                            service_files=service_files,
+                            origin_policy=origin_policy,
+                            origin_witness_sha256=origin_digest,
+                            expected_owner=packet["ownerId"])
+                        _require(latest_manager["managerWitnessSha256"]
+                                 == manager_digest, "BROKER_MANAGER_CHANGED")
                     if signed_checkpoint is not None:
                         latest_checkpoint = verify_fixture_checkpoint(
                             signed_checkpoint, checkpoint_root,
@@ -322,7 +354,8 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
                     service_grant_sha256=grant_digest,
                     service_release_sha256=release_digest,
                     origin_witness_sha256=origin_digest,
-                    checkpoint_sha256=checkpoint_digest)
+                    checkpoint_sha256=checkpoint_digest,
+                    manager_witness_sha256=manager_digest)
             _require(admitted["captureAllowed"] is False
                      and admitted["productionAllowed"] is False
                      and admitted["sourceProcessVerified"] is False,
@@ -330,7 +363,8 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
             result = _safe_reply(admitted)
         except (FixtureWireError, BrokerHandoffError, BrokerPeerError,
                 PeerLeaseError, ServiceFixtureError, ServiceGrantError,
-                ServiceReleaseError, FixtureOriginError, SignedCaptureError,
+                ServiceReleaseError, FixtureOriginError, ManagerOriginError,
+                SignedCaptureError,
                 OwnerTrustError,
                 TrustHistoryError, AtomicAdmissionError) as exc:
             code = str(exc)

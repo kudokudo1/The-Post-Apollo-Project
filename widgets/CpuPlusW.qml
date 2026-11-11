@@ -1843,10 +1843,11 @@ PanelWindow {
             visible: !(cpuPlusWindow.selectedModeIndex === 6
                        && (cpuPlusWindow.settingsSubMode === "TIME"
                            || cpuPlusWindow.settingsSubMode === "CONNECTIONS"
-                           || cpuPlusWindow.settingsSubMode === "LOCATION"
-                           || cpuPlusWindow.settingsInputPreviewSelected))
+                           || cpuPlusWindow.settingsSubMode === "LOCATION"))
                      && cpuPlusWindow.selectedModeIndex !== 5
                      && cpuPlusWindow.selectedModeIndex !== 4
+                     && !(cpuPlusWindow.selectedModeIndex === 6
+                          && cpuPlusWindow.settingsInputPreviewSelected)
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom

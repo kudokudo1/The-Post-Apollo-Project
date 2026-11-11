@@ -270,10 +270,12 @@ Scope {
     }
 
     function refresh() {
-        refreshPxRuntime();
-
+        // An in-flight refresh already owns the snapshot. Avoid launching
+        // another installed-PX probe while it is still gathering data.
         if (refreshing)
             return;
+
+        refreshPxRuntime();
 
         if (!repoSlug) {
             available = false;

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "GitHubToolboxBatch.js" as GitHubBatch
 
 Scope {
     id: root
@@ -477,9 +478,7 @@ Scope {
         refreshStdoutText = "";
         refreshStderrText = "";
 
-        const args = [
-            "bash",
-            "-lc",
+        const args = GitHubBatch.wrap(
             [
                 'limit="$1"',
                 'shift',
@@ -544,7 +543,7 @@ Scope {
                 'jq -nc --arg viewerLogin "$viewer" --argjson pullRequests "$pulls" --argjson repositories "$repos" \'{viewerLogin:$viewerLogin,pullRequests:$pullRequests,repositories:$repositories}\''
             ].join("\n"),
             "pa-github-attention",
-            String(
+            [String(
                 Math.max(
                     1,
                     Math.min(
@@ -552,8 +551,8 @@ Scope {
                         Number(maxPullRequestsPerRepository || 50)
                     )
                 )
-            )
-        ];
+            )]
+        );
 
         for (let i = 0; i < targets.length; ++i)
             args.push(targets[i]);

@@ -1,0 +1,28 @@
+name: TimeW MACHINE protected destination readiness
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineBraveProtectedDestinationReadiness.py"
+      - "tests/timew/test_machine_protected_destination_readiness.py"
+      - "docs/timew-machine-protected-destination-readiness.md"
+      - ".github/workflows/timew-machine-protected-destination-readiness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Kernel distinct-UID target isolation and strict read-only metadata observation
+        run: sudo -n python3 -B -I tests/timew/test_machine_protected_destination_readiness.py
+      - name: Preserve source private vault and deny-only broker regressions on main
+        run: |
+          python3 -B -I tests/timew/test_machine_brave_sealed_vault.py
+          python3 -B -I tests/timew/test_machine_brave_offline_archive_manager.py
+          python3 -B -I tests/timew/test_machine_brave_archive_admission_intent.py
+          python3 -B -I tests/timew/test_machine_brave_absolute_frame_deadline.py

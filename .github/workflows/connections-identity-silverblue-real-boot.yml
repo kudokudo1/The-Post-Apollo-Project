@@ -42,6 +42,7 @@ jobs:
           bash -n tests/connections/identity_silverblue/run_official_silverblue_identity.sh
           bash -n tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh
           python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
+          python3 -B tests/connections/identity_silverblue/test_identity_booted_rpm_mtime_only.py
       - name: Build the exact existing Identity gateway RPM on disposable Fedora 44
         shell: bash
         run: |

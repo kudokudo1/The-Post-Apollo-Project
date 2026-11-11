@@ -45,7 +45,8 @@ case "$phase" in
     (
       cd "$data"
       sha256sum --check --status identity-artifact-manifest.sha256 &&
-      sha256sum --check --status identity-fedora44-runtime-manifest.sha256
+      sha256sum --check --status identity-fedora44-runtime-manifest.sha256 &&
+      sha256sum --check --status postapollo_identity_ci.sha256
     ) || fail "OFFLINE_ARTIFACT_SHA_REFUSED"
     rpmfile="$data/identity-silverblue-ci.rpm"
     [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$rpmfile")" == "$pkg 0.1 noarch" ]] ||
@@ -110,6 +111,13 @@ case "$phase" in
       install -m 0600 "$candidate" "$store/$filename"
     done
     echo "C4B_ID_PASS // SIGNED_OFFLINE_FEDORA44_ED25519_DEPENDENCY_VERIFIED"
+    [[ -f "$data/postapollo_identity_ci.pp" &&
+       ! -L "$data/postapollo_identity_ci.pp" ]] ||
+      fail "SELINUX_OFFLINE_COMPILED_POLICY_MISSING"
+    install -m 0600 "$data/postapollo_identity_ci.pp" "$store/postapollo_identity_ci.pp"
+    [[ -s "$store/postapollo_identity_ci.pp" ]] ||
+      fail "SELINUX_OFFLINE_COMPILED_POLICY_EMPTY"
+    echo "C4B_ID_PASS // OFFLINE_TEST_SELINUX_MODULE_HASH_BOUND_BEFORE_LAYER"
     install -m 0600 "$rpmfile" "$store/identity-silverblue-ci.rpm"
     install -m 0600 "$data/identity-artifact-manifest.sha256" "$store/seed-manifest"
     echo "C4B_ID_PASS // SIGNED_IDENTITY_RPM_VERIFIED_OFFLINE_BEFORE_LAYER"
@@ -345,6 +353,12 @@ ID_MONITOR
     if getent passwd postapollo-identity-ci >/dev/null; then
       fail "POSTROLLBACK_DISPOSABLE_TEST_USER_LEFTOVER"
     fi
+    if command -v semodule >/dev/null 2>&1 &&
+       semodule -l | grep -Eq '^postapollo_identity_ci([[:space:]]|$)'; then
+      fail "POSTROLLBACK_TEST_SELINUX_MODULE_REMAINS"
+    fi
+    [[ ! -d /run/systemd/system/post-apollo-identity-silverblue-ci.service.d ]] ||
+      fail "POSTROLLBACK_SELINUX_UNIT_OVERRIDE_LEFTOVER"
     # Remove separately staged test keyring, local RPM and repo modifications.
     for original in "$store"/original-repos/*.repo; do
       [[ -f "$original" ]] || continue

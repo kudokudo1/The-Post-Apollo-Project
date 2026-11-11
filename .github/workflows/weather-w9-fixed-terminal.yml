@@ -19,6 +19,7 @@ on:
       - 'tests/weather/test_weather_w15_original_icons_fixed_overview.js'
       - 'tests/weather/test_weather_w16_one_page_icons.js'
       - 'tests/weather/test_weather_w17_overview_mirror.js'
+      - 'tests/weather/test_weather_w18_space_allocation.js'
       - 'tests/weather/test_weather_w10_three_band_solar.js'
       - 'widgets/weather/StationSky.qml'
       - 'tests/weather/test_weather_w9_fixed_paged_terminal.js'
@@ -52,6 +53,7 @@ jobs:
           node --test tests/weather/test_weather_w15_original_icons_fixed_overview.js
           node --test tests/weather/test_weather_w16_one_page_icons.js
           node --test tests/weather/test_weather_w17_overview_mirror.js
+          node --test tests/weather/test_weather_w18_space_allocation.js
           node --test tests/weather/test_weather_w8_unified_terminal.js
           node --test tests/weather/test_weather_subject_panels_m2a.js
           node --test tests/weather/test_weather_subject_panels_m2b.js
@@ -151,5 +153,6 @@ jobs:
           path: |
             /tmp/weather-w17-overview-compact.png
             /tmp/weather-w17-overview-wide.png
+            /tmp/weather-w18-overview-tall.png
           if-no-files-found: warn
           retention-days: 14

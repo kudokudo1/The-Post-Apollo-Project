@@ -49,7 +49,7 @@ Rectangle {
 
         GohuText {
             text: card.title
-            font.pixelSize: card.overviewDense ? 8 + Math.min(2,Math.floor(card.overviewExtra / 16)) : (card.compact ? 9 : 10)
+            font.pixelSize: card.overviewDense ? (card.height<50 ? 7 : 8 + Math.min(2,Math.floor(card.overviewExtra / 16))) : (card.compact ? 9 : 10)
             color: card.accentColor
             width: parent.width - (card.pinEnabled ? 32 : 0)
             elide: Text.ElideRight
@@ -57,7 +57,7 @@ Rectangle {
 
         GohuText {
             text: card.valueText
-            font.pixelSize: card.overviewDense ? 13 + Math.min(5,Math.floor(card.overviewExtra / 6)) : (card.compact ? 15 : 20)
+            font.pixelSize: card.overviewDense ? (card.height<50 ? 9 : 13 + Math.min(5,Math.floor(card.overviewExtra / 6))) : (card.compact ? 15 : 20)
             color: card.valueColor
             elide: Text.ElideRight
             width: parent.width
@@ -65,7 +65,7 @@ Rectangle {
 
         QuietText {
             text: card.detailText
-            font.pixelSize: card.overviewDense ? 7 + Math.min(2,Math.floor(card.overviewExtra / 12)) : (card.compact ? 8 : 10)
+            font.pixelSize: card.overviewDense ? (card.height<50 ? 6 : 7 + Math.min(2,Math.floor(card.overviewExtra / 12))) : (card.compact ? 8 : 10)
             elide: Text.ElideRight
             width: parent.width
             visible: text.length > 0
@@ -92,7 +92,7 @@ Rectangle {
 
         QuietText {
             text: card.footerText
-            font.pixelSize: card.overviewDense ? 7 + Math.min(2,Math.floor(card.overviewExtra / 12)) : (card.compact ? 8 : 9)
+            font.pixelSize: card.overviewDense ? (card.height<50 ? 6 : 7 + Math.min(2,Math.floor(card.overviewExtra / 12))) : (card.compact ? 8 : 9)
             elide: Text.ElideRight
             width: parent.width
             visible: text.length > 0

@@ -8,6 +8,7 @@ on:
       - "integrations/machine/brave-topology/**"
       - "tests/timew/test_machine_brave_save_native_trial.py"
       - "tests/timew/test_machine_brave_session_seal.mjs"
+      - "tests/timew/test_machine_brave_sealed_native_e2e.mjs"
       - "tests/timew/test_machine_brave_save_review_ui.mjs"
       - "docs/timew-machine-brave-sealed-capture.md"
       - ".github/workflows/timew-machine-brave-sealed-capture.yml"
@@ -28,6 +29,8 @@ jobs:
         run: node tests/timew/test_machine_brave_save_review_ui.mjs
       - name: Framed disposable-only native host and registration/rollback
         run: python3 -B -I tests/timew/test_machine_brave_save_native_trial.py
+      - name: End-to-end synthetic WebCrypto-to-framed-host-to-vault-to-authenticated-decrypt
+        run: node tests/timew/test_machine_brave_sealed_native_e2e.mjs
       - name: Preserve sealed vault, optional permission and title-marker contracts
         run: |
           python3 -B -I tests/timew/test_machine_brave_sealed_vault.py

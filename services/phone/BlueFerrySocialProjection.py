@@ -214,6 +214,11 @@ def normalize_legacy_contact_page(payload: object, *, profile_id: str,
             "id": f"legacy-row-{i}", "name": name, "organization": "",
             "primary": primary, "phone_count": len(checked_phones),
             "email_count": len(checked_emails), "has_photo": False,
+            # ListContacts(uu) already returned these arrays under the
+            # same contacts.read authorization. 0.9.1 has NO labels.
+            # Keep values tied to the fresh ephemeral read epoch only.
+            "phone_numbers": checked_phones,
+            "email_addresses": checked_emails,
         })
     # The legacy ListContacts endpoint has no total and no paging metadata.
     # Treat this page's count as a *returned record count*, not the full
@@ -266,6 +271,33 @@ def normalize_contact_page(payload: object, *, profile_id: str,
         has_photo = raw.get("has_photo")
         if type(has_photo) is not bool:
             raise _error()
+        # Modern ListContactCards currently exposes only counts and primary.
+        # Do not invent addresses, labels or provider lookups for that mode.
+        # Legacy ListContacts exposes both validated arrays in this very
+        # same authorized, one-shot snapshot. Either both are present or
+        # neither; their lengths must agree with the reported counts.
+        contains_numbers = "phone_numbers" in raw
+        contains_emails = "email_addresses" in raw
+        if contains_numbers != contains_emails:
+            raise _error()
+        addresses_available = contains_numbers
+        phone_numbers: list[str] = []
+        email_addresses: list[str] = []
+        if addresses_available:
+            values = raw["phone_numbers"]
+            mails = raw["email_addresses"]
+            if (type(values) is not list or type(mails) is not list
+                    or len(values) > 64 or len(mails) > 64
+                    or len(values) != phones or len(mails) != emails):
+                raise _error()
+            phone_numbers = [_text(item, MAX_SENDER) for item in values]
+            email_addresses = [_text(item, MAX_SENDER) for item in mails]
+            # A zero-address card has no primary; otherwise that field is
+            # exactly the first phone, or the first email if no phones.
+            expected = (phone_numbers[0] if phone_numbers else
+                        email_addresses[0] if email_addresses else "")
+            if primary != expected:
+                raise _error()
         cards.append({
             # No assumption of a globally stable contact ID. The caller must
             # supply a fresh daemon epoch obtained with the same bus owner.
@@ -279,6 +311,11 @@ def normalize_contact_page(payload: object, *, profile_id: str,
             "phoneCount": phones,
             "emailCount": emails,
             "hasPhoto": has_photo,
+            "hasAddressDetails": addresses_available,
+            # Strings from the provider, NOT stable contact identifiers or
+            # routing authority. No labels are inferred for legacy records.
+            "phoneNumbers": phone_numbers,
+            "emailAddresses": email_addresses,
         })
     if offset + len(cards) > total:
         raise _error()

@@ -66,35 +66,35 @@ def _as_uid(uid):
 
 def _run_server(sockpath,archive,mode):
     assert os.geteuid()==SERVICE_UID
-    assert mode in ("deny","synthetic")
+    assert mode=="deny"
     path=Path(sockpath)
     connection=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
     connection.bind(str(path))
-    os.chmod(path,0o666) # CI only, no production listener or unit
+    os.chmod(path,0o666)  # disposable CI only
     connection.listen(1)
     print("READY",flush=True)
     try:
         peer_socket,_=connection.accept()
         with peer_socket:
-            if mode=="deny":
-                result=broker.handle_once(
-                    peer_socket,protected_root=Path(archive))
-            else:
-                # Synthetic trust fixture, NOT a C3e process witness or
-                # C5 user-consent receipt. Enforce a known kernel UID.
-                def fixture_auth(peer,request,sha256):
-                    return (peer.uid==BROWSER_UID and peer.gid==BROWSER_UID
-                            and peer.pid>1 and len(sha256)==64 and
-                            request["kind"]==broker.REQUEST_KIND)
-                result=broker.handle_once(
-                    peer_socket,protected_root=Path(archive),
-                    test_only_grant=fixture_auth)
+            result=broker.handle_once(peer_socket,protected_root=Path(archive))
         print(json.dumps({"fixture_request_succeeded":result}),flush=True)
     finally:
         connection.close()
         path.unlink(missing_ok=True)
     return 0
 
+
+def _run_metadata(archive,payload):
+    """Direct source-reader CI fixture under service UID, NOT socket auth."""
+    assert os.geteuid()==SERVICE_UID
+    try:
+        request=broker.parse_request(json.dumps(json.loads(payload),separators=(",",":")).encode())
+        result=broker.metadata_from_protected_root(Path(archive),request)
+        print(json.dumps(result,sort_keys=True),flush=True)
+        return 0
+    except (broker.BrokerRefusal,vault.VaultError,OSError,ValueError):
+        print('{"status":"refused"}',flush=True)
+        return 1
 
 def _run_client(sockpath,payload):
     assert os.geteuid() in (BROWSER_UID,FOREIGN_UID)
@@ -217,7 +217,8 @@ def main():
     TEST_SCRIPT_PATH=fixture_tests/original.name
     shutil.copyfile(original,TEST_SCRIPT_PATH)
     for name in ("MachineBraveProtectedMetadataContract.py",
-                 "MachineBraveSealedVault.py"):
+                 "MachineBraveSealedVault.py",
+                 "MachineBraveArchiveAdmissionIntent.py"):
         shutil.copyfile(ROOT/"services"/"time"/name,fixture_modules/name)
     for path in (TEST_SCRIPT_PATH,*fixture_modules.iterdir()):
         path.chmod(0o644)
@@ -251,58 +252,54 @@ def main():
             {**INSPECT_REQ,"action":"DELETE"},
             {**LIST_REQ,"challenge":"wrong"},
         ]:
-            response=_ask_server(test_root,archive,"synthetic",payload)
+            response=_ask_server(test_root,archive,"deny",payload)
             assert response==broker.REFUSED
         # Correctly formatted foreign UID still cannot receive metadata
         # through the test-only simulated authorizer.
-        wrong_uid=_ask_server(test_root,archive,"synthetic",LIST_REQ,
+        wrong_uid=_ask_server(test_root,archive,"deny",LIST_REQ,
                               uid=FOREIGN_UID)
         assert wrong_uid==broker.REFUSED
 
-        # Positive CI fixture explicitly does NOT claim real client
-        # provenance or human consent. It exercises bounded metadata only.
-        listed=_ask_server(test_root,archive,"synthetic",LIST_REQ)
-        assert listed["status"]=="test_only_metadata_listed"
-        assert listed["challenge"]==LIST_REQ["challenge"]
-        assert listed["record_count"]==1
-        assert listed["client_authenticated"] is False
-        assert listed["operator_consent_verified"] is False
-        assert listed["restore_allowed"] is False
-        assert listed["safe_actions"]==[]
-        assert listed["records"][0]["record_id"]==RECORD_ID
-        inspected=_ask_server(test_root,archive,"synthetic",INSPECT_REQ)
-        assert inspected["status"]=="test_only_metadata_inspected"
-        assert inspected["record"]==listed["records"][0]
-        assert inspected["client_authenticated"] is False
-        assert inspected["operator_consent_verified"] is False
-        for obj in (listed,inspected):
-            output=json.dumps(obj)
-            for forbidden in (
-                "ciphertext\":", "https://","passphrase","envelope\":",
-                "encrypted-synthetic-payload","/tmp/machine-ci"
-            ):
-                assert forbidden not in output,forbidden
+        # Positive reader format is exercised DIRECTLY under protected UID.
+        # No browser socket can grant metadata, even to a valid client.
+        def service_metadata(req):
+            return _child_command(["--metadata",str(archive),json.dumps(req)],uid=SERVICE_UID)
+        listed_run=service_metadata(LIST_REQ)
+        assert listed_run.returncode==0,listed_run.stderr
+        listed=json.loads(listed_run.stdout)
+        assert listed['record_count']==1
+        assert listed['records'][0]['record_id']==RECORD_ID
+        inspected_run=service_metadata(INSPECT_REQ)
+        assert inspected_run.returncode==0,inspected_run.stderr
+        inspected=json.loads(inspected_run.stdout)
+        assert inspected['record']==listed['records'][0]
+        for item in (listed,inspected):
+            value=json.dumps(item)
+            for secret in ("https://","encrypted-synthetic-payload","passphrase"):
+                assert secret not in value
+        assert _ask_server(test_root,archive,"deny",LIST_REQ)==broker.REFUSED
+        assert _ask_server(test_root,archive,"deny",INSPECT_REQ)==broker.REFUSED
         assert path.read_bytes()==before
 
         # File owner and mode are vital. If the directory becomes
         # ordinary same-UID storage, the broker must not treat it as a
         # protected service-owned vault.
         os.chown(archive,BROWSER_UID,BROWSER_UID)
-        assert _ask_server(test_root,archive,"synthetic",LIST_REQ)==broker.REFUSED
+        assert service_metadata(LIST_REQ).returncode != 0
         os.chown(archive,SERVICE_UID,SERVICE_UID)
         archive.chmod(0o755)
-        assert _ask_server(test_root,archive,"synthetic",LIST_REQ)==broker.REFUSED
+        assert service_metadata(LIST_REQ).returncode != 0
         archive.chmod(0o700)
         os.chmod(path,0o644)
-        assert _ask_server(test_root,archive,"synthetic",LIST_REQ)==broker.REFUSED
+        assert service_metadata(LIST_REQ).returncode != 0
         os.chmod(path,0o600)
         symlink=archive/"dddddddd-dddd-4ddd-8ddd-dddddddddddd.json"
         symlink.symlink_to(path.name)
-        assert _ask_server(test_root,archive,"synthetic",LIST_REQ)==broker.REFUSED
+        assert service_metadata(LIST_REQ).returncode != 0
         symlink.unlink()
         orphan=archive/".tmp-incomplete"
         orphan.write_bytes(b"partial")
-        assert _ask_server(test_root,archive,"synthetic",LIST_REQ)==broker.REFUSED
+        assert service_metadata(LIST_REQ).returncode != 0
         orphan.unlink()
 
         assert path.read_bytes()==before
@@ -320,6 +317,9 @@ if __name__=="__main__":
     if len(sys.argv)>=2 and sys.argv[1]=="--client":
         assert len(sys.argv)==4
         sys.exit(_run_client(sys.argv[2],sys.argv[3]))
+    if len(sys.argv)>=2 and sys.argv[1]=="--metadata":
+        assert len(sys.argv)==4
+        sys.exit(_run_metadata(sys.argv[2],sys.argv[3]))
     if len(sys.argv)>=2 and sys.argv[1]=="--direct":
         assert len(sys.argv)==3
         sys.exit(_run_direct(sys.argv[2]))

@@ -8,7 +8,7 @@ const native=fs.readFileSync("tests/weather/fixtures/W15FixedWeatherOverviewNati
 
 // Match the actual QML height budget, including the minimum W17 instrument.
 function heights(viewport) {
- const row=Math.max(1,Math.min(88,Math.floor(viewport*0.18),
+ const row=Math.max(55,Math.min(88,Math.floor(viewport*0.18),
                             Math.floor(Math.max(0,viewport-164)/2)));
  return {summary:viewport-2*row,row};
 }

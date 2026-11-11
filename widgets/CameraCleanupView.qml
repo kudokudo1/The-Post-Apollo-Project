@@ -63,7 +63,7 @@ Column {
                        : cleanupPage.compactHosted
                          && modelData.id === "grid" ? "GRID"
                        : modelData.label
-                labelPixelSize: cleanupPage.compactHosted ? 9 : 9
+                labelPixelSize: 9
                 selected: camera.cleanupTechnique === modelData.id
                 accentColor: modelData.id === "hunt"
                              ? Colors.cyan : Colors.magenta

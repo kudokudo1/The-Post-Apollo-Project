@@ -59,7 +59,7 @@ ShellRoot {
             if (SwayScrollSettings.storeState === "error") {
                 root.fail("STORE_ERROR");return;
             }
-            if (!SwayScrollSettings.canStore)
+            if (!SwayScrollSettings.canStore || SwayScrollSettings.busy)
                 return;
             if (!devicesPane.visible || !factorPane.visible || !applyPane.visible) {
                 root.fail("PANE_MISSING");return;

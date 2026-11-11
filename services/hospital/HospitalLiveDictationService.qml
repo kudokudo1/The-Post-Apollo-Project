@@ -15,6 +15,9 @@ Scope {
     property bool safetyHold: true
     property string lastError: ""
     property string lastTranscript: ""
+    // Short lifecycle code only, never spoken words or audio. A few stage
+    // receipts permit post-crash correlation without reproducing speech.
+    property string lastStage: "SAFETY_HOLD"
     property int recordingElapsedSeconds: 0
     property double recordingStartedAt: 0
     property bool liveStreaming: true
@@ -61,6 +64,7 @@ Scope {
 
     function startRecording() {
         if (safetyHold) {
+            lastStage = "SAFETY_HOLD";
             lastError = "VOICE SAFETY HOLD // HOST CRASH NOT YET CLEARED";
             voiceError(lastError);
             return false;
@@ -77,6 +81,7 @@ Scope {
         packetCount = 0;
         lastError = "";
         lastTranscript = "";
+        lastStage = "REQUESTED";
         recordingStartedAt = Date.now();
         recordingElapsedSeconds = 0;
         voiceState = "recording";
@@ -129,6 +134,18 @@ Scope {
         catch (error) { return; }
         if (!data || typeof data.kind !== "string")
             return;
+        if (data.kind === "stage") {
+            // Python emits fixed low-cardinality lifecycle codes. The
+            // allowlist prevents untrusted child output reaching the journal.
+            const code = String(data.detail || "");
+            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|RECORDING_COMPLETED)$/.test(code))
+                return;
+            if (lastStage !== code) {
+                lastStage = code;
+                console.warn("HOSPITAL_VOICE_STAGE // " + code);
+            }
+            return;
+        }
         if (data.kind === "partial") {
             if (typeof data.text !== "string")
                 return;

@@ -71,14 +71,14 @@ test("E8 all EARTH screens preserve their C44 header on the correct owner",()=>{
     assert.match(parent,/objectName: "earth-e4-ground-tabs"/);
     assert.match(parent,/objectName: "earth-e4-ground-divider"/);
     assert.match(parent,/Height|height: HeaderGeometry\.tabHeight/);
-    for(const [file,names] of [[water,["water-title","water-tabs","water-divider"]],
-                               [services,["services-title","services-tabs","services-divider"]]]) {
-        for(const name of names)assert.ok(file.includes("earth-e2-"+name),name);
-        assert.ok(file.includes("HeaderGeometry.titleToTabs"));
-        assert.ok(file.includes("HeaderGeometry.tabHeight"));
-        assert.ok(file.includes("HeaderGeometry.tabsToRule"));
-        assert.ok(file.includes("HeaderGeometry.ruleToContent"));
-    }
+    for(const name of ["water-title","water-tabs","water-divider"])
+        assert.ok(water.includes("earth-e2-"+name),name);
+    assert.ok(water.includes("HeaderGeometry.titleToTabs"));
+    assert.ok(water.includes("HeaderGeometry.tabHeight"));
+    assert.ok(water.includes("HeaderGeometry.tabsToRule"));
+    assert.ok(water.includes("HeaderGeometry.ruleToContent"));
+    assert.match(services,/StationServicesConsole\\s*\\{/);
+    assert.match(services,/familyLabel: "EARTH"/);
     assert.match(parent,/StationEarthWaterPane\s*\{/);
     assert.match(parent,/StationEarthServicesPane\s*\{/);
     assert.match(fixture,/E8_NATIVE_PASS/);

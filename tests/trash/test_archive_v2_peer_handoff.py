@@ -188,8 +188,11 @@ class ProtectedPeerHandoffTests(unittest.TestCase):
         bad_signer=Ed25519PrivateKey.generate()
         with self.assertRaisesRegex(SignedCaptureError,"CAPTURE_SIGNATURE_REFUSED"):
             self.admit(proof=self.signed_claim(signer=bad_signer))
-        with self.assertRaisesRegex(BrokerHandoffError,"BROKER_REQUEST_SCOPE_MISMATCH"):
+        with self.assertRaisesRegex(BrokerHandoffError,"BROKER_OWNER_PEER_MISMATCH"):
             self.admit(owner_id="weather-events")
+        wrong_resource=dict(self.claim,resourceId="another-source")
+        with self.assertRaisesRegex(BrokerHandoffError,"BROKER_REQUEST_SCOPE_MISMATCH"):
+            self.admit(proof=self.signed_claim(wrong_resource))
         changed=dict(self.claim,payloadSha256="0"*64)
         with self.assertRaisesRegex(SignedCaptureError,"CAPTURE_SOURCE_MISMATCH"):
             self.admit(proof=self.signed_claim(changed))
@@ -225,7 +228,10 @@ class ProtectedPeerHandoffTests(unittest.TestCase):
     def test_tampered_peer_witness_format_fails_readonly_recovery(self):
         self.admit()
         with sqlite3.connect(self.root/FILE_NAME) as db:
-            db.execute("UPDATE test_copies SET peer_witness_sha256='invalid'")
+            # SQLite itself refuses wrong length; a 64-character non-hex
+            # rewrite reaches the read-only recovery's stricter validation.
+            db.execute("UPDATE test_copies SET peer_witness_sha256=?",
+                       ("g"*64,))
         with self.assertRaisesRegex(TrustHistoryError,
                                     "TEST_ADMISSION_INTEGRITY_INVALID"):
             self.inspect()

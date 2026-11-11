@@ -13,12 +13,14 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import tempfile
 
 VERSION = 1
 MAX_BYTES = 2 * 1024 * 1024
 MAX_RECEIPTS = 2048
+HEX_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 SNOOZE_MS = 5 * 60 * 1000
 MAX_NAME = 40
 MAX_NOTE = 256
@@ -69,7 +71,7 @@ def _validate(doc, scope):
             or not integer(doc["revision"], 0, 2147483647)
             or not integer(doc["ownerEpoch"], 0, 2147483647)
             or not isinstance(doc["sourceDigest"], str)
-            or len(doc["sourceDigest"]) != 64
+            or not HEX_DIGEST.fullmatch(doc["sourceDigest"])
             or not isinstance(doc["alarmDocument"], dict)
             or doc["alarmDocument"].get("version") != 2
             or not isinstance(doc["alarmDocument"].get("alarms"), list)
@@ -78,7 +80,7 @@ def _validate(doc, scope):
             or len(doc["receipts"]) > MAX_RECEIPTS):
         raise Refused("INVALID_SHADOW_STATE")
     for key, value in doc["receipts"].items():
-        if (not isinstance(key, str) or len(key) != 64
+        if (not isinstance(key, str) or not HEX_DIGEST.fullmatch(key)
                 or not isinstance(value, dict)
                 or set(value) != {"alarmId", "expectedDueMs",
                                   "ownerEpoch", "phase"}
@@ -170,7 +172,7 @@ class ShadowStore:
     def initialize(self, original_doc, source_digest, epoch, validate_alarm):
         if (not integer(epoch, 1, 2147483647)
                 or not isinstance(source_digest, str)
-                or len(source_digest) != 64):
+                or not HEX_DIGEST.fullmatch(source_digest)):
             raise Refused("INVALID_SHADOW_INIT")
         validate_alarm(original_doc)
         def init():
@@ -191,6 +193,7 @@ class ShadowStore:
             d = self._load_locked()
             # Do not expose private names, notes, or sound paths over IPC.
             return {"revision": d["revision"], "ownerEpoch": d["ownerEpoch"],
+                    "sourceDigest": d["sourceDigest"],
                     "receiptCount": len(d["receipts"]), "alarmCount":
                     len(d["alarmDocument"]["alarms"])}
         return self._execute(load)

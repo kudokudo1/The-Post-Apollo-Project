@@ -13,13 +13,19 @@ Item {
     property bool dock24Hour: false
     property bool dockFormatAvailable: false
     property bool zoneOpen: false
+    property bool detailsOpen: false
     readonly property bool zoneSearchFocused: compactZonePicker.searchFocused
     signal dockFormatRequested(bool use24)
 
-    onSettingsSectionChanged: zoneOpen = false
+    onSettingsSectionChanged: {
+        zoneOpen = false;
+        detailsOpen = false;
+    }
     onVisibleChanged: {
-        if (!visible)
+        if (!visible) {
             zoneOpen = false;
+            detailsOpen = false;
+        }
     }
 
     Column {
@@ -523,4 +529,118 @@ Item {
                   : "AUTOMATIC CHECK NEVER SETS HOST TIME. ONE-SHOT RESYNC REQUIRES CONFIRMATION / POLKIT."
         }
     }
+    // The ordinary pages never scroll. Full error/authorization messages are
+    // still available on demand rather than being silently truncated.
+    TimeActionButton {
+        id: compactDetailsButton
+        width: 86
+        height: 27
+        x: compact.width - width - 4
+        y: compact.height - height - 3
+        label: "DETAILS"
+        labelPixelSize: 10
+        actionRole: "time"
+        visible: !compact.detailsOpen
+        onLeftClicked: compact.detailsOpen = true
+    }
+
+    Rectangle {
+        id: detailsOverlay
+        anchors.fill: parent
+        anchors.margins: 4
+        z: 100
+        visible: compact.detailsOpen
+        color: Colors.black
+        border.width: 1
+        border.color: Colors.magenta
+
+        Column {
+            anchors.fill: parent
+            anchors.margins: 8
+            spacing: 7
+            Row {
+                width: parent.width
+                height: 30
+                spacing: 6
+                GohuText {
+                    width: parent.width - detailsClose.width - parent.spacing
+                    height: 30
+                    verticalAlignment: Text.AlignVCenter
+                    text: compact.settingsSection === "sync"
+                          ? "SYNC // DIAGNOSTICS" : "VISUAL // DETAILS"
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                }
+                TimeActionButton {
+                    id: detailsClose
+                    width: 72
+                    height: 28
+                    actionRole: "cancel"
+                    label: "CLOSE"
+                    labelPixelSize: 10
+                    onLeftClicked: compact.detailsOpen = false
+                }
+            }
+            Flickable {
+                id: detailsScroll
+                width: parent.width
+                height: Math.max(0, parent.height - 37)
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                contentWidth: width
+                contentHeight: detailRows.implicitHeight + 8
+                Column {
+                    id: detailRows
+                    x: 2
+                    y: 2
+                    width: Math.max(0, detailsScroll.width - 4)
+                    spacing: 10
+                    Repeater {
+                        model: compact.settingsSection === "sync" ? [
+                            { label: "NTP", value: String(TimeSettings.hostInfo.ntpEnabled || "unknown")
+                                       + " // " + String(TimeSettings.hostInfo.ntpSynchronized || "unknown") },
+                            { label: "RTC LOCAL", value: String(TimeSettings.hostInfo.rtcLocal || "unknown") },
+                            { label: "AUTO CHECK", value: TimeSettings.autoCheckResult },
+                            { label: "AUTO STORAGE", value: TimeSettings.autoCheckErrorCode },
+                            { label: "REFERENCE", value: TimeSettings.referenceMessage },
+                            { label: "REFERENCE SOURCE", value: TimeSettings.referenceSource },
+                            { label: "RESYNC", value: TimeSettings.resyncMessage },
+                            { label: "RESYNC ERROR", value: TimeSettings.resyncErrorCode },
+                            { label: "AUTH PATH", value: TimeSettings.resyncAuthPath },
+                            { label: "POLKIT", value: TimeSettings.authFlowStage
+                                      + " // " + TimeSettings.authActionId },
+                            { label: "DIAGNOSE", value: TimeSettings.diagnosticMessage },
+                            { label: "DIAG DETAILS", value: TimeSettings.diagnosticDetail },
+                            { label: "SAFETY", value: "CHECK TIME CONTACTS CONFIGURED NTP SOURCES (YOUR IP MAY BE VISIBLE). IT NEVER SETS THE CLOCK. RESYNC MAY CHANGE SYSTEM / FILE TIMES ONLY AFTER CONFIRMATION AND OS AUTHORIZATION." }
+                        ] : [
+                            { label: "VISUAL OFFSET", value: TimeSettings.displayOffsetLabel },
+                            { label: "DISPLAY STORE", value: TimeSettings.storageState
+                                      + " // " + TimeSettings.errorCode },
+                            { label: "ZONE", value: String(TimeSettings.hostInfo.timezone || "unknown") },
+                            { label: "UTC OFFSET", value: String(TimeSettings.hostInfo.utcOffset || "unknown") },
+                            { label: "DST", value: TimeSettings.hostInfo.status === "ready"
+                                      ? (TimeSettings.hostInfo.dstActive ? "ACTIVE" : "INACTIVE") : "UNKNOWN" },
+                            { label: "DIRECTORY", value: TimeSettings.zoneCatalogLoading ? "LOADING"
+                                      : TimeSettings.zoneCatalogFailed ? "UNAVAILABLE"
+                                      : String(TimeSettings.zoneCatalog.length) + " ZONES" },
+                            { label: "ZONE RESULT", value: TimeSettings.timezoneMessage },
+                            { label: "ZONE ERROR", value: TimeSettings.timezoneErrorCode },
+                            { label: "HOST", value: TimeSettings.hostError },
+                            { label: "AUTH", value: TimeSettings.authFlowStage },
+                            { label: "SAFETY", value: "VISUAL OFFSET NEVER MODIFIES HOST TIME. APPLY ZONE CHANGES SYSTEM LOCAL TIME WITH CONFIRMATION; UTC INSTANT IS UNCHANGED. RTC LOCAL CAN AFFECT HARDWARE CLOCK UPDATES." }
+                        ]
+                        GohuText {
+                            required property var modelData
+                            width: detailRows.width
+                            wrapMode: Text.WordWrap
+                            text: modelData.label + " // " + String(modelData.value || "NONE")
+                            color: modelData.label === "SAFETY" ? Colors.orange : Colors.white
+                            font.pixelSize: 10
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }

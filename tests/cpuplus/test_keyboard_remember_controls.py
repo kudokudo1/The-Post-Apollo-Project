@@ -34,8 +34,8 @@ class RememberUiContract(unittest.TestCase):
         self.assertIn('property string witnessCaps: "unknown"', LED)
         self.assertIn('previous !== "unknown" && previous !== value', LED)
         self.assertIn("KeyboardLockSettings.rememberLedTransition(lock, value)", LED)
-        self.assertIn("witnessStableTransition(\\"num\\", candidateNum)", LED)
-        self.assertIn("witnessStableTransition(\\"caps\\", candidateCaps)", LED)
+        self.assertIn('witnessStableTransition("num", candidateNum)', LED)
+        self.assertIn('witnessStableTransition("caps", candidateCaps)', LED)
 
     def test_sync_requires_arm_and_cas(self):
         self.assertIn("hostRememberNum", SETTINGS)

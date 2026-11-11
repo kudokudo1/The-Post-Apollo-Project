@@ -2572,11 +2572,14 @@ PanelWindow {
     // Front-desk wrappers retain their own UI/submit state; no parallel mics.
     HospitalLiveDictationService {
         id: workforceSpeechInputService
-        // Operator-approved first live trial: speech recognition is enabled,
-        // but exactly one guarded Whisper chunk is allowed per mic press.
-        // Leave the service's standalone safetyHold default at true.
+        // Operator observed no host crash with the one-chunk trial, but it
+        // auto-closed capture before the first partial could appear.
+        // Continue recording across guarded sequential Whisper chunks; the
+        // pilot remains limited to 6 model jobs and 25s of recorded PCM.
+        // Keep the standalone service fail-closed by default.
         safetyHold: false
-        pilotOneChunk: true
+        pilotOneChunk: false
+        pilotLiveChunks: 6
         chunkSeconds: 2
         firstChunkMs: 1400
         maxPackets: 48

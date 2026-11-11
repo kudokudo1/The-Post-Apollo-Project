@@ -63,6 +63,8 @@ test("fill width is proportional and never adds a fake minimum amount", () => {
   assert.ok(qml.includes('"NOT MEASURED"'));
   assert.ok(qml.includes('"NO DISK INVENTORY"'));
   assert.ok(qml.includes('"UNAVAILABLE"'));
+  assert.ok(qml.includes('archiveCapacityPercent < 0.01 ? "<0.01%"'));
+  assert.ok(qml.includes('archiveCapacityPercentText + " USED"'));
 });
 
 test("capacity updates use read-only backend data and preserve safe permissions", () => {

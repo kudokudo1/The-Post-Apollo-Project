@@ -32,7 +32,7 @@ def envelope(tag=b"A"):
         "kind": vault.ENVELOPE_KIND, "version": 1,
         "algorithm": "AES-256-GCM",
         "kdf": "PBKDF2-HMAC-SHA256", "iterations": 600000,
-        "salt": b64(b"random-salt-1234"), "nonce": b64(b"12-byte-nonce"),
+        "salt": b64(b"random-salt-1234"), "nonce": b64(b"twelve-nonce"),
         "aad": vault.AAD,
         "ciphertext": b64(b"synthetic ciphertext " + tag + b" fake-gcm-tag"),
     }

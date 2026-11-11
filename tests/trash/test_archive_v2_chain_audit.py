@@ -44,6 +44,15 @@ class ChainAuditTests(unittest.TestCase):
         self.assertEqual(self.report()["state"], "NOT_INSTALLED")
         self.assertEqual(set(self.root.iterdir()), before)
 
+    def test_created_but_empty_archive_is_not_misreported_as_legacy(self):
+        store = self.store()
+        result = self.report()
+        self.assertEqual(result["state"], "EMPTY")
+        self.assertEqual(result["snapshotCount"], 0)
+        self.assertEqual(result["legacyCount"], 0)
+        self.assertEqual(result["receiptCount"], 0)
+        self.assertEqual(store.status()["total"], 0)
+
     def test_global_chain_across_sources_counts_legacy_and_receipts(self):
         store = self.store()
         a = self.save(store, "demo-1", "rev1")

@@ -94,6 +94,44 @@ class ArchiveV2Tests(unittest.TestCase):
         self.assertEqual(limited.read_verified(first["id"]), b"x"*5000000)
         self.assertEqual(limited.status()["total"], 1)
 
+    def test_disk_quota_counts_sqlite_pages_and_keeps_existing_snapshots(self):
+        limited = mod.ArchiveStore(self.root, disk_quota=256 * 1024)
+        first = limited.save("demo-scrape", "disk-1", "r1", b"a" * 16384)
+        before = limited.read_verified(first["id"])
+        first_status = limited.status()
+        cap = first_status["capacity"]
+        self.assertGreaterEqual(cap["databaseBytes"], len(before))
+        self.assertGreaterEqual(cap["chargedBytes"], cap["databaseBytes"])
+        self.assertEqual(cap["diskQuotaBytes"], 256 * 1024)
+        self.assertEqual(cap["remainingBytes"],
+                         max(0, 256 * 1024 - cap["chargedBytes"]))
+        self.assertEqual(cap["capacityState"], "READY")
+        with self.assertRaisesRegex(mod.ArchiveError, "ARCHIVE_DISK_QUOTA"):
+            limited.save("demo-scrape", "disk-2", "r1", b"b" * (384 * 1024))
+        self.assertEqual(limited.status()["total"], 1)
+        self.assertEqual(limited.verify()["items"], 1)
+        self.assertEqual(limited.read_verified(first["id"]), before)
+
+    def test_preexisting_larger_store_remains_readable_under_smaller_budget(self):
+        first = self.store.save("demo-scrape", "existing", "r1",
+                                b"x" * (384 * 1024))
+        before = self.store.read_verified(first["id"])
+        limited = mod.ArchiveStore(self.root, disk_quota=64 * 1024)
+        cap = limited.status()["capacity"]
+        self.assertEqual(cap["capacityState"], "FULL")
+        self.assertEqual(cap["remainingBytes"], 0)
+        with self.assertRaisesRegex(mod.ArchiveError, "ARCHIVE_DISK_QUOTA"):
+            limited.save("demo-scrape", "no-new", "r1", b"x")
+        self.assertEqual(limited.read_verified(first["id"]), before)
+        self.assertEqual(limited.status()["total"], 1)
+
+    def test_no_unsafe_disk_quota_types(self):
+        for invalid in (0, 1024, True, None, "768MiB", 2**40 + 1):
+            with self.assertRaisesRegex(mod.ArchiveError,
+                                        "INVALID_ARCHIVE_CONFIG"):
+                mod.ArchiveStore(self.root, disk_quota=invalid)
+        self.assertEqual(self.store.status()["total"], 0)
+
     def test_corrupted_payload_detected_not_silently_fixed(self):
         snap = self.save()
         with sqlite3.connect(self.store.path) as db:

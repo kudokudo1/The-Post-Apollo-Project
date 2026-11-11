@@ -274,6 +274,11 @@ Column {
         const oldState = StreamingPreviewPolicy.cancel(root.streamingPreviewState);
         if (!oldState)
             return false;
+        // The same service owns STOP/CANCEL and the single decoder process.
+        if (root.speechInputService
+                && root.speechInputService.activeStreaming
+                && root.speechInputService.busy)
+            root.speechInputService.cancel();
         const field = root.voiceAreaForKey(oldState.field);
         // Never overwrite external edits made after preview ownership began.
         if (field && field.value === oldState.draft)
@@ -285,11 +290,15 @@ Column {
     }
     function selectDecoderMode(value) {
         const svc = root.speechInputService;
-        if (value !== "STANDARD" && value !== "FAST")
+        if (value !== "STANDARD" && value !== "FAST"
+                && value !== "STREAMING")
             return false;
         if (!root.active || !svc || svc.busy || root.otherVoiceBusy
                 || root.streamingPreviewState.active
                 || (root.mode !== "SETUP" && root.mode !== "JOB"))
+            return false;
+        if (value === "STREAMING" && (!svc.streamingTrialAllowed
+                || !svc.streamingModelDir.trim()))
             return false;
         root.decoderMode = value;
         return true;
@@ -298,9 +307,17 @@ Column {
         const svc = root.speechInputService;
         const field = root.voiceAreaForKey(key);
         if (!root.active || !svc || !field || !key
-                || root.streamingPreviewState.active
                 || (root.mode !== "SETUP" && root.mode !== "JOB"))
             return false;
+        if (root.streamingPreviewState.active) {
+            if (root.streamingPreviewState.field !== key
+                    || !svc.activeStreaming || !svc.recording)
+                return false;
+            const stopping = svc.stopRecording(false);
+            if (stopping)
+                root.dictationFeedback = "STREAMING MIC STOPPED // FINALIZING";
+            return stopping;
+        }
         if (svc.recording) {
             if (root.dictationField !== key)
                 return false;
@@ -313,6 +330,24 @@ Column {
             root.dictationFeedbackField = key;
             root.dictationFeedback = "MIC BUSY // WAIT FOR THE OTHER RECORDING";
             return false;
+        }
+        if (root.decoderMode === "STREAMING") {
+            if (!svc.streamingTrialAllowed || !svc.streamingModelDir.trim()) {
+                root.dictationFeedbackField = key;
+                root.dictationFeedback = "STREAMING TRIAL HELD // USE STANDARD";
+                return false;
+            }
+            const token = root.makeId("stream");
+            if (!root.beginStreamingPreview(key, token))
+                return false;
+            const launched = svc.startRecording("STREAMING");
+            if (!launched) {
+                root.cancelStreamingPreview();
+                root.dictationFeedbackField = key;
+                root.dictationFeedback = svc.lastError
+                    || "STREAMING TRIAL UNAVAILABLE";
+            }
+            return launched;
         }
         root.dictationField = key;
         root.dictationMode = root.mode;
@@ -813,7 +848,29 @@ Column {
         function onLiveFinished() {
             root.finishLiveDictation();
         }
+        function onStreamingPacketReady(packet) {
+            const state = root.streamingPreviewState;
+            if (!state.active || !root.speechInputService
+                    || !root.speechInputService.activeStreaming)
+                return;
+            if (!root.acceptStreamingPreview(state.token, packet)
+                    && !root.streamingPreviewState.active
+                    && root.speechInputService.busy)
+                root.speechInputService.cancel();
+        }
+        function onStreamingFinished() {
+            if (root.streamingPreviewState.active)
+                root.finishStreamingPreview(root.streamingPreviewState.token);
+        }
         function onVoiceError(message) {
+            if (root.streamingPreviewState.active) {
+                const key = root.streamingPreviewState.field;
+                root.cancelStreamingPreview();
+                root.dictationFeedbackField = key;
+                root.dictationFeedback = String(message
+                    || "STREAMING TRIAL FAILED").slice(0, 180);
+                return;
+            }
             if (!root.dictationField)
                 return;
             const messageText = String(message || "LOCAL DICTATION FAILED").slice(0,180);
@@ -1027,6 +1084,24 @@ Column {
                 && !root.streamingPreviewState.active
             onTriggered: root.selectDecoderMode("FAST")
         }
+    }
+    // Not displayed or enabled until a separately authorized host model
+    // path and explicit streamingTrialAllowed opt-in have been configured.
+    HospitalActionButton {
+        width: parent.width
+        height: 27
+        visible: (root.mode === "SETUP" || root.mode === "JOB")
+            && !!root.speechInputService
+            && root.speechInputService.streamingTrialAllowed
+            && !!root.speechInputService.streamingModelDir.trim()
+        label: "VOICE // STREAMING MODEL TRIAL"
+        accent: root.decoderMode === "STREAMING" ? Colors.magenta : Colors.cyan
+        selectedAction: root.decoderMode === "STREAMING"
+        contentGlowEnabled: false
+        enabledAction: root.active && !!root.speechInputService
+            && !root.speechInputService.busy && !root.otherVoiceBusy
+            && !root.streamingPreviewState.active
+        onTriggered: root.selectDecoderMode("STREAMING")
     }
     GohuText {
         width: parent.width
@@ -2246,7 +2321,8 @@ Column {
             && root.streamingPreviewState.field === voiceKey
         // The microphone can close while the guarded recognizer finishes.
         // Retain explicit stop feedback until the owned child exits.
-        readonly property bool stopInProgress: voiceActive
+        readonly property bool stopInProgress:
+            (voiceActive || streamingPreviewActive)
             && !!root.speechInputService
             && (root.speechInputService.stopping
                 || root.speechInputService.transcribing)
@@ -2317,31 +2393,41 @@ Column {
                 anchors.verticalCenter: parent.verticalCenter
                 readonly property bool canAct:
                     root.active && !!root.speechInputService
-                    && !root.streamingPreviewState.active
-                    && (managerArea.voiceActive
-                        && root.speechInputService.recording
-                        || (!root.speechInputService.busy && !root.otherVoiceBusy))
+                    && ((managerArea.streamingPreviewActive
+                            && root.speechInputService.activeStreaming
+                            && root.speechInputService.recording)
+                        || (!root.streamingPreviewState.active
+                            && ((managerArea.voiceActive
+                                    && root.speechInputService.recording)
+                                || (!root.speechInputService.busy
+                                    && !root.otherVoiceBusy))))
                 width: managerArea.voiceKey ? 30 : 0
                 height: 28
                 visible: !!managerArea.voiceKey
-                color: managerArea.voiceActive || micMouse.containsMouse
+                color: (managerArea.voiceActive || managerArea.streamingPreviewActive
+                        || micMouse.containsMouse)
                     ? Colors.yellow : Colors.dark
-                border.width: managerArea.voiceActive || micMouse.containsMouse
+                border.width: (managerArea.voiceActive || managerArea.streamingPreviewActive
+                        || micMouse.containsMouse)
                     ? 2 : 1
                 border.color: managerArea.stopInProgress ? Colors.red
-                    : managerArea.voiceActive || micMouse.containsMouse
+                    : (managerArea.voiceActive || managerArea.streamingPreviewActive
+                        || micMouse.containsMouse)
                       ? Colors.magenta : Colors.omnitrix
-                opacity: canAct || managerArea.voiceActive ? 1.0 : 0.45
+                opacity: canAct || managerArea.voiceActive
+                    || managerArea.streamingPreviewActive ? 1.0 : 0.45
 
                 RectangularShadow {
                     anchors.fill: parent
                     spread: managerArea.stopInProgress ? 5 : 4
                     z: -1
                     opacity: managerArea.stopInProgress ? 0.70
-                        : managerArea.voiceActive || micMouse.containsMouse
+                        : (managerArea.voiceActive || managerArea.streamingPreviewActive
+                        || micMouse.containsMouse)
                           ? 0.55 : 0.34
                     color: managerArea.stopInProgress ? Colors.red
-                        : managerArea.voiceActive || micMouse.containsMouse
+                        : (managerArea.voiceActive || managerArea.streamingPreviewActive
+                        || micMouse.containsMouse)
                           ? Colors.magenta : Colors.omnitrix
                 }
                 GohuText {
@@ -2350,7 +2436,8 @@ Column {
                     text: "🗣︎"
                     font.pixelSize: 20
                     color: managerArea.stopInProgress ? Colors.red
-                        : managerArea.voiceActive || micMouse.containsMouse
+                        : (managerArea.voiceActive || managerArea.streamingPreviewActive
+                        || micMouse.containsMouse)
                           ? Colors.magenta : Colors.omnitrix
                     layer.enabled: true
                     layer.effect: DropShadow {
@@ -2358,7 +2445,8 @@ Column {
                         samples: 9
                         opacity: 0.60
                         color: managerArea.stopInProgress ? Colors.red
-                            : managerArea.voiceActive || micMouse.containsMouse
+                            : (managerArea.voiceActive || managerArea.streamingPreviewActive
+                        || micMouse.containsMouse)
                               ? Colors.magenta : Colors.omnitrix
                         transparentBorder: true
                     }

@@ -21,6 +21,7 @@ from urllib.parse import quote
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.trash.archive_v2_location import ArchiveRootError, archive_directory
 from scripts.trash.archive_v2_capacity import CapacityError, capacity
+from scripts.trash.archive_v2_provenance import ProvenanceError, verify_receipt
 
 DB_NAME = "trashpp-archive-v2.sqlite3"
 STORE_SCHEMA = "post-apollo.trash-archive.v2a"
@@ -101,7 +102,9 @@ def _response(items, count, next_cursor=None, state="READY", query="",
 
 
 def _row(raw):
-    sid, owner, rid, revision, captured, label, checksum, size = raw
+    _require(isinstance(raw, (tuple, list)) and len(raw) == 20,
+             "ARCHIVE_METADATA_INVALID")
+    sid, owner, rid, revision, captured, label, checksum, size = raw[:8]
     _require(isinstance(sid, str) and HEX_ID.fullmatch(sid) is not None,
              "ARCHIVE_METADATA_INVALID")
     _require(owner in ALLOWED_OWNERS, "ARCHIVE_OWNER_UNAUTHORIZED")
@@ -117,15 +120,25 @@ def _row(raw):
              and HEX_DIGEST.fullmatch(checksum) is not None
              and type(size) is int and 1 <= size <= 8 * 1024 * 1024,
              "ARCHIVE_METADATA_INVALID")
+    try:
+        provenance = verify_receipt(
+            (sid, owner, rid, revision, captured, label, checksum, raw[8]),
+            raw[9:])
+    except ProvenanceError as exc:
+        raise ReadIndexError(str(exc)) from exc
     when = datetime.fromtimestamp(captured / 1000, timezone.utc)
     source_label = ("WEATHER // V2 COPY" if owner == "weather-events"
                     else "RESEARCH // V2 COPY")
+    provenance_note = ("RECEIPT " + provenance["receiptSha256"][:10]
+                       if provenance["state"] == "RECEIPT_MATCHED"
+                       else "LEGACY // NO RECEIPT")
     return {"id": sid, "ownerId": owner, "resourceId": rid,
-            "sourceRevision": revision, "kind": "V2 SNAPSHOT",
+            "sourceRevision": revision, "provenance": provenance,
+            "kind": "V2 SNAPSHOT",
             "source": source_label, "title": label or "UNTITLED COPY",
             "recordedAtMs": captured, "recordedAt": when.strftime("%Y-%m-%d %H:%M UTC"),
             "state": "archived-v2", "copyOnly": True, "verified": False,
-            "details": f"{size} BYTES // INDEX ONLY // PAYLOAD NOT VERIFIED",
+            "details": f"{size} BYTES // {provenance_note} // PAYLOAD NOT VERIFIED",
             "capabilities": {"inspect": True, "saveCopy": False,
                              "archive": False, "trash": False,
                              "restore": False, "burn": False}}
@@ -171,31 +184,51 @@ def index(directory, cursor="", query=""):
             db.execute("BEGIN")
             meta = db.execute("SELECT schema_id FROM archive_meta WHERE id=1").fetchone()
             _require(meta == (STORE_SCHEMA,), "ARCHIVE_SCHEMA_UNSUPPORTED")
+            columns = {row[1] for row in db.execute("PRAGMA table_info(snapshots)")}
+            has_flag = "provenance_required" in columns
+            has_receipts = db.execute("""SELECT 1 FROM sqlite_master
+                WHERE type='table' AND name='snapshot_receipts'""").fetchone() is not None
+            # A partially upgraded database is unsafe. An entirely legacy
+            # V2a store can still be listed without fabricating receipts.
+            _require(has_flag == has_receipts, "ARCHIVE_PROVENANCE_SCHEMA_INVALID")
+            if has_flag:
+                from_clause = (" FROM snapshots s LEFT JOIN snapshot_receipts r"
+                               " ON r.snapshot_id=s.id")
+                receipt_cols = (
+                    ",s.provenance_required,r.snapshot_id,r.owner_id,"
+                    "r.resource_id,r.source_revision,r.source_captured_ms,"
+                    "r.archived_ms,r.display_label,r.payload_sha256,"
+                    "r.previous_receipt_sha256,r.receipt_sha256,r.receipt_schema"
+                )
+            else:
+                from_clause = " FROM snapshots s"
+                receipt_cols = ",0," + ",".join(["NULL"] * 11)
             # Literal substring matching via parameter binding. Unlike LIKE,
             # '%' and '_' remain literal characters. SQLite's built-in lower()
             # is ASCII-case-insensitive; non-ASCII case folding is not promised.
             search_clause = (
-                "(instr(lower(display_label), ?) > 0 "
-                "OR instr(lower(resource_id), ?) > 0 "
-                "OR instr(lower(owner_id), ?) > 0)"
+                "(instr(lower(s.display_label), ?) > 0 "
+                "OR instr(lower(s.resource_id), ?) > 0 "
+                "OR instr(lower(s.owner_id), ?) > 0)"
             )
             search_params = (needle.lower(),) * 3
             filters = [search_clause] if needle else []
             if page_after:
-                filters.append("(captured_ms,id) < (?,?)")
+                filters.append("(s.captured_ms,s.id) < (?,?)")
             where = " WHERE " + " AND ".join(filters) if filters else ""
             count_where = " WHERE " + search_clause if needle else ""
             total = db.execute(
-                "SELECT count(*) FROM snapshots" + count_where,
+                "SELECT count(*) FROM snapshots s" + count_where,
                 search_params if needle else ()
             ).fetchone()[0]
             params = ((search_params if needle else ())
                       + (page_after if page_after else ())
                       + (PAGE_SIZE + 1,))
             records = db.execute(
-                "SELECT id,owner_id,resource_id,source_revision,captured_ms,"
-                "display_label,sha256,length(payload) FROM snapshots"
-                + where + " ORDER BY captured_ms DESC,id DESC LIMIT ?",
+                "SELECT s.id,s.owner_id,s.resource_id,s.source_revision,"
+                "s.captured_ms,s.display_label,s.sha256,length(s.payload)"
+                + receipt_cols + from_clause
+                + where + " ORDER BY s.captured_ms DESC,s.id DESC LIMIT ?",
                 params
             ).fetchall()
             # Refuse an entire page if a metadata row is malformed. Showing

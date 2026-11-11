@@ -166,7 +166,7 @@ Rectangle {
         QuietText {
             width: parent.width
             height: 10
-            text: "NEXT HOURS // PRECIPITATION CHANCE DURING EACH HOUR"
+            text: "FORECAST TIMES // RAIN CHANCE FOR EACH LISTED PERIOD"
             color: Colors.orange
             font.pixelSize: 8
             elide: Text.ElideRight
@@ -244,7 +244,7 @@ Rectangle {
         GohuText {
             width: parent.width
             height: 10
-            text: "NEXT DAYS // HIGHS, LOWS + DAILY RAIN CHANCE"
+            text: "NEXT DAYS // HIGH / LOW + PEAK RAIN CHANCE"
             color: Colors.magenta
             font.pixelSize: 9
             elide: Text.ElideRight
@@ -301,7 +301,7 @@ Rectangle {
                             GohuText {
                                 width: parent.width
                                 height: 10
-                                text: terminal.percent(sample.chanceRain)+" RAIN CHANCE"
+                                text: terminal.percent(sample.chanceRain)+" PEAK RAIN CHANCE"
                                 font.pixelSize: 9
                                 color: Colors.cyan
                                 elide: Text.ElideRight

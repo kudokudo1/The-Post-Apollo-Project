@@ -2173,7 +2173,11 @@ Column {
                     : root.speechInputService.audioDropped
                       ? "MODEL BEHIND // SOME AUDIO WAS SKIPPED"
                       : "LOCAL WHISPER // FINISHING // NO SUBMISSION")
-                : root.dictationFeedback
+                : (managerArea.voiceActive && root.speechInputService
+                    && root.dictationFeedback === "LIVE TRANSCRIPT READY // REVIEW BEFORE SUBMIT"
+                    && root.speechInputService.timingSummary.length > 0
+                    ? "REVIEW TEXT // " + root.speechInputService.timingSummary
+                    : root.dictationFeedback)
             color: managerArea.voiceActive ? Colors.magenta : Colors.orange
             font.pixelSize: 8
             elide: Text.ElideRight

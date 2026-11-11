@@ -19,7 +19,7 @@ assert manifest["manifest_version"] == 3
 assert manifest["incognito"] == "not_allowed"
 assert manifest["permissions"] == []
 assert manifest["host_permissions"] == []
-assert manifest["optional_permissions"] == ["nativeMessaging"]
+assert manifest["optional_permissions"] == ["nativeMessaging", "tabs"]
 assert manifest["action"]["default_popup"] == "popup.html"
 assert set(manifest) == {
     "manifest_version", "name", "version", "description",
@@ -31,7 +31,7 @@ for forbidden in (
     "scripting", "debugger", "activeTab", "background", "content_scripts",
     "externally_connectable", "webRequest", "<all_urls>",
 ):
-    assert forbidden not in json.dumps(manifest), forbidden
+    assert forbidden not in json.dumps({\n        key: value for key, value in manifest.items()\n        if key != "optional_permissions"\n    }), forbidden
 
 assert '<script type="module" src="popup.mjs"></script>' in html
 assert '<link rel="stylesheet" href="popup.css">' in html

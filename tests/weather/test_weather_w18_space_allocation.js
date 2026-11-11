@@ -4,6 +4,7 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const home=fs.readFileSync("widgets/weather/StationHome.qml","utf8");
 const instrument=fs.readFileSync("widgets/weather/StationWeatherOverviewCompactInstrument.qml","utf8");
+const cards=fs.readFileSync("widgets/weather/StationHomeMetricCard.qml","utf8");
 const native=fs.readFileSync("tests/weather/fixtures/W15FixedWeatherOverviewNative.qml","utf8");
 
 // Match the actual QML height budget, including the minimum W17 instrument.
@@ -39,4 +40,7 @@ test("W18 expands existing icons, forecast sections, not replacing artwork or ba
  assert.match(native,/window\.height=500/);
  assert.match(native,/OVERSIZED_EMPTY_CARDS/);
  assert.match(native,/TALL_WEATHER_INSTRUMENT_STILL_TINY/);
+ assert.match(cards,/readonly property real overviewExtra:/);
+ assert.match(cards,/card\.overviewExtra \/ 6/);
+ assert.match(native,/TALL_CARD_TEXT_STILL_TINY/);
 });

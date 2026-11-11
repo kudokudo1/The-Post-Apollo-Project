@@ -10,6 +10,7 @@ import "../services/hospital/HospitalFirstBedVerificationPolicy.js" as BedPolicy
 import "../services/hospital/HospitalGitHubOwnerPolicy.js" as GitHubOwnerPolicy
 import "../services/hospital/HospitalConversationIntakePolicy.js" as ConversationIntakePolicy
 import "../services/hospital/HospitalDictationTextPolicy.js" as DictationTextPolicy
+import "../services/hospital/HospitalStreamingPreviewPolicy.js" as StreamingPreviewPolicy
 
 // Collapsible content inside SURGERY → SHOW WORKERS, not a new Hospital route.
 // All writes require a separate operator REVIEW and CONFIRM.
@@ -27,6 +28,10 @@ Column {
     property string dictationOriginalText: ""
     property string dictationFeedbackField: ""
     property string dictationFeedback: ""
+    // Dormant until a separately authorized streaming adapter provides
+    // same-session events. The current Whisper microphone never calls this.
+    // No hypothesis enters any editable Job/Room form field.
+    property var streamingPreviewState: ({active: false})
     // Manual A/B choice for Surgery SETUP/JOB only. The active engine receives
     // a mode for a single recording; other clients always use Standard.
     property string decoderMode: "STANDARD"
@@ -199,11 +204,91 @@ Column {
         if (key === "checklist") return jobChecklistField;
         return null;
     }
+    // Preview controller for a future bounded streaming adapter. These are
+    // internal state methods, not buttons that start a microphone or model.
+    function beginStreamingPreview(key, token) {
+        const field = root.voiceAreaForKey(key);
+        if (!root.active || !field || !!root.dictationField
+                || root.streamingPreviewState.active || root.otherVoiceBusy
+                || (root.speechInputService && root.speechInputService.busy))
+            return false;
+        const started = StreamingPreviewPolicy.begin(
+            key, root.mode, field.value, field.voiceMaxLength, token);
+        if (!started)
+            return false;
+        root.streamingPreviewState = started;
+        root.dictationFeedbackField = key;
+        root.dictationFeedback = "STREAMING // PREVIEW WORDS ARE NOT SAVED";
+        return true;
+    }
+    function acceptStreamingPreview(token, packet) {
+        const activePreview = root.streamingPreviewState;
+        if (!activePreview.active)
+            return false;
+        if (!root.active || root.mode !== activePreview.mode) {
+            root.cancelStreamingPreview();
+            return false;
+        }
+        const field = root.voiceAreaForKey(activePreview.field);
+        if (!field || field.value !== activePreview.draft) {
+            root.streamingPreviewState = ({active: false});
+            root.dictationFeedbackField = activePreview.field;
+            root.dictationFeedback = "STREAMING PREVIEW REVOKED // DRAFT CHANGED";
+            return false;
+        }
+        const outcome = StreamingPreviewPolicy.receive(activePreview, token,
+            packet, DictationTextPolicy.appendTranscription);
+        // A late event from an earlier session must not cancel the current
+        // owner. Shape/revision failures revoke the preview, not the draft.
+        if (!outcome.accepted) {
+            if (outcome.reason === "INVALID STREAMING OWNER")
+                return false;
+            root.streamingPreviewState = ({active: false});
+            root.dictationFeedbackField = activePreview.field;
+            root.dictationFeedback = outcome.reason;
+            return false;
+        }
+        if (outcome.changedDraft)
+            field.value = outcome.state.draft;
+        root.streamingPreviewState = outcome.state;
+        return true;
+    }
+    function finishStreamingPreview(token) {
+        const state = root.streamingPreviewState;
+        const finished = StreamingPreviewPolicy.finish(state, token);
+        if (!finished)
+            return false;
+        const field = root.voiceAreaForKey(state.field);
+        if (!field || !root.active || root.mode !== state.mode
+                || field.value !== state.draft) {
+            root.streamingPreviewState = ({active: false});
+            return false;
+        }
+        root.streamingPreviewState = finished;
+        root.dictationFeedbackField = state.field;
+        root.dictationFeedback = "STREAMING COMPLETE // REVIEW BEFORE SAVING";
+        field.focusEditorAtEnd();
+        return true;
+    }
+    function cancelStreamingPreview() {
+        const oldState = StreamingPreviewPolicy.cancel(root.streamingPreviewState);
+        if (!oldState)
+            return false;
+        const field = root.voiceAreaForKey(oldState.field);
+        // Never overwrite external edits made after preview ownership began.
+        if (field && field.value === oldState.draft)
+            field.value = oldState.original;
+        root.streamingPreviewState = ({active: false});
+        root.dictationFeedbackField = oldState.field;
+        root.dictationFeedback = "STREAMING CANCELLED // ORIGINAL DRAFT PRESERVED";
+        return true;
+    }
     function selectDecoderMode(value) {
         const svc = root.speechInputService;
         if (value !== "STANDARD" && value !== "FAST")
             return false;
         if (!root.active || !svc || svc.busy || root.otherVoiceBusy
+                || root.streamingPreviewState.active
                 || (root.mode !== "SETUP" && root.mode !== "JOB"))
             return false;
         root.decoderMode = value;
@@ -213,6 +298,7 @@ Column {
         const svc = root.speechInputService;
         const field = root.voiceAreaForKey(key);
         if (!root.active || !svc || !field || !key
+                || root.streamingPreviewState.active
                 || (root.mode !== "SETUP" && root.mode !== "JOB"))
             return false;
         if (svc.recording) {
@@ -680,6 +766,8 @@ Column {
         if (!active)
             cancelDictation();
         if (!active)
+            cancelStreamingPreview();
+        if (!active)
             invalidateIntake();
         if (!active)
             bedProbe.invalidate();
@@ -694,6 +782,9 @@ Column {
     onModeChanged: {
         if (root.dictationField && root.mode !== root.dictationMode)
             cancelDictation();
+        if (root.streamingPreviewState.active
+                && root.mode !== root.streamingPreviewState.mode)
+            cancelStreamingPreview();
     }
     onSuggestedRepositoryChanged: {
         if (active && mode === "ROOM")
@@ -921,6 +1012,7 @@ Column {
             contentGlowEnabled: false
             enabledAction: root.active && !!root.speechInputService
                 && !root.speechInputService.busy && !root.otherVoiceBusy
+                && !root.streamingPreviewState.active
             onTriggered: root.selectDecoderMode("STANDARD")
         }
         HospitalActionButton {
@@ -932,6 +1024,7 @@ Column {
             contentGlowEnabled: false
             enabledAction: root.active && !!root.speechInputService
                 && !root.speechInputService.busy && !root.otherVoiceBusy
+                && !root.streamingPreviewState.active
             onTriggered: root.selectDecoderMode("FAST")
         }
     }
@@ -2148,6 +2241,9 @@ Column {
         property int voiceMaxLength: 4000
         readonly property bool voiceActive:
             !!voiceKey && root.dictationField === voiceKey
+        readonly property bool streamingPreviewActive:
+            !!voiceKey && root.streamingPreviewState.active
+            && root.streamingPreviewState.field === voiceKey
         // The microphone can close while the guarded recognizer finishes.
         // Retain explicit stop feedback until the owned child exits.
         readonly property bool stopInProgress: voiceActive
@@ -2161,6 +2257,7 @@ Column {
         width: root.width
         spacing: 3
         height: editHeight + 18 + (showVoiceLine ? 15 : 0)
+            + (streamingPreviewActive ? 15 : 0)
 
         function focusEditorAtEnd() {
             edit.cursorPosition = edit.text.length;
@@ -2205,6 +2302,7 @@ Column {
                 readOnly: managerArea.voiceActive
                     && root.speechInputService
                     && root.speechInputService.liveStreaming === true
+                    || managerArea.streamingPreviewActive
                 onTextChanged: managerArea.edited()
                 clip: true
             }
@@ -2219,6 +2317,7 @@ Column {
                 anchors.verticalCenter: parent.verticalCenter
                 readonly property bool canAct:
                     root.active && !!root.speechInputService
+                    && !root.streamingPreviewState.active
                     && (managerArea.voiceActive
                         && root.speechInputService.recording
                         || (!root.speechInputService.busy && !root.otherVoiceBusy))
@@ -2278,15 +2377,34 @@ Column {
                 anchors.right: micAction.left
                 anchors.rightMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
-                visible: managerArea.voiceActive && !!root.speechInputService
-                    && root.speechInputService.busy
+                visible: (managerArea.voiceActive && !!root.speechInputService
+                    && root.speechInputService.busy)
+                    || managerArea.streamingPreviewActive
                 width: visible ? 58 : 0
                 height: 28
                 label: "CANCEL"
                 accent: Colors.red
                 contentGlowEnabled: false
-                onTriggered: root.cancelDictation()
+                onTriggered: {
+                    if (managerArea.streamingPreviewActive)
+                        root.cancelStreamingPreview();
+                    else
+                        root.cancelDictation();
+                }
             }
+        }
+
+        // Never splice replaceable guesses into the editable draft. A
+        // future streaming adapter may update this single preview line;
+        // only confirmed events pass through the existing insertion policy.
+        GohuText {
+            width: parent.width
+            height: managerArea.streamingPreviewActive ? 12 : 0
+            visible: managerArea.streamingPreviewActive
+            text: "HEARING // " + (root.streamingPreviewState.provisional || "…")
+            color: Colors.cyan
+            font.pixelSize: 8
+            elide: Text.ElideRight
         }
 
         GohuText {

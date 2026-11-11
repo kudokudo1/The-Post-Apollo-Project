@@ -243,17 +243,140 @@ Scope {
         if (referenceChecking || authSessionActive)
             return false;
         referenceChecking = true;
-        referenceStatus = "checking";
+        referenceAttemptSucceeded = false;
+        if (referenceCheckedAtMs <= 0)
+            referenceStatus = "checking";
+        // Do not destroy the previous measurement while a new check runs.
         referenceMessage = "CHECKING CONFIGURED CHRONY REFERENCE...";
-        referenceCheckedAtMs = 0;
-        referenceUncertaintyMs = 0;
-        referenceSource = "NONE";
         referenceLastAttemptAtMs = Date.now();
         referenceProcess.exec([
             "python3", "-B", "-I",
             Quickshell.shellPath("services/time/TimeHostControl.py"), "measure"
         ]);
         return true;
+    }
+
+    function writeReferenceDocument(next) {
+        referencePendingDocument = next;
+        referenceStorageState = "saving";
+        referenceFile.setText(JSON.stringify(next, null, 2) + "\n");
+    }
+
+    function persistReferenceDocument(next) {
+        referenceDocument = next; // update live view before disk save
+        if (referenceStorageState !== "ready"
+                && referenceStorageState !== "empty"
+                && referenceStorageState !== "saving")
+            return;
+        if (referencePendingDocument !== null)
+            referenceQueuedDocument = next;
+        else
+            writeReferenceDocument(next);
+    }
+
+    function noteReferenceFailure(message) {
+        referenceAttemptSucceeded = false;
+        referenceFailureAtMs = Date.now();
+        referenceFailureMessage = String(message || "REFERENCE UNAVAILABLE");
+        referenceStatus = referenceCheckedAtMs > 0 ? "measured" : "unavailable";
+        referenceMessage = referenceFailureMessage;
+        // Preserve the old sample: a failure is not evidence of zero offset.
+        const next = Reference.withFailure(referenceDocument,
+                                           referenceFailureAtMs,
+                                           referenceFailureMessage);
+        if (next.ok)
+            persistReferenceDocument(next.document);
+    }
+
+    function recordReferenceMeasurement(output) {
+        const now = Date.now();
+        const offset = Number(output.offsetMs);
+        const uncertainty = Number(output.uncertaintyMs);
+        const source = String(output.source || "");
+        if (!Number.isFinite(offset) || !Number.isFinite(uncertainty)
+                || uncertainty < 0 || Math.abs(offset) > 86400000
+                || uncertainty > 86400000
+                || (source !== "CHRONY_TRACKING"
+                    && source !== "CHRONYD_ONESHOT")) {
+            noteReferenceFailure("INVALID REFERENCE MEASUREMENT");
+            return;
+        }
+        referenceOffsetMs = offset;
+        referenceUncertaintyMs = uncertainty;
+        referenceSource = source;
+        referenceCheckedAtMs = now;
+        referenceStatus = "measured";
+        referenceAttemptSucceeded = true;
+        referenceFailureMessage = "";
+        referenceFailureAtMs = 0;
+        referenceMessage = "REFERENCE // " + (offset / 1000).toFixed(3) + "S"
+                           + (source === "CHRONY_TRACKING"
+                              ? " // DAEMON TRACKING ESTIMATE"
+                              : " // CHRONYD MEASUREMENT");
+        const next = Reference.withMeasurement(referenceDocument,
+            { offsetMs: offset, uncertaintyMs: uncertainty, source: source },
+            now, referenceBootId);
+        if (next.ok)
+            persistReferenceDocument(next.document);
+    }
+
+    function restoreReferenceAfterLoad() {
+        if (referenceRestoreHandled || !referenceStoreReadDone
+                || !referenceBootReadDone)
+            return;
+        referenceRestoreHandled = true;
+        const saved = referenceLoadedDocument || Reference.initialDocument();
+        if (referenceCheckedAtMs <= 0)
+            referenceDocument = saved;
+        const projected = Reference.estimate(referenceDocument, Date.now(),
+                                              referenceBootId);
+        if (projected.available && referenceCheckedAtMs <= 0) {
+            const sample = referenceDocument.sample;
+            referenceOffsetMs = sample.offsetMs;
+            referenceUncertaintyMs = sample.uncertaintyMs;
+            referenceSource = sample.source;
+            referenceCheckedAtMs = sample.checkedAtMs;
+            referenceStatus = "measured";
+            referenceMessage = projected.fresh
+                ? "CACHED REFERENCE // NO EXTRA QUERY"
+                : "CACHED REFERENCE STALE // A NEW CHECK MAY BE DUE";
+        }
+        if (referenceDocument.lastFailureAtMs > 0) {
+            referenceFailureAtMs = referenceDocument.lastFailureAtMs;
+            referenceFailureMessage = referenceDocument.lastError;
+            autoCheckResult = "UNAVAILABLE // " + referenceFailureMessage;
+        } else if (projected.available) {
+            autoCheckResult = "CACHED // " + referenceLiveDetail;
+        }
+        referenceLoadedDocument = null;
+        maybeBeginStartupAutoChecks();
+    }
+
+    function maybeBeginStartupAutoChecks() {
+        if (autoCheckReloadHandled || autoCheckStorageState === "loading"
+                || !referenceRestoreHandled)
+            return;
+        autoCheckReloadHandled = true;
+        Qt.callLater(function() {
+            if (autoCheckOpenPendingWhileLoading) {
+                autoCheckOpenPendingWhileLoading = false;
+                timeSettings.checkOnClockOpened();
+            }
+            timeSettings.maybeAutoCheckTime("reload");
+            timeSettings.maybeAutoCheckTime();
+        });
+    }
+
+    function invalidateReferenceForResync() {
+        referenceStatus = "unchecked";
+        referenceCheckedAtMs = 0;
+        referenceUncertaintyMs = 0;
+        referenceSource = "NONE";
+        const previous = referenceDocument;
+        persistReferenceDocument({ version: Reference.VERSION, sample: null,
+            lastAttemptAtMs: previous.lastAttemptAtMs,
+            lastFailureAtMs: previous.lastFailureAtMs,
+            lastError: previous.lastError });
     }
 
     function writeAutoCheck(next) {
@@ -306,7 +429,7 @@ Scope {
     }
 
     function checkOnClockOpened() {
-        if (autoCheckStorageState === "loading") {
+        if (autoCheckStorageState === "loading" || !referenceRestoreHandled) {
             autoCheckOpenPendingWhileLoading = true;
             return false;
         }
@@ -324,9 +447,15 @@ Scope {
                 || resyncAuthPending || resyncProcess.running)
             return false;
         const now = Date.now();
+        const estimate = Reference.estimate(referenceDocument, now,
+                                             referenceBootId);
         if (!AutoCheck.canStartAutomaticCheck(active, reason, now,
                                               autoLastStartedAtMs,
-                                              referenceLastAttemptAtMs))
+                                              referenceLastAttemptAtMs,
+                                              { ready: referenceRestoreHandled,
+                                                fresh: estimate.fresh,
+                                                hasMeasurement: estimate.available,
+                                                lastFailureAtMs: referenceFailureAtMs }))
             return false;
         if (!checkTimeAccuracy())
             return false;
@@ -355,13 +484,20 @@ Scope {
         const offset = (referenceOffsetMs / 1000).toFixed(3) + "S";
         const uncertainty = (referenceUncertaintyMs / 1000).toFixed(3) + "S";
         autoCheckResult = !autoCheckExitOk
-                          || referenceStatus !== "measured"
+                          || !referenceAttemptSucceeded
                           ? "UNAVAILABLE // " + referenceMessage
                           : referenceIsOutOfSync(Date.now())
                           ? "OUT OF SYNC // OFFSET " + offset
                             + " // UNCERTAINTY " + uncertainty
                           : "MEASURED // OFFSET " + offset
                             + " // UNCERTAINTY " + uncertainty;
+    }
+
+    Timer {
+        interval: 1000
+        running: true
+        repeat: true
+        onTriggered: timeSettings.referenceNowMs = Date.now()
     }
 
     Timer {
@@ -615,10 +751,7 @@ Scope {
         resyncMessage = "PREPARING GRAPHICAL POLKIT AUTHORIZATION...";
         // Never show a pre-sync reading as freshly confirmed after a
         // privileged correction or a new burst request.
-        referenceStatus = "unchecked";
-        referenceCheckedAtMs = 0;
-        referenceUncertaintyMs = 0;
-        referenceSource = "NONE";
+        invalidateReferenceForResync();
         postResyncVerificationPending = false;
         authRegistrationFallback.restart();
     }

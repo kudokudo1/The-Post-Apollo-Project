@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import shutil
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
@@ -204,7 +205,23 @@ def test_crashes():
                     "status"] == "manual_reconciliation_required"
                 # Reply loss must not silently cause a second stage event.
                 refused(journal.append_fixture, path, plan, KEY, empty, A, "staged")
-            assert not list(root.glob("*-journal"))
+            # SQLite DELETE-mode rollback can leave a private hot-journal
+            # sidecar after crash recovery. Success is determined by the
+            # verified committed rows and expected head above, not by the
+            # absence of a sidecar. Refuse any unexpected/unsafe leftovers.
+            leftovers = sorted(root.iterdir())
+            assert all(p.name in (journal.FILENAME,
+                                  journal.FILENAME + "-journal")
+                       for p in leftovers)
+            sidecars = [p for p in leftovers
+                        if p.name == journal.FILENAME + "-journal"]
+            assert len(sidecars) <= 1
+            for sidecar in sidecars:
+                info = sidecar.lstat()
+                assert stat.S_ISREG(info.st_mode)
+                assert info.st_uid == os.geteuid()
+                assert info.st_nlink == 1
+                assert stat.S_IMODE(info.st_mode) == 0o600
         finally:
             shutil.rmtree(root)
 

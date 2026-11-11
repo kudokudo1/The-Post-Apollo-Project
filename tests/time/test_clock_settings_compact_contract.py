@@ -20,7 +20,15 @@ class ClockCompactSettingsContracts(unittest.TestCase):
         self.assertIn('settingsSection: timew.settingsView', TIMEW)
         self.assertIn('id: settingsTimeBasicsPane', CPU)
         self.assertNotIn('settingsSection:', CPU)
-        self.assertNotIn('Flickable {', COMPACT)
+        # The main pages are fixed. Only the explicit DETAILS overlay
+        # has an internal scroller for long diagnostic receipts.
+        self.assertEqual(COMPACT.count('Flickable {'), 1)
+        self.assertLess(COMPACT.index('id: sync'),
+                        COMPACT.index('id: detailsScroll'))
+        self.assertIn('id: detailsOverlay', COMPACT)
+        self.assertIn('visible: compact.detailsOpen', COMPACT)
+        self.assertIn('onLeftClicked: compact.detailsOpen = true', COMPACT)
+        self.assertIn('onLeftClicked: compact.detailsOpen = false', COMPACT)
         self.assertNotIn('ScrollBar {', COMPACT)
         self.assertIn('id: visual', COMPACT)
         self.assertIn('id: sync', COMPACT)
@@ -77,6 +85,10 @@ class ClockCompactSettingsContracts(unittest.TestCase):
         self.assertIn('TimeSettings.resyncMessage', sync)
         self.assertIn('TimeSettings.diagnosticMessage', sync)
         self.assertIn('TimeSettings.referenceMessage', sync)
+        self.assertIn('TimeSettings.diagnosticDetail', COMPACT)
+        self.assertIn('TimeSettings.resyncAuthPath', COMPACT)
+        self.assertIn('TimeSettings.authFlowStage', COMPACT)
+        self.assertIn('TimeSettings.timezoneMessage', COMPACT)
         self.assertIn('TimeSettings.resyncErrorCode', sync)
         self.assertIn('TimeSettings.autoCheckErrorCode', sync)
         self.assertIn('numericDetentInterval: 6', sync)

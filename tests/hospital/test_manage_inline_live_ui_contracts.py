@@ -207,6 +207,22 @@ check('send("stage", detail="RECORDER_STARTED")' in script
       and 'send("stage", detail="RECORDING_COMPLETED")' in script,
       "The Python recorder emits bounded non-content milestones around first inference")
 
+check('property bool safetyHold: true' in live
+      and 'safetyHold: false' in host
+      and 'pilotOneChunk: true' in host
+      and 'property bool pilotOneChunk: false' in live
+      and 'command.push("--pilot-one-chunk")' in live
+      and 'pilotWatchdog.restart()' in live
+      and 'id: pilotWatchdog' in live
+      and 'interval: 20000' in live,
+      "Operator-approved live trial is enabled only in HospitalW and bounded")
+check('parser.add_argument("--pilot-one-chunk"' in script
+      and 'pilot_one_chunk=args.pilot_one_chunk' in script
+      and 'if pilot_one_chunk and sent:' in script
+      and 'limit = RATE * FRAME_BYTES * (6 if pilot_one_chunk else MAX_SECONDS)' in script
+      and 'if not pilot_one_chunk and not cancelled.is_set()' in script,
+      "Pilot captures at most one guarded Whisper chunk, no tail rerun, or endless silence")
+
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")
     for issue in issues: print(" - " + issue)

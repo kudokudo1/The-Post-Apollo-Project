@@ -170,6 +170,7 @@ qemu-system-x86_64 \
   -nic none >"$tmp/guest-qemu.log" 2>&1 &
 pid="$!"
 final=0
+selinux_load_started=0
 for n in $(seq 1 700); do
   if [[ -r "$tmp/identity-guest-serial.log" ]]; then
     if grep -Fq 'C4B_ID_FAIL //' "$tmp/identity-guest-serial.log"; then
@@ -181,17 +182,28 @@ for n in $(seq 1 700); do
       final=1
       break
     fi
+    # Independent elapsed-time watchdog for the precise guest policy-load
+    # boundary. It does not grant acceptance or alter guest SELinux state.
+    # A stuck semodule/kernelload previously consumed the full QEMU window.
+    if grep -aFq 'C4B_ID_SELINUX_STAGE // before_module_install' "$tmp/identity-guest-serial.log" &&
+       ! grep -aFq 'C4B_ID_SELINUX_STAGE // after_module_install' "$tmp/identity-guest-serial.log"; then
+      if (( selinux_load_started == 0 )); then selinux_load_started=$SECONDS; fi
+      if (( SECONDS - selinux_load_started > 205 )); then
+        echo "C4B_ID_BLOCKED // REAL_ENFORCING_SELINUX_POLICY_LOAD_STALLED"
+        break
+      fi
+    fi
   fi
   if ! kill -0 "$pid" 2>/dev/null; then break; fi
   if (( n % 20 == 0 )); then
     echo "C4B_ID_HOST_HEARTBEAT // poll=$n"
-    grep -aE 'C4B_ID_(PASS|FAIL|STAGE|BLOCKED|PENDING|RPM_VERIFY_RC|RPM_VERIFY_DETAIL|SERVICE_OBSERVED|SERVICE_JOURNAL|SERVICE_PROBE_DETAIL|SERVICE_PROBE_RC|SELINUX_OBSERVED|SELINUX_LOAD_DETAIL|SELINUX_NEGATIVE_DETAIL)' \
+    grep -aE 'C4B_ID_(PASS|FAIL|STAGE|BLOCKED|PENDING|RPM_VERIFY_RC|RPM_VERIFY_DETAIL|SERVICE_OBSERVED|SERVICE_JOURNAL|SERVICE_PROBE_DETAIL|SERVICE_PROBE_RC|SELINUX_OBSERVED|SELINUX_STAGE|SELINUX_LOAD_DETAIL|SELINUX_UNLOAD_DETAIL|SELINUX_NEGATIVE_DETAIL)' \
       "$tmp/identity-guest-serial.log" 2>/dev/null | tail -n 12 || true
   fi
   sleep 2
 done
 echo "C4B_ID_HOST_EVIDENCE // BOUNDED_REAL_GUEST_MARKERS"
-grep -aE 'C4B_ID_(PASS|FAIL|STAGE|BLOCKED|PENDING|RPM_VERIFY_RC|RPM_VERIFY_DETAIL|SERVICE_OBSERVED|SERVICE_JOURNAL|SERVICE_PROBE_DETAIL|SERVICE_PROBE_RC|SELINUX_OBSERVED|SELINUX_LOAD_DETAIL|SELINUX_NEGATIVE_DETAIL)' \
+grep -aE 'C4B_ID_(PASS|FAIL|STAGE|BLOCKED|PENDING|RPM_VERIFY_RC|RPM_VERIFY_DETAIL|SERVICE_OBSERVED|SERVICE_JOURNAL|SERVICE_PROBE_DETAIL|SERVICE_PROBE_RC|SELINUX_OBSERVED|SELINUX_STAGE|SELINUX_LOAD_DETAIL|SELINUX_UNLOAD_DETAIL|SELINUX_NEGATIVE_DETAIL)' \
   "$tmp/identity-guest-serial.log" 2>/dev/null | tail -n 65 || true
 if [[ "$final" != 1 ]]; then
   echo "C4B_ID_BLOCKED // ORIGINAL_REAL_IDENTITY_OSTREE_ROLLBACK_NOT_VERIFIED"

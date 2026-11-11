@@ -161,6 +161,8 @@ class StreamingContractTests(unittest.TestCase):
                              (ROOT / path).read_text())
         self.assertEqual(probe.READ_BYTES, 3200)
         self.assertEqual(probe.MAX_AUDIO_SECONDS, 25)
+        self.assertEqual(probe.MAX_WALL_SECONDS, 45)
+        self.assertIn("signal.alarm(MAX_WALL_SECONDS)", text)
         self.assertEqual(probe.MAX_CORES, 2)
         self.assertEqual(probe.MAX_CPU_SECONDS, 12)
 

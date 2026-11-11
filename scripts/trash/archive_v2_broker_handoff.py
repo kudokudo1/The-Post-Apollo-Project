@@ -38,7 +38,7 @@ def admit_peer_bound_fixture(
     commit_guard=None, expected_peer_witness_sha256=None,
     service_witness_sha256="", service_grant_sha256="",
     service_release_sha256="", origin_witness_sha256="",
-    checkpoint_sha256="",
+    checkpoint_sha256="", manager_witness_sha256="",
 ):
     """Bind a live kernel peer witness to a signed TEST copy and its nonce.
 
@@ -103,6 +103,15 @@ def admit_peer_bound_fixture(
                               for c in checkpoint_sha256)))
              and (checkpoint_sha256 == "" or service_release_sha256 != ""),
              "BROKER_CHECKPOINT_INVALID")
+    _require(type(manager_witness_sha256) is str
+             and (manager_witness_sha256 == ""
+                  or (len(manager_witness_sha256) == 64
+                      and all(c in "0123456789abcdef"
+                              for c in manager_witness_sha256)))
+             and (manager_witness_sha256 == ""
+                  or (origin_witness_sha256 != ""
+                      and service_witness_sha256 != "")),
+             "BROKER_MANAGER_WITNESS_INVALID")
     claim_hash = hashlib.sha256(encoded_claim).hexdigest()
     authority_hash = hashlib.sha256(encoded_manifest).hexdigest()
     request = {
@@ -127,6 +136,8 @@ def admit_peer_bound_fixture(
         request["originWitnessSha256"] = origin_witness_sha256
     if checkpoint_sha256:
         request["checkpointSha256"] = checkpoint_sha256
+    if manager_witness_sha256:
+        request["managerWitnessSha256"] = manager_witness_sha256
     encoded = json.dumps(request, sort_keys=True, ensure_ascii=True,
                          separators=(",",":"), allow_nan=False)
     binding = hashlib.sha256(encoded.encode("ascii")).hexdigest()
@@ -147,6 +158,7 @@ def admit_peer_bound_fixture(
         service_release_sha256=service_release_sha256,
         origin_witness_sha256=origin_witness_sha256,
         checkpoint_sha256=checkpoint_sha256,
+        manager_witness_sha256=manager_witness_sha256,
     )
     _require(result["peerWitnessSha256"] == evidence["peerWitnessSha256"]
              and result["requestBindingSha256"] == binding,
@@ -164,6 +176,7 @@ def admit_peer_bound_fixture(
         "serviceReleaseSha256":service_release_sha256,
         "originWitnessSha256":origin_witness_sha256,
         "checkpointSha256":checkpoint_sha256,
+        "managerWitnessSha256":manager_witness_sha256,
         "nonce":claim["nonce"],
         "kernelPeerMatchedFixture":True,
         "payloadIntegrityStored":True,

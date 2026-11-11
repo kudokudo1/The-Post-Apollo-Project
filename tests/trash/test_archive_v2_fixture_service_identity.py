@@ -152,7 +152,8 @@ class ServiceIdentityV2qTests(unittest.TestCase):
 
     def send(self, *, service=None, signed_service_grant=None,
              signed_service_release=None, service_release_history=None,
-             origin_policy=None, signed_checkpoint=None, checkpoint_root=None):
+             origin_policy=None, signed_checkpoint=None, checkpoint_root=None,
+             manager_fixture=None, manager_policy=None):
         if service is None:
             service = self.pinned
         elif service is False:
@@ -171,7 +172,9 @@ class ServiceIdentityV2qTests(unittest.TestCase):
                     service_release_history=service_release_history,
                     origin_policy=origin_policy,
                     signed_checkpoint=signed_checkpoint,
-                    checkpoint_root=checkpoint_root)
+                    checkpoint_root=checkpoint_root,
+                    manager_fixture=manager_fixture,
+                    manager_policy=manager_policy)
 
     def counts(self):
         return self.ledger.test_copy_status("demo-scrape")

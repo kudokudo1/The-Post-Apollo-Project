@@ -173,6 +173,9 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
     capture_done = threading.Event()
     recognition_done = threading.Event()
     stopping_error = threading.Event()
+    # Single owner-reason receipt for STOP vs internal safety shutdown.
+    # Codes are bounded constants, never speech/text or device details.
+    capture_reason = ["CAPTURE_SOURCE_ENDED"]
     recorder = None
     model_lock = threading.Lock()
     active_model = None
@@ -264,6 +267,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                     halt_child()
                     break
                 if command == "STOP":
+                    capture_reason[0] = "CAPTURE_USER_STOP"
                     stopping.set()
                     halt_child()
                     break
@@ -302,6 +306,9 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
             try:
                 clips.put(raw, timeout=0.1)
                 accepted_chunks += 1
+                if (live_chunk_ceiling >= 3
+                        and accepted_chunks == live_chunk_ceiling - 1):
+                    send("stage", detail="CAPTURE_LIMIT_NEAR")
                 if not first_chunk_reported:
                     first_chunk_reported = True
                     send("stage", detail="FIRST_AUDIO_QUEUED")
@@ -355,11 +362,17 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                             and accepted_chunks >= live_chunk_ceiling):
                         # One active model, bounded queued clips, and a hard
                         # ceiling on model launches per live trial.
+                        capture_reason[0] = "CAPTURE_CHUNK_LIMIT"
                         stopping.set()
                         halt_child()
                         break
-                if (vad and heard_speech and quiet_ms >= max(300, silence_ms)) \
-                        or received >= limit:
+                if vad and heard_speech and quiet_ms >= max(300, silence_ms):
+                    capture_reason[0] = "CAPTURE_SILENCE_LIMIT"
+                    stopping.set()
+                    halt_child()
+                    break
+                if received >= limit:
+                    capture_reason[0] = "CAPTURE_DURATION_LIMIT"
                     stopping.set()
                     halt_child()
                     break
@@ -379,6 +392,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                     tail += bytes(minimum - len(tail))
                 enqueue(tail)
             capture_done.set()
+            send("stage", detail=capture_reason[0])
             send("stage", detail="CAPTURE_STOPPED")
             # Sentinel eventually enters after the finite queued chunks.
             while not cancelled.is_set() and not recognition_done.is_set():

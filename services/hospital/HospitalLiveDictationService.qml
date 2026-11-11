@@ -27,6 +27,11 @@ Scope {
     // Short lifecycle code only, never spoken words or audio. A few stage
     // receipts permit post-crash correlation without reproducing speech.
     property string lastStage: "SAFETY_HOLD"
+    // Persist the bounded capture reason past RECORDING_COMPLETED.
+    // This is a fixed code, not spoken words or transcript content.
+    property string captureStopReason: ""
+    property bool audioDropped: false
+    property bool safetyLimitSoon: false
     property int recordingElapsedSeconds: 0
     property double recordingStartedAt: 0
     property bool liveStreaming: true
@@ -92,6 +97,9 @@ Scope {
         lastError = "";
         lastTranscript = "";
         lastStage = "REQUESTED";
+        captureStopReason = "";
+        audioDropped = false;
+        safetyLimitSoon = false;
         recordingStartedAt = Date.now();
         recordingElapsedSeconds = 0;
         voiceState = "recording";
@@ -157,12 +165,18 @@ Scope {
             // Python emits fixed low-cardinality lifecycle codes. The
             // allowlist prevents untrusted child output reaching the journal.
             const code = String(data.detail || "");
-            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|MODEL_BACKPRESSURE|CAPTURE_STOPPED|MODEL_SESSION_STARTING|MODEL_SESSION_READY|MODEL_SESSION_UNAVAILABLE|RECORDING_COMPLETED)$/.test(code))
+            if (!/^(RECORDER_STARTED|FIRST_AUDIO_QUEUED|FIRST_MODEL_STARTED|FIRST_MODEL_ENDED|FIRST_TEXT_READY|MODEL_TIMEOUT|MODEL_FAILURE|MODEL_BACKPRESSURE|CAPTURE_STOPPED|CAPTURE_LIMIT_NEAR|CAPTURE_CHUNK_LIMIT|CAPTURE_DURATION_LIMIT|CAPTURE_SILENCE_LIMIT|CAPTURE_SOURCE_ENDED|CAPTURE_USER_STOP|MODEL_SESSION_STARTING|MODEL_SESSION_READY|MODEL_SESSION_UNAVAILABLE|RECORDING_COMPLETED)$/.test(code))
                 return;
             if (lastStage !== code) {
                 lastStage = code;
                 console.warn("HOSPITAL_VOICE_STAGE // " + code);
             }
+            if (code === "MODEL_BACKPRESSURE")
+                audioDropped = true;
+            if (code === "CAPTURE_LIMIT_NEAR")
+                safetyLimitSoon = true;
+            if (/^CAPTURE_(CHUNK_LIMIT|DURATION_LIMIT|SILENCE_LIMIT|SOURCE_ENDED|USER_STOP)$/.test(code))
+                captureStopReason = code;
             if (code === "CAPTURE_STOPPED" && recording) {
                 // Auto-ended capture still has at most one guarded model
                 // processing queued chunks. Do not imply mic remains open.

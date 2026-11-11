@@ -275,7 +275,18 @@ Column {
         root.dictationMode = "";
         root.dictationOriginalText = "";
         root.dictationFeedbackField = key;
-        root.dictationFeedback = "LIVE TRANSCRIPT READY // REVIEW BEFORE SUBMIT";
+        const voice = root.speechInputService;
+        const reason = voice ? String(voice.captureStopReason || "") : "";
+        if (voice && voice.audioDropped)
+            root.dictationFeedback = "AUDIO SKIPPED // MODEL TOO SLOW // REVIEW MISSING WORDS";
+        else if (reason === "CAPTURE_CHUNK_LIMIT")
+            root.dictationFeedback = "SAFETY STOP // CHUNK LIMIT // TAP MIC TO CONTINUE";
+        else if (reason === "CAPTURE_DURATION_LIMIT")
+            root.dictationFeedback = "SAFETY STOP // TIME LIMIT // TAP MIC TO CONTINUE";
+        else if (reason === "CAPTURE_SOURCE_ENDED")
+            root.dictationFeedback = "MIC SOURCE ENDED // REVIEW TRANSCRIPT";
+        else
+            root.dictationFeedback = "LIVE TRANSCRIPT READY // REVIEW BEFORE SUBMIT";
         if (field) field.focusEditorAtEnd();
     }
     function acceptDictation(text) {
@@ -2148,12 +2159,20 @@ Column {
             visible: managerArea.showVoiceLine
             text: managerArea.voiceActive && root.speechInputService
                 && root.speechInputService.recording
-                ? "LIVE " + root.speechInputService.recordingElapsedLabel
-                    + " // TALK TO FILL THIS BOX // PRESS MIC TO STOP"
+                ? (root.speechInputService.audioDropped
+                    ? "LIVE // AUDIO SKIPPED // MODEL FALLING BEHIND"
+                    : root.speechInputService.safetyLimitSoon
+                      ? "LIVE // SAFETY LIMIT SOON // FINISH PHRASE"
+                      : "LIVE " + root.speechInputService.recordingElapsedLabel
+                          + " // PRESS MIC TO STOP")
                 : managerArea.voiceActive && root.speechInputService
                     && (root.speechInputService.stopping
                         || root.speechInputService.transcribing)
-                ? "LOCAL WHISPER // FINISHING LAST CHUNK // NO SUBMISSION"
+                ? (root.speechInputService.captureStopReason === "CAPTURE_CHUNK_LIMIT"
+                    ? "SAFETY AUTO-STOP // FINISHING LAST CHUNK"
+                    : root.speechInputService.audioDropped
+                      ? "MODEL BEHIND // SOME AUDIO WAS SKIPPED"
+                      : "LOCAL WHISPER // FINISHING // NO SUBMISSION")
                 : root.dictationFeedback
             color: managerArea.voiceActive ? Colors.magenta : Colors.orange
             font.pixelSize: 8

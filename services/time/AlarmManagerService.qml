@@ -8,6 +8,8 @@ import "AlarmManagerPolicy.js" as Policy
 // TimeW is just a view. No QtMultimedia dependency in the scheduler itself.
 Scope {
     id: manager
+    // One stable alarm occurrence, never a generic Clock-level timer event.
+    signal alarmFired(int alarmId, double startedMs)
 
     readonly property string storagePath: Quickshell.dataDir + "/time-alarms-v2.json"
     readonly property string legacyPath: Quickshell.dataDir + "/time-alarm-v1.json"
@@ -262,6 +264,19 @@ Scope {
                 audioLoader.item.start();
         }
     }
+    function announceRestoredRinging() {
+        if (!canEdit) return;
+        const now = Date.now();
+        for (let i = 0; i < document.alarms.length; i++) {
+            const a = document.alarms[i];
+            // A still-active ring may have started before this shell loaded.
+            // NotificationProducer de-duplicates by stable occurrence ID.
+            if (a.ringing && a.ringStartedAtMs > 0
+                    && a.ringStartedAtMs <= now
+                    && now - a.ringStartedAtMs < Policy.MAX_RING_MS)
+                alarmFired(a.id, a.ringStartedAtMs);
+        }
+    }
     function checkDue() {
         if (!canEdit) return;
         const r = Policy.tick(document, nowMs);
@@ -273,6 +288,11 @@ Scope {
         if (saveDocument(r.document)) {
             if (r.started.length) {
                 if (previewing) endPreview();
+                for (let i = 0; i < r.started.length; i++) {
+                    const row = Policy.byId(document, r.started[i]);
+                    if (row && row.ringing)
+                        alarmFired(row.id, row.ringStartedAtMs);
+                }
                 feedback = "RINGING // " + r.started.length + " ALARM(S)";
             }
             else if (r.missed.length)
@@ -341,6 +361,7 @@ Scope {
             manager.storageState = "ready";
             manager.feedback = "SAVED ALARMS LOADED";
             Qt.callLater(manager.checkDue);
+            Qt.callLater(manager.announceRestoredRinging);
         }
         onLoadFailed: function(error) {
             if (error === FileViewError.FileNotFound) {
@@ -367,6 +388,7 @@ Scope {
                 if (manager.migrationRequested) {
                     manager.migrationRequested = false;
                     manager.feedback = "V1 ALARM MIGRATED // V1 FILE PRESERVED";
+                    Qt.callLater(manager.announceRestoredRinging);
                 }
                 Qt.callLater(manager.checkDue);
             }

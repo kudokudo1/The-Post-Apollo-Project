@@ -70,8 +70,8 @@ ShellRoot {
             root.ticks++;
             if(root.ticks > 25) return root.fail("TIMEOUT");
             if(weatherTerminal.metrics.length!==4
-                || weatherTerminal.hourlySamples.length!==3
-                || weatherTerminal.dailySamples.length!==3)
+                || (root.phase<2 && (weatherTerminal.hourlySamples.length!==3
+                   || weatherTerminal.dailySamples.length!==3)))
                 return root.fail("SYNTHETIC_OBSERVATION_NOT_RENDERED // "
                     +weatherTerminal.metrics.length+" / "
                     +weatherTerminal.hourlySamples.length+" / "

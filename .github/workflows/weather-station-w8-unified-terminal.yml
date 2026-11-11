@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'widgets/weather/StationWeatherTerminalSummary.qml'
+      - 'widgets/weather/StationWeatherLineGlyph.qml'
       - 'widgets/weather/StationWeatherSubjectPanelPolicy.js'
       - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
       - 'widgets/weather/StationSky.qml'
@@ -83,3 +84,11 @@ jobs:
           if grep -E 'W8_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi
+      - name: Upload optional W14 overview visual preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-w14-overview-preview
+          path: /tmp/weather-w14-overview-preview.png
+          if-no-files-found: warn
+          retention-days: 14

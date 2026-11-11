@@ -44,6 +44,7 @@ Rectangle {
     // Supplied by the existing Station root; no independent clock.
     property real runtimeNowMs: 0
 
+    readonly property alias overviewRailItem: magickOverviewRail
     readonly property string kind: MagickPolicy.kindForRoute(subjectRoute)
     readonly property string primaryObservation:
         MagickPolicy.sourceFor(subjectRoute)

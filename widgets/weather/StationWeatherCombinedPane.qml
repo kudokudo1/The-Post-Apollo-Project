@@ -18,8 +18,12 @@ Rectangle {
     color: Colors.black
     clip: true
 
-    readonly property var hourlyRows: sky && sky.hourlyForecast ? sky.hourlyForecast : []
-    readonly property var dailyRows: sky && sky.dailyForecast ? sky.dailyForecast : []
+    readonly property var hourlyRows: sky && sky.weatherService
+        && sky.weatherService.forecastReady && sky.hourlyForecast
+        ? sky.hourlyForecast : []
+    readonly property var dailyRows: sky && sky.weatherService
+        && sky.weatherService.forecastReady && sky.dailyForecast
+        ? sky.dailyForecast : []
     readonly property bool currentReady: Boolean(sky && sky.weatherReady)
     readonly property bool airReady: Boolean(sky && sky.aqiReady)
 
@@ -188,7 +192,8 @@ Rectangle {
                         font.pixelSize: 11
                         color: Colors.white
                         text: panel.currentReady
-                              ? panel.reading(panel.sky.pressureValue," hPa") : "--"
+                              ? (panel.sky.pressureValue >= 0
+                                ? panel.reading(panel.sky.pressureValue," hPa") : "--") : "--"
                     }
                     QuietText {
                         anchors.bottom: parent.bottom
@@ -196,7 +201,8 @@ Rectangle {
                         font.pixelSize: 8
                         elide: Text.ElideRight
                         text: panel.currentReady
-                              ? "VIS " + panel.reading(panel.sky.visibilityValue," mi")
+                              ? "VIS " + (panel.sky.visibilityValue >= 0
+                                ? panel.reading(panel.sky.visibilityValue," mi") : "--")
                               : "VIS --"
                     }
                 }

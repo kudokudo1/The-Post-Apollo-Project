@@ -1,0 +1,31 @@
+name: TimeW MACHINE sealed Brave snapshot vault
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineBraveSealedVault.py"
+      - "tests/timew/test_machine_brave_sealed_vault.py"
+      - "tests/timew/test_machine_brave_sealed_vault_crypto.mjs"
+      - "docs/timew-machine-brave-sealed-vault.md"
+      - ".github/workflows/timew-machine-brave-sealed-vault.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sealed-vault:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Strict ciphertext-only filesystem vault validation, unlink and crash refusal
+        run: python3 -B -I tests/timew/test_machine_brave_sealed_vault.py
+      - name: Encrypt synthetic browser URLs with AES-256-GCM, store and decrypt
+        run: node tests/timew/test_machine_brave_sealed_vault_crypto.mjs
+      - name: Preserve existing tab permission, privacy and recovery boundaries
+        run: |
+          node tests/timew/test_machine_brave_consent_preview.mjs
+          node tests/timew/test_machine_brave_session_recovery_plan.mjs
+          python3 -B -I tests/timew/test_machine_brave_session_recovery_contract.py
+          python3 -B -I tests/timew/test_machine_brave_topology_contract.py

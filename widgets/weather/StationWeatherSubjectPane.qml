@@ -125,9 +125,9 @@ Rectangle {
             objectName: "weather-w9-fixed-terminal-host"
             readonly property bool combined:
                 weatherPane.subjectRoute === "weather/conditions/current"
-            property string focus: "now"
+            property string activeInstrument: "now"
             onCombinedChanged: {
-                if (combined) focus = "now";
+                if (combined) activeInstrument = "now";
             }
             readonly property var runtimeRows: originalSky.runtimeRows
             readonly property alias renderer: originalSky
@@ -157,8 +157,8 @@ Rectangle {
                         label: modelData.label
                         labelPixelSize: 10
                         accentColor: Colors.cyan
-                        selected: skyHost.focus === modelData.focus
-                        onClicked: skyHost.focus = modelData.focus
+                        selected: skyHost.activeInstrument === modelData.focus
+                        onClicked: skyHost.activeInstrument = modelData.focus
                     }
                 }
             }
@@ -180,13 +180,13 @@ Rectangle {
                     id: originalSky
                     objectName: "weather-w9-original-sky"
                     subjectRoute: weatherPane.subjectRoute
-                    weatherFocus: skyHost.combined ? skyHost.focus : ""
+                    weatherFocus: skyHost.combined ? skyHost.activeInstrument : ""
                     weatherService: weatherPane.weatherService
                     runtimeNowMs: weatherPane.runtimeNowMs
                     width: skyHost.combined
-                           ? (skyHost.focus === "now" ? 860
-                              : skyHost.focus === "hourly" ? 790
-                              : skyHost.focus === "daily" ? 750 : 800)
+                           ? (skyHost.activeInstrument === "now" ? 860
+                              : skyHost.activeInstrument === "hourly" ? 790
+                              : skyHost.activeInstrument === "daily" ? 750 : 800)
                            : instrumentViewport.width
                     height: skyHost.combined ? 800 : instrumentViewport.height
                     transformOrigin: Item.TopLeft

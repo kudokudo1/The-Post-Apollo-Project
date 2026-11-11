@@ -229,7 +229,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             '[[ "$(id -u)" == 0 && -e /run/ostree-booted',
             '[[ "$(getenforce)" == Enforcing',
             'post-apollo-identity-silverblue-ci.service',
-            'UNIT_REFUSED_WITHOUT_CI_MARKER',
+            'REAL_SYSTEMD_UNIT_REFUSED_WITHOUT_MARKER',
             'systemctl show "$unit" --property=MainPID',
             'systemctl show "$unit" --property=ControlGroup',
             '"/proc/$pid/status"',

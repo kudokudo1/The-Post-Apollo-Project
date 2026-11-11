@@ -268,6 +268,27 @@ check('help_text" == *"--no-gpu"*' in stt
       and 'private_server_compatible || exit 3' in stt,
       "Private whisper-server launch accepts documented upstream flags, never unsupported -nc")
 
+check('capture_reason = ["CAPTURE_SOURCE_ENDED"]' in script
+      and 'capture_reason[0] = "CAPTURE_USER_STOP"' in script
+      and 'capture_reason[0] = "CAPTURE_CHUNK_LIMIT"' in script
+      and 'send("stage", detail="CAPTURE_LIMIT_NEAR")' in script
+      and 'send("stage", detail=capture_reason[0])' in script
+      and 'send("stage", detail="CAPTURE_STOPPED")' in script,
+      "Fixed non-content capture stop reasons distinguish user STOP from safety limit")
+check('property string captureStopReason: ""' in live
+      and 'property bool audioDropped: false' in live
+      and 'property bool safetyLimitSoon: false' in live
+      and 'captureStopReason = code;' in live
+      and 'audioDropped = true;' in live
+      and 'safetyLimitSoon = true;' in live
+      and 'CAPTURE_CHUNK_LIMIT' in live,
+      "Stage-only reasons latch in the held voice owner until next recording")
+check('SAFETY AUTO-STOP // FINISHING LAST CHUNK' in manager
+      and 'SAFETY STOP // CHUNK LIMIT // TAP MIC TO CONTINUE' in manager
+      and 'AUDIO SKIPPED // MODEL TOO SLOW // REVIEW MISSING WORDS' in manager
+      and 'SAFETY LIMIT SOON // FINISH PHRASE' in manager,
+      "Manage surfaces early cutoff and dropped audio, never silent truncation")
+
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")
     for issue in issues: print(" - " + issue)

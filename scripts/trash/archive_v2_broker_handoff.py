@@ -35,6 +35,7 @@ def admit_peer_bound_fixture(
     peer_connection, expected_peer_policy, signed_manifest, pinned_test_root,
     signed_claim, *, ledger, owner_id, resource_id, source_revision,
     source_captured_ms, payload, now_ms, on_stage=None,
+    commit_guard=None, expected_peer_witness_sha256=None,
 ):
     """Bind a live kernel peer witness to a signed TEST copy and its nonce.
 
@@ -44,6 +45,10 @@ def admit_peer_bound_fixture(
     lifetime binding, trusted clock, owner grant, and authorized ArchiveStore.
     """
     evidence = inspect_fixture_peer(peer_connection, expected_peer_policy)
+    _require(expected_peer_witness_sha256 is None
+             or (type(expected_peer_witness_sha256) is str
+                 and expected_peer_witness_sha256 == evidence["peerWitnessSha256"]),
+             "BROKER_LIFECYCLE_WITNESS_CHANGED")
     _require(evidence["ownerId"] == owner_id
              and evidence["captureAllowed"] is False,
              "BROKER_OWNER_PEER_MISMATCH")
@@ -89,6 +94,7 @@ def admit_peer_bound_fixture(
         payload=payload, now_ms=now_ms, on_stage=on_stage,
         peer_witness_sha256=evidence["peerWitnessSha256"],
         request_binding_sha256=binding,
+        commit_guard=commit_guard,
     )
     _require(result["peerWitnessSha256"] == evidence["peerWitnessSha256"]
              and result["requestBindingSha256"] == binding,

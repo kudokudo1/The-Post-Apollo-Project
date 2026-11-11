@@ -330,5 +330,18 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertNotIn("pip install", host)
 
 
+    def test_12_embedded_kernel_peer_python_compiles_without_vm(self):
+        # Catch Python heredoc regressions BEFORE an expensive offline boot.
+        probe = (AREA / "guest_identity_service_probe.sh").read_text()
+        prefix = "<<'PY' || probe_rc=\"$?\"\n"
+        self.assertEqual(probe.count(prefix), 1)
+        program = probe.split(prefix, 1)[1].split("\nPY\n", 1)[0]
+        self.assertIn("socket.SO_PEERCRED", program)
+        self.assertIn('if peer!=(pid,uid,gid):', program)
+        self.assertIn("check_origin(f\"before {action}\")", program)
+        self.assertIn("check_origin(f\"after {action}\")", program)
+        compile(program, "guest_identity_service_probe.sh:kernel-peer-python", "exec")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

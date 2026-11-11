@@ -57,8 +57,10 @@ Scope {
             soundState = "AUDIO REQUESTED";
             if (!soundLoader.active)
                 soundLoader.active = true;
-            else if (soundLoader.item)
+            else if (soundLoader.item) {
+                soundLoader.item.outputVolume = alarm.volumePercent / 100;
                 soundLoader.item.start();
+            }
         } else {
             stopAudio();
         }
@@ -158,6 +160,19 @@ Scope {
         return accepted;
     }
 
+    function setVolumePercent(value) {
+        if (!canEdit) return false;
+        const result = AlarmPolicy.withVolume(document, value);
+        if (!result.ok) return false;
+        const accepted = saveDocument(result.document);
+        if (accepted) {
+            if (soundLoader.item)
+                soundLoader.item.outputVolume = value / 100;
+            feedback = "ALARM VOLUME // " + value + "%";
+        }
+        return accepted;
+    }
+
     function previewSound() {
         if (!canEdit || ringing) return false;
         previewing = true;
@@ -194,9 +209,12 @@ Scope {
         active: false
         source: "AlarmAudio.qml"
         onLoaded: {
-            if (item && (alarmService.previewing
-                    || (alarmService.ringing && alarmService.alarm.soundEnabled)))
-                item.start();
+            if (item) {
+                item.outputVolume = alarmService.alarm.volumePercent / 100;
+                if (alarmService.previewing
+                        || (alarmService.ringing && alarmService.alarm.soundEnabled))
+                    item.start();
+            }
         }
         onStatusChanged: {
             if (status === Loader.Error)

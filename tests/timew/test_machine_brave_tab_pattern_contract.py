@@ -30,7 +30,7 @@ assert 'gap: 7px' in css
 assert manifest["permissions"] == []
 assert manifest["host_permissions"] == []
 assert manifest["incognito"] == "not_allowed"
-assert manifest["optional_permissions"] == ["nativeMessaging"]
+assert manifest["optional_permissions"] == ["nativeMessaging", "tabs"]
 
 # Shared widget presentation: labels cyan, // white, numbers orange.
 assert 'text: "TABS"' in part

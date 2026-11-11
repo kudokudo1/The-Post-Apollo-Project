@@ -9,6 +9,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+from unittest.mock import patch
 
 root = Path(__file__).resolve().parents[2]
 script = root / "services/time/MachineBraveSealedVault.py"
@@ -97,6 +98,14 @@ with tempfile.TemporaryDirectory(prefix="machine-sealed-vault-test-") as t:
     assert another["record_id"]!=key
     assert len(vault.listing()["records"])==2
 
+    # Injection: failure after writing/fsyncing temporary bytes but before
+    # publishing the final link rolls back only the new temporary file.
+    stable={entry.name:entry.read_bytes() for entry in target.iterdir()}
+    with patch.object(vault.os,"link",side_effect=OSError("SIMULATED LINK FAILURE")):
+        refused(vault.put,request())
+    assert {entry.name:entry.read_bytes() for entry in target.iterdir()}==stable
+    assert not list(target.glob(".tmp-*"))
+
     refused(vault.delete,key,"0"*64)
     assert file.exists()
     refused(vault.delete,key,"not-a-digest")
@@ -149,9 +158,7 @@ with tempfile.TemporaryDirectory(prefix="machine-sealed-vault-test-") as t:
     rc,out=call("read","../outside",env=env)
     assert rc!=0 and out["status"]=="refused"
 
-    # Symlink root must never be followed.
-    target.rmdir() if not list(target.iterdir()) else None
-    # The remaining third record is intentionally still present.
+    # Other records remain intact, even after rejected deletes.
     assert target.is_dir()
 
     # The raw browser session never gets routed through geometry storage.

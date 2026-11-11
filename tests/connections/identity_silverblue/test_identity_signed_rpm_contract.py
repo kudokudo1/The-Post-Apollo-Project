@@ -524,5 +524,31 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertIn("C4B_ID_(PASS|FAIL|STAGE|BLOCKED", host)
 
 
+    def test_18_observed_kernel_selinux_witness_goes_to_durable_guest_uart(self):
+        probe = (AREA / "guest_identity_service_probe.sh").read_text()
+        host = (AREA / "run_official_silverblue_identity.sh").read_text()
+        required = (
+            'C4B_ID_SELINUX_OBSERVED // %.180s\\n',
+            'REAL_ENFORCING_DEDICATED_SELINUX_DOMAIN_OBSERVED',
+            'C4B_ID_SERVICE_OBSERVED // pid=%s',
+            'REAL_SYSTEMD_IDENTITY_GATEWAY_SOCKET_AND_PROCESS_OBSERVED',
+        )
+        for marker in required:
+            self.assertIn(marker, probe)
+        self.assertIn(
+            """printf 'C4B_ID_SELINUX_OBSERVED // %.180s\\n' "$selinux" >/dev/ttyS0""",
+            probe,
+        )
+        self.assertIn(
+            'echo "C4B_ID_PASS // REAL_ENFORCING_DEDICATED_SELINUX_DOMAIN_OBSERVED" >/dev/ttyS0',
+            probe,
+        )
+        self.assertIn('C4B_ID_(PASS|FAIL|STAGE|BLOCKED', host)
+        self.assertIn('SELINUX_OBSERVED|SELINUX_STAGE', host)
+        # An observed label must precede the unchanged full-domain comparison.
+        self.assertLess(probe.index('printf \'C4B_ID_SELINUX_OBSERVED'),
+                        probe.index("system_u:system_r:postapollo_identity_ci_t:s0' &&"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

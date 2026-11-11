@@ -159,13 +159,13 @@ Rectangle {
                             Item {
                                 id: conditionArt
                                 objectName: "weather-w12-current-condition-icon"
-                                width: Math.min(69,Math.max(36,conditionValueRow.height))
+                                width: Math.min(69,Math.max(50,conditionValueRow.height))
                                 height: parent.height
                                 Text {
                                     anchors.centerIn: parent
                                     text: panel.currentReady && panel.sky
                                         ? panel.sky.conditionState.icon : "?"
-                                    font.pixelSize: Math.max(45,conditionArt.width)
+                                    font.pixelSize: Math.max(50,conditionArt.width)
                                     color: panel.currentReady && panel.sky
                                         ? panel.sky.iconColor(panel.sky.conditionState.color)
                                         : Colors.white

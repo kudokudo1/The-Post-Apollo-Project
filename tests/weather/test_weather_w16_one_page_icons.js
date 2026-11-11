@@ -13,8 +13,8 @@ test("W16 preserves original weather artwork but enlarges current, hour, day and
  assert.match(terminal,/hour\.forecastState\.icon/);
  assert.match(terminal,/day\.dayState\.icon/);
  assert.match(terminal,/WeatherCelestialGlyph\s*\{/);
- assert.match(terminal,/width: Math\.max\(86,Math\.min\(180,currentPanel\.height\+8,/);
- assert.match(terminal,/currentPanel\.height \* 1\.33/);
+ assert.match(terminal,/width: Math\.max\(80,Math\.min\(158,currentPanel\.height\+4,/);
+ assert.match(terminal,/currentPanel\.height \* 1\.08/);
  assert.match(terminal,/font\.pixelSize: Math\.max\(40,hourGlyph\.width\+7\)/);
  assert.match(terminal,/font\.pixelSize: Math\.max\(34,dayGlyph\.width\+5\)/);
  assert.match(summary,/font\.pixelSize: 25/);

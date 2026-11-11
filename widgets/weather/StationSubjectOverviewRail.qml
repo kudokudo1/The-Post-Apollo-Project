@@ -9,6 +9,7 @@ Item {
     objectName: "station-w21-shared-overview-rail"
     property var routes: []
     signal routeRequested(string path)
+    readonly property alias buttonRepeater: actionRepeater
     height: visible ? 31 : 0
 
     Row {
@@ -20,6 +21,7 @@ Item {
         height: 25
         spacing: HeaderGeometry.tabSpacing
         Repeater {
+            id: actionRepeater
             model: overviewRail.routes
             delegate: ActionButton {
                 required property var modelData

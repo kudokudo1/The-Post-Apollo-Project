@@ -72,7 +72,11 @@ ShellRoot {
             if(weatherTerminal.metrics.length!==4
                 || weatherTerminal.hourlySamples.length!==3
                 || weatherTerminal.dailySamples.length!==3)
-                return root.fail("SYNTHETIC_OBSERVATION_NOT_RENDERED");
+                return root.fail("SYNTHETIC_OBSERVATION_NOT_RENDERED // "
+                    +weatherTerminal.metrics.length+" / "
+                    +weatherTerminal.hourlySamples.length+" / "
+                    +weatherTerminal.dailySamples.length+" // READY "
+                    +weatherTerminal.forecastReady);
             if(!weatherTerminal.currentMetricItem
                 || !weatherTerminal.hourlyItem || !weatherTerminal.dailyItem)
                 return root.fail("INSTRUMENT_GEOMETRY_MISSING");

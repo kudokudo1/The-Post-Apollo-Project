@@ -227,6 +227,11 @@ PanelWindow {
             shellRoot.requestControlKeyboard("git", "notification-route");
             return true;
         }
+        if (widget === "time" && route.view === "alarm") {
+            // Navigate the existing Clock window. TimeW resolves the saved
+            // ID again, and refuses to overwrite an unsaved alarm note.
+            return timewWindow.openNotificationAlarm(route.alarmId);
+        }
         if (widget === "notifications" && route.view === "system") {
             notificationsHubWindow.open();
             notificationsHubWindow.activeFilter = "system";
@@ -544,6 +549,11 @@ PanelWindow {
         // Feed the already-running dock's 2s MPD observation: no new poller.
         mpdDockSource: sharedMediaDock
     }
+
+    // Clock's existing durable scheduler fans out to the normal Notifications
+    // policy/history/popup service. This is a passive listener, not a second
+    // alarm timer, notify-send service or audio player.
+    ClockAlarmNotificationProducer {}
 
     // Official NWS alerts only when an operator-pinned geographic point exists.
     NwsOfficialAlertNotificationProducer {

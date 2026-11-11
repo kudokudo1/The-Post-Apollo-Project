@@ -310,6 +310,24 @@ check('property int firstTextMs: -1' in live
       and 'root.speechInputService.timingSummary' in manager,
       "Hospital validates bounded timing and shows summary after normal dictation")
 
+check('WARMUP_MIN_BYTES = RATE * FRAME_BYTES * 3 // 10' in script
+      and 'model_warmup_requested = threading.Event()' in script
+      and 'if (prefer_persistent and pilot_live_chunks > 0' in script
+      and 'and is_speech(bytes(pending))' in script
+      and 'model_warmup_requested.set()' in script
+      and 'if model_warmup_requested.is_set() and not attempted_session:' in script
+      and 'start_persistent_once(early=True)' in script
+      and 'MODEL_EARLY_START' in live,
+      "One guarded persistent model can preload only after speech, before first chunk")
+check('clips = queue.Queue(maxsize=MAX_QUEUE)' in script
+      and 'MAX_QUEUE = 2' in script
+      and 'pilot_live_chunks: int = 0, prefer_persistent: bool = False' in script
+      and 'pilotOneChunk: false' in host
+      and 'pilotLiveChunks: 6' in host
+      and 'property bool safetyHold: true' in live
+      and 'interval: root.pilotLiveChunks > 0 ? 45000 : 20000' in live,
+      "Startup overlap changes no CPU/RAM caps, queue depth, model count or watchdog")
+
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")
     for issue in issues: print(" - " + issue)

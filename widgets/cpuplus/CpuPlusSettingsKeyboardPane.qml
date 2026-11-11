@@ -171,7 +171,11 @@ Item {
                     text: "REMEMBER NUM // "
                           + (KeyboardLockSettings.hostRememberNum
                              && KeyboardLockSettings.numMode === "remember"
-                             ? "ARMED" : "NOT ARMED")
+                             ? (KeyboardLockSettings.rememberSuspended
+                                ? "SUSPENDED"
+                                : KeyboardLedObservation.monitoringEnabled
+                                  ? "ARMED" : "PAUSED // MONITOR OFF")
+                             : "NOT ARMED")
                     color: KeyboardLockSettings.hostRememberNum
                            ? Colors.cyan : Colors.orange
                     font.pixelSize: 9
@@ -182,7 +186,11 @@ Item {
                     text: "REMEMBER CAPS // "
                           + (KeyboardLockSettings.hostRememberCaps
                              && KeyboardLockSettings.capsMode === "remember"
-                             ? "ARMED" : "NOT ARMED")
+                             ? (KeyboardLockSettings.rememberSuspended
+                                ? "SUSPENDED"
+                                : KeyboardLedObservation.monitoringEnabled
+                                  ? "ARMED" : "PAUSED // MONITOR OFF")
+                             : "NOT ARMED")
                     color: KeyboardLockSettings.hostRememberCaps
                            ? Colors.cyan : Colors.orange
                     font.pixelSize: 9

@@ -4,6 +4,7 @@ import Quickshell.Io
 import "../../components"
 import "../weather" as WeatherStage
 import "../../services/messaging/adapters" as PhoneAdapters
+import "PhoneDirectorySearch.js" as DirectorySearch
 
 // PHONE stays in Social. CONNECT PHONE performs an explicit read-only check
 // of existing provider observations; no pairing, permission or link is granted.
@@ -15,6 +16,27 @@ Rectangle {
     clip: true
 
     property string selectedSection: "MESSAGES"
+    // Search is a local, ephemeral filter of the already approved snapshot,
+    // not an API call. Keep separate CONTACTS and MESSAGES queries.
+    property string contactSearchQuery: ""
+    property string messageSearchQuery: ""
+    readonly property var filteredPhoneConversations: {
+        if (!visible || !personalApproved || personalNeedsExplicitReload
+                || personalReadStatus !== "LOCAL_SNAPSHOT"
+                || !phoneReadAdapter.active)
+            return [];
+        return DirectorySearch.filterConversations(
+            phoneReadAdapter.conversations, messageSearchQuery);
+    }
+    readonly property var filteredPhoneContacts: {
+        if (!visible || !personalApproved || personalNeedsExplicitReload
+                || personalReadStatus !== "LOCAL_SNAPSHOT"
+                || !phoneReadAdapter.active)
+            return [];
+        return DirectorySearch.filterContacts(
+            phoneReadAdapter.contactCards, contactSearchQuery);
+    }
+    readonly property var contactDirectoryRows: DirectorySearch.contactDirectoryRows(filteredPhoneContacts)
     // Remembered Personal preference, not Identity Center authorization.
     property string personalReadStatus: "NOT_STARTED"
     property string personalReadOperation: ""
@@ -58,6 +80,8 @@ Rectangle {
             personalReadProcess.running = false;
         phoneReadAdapter.forgetHostView();
         selectedPhoneContactId = "";
+        contactSearchQuery = "";
+        messageSearchQuery = "";
         personalApproved = false;
         personalPermissionOpen = false;
         personalNeedsExplicitReload = true;
@@ -739,6 +763,8 @@ Rectangle {
                 phoneStorageUnlockProcess.running = false;
             phoneReadAdapter.forgetHostView();
             selectedPhoneContactId = "";
+            contactSearchQuery = "";
+            messageSearchQuery = "";
             personalPermissionOpen = false;
             personalApproved = false;
         }
@@ -2458,77 +2484,234 @@ Rectangle {
         }
     }
 
+    // Fixed search, outside both scrolling lists. Only locally filter the
+    // current, authorized in-memory snapshot. BlueFerry 0.9.1's legacy
+    // contact list may be only its first 100 rows; no global search claim.
+    Rectangle {
+        id: phoneListSearchBar
+        anchors.top: personalReadBar.bottom
+        anchors.left: parent.left
+        width: Math.min(200, Math.max(135, phonePane.width * 0.30))
+        height: visible ? 56 : 0
+        visible: phonePane.selectedSection === "MESSAGES"
+                 || phonePane.selectedSection === "CONTACTS"
+        color: Colors.dark
+        border.width: 1
+        border.color: Colors.cyan
+        z: 6
+
+        Text {
+            id: phoneSearchIcon
+            anchors.left: parent.left
+            anchors.leftMargin: 8
+            anchors.top: parent.top
+            anchors.topMargin: 11
+            text: "⌕"
+            color: Colors.cyan
+            font.pixelSize: 18
+        }
+        TextInput {
+            id: phoneContactsSearch
+            visible: phonePane.selectedSection === "CONTACTS"
+            anchors.left: phoneSearchIcon.right
+            anchors.leftMargin: 5
+            anchors.right: parent.right
+            anchors.rightMargin: 7
+            anchors.top: parent.top
+            anchors.topMargin: 10
+            height: 23
+            text: phonePane.contactSearchQuery
+            color: Colors.magenta
+            font.pixelSize: 11
+            clip: true
+            maximumLength: 128
+            selectByMouse: true
+            cursorDelegate: Rectangle {
+                width: 2
+                height: phoneContactsSearch.font.pixelSize + 2
+                color: Colors.orange
+            }
+            onTextChanged: {
+                phonePane.contactSearchQuery = text;
+                phonePane.selectedPhoneContactId = "";
+            }
+        }
+        TextInput {
+            id: phoneMessagesSearch
+            visible: phonePane.selectedSection === "MESSAGES"
+            anchors.left: phoneSearchIcon.right
+            anchors.leftMargin: 5
+            anchors.right: parent.right
+            anchors.rightMargin: 7
+            anchors.top: parent.top
+            anchors.topMargin: 10
+            height: 23
+            text: phonePane.messageSearchQuery
+            color: Colors.magenta
+            font.pixelSize: 11
+            clip: true
+            maximumLength: 128
+            selectByMouse: true
+            cursorDelegate: Rectangle {
+                width: 2
+                height: phoneMessagesSearch.font.pixelSize + 2
+                color: Colors.orange
+            }
+            onTextChanged: {
+                phonePane.messageSearchQuery = text;
+                if (phonePane.personalReadUiReady && phoneContactList)
+                    phoneContactList.clearSelection();
+            }
+        }
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 8
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 5
+            width: parent.width - 16
+            text: phonePane.selectedSection === "CONTACTS"
+                  ? (phonePane.contactSearchQuery.length > 0
+                     ? "FILTERING LOADED CONTACTS"
+                     : "SEARCH LOADED CONTACTS")
+                  : (phonePane.messageSearchQuery.length > 0
+                     ? "FILTERING CONVERSATIONS"
+                     : "SEARCH CONVERSATIONS")
+            textFormat: Text.PlainText
+            font.pixelSize: 8
+            color: Colors.orange
+            elide: Text.ElideRight
+        }
+        Text {
+            anchors.left: phoneContactsSearch.left
+            anchors.top: phoneContactsSearch.top
+            text: "Search contacts..."
+            font.pixelSize: 11
+            color: Colors.white
+            opacity: 0.55
+            visible: phoneContactsSearch.visible && phoneContactsSearch.text.length === 0
+        }
+        Text {
+            anchors.left: phoneMessagesSearch.left
+            anchors.top: phoneMessagesSearch.top
+            text: "Search messages..."
+            font.pixelSize: 11
+            color: Colors.white
+            opacity: 0.55
+            visible: phoneMessagesSearch.visible && phoneMessagesSearch.text.length === 0
+        }
+    }
+
     ContactList {
         id: phoneContactList
-        anchors.top: personalReadBar.bottom
+        anchors.top: phoneListSearchBar.bottom
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         width: Math.min(200, Math.max(135, phonePane.width * 0.30))
         visible: phonePane.selectedSection === "MESSAGES"
         conversations: phonePane.selectedSection === "MESSAGES"
-                       ? phoneReadAdapter.conversations : []
+                       ? phonePane.filteredPhoneConversations : []
         keyboardFocused: false
-        phonePreviewMode: true // Scope two-line SMS excerpts to Social PHONE only.
+        phonePreviewMode: true // Preserve four-line native Social conversation previews.
         onContactClicked: {
             if (selectedConversation && phonePane.selectedSection === "MESSAGES")
                 phoneReadAdapter.loadMessages(String(selectedConversation.id));
         }
     }
 
-    // Contact cards are address book rows, not fake conversation threads.
+    // CONTACTS: one local, alphabetically sorted projection of currently
+    // loaded cards. A-Z/# headers scroll WITH rows; search stays pinned.
+    // No backend paging or stable contact identity is implied by grouping.
     ListView {
         id: phoneAddressBook
         anchors.fill: phoneContactList
         visible: phonePane.selectedSection === "CONTACTS"
         clip: true
-        model: phoneReadAdapter.contactCards
-        delegate: Rectangle {
-            id: addressBookRow
+        model: phonePane.contactDirectoryRows
+        spacing: 2
+        delegate: Item {
+            id: directoryRow
             required property var modelData
             width: phoneAddressBook.width
-            height: 64
-            readonly property bool isSelected: phonePane.selectedPhoneContactId
-                                               === String(modelData.id)
-            color: isSelected ? Colors.yellow : Colors.dark
-            border.width: 1
-            border.color: isSelected ? Colors.orange : Colors.cyan
-            clip: true
-            Column {
+            readonly property bool isHeading: modelData.kind === "heading"
+            height: isHeading ? 36 : 64
+            Rectangle {
+                id: directoryHeading
                 anchors.fill: parent
-                anchors.margins: 8
-                spacing: 5
+                visible: directoryRow.isHeading
+                color: Colors.dark
                 Text {
-                    width: parent.width
-                    height: 19
-                    text: modelData.displayNameInProfile || "Unnamed contact"
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -3
+                    text: directoryRow.modelData.letter || "#"
                     textFormat: Text.PlainText
-                    color: addressBookRow.isSelected ? Colors.black : Colors.orange
-                    font.pixelSize: 11
-                    wrapMode: Text.NoWrap
-                    maximumLineCount: 1
-                    clip: true
-                    elide: Text.ElideRight
+                    color: Colors.magenta
+                    font.bold: true
+                    font.pixelSize: 15
                 }
-                Text {
-                    width: parent.width
-                    height: 16
-                    text: modelData.primary || ""
-                    textFormat: Text.PlainText
-                    color: addressBookRow.isSelected ? Colors.black : Colors.cyan
-                    font.pixelSize: 9
-                    wrapMode: Text.NoWrap
-                    maximumLineCount: 1
-                    clip: true
-                    elide: Text.ElideRight
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    anchors.bottom: parent.bottom
+                    height: 2
+                    color: Colors.magenta
                 }
             }
-            MouseArea {
+            Rectangle {
+                id: addressBookRow
                 anchors.fill: parent
-                onClicked: {
-                    if (phonePane.personalApproved
-                            && phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
-                            && !phonePane.personalNeedsExplicitReload)
-                        phonePane.selectedPhoneContactId = String(modelData.id);
+                visible: !directoryRow.isHeading
+                readonly property var card: directoryRow.isHeading
+                                             ? null : directoryRow.modelData.card
+                readonly property bool isSelected: card !== null
+                                                   && phonePane.selectedPhoneContactId
+                                                      === String(card.id)
+                color: isSelected ? Colors.yellow : Colors.dark
+                border.width: 1
+                border.color: isSelected ? Colors.orange : Colors.cyan
+                clip: true
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 5
+                    Text {
+                        width: parent.width
+                        height: 19
+                        text: addressBookRow.card
+                              ? (addressBookRow.card.displayNameInProfile || "Unnamed contact") : ""
+                        textFormat: Text.PlainText
+                        color: addressBookRow.isSelected ? Colors.black : Colors.orange
+                        font.pixelSize: 11
+                        wrapMode: Text.NoWrap
+                        maximumLineCount: 1
+                        clip: true
+                        elide: Text.ElideRight
+                    }
+                    Text {
+                        width: parent.width
+                        height: 16
+                        text: addressBookRow.card ? (addressBookRow.card.primary || "") : ""
+                        textFormat: Text.PlainText
+                        color: addressBookRow.isSelected ? Colors.black : Colors.cyan
+                        font.pixelSize: 9
+                        wrapMode: Text.NoWrap
+                        maximumLineCount: 1
+                        clip: true
+                        elide: Text.ElideRight
+                    }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        if (addressBookRow.card !== null
+                                && phonePane.personalApproved
+                                && phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                                && !phonePane.personalNeedsExplicitReload)
+                            phonePane.selectedPhoneContactId = String(addressBookRow.card.id);
+                    }
                 }
             }
         }
@@ -2550,9 +2733,9 @@ Rectangle {
     Text {
         id: emptyPhoneContacts
         visible: phonePane.selectedSection === "CONTACTS"
-                 ? phoneReadAdapter.contactCards.length === 0
+                 ? phonePane.filteredPhoneContacts.length === 0
                  : phonePane.selectedSection === "MESSAGES"
-                   && phoneReadAdapter.conversations.length === 0
+                   && phonePane.filteredPhoneConversations.length === 0
         anchors.top: phoneContactList.top
         anchors.topMargin: 108
         anchors.left: phoneContactList.left
@@ -2560,12 +2743,18 @@ Rectangle {
         anchors.margins: 10
         z: 4
         text: phonePane.selectedSection === "CONTACTS"
-              ? (phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
-                 ? "NO CONTACT CARDS RETURNED"
-                 : "NO PHONE CONTACTS YET")
-              : (phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
-                 ? "NO CONVERSATIONS RETURNED"
-                 : "NO PHONE CHATS YET")
+              ? (phonePane.contactSearchQuery.trim().length > 0
+                 && phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                 ? "NO MATCHES IN LOADED CONTACTS"
+                 : phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                   ? "NO CONTACT CARDS RETURNED"
+                   : "NO PHONE CONTACTS YET")
+              : (phonePane.messageSearchQuery.trim().length > 0
+                 && phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                 ? "NO MATCHES IN LOADED CONVERSATIONS"
+                 : phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                   ? "NO CONVERSATIONS RETURNED"
+                   : "NO PHONE CHATS YET")
         color: Colors.white
         opacity: 0.8
         font.family: "GohuFont 11 Nerd Font Mono"

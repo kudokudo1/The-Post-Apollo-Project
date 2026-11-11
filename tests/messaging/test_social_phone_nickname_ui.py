@@ -50,7 +50,7 @@ class PhoneNicknameUiTests(unittest.TestCase):
         self.assertIn('"PERSONAL DISPLAY ONLY // Not an account', self.ui)
 
     def test_still_no_automatic_phone_pairing_or_private_content(self):
-        self.assertIn("phoneReadAdapter.conversations : []", self.ui)
+        self.assertIn("phonePane.filteredPhoneConversations : []", self.ui)
         self.assertIn("phoneReadAdapter.messages : []", self.ui)
         self.assertIn("sendEnabled: false", self.ui)
         self.assertNotIn('bluetoothctl remove', self.ui)

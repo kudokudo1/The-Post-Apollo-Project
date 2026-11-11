@@ -17,7 +17,7 @@ class UnifiedPhoneLayoutTests(unittest.TestCase):
     def test_real_social_contact_and_chat_components_used(self):
         self.assertIn("    ContactList {", self.phone)
         self.assertIn("    ChatFeed {", self.phone)
-        self.assertIn("phoneReadAdapter.conversations : []", self.phone)
+        self.assertIn("phonePane.filteredPhoneConversations : []", self.phone)
         self.assertIn("phoneContactList.selectedConversation : null", self.phone)
         self.assertIn("phoneReadAdapter.messages : []", self.phone)
         self.assertIn("        sendEnabled: false", self.phone)

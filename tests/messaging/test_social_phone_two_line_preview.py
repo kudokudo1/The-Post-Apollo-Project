@@ -54,7 +54,7 @@ class SharedContactPreviewTests(unittest.TestCase):
                       self.delegate)
         self.assertIn('(modelData.lastMessage ? modelData.lastMessage : "")',
                       self.delegate)  # explicit legacy opt-out only
-        self.assertIn("phoneReadAdapter.conversations", self.phone_list)
+        self.assertIn("phonePane.filteredPhoneConversations", self.phone_list)
         self.assertIn("phoneReadAdapter.loadMessages", self.phone_list)
         self.assertIn("sendEnabled: false", self.phone)
         self.assertIn("width: Math.min(200, Math.max(135, phonePane.width * 0.30))",

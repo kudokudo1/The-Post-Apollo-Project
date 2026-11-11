@@ -244,7 +244,10 @@ class ClockBG1BrokerTests(unittest.TestCase):
         self.assertIn("_peer_start_ticks(", source)
         self.assertIn("STALE_ALARM_FILE_REVISION", source)
         self.assertIn("OCCURRENCE_NOT_ELIGIBLE", source)
-        self.assertIn("OCCURRENCE_ALREADY_RESERVED", source)
+        # The broker delegates the duplicate fence to the locked BG1-A
+        # ledger, instead of reimplementing that invariant in the IPC code.
+        self.assertIn("OCCURRENCE_ALREADY_RESERVED",
+                      GATE.read_text(encoding="utf-8"))
         self.assertIn("actuationEnabled", source)
         self.assertNotIn("notify-send", source)
         self.assertNotIn("SoundEffect", source)

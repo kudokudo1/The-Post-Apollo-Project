@@ -288,6 +288,7 @@ Column {
         if (value !== "STANDARD" && value !== "FAST")
             return false;
         if (!root.active || !svc || svc.busy || root.otherVoiceBusy
+                || root.streamingPreviewState.active
                 || (root.mode !== "SETUP" && root.mode !== "JOB"))
             return false;
         root.decoderMode = value;
@@ -1011,6 +1012,7 @@ Column {
             contentGlowEnabled: false
             enabledAction: root.active && !!root.speechInputService
                 && !root.speechInputService.busy && !root.otherVoiceBusy
+                && !root.streamingPreviewState.active
             onTriggered: root.selectDecoderMode("STANDARD")
         }
         HospitalActionButton {
@@ -1022,6 +1024,7 @@ Column {
             contentGlowEnabled: false
             enabledAction: root.active && !!root.speechInputService
                 && !root.speechInputService.busy && !root.otherVoiceBusy
+                && !root.streamingPreviewState.active
             onTriggered: root.selectDecoderMode("FAST")
         }
     }
@@ -2314,6 +2317,7 @@ Column {
                 anchors.verticalCenter: parent.verticalCenter
                 readonly property bool canAct:
                     root.active && !!root.speechInputService
+                    && !root.streamingPreviewState.active
                     && (managerArea.voiceActive
                         && root.speechInputService.recording
                         || (!root.speechInputService.busy && !root.otherVoiceBusy))

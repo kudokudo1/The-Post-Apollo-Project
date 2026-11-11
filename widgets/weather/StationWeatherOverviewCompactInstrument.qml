@@ -109,6 +109,9 @@ Rectangle {
          valid:currentReady, fraction:0}
     ]
 
+    // W18 // Expand the three original WEATHER bands into reclaimed space.
+    // At compact 164px the original artwork/positions remain unchanged.
+    readonly property real expansion: Math.max(0, height - 164)
     height: 164
     color: Colors.dark
     // Parent StationWeatherTerminalSummary already draws the outer frame.
@@ -149,7 +152,7 @@ Rectangle {
             id: nowBand
             objectName: "weather-w17-current-instrument"
             width: parent.width
-            height: 52
+            height: 52 + panel.expansion * 0.50
             Rectangle {
                 width: 3
                 height: parent.height-2
@@ -176,7 +179,7 @@ Rectangle {
                     anchors.left: parent.left
                     anchors.leftMargin: 2
                     anchors.verticalCenter: parent.verticalCenter
-                    font.pixelSize: 25
+                    font.pixelSize: Math.min(41,25 + panel.expansion * 0.10)
                     color: Colors.orange
                     text: panel.currentReady ? panel.reading(panel.weatherService.tempF,"°F") : "--°F"
                 }
@@ -186,12 +189,13 @@ Rectangle {
                     anchors.right: parent.right
                     anchors.rightMargin: 1
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 47
-                    height: 47
+                    width: Math.min(90,47 + panel.expansion * 0.27,
+                                    Math.max(47,parent.width * 0.47))
+                    height: width
                     GohuText {
                         anchors.centerIn: parent
                         text: panel.iconText(panel.currentState)
-                        font.pixelSize: 49
+                        font.pixelSize: Math.min(97,currentIcon.width + 5)
                         color: panel.ink(panel.currentState.color)
                         visible: panel.currentArt==="weather"
                     }
@@ -253,7 +257,8 @@ Rectangle {
                         Row {
                             anchors.left: parent.left
                             anchors.top: parent.top
-                            anchors.topMargin: metric.modelData.key==="pressure" ? 7 : 9
+                            anchors.topMargin: (metric.modelData.key==="pressure" ? 7 : 9)
+                                               + Math.min(24,panel.expansion * 0.10)
                             spacing: 1
                             GohuText {
                                 visible: metric.modelData.key==="wind"
@@ -266,7 +271,8 @@ Rectangle {
                             }
                             GohuText {
                                 text: metric.modelData.value
-                                font.pixelSize: metric.modelData.key==="pressure" ? 8 : 11
+                                font.pixelSize: (metric.modelData.key==="pressure" ? 8 : 11)
+                                                + Math.min(3,panel.expansion * 0.02)
                                 color: Colors.white
                             }
                         }
@@ -331,7 +337,7 @@ Rectangle {
             id: hourStrip
             objectName: "weather-w17-six-hour-timeline"
             width: parent.width
-            height: 45
+            height: 45 + panel.expansion * 0.33
             spacing: 1
             Repeater {
                 id: hourRepeater
@@ -366,13 +372,13 @@ Rectangle {
                         id: hourIcon
                         objectName: "weather-w17-original-hourly-glyph"
                         anchors.horizontalCenter: parent.horizontalCenter
-                        y: 8
-                        width: 19
-                        height: 19
+                        y: 8 + (hourStrip.height - 45) * 0.18
+                        width: Math.min(50,19 + (hourStrip.height - 45) * 0.45)
+                        height: width
                         GohuText {
                             anchors.centerIn: parent
                             text: panel.iconText(hour.state)
-                            font.pixelSize: 22
+                            font.pixelSize: Math.min(54,22 + panel.expansion * 0.18)
                             color: panel.ink(hour.state.color)
                             visible: hour.art==="weather"
                         }
@@ -389,7 +395,7 @@ Rectangle {
                         }
                     }
                     GohuText {
-                        y: 27
+                        y: 27 + (hourStrip.height - 45) * 0.70
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
                         text: panel.reading(hour.entry.tempF,"°F")
@@ -397,7 +403,7 @@ Rectangle {
                         color: Colors.white
                     }
                     GohuText {
-                        y: 36
+                        y: 36 + (hourStrip.height - 45) * 0.85
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
                         text: panel.percent(hour.entry.chanceRain)
@@ -454,7 +460,7 @@ Rectangle {
             id: dayStrip
             objectName: "weather-w17-three-day-strip"
             width: parent.width
-            height: 24
+            height: 24 + panel.expansion * 0.17
             spacing: 3
             Repeater {
                 id: dayRepeater
@@ -480,12 +486,12 @@ Rectangle {
                         anchors.left: parent.left
                         anchors.leftMargin: 3
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 20
-                        height: 20
+                        width: Math.min(50,20 + (dayStrip.height - 24) * 0.83)
+                        height: width
                         GohuText {
                             anchors.centerIn: parent
                             text: panel.iconText(day.state)
-                            font.pixelSize: 22
+                            font.pixelSize: Math.min(54,22 + panel.expansion * 0.17)
                             color: panel.ink(day.state.color)
                             visible: day.art==="weather"
                         }
@@ -501,7 +507,7 @@ Rectangle {
                     }
                     Column {
                         anchors.left: parent.left
-                        anchors.leftMargin: 27
+                        anchors.leftMargin: 27 + Math.min(28,panel.expansion * 0.17)
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 0

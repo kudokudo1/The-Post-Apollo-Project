@@ -13,6 +13,7 @@ Rectangle {
     // W16 // Weather OVERVIEW alone can show both existing card groups in
     // one compact viewport. Does not alter HISTORY or regular HOME cards.
     property bool overviewDense: false
+    readonly property real overviewExtra: Math.max(0, height - 55)
     readonly property alias contentItem: standardCardContents
     // Only canonical HOME SERVICES uses this fit-safe two-row instrument.
     property bool servicesCompact: false
@@ -43,12 +44,12 @@ Rectangle {
         id: standardCardContents
         visible: !card.servicesCompact
         anchors.fill: parent
-        anchors.margins: card.overviewDense ? 1 : (card.compact ? 4 : 10)
-        spacing: card.overviewDense ? 0 : (card.compact ? 1 : 5)
+        anchors.margins: card.overviewDense ? 1 + Math.min(3,Math.floor(card.overviewExtra / 11)) : (card.compact ? 4 : 10)
+        spacing: card.overviewDense ? 0 + Math.min(3,Math.floor(card.overviewExtra / 11)) : (card.compact ? 1 : 5)
 
         GohuText {
             text: card.title
-            font.pixelSize: card.overviewDense ? 8 : (card.compact ? 9 : 10)
+            font.pixelSize: card.overviewDense ? 8 + Math.min(2,Math.floor(card.overviewExtra / 16)) : (card.compact ? 9 : 10)
             color: card.accentColor
             width: parent.width - (card.pinEnabled ? 32 : 0)
             elide: Text.ElideRight
@@ -56,7 +57,7 @@ Rectangle {
 
         GohuText {
             text: card.valueText
-            font.pixelSize: card.overviewDense ? 13 : (card.compact ? 15 : 20)
+            font.pixelSize: card.overviewDense ? 13 + Math.min(5,Math.floor(card.overviewExtra / 6)) : (card.compact ? 15 : 20)
             color: card.valueColor
             elide: Text.ElideRight
             width: parent.width
@@ -64,7 +65,7 @@ Rectangle {
 
         QuietText {
             text: card.detailText
-            font.pixelSize: card.overviewDense ? 7 : (card.compact ? 8 : 10)
+            font.pixelSize: card.overviewDense ? 7 + Math.min(2,Math.floor(card.overviewExtra / 12)) : (card.compact ? 8 : 10)
             elide: Text.ElideRight
             width: parent.width
             visible: text.length > 0
@@ -91,7 +92,7 @@ Rectangle {
 
         QuietText {
             text: card.footerText
-            font.pixelSize: card.overviewDense ? 7 : (card.compact ? 8 : 9)
+            font.pixelSize: card.overviewDense ? 7 + Math.min(2,Math.floor(card.overviewExtra / 12)) : (card.compact ? 8 : 9)
             elide: Text.ElideRight
             width: parent.width
             visible: text.length > 0

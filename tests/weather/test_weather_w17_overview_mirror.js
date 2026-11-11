@@ -19,7 +19,7 @@ test("W17 compact OVERVIEW mirrors full WEATHER three-band instrument",()=>{
  assert.match(compact,/model: Math\.min\(3,panel\.dailySamples\.length\)/);
  assert.match(compact,/model: panel\.telemetry/);
  assert.match(compact,/height: 164/);
- assert.match(home,/height: visible \? 164 : 0/);
+ assert.match(home,/height: visible \? home\.overviewInstrumentHeight : 0/);
  assert.match(home,/runtimeNowMs: home\.runtimeNowMs/);
  assert.match(full,/objectName: "weather-w14-current-focus"/);
 });
@@ -53,8 +53,8 @@ test("W17 carries same visible icon and meter relationships",()=>{
 });
 
 test("W17 slightly shrinks the lower cards but keeps their original data and no normal scrolling",()=>{
- assert.match(home,/weatherOverviewSummary\.height/);
- assert.match(home,/weatherSnapshotRow\.height/);
+ assert.match(home,/overviewInstrumentHeight/);
+ assert.match(home,/overviewCardRowHeight/);
  assert.match(home,/compact: home\.fixedWeatherOverview/);
  assert.match(home,/overviewDense: home\.fixedWeatherOverview/);
  assert.match(home,/id: weatherSnapshotRow/);

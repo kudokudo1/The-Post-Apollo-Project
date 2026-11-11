@@ -35,8 +35,8 @@ test("W16 one-page OVERVIEW shows original Snapshot and AUTO rows simultaneously
  assert.match(home,/visible: home\.sectionVisible\("relevant"\)/);
  assert.doesNotMatch(home,/overviewPage|overviewSelectionRequested/);
  assert.doesNotMatch(summary,/overviewHeaderPages|overviewSelectionRequested/);
- assert.match(home,/weatherSnapshotRow\.height/);
- assert.match(home,/weatherOverviewSummary\.height/);
+ assert.match(home,/overviewCardRowHeight/);
+ assert.match(home,/overviewInstrumentHeight/);
  assert.match(home,/overviewDense: home\.fixedWeatherOverview/);
  assert.match(home,/compact: home\.fixedWeatherOverview/);
  assert.match(card,/property bool overviewDense: false/);

@@ -232,7 +232,7 @@ PanelWindow {
         if (!Number.isInteger(requested) || requested < 0
                 || requested > 9999 || token.length > 64
                 || needle.length > 80 || /[\u0000-\u001f\u007f]/.test(needle)) {
-            archiveV2State = "INVALID V2 SEARCH // MAX 80 CHARACTERS";
+            archiveV2State = "INVALID SEARCH // MAX 80 CHARACTERS";
             return false;
         }
         archiveV2Busy = true;
@@ -274,7 +274,7 @@ PanelWindow {
         try { reply = JSON.parse(String(raw || "").trim()); }
         catch (error) {
             archiveV2Rows = [];
-            archiveV2State = "STALE // INVALID V2 RESPONSE";
+            archiveV2State = "STALE // INVALID COPY INDEX RESPONSE";
             return;
         }
         if (!reply || reply.ok !== true || reply.kind !== "archive-v2-index"
@@ -288,7 +288,7 @@ PanelWindow {
                                       || reply.nextCursor.length > 64))) {
             archiveV2Rows = [];
             archiveV2State = "STALE // " + String(reply && reply.error
-                                                  || "V2 INDEX UNAVAILABLE");
+                                                  || "COPY INDEX UNAVAILABLE");
             return;
         }
         for (let i = 0; i < reply.items.length; i++) {
@@ -300,7 +300,7 @@ PanelWindow {
                     || item.capabilities.restore !== false
                     || item.capabilities.burn !== false) {
                 archiveV2Rows = [];
-                archiveV2State = "STALE // V2 PERMISSION ENVELOPE INVALID";
+                archiveV2State = "STALE // COPY PERMISSIONS INVALID";
                 return;
             }
         }
@@ -321,9 +321,9 @@ PanelWindow {
         archiveV2HasMore = reply.hasMore;
         archiveV2NextCursor = reply.nextCursor || "";
         archiveV2State = reply.state === "NOT_INSTALLED"
-            ? "NOT INSTALLED // NO V2 COPIES"
+            ? "NO READ-ONLY COPIES INSTALLED"
             : archiveV2AppliedQuery !== ""
-            ? "READY // SEARCHED ALL V2 COPIES" : "READY // V2 READ ONLY";
+            ? "READY // SEARCHED ALL COPIES" : "READY // READ ONLY";
     }
 
     function runResearch(action, args) {
@@ -968,7 +968,7 @@ PanelWindow {
                 if (trashLauncher.archiveV2Busy) {
                     trashLauncher.archiveV2Busy = false;
                     trashLauncher.archiveV2Rows = [];
-                    trashLauncher.archiveV2State = "STALE // V2 INDEX PROCESS FAILED";
+                    trashLauncher.archiveV2State = "STALE // COPY INDEX PROCESS FAILED";
                 }
             });
         }
@@ -1729,7 +1729,7 @@ PanelWindow {
                             height: 28
                             spacing: 8
                             GohuText {
-                                width: parent.width - 174
+                                width: parent.width - 100
                                 height: parent.height
                                 color: Colors.yellow
                                 font.pixelSize: 12
@@ -1738,16 +1738,6 @@ PanelWindow {
                                       + (trashLauncher.archiveRows.length
                                          + trashLauncher.researchRows.length
                                          + trashLauncher.archiveV2Rows.length)
-                            }
-                            ActionButton {
-                                width: 66
-                                height: 27
-                                label: "FIND V2"
-                                labelPixelSize: 9
-                                accentColor: Colors.magenta
-                                available: !trashLauncher.archiveV2Busy
-                                onLeftClicked: trashLauncher.refreshArchiveV2(
-                                    0, "", trashLauncher.archiveSearchText.trim())
                             }
                             ActionButton {
                                 width: 92
@@ -1775,7 +1765,7 @@ PanelWindow {
                             elide: Text.ElideRight
                             text: trashLauncher.archiveState + " // "
                                 + trashLauncher.researchState + " // "
-                                + "V2:" + trashLauncher.archiveV2State + " // "
+                                + "COPIES:" + trashLauncher.archiveV2State + " // "
                                 + trashLauncher.archiveSources.map(function(v) {
                                     return v.id + ":" + v.state;
                                 }).join(" // ")
@@ -1788,7 +1778,7 @@ PanelWindow {
                             color: Colors.white
                             font.pixelSize: 10
                             placeholderTextColor: Colors.cyan
-                            placeholderText: "FIND RECORDS // SAVED COPIES // BIN"
+                            placeholderText: "SEARCH ARCHIVE // PRESS ENTER"
                             text: trashLauncher.archiveSearchText
                             onTextChanged: trashLauncher.archiveSearchText = text
                             onAccepted: trashLauncher.refreshArchiveV2(
@@ -1867,10 +1857,10 @@ PanelWindow {
                                             color: Colors.white
                                             elide: Text.ElideRight
                                             text: (modelData.kind === "V2 SNAPSHOT"
-                                                   ? "[V2 COPY] "
+                                                   ? "[READ-ONLY COPY] "
                                                    : modelData.kind === "SAVED RESEARCH"
                                                      || modelData.kind === "SAVED EVENT"
-                                                   ? "[V1 COPY] " : "[SOURCE] ")
+                                                   ? "[MANAGED COPY] " : "[SOURCE] ")
                                                   + String(modelData.title || "UNTITLED RECORD")
                                         }
                                         GohuText {
@@ -1988,7 +1978,7 @@ PanelWindow {
                             ActionButton {
                                 width: 67
                                 height: 25
-                                label: "V2 PREV"
+                                label: "PREVIOUS"
                                 labelPixelSize: 9
                                 accentColor: Colors.cyan
                                 available: !trashLauncher.archiveV2Busy
@@ -2005,18 +1995,22 @@ PanelWindow {
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 elide: Text.ElideRight
+                                // This rail pages only independently stored
+                                // READ-ONLY copies. Source and managed-copy
+                                // rows stay visible above across every page.
                                 text: trashLauncher.archiveV2QueryDirty
-                                    ? "V2 SEARCH NOT APPLIED // PRESS FIND V2"
-                                    : "V2 PAGE " + (trashLauncher.archiveV2Page + 1)
+                                    ? "PRESS ENTER TO SEARCH ALL COPIES"
+                                    : "READ-ONLY COPIES // PAGE "
+                                      + (trashLauncher.archiveV2Page + 1)
                                       + " // " + trashLauncher.archiveV2Total
                                       + (trashLauncher.archiveV2AppliedQuery === ""
-                                         ? " TOTAL" : " MATCHES ACROSS ALL V2")
+                                         ? " SAVED" : " MATCHES")
                             }
 
                             ActionButton {
                                 width: 67
                                 height: 25
-                                label: "V2 NEXT"
+                                label: "NEXT"
                                 labelPixelSize: 9
                                 accentColor: Colors.cyan
                                 available: !trashLauncher.archiveV2Busy

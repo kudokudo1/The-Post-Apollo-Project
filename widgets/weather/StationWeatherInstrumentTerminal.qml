@@ -459,7 +459,9 @@ Rectangle {
                                     objectName: "weather-w15-centered-hour-stack"
                                     anchors.centerIn: parent
                                     width: parent.width
-                                    spacing: 2
+                                    // Compact slots need the whole existing
+                                    // glyph/reading/meter group, not overflow.
+                                    spacing: hourInstrumentRegion.height<75 ? 0 : 2
                                     Item {
                                         id: hourGlyph
                                         objectName: "weather-w15-original-hour-icon"

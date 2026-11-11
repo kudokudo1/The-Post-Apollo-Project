@@ -22,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import wave
 from pathlib import Path
 
@@ -49,6 +50,9 @@ PLACEHOLDER = re.compile(
 TIMESTAMP = re.compile(r"^\s*\[\d\d:\d\d:\d\d(?:\.\d+)?\s*-->\s*"
                        r"\d\d:\d\d:\d\d(?:\.\d+)?\]\s*")
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+# Only non-content latency codes ever leave the Python process.
+TIMING_FIELDS = frozenset(("AUDIO_READY", "MODEL_STARTUP", "QUEUE_WAIT",
+                           "INFERENCE", "FIRST_TEXT"))
 
 
 def is_speech(pcm: bytes, threshold: float = 500.0) -> bool:
@@ -106,6 +110,15 @@ def trim_repeated_prefix(previous: str, current: str) -> str:
 def packet(kind: str, *, text: str = "", detail: str = "") -> str:
     return json.dumps({"kind": kind, "text": text, "detail": detail},
                       ensure_ascii=False, separators=(",", ":"))
+
+
+def timing_packet(metric: str, milliseconds: int) -> str:
+    """No text/audio, filenames, tokens, device identifiers or process IDs."""
+    if metric not in TIMING_FIELDS or type(milliseconds) is not int:
+        raise ValueError("INVALID TIMING RECEIPT")
+    return json.dumps({"kind": "timing", "detail": metric,
+                       "ms": max(0, min(45000, milliseconds))},
+                      separators=(",", ":"))
 
 
 def transcribe_chunk(stt_helper: str, audio: bytes, *,
@@ -166,6 +179,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
               flush=True)
         return 2
 
+    started_at = time.monotonic()  # session-relative, never wall-clock logging
     stopping = threading.Event()
     cancelled = threading.Event()
     clips = queue.Queue(maxsize=MAX_QUEUE)
@@ -227,6 +241,15 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
             return
         with send_lock:
             print(packet(kind, text=text, detail=detail), flush=True)
+
+    def send_timing(metric: str, start_at: float):
+        # Only allow elapsed milliseconds in fixed named slots; do not export
+        # raw monotonic timestamps, voice contents or microphone metadata.
+        if cancelled.is_set():
+            return
+        ms = round(max(0.0, time.monotonic() - start_at) * 1000)
+        with send_lock:
+            print(timing_packet(metric, ms), flush=True)
 
     def halt_child():
         if recorder is not None and recorder.poll() is None:
@@ -304,7 +327,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
             if live_chunk_ceiling and accepted_chunks >= live_chunk_ceiling:
                 return False
             try:
-                clips.put(raw, timeout=0.1)
+                clips.put((raw, time.monotonic()), timeout=0.1)
                 accepted_chunks += 1
                 if (live_chunk_ceiling >= 3
                         and accepted_chunks == live_chunk_ceiling - 1):
@@ -312,6 +335,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 if not first_chunk_reported:
                     first_chunk_reported = True
                     send("stage", detail="FIRST_AUDIO_QUEUED")
+                    send_timing("AUDIO_READY", started_at)
                 return True
             except queue.Full:
                 if live_chunk_ceiling:
@@ -411,13 +435,15 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
         try:
             while not cancelled.is_set():
                 try:
-                    chunk = clips.get(timeout=0.2)
+                    item = clips.get(timeout=0.2)
                 except queue.Empty:
                     if capture_done.is_set():
                         break
                     continue
-                if chunk is None:
+                if item is None:
                     break
+                chunk, enqueued_at = item
+                send_timing("QUEUE_WAIT", enqueued_at)
                 if prefer_persistent and not attempted_session:
                     attempted_session = True
                     # Fail closed to the previous guarded CLI if no compatible
@@ -426,7 +452,9 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                         send("stage", detail="MODEL_SESSION_STARTING")
                         candidate = hospital_whisper_session.WhisperSession(stt_helper)
                         try:
+                            model_loading_at = time.monotonic()
                             candidate.start(cancelled=cancelled)
+                            send_timing("MODEL_STARTUP", model_loading_at)
                             session = candidate
                             model_started(session.process)
                             send("stage", detail="MODEL_SESSION_READY")
@@ -439,6 +467,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                 if cancelled.is_set():
                     break
                 try:
+                    decoding_at = time.monotonic()
                     if session is None:
                         phrase = transcribe_chunk(stt_helper, chunk,
                                                   on_start=model_started,
@@ -454,6 +483,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                         previous_pcm_tail = chunk[-OVERLAP_BYTES:]
                         if phrase:
                             previous_text = (previous_text + " " + phrase)[-300:]
+                    send_timing("INFERENCE", decoding_at)
                 except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:
                     # No fallback after a server request fails: that could
                     # introduce a *second* model during a stressed session.
@@ -469,6 +499,7 @@ def live(stt_helper: str, *, chunk_seconds: int = CHUNK_SECONDS,
                     if not first_text_ready:
                         first_text_ready = True
                         send("stage", detail="FIRST_TEXT_READY")
+                        send_timing("FIRST_TEXT", started_at)
                     send("partial", text=phrase)
         finally:
             if session is not None:

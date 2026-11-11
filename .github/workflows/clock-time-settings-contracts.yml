@@ -186,7 +186,7 @@ jobs:
           const assert = require('assert/strict');
           function load(path) {
             const p = {};
-            vm.runInNewContext(fs.readFileSync(path, 'utf8').replace(/^\\.pragma library\\s*/, ''), p);
+            vm.runInNewContext(fs.readFileSync(path, 'utf8').replace(/^\.pragma library\s*/, ''), p);
             return p;
           }
           const p = load('services/time/TimeReferencePolicy.js');

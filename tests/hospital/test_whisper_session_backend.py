@@ -45,7 +45,7 @@ def build_fake_runtime(root: Path):
     recorder = fakebin / "pw-record"
     recorder.write_text(textwrap.dedent(r"""
         #!/usr/bin/env python3
-        import sys, time
+        import os, sys, time
         sample=(1700).to_bytes(2, "little", signed=True)
         interval = float(os.environ.get("TEST_RECORDER_STEP_DELAY", "0.025"))
         for _ in range(125):

@@ -218,9 +218,14 @@ class PersistentWhisperTests(unittest.TestCase):
                 self.assertNotIn("MODEL_SESSION_UNAVAILABLE", seen)
                 self.assertNotIn("PAUSE_CHUNK_READY", seen,
                                  "Continuous speech must keep fixed cadence")
+                self.assertNotIn("SILENT_OVERLAP_SKIPPED", seen,
+                                 "Never remove overlap across continuous speech")
                 self.assertNotIn("CAPTURE_STOPPED", seen)
                 self.assertEqual(starts.read_text().splitlines(), ["start"])
-                self.assertGreaterEqual(len(requests.read_text().splitlines()), 2)
+                sizes = [int(n) for n in requests.read_text().splitlines()]
+                self.assertGreaterEqual(len(sizes), 2)
+                self.assertGreater(sizes[1], sizes[0] + 18000,
+                                   "Continuous chunk retains its 750ms overlap")
                 self.assertFalse(cli_calls.exists(),
                                  "One model session must replace repeated CLI")
 
@@ -358,6 +363,98 @@ class PersistentWhisperTests(unittest.TestCase):
                 # Second request includes 750ms overlap plus ~1.2s audio,
                 # rather than 750ms overlap plus an entire 2s fixed window.
                 self.assertLess(payload_sizes[1], 75000)
+                process.stdin.write("STOP\n")
+                process.stdin.flush()
+                process.stdin.close()
+                process.wait(timeout=9)
+                self.assertEqual(process.returncode, 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=3)
+                selector.close()
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    if stream is not None and not stream.closed:
+                        stream.close()
+
+    def test_clear_pause_requires_four_quiet_frames_at_end(self):
+        speech = (1700).to_bytes(2, "little", signed=True)
+        silence = bytes(2)
+        quiet_noise = (200).to_bytes(2, "little", signed=True)
+        self.assertFalse(live.clear_pause_at_end(speech * 16000))
+        self.assertFalse(live.clear_pause_at_end(speech * 1600))
+        self.assertTrue(live.clear_pause_at_end(
+            speech * 16000 + silence * 8000))
+        self.assertTrue(live.clear_pause_at_end(
+            speech * 16000 + quiet_noise * 8000))
+        self.assertFalse(live.clear_pause_at_end(
+            speech * 16000 + silence * 6400 + speech * 1600))
+        self.assertFalse(live.clear_pause_at_end(
+            speech * 16000 + (400).to_bytes(2, "little", signed=True) * 8000))
+
+    def test_verified_silent_boundary_omits_redundant_audio_overlap(self):
+        # Three natural phrases. Two speech/quiet pauses trigger guarded
+        # early requests. The third request must not repeat 750ms from the
+        # second phrase, because it ended with verified sustained silence.
+        # Fake audio and fake Unix server only; no user's microphone/model.
+        with tempfile.TemporaryDirectory(prefix="hospital-overlap-silence-") as tmp:
+            root = Path(tmp)
+            env, starts, requests, _pid, cli_calls = build_fake_runtime(root)
+            recorder = root / "bin" / "pw-record"
+            recorder.write_text(textwrap.dedent(r"""
+                #!/usr/bin/env python3
+                import sys, time
+                voice = (1700).to_bytes(2, "little", signed=True)
+                silence = bytes(2)
+                for sample, frames in ((voice, 14), (voice, 7),
+                                       (silence, 5), (voice, 7),
+                                       (silence, 5), (silence, 10)):
+                    for _ in range(frames):
+                        sys.stdout.buffer.write(sample * 1600)
+                        sys.stdout.buffer.flush()
+                        time.sleep(0.065)
+                time.sleep(12)
+            """).lstrip())
+            recorder.chmod(0o700)
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), str(HELPER),
+                 "--chunk-seconds", "2", "--first-chunk-ms", "1400",
+                 "--pilot-live-chunks", "6", "--prefer-persistent",
+                 "--speech-pause-ms", "450"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+            pending = bytearray()
+            selector = selectors.DefaultSelector()
+            try:
+                selector.register(process.stdout, selectors.EVENT_READ)
+                stages = []
+                phrases = []
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline and not (
+                        len(phrases) >= 3 and
+                        "SILENT_OVERLAP_SKIPPED" in stages):
+                    entry = packet_from_pipe(process, selector, pending)
+                    if entry is None:
+                        continue
+                    if entry["kind"] == "stage":
+                        stages.append(entry["detail"])
+                    elif entry["kind"] == "partial":
+                        phrases.append(entry["text"])
+                    elif entry["kind"] == "error":
+                        self.fail(str(entry))
+                self.assertEqual(
+                    phrases[:3], ["Turn left at the", "next light", "and stop"])
+                self.assertIn("SILENT_OVERLAP_SKIPPED", stages)
+                self.assertGreaterEqual(stages.count("PAUSE_CHUNK_READY"), 2)
+                self.assertIn("MODEL_SESSION_READY", stages)
+                self.assertNotIn("CAPTURE_STOPPED", stages)
+                self.assertEqual(starts.read_text().splitlines(), ["start"])
+                self.assertFalse(cli_calls.exists())
+                payload_sizes = [int(v) for v in requests.read_text().splitlines()]
+                self.assertEqual(len(payload_sizes), 3)
+                self.assertLess(
+                    payload_sizes[2], payload_sizes[1] - 15000,
+                    "Third request omits 750ms prior audio, retaining same model")
                 process.stdin.write("STOP\n")
                 process.stdin.flush()
                 process.stdin.close()

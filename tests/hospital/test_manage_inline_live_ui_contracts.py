@@ -256,7 +256,8 @@ check('socket.AF_UNIX' in session
       "One private local CPU-only guarded model is reused, never a TCP listener")
 check('OVERLAP_BYTES = RATE * FRAME_BYTES * 3 // 4' in script
       and 'trim_repeated_prefix(' in script
-      and 'session.transcribe(previous_pcm_tail + chunk,' in script
+      and 'overlap = previous_pcm_tail' in script
+      and 'session.transcribe(overlap + chunk,' in script
       and 'prompt=previous_text[-160:]' in script
       and 'phrase = transcribe_chunk(stt_helper, chunk' in script,
       "Bounded overlapping windows and de-duplication preserve guarded CLI fallback")
@@ -351,6 +352,25 @@ check('property int speechPauseMs: 0' in live
       and 'chunkSeconds: 2' in host
       and 'firstChunkMs: 1400' in host,
       "Pause-aware partials opt in only from guarded Hospital owner, max cadence unchanged")
+
+check('def clear_pause_at_end(pcm: bytes' in script
+      and 'threshold: float = 350.0' in script
+      and 'quiet_pcm_frame(ending[pos:pos + frame_bytes], threshold)' in script
+      and 'previous_chunk_ended_quietly = False' in script
+      and 'if (speech_pause_ms > 0 and previous_chunk_ended_quietly' in script
+      and 'overlap = b""' in script
+      and 'send("stage", detail="SILENT_OVERLAP_SKIPPED")' in script
+      and 'previous_chunk_ended_quietly = (' in script
+      and 'speech_pause_ms > 0 and clear_pause_at_end(chunk)' in script
+      and 'prompt=previous_text[-160:]' in script
+      and 'OVERLAP_BYTES = RATE * FRAME_BYTES * 3 // 4' in script,
+      "Overlap removed only after sustained strict quiet, never during continuous speech")
+check('SILENT_OVERLAP_SKIPPED' in live
+      and 'speechPauseMs: 450' in host
+      and 'property int speechPauseMs: 0' in live
+      and 'pilotLiveChunks: 6' in host
+      and 'MAX_QUEUE = 2' in script,
+      "Silence-aware compute saving inherits guarded pause opt-in and CPU limits")
 
 if issues:
     print("HOSPITAL MANAGE LIVE INLINE // FAIL")

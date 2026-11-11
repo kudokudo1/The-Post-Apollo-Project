@@ -199,6 +199,27 @@ class PilotOwnerAdapterTests(unittest.TestCase):
             adapters.PilotSnapshotAdapter(object(), data_dir=self.data,
                                           home_dir=self.home)
 
+    def test_valid_long_weather_title_copies_without_metadata_overflow(self):
+        full = event_record()
+        full["title"] = ("W" * 145) + "\n" + ("A" * 30)
+        self.save_weather(full)
+        preview = self.pilot.preview_weather("usgs|quake-17", 1760001000000)
+        self.assertEqual(len(preview["displayLabel"]), 120)
+        self.assertEqual(preview["displayLabel"], "W" * 120)
+        row = self.pilot.capture_weather(
+            "usgs|quake-17", 1760001000000,
+            expected_revision=preview["sourceRevision"])
+        self.assertEqual(json.loads(self.archive.read_verified(row["id"]))["title"],
+                         full["title"])
+        self.assertEqual(self.archive.status()["total"], 1)
+
+    def test_invalid_weather_timestamp_types_fail_before_owner_read(self):
+        for value in (True, 0, -4, 99999999999999, "nan", "١٧٦٠٠٠١٠٠٠٠٠٠",
+                      "1760001000000.0", [], None):
+            with self.assertRaisesRegex(adapters.AdapterError,
+                                        "INVALID_EVENT_TIMESTAMP"):
+                self.pilot.preview_weather("usgs|quake-17", value)
+
     def test_no_delete_restore_burn_or_cli(self):
         for verb in ("trash", "restore", "burn", "burn_all", "delete", "migrate"):
             self.assertFalse(hasattr(self.pilot, verb))

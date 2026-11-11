@@ -247,6 +247,7 @@ Rectangle {
                         width: Math.max(1,(telemetryGrid.width-telemetryGrid.columnSpacing)/2)
                         height: (telemetryGrid.height-telemetryGrid.rowSpacing)/2
                         readonly property alias meter: telemetryMeter
+                        readonly property alias readoutRow: metricReadoutRow
                         GohuText {
                             anchors.left: parent.left
                             anchors.top: parent.top

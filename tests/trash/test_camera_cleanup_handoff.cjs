@@ -98,14 +98,16 @@ function trashHarness(overrides={}) {
         confirmMode:"",
         cameraCleanupController:camera,
         status:"",
+        archiveSearchText:"",
         archiveRefreshCalls:0,
         researchRefreshCalls:0,
         archiveV2RefreshCalls:0,
         refreshArchive(){ctx.archiveRefreshCalls++;return true;},
         refreshResearch(){ctx.researchRefreshCalls++;return true;},
-        refreshArchiveV2(page,cursor){
+        refreshArchiveV2(page,cursor,query){
             assert.equal(page,0);
             assert.equal(cursor,"");
+            assert.equal(query,ctx.archiveSearchText.trim());
             ctx.archiveV2RefreshCalls++;
             return true;
         },
@@ -273,6 +275,10 @@ test("Trash changes mode IN PLACE and does not hand off to Camera window",()=>{
     assert.equal(ctx.researchRefreshCalls,1);
     assert.equal(ctx.archiveV2RefreshCalls,1);
     assert.equal(ctx.menuOpen,true);
+    // Preserve the user's in-progress search while switching modes.
+    const ctxSearched=trashHarness({archiveSearchText:"  weather event  "});
+    assert.equal(vm.runInContext('setMode("archive")',ctxSearched),true);
+    assert.equal(ctxSearched.archiveV2RefreshCalls,1);
 });
 
 test("Busy or unowned actions fail closed and preserve current menu",()=>{

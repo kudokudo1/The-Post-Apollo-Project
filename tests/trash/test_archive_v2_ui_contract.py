@@ -27,8 +27,8 @@ class V2ArchiveUiContractTests(unittest.TestCase):
                        'id: archiveV2Process',
                        'Quickshell.shellPath("scripts/trash/archive_v2_index.py")',
                        'onStreamFinished: trashLauncher.consumeArchiveV2(this.text)',
-                       'id: archiveV2PageRail', 'label: "V2 PREV"',
-                       'label: "V2 NEXT"', 'MATCHES ACROSS ALL V2',
+                       'id: archiveV2PageRail', 'label: "PREVIOUS"',
+                       'label: "NEXT"', 'PRESS ENTER TO SEARCH ALL COPIES',
                        'item.copyOnly !== true',
                        'item.capabilities.burn !== false',
                        'item.capabilities.restore !== false',
@@ -39,14 +39,27 @@ class V2ArchiveUiContractTests(unittest.TestCase):
                        'archiveV2QueryDirty'):
             self.assertIn(marker, QML)
         self.assertIn('row.kind === "V2 SNAPSHOT"', QML)
-        self.assertIn('label: "FIND V2"', QML)
-        self.assertIn('V2 SEARCH NOT APPLIED // PRESS FIND V2', QML)
+        self.assertNotIn('label: "FIND V2"', QML)
+        self.assertNotIn('V2 SEARCH NOT APPLIED // PRESS FIND V2', QML)
+        self.assertIn('placeholderText: "SEARCH ARCHIVE // PRESS ENTER"', QML)
+        self.assertIn('onAccepted: trashLauncher.refreshArchiveV2(', QML)
+        self.assertIn('[MANAGED COPY]', QML)
+        self.assertIn('[READ-ONLY COPY]', QML)
+        self.assertIn('READ-ONLY COPIES // PAGE ', QML)
+        self.assertIn('COPIES:" + trashLauncher.archiveV2State', QML)
+        self.assertIn('trashLauncher.archiveFilteredRows.length', QML)
+        self.assertIn('anchors.rightMargin:', QML)
+        self.assertIn('? 126 : 6', QML)
         self.assertIn('reply.query !== archiveV2PendingQuery', QML)
         self.assertIn('String(row.ownerId || "")', QML)
         self.assertIn('String(row.resourceId || "")', QML)
         self.assertIn('onAccepted: trashLauncher.refreshArchiveV2(', QML)
         self.assertIn('!trashLauncher.archiveV2QueryDirty', QML)
         self.assertIn('selected !== "all" && selected !== "copies"', QML)
+        self.assertNotIn('label: "V2 PREV"', QML)
+        self.assertNotIn('label: "V2 NEXT"', QML)
+        self.assertNotIn('[V2 COPY]', QML)
+        self.assertNotIn('[V1 COPY]', QML)
         # The copy display is only a filtered model. Existing destructive
         # handlers receive the distinct legacy kind and state contracts.
         self.assertNotIn('modelData.kind === "V2 SNAPSHOT"\n                                                     ||', QML)

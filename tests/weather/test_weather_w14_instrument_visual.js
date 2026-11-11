@@ -46,19 +46,18 @@ test("W14 communicates real date, hourly probability and observed versus forecas
  assert.match(overview,/RAIN CHANCE/);
 });
 
-test("W14 icon system is single-ink line drawing, not emoji, filled or 3D decoration",()=>{
- assert.match(glyph,/Canvas\s*\{/);
- assert.match(glyph,/strokeSun/);
- assert.match(glyph,/strokeMoon/);
- assert.match(glyph,/strokeCloud/);
- assert.match(glyph,/strokeRain/);
- assert.match(glyph,/c.stroke\(\)/);
- assert.doesNotMatch(glyph,/c.fill\(\)/);
- assert.doesNotMatch(glyph,/LinearGradient|Image\s*\{|AnimatedImage|emoji\s*:\s*true/);
- assert.match(terminal,/StationWeatherLineGlyph\s*\{/);
- assert.match(overview,/StationWeatherLineGlyph\s*\{/);
- assert.doesNotMatch(overview,/function glyph\(/);
- assert.doesNotMatch(terminal,/WeatherCelestialGlyph\s*\{/);
+test("W15 restores the pre-W14 SKY/celestial and OVERVIEW glyph families",()=>{
+ assert.match(glyph,/Canvas\s*\{/); // Historical W14 file retained for recovery.
+ assert.match(terminal,/objectName: "weather-w15-original-current-icon"/);
+ assert.match(terminal,/terminal.sky.conditionState.icon/);
+ assert.match(terminal,/hour.forecastState.icon/);
+ assert.match(terminal,/day.dayState.icon/);
+ assert.match(terminal,/WeatherCelestialGlyph\s*\{/);
+ assert.match(terminal,/WeatherCyclePolicy.artworkFor\(/);
+ assert.match(overview,/function glyph\(weatherCode, condition\)/);
+ assert.match(overview,/terminal.glyph\(sample.weatherCode,sample.condition\)/);
+ assert.doesNotMatch(terminal,/StationWeatherLineGlyph\s*\{/);
+ assert.doesNotMatch(overview,/StationWeatherLineGlyph\s*\{/);
 });
 
 test("W14 restores padded menu header without disturbing WEATHER/TWILIGHT selections",()=>{

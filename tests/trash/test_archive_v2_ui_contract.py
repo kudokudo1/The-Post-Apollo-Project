@@ -17,6 +17,13 @@ class V2ArchiveUiContractTests(unittest.TestCase):
                        'id: archiveEntriesList'):
             self.assertIn(marker, QML)
         self.assertIn('archiveRows.concat(researchRows)', QML)
+        self.assertIn('property var archiveCapacity: null', QML)
+        self.assertIn('id: archiveCapacityLine', QML)
+        self.assertIn('ARCHIVE STORAGE // ', QML)
+        self.assertIn('archiveCapacity.chargedBytes', QML)
+        self.assertIn('archiveCapacity.diskQuotaBytes', QML)
+        self.assertIn('archiveCapacity.remainingBytes', QML)
+        self.assertNotIn('label: "ARCHIVE CAPACITY"', QML)
         self.assertIn('.concat(archiveV2QueryDirty ? [] : archiveV2Rows)', QML)
 
     def test_v2_is_page_scoped_and_explicitly_read_only(self):

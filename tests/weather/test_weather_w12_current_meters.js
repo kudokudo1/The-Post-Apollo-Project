@@ -6,7 +6,7 @@ const src=fs.readFileSync("widgets/weather/StationWeatherCombinedPane.qml","utf8
 const sky=fs.readFileSync("widgets/weather/StationSky.qml","utf8");
 
 test("W12 daily expands at the expense of oversized hourly cards",()=>{
-  assert.match(src,/dailyHeight: Math\.max\(56,Math\.min\(70,bandBudget\*0\.28\)\)/);
+  assert.match(src,/dailyHeight: Math\.max\(62,Math\.min\(74,bandBudget\*0\.30\)\)/);
   assert.match(src,/currentHeight: Math\.max\(69,Math\.round\(\(bandBudget-dailyHeight\)\*0\.47\)\)/);
   assert.match(src,/hourlyHeight: Math\.max\(1,bandBudget-dailyHeight-currentHeight\)/);
   assert.match(src,/height: panel\.dailyHeight/);
@@ -52,7 +52,7 @@ test("W12 wind direction compass uses existing sixteen-direction policy",()=>{
 
 test("W12 centers compact daily labels but keeps all three weather icons and rain bars",()=>{
   assert.match(src,/model: Math\.min\(3,panel\.dailyRows\.length\)/);
-  assert.match(src,/font\.pixelSize: 44/);
+  assert.match(src,/font\.pixelSize: Math\.min\(44,parent\.height\)/);
   assert.match(src,/horizontalAlignment: Text\.AlignHCenter/);
   assert.match(src,/anchors\.verticalCenter: parent\.verticalCenter/);
   assert.match(src,/WeatherCyclePolicy\.artworkFor\(/);

@@ -108,7 +108,7 @@ class C4bSyntheticReleaseRootContract(unittest.TestCase):
         expanded = self.raw.replace(b'"epoch":1', b'"epoch":1, "epoch":1', 1)
         self.refused("RELEASE_JSON_REFUSED", raw=expanded,
                      sig=self.root.sign(M.DOMAIN + expanded))
-        noncanonical = self.raw.replace(b',"epoch":1', b', "epoch":1', 1)
+        noncanonical = self.raw.replace(b'"epoch":1', b'"epoch": 1', 1)
         self.refused("RELEASE_JSON_REFUSED", raw=noncanonical,
                      sig=self.root.sign(M.DOMAIN + noncanonical))
 

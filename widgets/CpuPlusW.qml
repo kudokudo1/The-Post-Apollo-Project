@@ -1935,6 +1935,23 @@ PanelWindow {
             anchors.bottomMargin: 9
         }
 
+        // Mouse scroll factor lives in the left/overview bay. No scrollbar
+        // host or unrelated Settings mode changes are introduced here.
+        CpuPlusSettingsMouseScrollPane {
+            id: settingsMouseScrollFactorPane
+            area: "factor"
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "MOUSE"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedStateHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 13
+            anchors.rightMargin: 13
+            anchors.topMargin: 9
+            anchors.bottomMargin: 9
+        }
+
         CpuPlusSettingsKeyboardPane {
             id: settingsKeyboardControlsPane
             area: "controls"
@@ -2393,11 +2410,13 @@ PanelWindow {
             }
         }
 
-        // Stage 0 only: visible route selection without writing input config.
+        // Unimplemented input categories only. KEYBOARD and MOUSE own live
+        // three-bay control panes; ACCESSIBILITY and LIGHTING stay reserved.
         GohuText {
             visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsInputPreviewSelected
                      && cpuPlusWindow.settingsSubMode !== "KEYBOARD"
+                     && cpuPlusWindow.settingsSubMode !== "MOUSE"
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: targetSubModeStrip.bottom
             anchors.topMargin: 27
@@ -2410,12 +2429,29 @@ PanelWindow {
             visible: cpuPlusWindow.selectedModeIndex === 6
                      && cpuPlusWindow.settingsInputPreviewSelected
                      && cpuPlusWindow.settingsSubMode !== "KEYBOARD"
+                     && cpuPlusWindow.settingsSubMode !== "MOUSE"
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: targetSubModeStrip.bottom
             anchors.topMargin: 50
             font.pixelSize: 9
             color: Colors.white
             text: "NO DEVICE CHANGES"
+        }
+
+        // Device list and live observed scroll factor use middle/select bay.
+        CpuPlusSettingsMouseScrollPane {
+            id: settingsMouseScrollDevicePane
+            area: "devices"
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "MOUSE"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: targetSubModeStrip.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 10
+            anchors.bottomMargin: 9
         }
 
         CpuPlusSettingsKeyboardPane {
@@ -3005,6 +3041,23 @@ PanelWindow {
                 color: Colors.cyan
             }
         }
+        // All live Sway input mutations remain behind this exact-device
+        // two-click confirmation in the right/control bay.
+        CpuPlusSettingsMouseScrollPane {
+            id: settingsMouseScrollApplyPane
+            area: "apply"
+            visible: cpuPlusWindow.selectedModeIndex === 6
+                     && cpuPlusWindow.settingsSubMode === "MOUSE"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 20
+            anchors.bottomMargin: 10
+        }
+
         CpuPlusSettingsKeyboardPane {
             id: settingsKeyboardApplyPane
             area: "apply"

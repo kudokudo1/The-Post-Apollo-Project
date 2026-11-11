@@ -10,6 +10,9 @@ on:
       - 'widgets/weather/StationCosmosSpaceWeatherHubPane.qml'
       - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
       - 'tests/weather/test_services_w6_canonical_rollout.js'
+      - 'tests/weather/test_cosmos_full_visual_parity_m28p.js'
+      - 'tests/weather/test_cosmos_subject_panels_c1.js'
+      - 'tests/weather/fixtures/W3HomeSourcesHistoryNative.qml'
       - 'tests/weather/fixtures/W6ServicesConsoleNative.qml'
       - '.github/workflows/weather-services-w6-canonical.yml'
   workflow_dispatch:
@@ -39,6 +42,8 @@ jobs:
           node --test tests/weather/test_media_m5_feeds_services.js
           node --test tests/weather/test_cosmos_c42_space_runtime_dashboard.js
           node --test tests/weather/test_cosmos_c44_header_alignment.js
+          node --test tests/weather/test_cosmos_subject_panels_c1.js
+          node --test tests/weather/test_cosmos_full_visual_parity_m28p.js
           node --test tests/weather/test_weather_w5_canonical_services.js
 
   native-canonical:

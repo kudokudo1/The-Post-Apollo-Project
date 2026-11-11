@@ -26,6 +26,10 @@ Item {
     property int draftVolume: 60
     property int deleteConfirmId: 0
     property bool loadingNote: false
+    // An absent one-time date is an AUTO suggestion, not tomorrow by fiat.
+    // Never replace a date the operator entered or explicitly moved.
+    property bool loadingSelection: false
+    property bool onceDateExplicit: false
     property bool noteDirty: false
     property int noteSavePendingId: 0
     property string noteSavePendingText: ""
@@ -64,6 +68,7 @@ Item {
     function choose(id) {
         const a = AlarmManagerService.findAlarm(id);
         if (!a || !canLeaveNote(id)) return false;
+        loadingSelection = true;
         selectedId = id;
         settingsTab = "schedule";
         deleteConfirmId = 0;
@@ -77,14 +82,32 @@ Item {
         alarmName.text = a.name;
         alarmHour.text = ("0" + a.hour).slice(-2);
         alarmMinute.text = ("0" + a.minute).slice(-2);
-        alarmDate.text = a.date || Policy.dateOffset(Date.now(), 1);
+        onceDateExplicit = a.date !== "";
+        alarmDate.text = a.date || Policy.suggestedOnceDate(
+            a.hour, a.minute, Date.now());
         alarmResumeDate.text = a.pausedUntilDate || "";
         loadingNote = true;
         alarmNote.text = a.note || "";
         loadingNote = false;
         noteDirty = false;
         noteFeedback = "";
+        loadingSelection = false;
         return true;
+    }
+    function updateSuggestedOnceDate() {
+        if (loadingSelection || onceDateExplicit || !selectedAlarm)
+            return;
+        const date = Policy.suggestedOnceDate(
+            Number(alarmHour.text), Number(alarmMinute.text), Date.now());
+        if (date) alarmDate.text = date;
+    }
+    function createScheduledTest() {
+        if (!canLeaveNote(-1)) return;
+        const id = AlarmManagerService.createShortTestAlarm(selectedId);
+        if (id > 0) {
+            alarmSearch.text = "";
+            choose(id);
+        }
     }
     function openNote(id) {
         // Opening the selected row's NOTE must not discard unsaved edits
@@ -162,12 +185,19 @@ Item {
             AlarmManagerService.feedback = "TIME MUST BE 00:00 TO 23:59";
             return;
         }
+        // Recalculate only auto-suggested one-time dates, never manually
+        // chosen ones. Arming for an already-passed minute means tomorrow.
+        const oneTimeDate = draftMode === "once"
+            ? (onceDateExplicit ? alarmDate.text.trim()
+                : Policy.suggestedOnceDate(hour, minute, Date.now())) : "";
+        if (draftMode === "once" && !onceDateExplicit)
+            alarmDate.text = oneTimeDate;
         const patch = {
             name: alarmName.text.trim() || "ALARM",
             hour: hour, minute: minute,
             mode: draftMode,
             weekdays: draftDays.slice(),
-            date: draftMode === "once" ? alarmDate.text.trim() : "",
+            date: oneTimeDate,
             keepSaved: draftKeepSaved,
             enabled: arm ? true : draftEnabled,
             soundEnabled: draftSoundEnabled,
@@ -199,6 +229,7 @@ Item {
         return a.weekdays.map(function(d) {return abbrev[d];}).join(" ");
     }
     function shiftAlarmDate(days) {
+        onceDateExplicit = true;
         const typed = alarmDate.text.trim();
         const start = Policy.validDate(typed, false)
             ? Policy.dayAt(typed, 12, 0) : Date.now();
@@ -346,6 +377,7 @@ Item {
                 }
                 TextField {
                     id: alarmHour
+                    onTextChanged: pane.updateSuggestedOnceDate()
                     width: parent.width
                     height: 32
                     maximumLength: 2
@@ -387,6 +419,7 @@ Item {
                 }
                 TextField {
                     id: alarmMinute
+                    onTextChanged: pane.updateSuggestedOnceDate()
                     width: parent.width
                     height: 32
                     maximumLength: 2
@@ -517,7 +550,10 @@ Item {
                         labelPixelSize: 10
                         selected: pane.draftMode === "once"
                         accentColor: Colors.cyan
-                        onLeftClicked: pane.draftMode = "once"
+                        onLeftClicked: {
+                            pane.draftMode = "once";
+                            pane.updateSuggestedOnceDate();
+                        }
                     }
                     ActionButton {
                         width: (scheduleModes.width - scheduleModes.spacing) / 2
@@ -572,6 +608,7 @@ Item {
                     }
                     TextField {
                         id: alarmDate
+                        onTextEdited: pane.onceDateExplicit = true
                         width: Math.max(0, onceDateRow.width - 126
                                         - 2 * onceDateRow.spacing)
                         height: parent.height
@@ -596,17 +633,36 @@ Item {
                         onLeftClicked: pane.shiftAlarmDate(1)
                     }
                 }
-                ActionButton {
+                Row {
+                    id: schedulingTestRow
                     width: parent.width
                     height: 29
-                    visible: pane.draftMode === "once"
-                    label: pane.draftKeepSaved
-                        ? "KEEP ONE-TIME ALARM SAVED AFTER RINGING"
-                        : "REMOVE ONE-TIME ALARM AFTER RINGING"
-                    labelPixelSize: 10
-                    selected: pane.draftKeepSaved
-                    accentColor: Colors.magenta
-                    onLeftClicked: pane.draftKeepSaved = !pane.draftKeepSaved
+                    spacing: 6
+                    ActionButton {
+                        width: pane.draftMode === "once"
+                            ? (schedulingTestRow.width - schedulingTestRow.spacing) / 2 : 0
+                        height: parent.height
+                        visible: pane.draftMode === "once"
+                        label: pane.draftKeepSaved
+                            ? "KEEP AFTER RING" : "REMOVE AFTER RING"
+                        labelPixelSize: 9
+                        selected: pane.draftKeepSaved
+                        accentColor: Colors.magenta
+                        onLeftClicked: pane.draftKeepSaved = !pane.draftKeepSaved
+                    }
+                    ActionButton {
+                        id: timedAlarmTest
+                        width: pane.draftMode === "once"
+                            ? (schedulingTestRow.width - schedulingTestRow.spacing) / 2
+                            : schedulingTestRow.width
+                        height: parent.height
+                        label: "TEST // 1-2 MIN"
+                        labelPixelSize: 10
+                        accentColor: Colors.orange
+                        available: AlarmManagerService.canEdit
+                            && AlarmManagerService.count < Policy.MAX_ALARMS
+                        onLeftClicked: pane.createScheduledTest()
+                    }
                 }
             }
 
@@ -867,6 +923,25 @@ Item {
             }
         }
 
+        GohuText {
+            width: parent.width
+            height: 17
+            text: "SAVED NEXT // " + AlarmManagerService.nextText(pane.selectedId)
+            color: pane.selectedAlarm && pane.selectedAlarm.enabled
+                   ? Colors.cyan : Colors.orange
+            font.pixelSize: 10
+            elide: Text.ElideRight
+        }
+        GohuText {
+            width: parent.width
+            height: 17
+            text: "TICK // " + (AlarmManagerService.lastSchedulerTickMs > 0
+                ? new Date(AlarmManagerService.lastSchedulerTickMs).toLocaleTimeString()
+                : "WAITING") + "  AUDIO // " + AlarmManagerService.audioState
+            color: Colors.white
+            font.pixelSize: 9
+            elide: Text.ElideRight
+        }
         GohuText {
             width: parent.width
             height: 17

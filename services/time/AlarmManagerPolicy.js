@@ -55,6 +55,26 @@ function dateOffset(nowMs, days) {
     return dayKey(new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + days,
                            12, 0, 0, 0).getTime());
 }
+
+// Choose the earliest real future local occurrence when a new one-time
+// alarm has no explicitly chosen date. Never overwrite an operator-entered
+// date or silently arm a time that has already elapsed today.
+function suggestedOnceDate(hour, minute, nowMs) {
+    if (!integer(hour, 0, 23) || !integer(minute, 0, 59)
+            || !timestamp(nowMs) || nowMs === 0)
+        return "";
+    var today = dayKey(nowMs);
+    return dayAt(today, hour, minute) > nowMs
+        ? today : dateOffset(nowMs, 1);
+}
+
+// Real timer smoke test, due on a whole minute 61..120 seconds away.
+// No direct playback, synthetic notification or shortcut around tick().
+function shortTestDueMs(nowMs) {
+    if (!timestamp(nowMs) || nowMs === 0)
+        return 0;
+    return (Math.floor(nowMs / 60000) + 2) * 60000;
+}
 function weekdaysValid(days) {
     if (!Array.isArray(days) || days.length > 7) return false;
     var seen = {};

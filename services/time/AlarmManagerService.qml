@@ -25,6 +25,7 @@ Scope {
     property string legacyError: ""
     property bool migrationRequested: false
     property double nowMs: Date.now()
+    property double lastSchedulerTickMs: 0
     property string audioState: "NOT REQUESTED"
     property bool previewing: false
     property string previewSoundId: "chime"
@@ -113,6 +114,35 @@ Scope {
         feedback = "ALARM CREATED // EDIT AND ENABLE TO ARM";
         return r.id;
     }
+    // A real one-time test alarm is scheduled 61..120 seconds from now.
+    // It traverses the exact same durable tick -> audio -> notification path.
+    // Creating a separate alarm avoids altering any existing recurring alarm.
+    function createShortTestAlarm(templateId) {
+        if (!canEdit) { feedback = "STORAGE UNAVAILABLE"; return 0; }
+        const template = findAlarm(templateId);
+        const now = Date.now();
+        const dueMs = Policy.shortTestDueMs(now);
+        const at = new Date(dueMs);
+        const created = Policy.create(document, now);
+        if (!created.ok) { feedback = created.error; return 0; }
+        const edited = Policy.update(created.document, created.id, {
+            hour: at.getHours(), minute: at.getMinutes(),
+            mode: "once", weekdays: [],
+            date: Policy.dayKey(dueMs),
+            enabled: true, keepSaved: false,
+            soundEnabled: true,
+            soundId: template ? template.soundId : "chime",
+            volumePercent: template ? Math.max(35, template.volumePercent) : 65
+        }, now);
+        if (!edited.ok || !saveDocument(edited.document)) {
+            feedback = edited.error || "TEST ALARM SAVE FAILED";
+            return 0;
+        }
+        feedback = "TEST ARMED // " + at.toLocaleString()
+                   + " // STOP TO REMOVE";
+        return created.id;
+    }
+
     function duplicateAlarm(id) {
         if (!canEdit) return 0;
         const r = Policy.duplicate(document, id);
@@ -306,6 +336,7 @@ Scope {
         repeat: true
         onTriggered: {
             manager.nowMs = Date.now();
+            manager.lastSchedulerTickMs = manager.nowMs;
             manager.checkDue();
         }
     }

@@ -96,7 +96,7 @@ def parse_protocols(text):
     # Read actual wayland-info registry declarations, not mere mentions in
     # descriptions or unrelated logs.
     advertised = set(re.findall(
-        r"^\\s*interface:\\s*'([A-Za-z0-9_]+)'(?=\\s|,|$)",
+        r"^\s*interface:\s*'([A-Za-z0-9_]+)'(?=\s|,|$)",
         text, flags=re.MULTILINE))
     return {name: name in advertised for name in CAPABILITIES}
 

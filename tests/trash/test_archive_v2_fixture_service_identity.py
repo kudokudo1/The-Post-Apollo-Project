@@ -14,6 +14,11 @@ from cryptography.hazmat.primitives import serialization
 from scripts.trash.archive_v2_fixture_service_identity import (
     PinnedFixtureServiceFiles, ServiceFixtureError,
 )
+from scripts.trash.archive_v2_service_grant import (
+    SCHEMA as GRANT_SCHEMA, ServiceGrantError,
+    canonical_service_grant, canonical_service_policy,
+    verify_fixture_service_grant,
+)
 from scripts.trash.archive_v2_fixture_socket import (
     WIRE_SCHEMA, encode_fixture_frame, handle_fixture_connection,
 )
@@ -126,7 +131,26 @@ class ServiceIdentityV2qTests(unittest.TestCase):
             "signedClaim": self.claim,
         }
 
-    def send(self, *, service=None):
+    def service_grant(self, grant=None, *, signer=None):
+        if grant is None:
+            grant = {
+                "schema": GRANT_SCHEMA, "audience": AUDIENCE,
+                "purpose": PURPOSE, "policyOrigin": "TEST_FIXTURE_ONLY",
+                "rootKeyId": "test-root", "ownerId": "demo-scrape",
+                "captureKeyId": "test-source",
+                "servicePolicySha256": hashlib.sha256(
+                    canonical_service_policy(self.policy)).hexdigest(),
+                "sourceManifestSha256": hashlib.sha256(
+                    canonical_authority(self.manifest["manifest"])).hexdigest(),
+                "generation": 1, "issuedAtMs": 1760000400000,
+                "validFromMs": 1760000400000,
+                "validUntilMs": 1760000600000, "revoked": False,
+            }
+        key = self.root_key if signer is None else signer
+        return {"grant": grant, "signatureB64": base64.b64encode(
+            key.sign(canonical_service_grant(grant))).decode("ascii")}
+
+    def send(self, *, service=None, signed_service_grant=None):
         if service is None:
             service = self.pinned
         elif service is False:
@@ -139,7 +163,8 @@ class ServiceIdentityV2qTests(unittest.TestCase):
                     accepted, peer_policy=self.peer_policy,
                     pinned_test_root=self.trust_root,
                     ledger=self.ledger, now_ms=NOW,
-                    service_files=service)
+                    service_files=service,
+                    signed_service_grant=signed_service_grant)
 
     def counts(self):
         return self.ledger.test_copy_status("demo-scrape")
@@ -285,6 +310,105 @@ class ServiceIdentityV2qTests(unittest.TestCase):
         recovered = self.ledger.inspect_test_admission(
             "demo-scrape","test-source","a"*32)
         self.assertEqual(recovered["serviceWitnessSha256"], "")
+
+    def test_authority_signed_service_grant_bound_to_atomic_receipt(self):
+        signed = self.service_grant()
+        evidence = verify_fixture_service_grant(
+            signed, self.trust_root, self.pinned, self.manifest, now_ms=NOW)
+        self.assertTrue(evidence["serviceGrantSignatureVerified"])
+        self.assertFalse(evidence["sourceServiceVerified"])
+        self.assertFalse(evidence["captureAllowed"])
+        reply = self.send(signed_service_grant=signed)
+        self.assertTrue(reply["ok"], reply)
+        self.assertTrue(reply["signedServiceGrantChecked"])
+        self.assertEqual(reply["serviceGrantSha256"],
+                         evidence["serviceGrantSha256"])
+        recovered = self.ledger.inspect_test_admission(
+            "demo-scrape", "test-source", "a"*32)
+        self.assertEqual(recovered["serviceGrantSha256"],
+                         evidence["serviceGrantSha256"])
+        self.assertEqual(recovered["requestBindingSha256"],
+                         reply["requestBindingSha256"])
+        self.assertFalse(reply["productionAllowed"])
+        self.assertFalse(reply["archiveCopyAuthorized"])
+
+    def test_service_grant_self_signed_wrong_root_refused(self):
+        stranger = Ed25519PrivateKey.generate()
+        result = self.send(
+            signed_service_grant=self.service_grant(signer=stranger))
+        self.assertEqual(result["error"], "SERVICE_GRANT_SIGNATURE_REFUSED")
+        self.assertEqual(self.counts()["testCopies"], 0)
+
+    def test_service_grant_wrong_policy_and_key_refused(self):
+        wrong = dict(self.service_grant()["grant"],
+                     servicePolicySha256="c"*64)
+        result = self.send(signed_service_grant=self.service_grant(wrong))
+        self.assertEqual(result["error"], "SERVICE_GRANT_BINDING_MISMATCH")
+        wrong = dict(self.service_grant()["grant"],
+                     captureKeyId="another-key")
+        result = self.send(signed_service_grant=self.service_grant(wrong))
+        self.assertEqual(result["error"], "SERVICE_GRANT_BINDING_MISMATCH")
+        self.assertEqual(self.counts()["consumedNonces"], 0)
+
+    def test_revoked_and_expired_grants_refused(self):
+        base = self.service_grant()["grant"]
+        revoked = dict(base, revoked=True)
+        self.assertEqual(
+            self.send(signed_service_grant=self.service_grant(revoked))["error"],
+            "SERVICE_GRANT_REVOKED")
+        expired = dict(base, validUntilMs=NOW-1)
+        self.assertEqual(
+            self.send(signed_service_grant=self.service_grant(expired))["error"],
+            "SERVICE_GRANT_EXPIRED")
+        self.assertEqual(self.counts()["testCopies"], 0)
+
+    def test_unknown_scope_type_and_extra_grant_fields_refused(self):
+        base = self.service_grant()["grant"]
+        for changes, code in [
+            ({"purpose":"restore"}, "SERVICE_GRANT_SCOPE_INVALID"),
+            ({"ownerId":"hospital"}, "SERVICE_GRANT_FIELDS_INVALID"),
+            ({"generation":True}, "SERVICE_GRANT_FIELDS_INVALID"),
+            ({"revoked":"false"}, "SERVICE_GRANT_FIELDS_INVALID"),
+            ({"foreignKey":"unsupported"}, "SERVICE_GRANT_SCHEMA_INVALID"),
+            ({"validUntilMs":1760100000000}, "SERVICE_GRANT_TIME_INVALID"),
+        ]:
+            with self.assertRaisesRegex(ServiceGrantError, code):
+                canonical_service_grant(dict(base, **changes))
+
+    def test_service_grant_without_file_gate_refused(self):
+        result = self.send(service=False,
+                           signed_service_grant=self.service_grant())
+        self.assertEqual(result["error"], "SERVICE_GRANT_FILES_REQUIRED")
+        self.assertEqual(self.counts()["consumedNonces"], 0)
+
+    def test_grant_revocation_before_commit_rolls_back_nonce_and_copy(self):
+        signed = self.service_grant()
+        original = verify_fixture_service_grant
+        calls = []
+        def revoke_for_final_check(*args, **kwargs):
+            calls.append(True)
+            if len(calls) == 2:
+                changed = dict(args[0], grant=dict(args[0]["grant"],
+                                                   revoked=True))
+                return original(changed, *args[1:], **kwargs)
+            return original(*args, **kwargs)
+        with patch("scripts.trash.archive_v2_fixture_socket."
+                   "verify_fixture_service_grant",
+                   side_effect=revoke_for_final_check):
+            result = self.send(signed_service_grant=signed)
+        self.assertEqual(result["error"], "SERVICE_GRANT_REVOKED")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(self.counts()["testCopies"], 0)
+        self.assertEqual(self.counts()["consumedNonces"], 0)
+
+    def test_legacy_service_file_receipt_has_no_signed_grant(self):
+        result = self.send()
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["serviceGrantSha256"], "")
+        self.assertFalse(result["signedServiceGrantChecked"])
+        recovered = self.ledger.inspect_test_admission(
+            "demo-scrape", "test-source", "a"*32)
+        self.assertEqual(recovered["serviceGrantSha256"], "")
 
     def test_no_live_service_or_signer_or_archive_import(self):
         from scripts.trash import archive_v2_fixture_service_identity as mod

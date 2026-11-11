@@ -25,6 +25,9 @@ from scripts.trash.archive_v2_peer_lifecycle import (
 from scripts.trash.archive_v2_fixture_service_identity import (
     PinnedFixtureServiceFiles, ServiceFixtureError,
 )
+from scripts.trash.archive_v2_service_grant import (
+    ServiceGrantError, verify_fixture_service_grant,
+)
 from scripts.trash.archive_v2_owner_trust import OwnerTrustError
 from scripts.trash.archive_v2_peer_evidence import BrokerPeerError
 from scripts.trash.archive_v2_signed_capture import SignedCaptureError
@@ -154,6 +157,8 @@ def _safe_reply(result):
             "archiveCopyAuthorized":False,
             "peerLifetimeCheckedBeforeCommit":True,
             "serviceWitnessSha256":result["serviceWitnessSha256"],
+            "serviceGrantSha256":result["serviceGrantSha256"],
+            "signedServiceGrantChecked":bool(result["serviceGrantSha256"]),
             "serviceFilesMatchedBeforeCommit":
                 bool(result["serviceWitnessSha256"]),
             "captureAllowed":False,
@@ -163,7 +168,8 @@ def _safe_reply(result):
 
 
 def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
-                              ledger, now_ms, service_files=None):
+                              ledger, now_ms, service_files=None,
+                              signed_service_grant=None):
     """Handle ONE framed request and reply; no loop, listener or live keys.
 
     A successful result admits a TEST ledger copy only. All failures produce
@@ -186,6 +192,8 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
             # Fail-closed if pidfd is unsupported or the peer exits before
             # the nonce+synthetic copy transaction commits.
             witness = inspect_fixture_peer(connection, peer_policy)
+            _require(signed_service_grant is None or service_files is not None,
+                     "SERVICE_GRANT_FILES_REQUIRED")
             if service_files is not None:
                 _require(type(service_files) is PinnedFixtureServiceFiles,
                          "BROKER_SERVICE_FIXTURE_REQUIRED")
@@ -195,6 +203,17 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
                 service_digest = service_evidence["serviceWitnessSha256"]
             else:
                 service_digest = ""
+            if signed_service_grant is not None:
+                grant_evidence = verify_fixture_service_grant(
+                    signed_service_grant, pinned_test_root, service_files,
+                    packet["signedManifest"], now_ms=now_ms)
+                _require(grant_evidence["ownerId"] == packet["ownerId"]
+                         and grant_evidence["serviceWitnessSha256"]
+                             == service_digest,
+                         "SERVICE_GRANT_BINDING_MISMATCH")
+                grant_digest = grant_evidence["serviceGrantSha256"]
+            else:
+                grant_digest = ""
             with pin_fixture_peer(connection, witness) as lifetime:
                 lifetime.require_alive()
                 def before_fixture_commit():
@@ -203,6 +222,12 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
                         latest = service_files.check_connection(connection)
                         _require(latest["serviceWitnessSha256"] == service_digest,
                                  "BROKER_SERVICE_WITNESS_CHANGED")
+                    if signed_service_grant is not None:
+                        checked_grant = verify_fixture_service_grant(
+                            signed_service_grant, pinned_test_root,
+                            service_files, packet["signedManifest"], now_ms=now_ms)
+                        _require(checked_grant["serviceGrantSha256"] == grant_digest,
+                                 "BROKER_GRANT_CHANGED")
                 admitted = admit_peer_bound_fixture(
                     connection, peer_policy,
                     packet["signedManifest"], pinned_test_root,
@@ -214,14 +239,16 @@ def handle_fixture_connection(connection, *, peer_policy, pinned_test_root,
                     payload=payload, now_ms=now_ms,
                     commit_guard=before_fixture_commit,
                     expected_peer_witness_sha256=witness["peerWitnessSha256"],
-                    service_witness_sha256=service_digest)
+                    service_witness_sha256=service_digest,
+                    service_grant_sha256=grant_digest)
             _require(admitted["captureAllowed"] is False
                      and admitted["productionAllowed"] is False
                      and admitted["sourceProcessVerified"] is False,
                      "BROKER_UNEXPECTED_PRIVILEGE")
             result = _safe_reply(admitted)
         except (FixtureWireError, BrokerHandoffError, BrokerPeerError,
-                PeerLeaseError, ServiceFixtureError, SignedCaptureError,
+                PeerLeaseError, ServiceFixtureError, ServiceGrantError,
+                SignedCaptureError,
                 OwnerTrustError,
                 TrustHistoryError, AtomicAdmissionError) as exc:
             code = str(exc)

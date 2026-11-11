@@ -21,8 +21,8 @@ Rectangle {
         sky.weatherService.forecastReady && sky.dailyForecast
         ? sky.dailyForecast : []
     readonly property real budget: Math.max(1,height-19-12-8)
-    readonly property real currentHeight: Math.max(1,Math.round(budget*0.40))
-    readonly property real hourlyHeight: Math.max(1,Math.round(budget*0.40))
+    readonly property real currentHeight: Math.max(1,Math.round(budget*0.37))
+    readonly property real hourlyHeight: Math.max(1,Math.round(budget*0.45))
     readonly property real dailyHeight: Math.max(1,budget-currentHeight-hourlyHeight)
     readonly property alias currentItem: currentPanel
     readonly property alias hourlyItem: hourlyPanel
@@ -31,7 +31,7 @@ Rectangle {
     readonly property alias dayCardsRepeater: dailyRepeater
     readonly property alias footerItem: inspectStatus
     readonly property alias headingItem: heading
-    readonly property alias headingTitle: headingTitle
+    readonly property alias headingTitle: headingText
 
     function read(value,unit) {
         if(value===undefined || value===null || String(value).trim()==="")
@@ -77,7 +77,7 @@ Rectangle {
             width: parent.width
             height: 19
             GohuText {
-                id: headingTitle
+                id: headingText
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.max(1,parent.width-160)
@@ -419,19 +419,12 @@ Rectangle {
                                 font.pixelSize: 10
                                 color: Colors.yellow
                                 horizontalAlignment: Text.AlignHCenter
-                                text: String(hour.entry.timeLabel||"--")
-                            }
-                            GohuText {
-                                width: parent.width
-                                height: 10
-                                font.pixelSize: 9
-                                color: Colors.cyan
-                                horizontalAlignment: Text.AlignHCenter
-                                text: terminal.dateLabel(hour.entry.date)
+                                text: terminal.dateLabel(hour.entry.date)+" "+
+                                      String(hour.entry.timeLabel||"--")
                             }
                             StationWeatherLineGlyph {
                                 id: hourGlyph
-                                width: Math.min(38,Math.max(26,hour.height-51))
+                                width: Math.min(36,Math.max(22,hour.height-48))
                                 height: width
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 mode: hour.art
@@ -443,15 +436,15 @@ Rectangle {
                             }
                             GohuText {
                                 width: parent.width
-                                height: 18
-                                font.pixelSize: 17
+                                height: 16
+                                font.pixelSize: 16
                                 color: Colors.white
                                 horizontalAlignment: Text.AlignHCenter
                                 text: terminal.read(hour.entry.tempF,"°F")
                             }
                             GohuText {
                                 width: parent.width
-                                height: 11
+                                height: 10
                                 font.pixelSize: 10
                                 color: Colors.cyan
                                 horizontalAlignment: Text.AlignHCenter
@@ -460,7 +453,7 @@ Rectangle {
                             Rectangle {
                                 id: hourRain
                                 width: parent.width-6
-                                height: 5
+                                height: 4
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 color: Colors.black
                                 border.width: 1
@@ -568,17 +561,13 @@ Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 0
                             GohuText {
-                                text: terminal.dateLabel(day.entry.date)
-                                font.pixelSize: 10
-                                color: Colors.magenta
-                                width: parent.width
-                            }
-                            GohuText {
-                                text: terminal.read(day.entry.maxTempF,"°")
-                                      +" / "+terminal.read(day.entry.minTempF,"°F")
-                                font.pixelSize: 13
+                                text: terminal.dateLabel(day.entry.date)+"  "+
+                                      terminal.read(day.entry.maxTempF,"°")
+                                      +"/"+terminal.read(day.entry.minTempF,"°F")
+                                font.pixelSize: 11
                                 color: Colors.white
                                 width: parent.width
+                                elide: Text.ElideRight
                             }
                             GohuText {
                                 text: terminal.rainChance(day.entry.chanceRain)

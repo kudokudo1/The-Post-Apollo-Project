@@ -295,5 +295,80 @@ class C3eYSignedHostChallengeTests(unittest.TestCase):
             self.assertTrue(self.verify()["completeHostRecordSignatureVerifiedInCI"])
         self.assertEqual(self.state()[0], "consumed")
 
+
+    def test_22_lower_same_epoch_release_cannot_issue_after_floor(self):
+        with self.assertRaises(Y.Refused):
+            self.issuer.issue(release_epoch=self.epoch,release_sequence=self.sequence-1)
+        self.assertEqual(self.state(),("issued",None))
+        with Y._connect(self.root) as db:
+            self.assertEqual(db.execute(
+                "SELECT floor_epoch,floor_sequence FROM ledger_meta WHERE id=1"
+            ).fetchone(),(self.epoch,self.sequence))
+        self.assertTrue(self.verify()["completeHostRecordSignatureVerifiedInCI"])
+
+    def test_23_higher_epoch_with_reset_sequence_invalidates_old_challenge(self):
+        upgraded=self.issuer.issue(release_epoch=self.epoch+1,release_sequence=1)
+        self.refused()
+        self.assertEqual(self.state(),("issued",None))
+        self.challenge=upgraded
+        self.epoch+=1
+        self.sequence=1
+        self._sign()
+        self.assertTrue(self.verify()["separatelyIssuedChallengeConsumedInRootLocalCI"])
+
+    def test_24_release_advanced_between_issued_check_and_consume_refuses(self):
+        original=Y.X.inspect_running_denials
+        def recheck_and_supersede(**kwargs):
+            result=original(**kwargs)
+            self.issuer.issue(release_epoch=self.epoch,
+                              release_sequence=self.sequence+1)
+            return result
+        with mock.patch.object(Y.X,"inspect_running_denials",
+                               side_effect=recheck_and_supersede):
+            self.refused()
+        self.assertEqual(self.state(),("issued",None))
+        with self.assertRaises(Y.Refused):
+            self.issuer.issue(release_epoch=self.epoch,
+                              release_sequence=self.sequence)
+
+    def test_25_floor_survives_new_issuer_and_allows_equal_floor(self):
+        next_process=Y.DisposableCIChallengeIssuer(self.root)
+        with self.assertRaises(Y.Refused):
+            next_process.issue(release_epoch=self.epoch-1,
+                               release_sequence=999999)
+        token=next_process.issue(release_epoch=self.epoch,
+                                 release_sequence=self.sequence)
+        self.assertEqual(len(token),32)
+        self.assertNotEqual(token,self.challenge)
+        self.assertEqual(self.state(),("issued",None))
+        self.assertTrue(self.verify()["completeHostRecordSignatureVerifiedInCI"])
+
+    def test_26_floor_metadata_missing_or_inconsistent_refuses_without_recreating(self):
+        db_path=self.root/Y.DB_FILE
+        with sqlite3.connect(db_path) as db:
+            db.execute("UPDATE ledger_meta SET floor_epoch=0,floor_sequence=0")
+        self.refused()
+        with sqlite3.connect(db_path) as db:
+            db.execute("UPDATE ledger_meta SET floor_epoch=?,floor_sequence=?",
+                       (self.epoch,self.sequence))
+            db.execute("DROP TABLE ledger_meta")
+        self.refused()
+        with sqlite3.connect(db_path) as db:
+            self.assertEqual(db.execute(
+                "SELECT COUNT(*) FROM sqlite_master "
+                "WHERE type='table' AND name='ledger_meta'"
+            ).fetchone(),(0,))
+
+    def test_27_cross_epoch_downgrade_refused_even_with_higher_sequence(self):
+        token=self.issuer.issue(release_epoch=self.epoch+1,release_sequence=1)
+        self.assertEqual(len(token),32)
+        for epoch,sequence in ((self.epoch,self.sequence+999),
+                               (self.epoch+1,0),
+                               (self.epoch+1,0x7fffffffffffffff+1)):
+            with self.subTest(epoch=epoch,sequence=sequence):
+                with self.assertRaises(Y.Refused):
+                    self.issuer.issue(release_epoch=epoch,
+                                      release_sequence=sequence)
+
 if __name__=="__main__":
     unittest.main(verbosity=2)

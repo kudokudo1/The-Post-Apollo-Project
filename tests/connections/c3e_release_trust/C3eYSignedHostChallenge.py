@@ -35,7 +35,7 @@ ROLE = X.ROLE
 PURPOSE = "postapollo.identity.c3ey-deny-only-full-record.ci"
 AUDIENCE = "postapollo.connections.c3ey-disposable-root-issuer.ci"
 DOMAIN = b"postapollo.connections.c3ey-signed-full-identity-evidence.ci-v1\x00"
-DB_SCHEMA = "postapollo.connections.c3ey-root-local-one-use.ci-v1"
+DB_SCHEMA = "postapollo.connections.c3ey-root-local-one-use.ci-v2"
 DIR_PREFIX = "c3ey-ci-"
 DB_FILE = "challenge-ledger.sqlite"
 SIGNED_KEYS = frozenset((
@@ -46,7 +46,11 @@ SIGNED_KEYS = frozenset((
 CREATE_SQL = """
 CREATE TABLE ledger_meta (
     id INTEGER PRIMARY KEY CHECK(id=1),
-    schema TEXT NOT NULL CHECK(schema='postapollo.connections.c3ey-root-local-one-use.ci-v1')
+    schema TEXT NOT NULL CHECK(schema='postapollo.connections.c3ey-root-local-one-use.ci-v2'),
+    floor_epoch INTEGER NOT NULL CHECK(floor_epoch>=0),
+    floor_sequence INTEGER NOT NULL CHECK(floor_sequence>=0),
+    CHECK ((floor_epoch=0 AND floor_sequence=0) OR
+           (floor_epoch>0 AND floor_sequence>0))
 );
 CREATE TABLE challenges (
     digest TEXT PRIMARY KEY CHECK(length(digest)=64),
@@ -58,8 +62,8 @@ CREATE TABLE challenges (
     CHECK ((state='issued' AND signed_record_sha256 IS NULL) OR
            (state='consumed' AND length(signed_record_sha256)=64))
 );
-INSERT INTO ledger_meta(id,schema) VALUES(
-    1, 'postapollo.connections.c3ey-root-local-one-use.ci-v1');
+INSERT INTO ledger_meta(id,schema,floor_epoch,floor_sequence) VALUES(
+    1, 'postapollo.connections.c3ey-root-local-one-use.ci-v2', 0, 0);
 """
 
 
@@ -127,9 +131,25 @@ def _connect(root):
         db.execute("PRAGMA busy_timeout=8000")
         db.execute("PRAGMA journal_mode=DELETE")
         db.execute("PRAGMA synchronous=FULL")
-        if db.execute("SELECT schema FROM ledger_meta WHERE id=1").fetchone() != (DB_SCHEMA,):
+        meta = db.execute(
+            "SELECT schema,floor_epoch,floor_sequence "
+            "FROM ledger_meta WHERE id=1").fetchone()
+        if (meta is None or meta[0] != DB_SCHEMA
+                or type(meta[1]) is not int or type(meta[2]) is not int
+                or not (meta[1:] == (0, 0)
+                        or (_positive_number(meta[1]) and
+                            _positive_number(meta[2])))):
             db.close()
-            _deny("ISSUER_LEDGER_SCHEMA_REFUSED")
+            _deny("ISSUER_LEDGER_SCHEMA_OR_FLOOR_REFUSED")
+        # A truncated/replaced floor cannot silently undercut issuance
+        # entries still visible in this same (disposable) CI ledger.
+        future = db.execute(
+            "SELECT 1 FROM challenges WHERE release_epoch > ? "
+            "OR (release_epoch = ? AND release_sequence > ?) LIMIT 1",
+            (meta[1], meta[1], meta[2])).fetchone()
+        if future is not None:
+            db.close()
+            _deny("ISSUER_LEDGER_FLOOR_INCONSISTENT")
         if db.execute("PRAGMA quick_check").fetchone() != ("ok",):
             db.close()
             _deny("ISSUER_LEDGER_CORRUPT")
@@ -176,6 +196,17 @@ class DisposableCIChallengeIssuer:
         with _connect(self.root) as db:
             try:
                 db.execute("BEGIN IMMEDIATE")
+                floor = db.execute(
+                    "SELECT floor_epoch,floor_sequence "
+                    "FROM ledger_meta WHERE id=1").fetchone()
+                requested = (release_epoch, release_sequence)
+                if floor is None or requested < floor:
+                    db.execute("ROLLBACK")
+                    _deny("ISSUER_RELEASE_DOWNGRADE_REFUSED")
+                if requested > floor:
+                    db.execute(
+                        "UPDATE ledger_meta SET floor_epoch=?,floor_sequence=? "
+                        "WHERE id=1", requested)
                 db.execute(
                     "INSERT INTO challenges VALUES(?,?,?,?,? ,?)",
                     (digest, AUDIENCE, release_epoch, release_sequence,
@@ -192,9 +223,14 @@ class DisposableCIChallengeIssuer:
         if not _positive_number(epoch) or not _positive_number(sequence):
             _deny("RELEASE_FLOOR_INVALID")
         with _connect(self.root) as db:
+            floor = db.execute(
+                "SELECT floor_epoch,floor_sequence "
+                "FROM ledger_meta WHERE id=1").fetchone()
             row = db.execute(
                 "SELECT audience,release_epoch,release_sequence,state "
                 "FROM challenges WHERE digest=?", (_hash(challenge),)).fetchone()
+        if floor != (epoch, sequence):
+            _deny("ISSUER_OUTSTANDING_CHALLENGE_RELEASE_SUPERSEDED")
         if row is None:
             _deny("CHALLENGE_NOT_ISSUED")
         if row[:3] != (AUDIENCE, epoch, sequence):
@@ -208,6 +244,12 @@ class DisposableCIChallengeIssuer:
         with _connect(self.root) as db:
             try:
                 db.execute("BEGIN IMMEDIATE")
+                floor = db.execute(
+                    "SELECT floor_epoch,floor_sequence "
+                    "FROM ledger_meta WHERE id=1").fetchone()
+                if floor != (epoch, sequence):
+                    db.execute("ROLLBACK")
+                    _deny("ISSUER_RELEASE_SUPERSEDED_BEFORE_CONSUME")
                 cursor = db.execute(
                     "UPDATE challenges SET state='consumed',signed_record_sha256=? "
                     "WHERE digest=? AND audience=? AND release_epoch=? "

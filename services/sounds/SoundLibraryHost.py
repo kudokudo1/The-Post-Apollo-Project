@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded, local WAV tone import for the shared Post-Apollo Sound Library.
+"""Bounded local WAV/MP3 import for the shared Post-Apollo Sound Library.
 
 Invoked on explicit user action by Quickshell. Only the host copies/deletes
 files. Never executes media, shell commands, network calls or an input path.
@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import subprocess
 import sys
 import tempfile
 from urllib.parse import urlsplit, unquote
@@ -20,7 +21,9 @@ import wave
 VERSION = 1
 MAX_TONES = 32
 MAX_BYTES = 8 * 1024 * 1024
+MAX_MP3_BYTES = 16 * 1024 * 1024
 MAX_SECONDS = 30
+CONVERSION_TIMEOUT_SECONDS = 20
 NAME_MAX = 40
 ID = re.compile(r"^user-[0-9a-f]{64}$")
 ALLOWED_RATES = (24000, 48000)
@@ -41,8 +44,8 @@ def source_path(url):
     if parts.scheme != "file" or parts.netloc not in ("", "localhost") or parts.query or parts.fragment:
         raise Refused("LOCAL_FILE_REQUIRED")
     path = Path(unquote(parts.path))
-    if not path.is_absolute() or path.suffix.lower() != ".wav":
-        raise Refused("WAV_FILE_REQUIRED")
+    if not path.is_absolute() or path.suffix.lower() not in (".wav", ".mp3"):
+        raise Refused("WAV_OR_MP3_FILE_REQUIRED")
     return path
 
 
@@ -155,8 +158,10 @@ def inspected_wav(source):
         raise
 
 
-def import_wav(root, args):
-    source = source_path(args.source)
+def import_wav(root, args, source_override=None):
+    source = source_override if source_override is not None else source_path(args.source)
+    if source.suffix.lower() != ".wav":
+        raise Refused("WAV_FILE_REQUIRED")
     if not name_ok(args.name):
         raise Refused("INVALID_TONE_NAME")
     fd, digest, seconds = inspected_wav(source)
@@ -193,6 +198,83 @@ def import_wav(root, args):
         return {"ok": True, "status": "imported", "tones": with_urls(root, new_tones), "selectedId": tone_id}
     finally:
         os.close(fd)
+
+
+def convert_mp3(root, source):
+    """Decode untrusted MP3 into a private, short PCM WAV, never at source path.
+
+    The decoder reads a previously opened no-follow source FD via pipe:0.
+    It cannot follow MP3 metadata to arbitrary local/network URLs, cannot
+    access arbitrary source paths as FFmpeg inputs, and may only write the
+    single reserved temporary WAV under the managed Sound Library.
+    """
+    if source.suffix.lower() != ".mp3":
+        raise Refused("MP3_FILE_REQUIRED")
+    fd = os.open(source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_size < 128 or st.st_size > MAX_MP3_BYTES:
+            raise Refused("INVALID_MP3_SIZE")
+        with os.fdopen(fd, "rb", closefd=False) as handle:
+            # Explicit 16 MiB upper bound even if the source changes after fstat.
+            source_bytes = handle.read(MAX_MP3_BYTES + 1)
+        if len(source_bytes) > MAX_MP3_BYTES:
+            raise Refused("INVALID_MP3_SIZE")
+    finally:
+        os.close(fd)
+
+    temporary_fd, temporary_name = tempfile.mkstemp(
+        prefix=".mp3-decode-", suffix=".wav", dir=root
+    )
+    os.close(temporary_fd)
+    temporary = Path(temporary_name)
+    try:
+        command = [
+            "ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error",
+            "-xerror", "-y",
+            "-protocol_whitelist", "pipe", "-f", "mp3", "-i", "pipe:0",
+            "-map", "0:a:0", "-vn", "-sn", "-dn",
+            "-ac", "1", "-ar", "48000", "-c:a", "pcm_s16le",
+            # Decode 31s to detect/reject samples beyond the 30s allowance.
+            # The output is capped by the mono PCM format at about 3 MiB.
+            "-t", str(MAX_SECONDS + 1), "-threads", "1",
+            "-f", "wav", str(temporary),
+        ]
+        try:
+            outcome = subprocess.run(
+                command, input=source_bytes, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, timeout=CONVERSION_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            raise Refused("MP3_CONVERTER_UNAVAILABLE") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise Refused("MP3_CONVERSION_TIMEOUT") from exc
+        if outcome.returncode != 0:
+            raise Refused("MP3_CONVERSION_FAILED")
+        # The existing WAV validator also enforces PCM sample format,
+        # data size and complete 0.2..30s duration before any index write.
+        fd, _, _ = inspected_wav(temporary)
+        os.close(fd)
+        return temporary
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def import_audio(root, args):
+    source = source_path(args.source)
+    if not name_ok(args.name):
+        raise Refused("INVALID_TONE_NAME")
+    if source.suffix.lower() == ".wav":
+        return import_wav(root, args, source)
+    # MP3 conversion is optional. Missing FFmpeg must not change or prevent
+    # existing WAV imports, alarm schedules or playback.
+    converted = convert_mp3(root, source)
+    try:
+        return import_wav(root, args, converted)
+    finally:
+        converted.unlink(missing_ok=True)
 
 
 def with_urls(root, tones):
@@ -251,7 +333,7 @@ def run(args):
     if args.operation == "list":
         return {"ok": True, "status": "ready", "tones": with_urls(root, load(root))}
     if args.operation == "import":
-        return import_wav(root, args)
+        return import_audio(root, args)
     if args.operation == "rename":
         return rename(root, args)
     if args.operation == "delete":

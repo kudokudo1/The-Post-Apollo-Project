@@ -47,7 +47,11 @@ def _key(key):
 
 def _path(path, *, exists):
     """Deliberately unusable with user-selected production archive paths."""
-    require(type(path) is Path and path.is_absolute()
+    # pathlib.Path() constructs the platform-native concrete class (PosixPath
+    # on Linux). An exact type check against Path itself rejects every valid
+    # fixture. Keep the concrete type check so arbitrary subclasses/strings
+    # still refuse; all location, owner and mode guards below remain intact.
+    require(type(path) is type(Path("/")) and path.is_absolute()
             and path.name == FILENAME and path.parent.parent == Path("/tmp")
             and path.parent.name.startswith(ROOT_PREFIX))
     try:

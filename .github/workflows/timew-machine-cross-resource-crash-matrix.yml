@@ -3,6 +3,8 @@ name: TimeW MACHINE cross-resource crash recovery matrix
 on:
   pull_request:
     paths:
+      - "services/time/MachineBraveFixtureRecoveryJournal.py"
+      - "tests/timew/test_machine_fixture_recovery_journal.py"
       - "tests/timew/test_machine_cross_resource_crash_matrix.py"
       - "docs/timew-machine-cross-resource-crash-matrix.md"
       - ".github/workflows/timew-machine-cross-resource-crash-matrix.yml"

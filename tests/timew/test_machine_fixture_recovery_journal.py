@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import shutil
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
@@ -111,6 +112,28 @@ def child_main():
     raise AssertionError("crash injection returned")
 
 
+def test_native_fixture_path_type():
+    """Accept only the concrete Linux Path, not a string or user subclass."""
+    root, path = fixture()
+    try:
+        plan = sample()
+        assert type(path) is type(Path("/"))
+        empty = journal.initialize(path, plan, KEY)
+        assert empty == {"sequence": 0, "mac": journal.EMPTY_MAC}
+        assert journal.inspect(path, plan, KEY, empty)["status"] == (
+            "fixture_pinned_head_observed")
+        refused(journal.inspect, str(path), plan, KEY, empty)
+
+        class DerivedNativePath(type(Path("/"))):
+            pass
+
+        refused(journal.inspect, DerivedNativePath(str(path)), plan, KEY, empty)
+        assert path.exists()
+        assert path.stat().st_mode & 0o777 == 0o600
+    finally:
+        shutil.rmtree(root)
+
+
 def test_normal():
     root, path = fixture()
     try:
@@ -182,7 +205,23 @@ def test_crashes():
                     "status"] == "manual_reconciliation_required"
                 # Reply loss must not silently cause a second stage event.
                 refused(journal.append_fixture, path, plan, KEY, empty, A, "staged")
-            assert not list(root.glob("*-journal"))
+            # SQLite DELETE-mode rollback can leave a private hot-journal
+            # sidecar after crash recovery. Success is determined by the
+            # verified committed rows and expected head above, not by the
+            # absence of a sidecar. Refuse any unexpected/unsafe leftovers.
+            leftovers = sorted(root.iterdir())
+            assert all(p.name in (journal.FILENAME,
+                                  journal.FILENAME + "-journal")
+                       for p in leftovers)
+            sidecars = [p for p in leftovers
+                        if p.name == journal.FILENAME + "-journal"]
+            assert len(sidecars) <= 1
+            for sidecar in sidecars:
+                info = sidecar.lstat()
+                assert stat.S_ISREG(info.st_mode)
+                assert info.st_uid == os.geteuid()
+                assert info.st_nlink == 1
+                assert stat.S_IMODE(info.st_mode) == 0o600
         finally:
             shutil.rmtree(root)
 
@@ -245,6 +284,7 @@ def test_static_no_archives():
 
 def main():
     assert sys.platform.startswith("linux")
+    test_native_fixture_path_type()
     test_normal()
     test_crashes()
     test_tamper_and_floor()

@@ -148,14 +148,14 @@ def begin(connection, lease) -> InFlightGuard:
     """Initial snapshot is taken only after a kernel-anchored process lease."""
     if not lease.valid():
         refuse()
+    # The first frame may already be buffered when the broker accepts a
+    # socket. Do not reject pending first-request bytes as pipelining.
+    # After that exact frame has been consumed, guard.valid() will require
+    # an empty, still-connected read side.
     original = _session_context(lease.identity.pid)
-    if not _socket_still_waiting(connection) or not lease.valid():
+    if not lease.valid():
         refuse()
-    guard = InFlightGuard(connection, lease, original)
-    if not guard.valid():
-        guard.cancel()
-        refuse()
-    return guard
+    return InFlightGuard(connection, lease, original)
 
 
 if __name__ == "__main__":

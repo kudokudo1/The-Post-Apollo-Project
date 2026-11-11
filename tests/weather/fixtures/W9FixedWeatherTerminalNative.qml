@@ -147,8 +147,32 @@ ShellRoot {
                 const hour=combined.hourRepeater.itemAt(0);
                 if(!hour || !hour.glyph || !hour.rainMeter ||
                    !hour.timeItem.text.includes("11/10") ||
-                   hour.glyph.width<28 || hour.rainMeter.height<4)
+                   hour.glyph.width<28 || hour.rainMeter.height<6)
                     return root.fail("FORECAST_HOUR_CONTEXT_OR_SYMBOL");
+                // W19 // Both periods use a real meter between
+                // their temperature and probability labels.
+                function meterBetween(item, label) {
+                    if(!item || !item.rainMeter || !item.temperatureItem
+                       || !item.chanceItem)
+                        return label+"_ITEM_MISSING";
+                    const tempBottom=item.temperatureItem.mapToItem(
+                        item,0,item.temperatureItem.height).y;
+                    const meterTop=item.rainMeter.mapToItem(item,0,0).y;
+                    const meterBottom=item.rainMeter.mapToItem(
+                        item,0,item.rainMeter.height).y;
+                    const percentTop=item.chanceItem.mapToItem(item,0,0).y;
+                    if(tempBottom>meterTop+1 || meterBottom>percentTop+1)
+                        return label+"_BAR_NOT_BETWEEN "+tempBottom+"/"
+                            +meterTop+"/"+meterBottom+"/"+percentTop;
+                    return "";
+                }
+                let order=meterBetween(hour,"HOURLY");
+                if(order!=="")return root.fail(order);
+                const day=combined.dayCardsRepeater.itemAt(0);
+                if(!day || day.rainMeter.height<6)
+                    return root.fail("DAILY_RAIN_BAR_MISSING");
+                order=meterBetween(day,"DAILY");
+                if(order!=="")return root.fail(order);
                 const dailyBottom=combined.dailyItem.mapToItem(
                     combined,0,combined.dailyItem.height).y;
                 if(dailyBottom>combined.height)
@@ -222,6 +246,12 @@ ShellRoot {
                     first,0,first.rainMeter.height).y;
                 const lastDailyEdge=combined.dailyItem.mapToItem(
                     combined,0,combined.dailyItem.height).y;
+                const narrowDay=combined.dayCardsRepeater.itemAt(0);
+                const dailyChanceEnd=narrowDay.chanceItem.mapToItem(
+                    narrowDay,0,narrowDay.chanceItem.height).y;
+                if(dailyChanceEnd>narrowDay.height+1)
+                    return root.fail("NARROW_DAILY_RAIN_LABEL_CLIPPED // "
+                                     +dailyChanceEnd+"/"+narrowDay.height);
                 const footerEdge=combined.footerItem.mapToItem(
                     combined,0,combined.footerItem.height).y;
                 if(rainEnd>first.height+2 ||
@@ -248,7 +278,7 @@ ShellRoot {
                     +centered.height/2-region.height/2);
                 if(centerError>1.5 ||
                    region.y < first.timeItem.height-1 ||
-                   first.rainMeter.height!==4)
+                   first.rainMeter.height!==6)
                     return root.fail("W15_HOURLY_STACK_NOT_CENTERED // "
                         +centerError+" / "+region.y);
                 if(!root.narrowPreviewRequested) {

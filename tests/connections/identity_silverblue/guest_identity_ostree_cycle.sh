@@ -330,7 +330,7 @@ ID_MONITOR
     probe_rc=0
     timeout --signal=TERM --kill-after=10s 420s /usr/bin/bash "$service_probe" ||
       probe_rc="$?"
-    printf 'C4B_ID_STAGE // after_service_probe rc=%s\\n' "$probe_rc"
+    printf 'C4B_ID_STAGE // after_service_probe rc=%s\n' "$probe_rc"
     [[ "$probe_rc" == 0 ]] ||
       fail "REAL_SYSTEMD_DENY_ONLY_IDENTITY_SERVICE_PROBE_REFUSED_RC_$probe_rc"
     [[ "$(cat "$stage")" == layer_pending ]] ||

@@ -114,11 +114,14 @@ def assess_untrusted_markers(*, artifact: bytes,
     lines = _tokens(artifact)
     failures = tuple(
         x for x in lines
-        if x.startswith(("C4B_ID_FAIL //", "C4B_ID_BLOCKED //")))
-    exits = [EXIT_CODE.fullmatch(x) for x in lines
-             if x.startswith("C4B_ID_VM_PROCESS_EXIT //")]
-    if len(exits) != 1 or exits[0] is None:
-        _deny("C4B_VM_EXIT_MARKER_MISSING_DUPLICATE_OR_MALFORMED")
+        if "C4B_ID_FAIL //" in x or "C4B_ID_BLOCKED //" in x)
+    exit_positions = [idx for idx, line in enumerate(lines)
+                      if line.startswith("C4B_ID_VM_PROCESS_EXIT //")]
+    if len(exit_positions) != 1 or exit_positions[0] != len(lines) - 1:
+        _deny("C4B_VM_EXIT_MARKER_MISSING_DUPLICATE_OR_NONTERMINAL")
+    exits = [EXIT_CODE.fullmatch(lines[exit_positions[0]])]
+    if exits[0] is None:
+        _deny("C4B_VM_EXIT_MARKER_MALFORMED")
     vm_exit = int(exits[0].group(1))
     if vm_exit > 255:
         _deny("C4B_VM_EXIT_OUT_OF_RANGE")

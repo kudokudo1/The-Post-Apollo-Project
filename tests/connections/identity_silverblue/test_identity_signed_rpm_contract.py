@@ -760,5 +760,34 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         compile(qmp_python, "c4b-qmp-read-only-status", "exec")
 
 
+    def test_25_host_vcpu_witness_is_safe_and_awk_prefix_executes(self):
+        import subprocess
+
+        host = (AREA / "run_official_silverblue_identity.sh").read_text()
+        self.assertIn('f"/proc/{qemu_pid}/task/{tid}/stat"', host)
+        self.assertIn('vcpu_tick_progress=', host)
+        self.assertIn('vcpu_uninterruptible=', host)
+        self.assertIn('type(cpu.get("thread-id")) is int', host)
+        self.assertIn('len(tid_set) != len(cpus)', host)
+        self.assertIn('time.sleep(2)', host)
+        self.assertNotIn("sed 's/^/C4B_ID_STAGE // HOST_QEMU_PROCESS", host)
+        self.assertNotIn("query-memory-devices", host)
+        self.assertNotIn("pmemsave", host)
+        self.assertNotIn("guest-exec", host)
+        awk = 'NR <= 2 {print "C4B_ID_STAGE // HOST_QEMU_PROCESS // " $0}'
+        self.assertIn(awk, host)
+        result = subprocess.run(
+            ["awk", awk],
+            input="101 1 S futex_wait 00:00 qemu-system-x86\\n",
+            text=True, capture_output=True, check=True, timeout=3,
+        )
+        self.assertEqual(
+            result.stdout,
+            "C4B_ID_STAGE // HOST_QEMU_PROCESS // "
+            "101 1 S futex_wait 00:00 qemu-system-x86\\n",
+        )
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

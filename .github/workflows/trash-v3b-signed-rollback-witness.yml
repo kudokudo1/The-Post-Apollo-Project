@@ -1,0 +1,31 @@
+name: Trash++ V3b signed witness rollback refusal
+
+on:
+  pull_request:
+    paths:
+      - scripts/trash/archive_v3b_signed_rollback_witness.py
+      - tests/trash/test_archive_v3b_signed_rollback_witness.py
+      - scripts/trash/ARCHIVE-SIGNED-ROLLBACK-WITNESS-V3B.md
+      - .github/workflows/trash-v3b-signed-rollback-witness.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-witness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned signing-verification dependency
+        run: python3 -m pip install 'cryptography>=44,<48'
+      - name: Verify signed independent fixture witness comparisons and all-deny guarantees
+        run: python3 -B -m unittest discover -s tests/trash -p 'test_archive_v3b_signed_rollback_witness.py' -v
+      - name: Rerun actual V2w signed floor and V3a read-only readiness regressions
+        run: |
+          python3 -B -m unittest discover -s tests/trash -p 'test_archive_v2_external_floor_reader.py' -v
+          python3 -B -m unittest discover -s tests/trash -p 'test_archive_v3a_cutover_readiness_review.py' -v

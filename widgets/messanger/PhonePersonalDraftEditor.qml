@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "PhonePersonalDraftState.js" as DraftState
 import "PhonePersonalSavePlanP44.js" as SavePlan
+import "PhonePersonalSaveFeedbackP45.js" as SaveFeedback
 
 // P42 isolated PHONE Personal editor shell. NOT connected to live PhonePane.
 // A future trusted native host may wire this only after independent C5
@@ -220,6 +221,15 @@ Rectangle {
                     editor.cancelRequested();
                 }
             }
+        }
+
+        Text {
+            width: parent.width
+            text: SaveFeedback.classify({status: "HOST_UNAVAILABLE"}).text
+            color: Colors.orange
+            font.pixelSize: 10
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
         }
 
         Text {

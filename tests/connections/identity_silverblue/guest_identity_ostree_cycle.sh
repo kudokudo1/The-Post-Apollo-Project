@@ -321,10 +321,23 @@ ID_MONITOR
     [[ -f "$service_probe" && ! -L "$service_probe" &&
        "$(stat -c '%u:%g:%a' "$service_probe")" == '0:0:700' ]] ||
       fail "CI_ONLY_REAL_IDENTITY_SERVICE_PROBE_MISSING"
-    /usr/bin/bash "$service_probe" ||
-      fail "REAL_SYSTEMD_DENY_ONLY_IDENTITY_SERVICE_PROBE_REFUSED"
+    # A completed probe must actually return to this parent before the
+    # persistent rollback stage is advanced. Previously the probe printed its
+    # cleanup markers but the parent never reached this boundary, leaving an
+    # unobserved hang until the outer QEMU watchdog. The bounded child return
+    # preserves a nonzero/timeout as FAIL, never as rollback authorization.
+    echo "C4B_ID_STAGE // before_service_probe"
+    probe_rc=0
+    timeout --signal=TERM --kill-after=10s 420s /usr/bin/bash "$service_probe" ||
+      probe_rc="$?"
+    printf 'C4B_ID_STAGE // after_service_probe rc=%s\\n' "$probe_rc"
+    [[ "$probe_rc" == 0 ]] ||
+      fail "REAL_SYSTEMD_DENY_ONLY_IDENTITY_SERVICE_PROBE_REFUSED_RC_$probe_rc"
+    [[ "$(cat "$stage")" == layer_pending ]] ||
+      fail "SERVICE_PROBE_CHANGED_OSTREE_STAGE"
     echo "C4B_ID_PASS // REAL_IDENTITY_SERVICE_PROBE_FINISHED_BEFORE_ROLLBACK"
     echo rollback_pending > "$stage"
+    echo "C4B_ID_STAGE // rollback_command_started"
     rpm-ostree rollback --reboot || fail "REAL_IDENTITY_ROLLBACK_COMMAND_FAILED"
     ;;
   rollback_pending)

@@ -1,0 +1,57 @@
+name: Social PHONE P44 Full Favorite/Note Transaction Rehearsal (Disposable)
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/PhonePersonalSavePlanP44.js'
+      - 'services/phone/PhonePersonalSaveOrchestratorP44.py'
+      - 'tests/messaging/test_social_phone_save_plan_p44.cjs'
+      - 'tests/phone/test_phone_personal_save_orchestrator_p44.py'
+      - 'MODEL/contracts/social-phone-p44-transaction-rehearsal-v0.md'
+      - '.github/workflows/social-phone-p44-transaction-rehearsal.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/PhonePersonalSavePlanP44.js'
+      - 'services/phone/PhonePersonalSaveOrchestratorP44.py'
+      - 'tests/messaging/test_social_phone_save_plan_p44.cjs'
+      - 'tests/phone/test_phone_personal_save_orchestrator_p44.py'
+      - 'MODEL/contracts/social-phone-p44-transaction-rehearsal-v0.md'
+      - '.github/workflows/social-phone-p44-transaction-rehearsal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  end-to-end-disposable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Disposable AES-GCM requirement
+        run: python -m pip install cryptography==50.0.2
+      - name: Validate UI plan syntax
+        run: node --check widgets/messanger/PhonePersonalSavePlanP44.js
+      - name: Test multi-action plan, note clear and private state
+        run: node --test tests/messaging/test_social_phone_save_plan_p44.cjs
+      - name: Compile P44 and P43 backend
+        run: |
+          python -m py_compile services/phone/PhonePersonalSaveOrchestratorP44.py
+          python -m py_compile services/phone/PhonePersonalEditIngressP43.py
+      - name: Full encrypted Favorite + Note transaction matrix
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_save_orchestrator_p44.py' -v
+      - name: P35 encrypted vault and CAS regressions
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_contact_vault.py' -v
+      - name: P36 per-action permission and keyring regressions
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_host_gate_p36.py' -v
+      - name: P43 ingress and mounted editor regressions
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_edit_ingress_p43.py' -v
+      - name: P40R uncertain-save observation regressions
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_vault_recovery_p40r.py' -v

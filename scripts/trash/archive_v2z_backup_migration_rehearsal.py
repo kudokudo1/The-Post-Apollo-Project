@@ -318,7 +318,6 @@ class TestMigrationSafetyV2z:
                 source_db.execute("PRAGMA query_only=ON")
                 with closing(sqlite3.connect(str(target),timeout=5)) as backup_db:
                     source_db.backup(backup_db,pages=64,sleep=0.01)
-                    backup_db.execute("PRAGMA wal_checkpoint") if False else None
                     backup_db.commit()
             with open(target,"rb") as stream:
                 os.fsync(stream.fileno())

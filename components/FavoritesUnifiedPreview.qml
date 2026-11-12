@@ -71,18 +71,26 @@ Rectangle {
             }
         }
 
-        Row {
+        // Show three readable source summaries, with horizontal scroll for
+        // the additional ALARMS and ANGEL groups beside existing WORLD zones.
+        Flickable {
             width: parent.width
             height: 32
-            spacing: 5
-
-            Repeater {
-                model: preview.groups
-                Rectangle {
-                    width: Math.max(1,(preview.width - 16
-                        - Math.max(0,preview.groups.length-1)*5)
-                        / Math.max(1,preview.groups.length))
-                    height: 31
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.HorizontalFlick
+            contentWidth: groupSummaries.implicitWidth
+            contentHeight: height
+            interactive: contentWidth > width
+            Row {
+                id: groupSummaries
+                height: 32
+                spacing: 5
+                Repeater {
+                    model: preview.groups
+                    Rectangle {
+                        width: Math.max(94,Math.floor((preview.width - 16 - 2*5)/3))
+                        height: 31
                     color: "transparent"
                     border.color: Colors.cyan
                     border.width: 1
@@ -111,6 +119,7 @@ Rectangle {
                         }
                     }
                 }
+            }
             }
         }
 

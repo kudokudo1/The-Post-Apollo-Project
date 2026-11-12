@@ -70,6 +70,12 @@ check('onIdCollision: function(existingId)' in MANAGER
       and 'OLD ROOM UNCHANGED' in MANAGER
       and 'REVIEW AGAIN' in MANAGER,
       "Known collision regenerates ID and disarms review")
+check('if (kind === "CREATE_ROOM" && root.rooms.some(function(r)' in MANAGER
+      and 'ROOM ID WAS ALREADY REGISTERED // NEW ID GENERATED' in MANAGER
+      and 'NO WRITE' in MANAGER
+      and 'onRoomsChanged:' in MANAGER
+      and 'EXISTING ROOM PRESERVED // FRESH ID GENERATED' in MANAGER,
+      "Newly loaded/existing Room ID automatically re-keyed before any action")
 check('PX NAME SUPPORT MISSING // CONFIRM CREATES AN ID-ONLY ROOM' in MANAGER
       and 'THE TYPED NAME WILL NOT BE SAVED' in MANAGER
       and 'NEXT ROOM ID // ' in MANAGER

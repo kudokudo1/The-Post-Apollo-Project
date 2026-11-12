@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - 'widgets/messanger/PhonePersonalSavePlanP44.js'
+      - 'widgets/messanger/PhonePersonalDraftEditor.qml'
       - 'services/phone/PhonePersonalSaveOrchestratorP44.py'
       - 'tests/messaging/test_social_phone_save_plan_p44.cjs'
+      - 'tests/messaging/test_social_phone_transaction_review_p44.py'
       - 'tests/phone/test_phone_personal_save_orchestrator_p44.py'
       - 'MODEL/contracts/social-phone-p44-transaction-rehearsal-v0.md'
       - '.github/workflows/social-phone-p44-transaction-rehearsal.yml'
@@ -47,6 +49,8 @@ jobs:
           python -m py_compile services/phone/PhonePersonalEditIngressP43.py
       - name: Full encrypted Favorite + Note transaction matrix
         run: python -m unittest discover -s tests/phone -p 'test_phone_personal_save_orchestrator_p44.py' -v
+      - name: Native P44 editor review, one or two approvals, SAVE locked
+        run: python -m unittest discover -s tests/messaging -p 'test_social_phone_transaction_review_p44.py' -v
       - name: P35 encrypted vault and CAS regressions
         run: python -m unittest discover -s tests/phone -p 'test_phone_personal_contact_vault.py' -v
       - name: P36 per-action permission and keyring regressions

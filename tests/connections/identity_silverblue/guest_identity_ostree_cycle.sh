@@ -361,7 +361,7 @@ C4B_SEPARATE_WITNESS
     timeout --signal=TERM --kill-after=3s 20s \
       systemd-run --quiet --collect --unit=postapollo-id-ci-probe-witness \
       --property=NoNewPrivileges=yes --property=PrivateNetwork=yes \
-      --property=ProtectHome=yes "$independent_script" ||
+      --property=ProtectHome=yes /usr/bin/bash "$independent_script" ||
       fail "INDEPENDENT_PROBE_WITNESS_START_REFUSED"
     echo "C4B_ID_STAGE // separate_probe_witness_started"
     # A separate guest-local watchdog provides a bounded kernel-process

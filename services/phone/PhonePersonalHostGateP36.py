@@ -180,14 +180,16 @@ class FixtureCoordinator:
             if result.get("ok") is not True or result.get("changed") is False:
                 _deny()
             new_doc = result["document"]
-            # Last check immediately before durable commit. Even this only
-            # demonstrates behavior: real permission checking must be held
-            # under a verified host-owned lock in the production implementation.
-            after, selected = self._current(intent)
-            if after != before or selected != card:
-                _deny()
+            # Check as close to publication as the P35 synthetic vault can:
+            # inside its revision/file lock, after current ciphertext is read.
+            # This Python fixture is NOT a production authority/lease.
+            def recheck_under_vault_lock() -> bool:
+                after, selected = self._current(intent)
+                return after == before and selected == card
+
             saved = Vault.commit(key, before.profile, self._root, new_doc,
-                                 expected_revision=intent.expected_revision)
+                                 expected_revision=intent.expected_revision,
+                                 pre_publish_check=recheck_under_vault_lock)
             self._consumed.add(intent.nonce)
             return {"status": "SYNTHETIC_SEALED", "revision": saved["revision"],
                     "productionEnabled": False}

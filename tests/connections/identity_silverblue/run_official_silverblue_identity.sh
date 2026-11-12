@@ -199,12 +199,14 @@ for n in $(seq 1 700); do
         echo "C4B_ID_BLOCKED // GUEST_SILENT_AFTER_SERVICE_CLEANUP_NO_ROLLBACK"
         # Only QEMU/host process state, not guest memory or private identities.
         ps -o pid=,ppid=,stat=,wchan:24=,etime=,comm= -p "$pid" 2>/dev/null |
-          sed 's/^/C4B_ID_STAGE // HOST_QEMU_PROCESS \/\/ /' | head -n 2 || true
-        timeout --signal=TERM --kill-after=2s 12s \
-          python3 - "$tmp/identity-qmp.sock" <<'C4B_QMP_STATUS' || true
+          awk 'NR <= 2 {print "C4B_ID_STAGE // HOST_QEMU_PROCESS // " $0}' || true
+        timeout --signal=TERM --kill-after=2s 15s \
+          python3 - "$tmp/identity-qmp.sock" "$pid" <<'C4B_QMP_STATUS' || true
 import json
+from pathlib import Path
 import socket
 import sys
+import time
 
 try:
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
@@ -242,10 +244,55 @@ try:
                 )
             if name == "query-cpus-fast":
                 cpus = response.get("return", [])
-                if not isinstance(cpus, list):
+                if not isinstance(cpus, list) or len(cpus) > 16:
                     raise RuntimeError("qmp_cpu_format")
                 print(
                     "C4B_ID_STAGE // HOST_QMP // cpu_count=" + str(len(cpus)),
+                    flush=True,
+                )
+                # QMP only supplies vCPU OS thread IDs; inspect host kernel
+                # scheduling ticks without reading private guest memory.
+                tid_set = {
+                    cpu.get("thread-id") for cpu in cpus
+                    if isinstance(cpu, dict)
+                    and type(cpu.get("thread-id")) is int
+                    and 0 < cpu["thread-id"] < 2**31
+                }
+                if len(tid_set) != len(cpus):
+                    raise RuntimeError("qmp_cpu_thread_ids_invalid")
+                qemu_pid = int(sys.argv[2])
+                if qemu_pid <= 0:
+                    raise RuntimeError("qemu_pid_invalid")
+
+                def sample_ticks():
+                    samples = []
+                    for tid in sorted(tid_set):
+                        data = Path(
+                            f"/proc/{qemu_pid}/task/{tid}/stat"
+                        ).read_text(encoding="ascii")
+                        fields = data.rsplit(") ", 1)[1].split()
+                        if len(fields) < 13:
+                            raise RuntimeError("vcpu_stat_truncated")
+                        state = fields[0]
+                        if state not in ("R", "S", "D", "I", "T", "t"):
+                            raise RuntimeError("vcpu_stat_state_invalid")
+                        samples.append(
+                            (state, int(fields[11]) + int(fields[12]))
+                        )
+                    return samples
+
+                before = sample_ticks()
+                time.sleep(2)
+                after = sample_ticks()
+                moving = sum(
+                    later[1] > earlier[1]
+                    for earlier, later in zip(before, after)
+                )
+                blocked = sum(state == "D" for state, _ in after)
+                print(
+                    "C4B_ID_STAGE // HOST_QMP // vcpu_tick_progress="
+                    + str(moving)
+                    + " vcpu_uninterruptible=" + str(blocked),
                     flush=True,
                 )
 except (OSError, RuntimeError, ValueError, TypeError) as exc:

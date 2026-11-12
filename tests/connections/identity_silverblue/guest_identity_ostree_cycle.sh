@@ -327,10 +327,36 @@ ID_MONITOR
     # unobserved hang until the outer QEMU watchdog. The bounded child return
     # preserves a nonzero/timeout as FAIL, never as rollback authorization.
     echo "C4B_ID_STAGE // before_service_probe"
+    # A separate guest-local watchdog provides a bounded kernel-process
+    # observation even if the synchronous timeout itself never returns.
+    # It emits process names/states only, never argv, signing key or payload.
+    # The independent fail marker powers off this disposable guest without
+    # advancing rollback, preserving the host's strict missing-stage refusal.
+    probe_parent_pid="$BASHPID"
+    (
+      sleep 120
+      if [[ "$(cat "$stage" 2>/dev/null || true)" == layer_pending ]]; then
+        echo "C4B_ID_STAGE // SERVICE_PROBE_STILL_WAITING_120S" >/dev/ttyS0
+        timeout --signal=TERM --kill-after=2s 5s \
+          ps -eo pid,ppid,stat,wchan:24,comm 2>/dev/null |
+          awk 'NR == 1 || $5 ~ /^(bash|timeout|systemctl|semodule|journalctl|userdel|rpm-ostree)$/ {
+            print "C4B_ID_STAGE // SERVICE_PROBE_KERNEL_PROCESS " $0
+            if (++n >= 24) exit
+          }' >/dev/ttyS0 || true
+      fi
+      sleep 340
+      if [[ "$(cat "$stage" 2>/dev/null || true)" == layer_pending ]]; then
+        echo "C4B_ID_FAIL // SERVICE_PROBE_PARENT_STUCK_AFTER_460S" >/dev/ttyS0
+        systemctl poweroff --no-block || true
+      fi
+    ) &
+    probe_watchdog_pid="$!"
     probe_rc=0
     timeout --signal=TERM --kill-after=10s 420s /usr/bin/bash "$service_probe" ||
       probe_rc="$?"
     printf 'C4B_ID_STAGE // after_service_probe rc=%s\n' "$probe_rc"
+    kill "$probe_watchdog_pid" >/dev/null 2>&1 || true
+    wait "$probe_watchdog_pid" 2>/dev/null || true
     [[ "$probe_rc" == 0 ]] ||
       fail "REAL_SYSTEMD_DENY_ONLY_IDENTITY_SERVICE_PROBE_REFUSED_RC_$probe_rc"
     [[ "$(cat "$stage")" == layer_pending ]] ||

@@ -207,10 +207,11 @@ class TestBackupAndMigrationSafetyV2z(unittest.TestCase):
         with self.assertRaisesRegex(MigrationSafetyRefused,
                                     "V2Z_TEST_ROOT_REQUIRED"):
             TestMigrationSafetyV2z(ArchiveStore(wrong),self.dst)
+        nested=self.src/"trashpp-v2z-backups-nested"
+        nested.mkdir(mode=0o700)
         with self.assertRaisesRegex(MigrationSafetyRefused,
                                     "V2Z_WORKSPACE_NOT_SEPARATE"):
-            TestMigrationSafetyV2z(self.archive,
-                                   self.src/"trashpp-v2z-backups-nested")
+            TestMigrationSafetyV2z(self.archive,nested)
 
     def test_symlink_marker_or_world_writable_workspace_refused(self):
         self.marker.unlink()

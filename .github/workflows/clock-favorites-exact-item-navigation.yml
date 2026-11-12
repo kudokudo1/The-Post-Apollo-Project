@@ -1,0 +1,36 @@
+name: Clock Favorites exact-item navigation
+on:
+  pull_request:
+    paths:
+      - "services/favorites/FavoritesClockExactItemPolicy.js"
+      - "widgets/cpuplus/CpuPlusFavoritesHubPane.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/AngelPane.qml"
+      - "shell.qml"
+      - "tests/favorites/test_clock_exact_item_navigation.cjs"
+      - ".github/workflows/clock-favorites-exact-item-navigation.yml"
+  push:
+    paths:
+      - "services/favorites/FavoritesClockExactItemPolicy.js"
+      - "widgets/cpuplus/CpuPlusFavoritesHubPane.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/AngelPane.qml"
+      - "shell.qml"
+      - "tests/favorites/test_clock_exact_item_navigation.cjs"
+      - ".github/workflows/clock-favorites-exact-item-navigation.yml"
+permissions:
+  contents: read
+jobs:
+  exact-owner-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run exact saved-identity plan and real owner method guards
+        run: node --test tests/favorites/test_clock_exact_item_navigation.cjs
+      - name: Keep earlier Favorites and Clock projection contracts green
+        run: |
+          node --test tests/favorites/test_clock_three_favorite_owners.cjs
+          node --test tests/cpuplus/test_cpuplus_favorites_center.cjs
+          node --test tests/favorites/test_favorites_universal_u2.cjs

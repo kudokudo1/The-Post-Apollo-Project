@@ -160,7 +160,7 @@ class AlarmManagerV2Contracts(unittest.TestCase):
         self.assertIn('function saveNote()', PANE)
         self.assertIn('function discardNote()', PANE)
         self.assertIn('function settleNoteWrite(success, reason)', PANE)
-        self.assertIn('NOTE NOT SAVED // KEEP DRAFT VISIBLE', PANE)
+        self.assertIn('NOTE NOT CONFIRMED // ', PANE)
         self.assertIn('function onNoteSaved(alarmId)', PANE)
         self.assertIn('function onNoteSaveFailed(alarmId, reason)', PANE)
         self.assertIn('id: alarmNote', PANE)

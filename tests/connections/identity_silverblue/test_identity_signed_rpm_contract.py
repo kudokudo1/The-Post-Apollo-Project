@@ -822,5 +822,35 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         )
 
 
+    def test_27_independent_witness_only_emits_bounded_systemd_failure_fields(self):
+        import subprocess
+
+        guest = (AREA / "guest_identity_ostree_cycle.sh").read_text()
+        for required in (
+            "Result,ExecMainPID,ExecMainCode,ExecMainStatus,ControlPID",
+            "SEPARATE_PROBE_CYCLE ",
+            "SEPARATE_PROBE_SYSTEMD_RESULT timeout",
+            "SEPARATE_PROBE_SYSTEMD_RESULT exit-code",
+            "SEPARATE_PROBE_SYSTEMD_RESULT signal",
+            "SEPARATE_PROBE_SYSTEMD_RESULT core-dump",
+            "SEPARATE_PROBE_SYSTEMD_START_TIMEOUT",
+            "sort -u | head -n 8",
+        ):
+            self.assertIn(required, guest)
+        self.assertNotIn("journalctl --follow", guest)
+        self.assertNotIn("journalctl -f", guest)
+        witness = guest.split("<<'C4B_SEPARATE_WITNESS'\\n", 1)[1].split(
+            "\\nC4B_SEPARATE_WITNESS", 1
+        )[0]
+        subprocess.run(
+            ["/usr/bin/bash", "-n"], input=witness,
+            text=True, capture_output=True, check=True, timeout=3,
+        )
+        # Journal extraction may report predefined failure categories ONLY.
+        self.assertNotIn('print $0', witness)
+        self.assertNotIn('echo "$journal"', witness)
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

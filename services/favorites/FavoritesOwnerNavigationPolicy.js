@@ -1,4 +1,5 @@
 .pragma library
+.import "FavoritesResourcePolicy.js" as Resource
 
 // U7a: review-only navigation destinations for already-normalized CPU++
 // Favorites. This policy never forwards source IDs, credentials, callbacks,
@@ -8,10 +9,23 @@ function fail() {
 }
 function plan(row) {
     if(!row || typeof row!=="object" || Array.isArray(row)
-            || row.readOnly!==true || typeof row.key!=="string"
-            || row.key.length===0)
+            || typeof row.key!=="string" || row.key.length===0)
         return fail();
+    // Angel numbers already belong to FavoritesDefaultStore. Opening its
+    // journal changes a VIEW, never this source-owned favorite membership.
+    if (row.owner==="angel" && row.provider==="angel"
+            && row.category==="NEW" && row.kind==="number"
+            && row.isFavorite===true && row.readOnly===false
+            && typeof row.resourceId==="string"
+            && /^[0-9]{1,8}$/.test(row.resourceId)
+            && row.key===Resource.identityKey("angel","number",row.resourceId))
+        return {ok:true,owner:"clock",view:"angel"};
+    if (row.readOnly!==true) return fail();
     const owner=row.owner,category=row.category,menu=row.menu;
+    if (owner==="clock-alarm" && category==="CLOCK" && menu==="ALARMS"
+            && row.provider==="clock-alarm" && row.kind==="alarm"
+            && row.isFavorite===true)
+        return {ok:true,owner:"clock",view:"alarm"};
     if(owner==="appcontrol"
             && ((category==="APP CTRL"
                  && ["APPS","FILES","RUN","WINDOWS","KILL","THERMAL","SYSTEM","OTHER"]

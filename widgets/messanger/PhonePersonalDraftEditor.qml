@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "PhonePersonalDraftState.js" as DraftState
+import "PhonePersonalSavePlanP44.js" as SavePlan
 
 // P42 isolated PHONE Personal editor shell. NOT connected to live PhonePane.
 // A future trusted native host may wire this only after independent C5
@@ -14,6 +15,8 @@ Rectangle {
     readonly property bool secureSaveAuthorized: false
     readonly property bool canStage: previewEnabled && contact !== null
     property var pending: DraftState.empty()
+    readonly property var reviewPlan:
+        SavePlan.planDraft(pending, currentContactId())
     property bool resettingDraft: false
 
     signal cancelRequested()
@@ -162,6 +165,20 @@ Rectangle {
             width: parent.width
             text: DraftState.summary(editor.pending, editor.currentContactId())
             color: Colors.orange
+            font.pixelSize: 10
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+
+        Text {
+            width: parent.width
+            text: editor.reviewPlan.status === "UNTRUSTED_REVIEW_ONLY"
+                  ? (editor.reviewPlan.operations.length === 2
+                     ? "REVIEW // 2 SEPARATE HUMAN APPROVALS REQUIRED // NOT SAVED"
+                     : "REVIEW // 1 HUMAN APPROVAL REQUIRED // NOT SAVED")
+                  : "REVIEW // NO VALID CHANGE TO SAVE"
+            color: Colors.cyan
+            font.bold: true
             font.pixelSize: 10
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap

@@ -4,3 +4,4 @@ singleton TimeSettings 1.0 TimeSettings.qml
 singleton AngelObservationsStore 1.0 AngelObservationsStore.qml
 singleton AlarmService 1.0 AlarmService.qml
 singleton AlarmManagerService 1.0 AlarmManagerService.qml
+singleton AlarmNoteRecoveryService 1.0 AlarmNoteRecoveryService.qml

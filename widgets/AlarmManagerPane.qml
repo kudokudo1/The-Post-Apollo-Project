@@ -39,6 +39,7 @@ Item {
     property int noteSavePendingId: 0
     property string noteSavePendingText: ""
     property string noteFeedback: ""
+    property bool reviewingRecoveryNote: false
 
     readonly property bool editingActive:
         alarmSearch.activeFocus || alarmName.activeFocus
@@ -102,6 +103,7 @@ Item {
         loadingNote = false;
         noteDirty = false;
         noteFeedback = "";
+        reviewingRecoveryNote = false;
         loadingSelection = false;
         return true;
     }
@@ -125,7 +127,9 @@ Item {
         // to its name, time, weekday selection or other pinned fields.
         if (id !== selectedId && !choose(id)) return;
         settingsTab = "note";
-        alarmNote.forceActiveFocus();
+        reviewingRecoveryNote = false;
+        if (AlarmNoteRecoveryService.draftState !== "ready")
+            alarmNote.forceActiveFocus();
     }
     function saveNote() {
         if (!selectedAlarm || !AlarmManagerService.canEdit
@@ -137,8 +141,8 @@ Item {
             return true;
         }
         const id = selectedId;
-        if (!AlarmManagerService.saveAlarmNote(id, alarmNote.text)) {
-            noteFeedback = "NOTE SAVE NOT ACCEPTED";
+        if (!AlarmNoteRecoveryService.saveNote(id, alarmNote.text)) {
+            noteFeedback = AlarmNoteRecoveryService.feedback;
             return false;
         }
         noteSavePendingId = id;
@@ -155,19 +159,16 @@ Item {
         noteDirty = false;
         noteFeedback = "UNSAVED NOTE DISCARDED";
     }
-    function settleNoteWrite() {
+    function settleNoteWrite(success, reason) {
         if (noteSavePendingId === 0) return;
-        if (AlarmManagerService.storageState === "ready") {
-            const saved = AlarmManagerService.findAlarm(noteSavePendingId);
-            if (saved && (saved.note || "") === noteSavePendingText) {
-                noteSavePendingId = 0;
-                noteDirty = alarmNote.text.trim() !== noteSavePendingText;
-                noteFeedback = "NOTE SAVED TO ALARM STORE";
-            }
-        } else if (AlarmManagerService.storageState === "error") {
-            noteSavePendingId = 0;
+        const expected = noteSavePendingText;
+        noteSavePendingId = 0;
+        if (success) {
+            noteDirty = alarmNote.text.trim() !== expected;
+            noteFeedback = "NOTE SAVED TO ALARM STORE";
+        } else {
             noteDirty = true;
-            noteFeedback = "NOTE NOT SAVED // KEEP DRAFT VISIBLE";
+            noteFeedback = "NOTE NOT CONFIRMED // " + reason;
             settingsTab = "note";
         }
     }
@@ -216,15 +217,22 @@ Item {
             volumePercent: draftVolume,
             note: alarmNote.text.trim()
         };
-        const hadDraft = noteDirty;
-        if (AlarmManagerService.saveAlarm(selectedId, patch)) {
+        const hadDraft = noteDirty
+            && patch.note !== (selectedAlarm.note || "");
+        const accepted = hadDraft
+            ? AlarmNoteRecoveryService.saveWithPatch(selectedId, patch)
+            : AlarmManagerService.saveAlarm(selectedId, patch);
+        if (accepted) {
             if (hadDraft) {
                 noteSavePendingId = selectedId;
                 noteSavePendingText = alarmNote.text.trim();
-                noteFeedback = "SAVING // KEEP NOTE OPEN";
+                noteFeedback = "PRESERVING NOTE // WAIT FOR DISK RECEIPT";
             } else {
                 choose(selectedId);
             }
+        } else {
+            noteFeedback = hadDraft ? AlarmNoteRecoveryService.feedback
+                                    : AlarmManagerService.feedback;
         }
     }
     function toggleDay(index) {
@@ -400,8 +408,19 @@ Item {
             if (!pane.selectedAlarm && AlarmManagerService.count > 0)
                 pane.choose(AlarmManagerService.document.alarms[0].id);
         }
-        function onStorageStateChanged() {
-            pane.settleNoteWrite();
+        // Main alarm store receipts are owned by AlarmNoteRecoveryService,
+        // not inferred from an in-memory copy of the alarm document.
+    }
+
+    Connections {
+        target: AlarmNoteRecoveryService
+        function onNoteSaved(alarmId) {
+            if (pane.noteSavePendingId === alarmId)
+                pane.settleNoteWrite(true, "");
+        }
+        function onNoteSaveFailed(alarmId, reason) {
+            if (pane.noteSavePendingId === alarmId)
+                pane.settleNoteWrite(false, reason);
         }
     }
 
@@ -1063,6 +1082,8 @@ Item {
                 width: parent.width
                 spacing: 5
                 visible: pane.settingsTab === "note"
+                    && !(AlarmNoteRecoveryService.draftState === "ready"
+                         && AlarmNoteRecoveryService.phase === "")
                 TextField {
                     id: alarmNote
                     width: parent.width
@@ -1101,7 +1122,7 @@ Item {
                         label: "SAVE NOTE"
                         labelPixelSize: 10
                         accentColor: Colors.green
-                        available: AlarmManagerService.canEdit
+                        available: AlarmNoteRecoveryService.writable
                             && pane.noteSavePendingId === 0
                         onLeftClicked: pane.saveNote()
                     }
@@ -1122,6 +1143,91 @@ Item {
                         + Policy.MAX_NOTE_LENGTH + " CHARACTERS"
                     color: Colors.white
                     font.pixelSize: 9
+                    elide: Text.ElideRight
+                }
+            }
+
+            // A recovered draft occupies the same bounded 99px NOTE slot;
+            // no new window and no extra scrollbars.
+            Column {
+                id: noteRecoveryEditor
+                width: parent.width
+                spacing: 4
+                visible: pane.settingsTab === "note"
+                    && AlarmNoteRecoveryService.draftState === "ready"
+                    && AlarmNoteRecoveryService.phase === ""
+                GohuText {
+                    width: parent.width
+                    height: 16
+                    text: "NOTE #" + (AlarmNoteRecoveryService.noteDraft
+                        ? AlarmNoteRecoveryService.noteDraft.id : "?")
+                        + " // " + AlarmNoteRecoveryService.disposition.toUpperCase()
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    elide: Text.ElideRight
+                }
+                TextField {
+                    width: parent.width
+                    height: 27
+                    readOnly: true
+                    selectByMouse: true
+                    text: pane.reviewingRecoveryNote
+                        && AlarmNoteRecoveryService.noteDraft
+                        ? AlarmNoteRecoveryService.noteDraft.after
+                        : "REVIEW TO INSPECT RECOVERED NOTE"
+                    color: Colors.magenta
+                    font.pixelSize: 10
+                    background: Rectangle {
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.cyan
+                    }
+                }
+                Row {
+                    width: parent.width
+                    height: 28
+                    spacing: 4
+                    ActionButton {
+                        width: Math.max(0, (parent.width - parent.spacing * 2) / 3)
+                        height: parent.height
+                        label: "CHECK DISK"
+                        labelPixelSize: 8
+                        accentColor: Colors.cyan
+                        available: AlarmNoteRecoveryService.phase === ""
+                        onLeftClicked: AlarmNoteRecoveryService.checkDisk()
+                    }
+                    ActionButton {
+                        width: Math.max(0, (parent.width - parent.spacing * 2) / 3)
+                        height: parent.height
+                        label: AlarmNoteRecoveryService.disposition === "already-saved"
+                            ? "CLEAR" : "RETRY"
+                        labelPixelSize: 8
+                        accentColor: Colors.orange
+                        available: AlarmNoteRecoveryService.canRetry
+                            || AlarmNoteRecoveryService.canClear
+                        onLeftClicked: {
+                            if (AlarmNoteRecoveryService.disposition === "already-saved")
+                                AlarmNoteRecoveryService.clearVerified();
+                            else
+                                AlarmNoteRecoveryService.retryVerified();
+                        }
+                    }
+                    ActionButton {
+                        width: Math.max(0, (parent.width - parent.spacing * 2) / 3)
+                        height: parent.height
+                        label: pane.reviewingRecoveryNote ? "HIDE" : "REVIEW"
+                        labelPixelSize: 8
+                        accentColor: Colors.magenta
+                        onLeftClicked: pane.reviewingRecoveryNote
+                            = !pane.reviewingRecoveryNote
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    height: 12
+                    text: AlarmNoteRecoveryService.feedback
+                    color: Colors.white
+                    font.pixelSize: 8
                     elide: Text.ElideRight
                 }
             }

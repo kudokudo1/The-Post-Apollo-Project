@@ -5,6 +5,7 @@ on:
     paths:
       - shell.qml
       - modules/Trash.qml
+      - components/TrashLifecycleActionDeck.qml
       - widgets/CameraW.qml
       - widgets/CameraCleanupView.qml
       - modules/Power.qml
@@ -16,6 +17,7 @@ on:
     paths:
       - shell.qml
       - modules/Trash.qml
+      - components/TrashLifecycleActionDeck.qml
       - widgets/CameraW.qml
       - widgets/CameraCleanupView.qml
       - modules/Power.qml
@@ -39,6 +41,10 @@ jobs:
         run: python3 -m pip install 'cryptography>=44,<48' 'dbus-next==0.2.3'
       - name: Verify Trash launcher, scoped GIO adapter, and deletion safeguards
         run: python3 -m unittest discover -s tests/trash -p 'test_*.py' -v
+      - name: Inventory unreviewed Delete Trash Burn UI sites (read-only)
+        run: |
+          python3 -I -B scripts/trash/universal_delete_inventory_u1.py > "$RUNNER_TEMP/trashpp-u1.json"
+          python3 -c 'import json,sys; d=json.load(open(sys.argv[1], encoding="utf-8")); print("U1 STATE:", d["state"]); print("CANDIDATE LOCATIONS:", d["totals"]["candidateLocations"]); print("BY FAMILY:", d["totals"]["byFamily"]); print("INCOMPLETE PATHS:", len(d["incompletePaths"])); print("CANDIDATE FILES:", sorted(set(x["path"] for x in d["candidates"]))[:80])' "$RUNNER_TEMP/trashpp-u1.json"
       - name: Verify Camera Cleanup handoff preserves shared queue and authority
         run: node --test tests/trash/test_camera_cleanup_handoff.cjs
       - name: Verify V2 pilot snapshots require preview, confirmation and owner scope

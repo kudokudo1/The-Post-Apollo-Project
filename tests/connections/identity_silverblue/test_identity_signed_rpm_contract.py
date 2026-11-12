@@ -778,13 +778,13 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertIn(awk, host)
         result = subprocess.run(
             ["awk", awk],
-            input="101 1 S futex_wait 00:00 qemu-system-x86\\n",
+            input="101 1 S futex_wait 00:00 qemu-system-x86\n",
             text=True, capture_output=True, check=True, timeout=3,
         )
         self.assertEqual(
             result.stdout,
             "C4B_ID_STAGE // HOST_QEMU_PROCESS // "
-            "101 1 S futex_wait 00:00 qemu-system-x86\\n",
+            "101 1 S futex_wait 00:00 qemu-system-x86\n",
         )
 
 

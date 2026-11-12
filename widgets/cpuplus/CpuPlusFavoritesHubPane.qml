@@ -1361,8 +1361,8 @@ Item {
                     - parent.spacing*(angelOpenButton.visible ? 2 : 1))
                 height: 30
                 label: pane.selectedResource && pane.selectedResource.readOnly
-                    ? (pane.clockItemSelection.ok || pane.exactNavigation.ok
-                       || pane.appSelection.ok
+                    ? (pane.exactNavigation.ok || pane.appSelection.ok
+                       || pane.clockItemSelection.ok
                        || pane.systemSelection.ok || pane.systemWatchSelection.ok
                          || pane.thermalSelection.ok
                        ? "OPEN ITEM" : "NO ACTION")
@@ -1378,8 +1378,8 @@ Item {
                 accentColor: Colors.cyan
                 available: pane.selectedResource !== null &&
                     (pane.selectedResource.readOnly
-                      ? (pane.clockItemSelection.ok || pane.exactNavigation.ok
-                       || pane.appSelection.ok
+                      ? (pane.exactNavigation.ok || pane.appSelection.ok
+                       || pane.clockItemSelection.ok
                          || pane.systemSelection.ok || pane.systemWatchSelection.ok
                          || pane.thermalSelection.ok)
                       : pane.selectedResource.category==="CLOCK"

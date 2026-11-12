@@ -698,5 +698,33 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
 
 
 
+    def test_23_stuck_probe_has_independent_bounded_kernel_witness(self):
+        guest = (AREA / "guest_identity_ostree_cycle.sh").read_text()
+        for required in (
+            'probe_parent_pid="$BASHPID"',
+            'C4B_ID_STAGE // SERVICE_PROBE_STILL_WAITING_120S',
+            'ps -eo pid,ppid,stat,wchan:24,comm',
+            'C4B_ID_STAGE // SERVICE_PROBE_KERNEL_PROCESS',
+            'C4B_ID_FAIL // SERVICE_PROBE_PARENT_STUCK_AFTER_460S',
+            'systemctl poweroff --no-block || true',
+            'probe_watchdog_pid="$!"',
+            'kill "$probe_watchdog_pid"',
+            'wait "$probe_watchdog_pid"',
+            'timeout --signal=TERM --kill-after=10s 420s /usr/bin/bash "$service_probe"',
+        ):
+            self.assertIn(required, guest)
+        self.assertNotIn('ps -eo args', guest)
+        self.assertNotIn('ps -ef', guest)
+        self.assertLess(
+            guest.index('C4B_ID_FAIL // SERVICE_PROBE_PARENT_STUCK_AFTER_460S'),
+            guest.index('echo rollback_pending > "$stage"'),
+        )
+        self.assertLess(
+            guest.index('wait "$probe_watchdog_pid"'),
+            guest.index('C4B_ID_PASS // REAL_IDENTITY_SERVICE_PROBE_FINISHED_BEFORE_ROLLBACK'),
+        )
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

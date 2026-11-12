@@ -789,5 +789,38 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
 
 
 
+    def test_26_independent_guest_probe_witness_has_no_acceptance_authority(self):
+        import subprocess
+
+        guest = (AREA / "guest_identity_ostree_cycle.sh").read_text()
+        for required in (
+            "C4B_SEPARATE_WITNESS",
+            "--collect --unit=postapollo-id-ci-probe-witness",
+            "--property=NoNewPrivileges=yes --property=PrivateNetwork=yes",
+            '--property=ProtectHome=yes /usr/bin/bash "$independent_script"',
+            "C4B_ID_STAGE // SEPARATE_PROBE_PROCESS ",
+            "C4B_ID_STAGE // SEPARATE_PROBE_CYCLE ",
+            "C4B_ID_STAGE // separate_probe_witness_started",
+            'systemctl stop "$independent_unit"',
+            'rm -f -- "$independent_script"',
+            'fail "INDEPENDENT_PROBE_WITNESS_STOP_REFUSED"',
+        ):
+            self.assertIn(required, guest)
+        self.assertLess(
+            guest.index('systemctl stop "$independent_unit"'),
+            guest.index('echo rollback_pending > "$stage"'),
+        )
+        self.assertNotIn("setenforce 0", guest)
+        self.assertNotIn("C4B_ID_PASS // SEPARATE_PROBE", guest)
+        witness = guest.split("<<'C4B_SEPARATE_WITNESS'\\n", 1)[1].split(
+            "\\nC4B_SEPARATE_WITNESS", 1
+        )[0]
+        subprocess.run(
+            ["/usr/bin/bash", "-n"],
+            input=witness, text=True, check=True, capture_output=True,
+            timeout=3,
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

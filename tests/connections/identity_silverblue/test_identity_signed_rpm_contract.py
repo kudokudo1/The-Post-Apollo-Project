@@ -726,5 +726,39 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
 
 
 
+    def test_24_real_host_stalled_selinux_cleanup_is_bounded_and_read_only(self):
+        host = (AREA / "run_official_silverblue_identity.sh").read_text()
+        guest = (AREA / "guest_identity_ostree_cycle.sh").read_text()
+        for needle in (
+            '-qmp "unix:$tmp/identity-qmp.sock,server=on,wait=off"',
+            'service_cleanup_seen=0',
+            'C4B_ID_PASS // REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP',
+            'C4B_ID_STAGE // after_service_probe',
+            'SECONDS - service_cleanup_seen > 180',
+            'C4B_ID_BLOCKED // GUEST_SILENT_AFTER_SERVICE_CLEANUP_NO_ROLLBACK',
+            'C4B_ID_STAGE // HOST_QEMU_PROCESS',
+            'C4B_ID_STAGE // HOST_QMP',
+            '("qmp_capabilities", "query-status", "query-cpus-fast")',
+            'C4B_QMP_STATUS',
+        ):
+            self.assertIn(needle, host)
+        self.assertIn('C4B_ID_FAIL // SERVICE_PROBE_PARENT_STUCK_AFTER_460S', guest)
+        self.assertLess(
+            host.index('C4B_ID_BLOCKED // GUEST_SILENT_AFTER_SERVICE_CLEANUP_NO_ROLLBACK'),
+            host.index('C4B_ID_BLOCKED // ORIGINAL_REAL_IDENTITY_OSTREE_ROLLBACK_NOT_VERIFIED'),
+        )
+        # The host checks state through QMP only. It must not inject guest
+        # control commands, expand the VM network, or mark cleanup as success.
+        for forbidden in (
+            'system_powerdown', 'human-monitor-command', 'device_add',
+            'guest-exec', 'setenforce 0', 'C4B_ID_PASS // GUEST_SILENT',
+        ):
+            self.assertNotIn(forbidden, host)
+        qmp_python = host.split("<<'C4B_QMP_STATUS'", 1)[1].split(
+            "\nC4B_QMP_STATUS", 1
+        )[0]
+        compile(qmp_python, "c4b-qmp-read-only-status", "exec")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

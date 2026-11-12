@@ -639,6 +639,18 @@ Column {
     }
     function review(kind) {
         disarm();
+        // The source registry can refresh after an ID was minted. A known
+        // collision must automatically get a fresh candidate, not force the
+        // operator to invent an ID or repeatedly retry with the old one.
+        if (kind === "CREATE_ROOM" && root.rooms.some(function(r) {
+            return String((r || {}).id || (r || {}).roomId || "")
+                === root.roomId;
+        })) {
+            root.roomId = root.makeId("room");
+            root.outcome = "ROOM ID WAS ALREADY REGISTERED // NEW ID GENERATED"
+                + " // REVIEW AGAIN // NO WRITE";
+            return false;
+        }
         const p = planFor(kind);
         if (kind === "CREATE_ROOM" && roomCreate.nameSupport === "CHECKING") {
             outcome = "ROOM CREATE HOLD // CHECKING INSTALLED PX NAME SUPPORT";
@@ -804,6 +816,15 @@ Column {
     onRoomsChanged: {
         disarm();
         bedProbe.invalidate();
+        // Re-key a draft whose generated ID has since entered the registry.
+        // Never change, delete or upsert the already registered Room.
+        if (root.rooms.some(function(r) {
+            return String((r || {}).id || (r || {}).roomId || "")
+                === root.roomId;
+        })) {
+            root.roomId = root.makeId("room");
+            root.outcome = "EXISTING ROOM PRESERVED // FRESH ID GENERATED";
+        }
     }
     onSessionsChanged: disarm()
     onRegistryErrorChanged: disarm()

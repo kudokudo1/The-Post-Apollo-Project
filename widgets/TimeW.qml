@@ -1921,6 +1921,22 @@ PanelWindow {
         menuOpen = !menuOpen;
     }
 
+    // CPU++ may request only fixed, owner-controlled Clock views.
+    // No saved ID, alarm action or Angel observation is forwarded by shell.
+    function openFavoriteView(view) {
+        if (view === "angel") {
+            if (!angelPane.openFavoriteJournal()) return false;
+            chooseMode(4); // Existing ANGEL view, original journal owns data.
+        } else if (view === "alarm") {
+            chooseMode(2); // Existing TOOLS -> ALARM view.
+            toolsView = "alarm";
+        } else {
+            return false;
+        }
+        if (!menuOpen) menuOpen = true;
+        return true;
+    }
+
     function openNotificationAlarm(alarmId) {
         // Resolve against saved alarm IDs. Do not create an alarm, interpret
         // notification titles, or discard a different alarm's unsaved note.

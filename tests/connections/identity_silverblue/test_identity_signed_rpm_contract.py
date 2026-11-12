@@ -754,7 +754,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             'guest-exec', 'setenforce 0', 'C4B_ID_PASS // GUEST_SILENT',
         ):
             self.assertNotIn(forbidden, host)
-        qmp_python = host.split("<<'C4B_QMP_STATUS'", 1)[1].split(
+        qmp_python = host.split("<<'C4B_QMP_STATUS' || true\n", 1)[1].split(
             "\nC4B_QMP_STATUS", 1
         )[0]
         compile(qmp_python, "c4b-qmp-read-only-status", "exec")

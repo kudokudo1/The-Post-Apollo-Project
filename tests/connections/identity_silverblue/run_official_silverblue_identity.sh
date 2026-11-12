@@ -162,10 +162,10 @@ kill "$pid" 2>/dev/null || true
 wait "$pid" 2>/dev/null || true
 pid=""
 echo "C4B_ID_PASS // REAL_OFFLINE_SILVERBLUE_INSTALLED"
+# Read-only host diagnostics use QMP query-status/query-cpus-fast only.
 qemu-system-x86_64 \
   -machine accel=kvm -m 4096 -smp 3 -display none -monitor none \
   -serial "file:$tmp/identity-guest-serial.log" \
-  # Read-only host diagnostics use QMP query-status/query-cpus-fast only.
   -qmp "unix:$tmp/identity-qmp.sock,server=on,wait=off" \
   -drive "file=$tmp/identity-silverblue.qcow2,if=virtio,format=qcow2" \
   -drive "file=$tmp/identity-seed.iso,if=ide,media=cdrom,readonly=on,index=1" \
@@ -226,7 +226,7 @@ try:
             raise RuntimeError("invalid_qmp_greeting")
         for name in ("qmp_capabilities", "query-status", "query-cpus-fast"):
             connection.sendall(
-                (json.dumps({"execute": name, "id": name}) + "\\n").encode()
+                (json.dumps({"execute": name, "id": name}) + "\n").encode()
             )
             response = read_response()
             if response.get("id") != name or "error" in response:

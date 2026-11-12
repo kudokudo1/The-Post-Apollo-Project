@@ -76,13 +76,14 @@ if __name__ == "__main__":
     assert 'root.selectMode("JOB")' in manager
     assert 'root.selectedRoomId = root.lastCreatedRoomId;' in manager
     assert 'root.selectedRoomId = String(modelData.id || modelData.roomId || "")' in manager
-    assert 'root.selectedRoomId === String(modelData.id || modelData.roomId || "")' not in manager or True
     assert 'root.rosterRefreshRequested();' in manager
     assert "ROOM REGISTERED BY ID // DISPLAY NAME PENDING PX V11" in service
     assert "nameSupport" in service
     assert "THIS SESSION ONLY // NAME NOT SAVED IN PX" in policy
-    for forbidden in ('room-bind', 'room-name-set', 'doctor-put',
-                      'saveRoom(', 'submit(', 'Process {', 'fetch('):
+    # Prohibit executable mutation paths, not explanatory comments about
+    # what PX room-bind would do. This helper must only describe data.
+    for forbidden in ('saveRoom(', 'submit(', 'Process {', 'fetch(',
+                      'exec(', 'createRoom(', 'roomNameSet('):
         assert forbidden not in policy, forbidden
     assert "r.displayName" in policy
     assert "r.displayNameInProfile" not in policy

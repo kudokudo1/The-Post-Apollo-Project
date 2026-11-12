@@ -1,5 +1,4 @@
 .pragma library
-.import "FavoritesResourcePolicy.js" as Resource
 
 // U7a: review-only navigation destinations for already-normalized CPU++
 // Favorites. This policy never forwards source IDs, credentials, callbacks,
@@ -18,7 +17,7 @@ function plan(row) {
             && row.isFavorite===true && row.readOnly===false
             && typeof row.resourceId==="string"
             && /^[0-9]{1,8}$/.test(row.resourceId)
-            && row.key===Resource.identityKey("angel","number",row.resourceId))
+            && row.key==="fav1:local:angel:number:" + row.resourceId)
         return {ok:true,owner:"clock",view:"angel"};
     if (row.readOnly!==true) return fail();
     const owner=row.owner,category=row.category,menu=row.menu;

@@ -1,0 +1,38 @@
+name: Social PHONE P41b Exact Edit Commitment (Synthetic Only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhonePersonalActionCommitmentP41b.py'
+      - 'tests/phone/test_phone_personal_action_commitment_p41b.py'
+      - 'MODEL/contracts/social-phone-p41b-exact-edit-commitment-v0.md'
+      - '.github/workflows/social-phone-p41b-exact-edit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhonePersonalActionCommitmentP41b.py'
+      - 'tests/phone/test_phone_personal_action_commitment_p41b.py'
+      - 'MODEL/contracts/social-phone-p41b-exact-edit-commitment-v0.md'
+      - '.github/workflows/social-phone-p41b-exact-edit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-exact-binding:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile PHONE-only in-memory commitment builder
+        run: python -m py_compile services/phone/PhonePersonalActionCommitmentP41b.py
+      - name: Run exact-edit commitment adversarial tests
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_action_commitment_p41b.py' -v
+      - name: Run existing P37 synthetic signed-trust regressions
+        run: |
+          python -m pip install cryptography==50.0.2
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_signed_trust_p37.py' -v

@@ -369,7 +369,9 @@ try:
 except OSError as exc:
     if exc.errno not in (errno.EACCES,errno.EPERM):
         raise SystemExit("C4B_ID_FAIL // SELINUX_NEGATIVE_PROBE_OTHER_ERROR")
-    print("C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE",flush=True)
+    # Raw journal witness is intentionally NOT the host-facing final PASS.
+    # The host requires exactly one final PASS marker in the guest serial.
+    print("C4B_ID_NEGATIVE_WITNESS // KERNEL_AF_INET_CREATE_DENIED",flush=True)
 else:
     conn.close()
     raise SystemExit("C4B_ID_FAIL // SELINUX_DOMAIN_ALLOWED_INET_SOCKET_CREATE")
@@ -417,7 +419,7 @@ done
 negative_result="$(systemctl show "$negative_unit" --property=Result --value)" ||
   fail "SELINUX_NEGATIVE_UNIT_RESULT_UNAVAILABLE"
 [[ "$negative_rc" == 0 && "$negative_result" == success &&
-   "$(grep -Fc 'C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE' "$negative_journal")" == 1 ]] &&
+   "$(grep -Fc 'C4B_ID_NEGATIVE_WITNESS // KERNEL_AF_INET_CREATE_DENIED' "$negative_journal")" == 1 ]] &&
    ! grep -Fq 'C4B_ID_FAIL //' "$negative_journal" ||
   fail "REAL_ENFORCING_SELINUX_NETWORK_DENIAL_NOT_PROVEN"
 echo "C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE" >/dev/ttyS0

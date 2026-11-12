@@ -8,6 +8,28 @@ Rectangle {
     id: detail
     property var contact: null
     property bool canPrepareCall: false
+    // P43: preview-only editor. It is only opened by a conscious EDIT
+    // gesture on the selected card; real vault/host write remains hard false.
+    property bool draftPreviewOpen: false
+    readonly property bool canOpenDraftPreview:
+        contact !== null && visible && typeof contact.id === "string"
+        && contact.id.length > 0 && contact.id.length <= 256
+
+    function openDraftPreview() {
+        if (canOpenDraftPreview)
+            draftPreviewOpen = true;
+    }
+
+    function closeDraftPreview() {
+        draftPreviewOpen = false;
+    }
+
+    onContactChanged: closeDraftPreview()
+    onVisibleChanged: {
+        if (!visible)
+            closeDraftPreview();
+    }
+
     // P40: no installed signed host, C5 consent or authenticated encrypted
     // save response is available to QML. A read preference is not write grant.
     readonly property bool personalMetadataWritable: false
@@ -67,8 +89,11 @@ Rectangle {
                     label: "EDIT"
                     labelPixelSize: 10
                     accentColor: Colors.orange
-                    available: false
-                    interactive: false // No authenticated local contact editor.
+                    // EDIT opens a clearly marked UNSAVED draft preview only.
+                    // It never permits a P35 vault operation.
+                    available: detail.canOpenDraftPreview
+                    interactive: detail.canOpenDraftPreview
+                    onTriggered: detail.openDraftPreview()
                 }
             }
             Text {
@@ -292,6 +317,16 @@ Rectangle {
                     available: false
                     interactive: false // No trusted vault deletion response.
                 }
+            }
+            PhonePersonalDraftEditor {
+                id: personalDraftEditor
+                width: parent.width
+                height: visible ? implicitHeight : 0
+                contact: detail.draftPreviewOpen && detail.canOpenDraftPreview
+                         ? detail.contact : null
+                previewEnabled: detail.draftPreviewOpen
+                                && detail.canOpenDraftPreview
+                onCancelRequested: detail.closeDraftPreview()
             }
             Text {
                 width: parent.width

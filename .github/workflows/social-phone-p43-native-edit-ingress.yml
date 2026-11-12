@@ -1,0 +1,52 @@
+name: Social PHONE P43 Native Editor Mount and Untrusted Intent Boundary
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/PhoneContactDetail.qml'
+      - 'services/phone/PhonePersonalEditIngressP43.py'
+      - 'tests/phone/test_phone_personal_edit_ingress_p43.py'
+      - 'tests/messaging/test_social_phone_contact_metadata_locked_p40.py'
+      - 'tests/messaging/test_social_phone_personal_draft_shell_p42.py'
+      - 'MODEL/contracts/social-phone-p43-integrated-draft-ingress-v0.md'
+      - '.github/workflows/social-phone-p43-native-edit-ingress.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/PhoneContactDetail.qml'
+      - 'services/phone/PhonePersonalEditIngressP43.py'
+      - 'tests/phone/test_phone_personal_edit_ingress_p43.py'
+      - 'tests/messaging/test_social_phone_contact_metadata_locked_p40.py'
+      - 'tests/messaging/test_social_phone_personal_draft_shell_p42.py'
+      - 'MODEL/contracts/social-phone-p43-integrated-draft-ingress-v0.md'
+      - '.github/workflows/social-phone-p43-native-edit-ingress.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-draft-and-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Compile PHONE inbound intent parser
+        run: python -m py_compile services/phone/PhonePersonalEditIngressP43.py
+      - name: P43 integrated draft and untrusted input rejection
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_edit_ingress_p43.py' -v
+      - name: P40 and P42 live/editor regression contract
+        run: |
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_contact_metadata_locked_p40.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_personal_draft_shell_p42.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_contact_details.py' -v
+      - name: P42 draft favorites, notes, selection and discard behavior
+        run: |
+          node --check widgets/messanger/PhonePersonalDraftState.js
+          node --test tests/messaging/test_social_phone_personal_draft_state_p42.cjs

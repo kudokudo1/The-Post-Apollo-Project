@@ -37,14 +37,19 @@ class LockedContactMetadataTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, self.detail)
 
-    def test_header_edit_is_visible_at_top_right_but_disabled(self):
+    def test_header_edit_opens_unsaved_preview_but_never_authorizes_save(self):
         header = self.part("id: contactHeader", 'text: detail.contact ?')
         self.assertIn('text: "IPHONE CONTACT // PERSONAL // READ ONLY"', header)
         self.assertIn('label: "EDIT"', header)
         self.assertIn("width: Math.max(0, contactHeader.width - 84)", header)
-        self.assertIn("interactive: false", header)
-        self.assertIn("available: false", header)
+        self.assertIn("interactive: detail.canOpenDraftPreview", header)
+        self.assertIn("available: detail.canOpenDraftPreview", header)
+        self.assertIn("onTriggered: detail.openDraftPreview()", header)
         self.assertIn("accentColor: Colors.orange", header)
+        self.assertIn("readonly property bool personalMetadataWritable: false",
+                      self.detail)
+        self.assertIn("onContactChanged: closeDraftPreview()", self.detail)
+        self.assertIn("PhonePersonalDraftEditor {", self.detail)
 
     def test_call_message_facetime_email_are_four_actions(self):
         row = self.part("id: contactActions", 'text: "PERSONAL // FAVORITE"')

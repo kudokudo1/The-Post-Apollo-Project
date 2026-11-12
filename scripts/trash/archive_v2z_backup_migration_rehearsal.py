@@ -63,7 +63,7 @@ def _need(ok, code):
 
 
 def _private_directory(path, expected_prefix):
-    _need(type(path) is Path and path.is_absolute()
+    _need(isinstance(path, Path) and path.is_absolute()
           and ".." not in path.parts and len(str(path)) <= 4096
           and path.name.startswith(expected_prefix),
           "V2Z_TEST_ROOT_REQUIRED")

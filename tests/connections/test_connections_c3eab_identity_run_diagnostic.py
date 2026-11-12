@@ -213,5 +213,38 @@ class C3eABIdentityRunDiagnosticTests(unittest.TestCase):
         self.assertFalse(out["installedIdentityHostAuthenticated"])
 
 
+    def test_19_nested_guest_failure_inside_journal_detail_refuses(self):
+        data = bundle(
+            *D.REQUIRED_ORDER,
+            "C4B_ID_SELINUX_NEGATIVE_DETAIL // C4B_ID_FAIL // GUEST_FAILED",
+            "C4B_ID_VM_PROCESS_EXIT // 0",
+        )
+        outcome = self.check(data)
+        self.assertTrue(outcome["guestFailureMarkerObserved"])
+        self.assertFalse(outcome["completeMarkerSequenceConsistentInCI"])
+        self.refused(data)
+
+    def test_20_vm_exit_must_be_final_runner_artifact_line(self):
+        data = bundle(
+            *D.REQUIRED_ORDER[:10],
+            "C4B_ID_VM_PROCESS_EXIT // 0",
+            *D.REQUIRED_ORDER[10:],
+        )
+        with self.assertRaises(D.Refused):
+            self.check(data)
+
+    def test_21_no_rollback_from_shutdown_cleanup_only(self):
+        lines = [x for x in D.REQUIRED_ORDER if x not in (
+            "C4B_ID_PASS // REAL_IDENTITY_SERVICE_PROBE_FINISHED_BEFORE_ROLLBACK",
+            "C4B_ID_STAGE // rollback_pending",
+            "C4B_ID_PASS // REAL_SILVERBLUE_IDENTITY_RPM_LAYER_REMOVED",
+            "C4B_ID_PASS // TEST_KEYRING_REMOVED_AND_PRODUCTION_DISABLED",
+            "C4B_ID_PASS // REAL_OFFICIAL_SILVERBLUE_SIGNED_IDENTITY_RPM_TWO_REBOOTS_AND_ROLLBACK",
+        )]
+        result=self.check(bundle(*lines,"C4B_ID_VM_PROCESS_EXIT // 0"))
+        self.assertFalse(result["completeMarkerSequenceConsistentInCI"])
+        self.assertIs(result["productionAuthority"], False)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

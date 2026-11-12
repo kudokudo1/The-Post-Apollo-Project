@@ -1,0 +1,45 @@
+name: Social PHONE P42 Draft Editor Shell (No Production Wiring)
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/PhonePersonalDraftEditor.qml'
+      - 'widgets/messanger/PhonePersonalDraftState.js'
+      - 'tests/messaging/test_social_phone_personal_draft_shell_p42.py'
+      - 'tests/messaging/test_social_phone_personal_draft_state_p42.cjs'
+      - 'MODEL/contracts/social-phone-p42-editor-shell-v0.md'
+      - '.github/workflows/social-phone-p42-editor-shell.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/PhonePersonalDraftEditor.qml'
+      - 'widgets/messanger/PhonePersonalDraftState.js'
+      - 'tests/messaging/test_social_phone_personal_draft_shell_p42.py'
+      - 'tests/messaging/test_social_phone_personal_draft_state_p42.cjs'
+      - 'MODEL/contracts/social-phone-p42-editor-shell-v0.md'
+      - '.github/workflows/social-phone-p42-editor-shell.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preview-source-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate pure draft state syntax
+        run: node --check widgets/messanger/PhonePersonalDraftState.js
+      - name: Test favorite, note, cross-selection and discard states
+        run: node --test tests/messaging/test_social_phone_personal_draft_state_p42.cjs
+      - name: Inspect native QML draft shell integration boundaries
+        run: python -m unittest discover -s tests/messaging -p 'test_social_phone_personal_draft_shell_p42.py' -v
+      - name: Preserve existing locked live contact detail
+        run: python -m unittest discover -s tests/messaging -p 'test_social_phone_contact_metadata_locked_p40.py' -v

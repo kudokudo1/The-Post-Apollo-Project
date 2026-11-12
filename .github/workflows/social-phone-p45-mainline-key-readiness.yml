@@ -1,0 +1,72 @@
+name: Social PHONE P45 Mainline Recovery + Key and Save Feedback Readiness
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhonePersonalProtectedKeyP45.py'
+      - 'services/phone/PhonePersonalSaveOrchestratorP44.py'
+      - 'widgets/messanger/PhonePersonalSavePlanP44.js'
+      - 'widgets/messanger/PhonePersonalSaveFeedbackP45.js'
+      - 'widgets/messanger/PhonePersonalDraftEditor.qml'
+      - 'tests/phone/test_phone_personal_protected_key_p45.py'
+      - 'tests/messaging/test_social_phone_save_feedback_p45.cjs'
+      - 'tests/messaging/test_social_phone_mainline_completeness_p45.py'
+      - 'MODEL/contracts/social-phone-p45-mainline-and-key-readiness-v0.md'
+      - '.github/workflows/social-phone-p45-mainline-key-readiness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhonePersonalProtectedKeyP45.py'
+      - 'services/phone/PhonePersonalSaveOrchestratorP44.py'
+      - 'widgets/messanger/PhonePersonalSavePlanP44.js'
+      - 'widgets/messanger/PhonePersonalSaveFeedbackP45.js'
+      - 'widgets/messanger/PhonePersonalDraftEditor.qml'
+      - 'tests/phone/test_phone_personal_protected_key_p45.py'
+      - 'tests/messaging/test_social_phone_save_feedback_p45.cjs'
+      - 'tests/messaging/test_social_phone_mainline_completeness_p45.py'
+      - 'MODEL/contracts/social-phone-p45-mainline-and-key-readiness-v0.md'
+      - '.github/workflows/social-phone-p45-mainline-key-readiness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile-and-prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install disposable cryptography runtime for P35 tests
+        run: python -m pip install cryptography==50.0.2
+      - name: Verify P44 is actually present in this checkout
+        run: python -m unittest discover -s tests/messaging -p 'test_social_phone_mainline_completeness_p45.py' -v
+      - name: Protected host-only Secret Service read behavior (mocked)
+        run: |
+          python -m py_compile services/phone/PhonePersonalProtectedKeyP45.py
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_protected_key_p45.py' -v
+      - name: No false saved status, revoke and uncertain UI feedback
+        run: |
+          node --check widgets/messanger/PhonePersonalSaveFeedbackP45.js
+          node --test tests/messaging/test_social_phone_save_feedback_p45.cjs
+      - name: Recovered P44 exact two-action plan and encrypted matrix
+        run: |
+          node --check widgets/messanger/PhonePersonalSavePlanP44.js
+          node --test tests/messaging/test_social_phone_save_plan_p44.cjs
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_save_orchestrator_p44.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_transaction_review_p44.py' -v
+      - name: Existing P35 P36 P40R P43 and P42 regressions
+        run: |
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_contact_vault.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_host_gate_p36.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_vault_recovery_p40r.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_edit_ingress_p43.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_contact_metadata_locked_p40.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_personal_draft_shell_p42.py' -v
+          node --test tests/messaging/test_social_phone_personal_draft_state_p42.cjs

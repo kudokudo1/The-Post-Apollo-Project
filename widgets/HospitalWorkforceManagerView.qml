@@ -4,6 +4,7 @@ import Qt5Compat.GraphicalEffects
 import qs.components
 import "../services/hospital"
 import "../services/hospital/HospitalWorkforceManagerPolicy.js" as ManagementPolicy
+import "../services/hospital/HospitalRoomPickerLabelPolicy.js" as RoomPickerLabelPolicy
 import "../services/hospital/HospitalWorkforceJobActivationPolicy.js" as JobActivationPolicy
 import "../services/hospital/HospitalWorkforceStaffingPolicy.js" as StaffingPolicy
 import "../services/hospital/HospitalFirstBedVerificationPolicy.js" as BedPolicy
@@ -101,6 +102,16 @@ Column {
         });
         return rows.length === 1 ? rows[0] : ({});
     }
+    // The last created Room's requested label remains visible only inside
+    // this live Manager instance on old PX. No persistence is implied.
+    function roomDisplay(room) {
+        return RoomPickerLabelPolicy.describe(room,
+            root.lastCreatedRoomId, root.lastCreatedRequestedName,
+            root.lastCreatedNameSaved);
+    }
+    readonly property var selectedRoomDisplay: root.roomDisplay(
+        root.selectedStaffingRoom.id ? root.selectedStaffingRoom
+            : ({id: root.selectedRoomId}))
     readonly property var bedChoices: BedPolicy.candidateRows({
         room: root.selectedStaffingRoom,
         rooms: root.rooms, roomsLoaded: root.roomsLoaded,
@@ -1576,23 +1587,36 @@ Column {
                                     (root.roomPage + 1) * root.pageSize)
             Rectangle {
                 required property var modelData
+                readonly property var roomLabel: root.roomDisplay(modelData)
                 width: root.width
-                height: 30
+                height: 47
                 color: Colors.black
                 border.width: 1
                 border.color: root.selectedRoomId
                     === String(modelData.id || modelData.roomId || "")
                     ? Colors.magenta : Colors.blue
-                GohuText {
+                Column {
                     anchors.fill: parent
                     anchors.margins: 5
-                    text: String(modelData.displayName || modelData.team
-                                 || modelData.id || "ROOM")
-                        + " // " + String(modelData.repository || "NO PATIENT")
-                    font.pixelSize: 9
-                    color: Colors.white
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
+                    spacing: 2
+                    GohuText {
+                        width: parent.width
+                        height: 17
+                        text: roomLabel.title
+                        font.pixelSize: 10
+                        color: Colors.white
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    GohuText {
+                        width: parent.width
+                        height: 15
+                        text: roomLabel.idLine + " // " + roomLabel.nameStatus
+                        font.pixelSize: 8
+                        color: roomLabel.hasSavedName ? Colors.cyan : Colors.orange
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
                 }
                 MouseArea {
                     anchors.fill: parent
@@ -1612,9 +1636,15 @@ Column {
         }
         GohuText {
             width: parent.width
-            text: "ROOM // " + (root.selectedRoomId || "NOT SELECTED")
-                + " // Assignment saved in PLANNING, not activated"
-            color: Colors.blue
+            text: root.selectedRoomId
+                ? "SELECTED ROOM // " + root.selectedRoomDisplay.title
+                    + "\n" + root.selectedRoomDisplay.idLine
+                    + "\nNAME STATUS // " + root.selectedRoomDisplay.nameStatus
+                    + "\nPATIENT // " + root.selectedRoomDisplay.repository
+                    + "\nAssignment saved in PLANNING, not activated"
+                : "SELECTED ROOM // NOT SELECTED"
+            color: root.selectedRoomDisplay.hasSavedName ? Colors.cyan
+                : Colors.orange
             font.pixelSize: 9
             wrapMode: Text.WrapAnywhere
         }
@@ -1760,23 +1790,37 @@ Column {
                 (root.staffRoomPage + 1) * root.pageSize)
             Rectangle {
                 required property var modelData
+                readonly property var roomLabel: root.roomDisplay(modelData)
                 width: root.width
-                height: 31
+                height: 47
                 color: Colors.black
                 border.width: 1
                 border.color: root.selectedRoomId
                     === String(modelData.id || modelData.roomId || "")
                     ? Colors.magenta : Colors.blue
-                GohuText {
+                Column {
                     anchors.fill: parent
                     anchors.margins: 5
-                    text: String(modelData.displayName || modelData.team
-                        || modelData.id || "ROOM")
-                        + " // JOB #" + String(modelData.assignmentId || "NONE")
-                    color: Colors.white
-                    font.pixelSize: 9
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
+                    spacing: 2
+                    GohuText {
+                        width: parent.width
+                        height: 17
+                        text: roomLabel.title + " // JOB #"
+                            + String(modelData.assignmentId || "NONE")
+                        color: Colors.white
+                        font.pixelSize: 10
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    GohuText {
+                        width: parent.width
+                        height: 15
+                        text: roomLabel.idLine + " // " + roomLabel.nameStatus
+                        color: roomLabel.hasSavedName ? Colors.cyan : Colors.orange
+                        font.pixelSize: 8
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
                 }
                 MouseArea {
                     anchors.fill: parent

@@ -127,6 +127,29 @@ Item {
         return true;
     }
 
+    // A starred number may originate from MEANING without a journal
+    // observation. Open those exact digits in the existing read-only lens.
+    // Never overwrite a typed number or interrupt a note/recovery editor.
+    function openFavoriteNumber(digits) {
+        if (!AngelPolicy.validDigits(digits)
+                || FavoritesDefaultStore.storageState !== "ready"
+                || FavoritesDefaultStore.pendingDocument !== null
+                || FavoritesDefaultStore.queuedDocument !== null
+                || !Array.isArray(FavoritesDefaultStore.document.favorites)
+                || FavoritesDefaultStore.document.favorites.indexOf(
+                    AngelPolicy.favoriteKey(digits)) < 0
+                || editingText || editingNoteId !== ""
+                || noteInFlightId !== "" || reviewingDraft
+                || (activeView === "meaning"
+                    && angelMeaningPane.digits !== meaningSelection))
+            return false;
+        selectedId = "";
+        pendingDeleteId = "";
+        meaningSelection = digits;
+        activeView = "meaning";
+        return true;
+    }
+
     function editObservationNote(row) {
         if (!row || pane.noteInFlightId !== "")
             return;

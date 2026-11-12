@@ -6,6 +6,7 @@ import "../../services/favorites/FavoritesSearchPolicy.js" as Search
 import "../../services/favorites/FavoritesCollectionsViewPolicy.js" as CollectionView
 import "../../services/favorites/FavoritesOwnerNavigationPolicy.js" as OwnerNavigation
 import "../../services/favorites/FavoritesExactNavigationPolicy.js" as ExactNavigation
+import "../../services/favorites/FavoritesClockExactItemPolicy.js" as ClockItem
 import "../../services/favorites/FavoritesAppSelectionPolicy.js" as AppSelection
 import "../../services/favorites/FavoritesSystemSelectionPolicy.js" as SystemSelection
 import "../../services/favorites/FavoritesSystemWatchSelectionPolicy.js" as SystemWatchSelection
@@ -60,6 +61,8 @@ Item {
     signal ownerNavigationRequested(string owner, string view)
     // Fixed, non-sensitive exact route only; Weather rechecks its own store.
     signal exactNavigationRequested(string owner, string route)
+    // Strict numeric Clock identity only, rechecked by the owning widget.
+    signal clockItemRequested(string kind, string id)
     // U7b-C: one vetted DesktopEntry id, never AppControl actions.
     signal appSelectionRequested(string desktopId)
     // U7b-D: fixed SYSTEM metric only, not a device ID or control action.
@@ -80,6 +83,8 @@ Item {
         OwnerNavigation.plan(pane.selectedResource)
     readonly property var exactNavigation:
         ExactNavigation.plan(pane.selectedResource)
+    readonly property var clockItemSelection:
+        ClockItem.plan(pane.selectedResource)
     readonly property var dossier: Dossier.build(pane.candidates)
     readonly property var collectionView: CollectionView.build(
         pane.collectionsOwner ? pane.collectionsOwner.collections : [],
@@ -1357,6 +1362,7 @@ Item {
                 height: 30
                 label: pane.selectedResource && pane.selectedResource.readOnly
                     ? (pane.exactNavigation.ok || pane.appSelection.ok
+                       || pane.clockItemSelection.ok
                        || pane.systemSelection.ok || pane.systemWatchSelection.ok
                          || pane.thermalSelection.ok
                        ? "OPEN ITEM" : "NO ACTION")
@@ -1373,6 +1379,7 @@ Item {
                 available: pane.selectedResource !== null &&
                     (pane.selectedResource.readOnly
                       ? (pane.exactNavigation.ok || pane.appSelection.ok
+                       || pane.clockItemSelection.ok
                          || pane.systemSelection.ok || pane.systemWatchSelection.ok
                          || pane.thermalSelection.ok)
                       : pane.selectedResource.category==="CLOCK"
@@ -1383,6 +1390,11 @@ Item {
                 onLeftClicked: {
                     if(!available || !pane.selectedResource) return;
                     if(pane.selectedResource.readOnly) {
+                        if(pane.clockItemSelection.ok) {
+                            const clock = pane.clockItemSelection;
+                            pane.clockItemRequested(clock.kind,clock.id);
+                            return;
+                        }
                         const target=pane.exactNavigation;
                         if(target.ok)
                             pane.exactNavigationRequested(target.owner,target.route);
@@ -1414,11 +1426,11 @@ Item {
                 label: "OPEN ANGEL"
                 labelPixelSize: 8
                 accentColor: Colors.magenta
-                available: visible && pane.ownerNavigation.ok
+                available: visible && pane.clockItemSelection.ok
                 onLeftClicked: {
                     if (!available) return;
-                    const target = pane.ownerNavigation;
-                    pane.ownerNavigationRequested(target.owner,target.view);
+                    const item = pane.clockItemSelection;
+                    pane.clockItemRequested(item.kind,item.id);
                 }
             }
         }

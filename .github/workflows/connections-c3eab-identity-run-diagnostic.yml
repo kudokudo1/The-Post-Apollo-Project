@@ -1,0 +1,65 @@
+name: Connections C3e-AB C4b complete rollback diagnostic gate (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/C3eABIdentityRunDiagnostic.py"
+      - "tests/connections/test_connections_c3eab_identity_run_diagnostic.py"
+      - ".github/workflows/connections-c3eab-identity-run-diagnostic.yml"
+      - "docs/connections-c3eab-identity-run-diagnostic.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-readonly-guest-marker-diagnostic:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Syntax and exact no-grant static guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eABIdentityRunDiagnostic.py \
+            tests/connections/test_connections_c3eab_identity_run_diagnostic.py
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path("tests/connections/c3e_release_trust/C3eABIdentityRunDiagnostic.py")
+          source=path.read_text()
+          for flag in ("artifactOriginCryptographicallyAuthenticated",
+                       "githubWorkflowResultIndependentlyAuthenticated",
+                       "installedIdentityHostAuthenticated",
+                       "independentReleaseWitnessVerified",
+                       "externalRollbackResistanceVerified",
+                       "c5HumanConsentVerified",
+                       "credentialActionsEnabled", "canBeginSignIn",
+                       "productionAuthority"):
+              assert '"'+flag+'": False' in source
+          assert "NOT HOST TRUST" in source or "NOT HOST" in source
+          assert "REAL_SILVERBLUE_IDENTITY_RPM_LAYER_REMOVED" in source
+          assert "REAL_OFFICIAL_SILVERBLUE_SIGNED_IDENTITY_RPM_TWO_REBOOTS_AND_ROLLBACK" in source
+          assert "This is not independently authenticated" in Path(
+              "docs/connections-c3eab-identity-run-diagnostic.md").read_text()
+          print("C3EAB_PASS // NO_GUEST_LOG_OR_WORKFLOW_RESULT_PROMOTES_HOST_AUTHORITY")
+          PY
+      - name: Eighteen strict stage-order and failed full-VM adversarial tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3eab_identity_run_diagnostic.py
+          echo "C3EAB_PASS // 18_BOUNDED_C4B_ROLLBACK_DIAGNOSTIC_TESTS"
+      - name: No sign-in permissions created in existing Connections broker
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "readonly property bool credentialActionsEnabled: false" \
+            services/connections/ConnectionsBroker.qml
+          grep -Fq "readonly property bool hostAuthenticated: false" \
+            services/connections/ConnectionsRequestStatus.qml
+          echo "C3EAB_HOLD // NO_ACTIVE_AUTHENTICATED_IDENTITY_HOST_OR_C5_CONSENT"

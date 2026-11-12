@@ -15,11 +15,15 @@ Rectangle {
 
     property string activeSection: "compose"
     property string selectedDraftId: ""
+    readonly property int linkedMediaCount: PublisherMediaStore.snapshot.links.filter(function(link) {
+        return link.draftId === publisher.selectedDraftId;
+    }).length
     property string feedback: "LOCAL DRAFTS ONLY // NO PUBLICATION"
     readonly property var storeSnapshot: PublisherDraftStore.snapshot
     readonly property var sections: [
         {id:"compose", label:"COMPOSE"},
         {id:"library", label:"LIBRARY"},
+        {id:"media", label:"MEDIA"},
         {id:"calendar", label:"CALENDAR"},
         {id:"queue", label:"QUEUE"},
         {id:"history", label:"HISTORY"}
@@ -87,7 +91,8 @@ Rectangle {
                 model: publisher.sections
                 ActionButton {
                     required property var modelData
-                    width: (sectionRail.width - 4 * sectionRail.spacing) / 5
+                    width: (sectionRail.width - (publisher.sections.length - 1)
+                           * sectionRail.spacing) / publisher.sections.length
                     height: 36
                     label: modelData.label
                     labelPixelSize: 11
@@ -163,14 +168,21 @@ Rectangle {
                         height: 36
                         spacing: 8
                         ActionButton {
-                            width: (parent.width - parent.spacing) / 2
+                            width: (parent.width - 2 * parent.spacing) / 3
                             height: 36
                             label: "NEW"
                             accentColor: Colors.cyan
                             onTriggered: publisher.newDraft()
                         }
                         ActionButton {
-                            width: (parent.width - parent.spacing) / 2
+                            width: (parent.width - 2 * parent.spacing) / 3
+                            height: 36
+                            label: "MEDIA // " + publisher.linkedMediaCount
+                            accentColor: Colors.cyan
+                            onTriggered: publisher.activeSection = "media"
+                        }
+                        ActionButton {
+                            width: (parent.width - 2 * parent.spacing) / 3
                             height: 36
                             label: PublisherDraftStore.storageState === "saving"
                                    ? "SAVING" : "SAVE DRAFT"
@@ -238,6 +250,14 @@ Rectangle {
                         }
                     }
                 }
+            }
+
+            PublisherMediaLibraryPane {
+                id: publisherMediaPane
+                anchors.fill: parent
+                anchors.margins: 10
+                activeDraftId: publisher.selectedDraftId
+                visible: publisher.activeSection === "media"
             }
 
             Column {

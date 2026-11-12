@@ -32,6 +32,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Exercise Publisher local draft policy
         run: node tests/publisher/test_publisher_draft_policy.cjs
+      - name: Exercise media catalog and draft link policy
+        run: node tests/publisher/test_publisher_media_policy.cjs
+      - name: Verify read-only local media inspection and source checks
+        run: python3 -m unittest discover -s tests/publisher -p 'test_publisher_media_*.py' -v
       - name: Guard Social companion routing and single writer
         run: python3 tests/publisher/test_publisher_social_integration.py
       - name: Re-run existing Social Settings contracts

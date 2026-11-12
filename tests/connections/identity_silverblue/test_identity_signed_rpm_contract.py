@@ -852,5 +852,39 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
 
 
 
+    def test_28_parent_failure_trace_is_numeric_volatile_and_rollback_fenced(self):
+        import subprocess
+
+        guest = (AREA / "guest_identity_ostree_cycle.sh").read_text()
+        for required in (
+            'parent_line_file=/run/postapollo-id-ci-cycle-lastline',
+            'PARENT_LINE_WITNESS_START_REFUSED',
+            'trap \'printf "%s:%s',
+            '$BASHPID',
+            '$LINENO',
+            'SEPARATE_PROBE_PARENT_LASTLINE',
+            'if [[ "$trace" =~ ^[0-9]{1,10}:[0-9]{1,5}$ ]]',
+            'trap - DEBUG',
+            'rm -f -- "$parent_line_file"',
+            'PARENT_LINE_WITNESS_RESIDUE',
+        ):
+            self.assertIn(required, guest)
+        self.assertLess(
+            guest.index('trap - DEBUG'),
+            guest.index('echo rollback_pending > "$stage"'),
+        )
+        self.assertLess(
+            guest.index('rm -f -- "$parent_line_file"'),
+            guest.index('systemctl stop "$independent_unit"'),
+        )
+        self.assertNotIn('BASH_COMMAND', guest.split(
+            'trap \'printf "%s:%s', 1
+        )[1].split(' DEBUG', 1)[0])
+        subprocess.run(
+            ["/usr/bin/bash", "-n"], input=guest,
+            text=True, capture_output=True, check=True, timeout=3,
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

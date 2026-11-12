@@ -12,7 +12,23 @@ Scope {
     property string lastStatus: ""
     property var pending: ({})
     property var savedRoom: null
+    // v10 PX supports room-bind but not independent display names. Determine
+    // compatibility *before* writing, without touching the Hospital DB.
+    property string nameSupport: "CHECKING"
+    property string lastRegisteredId: ""
+    property string lastRequestedName: ""
+    property bool lastNameSaved: false
     signal created(var room)
+    signal idCollision(string roomId)
+
+    function probeNameSupport() {
+        if (creating || capabilityProcess.running)
+            return false;
+        nameSupport = "CHECKING";
+        capabilityProcess.exec(pxArgs(["hospital", "room-name-set", "--help"]));
+        return true;
+    }
+    Component.onCompleted: probeNameSupport()
 
     function pxArgs(args) {
         return [
@@ -31,8 +47,13 @@ Scope {
         const name = String(v.name || "").trim();
         const patientId = String(v.patientId || "").trim();
         const patientLabel = String(v.patientLabel || "").trim();
-        if (creating || bindProcess.running || nameProcess.running)
+        if (creating || bindProcess.running || nameProcess.running
+                || lookupProcess.running)
             return false;
+        if (nameSupport === "CHECKING") {
+            lastError = "PX CAPABILITY CHECK RUNNING // ROOM NOT WRITTEN";
+            return false;
+        }
         if (!/^room-[a-z0-9-]{8,90}$/.test(id)
                 || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)
                 || !name || name.length > 96 || !patientId
@@ -45,16 +66,66 @@ Scope {
             patientId: patientId, patientLabel: patientLabel};
         savedRoom = null;
         lastError = "";
-        lastStatus = "CREATING UNSTAFFED ROOM // NO AGENT WILL LAUNCH";
+        lastStatus = "CHECKING ROOM ID // NO ROOM BIND SENT";
         creating = true;
-        bindProcess.exec(pxArgs([
-            "hospital", "room-bind", id,
-            "--repository", repository,
-            "--patient-id", patientId,
-            "--patient-label", patientLabel,
-            "--json"
-        ]));
+        // room-bind is an UPSERT in PX v10/v11. Never call it without first
+        // checking the authoritative store for the exact generated ID.
+        lookupProcess.exec(pxArgs(["hospital", "room", id, "--json"]));
         return true;
+    }
+
+    Process {
+        id: capabilityProcess
+        stdout: StdioCollector {}
+        stderr: StdioCollector {}
+        onExited: function(code, exitStatus) {
+            root.nameSupport = Number(code) === 0
+                ? "SUPPORTED" : "UNSUPPORTED";
+        }
+    }
+
+    Process {
+        id: lookupProcess
+        property string resultText: ""
+        property string errorText: ""
+        stdout: StdioCollector {
+            onStreamFinished: lookupProcess.resultText = String(this.text || "")
+        }
+        stderr: StdioCollector {
+            onStreamFinished: lookupProcess.errorText = String(this.text || "")
+        }
+        onExited: function(code, exitStatus) {
+            const id = String(root.pending.id || "");
+            const error = String(lookupProcess.errorText || "");
+            const exists = Number(code) === 0;
+            const absent = Number(code) !== 0
+                && error.indexOf("unknown Hospital room: " + id) >= 0;
+            lookupProcess.resultText = "";
+            lookupProcess.errorText = "";
+            if (!root.creating || !id)
+                return;
+            if (exists || !absent) {
+                root.lastError = exists
+                    ? "ROOM ID COLLISION // EXISTING ROOM PRESERVED"
+                    : "ROOM REGISTRY UNAVAILABLE // NO WRITE PERFORMED";
+                root.lastStatus = exists
+                    ? "FRESH ROOM ID REQUIRED // REVIEW AGAIN"
+                    : "ROOM CREATE HELD // CHECK PX REGISTRY";
+                root.creating = false;
+                root.pending = ({});
+                if (exists)
+                    root.idCollision(id);
+                return;
+            }
+            root.lastStatus = "CREATING UNSTAFFED ROOM // NO AGENT WILL LAUNCH";
+            bindProcess.exec(root.pxArgs([
+                "hospital", "room-bind", id,
+                "--repository", root.pending.repository,
+                "--patient-id", root.pending.patientId,
+                "--patient-label", root.pending.patientLabel,
+                "--json"
+            ]));
+        }
     }
 
     Process {
@@ -94,6 +165,20 @@ Scope {
             bindProcess.resultText = "";
             bindProcess.errorText = "";
             root.savedRoom = result;
+            root.lastRegisteredId = root.pending.id;
+            root.lastRequestedName = root.pending.name;
+            if (root.nameSupport !== "SUPPORTED") {
+                // The Room exists in PX v10, but v10 has no independent
+                // display-name column. Never falsely claim the label saved
+                // or reinterpret the Room name as its Team.
+                root.creating = false;
+                root.lastNameSaved = false;
+                root.lastError = "";
+                root.lastStatus = "ROOM REGISTERED BY ID // DISPLAY NAME PENDING PX V11";
+                root.created(root.savedRoom);
+                root.pending = ({});
+                return;
+            }
             root.lastStatus = "ROOM REGISTERED // APPLYING DISPLAY NAME";
             nameProcess.exec(root.pxArgs([
                 "hospital", "room-name-set", root.pending.id,
@@ -118,17 +203,23 @@ Scope {
             try {
                 if (Number(code) === 0) {
                     const result = JSON.parse(nameProcess.resultText);
-                    nameSaved = String(result.id || "") === id;
+                    // An ID echo alone does not prove that a human-friendly
+                    // label was persisted. Require the exact saved label.
+                    nameSaved = String(result.id || "") === id
+                        && String(result.displayName || "") === root.pending.name;
                 }
             } catch (error) {
                 nameSaved = false;
             }
             root.creating = false;
+            root.lastNameSaved = nameSaved;
             root.lastStatus = nameSaved
-                ? "ROOM CREATED // UNSTAFFED // NO SESSION OR WORKTREE"
-                : "ROOM CREATED // NAME SAVE FAILED // USE EDIT NAME";
+                ? "ROOM REGISTERED + NAMED // NO SESSION OR WORKTREE"
+                : "ROOM REGISTERED BY ID // DISPLAY NAME NOT SAVED";
+            // This command may be unsupported on a mismatched PX runtime
+            // after a successful bind. Never call it an ID collision.
             root.lastError = nameSaved ? ""
-                : "ROOM " + id + " EXISTS // " + String(nameProcess.errorText || "name not verified").slice(0,170);
+                : "PX NAME SAVE UNSUPPORTED OR FAILED // ROOM ID IS REGISTERED";
             nameProcess.resultText = "";
             nameProcess.errorText = "";
             root.created(root.savedRoom);

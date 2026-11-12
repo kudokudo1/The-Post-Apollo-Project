@@ -67,6 +67,11 @@ Column {
     property string workerRole: "INT"
     property string workerId: makeId("worker")
     property string roomId: makeId("room")
+    // The ID is the stable technical key; never mistake it for the label.
+    // Keep the last durable result visible after generating the next ID.
+    property string lastCreatedRoomId: ""
+    property string lastCreatedRequestedName: ""
+    property bool lastCreatedNameSaved: false
     property string selectedDoctorId: ""
     property string selectedRoomId: ""
     property string selectedStaffDoctorId: ""
@@ -547,6 +552,8 @@ Column {
         outcome = "";
         if (value === "ROOM") {
             root.applyRoomSuggestions();
+            // Read-only CLI capability check, never a Room write.
+            roomCreate.probeNameSupport();
             if (!githubOwner.loaded && !githubOwner.reading)
                 githubOwner.refresh();
         }
@@ -632,7 +639,23 @@ Column {
     }
     function review(kind) {
         disarm();
+        // The source registry can refresh after an ID was minted. A known
+        // collision must automatically get a fresh candidate, not force the
+        // operator to invent an ID or repeatedly retry with the old one.
+        if (kind === "CREATE_ROOM" && root.rooms.some(function(r) {
+            return String((r || {}).id || (r || {}).roomId || "")
+                === root.roomId;
+        })) {
+            root.roomId = root.makeId("room");
+            root.outcome = "ROOM ID WAS ALREADY REGISTERED // NEW ID GENERATED"
+                + " // REVIEW AGAIN // NO WRITE";
+            return false;
+        }
         const p = planFor(kind);
+        if (kind === "CREATE_ROOM" && roomCreate.nameSupport === "CHECKING") {
+            outcome = "ROOM CREATE HOLD // CHECKING INSTALLED PX NAME SUPPORT";
+            return false;
+        }
         if (registryBusy || !p.ready) {
             outcome = "HOLD // " + (registryBusy
                 ? "Refreshing PX registry"
@@ -793,6 +816,15 @@ Column {
     onRoomsChanged: {
         disarm();
         bedProbe.invalidate();
+        // Re-key a draft whose generated ID has since entered the registry.
+        // Never change, delete or upsert the already registered Room.
+        if (root.rooms.some(function(r) {
+            return String((r || {}).id || (r || {}).roomId || "")
+                === root.roomId;
+        })) {
+            root.roomId = root.makeId("room");
+            root.outcome = "EXISTING ROOM PRESERVED // FRESH ID GENERATED";
+        }
     }
     onSessionsChanged: disarm()
     onRegistryErrorChanged: disarm()
@@ -882,14 +914,27 @@ Column {
     }
     HospitalWorkforceRoomCreateService {
         id: roomCreate
-        onCreated: function(room) {
-            root.outcome = roomCreate.lastStatus
-                + " // " + String((room || {}).id || "");
-            root.selectedRoomId = String((room || {}).id || "");
+        onIdCollision: function(existingId) {
+            // Never reuse a committed ID, even if the UI roster is stale.
+            // Reject the requested write and require a fresh REVIEW.
             root.roomId = root.makeId("room");
+            root.disarm();
+            root.outcome = "ROOM ID ALREADY REGISTERED // OLD ROOM UNCHANGED"
+                + " // NEW ID GENERATED // REVIEW AGAIN";
+            root.rosterRefreshRequested();
+        }
+        onCreated: function(room) {
+            const savedId = String((room || {}).id || "");
+            root.lastCreatedRoomId = savedId;
+            root.lastCreatedRequestedName = roomCreate.lastRequestedName;
+            root.lastCreatedNameSaved = roomCreate.lastNameSaved;
+            root.outcome = roomCreate.lastStatus + " // ID " + savedId;
+            root.selectedRoomId = savedId;
+            // A subsequent creation always uses a fresh ID. The previous
+            // registered ID remains visible separately for navigation.
+            root.roomId = root.makeId("room");
+            root.disarm();
             roomNameField.value = "";
-            // Start the NEXT Room in this same Floor with a fresh auto-fill.
-            // Only reset after the previous Room is confirmed as created.
             root.roomOwnerManuallyEdited = false;
             root.roomRepositoryManuallyEdited = false;
             root.applyRoomSuggestions();
@@ -1372,6 +1417,17 @@ Column {
         ManagerField {id:roomNameField; caption:"ROOM NAME"}
         GohuText {
             width: parent.width
+            text: roomCreate.nameSupport === "SUPPORTED"
+                ? "PX NAME SUPPORT READY // NAME WILL BE STORED SEPARATELY FROM ROOM ID AND TEAM"
+                : roomCreate.nameSupport === "UNSUPPORTED"
+                ? "PX NAME SUPPORT MISSING // CONFIRM CREATES AN ID-ONLY ROOM. THE TYPED NAME WILL NOT BE SAVED. UPGRADE PX TO ADD NAMES."
+                : "CHECKING PX ROOM NAME SUPPORT // REVIEW UNAVAILABLE UNTIL CHECK ENDS"
+            color: roomCreate.nameSupport === "SUPPORTED" ? Colors.cyan : Colors.orange
+            font.pixelSize: 9
+            wrapMode: Text.WrapAnywhere
+        }
+        GohuText {
+            width: parent.width
             text: "CURRENT FLOOR REPOSITORY // "
                 + (root.currentPatientRepository.owner
                     ? root.suggestedRepository
@@ -1457,7 +1513,8 @@ Column {
         }
         GohuText {
             width: parent.width
-            text: "ID // " + root.roomId
+            text: "NEXT ROOM ID // " + root.roomId
+                + "\nAutomatically generated technical key. It is NOT your Room name."
                 + "\nNo Doctor, Assignment, Provider, branch, Bed or Session will be attached."
             font.pixelSize: 8
             color: Colors.blue
@@ -1471,6 +1528,35 @@ Column {
             color: roomCreate.lastError ? Colors.orange : Colors.cyan
             font.pixelSize: 9
             wrapMode: Text.Wrap
+        }
+        GohuText {
+            width: parent.width
+            visible: !!root.lastCreatedRoomId
+            text: "LAST REGISTERED ROOM // " + root.lastCreatedRoomId
+                + "\nREQUESTED NAME // " + root.lastCreatedRequestedName
+                + (root.lastCreatedNameSaved
+                    ? "\nDISPLAY NAME SAVED // ROOM READY"
+                    : "\nDISPLAY NAME NOT SAVED // ROOM EXISTS UNDER ITS ID"
+                        + "\nPX NAME SUPPORT REQUIRED FOR RENAMING")
+            color: root.lastCreatedNameSaved ? Colors.cyan : Colors.orange
+            font.pixelSize: 9
+            wrapMode: Text.WrapAnywhere
+        }
+        HospitalActionButton {
+            width: parent.width
+            height: 28
+            visible: !!root.lastCreatedRoomId
+            label: "USE LAST REGISTERED ROOM // NEW JOB"
+            accent: Colors.cyan
+            contentGlowEnabled: false
+            enabledAction: root.roomsLoaded && root.rooms.some(function(r) {
+                return String((r || {}).id || (r || {}).roomId || "")
+                    === root.lastCreatedRoomId;
+            })
+            onTriggered: {
+                root.selectedRoomId = root.lastCreatedRoomId;
+                root.selectMode("JOB");
+            }
         }
     }
 

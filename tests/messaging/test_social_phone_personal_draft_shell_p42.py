@@ -18,7 +18,10 @@ class PersonalDraftShellTests(unittest.TestCase):
         cls.pane = PANE.read_text()
 
     def test_isolated_only_no_public_save_grant(self):
-        self.assertNotIn("PhonePersonalDraftEditor", self.detail)
+        # P43 mounts it only behind a deliberate unsaved EDIT gesture.
+        self.assertIn("PhonePersonalDraftEditor {", self.detail)
+        self.assertIn("previewEnabled: detail.draftPreviewOpen", self.detail)
+        self.assertIn("onCancelRequested: detail.closeDraftPreview()", self.detail)
         self.assertNotIn("PhonePersonalDraftEditor", self.pane)
         self.assertIn("property bool previewEnabled: false", self.source)
         self.assertIn("readonly property bool secureSaveAuthorized: false", self.source)

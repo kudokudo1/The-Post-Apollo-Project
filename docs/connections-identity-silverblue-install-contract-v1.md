@@ -5,7 +5,7 @@
 **STAFF ROLE //** external Hospital-compatible DOC implementation, live registration unverified  
 **ASSIGNMENT //** independently inspectable signed Identity **RPM**, supervised Silverblue service origin, SELinux/seat/process and rollback proof  
 **AUTHORITY //** operator expressly authorized this separate assignment November 10, 2026, without merging, workstation installation or production activation  
-**STATUS //** Phase 1 signed RPM and synthetic release-envelope tests verified. Phase 2 real offline Silverblue installation/layering/two-boot rollback verified. Phase 3 real supervised nonroot systemd/AF_UNIX service and four signed UNAVAILABLE receipts verified; process was **unconfined_service_t**, NOT a dedicated SELinux domain. Current C4b process-continuity checks and separate compile-only custom policy prototype are pending runtime verification.  
+**STATUS //** Phase 1 signed RPM and synthetic release-envelope tests verified. Phase 2 real offline Silverblue installation/layering/two-boot rollback verified. Phase 3 supervised nonroot AF_UNIX gateway, four signed `UNAVAILABLE` receipts and complete rollback verified in an earlier **unconfined** run. Phase 4 real **enforcing `postapollo_identity_ci_t`** gateway and kernel PID/start/cgroup/peer continuity for four signed denials verified in [#43067641932](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/43067641932). The **independent AF_INET SELinux denial, disposable custom-policy cleanup and combined two-boot rollback remain unverified together**. Most recent exact-head CI suffered GitHub Actions `startup_failure` before any job steps.  
 **OWNERSHIP //** `tests/connections/identity_silverblue/**`, its new workflow, this document. Identity DOC retains `services/identity/**`, `tests/identity/**`; protected C3e retains the trust reviewer/importer; C5 retains consent.
 
 ## IMPLEMENTATION
@@ -13,7 +13,7 @@
 This **does not reuse C4d's fake Connections status host**. It packages the *actual existing* Identity-installed test gateway from `tests/identity/fixtures/identity_gateway_installed_ci` and the seven exact modules already used by Identity DOC's merged Ubuntu dpkg/systemd test. The source files are read-only inputs; no forked auth, extra protocol, QML edits or new credential path.
 
 - `signed_identity_gateway.spec`: exact allowlisted eight source files under `/usr/libexec/post-apollo/identity/` (root-owned mode 0555), one CI-only unit (0644), no RPM scriptlets/triggers or automatic enablement. Product name `post-apollo-identity-silverblue-ci`, separate from the existing Ubuntu `post-apollo-identity-ci-fixture` and C4d status host.
-- `post-apollo-identity-silverblue-ci.service`: non-enabled test unit. A disposable authorized-test marker and external transient runtime environment are required. Dedicated nonroot service identity, private runtime and explicit no-elevation settings; the actual confinement still needs a **new Identity-specific SELinux test policy** and kernel verification. An inert unit file is not proof that `systemd` ever started it.
+- `post-apollo-identity-silverblue-ci.service`: non-enabled test unit. A disposable authorized-test marker and transient runtime environment are required. Dedicated nonroot identity, private runtime and `NoNewPrivileges=true` are retained. In disposable guest CI only, a compiled **Identity-specific SELinux test policy** plus a labeled, byte-identical temporary Python entrypoint and ephemeral systemd override produced the observed `postapollo_identity_ci_t` domain. The RPM-installed unit alone does not enable or prove that confinement; no workstation/production SELinux policy is installed.
 - `build_signed_identity_gateway.sh`: guarded GitHub-only Fedora 44 RPM builder; disposable OpenPGP key signs package. Only public-key/fingerprint, signed RPM and hashes leave the builder. Never uploads a private release root or receipt signer.
 - `verify_signed_identity_gateway.sh`: a **separate fresh Fedora container** creates its own RPM database, requires that the package signature be untrusted **before** explicit public key import, then verifies the package signature and exact role with no scriptlets. This establishes CI package signature correctness, *not* independent operator production key custody.
 - `test_identity_signed_rpm_contract.py`: exact source roster, service start-gate and negative release/authority contracts. The CI workflow checks these and builds/verifies the RPM. No package is installed on the operator's Fedora machine.
@@ -37,7 +37,7 @@ These are **interface requirements to review**, not a published, accepted produc
 
 ## HOW TO USE
 
-GitHub Actions only: inspect draft PR #1785's signed RPM, actual official Silverblue VM, and compile-only SELinux policy checks. No desktop action. The real two-boot rollback and signed deny-only gateway have passed in disposable CI. Do not install these RPMs locally or treat passing CI as independently enrolled production trust, confirmed confinement, or real C5 consent.
+GitHub Actions only: inspect open, unmerged [PR #1785](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/1785), its signed-RPM contracts, real official Silverblue KVM workflow, and separate test-policy compiler. No desktop action. A previous **unconfined** real guest passed signed deny-only IPC and full two-boot rollback. A later real guest separately proved **actual dedicated enforcing confinement** with four signed refusals, but the **combined independent network-denial and rollback test has not passed**. Neither earlier result establishes operator-enrolled production trust, a protected seat witness, or C5 human consent.
 
 ## VERIFY
 
@@ -47,9 +47,9 @@ GitHub Actions only: inspect draft PR #1785's signed RPM, actual official Silver
 
 **Phase 3 running service [#42993936702](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42993936702): PASS within deny-only CI scope.** Offline signed Fedora cryptography/CFFI/pycparser runtime dependencies; nonroot actual canonical installed Identity gateway supervised by systemd; PID/UID/GID/cgroup, kernel socket and process context observed; signed UNAVAILABLE for BEGIN, STATUS, CANCEL and RECOVER; test runtime/user/key deletion before real second rollback, and all four installed RPMs absent after rollback. **Crucial limitation:** observed SELinux domain was `system_u:system_r:unconfined_service_t:s0`. This is not dedicated SELinux confinement.
 
-**Next process continuity check:** CI-only guest script now rechecks kernel `SO_PEERCRED`, systemd MainPID, `/proc/PID/stat` start ticks, all effective/real/FS UIDs/GIDs, cgroup and SELinux label before and after every signed denial; exact-head real VM verdict pending. This validates observed continuity only, not a protected release root, logind seat, guest code identity independent of guest reports, or the C5 consent interface.
+**Phase 4 actual kernel confinement and continuity [#43067641932](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/43067641932): PASS for the confined service and signed-refusal stages, complete workflow FAILED later.** Official offline Silverblue guest loaded the test-only module while enforcing, executed the installed nonroot gateway as `system_u:system_r:postapollo_identity_ci_t:s0` using a labeled CI-only entrypoint and `NoNewPrivileges=true` transition, verified kernel `SO_PEERCRED`, systemd MainPID, `/proc/PID/stat` start ticks, four real/effective/saved/FS UIDs/GIDs, cgroup and SELinux label around each signed `UNAVAILABLE` BEGIN/STATUS/CANCEL/RECOVER receipt. This proves *observed guest process continuity and actual dedicated domain*, not independently protected release-root custody, logind seat, or real C5 consent.
 
-**Next SELinux gate:** `selinux/postapollo_identity_ci.te` proposes a distinct test-only domain; `selinux/build_policy_ci.sh` and its separate workflow compile it in a disposable Fedora 44 container without policy load. **Compiling a module is not proof of confinement.** Subsequent operator-approved C4b CI must bind a labelled entrypoint, enforce an exact unique domain, prove denied forbidden actions, and remove the test policy before rollback. Independent C3e/Identity DOC security review remains mandatory.
+**Next combined SELinux/rollback gate: STILL BLOCKED.** The negative socket probe must itself run as `postapollo_identity_ci_t` without `RestrictAddressFamilies`, namespace or socket seccomp denial, observe kernel `EACCES`/`EPERM` creating an AF_INET socket, and prove the test policy, key, account and unit disappear before the actual second-boot rollback. A temporary journal-backed unit replaced an unreliable `systemd-run --pipe` attempt, but its latest execution verdict is unavailable: [#43071256155](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/43071256155) failed without retrievable complete guest evidence and the next attempts [#43098247648](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/43098247648) ended in GitHub `startup_failure` before running. Compile-only PASS does not close this combined gate. Independent C3e/Identity DOC security review remains mandatory.
 
 ## WATCH OUT FOR
 
@@ -63,16 +63,17 @@ The Identity gateway fixture currently refuses all real login, peer, seat and op
 - [ ] Identity-specific signed release manifest with separate authority and revocation floors (reviewed)
 - [x] Real official Silverblue RPM-OSTree install, second boot, signed deny-only IPC (CI-only)
 - [x] Real rollback and complete absence of guest package/keys/runtime (no custom policy installed yet)
-- [ ] Unique enforcing SELinux domain with actual denied accesses, process replacement negative checks, policy removal and full rollback
-- [ ] Kernel peer/PID start/cgroup/SELinux continuity gate verified by latest real VM
+- [x] Dedicated enforcing SELinux domain and kernel peer/PID start/cgroup/SELinux continuity verified with four signed refusals in real guest (prior run)
+- [ ] Independent kernel AF_INET socket denial without a systemd network sandbox, custom policy removal and complete two-boot rollback in the **same** real guest
+- [ ] Additional process replacement/host loss and protected-seat negatives at the independent trust-review boundary
 - [ ] Independent protected C3e technical review and Identity DOC interface acceptance
 - [ ] Operator final acceptance and separately authorized merge
 - [ ] Production activation: **HOLD**, not included in this assignment
 
 ## NEXT
 
-Verify the exact-head kernel peer/PID-start/cgroup continuity test, then independently compile and test the proposed dedicated SELinux domain. Do not call confinement complete until the actual Silverblue guest launches the gateway in that domain under enforcing policy, denies forbidden accesses, and proves complete test policy teardown. Coordinate protected release/receipt signer and consent seams with C3e, Identity DOC and C5 without editing their owned files.
+Restore actual GitHub Actions execution for this PR and retrieve bounded real-guest markers. Then close the **independent enforcing SELinux AF_INET denial + disposable policy/key/user cleanup + real two-boot rollback in one run**. The dedicated running gateway and signed-refusal continuity are already demonstrated, but not the remaining combined gate. After that, coordinate the protected release/receipt signer, logind-seat and consent seams with C3e, Identity DOC and C5 without editing their owned files.
 
 ## DECISIONS
 
-This is a separate authorized **development assignment**, not a transfer of the old C4d room or a production release. Draft PR only. No local Fedora writes, cross-owner source changes, merges, live key deployment, provider operations or production login activation.
+This is a separate authorized **development assignment**, not a transfer of the old C4d room or a production release. Open PR, unmerged and without operator final acceptance; a ready-for-review GitHub flag is not authorization to merge. No local Fedora writes, cross-owner source changes, live key deployment, provider operations or production login activation.

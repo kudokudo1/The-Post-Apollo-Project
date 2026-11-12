@@ -37,6 +37,7 @@ def _sibling(name):
 _gate_module = _sibling("AlarmOwnershipGate")
 _observer_module = _sibling("AlarmBackgroundObserver")
 _shadow_module = _sibling("AlarmShadowTransactions")
+_peer_identity = _sibling("AlarmPeerIdentity")
 ShadowStore = _shadow_module.ShadowStore
 ShadowRefused = _shadow_module.Refused
 OwnershipGate = _gate_module.OwnershipGate
@@ -49,7 +50,7 @@ MAX_FRAME = 8192
 MAX_ALARMS_BYTES = 2 * 1024 * 1024
 DIGEST = re.compile(r"^[0-9a-f]{64}$")
 PREFIX = {"mode": "SYNTHETIC_BG1_B", "actuationEnabled": False,
-          "ownsAlarmFile": False}
+          "ownsAlarmFile": False, "roleAuthenticated": False}
 
 
 def _integer(value, minimum=0, maximum=8640000000000000):
@@ -57,33 +58,21 @@ def _integer(value, minimum=0, maximum=8640000000000000):
 
 
 def _peer_start_ticks(pid):
+    # Keep this explicit lifecycle check in the B1 broker contract.
     try:
-        record = Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
-        fields = record.rsplit(") ", 1)[1].split()
-        if fields[0] in ("Z", "X", "x"):
-            raise ValueError("exited")
-        value = int(fields[19])
-        if value <= 0:
-            raise ValueError("invalid start")
-        return value
-    except (OSError, ValueError, IndexError) as exc:
-        raise Refused("PEER_PROCESS_UNVERIFIED") from exc
+        return _peer_identity._start_ticks(pid)
+    except _peer_identity.Refused as exc:
+        raise Refused(str(exc)) from exc
 
 
 def _peer_process(connection, expected_exe):
-    if not hasattr(socket, "SO_PEERCRED"):
-        raise Refused("SO_PEERCRED_UNAVAILABLE")
+    # socket.SO_PEERCRED identifies PID/UID, not an authorized role.
+    # The separate kernel SO_PEERPIDFD pins that *exact socket peer*
+    # throughout this synthetic session. No fallback to user-supplied PIDs.
     try:
-        raw = connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
-        pid, uid, _gid = struct.unpack("3i", raw)
-        if pid <= 1 or uid != os.getuid():
-            raise Refused("PEER_UID_REFUSED")
-        exe = os.path.realpath(os.readlink(f"/proc/{pid}/exe"))
-        if exe != expected_exe:
-            raise Refused("UNEXPECTED_SYNTHETIC_PEER_EXE")
-        return {"pid": pid, "uid": uid, "ticks": _peer_start_ticks(pid)}
-    except OSError as exc:
-        raise Refused("PEER_PROCESS_UNVERIFIED") from exc
+        return _peer_identity.capture(connection, expected_exe)
+    except _peer_identity.Refused as exc:
+        raise Refused(str(exc)) from exc
 
 
 def _source_snapshot(alarm_file, now_ms):
@@ -194,6 +183,11 @@ class BrokerHandler(socketserver.StreamRequestHandler):
     def _peer_ok(self):
         if self.peer is None:
             self.peer = _peer_process(self.request, self.server.synthetic_exe)
+        try:
+            _peer_identity.verify(self.request, self.peer,
+                                  self.server.synthetic_exe)
+        except _peer_identity.Refused as exc:
+            raise Refused(str(exc)) from exc
         if _peer_start_ticks(self.peer["pid"]) != self.peer["ticks"]:
             raise Refused("PEER_PROCESS_CHANGED")
         return self.peer
@@ -367,6 +361,11 @@ class BrokerHandler(socketserver.StreamRequestHandler):
                             pass
                         self.server.active_owner = None
                         self.token = None
+            # One kernel pidfd per accepted connection. Always release it,
+            # including denied, disconnected and lease-expired sessions.
+            if self.peer is not None:
+                _peer_identity.close(self.peer)
+                self.peer = None
 
 
 def main():

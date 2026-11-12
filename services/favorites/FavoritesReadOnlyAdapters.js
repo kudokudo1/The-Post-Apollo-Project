@@ -165,3 +165,50 @@ function radio(favorites, recents) {
     ingest(recents,"recent");
     return out;
 }
+
+
+// Saved alarms are owned exclusively by AlarmManagerService. Never copy
+// notes, ringing receipts, audio locations or commands into Favorites.
+function clockAlarms(alarms) {
+    const out = result();
+    if (!Array.isArray(alarms)) {
+        out.invalidCount++;
+        return out;
+    }
+    for (const a of alarms.slice(0, 100)) {
+        if (!a || !Number.isSafeInteger(a.id) || a.id < 1
+                || a.favorite !== true) continue;
+        if (typeof a.name !== "string" || a.name.length < 1
+                || a.name.length > 40 || /[\u0000-\u001f\u007f]/.test(a.name)) {
+            out.invalidCount++;
+            continue;
+        }
+        add(out, "clock-alarm", "alarm", String(a.id),
+            ["favorite", "recall"], "ALARM // " + a.name);
+    }
+    out.invalidCount += Math.max(0, alarms.length - 100);
+    return out;
+}
+
+// Angel number stars already live in FavoritesDefaultStore. Project those
+// original keys as read-only labels: no second persistence, no journal copy.
+function angelNumbers(keys) {
+    const out = result();
+    if (!Array.isArray(keys)) {
+        out.invalidCount++;
+        return out;
+    }
+    for (const key of keys.slice(0, 2048)) {
+        if (typeof key !== "string"
+                || key.indexOf("fav1:local:angel:number:") !== 0) continue;
+        const digits = key.slice("fav1:local:angel:number:".length);
+        if (!/^[0-9]{1,8}$/.test(digits)) {
+            out.invalidCount++;
+            continue;
+        }
+        add(out, "angel", "number", digits,
+            ["favorite", "recall"], "ANGEL // " + digits);
+    }
+    out.invalidCount += Math.max(0, keys.length - 2048);
+    return out;
+}

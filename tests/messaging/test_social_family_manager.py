@@ -47,7 +47,7 @@ class SocialFamilyManagerContracts(unittest.TestCase):
         self.assertIn('appSelector.settingsOpen = !appSelector.settingsOpen', SELECTOR)
         # PHONE sits above Settings; the existing rail is still scrollable
         # and preserves both footer entry points within one Social window.
-        self.assertIn('bottom: statusMessage.visible ? statusMessage.top : phoneFooter.top',
+        self.assertIn('bottom: statusMessage.visible ? statusMessage.top : publisherFooter.top',
                       SELECTOR)
         self.assertIn('id: phoneFooter', SELECTOR)
         self.assertIn('anchors.bottom: settingsFooter.top', SELECTOR)

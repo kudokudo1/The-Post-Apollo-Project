@@ -25,6 +25,7 @@ on:
       - 'tests/weather/test_weather_w19_rain_meter_grammar.js'
       - 'tests/weather/test_weather_w20_visual_hierarchy.js'
       - 'tests/weather/test_weather_w21_rails_and_forecast_hierarchy.js'
+      - 'tests/weather/test_weather_w22_icon_and_overview_header.js'
       - 'tests/weather/test_weather_w10_three_band_solar.js'
       - 'widgets/weather/StationSky.qml'
       - 'tests/weather/test_weather_w9_fixed_paged_terminal.js'
@@ -63,6 +64,7 @@ jobs:
           node --test tests/weather/test_weather_w19_rain_meter_grammar.js
           node --test tests/weather/test_weather_w20_visual_hierarchy.js
           node --test tests/weather/test_weather_w21_rails_and_forecast_hierarchy.js
+          node --test tests/weather/test_weather_w22_icon_and_overview_header.js
           node --test tests/weather/test_weather_w8_unified_terminal.js
           node --test tests/weather/test_weather_subject_panels_m2a.js
           node --test tests/weather/test_weather_subject_panels_m2b.js

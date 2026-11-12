@@ -43,16 +43,27 @@ ShellRoot {
             if(root.ticks>40)
                 return root.fail("TIMEOUT");
             const rail=magick.overviewRailItem;
-            if(!rail || !rail.visible || rail.height!==31 ||
+            if(!rail || !rail.visible || rail.height!==49 ||
                rail.buttonRepeater.count!==3)
                 return root.fail("MISSING_SHARED_MAGICK_RAIL");
             if(Math.abs(rail.width-(window.width-12))>1)
                 return root.fail("MAGICK_RAIL_NOT_FULL_WIDTH");
+            if(!rail.titleItem.visible ||
+               rail.titleItem.text!=="MAGICK // OVERVIEW"
+               || rail.titleItem.height!==18)
+                return root.fail("W22_MAGICK_HEADER_MISSING");
             for(let i=0;i<3;i++) {
                 const button=rail.buttonRepeater.itemAt(i);
-                if(!button || button.width<rail.width/3-6
-                   || button.height!==25)
+                if(!button || button.width<rail.width/3-7
+                   || button.height!==24)
                     return root.fail("MAGICK_LONG_BUTTON_GEOMETRY_"+i);
+                if(i>0) {
+                    const prev=rail.buttonRepeater.itemAt(i-1);
+                    const gap=button.mapToItem(rail,0,0).x
+                          - prev.mapToItem(rail,prev.width,0).x;
+                    if(gap<7)
+                        return root.fail("W22_MAGICK_TAB_GAP_TOO_NARROW_"+i);
+                }
             }
             if(root.lastRoute==="") {
                 rail.buttonRepeater.itemAt(1).clicked(null);

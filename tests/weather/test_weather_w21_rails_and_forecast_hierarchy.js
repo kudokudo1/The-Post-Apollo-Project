@@ -16,11 +16,13 @@ const native=fs.readFileSync("tests/weather/fixtures/W15FixedWeatherOverviewNati
 test("W21 shares full-width C44 cyan-divider navigation across WEATHER and MAGICK",()=>{
   assert.match(rail,/id: overviewRail/);
   assert.match(rail,/id: longButtons/);
-  assert.match(rail,/HeaderGeometry.buttonWidth\(longButtons.width,/);
+  assert.match(rail,/overviewRail.buttonGap/);
   assert.match(rail,/HeaderGeometry.ruleHeight/);
   assert.match(rail,/color: Colors.cyan/);
   assert.match(rail,/onClicked: overviewRail.routeRequested\(modelData.path\)/);
   assert.match(header,/var tabSpacing = 4/);
+ assert.match(rail,/property string titleText:/);
+ assert.match(rail,/id: railHeading/);
   assert.match(home,/id: weatherOverviewRail/);
   assert.match(home,/weather-w21-overview-top-rail/);
   assert.match(weatherHost,/onRouteRequested: function\(path\)/);
@@ -41,8 +43,8 @@ test("W21 shares full-width C44 cyan-divider navigation across WEATHER and MAGIC
 test("W21 transfers full Weather NOW space to six forecast readings without replacing glyphs",()=>{
   assert.match(full,/Math.round\(budget\*0.48\)/);
   assert.match(full,/Math.round\(budget\*0.42\)/);
-  assert.match(full,/currentPanel.height \* 1.33/);
-  assert.match(full,/scale: 1.35/);
+  assert.match(full,/currentPanel.height \* 1.08/);
+  assert.match(full,/scale: 1.25/);
   assert.match(full,/terminal.sky.conditionState.icon/);
   assert.match(full,/id: hourInstrumentStack/);
   assert.match(full,/id: dayRainMeter/);
@@ -50,18 +52,19 @@ test("W21 transfers full Weather NOW space to six forecast readings without repl
 });
 test("W21 fits Overview rail and supporting cards into compact and tall viewports",()=>{
   const budget=h=>{
-    const row=Math.max(h<286?46:55,Math.min(60,Math.floor(h*.18),
+    const row=Math.max(h<286?46:48,Math.min(51,Math.floor(h*.16),
                              Math.floor(Math.max(0,h-195)/2)));
-    const summary=h-31-2*row;
-    return {row,summary,deficit:Math.max(0,164-summary)};
+    const railHeight=h<286?31:49;
+    const summary=h-railHeight-2*row;
+    return {row,summary,railHeight,deficit:Math.max(0,164-summary)};
   };
   for(const h of [275,300,500]){
     const a=budget(h);
-    assert.equal(a.summary+2*a.row+31,h);
-    assert.ok(a.row<=60);
+    assert.equal(a.summary+2*a.row+a.railHeight,h);
+    assert.ok(a.row<=51);
     assert.ok(a.summary>=152);
   }
-  assert.equal(budget(500).row,60);
+  assert.equal(budget(500).row,51);
   assert.ok(budget(500).summary>=349);
   assert.match(home,/weatherOverviewRail.height/);
   assert.match(overview,/compactDeficit: Math.max\(0,164-height\)/);
@@ -70,11 +73,11 @@ test("W21 fits Overview rail and supporting cards into compact and tall viewport
   assert.match(overview,/id: dayRainMeter/);
 });
 test("W21 makes Overview NOW art bigger, three-day art smaller, leaves lower data bars alone",()=>{
-  assert.match(overview,/Math.min\(122,47 \+ panel.expansion \* 0.39,/);
-  assert.match(overview,/Math.min\(171,currentIcon.width \* 1.42\)/);
-  assert.match(overview,/scale: 1.32/);
+  assert.match(overview,/Math.min\(112,47 \+ panel.expansion \* 0.37,/);
+  assert.match(overview,/Math.min\(156,currentIcon.width \* 1.34\)/);
+  assert.match(overview,/scale: 1.25/);
   assert.match(overview,/width: parent.width\*0.49-6/);
-  assert.match(overview,/anchors.rightMargin: 12/);
+  assert.match(overview,/anchors.rightMargin: 18/);
   assert.match(overview,/Math.min\(35,20 \+ \(dayStrip.height - 24\) \* 0.54\)/);
   assert.match(overview,/Math.min\(40,22 \+ panel.expansion \* 0.11\)/);
   assert.match(overview,/["']⚡︎["']/);

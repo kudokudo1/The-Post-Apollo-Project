@@ -177,13 +177,16 @@ Rectangle {
                     id: mainWeatherIcon
                     objectName: "weather-w15-original-current-icon"
                     anchors.right: parent.right
+                    // W22 // Smaller NOW artwork, shifted left toward the
+                    // panel center while staying right of the temperature.
+                    anchors.rightMargin: 16
                     anchors.verticalCenter: parent.verticalCenter
                     // Keep the original artwork while making the primary
                     // observation symbol the dominant icon of this band.
                     // W20 // Remove the 104px cap and the old 50%-width
                     // squeeze; the icon is the primary visual landmark.
-                    width: Math.max(86,Math.min(180,currentPanel.height+8,
-                                     largeCurrent.width*0.80))
+                    width: Math.max(80,Math.min(158,currentPanel.height+4,
+                                     largeCurrent.width*0.72))
                     height: width
                     Text {
                         id: originalConditionGlyph
@@ -192,8 +195,8 @@ Rectangle {
                         // W21 // Grow the *drawn symbol*, not its empty box.
                         // W21 fit correction // The painted symbol should
                         // dominate NOW without escaping its shorter band.
-                        font.pixelSize: Math.min(185,Math.max(91,
-                                         currentPanel.height * 1.22))
+                        font.pixelSize: Math.min(172,Math.max(86,
+                                         currentPanel.height * 1.08))
                         color: terminal.sky
                                ? terminal.sky.iconColor(terminal.sky.conditionState.color)
                                : Colors.orange
@@ -205,7 +208,7 @@ Rectangle {
                         anchors.centerIn: parent
                         width: parent.width
                         height: parent.height
-                        scale: 1.35
+                        scale: 1.25
                         mode: terminal.sky ? terminal.sky.currentCelestialMode : "moon"
                         weatherKind: terminal.sky
                                      ? WeatherCyclePolicy.nightKind(terminal.sky.conditionState)

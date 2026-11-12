@@ -31,11 +31,12 @@ Rectangle {
     // W20 // Shorten only the two supporting card rows; do not touch
     // their existing internals or meter heights. Freed space goes to
     // the six-period forecast in the upper WEATHER instrument.
-    // W21 // A real 31px navigation rail fits above the same one-page
-    // content. Only sub-286px viewports use the denser 46px card rows.
+    // W22 // A 49px C44-style title/tabs/divider stage is offset by
+    // compacting only the two supporting rows; the 275px viewport retains
+    // its W21 31px rail and 46px rows, preserving the one-page contract.
     readonly property real overviewCardRowHeight: Math.max(
-        homeScroll.height < 286 ? 46 : 55, Math.min(
-        60, Math.floor(homeScroll.height * 0.18),
+        homeScroll.height < 286 ? 46 : 48, Math.min(
+        51, Math.floor(homeScroll.height * 0.16),
         Math.floor(Math.max(0, homeScroll.height - 195) / 2)))
     readonly property real overviewInstrumentHeight: Math.max(
         0, homeScroll.height - weatherOverviewRail.height
@@ -1045,6 +1046,8 @@ Rectangle {
             objectName: "weather-w21-overview-top-rail"
             visible: home.fixedWeatherOverview
             width: parent.width
+            titleText: "WEATHER // OVERVIEW"
+            condensed: homeScroll.height < 286
             routes: [
                 {label:"CURRENT",path:"weather/conditions/current"},
                 {label:"FORECAST",path:"weather/forecasts/hourly"},

@@ -66,6 +66,7 @@ Rectangle {
 
         GohuText {
             width: parent.width
+            visible: magickPane.subjectRoute !== "magick/overview"
             text: MagickPolicy.titleFor(magickPane.subjectRoute)
             color: Colors.magenta
             font.pixelSize: 17
@@ -79,6 +80,7 @@ Rectangle {
             objectName: "magick-w21-overview-top-rail"
             visible: magickPane.subjectRoute === "magick/overview"
             width: parent.width
+            titleText: "MAGICK // OVERVIEW"
             routes: [
                 {label:"LUNAR / SOLAR",path:"magick/lunar-solar/moon"},
                 {label:"ASTROLOGY",path:"magick/astrology/charts"},

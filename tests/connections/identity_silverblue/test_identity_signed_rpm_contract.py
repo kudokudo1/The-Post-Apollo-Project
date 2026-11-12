@@ -468,7 +468,13 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         self.assertIn('systemctl stop "$negative_unit"', probe)
         self.assertIn('negative_result="$(systemctl show "$negative_unit" --property=Result --value)"', probe)
         self.assertIn('"$negative_result" == success', probe)
-        self.assertIn('"$(grep -Fc \'C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE\' "$negative_journal")" == 1', probe)
+        self.assertIn('"$(grep -Fc \'C4B_ID_NEGATIVE_WITNESS // KERNEL_AF_INET_CREATE_DENIED\' "$negative_journal")" == 1', probe)
+        self.assertIn('C4B_ID_NEGATIVE_WITNESS // KERNEL_AF_INET_CREATE_DENIED', program)
+        self.assertNotIn('C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE', program)
+        self.assertEqual(
+            probe.count('echo "C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE" >/dev/ttyS0'),
+            1,
+        )
         self.assertIn('! grep -Fq \'C4B_ID_FAIL //\' "$negative_journal"', probe)
         self.assertIn('[[ ! -e "$base" && ! -e "$dropindir" && ! -e "$negative_unit_file" ]]', probe)
         # A deny-only proof cannot rely on any other network sandbox.

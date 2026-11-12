@@ -366,6 +366,13 @@ for interval in 90 145; do
       /Failed with result .core-dump./ { print "C4B_ID_STAGE // SEPARATE_PROBE_SYSTEMD_RESULT core-dump" }
       /start operation timed out/ { print "C4B_ID_STAGE // SEPARATE_PROBE_SYSTEMD_START_TIMEOUT" }
     ' | sort -u | head -n 8 >/dev/ttyS0 || true
+  if [[ -f /run/postapollo-id-ci-cycle-lastline ]]; then
+    trace="$(cat /run/postapollo-id-ci-cycle-lastline 2>/dev/null || true)"
+    if [[ "$trace" =~ ^[0-9]{1,10}:[0-9]{1,5}$ ]]; then
+      printf 'C4B_ID_STAGE // SEPARATE_PROBE_PARENT_LASTLINE %s\n' \
+        "$trace" >/dev/ttyS0
+    fi
+  fi
   sleep 55
 done
 C4B_SEPARATE_WITNESS
@@ -376,6 +383,15 @@ C4B_SEPARATE_WITNESS
       --property=ProtectHome=yes /usr/bin/bash "$independent_script" ||
       fail "INDEPENDENT_PROBE_WITNESS_START_REFUSED"
     echo "C4B_ID_STAGE // separate_probe_witness_started"
+    # The real verifier exited status=1 before returning from the probe.
+    # Keep only the executing parent's Bash PID and source line in a 0600
+    # volatile /run file; the independent cgroup can read it after an
+    # unexpected exit. Never record BASH_COMMAND, command arguments, env,
+    # identities or signing data. This does not influence acceptance.
+    parent_line_file=/run/postapollo-id-ci-cycle-lastline
+    (umask 077; printf '0:0\n' > "$parent_line_file") ||
+      fail "PARENT_LINE_WITNESS_START_REFUSED"
+    trap 'printf "%s:%s\n" "$BASHPID" "$LINENO" > /run/postapollo-id-ci-cycle-lastline || true' DEBUG
     # A separate guest-local watchdog provides a bounded kernel-process
     # observation even if the synchronous timeout itself never returns.
     # It emits process names/states only, never argv, signing key or payload.
@@ -406,6 +422,10 @@ C4B_SEPARATE_WITNESS
     printf 'C4B_ID_STAGE // after_service_probe rc=%s\n' "$probe_rc"
     kill "$probe_watchdog_pid" >/dev/null 2>&1 || true
     wait "$probe_watchdog_pid" 2>/dev/null || true
+    trap - DEBUG
+    rm -f -- "$parent_line_file"
+    [[ ! -e "$parent_line_file" ]] ||
+      fail "PARENT_LINE_WITNESS_RESIDUE"
     # Stop and remove independent transient diagnostics before advancing any
     # rollback stage. A failed stop cannot become an authorized rollback.
     timeout --signal=TERM --kill-after=3s 15s \

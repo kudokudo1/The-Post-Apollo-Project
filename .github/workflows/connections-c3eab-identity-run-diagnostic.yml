@@ -48,12 +48,12 @@ jobs:
               "docs/connections-c3eab-identity-run-diagnostic.md").read_text()
           print("C3EAB_PASS // NO_GUEST_LOG_OR_WORKFLOW_RESULT_PROMOTES_HOST_AUTHORITY")
           PY
-      - name: Eighteen strict stage-order and failed full-VM adversarial tests
+      - name: Twenty-one strict stage-order and failed full-VM adversarial tests
         shell: bash
         run: |
           set -euo pipefail
           python3 -B tests/connections/test_connections_c3eab_identity_run_diagnostic.py
-          echo "C3EAB_PASS // 18_BOUNDED_C4B_ROLLBACK_DIAGNOSTIC_TESTS"
+          echo "C3EAB_PASS // 21_BOUNDED_C4B_ROLLBACK_DIAGNOSTIC_TESTS"
       - name: No sign-in permissions created in existing Connections broker
         shell: bash
         run: |

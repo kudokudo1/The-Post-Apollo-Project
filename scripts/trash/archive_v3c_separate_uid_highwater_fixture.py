@@ -257,10 +257,12 @@ def record(root, *, old_envelope, new_envelope, pin, floor,
                   and head[2] == proposed["ownerId"]
                   and head[3] == proposed["grantSha256"]
                   and (not bool(head[7]) or proposed["revoked"])
-                  and set(result["holdReasons"]) <= {
+                  and set(result["holdReasons"]) <= ({
                       "same_uid_floor_fixture",
                       "off_uid_file_not_monotonic_authority",
-                  }, "V3C_SIGNED_HISTORY_REFUSED")
+                  } | ({"revocation_witness_observed"}
+                       if proposed["revoked"] else set())),
+                  "V3C_SIGNED_HISTORY_REFUSED")
         db.execute(
             "INSERT INTO witness_events VALUES(?,?,?,?,?,?,?,?,?)",
             (proposed["witnessSequence"], digest,

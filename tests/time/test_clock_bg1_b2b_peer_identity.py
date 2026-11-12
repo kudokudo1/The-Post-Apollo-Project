@@ -3,6 +3,7 @@
 All processes and files are disposable. This does not touch the user's Clock.
 """
 from __future__ import annotations
+from contextlib import ExitStack
 import importlib.util
 import os
 from pathlib import Path
@@ -31,7 +32,10 @@ class PeerKernelIdentityTests(unittest.TestCase):
         self.assertEqual(str(raised.exception), reason)
 
     def test_kernel_socketpair_pins_exact_process_and_closes_fd(self):
-        with socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM) as (a, b):
+        with ExitStack() as sockets:
+            a, b = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+            sockets.enter_context(a)
+            sockets.enter_context(b)
             witness = identity.capture(a, sys.executable)
             fd = witness["pidfd"]
             try:
@@ -51,7 +55,10 @@ class PeerKernelIdentityTests(unittest.TestCase):
             identity.close(witness)  # idempotent cleanup
 
     def test_pidfd_required_no_fallback_to_pid_lookup(self):
-        with socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM) as (a, b):
+        with ExitStack() as sockets:
+            a, b = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+            sockets.enter_context(a)
+            sockets.enter_context(b)
             class NoPidfd:
                 def getsockopt(self, level, option, size):
                     if option == identity.SO_PEERPIDFD:
@@ -132,7 +139,10 @@ class PeerKernelIdentityTests(unittest.TestCase):
         self.assertEqual(child.poll(), None, "Peer must still be alive after exec")
 
     def test_exact_peer_witness_shape_fails_closed(self):
-        with socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM) as (a, b):
+        with ExitStack() as sockets:
+            a, b = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+            sockets.enter_context(a)
+            sockets.enter_context(b)
             witness = identity.capture(a, sys.executable)
             try:
                 altered = dict(witness, ticks=witness["ticks"] + 1)

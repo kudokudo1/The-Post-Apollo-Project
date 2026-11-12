@@ -31,7 +31,10 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from scripts.trash import archive_v3c_separate_uid_highwater_fixture as fixture
 from scripts.trash import archive_v3b_signed_rollback_witness as witness
 from scripts.trash.archive_v2_signed_capture import AUDIENCE, PURPOSE
-import test_archive_v2_external_floor_reader as v2w
+# The synthetic owner subprocess must NOT import root-only V2w test setup.
+# It loads only a staged, root-owned, read-only copy of the verifier modules.
+if not (len(sys.argv) == 5 and sys.argv[1] == "child"):
+    import test_archive_v2_external_floor_reader as v2w
 
 
 def pub(key):
@@ -95,6 +98,26 @@ class TestV3cSeparateUidAuthority(unittest.TestCase):
             prefix=fixture.PARENT_PREFIX, dir="/tmp"))
         self.addCleanup(shutil.rmtree, self.base)
         self.base.chmod(0o711)
+        # GitHub's checkout is private to the runner login. Never relax
+        # checkout permissions. Stage only four import dependencies and this
+        # test entrypoint in a new root-owned, world-readable (NOT WRITABLE)
+        # synthetic source tree under the named disposable fixture root.
+        readonly = self.base / "readonly-source"
+        for rel in (
+            "scripts/trash/archive_v3c_separate_uid_highwater_fixture.py",
+            "scripts/trash/archive_v3b_signed_rollback_witness.py",
+            "scripts/trash/archive_v3a_cutover_readiness_review.py",
+            "scripts/trash/archive_v2_signed_capture.py",
+            "tests/trash/test_archive_v3c_separate_uid_highwater_fixture.py",
+        ):
+            dest = readonly / rel
+            dest.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / rel, dest)
+            dest.chmod(0o444)
+            assert dest.stat().st_uid == 0
+        self.child_script = (
+            readonly / "tests/trash/test_archive_v3c_separate_uid_highwater_fixture.py")
+        self.assertEqual(stat.S_IMODE(readonly.stat().st_mode), 0o755)
         self.root = self.base / "authority"
         self.broker_dir = self.base / "broker"
         self.root.mkdir(mode=0o700)
@@ -164,7 +187,7 @@ class TestV3cSeparateUidAuthority(unittest.TestCase):
                 "crashPoint": crash,
             }
         result = subprocess.run(
-            [sys.executable, "-B", "-I", str(Path(__file__).resolve()),
+            [sys.executable, "-B", "-I", str(self.child_script),
              "child", mode, str(self.root), json.dumps(request)],
             capture_output=True, text=True, timeout=20, preexec_fn=identity)
         if result.returncode == 0:

@@ -24,7 +24,7 @@ from pathlib import Path
 import re
 import secrets
 import stat
-from typing import Iterator
+from typing import Callable, Iterator
 
 import PhonePersonalContactIdentity as Identity
 
@@ -342,15 +342,21 @@ def _publish(dfd: int, name: str, payload: bytes) -> None:
 
 
 def commit(master_key: bytes, profile: str, root: Path,
-           document: object, *, expected_revision: int) -> dict[str, object]:
+           document: object, *, expected_revision: int,
+           pre_publish_check: Callable[[], bool] | None = None) -> dict[str, object]:
     """Explicit durable write of a previously user-approved P34 update.
 
     The caller MUST check current consent/device, approve the edit, and retain
     the master key in a trusted Secret Service or other approved provider.
     No public host/CLI is provided. CAS conflicts fail closed; no last-wins.
+    The optional test seam rechecks a caller-supplied predicate inside the
+    revision lock. That predicate is forgeable and is NEVER a production grant.
+    A real trusted host must control its own non-forgeable consent/lock lease.
     """
     _require_key(master_key)
     _require_profile(profile)
+    if pre_publish_check is not None and not callable(pre_publish_check):
+        _refuse()
     if (type(expected_revision) is not int or expected_revision < 0
             or not Identity.valid_document(document)
             or document["revision"] != expected_revision + 1
@@ -370,6 +376,16 @@ def commit(master_key: bytes, profile: str, root: Path,
                        else unseal(master_key, profile, current_raw))
             if current["revision"] != expected_revision:
                 _refuse()
+            # The synthetic P36 fixture may recheck its observation here,
+            # while the P35 flock is held. This is not an OS trust boundary:
+            # a Python callback can be forged and live grants can change.
+            if pre_publish_check is not None:
+                try:
+                    approval = pre_publish_check()
+                except Exception:
+                    _refuse()
+                if approval is not True:
+                    _refuse()
             _publish(dfd, name, payload)
     finally:
         os.close(dfd)

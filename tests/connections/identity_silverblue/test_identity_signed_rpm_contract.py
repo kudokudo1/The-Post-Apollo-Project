@@ -643,5 +643,31 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
                         workflow.index('Preserve bounded real-guest C4b marker evidence'))
 
 
+    def test_21_final_success_limitations_match_real_confinement_evidence(self):
+        host = (AREA / "run_official_silverblue_identity.sh").read_text()
+        document = (ROOT / "docs/connections-identity-silverblue-install-contract-v1.md").read_text()
+        self.assertIn(
+            'C4B_ID_LIMITATION // CI_ONLY_CONFIRMED_CONFINEMENT_NO_INDEPENDENT_RELEASE_ROOT_SEAT_OR_C5_CONSENT',
+            host,
+        )
+        self.assertNotIn('INERT_GATEWAY_ONLY_NO_SYSTEMD_SELINUX_PROCESS_ATTESTATION', host)
+        self.assertLess(
+            host.index('C4B_ID_PASS // REAL_ENFORCING_DEDICATED_SELINUX_DOMAIN_OBSERVED'),
+            host.index('C4B_ID_LIMITATION // CI_ONLY_CONFIRMED_CONFINEMENT'),
+        )
+        for required in (
+            'postapollo_identity_ci_t',
+            'independent AF_INET SELinux denial',
+            'combined two-boot rollback remain unverified together',
+            'startup_failure',
+            'C5 human consent',
+        ):
+            self.assertIn(required, document)
+        self.assertNotIn(
+            'Current C4b process-continuity checks and separate compile-only custom policy prototype are pending',
+            document,
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

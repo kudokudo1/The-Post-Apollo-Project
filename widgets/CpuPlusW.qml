@@ -220,7 +220,8 @@ PanelWindow {
             cpuPlusWindow.weatherHomeFavoritesSnapshot,
             cpuPlusWindow.notificationFavoritesSnapshot,
             cpuPlusWindow.radioFavoritesSnapshot,
-            cpuPlusWindow.hospitalPinnedFavoritesSnapshot)
+            cpuPlusWindow.hospitalPinnedFavoritesSnapshot,
+            AlarmManagerService.document.alarms)
     readonly property var selectedFavoriteResource:
         FavoritesManagement.recordFor(favoriteCandidates,selectedFavoriteKey)
     // Original AppControl provides display-only menu/item/type descriptors.

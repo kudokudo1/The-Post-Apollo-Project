@@ -96,6 +96,7 @@ test("Clock ALL FAVS reuses worlds and original providers, with no new favorite 
     const angel=read("widgets/AngelPane.qml");
     const cpu=read("widgets/CpuPlusW.qml");
     const management=read("services/favorites/FavoritesManagementPolicy.js");
+    const cpuPane=read("widgets/cpuplus/CpuPlusFavoritesHubPane.qml");
     for(const token of ["worldSource: TimeSettings",
         "alarmSource: AlarmManagerService",
         "angelDefaultSource: FavoritesDefaultStore",
@@ -107,6 +108,9 @@ test("Clock ALL FAVS reuses worlds and original providers, with no new favorite 
     assert(preview.includes("contentWidth: groupSummaries.implicitWidth"));
     assert(management.includes("Adapters.clockAlarms(alarmSnapshot)"));
     assert(cpu.includes("AlarmManagerService.document.alarms)"));
+    assert(cpuPane.includes("id: angelOpenButton"));
+    assert(cpuPane.includes("pane.defaultOwner.togglePinned(pane.selectedResource.key)"));
+    assert(cpuPane.includes("pane.defaultOwner.setFavorite(item.key,false)"));
     assert(angel.includes("function openFavoriteJournal()"));
     assert(time.includes("function openFavoriteView(view)"));
     assert(shell.includes('owner==="clock" && (view==="alarm" || view==="angel")'));

@@ -1937,6 +1937,43 @@ PanelWindow {
         return true;
     }
 
+    // Exact Clock favorite navigation is display-only. The owner rechecks
+    // *confirmed* local membership, not CPU++'s possibly stale candidate.
+    // Never arm, snooze, sound, fetch, or write data here.
+    function openFavoriteClockItem(kind, id) {
+        if (typeof id !== "string") return false;
+        if (kind === "alarm") {
+            if (!/^[1-9][0-9]{0,14}$/.test(id)) return false;
+            const number = Number(id);
+            if (!Number.isSafeInteger(number)
+                    || AlarmManagerService.storageState !== "ready"
+                    || AlarmManagerService.pendingDocument !== null
+                    || AlarmManagerService.queuedDocument !== null)
+                return false;
+            const alarm = AlarmManagerService.findAlarm(number);
+            if (!alarm || alarm.favorite !== true
+                    || !alarmPlaceholderPane.choose(number))
+                return false;
+            chooseMode(2);
+            toolsView = "alarm";
+        } else if (kind === "angel") {
+            if (!/^[0-9]{1,8}$/.test(id)
+                    || FavoritesDefaultStore.storageState !== "ready"
+                    || FavoritesDefaultStore.pendingDocument !== null
+                    || FavoritesDefaultStore.queuedDocument !== null
+                    || !Array.isArray(FavoritesDefaultStore.document.favorites)
+                    || FavoritesDefaultStore.document.favorites.indexOf(
+                        "fav1:local:angel:number:" + id) < 0
+                    || !angelPane.openFavoriteNumber(id))
+                return false;
+            chooseMode(4);
+        } else {
+            return false;
+        }
+        if (!menuOpen) menuOpen = true;
+        return true;
+    }
+
     function openNotificationAlarm(alarmId) {
         // Resolve against saved alarm IDs. Do not create an alarm, interpret
         // notification titles, or discard a different alarm's unsaved note.

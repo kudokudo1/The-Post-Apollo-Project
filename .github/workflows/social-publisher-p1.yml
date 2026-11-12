@@ -1,0 +1,38 @@
+name: SocialW Publisher P1 local draft contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/messanger/AppSelector.qml"
+      - "widgets/messanger/MessagingW.qml"
+      - "widgets/publisher/**"
+      - "services/publisher/**"
+      - "tests/publisher/**"
+      - ".github/workflows/social-publisher-p1.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/messanger/AppSelector.qml"
+      - "widgets/messanger/MessagingW.qml"
+      - "widgets/publisher/**"
+      - "services/publisher/**"
+      - "tests/publisher/**"
+      - ".github/workflows/social-publisher-p1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise Publisher local draft policy
+        run: node tests/publisher/test_publisher_draft_policy.cjs
+      - name: Guard Social companion routing and single writer
+        run: python3 tests/publisher/test_publisher_social_integration.py
+      - name: Re-run existing Social Settings contracts
+        run: python3 tests/messaging/test_social_settings_workspace.py

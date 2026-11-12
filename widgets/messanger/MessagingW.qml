@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "../../components"
 import "../../services/messaging"
+import "../publisher" as PublisherUi
 import qs.services.social
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
@@ -993,7 +994,7 @@ PanelWindow {
             // Settings temporarily owns the contact/chat input surface.
             // When closed, external apps retain the original rail mask.
             width: messagingWindow.menuOpen
-                   ? (appSelector.settingsOpen
+                   ? ((appSelector.settingsOpen || appSelector.publisherOpen)
                       ? socialWindow.width
                       : (messagingWindow.externalSelected
                          ? messagingWindow.appSelectorWidth : socialWindow.width))
@@ -1468,13 +1469,15 @@ PanelWindow {
     }
 
     function raiseX() {
-        if (!menuOpen || !xSelected || !xReady || appSelector.settingsOpen)
+        if (!menuOpen || !xSelected || !xReady || appSelector.settingsOpen
+                || appSelector.publisherOpen)
             return;
         sendGeometryHelper({ op: "focusX" });
     }
 
     function raiseDiscord() {
-        if (!menuOpen || !discordSelected || !discordReady || appSelector.settingsOpen)
+        if (!menuOpen || !discordSelected || !discordReady || appSelector.settingsOpen
+                || appSelector.publisherOpen)
             return;
 
         helperFocusDiscord();
@@ -1684,8 +1687,9 @@ PanelWindow {
     }
 
     function activateApp(index, retainSelectorFocus) {
-        // Phone is a companion workspace, not another provider app index.
+        // Phone and Publisher are companion workspaces, never app indices.
         appSelector.phoneOpen = false;
+        appSelector.publisherOpen = false;
         hideProviderDesktop();
         if (providerWebOpen) {
             hideX();
@@ -1823,6 +1827,12 @@ PanelWindow {
                 if (appSelector.phoneOpen) {
                     if (event.key === Qt.Key_Escape)
                         appSelector.phoneOpen = false;
+                    event.accepted = true;
+                    return;
+                }
+                if (appSelector.publisherOpen) {
+                    if (event.key === Qt.Key_Escape)
+                        appSelector.publisherOpen = false;
                     event.accepted = true;
                     return;
                 }
@@ -2031,6 +2041,15 @@ PanelWindow {
                 }
             }
 
+            onPublisherOpenChanged: {
+                if (!messagingWindow.menuOpen || !publisherOpen)
+                    return;
+                discordRaiseDelay.stop();
+                xRaiseDelay.stop();
+                messagingWindow.focusAppSelector();
+                socialWindow.requestActivate();
+            }
+
             onPhoneOpenChanged: {
                 if (!messagingWindow.menuOpen || !phoneOpen)
                     return;
@@ -2073,6 +2092,21 @@ PanelWindow {
         }
 
         // ========================================================
+        // PUBLISHER // LOCAL-ONLY COMPANION WORKSPACE
+        // ========================================================
+
+        PublisherUi.PublisherPane {
+            id: publisherPane
+            x: messagingWindow.appSelectorWidth
+            y: 0
+            width: Math.max(1, messagingContent.width - x)
+            height: messagingContent.height
+            visible: messagingWindow.menuOpen && appSelector.publisherOpen
+                     && !appSelector.settingsOpen && !appSelector.phoneOpen
+            z: 8
+        }
+
+        // ========================================================
         // PHONE // READ-ONLY COMPANION WORKSPACE
         // ========================================================
 
@@ -2112,7 +2146,7 @@ PanelWindow {
             // Discord keeps the normal contact panel instantiated underneath
             // Vesktop; discordMode only empties its inner contents.
             visible: messagingWindow.menuOpen && !appSelector.settingsOpen
-                     && !appSelector.phoneOpen
+                     && !appSelector.phoneOpen && !appSelector.publisherOpen
                      && !providerAccessPanel.visible
                      && !messagingWindow.providerDesktopManaged
 
@@ -2165,7 +2199,7 @@ PanelWindow {
             width: Math.max(1, messagingContent.width - x)
             height: messagingContent.height
             visible: messagingWindow.menuOpen && !appSelector.settingsOpen
-                     && !appSelector.phoneOpen
+                     && !appSelector.phoneOpen && !appSelector.publisherOpen
                      && messagingWindow.activeAppIndex === 2
                      && (messageRouter.telegramNeedsSetup
                          || messagingWindow.telegramAppKeyEditorOpen)
@@ -2186,7 +2220,7 @@ PanelWindow {
             width: Math.max(1, messagingContent.width - x)
             height: messagingContent.height
             visible: messagingWindow.menuOpen && !appSelector.settingsOpen
-                     && !appSelector.phoneOpen
+                     && !appSelector.phoneOpen && !appSelector.publisherOpen
                      && messagingWindow.providerAccessSelected
                      && !messagingWindow.providerWebOpen && !messagingWindow.providerDesktopManaged
             z: 2
@@ -2223,7 +2257,7 @@ PanelWindow {
             // Discord keeps the normal chat panel instantiated underneath
             // Vesktop; discordMode only empties its inner contents.
             visible: messagingWindow.menuOpen && !appSelector.settingsOpen
-                     && !appSelector.phoneOpen
+                     && !appSelector.phoneOpen && !appSelector.publisherOpen
                      && !telegramConnectPanel.visible
                      && !providerAccessPanel.visible
                      && !messagingWindow.providerDesktopManaged
@@ -2318,6 +2352,7 @@ PanelWindow {
         providerWebOpen = false;
         appSelector.settingsOpen = false;
         appSelector.phoneOpen = false;
+        appSelector.publisherOpen = false;
         setGeometryWatch(menuOpen);
 
         if (menuOpen) {

@@ -24,6 +24,8 @@ Rectangle {
     property bool settingsOpen: false
     // UI-only companion pane: not an app index, identity grant or adapter.
     property bool phoneOpen: false
+    // P1 companion workspace; never a provider account or service index.
+    property bool publisherOpen: false
     // Local UI selection only. Not a sign-in state or authorized organization.
     property string settingsSection: "SOCIAL LAYOUT"
     // Browser identity sessions are explicitly opt-in and live in MessagingW.
@@ -379,6 +381,7 @@ Rectangle {
     onSettingsOpenChanged: {
         if (settingsOpen) {
             phoneOpen = false;
+            publisherOpen = false;
             // Preserve the established editor as the default settings screen.
             settingsSection = "SOCIAL LAYOUT";
             appSelector.refreshAccountForm();
@@ -614,7 +617,7 @@ Rectangle {
             top: parent.top
             left: parent.left
             right: parent.right
-            bottom: statusMessage.visible ? statusMessage.top : phoneFooter.top
+            bottom: statusMessage.visible ? statusMessage.top : publisherFooter.top
         }
         contentWidth: width
         contentHeight: appColumn.height + 20
@@ -832,6 +835,7 @@ Rectangle {
                             id: appMouse
                             // Preview remains visible but cannot switch live accounts.
                             enabled: !appSelector.settingsOpen && !appSelector.phoneOpen
+                                     && !appSelector.publisherOpen
     
                             anchors.fill: parent
     
@@ -2528,6 +2532,27 @@ Rectangle {
         }
     }
 
+    // P1 Publisher stays in the SAME Social window, never in provider IDs.
+    ActionButton {
+        id: publisherFooter
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: phoneFooter.top
+        anchors.bottomMargin: 4
+        width: parent.width - 12
+        height: 38
+        label: "PUBLISHER"
+        labelPixelSize: 10
+        contentPadding: 2
+        accentColor: Colors.magenta
+        selected: appSelector.publisherOpen
+        onTriggered: {
+            const next = !appSelector.publisherOpen;
+            appSelector.settingsOpen = false;
+            appSelector.phoneOpen = false;
+            appSelector.publisherOpen = next;
+        }
+    }
+
     // A companion Phone control, separate from provider app IDs and local
     // Social identity/family metadata. No phone action executes on this click.
     ActionButton {
@@ -2545,6 +2570,7 @@ Rectangle {
         onTriggered: {
             const next = !appSelector.phoneOpen;
             appSelector.settingsOpen = false;
+            appSelector.publisherOpen = false;
             appSelector.phoneOpen = next;
         }
     }
@@ -2573,7 +2599,7 @@ Rectangle {
         id: statusMessage
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: phoneFooter.top
+        anchors.bottom: publisherFooter.top
         anchors.margins: 6
         visible: appSelector.statusText !== ""
         text: appSelector.statusText

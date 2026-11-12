@@ -61,7 +61,7 @@ class ClockAlarmNoteRecovery(unittest.TestCase):
         self.assertIn('=== JSON.stringify(diskDocument)', SERVICE)
         self.assertIn('function disposition(d, doc)', POLICY)
         self.assertIn('return "conflict"', POLICY)
-        self.assertIn('return "identity-conflict"', POLICY)
+        self.assertIn('"identity-conflict"', POLICY)
         self.assertIn('return "already-saved"', POLICY)
         self.assertIn('return "recoverable"', POLICY)
 

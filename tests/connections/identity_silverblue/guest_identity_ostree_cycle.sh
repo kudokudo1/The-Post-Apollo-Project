@@ -327,6 +327,43 @@ ID_MONITOR
     # unobserved hang until the outer QEMU watchdog. The bounded child return
     # preserves a nonzero/timeout as FAIL, never as rollback authorization.
     echo "C4B_ID_STAGE // before_service_probe"
+    # This witness MUST be outside this oneshot service's process cgroup.
+    # The prior same-cgroup Bash watchdog went silent together with the
+    # verifier. A transient systemd unit observes only numeric kernel process
+    # states and unit state, never arguments, credentials, or guest payloads.
+    # It has no sign-in, rollback, or acceptance authority.
+    independent_unit=postapollo-id-ci-probe-witness.service
+    independent_script=/run/postapollo-id-ci-probe-witness.sh
+    [[ ! -e "$independent_script" ]] ||
+      fail "INDEPENDENT_PROBE_WITNESS_SCRIPT_PREEXISTS"
+    cat > "$independent_script" <<'C4B_SEPARATE_WITNESS'
+#!/usr/bin/bash
+set -euo pipefail
+sleep 90
+for interval in 90 145; do
+  printf 'C4B_ID_STAGE // SEPARATE_PROBE_WITNESS_%sS\n' "$interval" >/dev/ttyS0
+  timeout --signal=TERM --kill-after=2s 6s \
+    ps -eo pid,ppid,stat,wchan:24,comm 2>/dev/null |
+    awk 'NR == 1 || $5 ~ /^(bash|timeout|systemctl|semodule|journalctl|rpm-ostree)$/ {
+      print "C4B_ID_STAGE // SEPARATE_PROBE_PROCESS " $0
+      if (++n >= 25) exit
+    }' >/dev/ttyS0 || true
+  timeout --signal=TERM --kill-after=2s 6s \
+    systemctl show postapollo-id-ci-cycle.service \
+      --property=ActiveState,SubState,MainPID --no-pager 2>/dev/null |
+    awk -F= '/^(ActiveState|SubState|MainPID)=/ {
+      print "C4B_ID_STAGE // SEPARATE_PROBE_CYCLE " $1 "=" $2
+    }' >/dev/ttyS0 || true
+  sleep 55
+done
+C4B_SEPARATE_WITNESS
+    chmod 0700 "$independent_script"
+    timeout --signal=TERM --kill-after=3s 20s \
+      systemd-run --quiet --collect --unit=postapollo-id-ci-probe-witness \
+      --property=NoNewPrivileges=yes --property=PrivateNetwork=yes \
+      --property=ProtectHome=yes "$independent_script" ||
+      fail "INDEPENDENT_PROBE_WITNESS_START_REFUSED"
+    echo "C4B_ID_STAGE // separate_probe_witness_started"
     # A separate guest-local watchdog provides a bounded kernel-process
     # observation even if the synchronous timeout itself never returns.
     # It emits process names/states only, never argv, signing key or payload.
@@ -357,6 +394,14 @@ ID_MONITOR
     printf 'C4B_ID_STAGE // after_service_probe rc=%s\n' "$probe_rc"
     kill "$probe_watchdog_pid" >/dev/null 2>&1 || true
     wait "$probe_watchdog_pid" 2>/dev/null || true
+    # Stop and remove independent transient diagnostics before advancing any
+    # rollback stage. A failed stop cannot become an authorized rollback.
+    timeout --signal=TERM --kill-after=3s 15s \
+      systemctl stop "$independent_unit" ||
+      fail "INDEPENDENT_PROBE_WITNESS_STOP_REFUSED"
+    rm -f -- "$independent_script"
+    [[ ! -e "$independent_script" ]] ||
+      fail "INDEPENDENT_PROBE_WITNESS_SCRIPT_REMAINS"
     [[ "$probe_rc" == 0 ]] ||
       fail "REAL_SYSTEMD_DENY_ONLY_IDENTITY_SERVICE_PROBE_REFUSED_RC_$probe_rc"
     [[ "$(cat "$stage")" == layer_pending ]] ||

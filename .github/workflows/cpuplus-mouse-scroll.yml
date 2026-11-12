@@ -10,6 +10,14 @@ on:
       - "services/input/SwayScrollLock.py"
       - "services/input/ScrollModeSettings.qml"
       - "services/input/AutoscrollMouseEngine.py"
+      - "services/input/AutoscrollOriginProbe.py"
+      - "tests/cpuplus/test_autoscroll_origin_probe.py"
+      - "tests/cpuplus/test_autoscroll_capability_stop_ui.py"
+      - "services/input/AutoscrollStopChannel.py"
+      - "services/input/AutoscrollStop.py"
+      - "widgets/cpuplus/AutoscrollAnchorOverlay.qml"
+      - "tests/cpuplus/test_autoscroll_stop_channel.py"
+      - "tests/cpuplus/test_autoscroll_overlay_stop_contract.py"
       - "services/input/AutoscrollEvdevBackend.py"
       - "tests/cpuplus/test_autoscroll_evdev_engine.py"
       - "tests/cpuplus/test_autoscroll_evdev_backend.py"
@@ -38,6 +46,11 @@ on:
       - "tests/cpuplus/fixtures/MouseScrollNative.qml"
       - "scripts/cpuplus/verify_mouse_scroll_native.sh"
       - ".github/workflows/cpuplus-mouse-scroll.yml"
+  # Recheck isolated autoscroll branches even when dependent PR checks
+  # are delayed or skipped by the GitHub Actions PR event scheduler.
+  push:
+    branches:
+      - "cpuplus/autoscroll-*"
   workflow_dispatch:
 
 permissions:
@@ -68,6 +81,14 @@ jobs:
         run: python3 tests/cpuplus/test_autoscroll_evdev_engine.py
       - name: Verify experimental evdev/uinput driver without physical devices
         run: python3 tests/cpuplus/test_autoscroll_evdev_backend.py
+      - name: Verify private same-user emergency stop socket
+        run: python3 tests/cpuplus/test_autoscroll_stop_channel.py
+      - name: Verify click-through anchor overlay and STOP integration
+        run: python3 tests/cpuplus/test_autoscroll_overlay_stop_contract.py
+      - name: Verify read-only Sway/Wayland cursor-origin capability probe
+        run: python3 tests/cpuplus/test_autoscroll_origin_probe.py
+      - name: Verify CPU++ global capability and STOP cannot activate scrolling
+        run: python3 tests/cpuplus/test_autoscroll_capability_stop_ui.py
       - name: Verify CPU++ Scroll Mode routing and no unverified global injection
         run: python3 tests/cpuplus/test_scroll_mode_ui.py
       - name: Verify CPU++ three-bay integration and reserved-category guards

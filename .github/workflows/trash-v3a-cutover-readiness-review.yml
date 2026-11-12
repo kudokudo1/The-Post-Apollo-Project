@@ -1,0 +1,31 @@
+name: Trash++ V3a deny-only production cutover readiness review
+
+on:
+  pull_request:
+    paths:
+      - scripts/trash/archive_v3a_cutover_readiness_review.py
+      - tests/trash/test_archive_v3a_cutover_readiness_review.py
+      - scripts/trash/ARCHIVE-PRODUCTION-READINESS-V3A.md
+      - .github/workflows/trash-v3a-cutover-readiness-review.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  v3a-readiness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned source-contract crypto dependency
+        run: python3 -m pip install 'cryptography>=44,<48'
+      - name: Refuse forged production readiness on actual V2z disposable Archive fixtures
+        run: python3 -B -m unittest discover -s tests/trash -p 'test_archive_v3a_cutover_readiness_review.py' -v
+      - name: Regression test verified V2z sealed backup and independent recovery
+        run: python3 -B -m unittest discover -s tests/trash -p 'test_archive_v2z_backup_migration_rehearsal.py' -v
+      - name: Regression test V2w read-only external release-floor reader
+        run: python3 -B -m unittest discover -s tests/trash -p 'test_archive_v2_external_floor_reader.py' -v

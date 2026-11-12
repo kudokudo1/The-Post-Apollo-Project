@@ -1,0 +1,45 @@
+name: Clock three-source Favorites integration
+on:
+  pull_request:
+    paths:
+      - "services/favorites/FavoritesReadOnlyAdapters.js"
+      - "services/favorites/FavoritesUnifiedCatalog.qml"
+      - "services/favorites/FavoritesManagementPolicy.js"
+      - "services/favorites/FavoritesDossierIndexPolicy.js"
+      - "services/favorites/FavoritesOwnerNavigationPolicy.js"
+      - "components/FavoritesUnifiedPreview.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/AngelPane.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/cpuplus/CpuPlusFavoritesHubPane.qml"
+      - "shell.qml"
+      - "tests/favorites/test_clock_three_favorite_owners.cjs"
+      - ".github/workflows/clock-three-favorites.yml"
+  push:
+    paths:
+      - "services/favorites/FavoritesReadOnlyAdapters.js"
+      - "services/favorites/FavoritesUnifiedCatalog.qml"
+      - "services/favorites/FavoritesManagementPolicy.js"
+      - "services/favorites/FavoritesDossierIndexPolicy.js"
+      - "services/favorites/FavoritesOwnerNavigationPolicy.js"
+      - "components/FavoritesUnifiedPreview.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/AngelPane.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/cpuplus/CpuPlusFavoritesHubPane.qml"
+      - "shell.qml"
+      - "tests/favorites/test_clock_three_favorite_owners.cjs"
+      - ".github/workflows/clock-three-favorites.yml"
+permissions:
+  contents: read
+jobs:
+  owner-readonly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify real Alarm/Angel/zone projections and owner routing
+        run: node --test tests/favorites/test_clock_three_favorite_owners.cjs
+      - name: Preserve original U2 and CPU++ Favorites contracts
+        run: |
+          node --test tests/favorites/test_favorites_universal_u2.cjs
+          node --test tests/cpuplus/test_cpuplus_favorites_center.cjs

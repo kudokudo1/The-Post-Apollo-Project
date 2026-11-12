@@ -9,12 +9,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import re
+
 import PhonePersonalContactIdentity as Identity
 
 SCHEMA = "post-apollo.phone.personal-editor-intent.p43.v1"
 ACTIONS = frozenset(("LINK", "UNLINK", "FAVORITE", "NOTE"))
 BASE_FIELDS = frozenset(("schema", "action", "selectedContactId"))
 MAX_SELECTOR = 256
+SELECTOR = re.compile(r"^[A-Za-z0-9:_-]{1,256}$", re.ASCII)
 
 
 class EditorIntentRefused(Exception):
@@ -61,9 +64,8 @@ def parse_untrusted_editor_intent(payload: object) -> StagedEditorIntent:
         if set(payload) != expected or payload.get("schema") != SCHEMA:
             _deny()
         selected = payload["selectedContactId"]
-        if (type(selected) is not str or not 0 < len(selected) <= MAX_SELECTOR
-                or any(ord(char) < 0x21 or ord(char) > 0x7e
-                       for char in selected)):
+        if (type(selected) is not str
+                or SELECTOR.fullmatch(selected) is None):
             _deny()
         if action == "FAVORITE":
             favorite = payload["favorite"]

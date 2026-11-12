@@ -1221,6 +1221,8 @@ Item {
                          ? "RADIO-OWNED // READ ONLY"
                          : pane.selectedResource.owner==="hospital"
                          ? "HOSPITAL RECEPTION-OWNED // READ ONLY"
+                         : pane.selectedResource.owner==="clock-alarm"
+                         ? "CLOCK ALARM-OWNED // READ ONLY"
                          : "APP CONTROL-OWNED // READ ONLY")
                       : "SAVED IDENTITY")
                 : "CHOOSE AN ITEM IN THE CENTER BAY"
@@ -1236,7 +1238,8 @@ Item {
                          || pane.selectedResource.owner==="weather-home"
                          || pane.selectedResource.owner==="notifications"
                          || pane.selectedResource.owner==="radio"
-                         || pane.selectedResource.owner==="hospital")
+                         || pane.selectedResource.owner==="hospital"
+                         || pane.selectedResource.owner==="clock-alarm")
             width: parent.width
             spacing: 3
             GohuText {
@@ -1253,6 +1256,9 @@ Item {
                     : pane.selectedResource
                       && pane.selectedResource.owner==="hospital"
                     ? "SOURCE // HOSPITAL RECEPTION"
+                    : pane.selectedResource
+                      && pane.selectedResource.owner==="clock-alarm"
+                    ? "SOURCE // CLOCK ALARMS"
                     : "SOURCE // APP CONTROL"
                 font.pixelSize: 10
                 color: Colors.cyan
@@ -1359,7 +1365,8 @@ Item {
                     ? "CHECK ZONES"
                     : pane.selectedResource
                       && pane.selectedResource.category==="NEW"
-                    ? (pane.selectedResource.isPinned?"UNPIN":"PIN")
+                    ? (pane.selectedResource.provider==="angel"
+                       ? "OPEN ANGEL" : (pane.selectedResource.isPinned?"UNPIN":"PIN"))
                     : "NO ACTION"
                 labelPixelSize: 9
                 accentColor: Colors.cyan
@@ -1372,7 +1379,10 @@ Item {
                         ? pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
                           && !pane.timeOwner.zoneCatalogLoading
                         : pane.selectedResource.category==="NEW"
-                          && pane.defaultOwner !== null && pane.defaultOwner.canEdit)
+                          && (pane.selectedResource.provider==="angel"
+                              ? pane.ownerNavigation.ok
+                              : pane.defaultOwner !== null
+                                && pane.defaultOwner.canEdit))
                 onLeftClicked: {
                     if(!available || !pane.selectedResource) return;
                     if(pane.selectedResource.readOnly) {
@@ -1391,8 +1401,14 @@ Item {
                     }
                     if(pane.selectedResource.category==="CLOCK")
                         pane.timeOwner.loadZoneCatalog();
-                    else if(pane.selectedResource.category==="NEW")
-                        pane.defaultOwner.togglePinned(pane.selectedResource.key);
+                    else if(pane.selectedResource.category==="NEW") {
+                        if(pane.selectedResource.provider==="angel") {
+                            const target=pane.ownerNavigation;
+                            if(target.ok)
+                                pane.ownerNavigationRequested(target.owner,target.view);
+                        } else
+                            pane.defaultOwner.togglePinned(pane.selectedResource.key);
+                    }
                 }
             }
         }

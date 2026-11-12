@@ -28,6 +28,9 @@ import time
 
 from AutoscrollMouseEngine import MouseAutoscroll, BTN_MIDDLE
 from AutoscrollStopChannel import StopServer
+from AutoscrollPointerWitness import (
+    require_verified_pointer_provider, WitnessError
+)
 
 MOUSE_MIN = 272
 MOUSE_MAX = 287
@@ -135,7 +138,9 @@ def probe() -> dict:
         "permission_changes": False,
         "global_overlay": False,
         "escape_binding": False,
-        "hardware_verified": False
+        "hardware_verified": False,
+        "pointer_target_verified": False,
+        "live_entrypoint_blocked": True
     }
 
 
@@ -144,6 +149,13 @@ def run_live(device_path: str) -> int:
         raise DriverError("EXPERIMENTAL_NONROOT_OPTIN_REQUIRED")
     if not os.environ.get("SWAYSOCK") or not no_native_lock():
         raise DriverError("NO_COMPATIBLE_SWAY_INPUT_OWNER")
+    # Keyboard focus is not the pointer-under-cursor target. No physical
+    # event device may be opened/grabbed until a real compositor-origin
+    # pointer witness source has been independently verified.
+    try:
+        require_verified_pointer_provider()
+    except WitnessError as exc:
+        raise DriverError(str(exc)) from exc
     if sway_focus() is None:
         raise DriverError("NO_VERIFIED_SINGLE_SEAT_FOCUS")
     physical = select_physical_device(device_path)

@@ -51,7 +51,8 @@ check('if (root.nameSupport !== "SUPPORTED")' in SERVICE
       "Older PX completes ID-only creation after authoritative bind")
 check('nameProcess.exec(root.pxArgs([' in SERVICE
       and '"hospital", "room-name-set", root.pending.id' in SERVICE
-      and 'ROOM REGISTERED + NAMED' in SERVICE,
+      and 'ROOM REGISTERED + NAMED' in SERVICE
+      and 'String(result.displayName || "") === root.pending.name' in SERVICE,
       "PX v11 still writes independent display names")
 check('PX NAME SAVE UNSUPPORTED OR FAILED // ROOM ID IS REGISTERED' in SERVICE
       and 'ROOM REGISTERED BY ID // DISPLAY NAME NOT SAVED' in SERVICE

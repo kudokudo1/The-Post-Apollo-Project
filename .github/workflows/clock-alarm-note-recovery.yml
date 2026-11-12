@@ -1,0 +1,37 @@
+name: Clock alarm durable note recovery
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmNoteDraftPolicy.js"
+      - "services/time/AlarmNoteRecoveryService.qml"
+      - "services/time/qmldir"
+      - "widgets/AlarmManagerPane.qml"
+      - "tests/time/test_clock_alarm_manager_v2_contract.py"
+      - "tests/time/test_clock_alarm_note_draft_policy.cjs"
+      - "tests/time/test_clock_alarm_note_recovery_contract.py"
+      - ".github/workflows/clock-alarm-note-recovery.yml"
+  push:
+    paths:
+      - "services/time/AlarmNoteDraftPolicy.js"
+      - "services/time/AlarmNoteRecoveryService.qml"
+      - "services/time/qmldir"
+      - "widgets/AlarmManagerPane.qml"
+      - "tests/time/test_clock_alarm_manager_v2_contract.py"
+      - "tests/time/test_clock_alarm_note_draft_policy.cjs"
+      - "tests/time/test_clock_alarm_note_recovery_contract.py"
+      - ".github/workflows/clock-alarm-note-recovery.yml"
+jobs:
+  contract-and-conflict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Execute actual note-draft parser and conflict transitions
+        run: node tests/time/test_clock_alarm_note_draft_policy.cjs
+      - name: Check recovery ownership and in-panel controls
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_note_recovery_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_manager_v2_contract.py' -v
+      - name: Preserve existing Clock notification and reliability contracts
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_reliability_popup_actions_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_restart_resume_recovery_contract.py' -v

@@ -91,8 +91,8 @@ function timeHarness() {
         if(this.blocked)return false;this.selected=id;return true;}};
     const env={AlarmManagerService:service,FavoritesDefaultStore:store,
         alarmPlaceholderPane:selection,angelPane:angel,
-        toolsView:"stopwatch",menuOpen:false,mode:-1,
-        chooseMode(i){this.mode=i;}};
+        toolsView:"stopwatch",menuOpen:false,mode:-1};
+    env.chooseMode = i => {env.mode=i;};
     vm.runInNewContext("function openFavoriteClockItem(kind,id) {"+
         method(read("widgets/TimeW.qml"),"openFavoriteClockItem")+"}",env);
     return {env,alarms,store,service,selection,angel};
@@ -180,8 +180,11 @@ test("real AngelPane code preserves ongoing notes and uncommitted Meaning edits"
         x=>x.FavoritesDefaultStore.document={favorites:[]}
     ]) {
         const q=harness();mutate(q);
+        const originalView=q.activeView;
+        const originalNumber=q.meaningSelection;
         assert.equal(q.openFavoriteNumber("0022"),false);
-        assert.equal(q.activeView,mutate===null?"meaning":q.activeView);
+        assert.equal(q.activeView,originalView);
+        assert.equal(q.meaningSelection,originalNumber);
     }
     assert.equal(harness().openFavoriteNumber("22%2F"),false);
     assert.equal(harness().openFavoriteNumber("123456789"),false);

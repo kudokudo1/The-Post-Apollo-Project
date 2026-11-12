@@ -8,6 +8,16 @@ ShellRoot {
     property bool done: false
     property int tick: 0
     property int phase: 0
+    AutoscrollAnchorOverlay {
+        id: autoscrollOverlay
+        authorized: false
+        coordinateVerified: false
+        runtimeVerified: false
+        anchorX: 120
+        anchorY: 120
+        anchorOutput: "unverified"
+        verifiedOutput: "unverified"
+    }
     FloatingWindow {
         id: window
         visible: true
@@ -92,8 +102,55 @@ ShellRoot {
                         || ScrollModeSettings.confirm()) {
                     root.fail("UNSAFE_AUTOSCROLL_ACTIVATION");return;
                 }
-                root.done = true;
                 console.log("SCROLL_MODE_NATIVE_PASS // LOCK_CANCEL_AND_AUTOSCROLL_GATED");
+                if (autoscrollOverlay.safeToShow || autoscrollOverlay.visible
+                        || autoscrollOverlay.focusable) {
+                    root.fail("OVERLAY_PREMATURELY_ACTIVE");return;
+                }
+                if (autoscrollOverlay.width > 240
+                        && autoscrollOverlay.height > 240
+                        && autoscrollOverlay.screen
+                        && String(autoscrollOverlay.screen.name).length > 0) {
+                    let screenName = String(autoscrollOverlay.screen.name);
+                    autoscrollOverlay.anchorOutput = screenName;
+                    autoscrollOverlay.verifiedOutput = screenName;
+                    autoscrollOverlay.coordinateVerified = true;
+                    autoscrollOverlay.runtimeVerified = true;
+                    autoscrollOverlay.authorized = true;
+                    if (!autoscrollOverlay.safeToShow) {
+                        root.fail("OVERLAY_TRUST_GATE_REFUSED");return;
+                    }
+                    autoscrollOverlay.authorized = false;
+                    if (autoscrollOverlay.safeToShow
+                            || autoscrollOverlay.visible) {
+                        root.fail("OVERLAY_REVOCATION_FAILED");return;
+                    }
+                    console.log("AUTOSCROLL_OVERLAY_NATIVE_PASS // TRUSTED_ORIGIN_AND_REVOCATION");
+                } else {
+                    // Xvfb may not assign an output to an unmapped layer shell.
+                    // The no-origin fail-closed case must still remain hidden.
+                    console.log("AUTOSCROLL_OVERLAY_NATIVE_PASS // NO_ORIGIN_FAIL_CLOSED");
+                }
+                ScrollModeSettings.acceptOrigin(JSON.stringify({
+                    status: "inventory_only", pointer_origin_verified: false,
+                    runtime_enabled: false,
+                    protocols: {zwlr_layer_shell_v1: true,
+                        zwlr_virtual_pointer_manager_v1: true},
+                    outputs: [{name:"TEST-OUTPUT"}]
+                }));
+                if (ScrollModeSettings.originProbeStatus !== "inventory_only"
+                        || !ScrollModeSettings.originProtocolsAvailable
+                        || ScrollModeSettings.autoscrollRuntimeAvailable) {
+                    root.fail("UNSAFE_AUTOSCROLL_CAPABILITY_RESULT");return;
+                }
+                ScrollModeSettings.acceptStop(JSON.stringify({
+                    status:"stop_acknowledged", runtime_stopped:false
+                }));
+                if (!ScrollModeSettings.stopFeedback.includes("EXIT NOT YET VERIFIED")) {
+                    root.fail("MISLEADING_STOP_ACK");return;
+                }
+                console.log("AUTOSCROLL_CAPABILITY_NATIVE_PASS // PROBE_ONLY_STOP_NOT_EXIT");
+                root.done = true;
                 return;
             }
             if (root.phase === 2) {

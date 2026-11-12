@@ -208,6 +208,44 @@ Item {
                     wrapMode: Text.WordWrap
                 }
                 ActionButton {
+                    visible: ScrollModeSettings.stagedMode === "auto"
+                    width: parent.width
+                    height: visible ? 34 : 0
+                    label: ScrollModeSettings.originProbeBusy
+                           ? "INSPECTING GLOBAL INPUT" : "CHECK GLOBAL INPUT SUPPORT"
+                    labelPixelSize: 9
+                    available: !ScrollModeSettings.originProbeBusy
+                    onLeftClicked: ScrollModeSettings.inspectAutoscrollCapabilities()
+                }
+                GohuText {
+                    visible: ScrollModeSettings.stagedMode === "auto"
+                    width: parent.width
+                    text: "CAPABILITY // " + ScrollModeSettings.originProbeStatus.toUpperCase()
+                          + " // " + ScrollModeSettings.originProbeMessage
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    visible: ScrollModeSettings.stagedMode === "auto"
+                    width: parent.width
+                    height: visible ? 34 : 0
+                    label: ScrollModeSettings.stopBusy
+                           ? "SENDING STOP" : "EMERGENCY STOP EXPERIMENT"
+                    labelPixelSize: 9
+                    accentColor: Colors.red
+                    available: !ScrollModeSettings.stopBusy
+                    onLeftClicked: ScrollModeSettings.requestEmergencyStop()
+                }
+                GohuText {
+                    visible: ScrollModeSettings.stagedMode === "auto"
+                    width: parent.width
+                    text: ScrollModeSettings.stopFeedback
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
                     width: parent.width
                     height: 35
                     label: "PREPARE INPUT MODE"

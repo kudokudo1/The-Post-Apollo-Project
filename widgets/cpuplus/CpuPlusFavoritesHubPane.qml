@@ -1365,7 +1365,7 @@ Item {
                     ? "CHECK ZONES"
                     : pane.selectedResource
                       && pane.selectedResource.category==="NEW"
-                    ? (pane.selectedResource.provider==="angel"
+                    ? ((pane.selectedResource.provider==="angel" && pane.selectedResource.isFavorite)
                        ? "OPEN ANGEL" : (pane.selectedResource.isPinned?"UNPIN":"PIN"))
                     : "NO ACTION"
                 labelPixelSize: 9
@@ -1379,7 +1379,7 @@ Item {
                         ? pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
                           && !pane.timeOwner.zoneCatalogLoading
                         : pane.selectedResource.category==="NEW"
-                          && (pane.selectedResource.provider==="angel"
+                          && ((pane.selectedResource.provider==="angel" && pane.selectedResource.isFavorite)
                               ? pane.ownerNavigation.ok
                               : pane.defaultOwner !== null
                                 && pane.defaultOwner.canEdit))
@@ -1402,7 +1402,7 @@ Item {
                     if(pane.selectedResource.category==="CLOCK")
                         pane.timeOwner.loadZoneCatalog();
                     else if(pane.selectedResource.category==="NEW") {
-                        if(pane.selectedResource.provider==="angel") {
+                        if((pane.selectedResource.provider==="angel" && pane.selectedResource.isFavorite)) {
                             const target=pane.ownerNavigation;
                             if(target.ok)
                                 pane.ownerNavigationRequested(target.owner,target.view);

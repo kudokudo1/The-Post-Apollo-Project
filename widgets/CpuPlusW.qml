@@ -24,6 +24,8 @@ PanelWindow {
     signal favoriteOwnerNavigationRequested(string owner,string view)
     // U7b: this never carries saved resource keys, only one fixed HOME route.
     signal favoriteExactNavigationRequested(string owner,string route)
+    // Separate narrowly validated numeric Clock item navigation.
+    signal favoriteClockItemRequested(string kind,string id)
     // APPS selection only; no commands/actions or arbitrary favorite keys.
     signal favoriteAppSelectionRequested(string desktopId)
     // U7b-D: one fixed core SYSTEM metric token, not a monitor action.
@@ -3155,6 +3157,9 @@ PanelWindow {
             }
             onExactNavigationRequested: function(owner,route) {
                 cpuPlusWindow.favoriteExactNavigationRequested(owner,route);
+            }
+            onClockItemRequested: function(kind,id) {
+                cpuPlusWindow.favoriteClockItemRequested(kind,id);
             }
             onAppSelectionRequested: function(desktopId) {
                 cpuPlusWindow.favoriteAppSelectionRequested(desktopId);

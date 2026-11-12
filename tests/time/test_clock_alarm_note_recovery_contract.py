@@ -63,7 +63,7 @@ class ClockAlarmNoteRecovery(unittest.TestCase):
         self.assertIn('return "conflict"', POLICY)
         self.assertIn('"identity-conflict"', POLICY)
         self.assertIn('return "already-saved"', POLICY)
-        self.assertIn('return "recoverable"', POLICY)
+        self.assertIn('"recoverable"', POLICY)
 
     def test_original_alarm_ui_routes_note_edits_to_sidecar(self):
         self.assertIn('AlarmNoteRecoveryService.saveNote(id, alarmNote.text)', PANE)

@@ -61,6 +61,21 @@ class BackendRules(unittest.TestCase):
         self.assertFalse(result["global_overlay"])
         self.assertFalse(result["escape_binding"])
         self.assertFalse(result["hardware_verified"])
+        self.assertFalse(result["pointer_target_verified"])
+        self.assertTrue(result["live_entrypoint_blocked"])
+
+    def test_missing_trusted_pointer_target_blocks_before_device_open(self):
+        with patch.dict(os.environ, {
+                backend.RUN_MARKER:"1", "SWAYSOCK":"/fake/sway"
+                }, clear=True), patch.object(
+                backend.os, "getuid", return_value=1000), patch.object(
+                backend, "no_native_lock", return_value=True), patch.object(
+                backend, "select_physical_device",
+                side_effect=AssertionError("unsafe device open before witness")):
+            with self.assertRaisesRegex(
+                backend.DriverError, "COMPOSITOR_POINTER_TARGET_UNAVAILABLE"
+            ):
+                backend.run_live("/dev/input/event7")
 
     def test_sway_focus_only_one_real_seat(self):
         with patch.object(backend.subprocess,"run",return_value=SimpleNamespace(
@@ -142,7 +157,11 @@ class FakeLinuxIntegration(unittest.TestCase):
             def close(self):
                 self.closed = True
         fake_stop = FakeStopServer()
-        with patch.object(backend, "StopServer", return_value=fake_stop),patch.dict(sys.modules,{"evdev":module}),patch.dict(os.environ,{
+        # Synthetic lab-only bypass of the unimplemented compositor provider.
+        # There is NO environment or CLI switch for this on real desktops.
+        with patch.object(backend, "require_verified_pointer_provider",
+                          return_value=object()), patch.object(
+                backend, "StopServer", return_value=fake_stop),patch.dict(sys.modules,{"evdev":module}),patch.dict(os.environ,{
                 backend.RUN_MARKER:"1","SWAYSOCK":"/fake/sway"},clear=True),patch.object(
                 backend.os,"getuid",return_value=1000),patch.object(
                 backend,"no_native_lock",return_value=True),patch.object(

@@ -13,7 +13,7 @@ var ORDER=[
     "RADIO|FAVORITES","RADIO|RECENTS",
     "HOSPITAL|ROUNDS","HOSPITAL|STAFF","HOSPITAL|REPORTS",
     "HOSPITAL|PHONE","HOSPITAL|INTERCOM","HOSPITAL|ACTIVITY",
-    "CLOCK|CLOCK","PLACES|PLACES","NEW|NEW"
+    "CLOCK|CLOCK","CLOCK|ALARMS","PLACES|PLACES","NEW|NEW"
 ];
 function itemLabel(row,menu) {
     if (row.owner==="weather-home" || row.owner==="notifications"
@@ -40,7 +40,7 @@ function build(candidates) {
             continue;
         const menu=row.owner==="appcontrol" || row.owner==="weather-home"
             || row.owner==="notifications" || row.owner==="radio"
-            || row.owner==="hospital"
+            || row.owner==="hospital" || row.owner==="clock-alarm"
             ? String(row.menu || "OTHER") : category;
         const key=category+"|"+menu;
         if (!byKey[key]) {

@@ -116,6 +116,17 @@ Item {
             }, observedAtMs);
     }
 
+    // Called only by the fixed Clock owner navigation. Do not replace an
+    // active note editor or its recovery preview with a different view.
+    function openFavoriteJournal() {
+        if (editingNoteId !== "" || noteInFlightId !== ""
+                || reviewingDraft) return false;
+        activeView = "journal";
+        activeFilter = "favorite";
+        angelSearchInput.text = "";
+        return true;
+    }
+
     function editObservationNote(row) {
         if (!row || pane.noteInFlightId !== "")
             return;

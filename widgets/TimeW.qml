@@ -366,6 +366,8 @@ PanelWindow {
         appControlSource: FavoritesStore
         worldSource: TimeSettings
         placesSource: PlaceRegistry
+        alarmSource: AlarmManagerService
+        angelDefaultSource: FavoritesDefaultStore
     }
     property string selectedQuickZone: "UTC"
     property string selectedSearchedZone: ""
@@ -1917,6 +1919,22 @@ PanelWindow {
 
     function toggle() {
         menuOpen = !menuOpen;
+    }
+
+    // CPU++ may request only fixed, owner-controlled Clock views.
+    // No saved ID, alarm action or Angel observation is forwarded by shell.
+    function openFavoriteView(view) {
+        if (view === "angel") {
+            if (!angelPane.openFavoriteJournal()) return false;
+            chooseMode(4); // Existing ANGEL view, original journal owns data.
+        } else if (view === "alarm") {
+            chooseMode(2); // Existing TOOLS -> ALARM view.
+            toolsView = "alarm";
+        } else {
+            return false;
+        }
+        if (!menuOpen) menuOpen = true;
+        return true;
     }
 
     function openNotificationAlarm(alarmId) {

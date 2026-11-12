@@ -126,7 +126,7 @@ function safeUnresolvedLabel(menu,classification,ordinal) {
     return menu+" // "+(type[menu] || "SAVED ITEM")+" #"+ordinal;
 }
 
-function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions, weatherHomeSnapshot, notificationsSnapshot, radioSnapshot, hospitalSnapshot) {
+function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appControlDisplayLabels, appControlDescriptions, weatherHomeSnapshot, notificationsSnapshot, radioSnapshot, hospitalSnapshot, alarmSnapshot) {
     const out=[], seen=Object.create(null);
     let rejected=0,total=0;
     function accept(record) {
@@ -157,6 +157,25 @@ function list(clockZones, savedPlaces, defaults, pins, appControlSnapshot, appCo
             isFavorite:!!isFavorite,isPinned:!!isPinned,
             available:"unresolved",capabilities:["collection"]
         });
+    }
+
+    // Clock owns the only durable saved alarm flag and its stable numeric ID.
+    // Do not copy notes, alarm times, tone paths, or process actions.
+    if (alarmSnapshot !== undefined && alarmSnapshot !== null) {
+        const alarms = Adapters.clockAlarms(alarmSnapshot);
+        rejected += alarms.invalidCount;
+        for (const a of alarms.items) {
+            accept({
+                key:a.key, provider:"clock-alarm",kind:"alarm",
+                resourceId:a.resourceId,label:a.label,
+                sourceName:"CLOCK",menu:"ALARMS",
+                item:a.label.slice("ALARM // ".length),
+                favoriteType:"SAVED ALARM",resolved:true,
+                category:"CLOCK",owner:"clock-alarm",readOnly:true,
+                isFavorite:true,isPinned:false,
+                available:"unresolved",capabilities:[]
+            });
+        }
     }
 
     // Read-only AppControl projection: uses the existing U0 adapter contract.

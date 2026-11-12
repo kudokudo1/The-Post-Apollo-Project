@@ -317,6 +317,11 @@ PanelWindow {
     // contain fixed menu/view names, NEVER saved resource keys, paths, PIDs,
     // process commands, station URLs or Hospital record identities.
     function openApolloFavoriteOwner(owner,view) {
+        if (owner==="clock" && (view==="alarm" || view==="angel")) {
+            // The Clock owner chooses its existing ALARM or ANGEL view.
+            // Do not transfer arbitrary saved IDs or create another window.
+            return timewWindow.openFavoriteView(view);
+        }
         if(owner==="appcontrol") {
             const modes={
                 "FAVORITES":appControlWindow.favoritesModeIndex,

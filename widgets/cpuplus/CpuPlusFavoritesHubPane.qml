@@ -1221,6 +1221,8 @@ Item {
                          ? "RADIO-OWNED // READ ONLY"
                          : pane.selectedResource.owner==="hospital"
                          ? "HOSPITAL RECEPTION-OWNED // READ ONLY"
+                         : pane.selectedResource.owner==="clock-alarm"
+                         ? "CLOCK ALARM-OWNED // READ ONLY"
                          : "APP CONTROL-OWNED // READ ONLY")
                       : "SAVED IDENTITY")
                 : "CHOOSE AN ITEM IN THE CENTER BAY"
@@ -1236,7 +1238,8 @@ Item {
                          || pane.selectedResource.owner==="weather-home"
                          || pane.selectedResource.owner==="notifications"
                          || pane.selectedResource.owner==="radio"
-                         || pane.selectedResource.owner==="hospital")
+                         || pane.selectedResource.owner==="hospital"
+                         || pane.selectedResource.owner==="clock-alarm")
             width: parent.width
             spacing: 3
             GohuText {
@@ -1253,6 +1256,9 @@ Item {
                     : pane.selectedResource
                       && pane.selectedResource.owner==="hospital"
                     ? "SOURCE // HOSPITAL RECEPTION"
+                    : pane.selectedResource
+                      && pane.selectedResource.owner==="clock-alarm"
+                    ? "SOURCE // CLOCK ALARMS"
                     : "SOURCE // APP CONTROL"
                 font.pixelSize: 10
                 color: Colors.cyan
@@ -1346,7 +1352,8 @@ Item {
 
             ActionButton {
                 id: openItem
-                width: Math.max(0,parent.width-remove.width-parent.spacing)
+                width: Math.max(0,parent.width-remove.width-angelOpenButton.width
+                    - parent.spacing*(angelOpenButton.visible ? 2 : 1))
                 height: 30
                 label: pane.selectedResource && pane.selectedResource.readOnly
                     ? (pane.exactNavigation.ok || pane.appSelection.ok
@@ -1393,6 +1400,25 @@ Item {
                         pane.timeOwner.loadZoneCatalog();
                     else if(pane.selectedResource.category==="NEW")
                         pane.defaultOwner.togglePinned(pane.selectedResource.key);
+                }
+            }
+            // Angel stars remain removable/pinnable in the original default
+            // store; opening their owner is a separate, read-only action.
+            ActionButton {
+                id: angelOpenButton
+                width: visible ? 77 : 0
+                height: 30
+                visible: pane.selectedResource !== null
+                    && pane.selectedResource.provider === "angel"
+                    && pane.selectedResource.isFavorite === true
+                label: "OPEN ANGEL"
+                labelPixelSize: 8
+                accentColor: Colors.magenta
+                available: visible && pane.ownerNavigation.ok
+                onLeftClicked: {
+                    if (!available) return;
+                    const target = pane.ownerNavigation;
+                    pane.ownerNavigationRequested(target.owner,target.view);
                 }
             }
         }

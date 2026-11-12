@@ -1,0 +1,46 @@
+name: Social PHONE P41a Vault In-Lock Final Check (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhonePersonalContactVault.py'
+      - 'services/phone/PhonePersonalHostGateP36.py'
+      - 'tests/phone/test_phone_personal_under_lock_p41a.py'
+      - 'MODEL/contracts/social-phone-p41a-vault-in-lock-fixture-v0.md'
+      - '.github/workflows/social-phone-p41a-vault-in-lock.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhonePersonalContactVault.py'
+      - 'services/phone/PhonePersonalHostGateP36.py'
+      - 'tests/phone/test_phone_personal_under_lock_p41a.py'
+      - 'MODEL/contracts/social-phone-p41a-vault-in-lock-fixture-v0.md'
+      - '.github/workflows/social-phone-p41a-vault-in-lock.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-critical-section:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Disposable Python crypto requirement
+        run: python -m pip install cryptography==50.0.2
+      - name: Compile PHONE-only dormant modules
+        run: |
+          python -m py_compile services/phone/PhonePersonalContactVault.py
+          python -m py_compile services/phone/PhonePersonalHostGateP36.py
+      - name: P41a in-lock revocation tests
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_under_lock_p41a.py' -v
+      - name: P35 encryption and atomic replace regressions
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_contact_vault.py' -v
+      - name: P36 synthetic host gate regressions
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_host_gate_p36.py' -v
+      - name: P40R uncertain acknowledgment regressions
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_vault_recovery_p40r.py' -v

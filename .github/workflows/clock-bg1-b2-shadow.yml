@@ -38,23 +38,43 @@ jobs:
         run: |
           python3 - <<'PY'
           import subprocess
+          # B2A originally required exactly six files relative to its
+          # old B1 feature branch. That branch has since merged into main;
+          # post-B2A security followups must have their own exact allowlist.
           changed=set(subprocess.check_output([
-              'git','diff','--name-only',
-              'origin/fix/clock-bg1-b1-main-reconcile-20261111...HEAD'],
+              'git','diff','--name-only','origin/main...HEAD'],
               text=True).splitlines())
-          permitted={
+          b2b_peers={
+              'services/time/AlarmPeerIdentity.py',
+              'services/time/AlarmOwnershipBroker.py',
+              'services/time/BG1-ALARM-PEER-LIFETIME.md',
+              'tests/time/test_clock_bg1_b2b_peer_identity.py',
+              '.github/workflows/clock-bg1-b2b-peer.yml',
+              '.github/workflows/clock-bg1-b2-shadow.yml',
+          }
+          b2a_initial={
               'services/time/AlarmOwnershipBroker.py',
               'services/time/AlarmShadowTransactions.py',
               'services/time/BG1-ALARM-SHADOW-TRANSACTIONS.md',
               'tests/time/test_clock_bg1_b2_shadow_transactions.py',
               '.github/workflows/clock-bg1-b2-shadow.yml',
-              '.github/workflows/clock-bg1-broker-b1.yml'
+              '.github/workflows/clock-bg1-broker-b1.yml',
           }
-          assert changed == permitted, f'Unexpected files: {changed ^ permitted}'
+          if 'services/time/AlarmPeerIdentity.py' in changed:
+              assert changed == b2b_peers, f'Unexpected B2B files: {changed ^ b2b_peers}'
+          else:
+              # Keep the original stacked B2A audit exact when applied to
+              # the historical branch, rather than weakening that review.
+              original=set(subprocess.check_output([
+                  'git','diff','--name-only',
+                  'origin/fix/clock-bg1-b1-main-reconcile-20261111...HEAD'],
+                  text=True).splitlines())
+              assert original == b2a_initial, f'Unexpected B2A files: {original ^ b2a_initial}'
           for forbidden in ('services/time/AlarmManagerService.qml',
                              'services/time/AlarmManagerPolicy.js',
+                             'services/time/AlarmAudioV2.qml',
                              'services/time/AlarmBackgroundObserver.py',
                              'ops/systemd/user/post-apollo-alarm-observer.service'):
               assert forbidden not in changed
-          print('BG1-B2A is synthetic, source-only and non-actuating: PASS')
+          print('BG1 shadow and peer lifecycle remain source-only, DENY-ONLY: PASS')
           PY

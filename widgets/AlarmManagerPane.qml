@@ -1082,7 +1082,8 @@ Item {
                 width: parent.width
                 spacing: 5
                 visible: pane.settingsTab === "note"
-                    && AlarmNoteRecoveryService.draftState !== "ready"
+                    && !(AlarmNoteRecoveryService.draftState === "ready"
+                         && AlarmNoteRecoveryService.phase === "")
                 TextField {
                     id: alarmNote
                     width: parent.width
@@ -1154,11 +1155,13 @@ Item {
                 spacing: 4
                 visible: pane.settingsTab === "note"
                     && AlarmNoteRecoveryService.draftState === "ready"
+                    && AlarmNoteRecoveryService.phase === ""
                 GohuText {
                     width: parent.width
                     height: 16
-                    text: "RECOVERY // "
-                        + AlarmNoteRecoveryService.disposition.toUpperCase()
+                    text: "NOTE #" + (AlarmNoteRecoveryService.noteDraft
+                        ? AlarmNoteRecoveryService.noteDraft.id : "?")
+                        + " // " + AlarmNoteRecoveryService.disposition.toUpperCase()
                     color: Colors.orange
                     font.pixelSize: 9
                     elide: Text.ElideRight

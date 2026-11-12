@@ -131,7 +131,9 @@ class TestV3cSeparateUidAuthority(unittest.TestCase):
             "previousWitnessSha256": "", "revoked": False,
         }
         self.first = signed(self.signer, self.claim)
-        self.assertDenied(self.run_child("initialize")[1])
+        init_rc, init_result = self.run_child("initialize")
+        self.assertEqual(init_rc, 0, "V3C child initialization failed: " + str(init_result))
+        self.assertDenied(init_result)
         self.assertEqual(self.head()["sequence"], 0)
 
     def run_child(self, mode, data=None, *, as_broker=False, crash=None):

@@ -10,6 +10,8 @@ on:
       - "services/input/SwayScrollLock.py"
       - "services/input/ScrollModeSettings.qml"
       - "services/input/AutoscrollMouseEngine.py"
+      - "services/input/AutoscrollPointerWitness.py"
+      - "tests/cpuplus/test_autoscroll_pointer_witness.py"
       - "services/input/AutoscrollOriginProbe.py"
       - "tests/cpuplus/test_autoscroll_origin_probe.py"
       - "tests/cpuplus/test_autoscroll_capability_stop_ui.py"
@@ -87,6 +89,8 @@ jobs:
         run: python3 tests/cpuplus/test_autoscroll_overlay_stop_contract.py
       - name: Verify read-only Sway/Wayland cursor-origin capability probe
         run: python3 tests/cpuplus/test_autoscroll_origin_probe.py
+      - name: Verify pointer-target witness freshness, output identity and hard runtime gate
+        run: python3 tests/cpuplus/test_autoscroll_pointer_witness.py
       - name: Verify CPU++ global capability and STOP cannot activate scrolling
         run: python3 tests/cpuplus/test_autoscroll_capability_stop_ui.py
       - name: Verify CPU++ Scroll Mode routing and no unverified global injection

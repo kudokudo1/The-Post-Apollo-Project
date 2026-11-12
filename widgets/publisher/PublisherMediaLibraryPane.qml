@@ -183,9 +183,19 @@ Rectangle {
         }
     }
 
-    Column {
+    // Small Social layouts must remain operable, even with previews and rows.
+    Flickable {
+        id: mediaScroll
         anchors.fill: parent
-        spacing: 7
+        clip: true
+        contentWidth: width
+        contentHeight: mediaContent.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
+
+        Column {
+            id: mediaContent
+            width: mediaScroll.width
+            spacing: 7
 
         Text {
             width: parent.width
@@ -227,7 +237,7 @@ Rectangle {
         Flickable {
             id: mediaList
             width: parent.width
-            height: Math.max(65, parent.height * 0.29)
+            height: Math.max(65, mediaPane.height * 0.29)
             contentWidth: width
             contentHeight: mediaRows.height
             clip: true
@@ -257,7 +267,7 @@ Rectangle {
         Rectangle {
             id: previewFrame
             width: parent.width
-            height: Math.max(100, parent.height * 0.36)
+            height: Math.max(100, mediaPane.height * 0.36)
             color: Colors.black
             border.color: Colors.cyan
             border.width: 1
@@ -374,6 +384,7 @@ Rectangle {
             elide: Text.ElideRight
             font.pixelSize: 10
             text: mediaPane.feedback
+        }
         }
     }
 }

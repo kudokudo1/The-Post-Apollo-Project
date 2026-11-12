@@ -165,12 +165,15 @@ echo "C4B_ID_PASS // REAL_OFFLINE_SILVERBLUE_INSTALLED"
 qemu-system-x86_64 \
   -machine accel=kvm -m 4096 -smp 3 -display none -monitor none \
   -serial "file:$tmp/identity-guest-serial.log" \
+  # Read-only host diagnostics use QMP query-status/query-cpus-fast only.
+  -qmp "unix:$tmp/identity-qmp.sock,server=on,wait=off" \
   -drive "file=$tmp/identity-silverblue.qcow2,if=virtio,format=qcow2" \
   -drive "file=$tmp/identity-seed.iso,if=ide,media=cdrom,readonly=on,index=1" \
   -nic none >"$tmp/guest-qemu.log" 2>&1 &
 pid="$!"
 final=0
 selinux_load_started=0
+service_cleanup_seen=0
 for n in $(seq 1 700); do
   if [[ -r "$tmp/identity-guest-serial.log" ]]; then
     if grep -Fq 'C4B_ID_FAIL //' "$tmp/identity-guest-serial.log"; then
@@ -181,6 +184,82 @@ for n in $(seq 1 700); do
         "$tmp/identity-guest-serial.log"; then
       final=1
       break
+    fi
+    # A guest policy unload can stall scheduling AFTER emitting the cleanup
+    # marker: the guest watchdog then cannot speak, while the outer 700-poll
+    # loop needlessly waits 23 minutes. This separate GitHub-host watchdog
+    # observes the real serial file and fails CLOSED if the parent has not
+    # advanced within three minutes of confirmed service cleanup.
+    if grep -aFq 'C4B_ID_PASS // REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP' \
+        "$tmp/identity-guest-serial.log" &&
+       ! grep -aFq 'C4B_ID_STAGE // after_service_probe' \
+        "$tmp/identity-guest-serial.log"; then
+      if (( service_cleanup_seen == 0 )); then service_cleanup_seen=$SECONDS; fi
+      if (( SECONDS - service_cleanup_seen > 180 )); then
+        echo "C4B_ID_BLOCKED // GUEST_SILENT_AFTER_SERVICE_CLEANUP_NO_ROLLBACK"
+        # Only QEMU/host process state, not guest memory or private identities.
+        ps -o pid=,ppid=,stat=,wchan:24=,etime=,comm= -p "$pid" 2>/dev/null |
+          sed 's/^/C4B_ID_HOST_QEMU_PROCESS \/\/ /' | head -n 2 || true
+        timeout --signal=TERM --kill-after=2s 12s \
+          python3 - "$tmp/identity-qmp.sock" <<'C4B_QMP_STATUS' || true
+import json
+import socket
+import sys
+
+try:
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+        connection.settimeout(4)
+        connection.connect(sys.argv[1])
+        stream = connection.makefile("rb")
+
+        def read_response():
+            for _ in range(12):
+                raw = stream.readline(4096)
+                if not raw:
+                    raise RuntimeError("no_qmp_data")
+                result = json.loads(raw)
+                if "event" not in result:
+                    return result
+            raise RuntimeError("too_many_async_qmp_events")
+
+        if "QMP" not in read_response():
+            raise RuntimeError("invalid_qmp_greeting")
+        for name in ("qmp_capabilities", "query-status", "query-cpus-fast"):
+            connection.sendall(
+                (json.dumps({"execute": name, "id": name}) + "\\n").encode()
+            )
+            response = read_response()
+            if response.get("id") != name or "error" in response:
+                raise RuntimeError("qmp_query_refused_" + name)
+            if name == "query-status":
+                state = response.get("return", {})
+                print(
+                    "C4B_ID_HOST_QMP // status="
+                    + str(state.get("status", "unknown"))[:35]
+                    + " running="
+                    + str(state.get("running", "unknown"))[:6],
+                    flush=True,
+                )
+            if name == "query-cpus-fast":
+                cpus = response.get("return", [])
+                if not isinstance(cpus, list):
+                    raise RuntimeError("qmp_cpu_format")
+                print(
+                    "C4B_ID_HOST_QMP // cpu_count=" + str(len(cpus)),
+                    flush=True,
+                )
+except (OSError, RuntimeError, ValueError, TypeError) as exc:
+    # Never print a raw QMP response or guest data in CI evidence.
+    print(
+        "C4B_ID_HOST_QMP // QUERY_UNAVAILABLE_"
+        + type(exc).__name__,
+        flush=True,
+    )
+C4B_QMP_STATUS
+        break
+      fi
+    else
+      service_cleanup_seen=0
     fi
     # Independent elapsed-time watchdog for the precise guest policy-load
     # boundary. It does not grant acceptance or alter guest SELinux state.

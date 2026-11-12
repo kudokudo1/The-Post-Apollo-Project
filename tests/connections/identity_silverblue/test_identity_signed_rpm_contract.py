@@ -675,5 +675,28 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         )
 
 
+    def test_22_real_service_probe_return_must_precede_rollback(self):
+        guest = (AREA / "guest_identity_ostree_cycle.sh").read_text()
+        required = (
+            'C4B_ID_STAGE // before_service_probe',
+            'timeout --signal=TERM --kill-after=10s 420s /usr/bin/bash "$service_probe"',
+            'C4B_ID_STAGE // after_service_probe rc=%s',
+            '[[ "$probe_rc" == 0 ]] ||',
+            'fail "REAL_SYSTEMD_DENY_ONLY_IDENTITY_SERVICE_PROBE_REFUSED_RC_$probe_rc"',
+            '[[ "$(cat "$stage")" == layer_pending ]] ||',
+            'fail "SERVICE_PROBE_CHANGED_OSTREE_STAGE"',
+            'C4B_ID_PASS // REAL_IDENTITY_SERVICE_PROBE_FINISHED_BEFORE_ROLLBACK',
+            'echo rollback_pending > "$stage"',
+            'C4B_ID_STAGE // rollback_command_started',
+            'rpm-ostree rollback --reboot',
+        )
+        for token in required:
+            self.assertIn(token, guest)
+        steps = [guest.index(token) for token in required]
+        self.assertEqual(steps, sorted(steps))
+        self.assertNotIn('|| true\n    echo "C4B_ID_PASS // REAL_IDENTITY_SERVICE_PROBE_FINISHED_BEFORE_ROLLBACK"', guest)
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

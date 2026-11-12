@@ -28,9 +28,9 @@ HANDLER = re.compile(
     r"\bon(?:Clicked|Triggered|Accepted)\b.*"
     r"(?:delete|remove|trash|burn|purge|erase|clear)", re.I)
 METHOD = re.compile(
-    r"\b(?:function|def)\s+[A-Za-z_][A-Za-z0-9_]*"
-    r"(?:Delete|Remove|Trash|Burn|Purge|Erase|Clear|delete|remove|trash|burn|purge|erase|clear)"
-    r"[A-Za-z0-9_]*\s*\(", re.I)
+    r"\b(?:function|def)\s+(?=[A-Za-z_]*"
+    r"(?:delete|remove|trash|burn|purge|erase|clear))"
+    r"[A-Za-z_][A-Za-z0-9_]*\s*\(", re.I)
 PATTERNS = (("label", LABEL), ("handler", HANDLER), ("method", METHOD))
 
 

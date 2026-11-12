@@ -366,6 +366,8 @@ PanelWindow {
         appControlSource: FavoritesStore
         worldSource: TimeSettings
         placesSource: PlaceRegistry
+        alarmSource: AlarmManagerService
+        angelDefaultSource: FavoritesDefaultStore
     }
     property string selectedQuickZone: "UTC"
     property string selectedSearchedZone: ""

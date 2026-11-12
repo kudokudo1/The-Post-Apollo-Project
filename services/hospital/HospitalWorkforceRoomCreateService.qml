@@ -66,7 +66,7 @@ Scope {
             patientId: patientId, patientLabel: patientLabel};
         savedRoom = null;
         lastError = "";
-        lastStatus = "CHECKING NEW ROOM ID // READ ONLY // NO WORKER";
+        lastStatus = "CHECKING ROOM ID // NO ROOM BIND SENT";
         creating = true;
         // room-bind is an UPSERT in PX v10/v11. Never call it without first
         // checking the authoritative store for the exact generated ID.
@@ -203,7 +203,10 @@ Scope {
             try {
                 if (Number(code) === 0) {
                     const result = JSON.parse(nameProcess.resultText);
-                    nameSaved = String(result.id || "") === id;
+                    // An ID echo alone does not prove that a human-friendly
+                    // label was persisted. Require the exact saved label.
+                    nameSaved = String(result.id || "") === id
+                        && String(result.displayName || "") === root.pending.name;
                 }
             } catch (error) {
                 nameSaved = false;

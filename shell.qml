@@ -313,6 +313,21 @@ PanelWindow {
         return true;
     }
 
+    // Separate exact-item Clock route, never part of U7a generic owner
+    // navigation. Numeric IDs only; TimeW + original owner revalidate
+    // durable membership after this lightweight lexical gate.
+    function openApolloFavoriteClockItem(kind,id) {
+        if (typeof id !== "string") return false;
+        if (kind === "alarm") {
+            if (!/^[1-9][0-9]{0,14}$/.test(id)
+                    || !Number.isSafeInteger(Number(id)))
+                return false;
+        } else if (kind === "angel") {
+            if (!/^[0-9]{1,8}$/.test(id)) return false;
+        } else return false;
+        return timewWindow.openFavoriteClockItem(kind,id);
+    }
+
     // U7a: explicit Favorites owner navigation only. These destinations
     // contain fixed menu/view names, NEVER saved resource keys, paths, PIDs,
     // process commands, station URLs or Hospital record identities.
@@ -1223,6 +1238,12 @@ PanelWindow {
                 onFavoriteExactNavigationRequested: function(owner,route) {
                     // A failed/stale owner request leaves CPU++ open.
                     if(shellRoot.openApolloFavoriteItem(owner,route))
+                        cpuPlusWindow.close();
+                }
+                onFavoriteClockItemRequested: function(kind,id) {
+                    // Exact item is checked by Clock's own confirmed stores.
+                    // Refusal keeps CPU++ open and its selection unchanged.
+                    if(shellRoot.openApolloFavoriteClockItem(kind,id))
                         cpuPlusWindow.close();
                 }
                 onFavoriteAppSelectionRequested: function(desktopId) {

@@ -812,8 +812,8 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         )
         self.assertNotIn("setenforce 0", guest)
         self.assertNotIn("C4B_ID_PASS // SEPARATE_PROBE", guest)
-        witness = guest.split("<<'C4B_SEPARATE_WITNESS'\\n", 1)[1].split(
-            "\\nC4B_SEPARATE_WITNESS", 1
+        witness = guest.split("<<'C4B_SEPARATE_WITNESS'\n", 1)[1].split(
+            "\nC4B_SEPARATE_WITNESS", 1
         )[0]
         subprocess.run(
             ["/usr/bin/bash", "-n"],

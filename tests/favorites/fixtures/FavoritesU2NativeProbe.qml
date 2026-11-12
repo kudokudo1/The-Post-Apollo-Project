@@ -66,12 +66,18 @@ ShellRoot {
                     || !preview.snapshot.ok)
                 return;
             if (root.stage === 0) {
+                // #1942 prioritizes WORLD-owned entries ahead of generic
+                // AppControl labels so the bounded Clock popup always shows
+                // time zones. Keep the same no-credentials/no-actions checks.
                 if (current.total !== 3 || current.groups.length !== 3
-                        || current.rows[0].label !== "APP CONTROL FAVORITE"
-                        || current.rows[1].label !== "UTC"
-                        || current.rows[2].label !== "Synthetic Place"
-                        || current.rows[0].availability !== "unresolved"
-                        || current.rows[0].label.indexOf("synthetic-one") >= 0) {
+                        || current.groups[0].id !== "time"
+                        || current.groups[1].id !== "places"
+                        || current.groups[2].id !== "appcontrol"
+                        || current.rows[0].label !== "UTC"
+                        || current.rows[1].label !== "Synthetic Place"
+                        || current.rows[2].label !== "APP CONTROL FAVORITE"
+                        || current.rows[2].availability !== "unresolved"
+                        || current.rows[2].label.indexOf("synthetic-one") >= 0) {
                     root.fail("INITIAL_OWNER_SNAPSHOTS");
                     return;
                 }

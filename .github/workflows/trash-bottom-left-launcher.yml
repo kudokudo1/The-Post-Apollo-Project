@@ -5,6 +5,7 @@ on:
     paths:
       - shell.qml
       - modules/Trash.qml
+      - components/TrashLifecycleActionDeck.qml
       - widgets/CameraW.qml
       - widgets/CameraCleanupView.qml
       - modules/Power.qml
@@ -16,6 +17,7 @@ on:
     paths:
       - shell.qml
       - modules/Trash.qml
+      - components/TrashLifecycleActionDeck.qml
       - widgets/CameraW.qml
       - widgets/CameraCleanupView.qml
       - modules/Power.qml

@@ -350,10 +350,22 @@ for interval in 90 145; do
     }' >/dev/ttyS0 || true
   timeout --signal=TERM --kill-after=2s 6s \
     systemctl show postapollo-id-ci-cycle.service \
-      --property=ActiveState,SubState,MainPID --no-pager 2>/dev/null |
-    awk -F= '/^(ActiveState|SubState|MainPID)=/ {
-      print "C4B_ID_STAGE // SEPARATE_PROBE_CYCLE " $1 "=" $2
+      --property=ActiveState,SubState,MainPID,Result,ExecMainPID,ExecMainCode,ExecMainStatus,ControlPID --no-pager 2>/dev/null |
+    awk -F= '/^(ActiveState|SubState|MainPID|Result|ExecMainPID|ExecMainCode|ExecMainStatus|ControlPID)=/ {
+      if ($2 ~ /^[a-zA-Z0-9_-]{1,40}$/ || $2 ~ /^[0-9]{1,10}$/)
+        print "C4B_ID_STAGE // SEPARATE_PROBE_CYCLE " $1 "=" $2
     }' >/dev/ttyS0 || true
+  # Journal is a second observation of why the unit failed. Emit ONLY fixed
+  # systemd status categories; never forward arbitrary journal entries.
+  timeout --signal=TERM --kill-after=2s 6s \
+    journalctl -b -u postapollo-id-ci-cycle.service -n 48 --no-pager -o cat 2>/dev/null |
+    awk '
+      /Failed with result .timeout./ { print "C4B_ID_STAGE // SEPARATE_PROBE_SYSTEMD_RESULT timeout" }
+      /Failed with result .exit-code./ { print "C4B_ID_STAGE // SEPARATE_PROBE_SYSTEMD_RESULT exit-code" }
+      /Failed with result .signal./ { print "C4B_ID_STAGE // SEPARATE_PROBE_SYSTEMD_RESULT signal" }
+      /Failed with result .core-dump./ { print "C4B_ID_STAGE // SEPARATE_PROBE_SYSTEMD_RESULT core-dump" }
+      /start operation timed out/ { print "C4B_ID_STAGE // SEPARATE_PROBE_SYSTEMD_START_TIMEOUT" }
+    ' | sort -u | head -n 8 >/dev/ttyS0 || true
   sleep 55
 done
 C4B_SEPARATE_WITNESS

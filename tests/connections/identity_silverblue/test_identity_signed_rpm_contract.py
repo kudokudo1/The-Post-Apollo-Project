@@ -839,8 +839,8 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             self.assertIn(required, guest)
         self.assertNotIn("journalctl --follow", guest)
         self.assertNotIn("journalctl -f", guest)
-        witness = guest.split("<<'C4B_SEPARATE_WITNESS'\\n", 1)[1].split(
-            "\\nC4B_SEPARATE_WITNESS", 1
+        witness = guest.split("<<'C4B_SEPARATE_WITNESS'\n", 1)[1].split(
+            "\nC4B_SEPARATE_WITNESS", 1
         )[0]
         subprocess.run(
             ["/usr/bin/bash", "-n"], input=witness,

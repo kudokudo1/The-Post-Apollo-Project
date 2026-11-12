@@ -1352,7 +1352,8 @@ Item {
 
             ActionButton {
                 id: openItem
-                width: Math.max(0,parent.width-remove.width-parent.spacing)
+                width: Math.max(0,parent.width-remove.width-angelOpenButton.width
+                    - parent.spacing*(angelOpenButton.visible ? 2 : 1))
                 height: 30
                 label: pane.selectedResource && pane.selectedResource.readOnly
                     ? (pane.exactNavigation.ok || pane.appSelection.ok
@@ -1365,8 +1366,7 @@ Item {
                     ? "CHECK ZONES"
                     : pane.selectedResource
                       && pane.selectedResource.category==="NEW"
-                    ? ((pane.selectedResource.provider==="angel" && pane.selectedResource.isFavorite)
-                       ? "OPEN ANGEL" : (pane.selectedResource.isPinned?"UNPIN":"PIN"))
+                    ? (pane.selectedResource.isPinned?"UNPIN":"PIN")
                     : "NO ACTION"
                 labelPixelSize: 9
                 accentColor: Colors.cyan
@@ -1379,10 +1379,7 @@ Item {
                         ? pane.timeOwner !== null && !pane.timeOwner.zoneCatalogLoaded
                           && !pane.timeOwner.zoneCatalogLoading
                         : pane.selectedResource.category==="NEW"
-                          && ((pane.selectedResource.provider==="angel" && pane.selectedResource.isFavorite)
-                              ? pane.ownerNavigation.ok
-                              : pane.defaultOwner !== null
-                                && pane.defaultOwner.canEdit))
+                          && pane.defaultOwner !== null && pane.defaultOwner.canEdit)
                 onLeftClicked: {
                     if(!available || !pane.selectedResource) return;
                     if(pane.selectedResource.readOnly) {
@@ -1401,14 +1398,27 @@ Item {
                     }
                     if(pane.selectedResource.category==="CLOCK")
                         pane.timeOwner.loadZoneCatalog();
-                    else if(pane.selectedResource.category==="NEW") {
-                        if((pane.selectedResource.provider==="angel" && pane.selectedResource.isFavorite)) {
-                            const target=pane.ownerNavigation;
-                            if(target.ok)
-                                pane.ownerNavigationRequested(target.owner,target.view);
-                        } else
-                            pane.defaultOwner.togglePinned(pane.selectedResource.key);
-                    }
+                    else if(pane.selectedResource.category==="NEW")
+                        pane.defaultOwner.togglePinned(pane.selectedResource.key);
+                }
+            }
+            // Angel stars remain removable/pinnable in the original default
+            // store; opening their owner is a separate, read-only action.
+            ActionButton {
+                id: angelOpenButton
+                width: visible ? 77 : 0
+                height: 30
+                visible: pane.selectedResource !== null
+                    && pane.selectedResource.provider === "angel"
+                    && pane.selectedResource.isFavorite === true
+                label: "OPEN ANGEL"
+                labelPixelSize: 8
+                accentColor: Colors.magenta
+                available: visible && pane.ownerNavigation.ok
+                onLeftClicked: {
+                    if (!available) return;
+                    const target = pane.ownerNavigation;
+                    pane.ownerNavigationRequested(target.owner,target.view);
                 }
             }
         }

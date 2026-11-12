@@ -199,7 +199,7 @@ for n in $(seq 1 700); do
         echo "C4B_ID_BLOCKED // GUEST_SILENT_AFTER_SERVICE_CLEANUP_NO_ROLLBACK"
         # Only QEMU/host process state, not guest memory or private identities.
         ps -o pid=,ppid=,stat=,wchan:24=,etime=,comm= -p "$pid" 2>/dev/null |
-          sed 's/^/C4B_ID_HOST_QEMU_PROCESS \/\/ /' | head -n 2 || true
+          sed 's/^/C4B_ID_STAGE // HOST_QEMU_PROCESS \/\/ /' | head -n 2 || true
         timeout --signal=TERM --kill-after=2s 12s \
           python3 - "$tmp/identity-qmp.sock" <<'C4B_QMP_STATUS' || true
 import json
@@ -234,7 +234,7 @@ try:
             if name == "query-status":
                 state = response.get("return", {})
                 print(
-                    "C4B_ID_HOST_QMP // status="
+                    "C4B_ID_STAGE // HOST_QMP // status="
                     + str(state.get("status", "unknown"))[:35]
                     + " running="
                     + str(state.get("running", "unknown"))[:6],
@@ -245,13 +245,13 @@ try:
                 if not isinstance(cpus, list):
                     raise RuntimeError("qmp_cpu_format")
                 print(
-                    "C4B_ID_HOST_QMP // cpu_count=" + str(len(cpus)),
+                    "C4B_ID_STAGE // HOST_QMP // cpu_count=" + str(len(cpus)),
                     flush=True,
                 )
 except (OSError, RuntimeError, ValueError, TypeError) as exc:
     # Never print a raw QMP response or guest data in CI evidence.
     print(
-        "C4B_ID_HOST_QMP // QUERY_UNAVAILABLE_"
+        "C4B_ID_STAGE // HOST_QMP // QUERY_UNAVAILABLE_"
         + type(exc).__name__,
         flush=True,
     )

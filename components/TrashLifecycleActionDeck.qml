@@ -12,6 +12,10 @@ Row {
     property string ownerId: ""
     property string resourceId: ""
     property string resourceRevision: ""
+    // The default remains the 64-hex source witness. Local managed-copy
+    // revisions use a strict decimal store counter; this is a request token,
+    // never authentication or a permit to delete.
+    property string resourceRevisionKind: "sha256"
 
     // Every new consumer starts with all actions hidden and unavailable.
     property bool showTrash: false
@@ -33,11 +37,17 @@ Row {
     property int actionHeight: 30
     spacing: 6
 
+    readonly property bool revisionReady:
+        (resourceRevisionKind === "sha256"
+         && /^[0-9a-f]{64}$/.test(resourceRevision))
+        || (resourceRevisionKind === "store-counter"
+            && /^(0|[1-9][0-9]{0,9})$/.test(resourceRevision))
+
     readonly property bool identityReady:
         /^[A-Za-z0-9._:-]{1,96}$/.test(ownerId)
         && resourceId.length > 0 && resourceId.length <= 260
         && /^[A-Za-z0-9._:|/-]+$/.test(resourceId)
-        && /^[0-9a-f]{64}$/.test(resourceRevision)
+        && revisionReady
 
     readonly property bool canReviewTrash:
         showTrash && trashCapable && identityReady

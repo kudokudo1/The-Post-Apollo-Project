@@ -685,6 +685,34 @@ PanelWindow {
         return runResearch("restore", [String(row.id), String(researchRevision)]);
     }
 
+    // U3 // The new shared ActionDeck only requests review. This Trash-owned
+    // adapter maps a strict store-counter witness back to the existing
+    // recoverable managed-copy backend. It never touches source-owned records.
+    function reviewManagedCopyAction(operation, ownerId, resourceId,
+                                     expectedRevision) {
+        if (!menuOpen || activeMode !== "archive" || busy || researchBusy
+                || archiveBusy || archiveV2Busy || snapshotBusy
+                || researchBurnId !== "" || confirmMode !== ""
+                || burnUiStage !== ""
+                || ownerId !== "trashpp-managed-copy"
+                || (operation !== "trash" && operation !== "restore")
+                || !/^[0-9a-f]{32}$/.test(resourceId)
+                || !/^(0|[1-9][0-9]{0,9})$/.test(expectedRevision)
+                || expectedRevision !== String(researchRevision))
+            return false;
+        const expectedState = operation === "trash" ? "archived" : "trashed";
+        const row = researchRows.find(function(item) {
+            return item.id === resourceId
+                   && (item.kind === "SAVED RESEARCH"
+                       || item.kind === "SAVED EVENT")
+                   && item.state === expectedState;
+        });
+        if (!row)
+            return false;
+        return operation === "trash"
+               ? trashResearchCopy(row) : restoreResearchCopy(row);
+    }
+
     function clearResearchBurn() {
         researchBurnArmAnimation.stop();
         researchBurnId = "";
@@ -2360,24 +2388,16 @@ PanelWindow {
                                         width: 109
                                         spacing: 4
 
+                                        // The source-owned SAVE COPY path is
+                                        // unchanged and cannot trash originals.
                                         ActionButton {
                                             width: parent.width
                                             height: 30
                                             visible: modelData.kind === "WEB SCRAPE"
                                                      || modelData.kind === "EVENT HISTORY"
-                                                     || modelData.kind === "SAVED RESEARCH"
-                                                     || modelData.kind === "SAVED EVENT"
-                                            label: modelData.kind === "WEB SCRAPE"
-                                                   || modelData.kind === "EVENT HISTORY"
-                                                   ? "SAVE COPY"
-                                                   : modelData.state === "trashed"
-                                                   ? "RESTORE" : "TRASH COPY"
+                                            label: "SAVE COPY"
                                             labelPixelSize: 9
-                                            accentColor: modelData.state === "trashed"
-                                                         ? Colors.green
-                                                         : (modelData.kind === "SAVED RESEARCH"
-                                                            || modelData.kind === "SAVED EVENT")
-                                                         ? Colors.red : Colors.cyan
+                                            accentColor: Colors.cyan
                                             available: !trashLauncher.researchBusy
                                                        && !trashLauncher.archiveBusy
                                                        && trashLauncher.researchBurnId === ""
@@ -2386,10 +2406,54 @@ PanelWindow {
                                                     trashLauncher.saveDemoCopy(modelData);
                                                 else if (modelData.kind === "EVENT HISTORY")
                                                     trashLauncher.saveWeatherEventCopy(modelData);
-                                                else if (modelData.state === "trashed")
-                                                    trashLauncher.restoreResearchCopy(modelData);
-                                                else
-                                                    trashLauncher.trashResearchCopy(modelData);
+                                            }
+                                        }
+
+                                        // U3 replaces only the Trash++-owned
+                                        // managed-copy TRASH/RESTORE button.
+                                        // UI booleans gate review requests,
+                                        // never source permissions. The
+                                        // backend rechecks the store revision.
+                                        TrashLifecycleActionDeck {
+                                            id: managedCopyLifecycleActions
+                                            readonly property bool managedRow:
+                                                modelData.kind === "SAVED RESEARCH"
+                                                || modelData.kind === "SAVED EVENT"
+                                            visible: managedRow
+                                            width: parent.width
+                                            height: 30
+                                            actionWidth: width
+                                            actionHeight: 30
+                                            ownerId: "trashpp-managed-copy"
+                                            resourceId: String(modelData.id || "")
+                                            resourceRevisionKind: "store-counter"
+                                            resourceRevision: String(trashLauncher.researchRevision)
+                                            showTrash: managedRow && modelData.state === "archived"
+                                            showRestore: managedRow && modelData.state === "trashed"
+                                            trashCapable: managedRow && modelData.state === "archived"
+                                            restoreCapable: managedRow && modelData.state === "trashed"
+                                            showBurn: false
+                                            ownerApproved: managedRow
+                                            policyReviewed: managedRow
+                                            protectedResource: !managedRow
+                                            retentionHold: !managedRow
+                                            requestInFlight: !trashLauncher.menuOpen
+                                                || trashLauncher.activeMode !== "archive"
+                                                || trashLauncher.busy
+                                                || trashLauncher.researchBusy
+                                                || trashLauncher.archiveBusy
+                                                || trashLauncher.archiveV2Busy
+                                                || trashLauncher.snapshotBusy
+                                                || trashLauncher.confirmMode !== ""
+                                                || trashLauncher.researchBurnId !== ""
+                                                || trashLauncher.burnUiStage !== ""
+                                            onTrashReviewRequested: function(ownerId, resourceId, expectedRevision) {
+                                                trashLauncher.reviewManagedCopyAction(
+                                                    "trash", ownerId, resourceId, expectedRevision);
+                                            }
+                                            onRestoreReviewRequested: function(ownerId, resourceId, expectedRevision) {
+                                                trashLauncher.reviewManagedCopyAction(
+                                                    "restore", ownerId, resourceId, expectedRevision);
                                             }
                                         }
 

@@ -21,6 +21,8 @@ import stat
 import struct
 from threading import Event
 
+import PhonePersonalPeerEvidenceP48 as PeerEvidence
+
 SCHEMA = "post-apollo.phone.personal-host-status.p47.v1"
 SOCKET_NAME = "phone-personal-status-p47.sock"
 MAX_REQUEST = 512
@@ -136,7 +138,8 @@ def _read_exact_status(conn: socket.socket) -> bool:
 
 def _respond(conn: socket.socket) -> None:
     try:
-        if _kernel_same_uid_peer(conn) and _read_exact_status(conn):
+        if (_kernel_same_uid_peer(conn) and _read_exact_status(conn)
+                and PeerEvidence.observe_socket_peer(conn) is not None):
             conn.sendall(STATUS_FRAME)
         else:
             conn.sendall(DENIED_FRAME)

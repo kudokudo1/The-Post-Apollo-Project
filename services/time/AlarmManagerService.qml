@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import qs.services.sounds
 import "AlarmManagerPolicy.js" as Policy
+import "AlarmWriterQuiescencePolicy.js" as WriterQuiescence
 
 // V2 is the only mounted Alarm owner; V1 remains read-only migration input.
 // TimeW is just a view. No QtMultimedia dependency in the scheduler itself.
@@ -42,6 +43,30 @@ Scope {
     property bool previewing: false
     property string previewSoundId: "chime"
     property int previewVolume: 60
+    // BG1-B2B4 read-only readiness observation. This is never a transfer
+    // receipt: the current FileView remains the ONLY mounted alarm writer.
+    readonly property bool writerReleaseAcknowledged: false
+    readonly property bool writerReleaseActivated: false
+    readonly property var writerQuiescenceStatus:
+        WriterQuiescence.status(writerQuiescenceSnapshot())
+    function writerQuiescenceSnapshot() {
+        return {
+            storageState: manager.storageState,
+            pendingWrite: manager.pendingDocument !== null,
+            queuedWrite: manager.queuedDocument !== null,
+            migrationRequested: manager.migrationRequested,
+            ringingCount: manager.ringingCount,
+            previewing: manager.previewing,
+            audioState: manager.audioState,
+            notificationOutcome: manager.notificationOutcome
+        };
+    }
+    function requestWriterRelease() {
+        // No release endpoint, signing authority or background owner exists.
+        // A local drained queue is NOT a durable FileView release ack.
+        return WriterQuiescence.requestRelease(writerQuiescenceSnapshot());
+    }
+
     readonly property bool canEdit:
         storageState === "ready" || storageState === "empty"
         || storageState === "saving"

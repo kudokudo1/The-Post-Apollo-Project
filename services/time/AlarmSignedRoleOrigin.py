@@ -96,9 +96,14 @@ def _policy(raw):
         raise Refused("SIGNED_POLICY_JSON") from exc
     if type(policy) is not dict or set(policy) != FIELDS:
         raise Refused("SIGNED_POLICY_FIELDS")
-    if canonical(policy) != raw:
+    try:
+        normalized = canonical(policy)
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise Refused("SIGNED_POLICY_JSON") from exc
+    if normalized != raw:
         raise Refused("NONCANONICAL_SIGNED_POLICY")
     if (policy["schema"] != SCHEMA or policy["purpose"] != PURPOSE
+            or type(policy["role"]) is not str
             or policy["role"] not in ROLES
             or type(policy["releaseEpoch"]) is not int
             or type(policy["releaseSequence"]) is not int
@@ -188,6 +193,7 @@ class SignedClockRoleProbe:
         if (not isinstance(pinned_release_root, Ed25519PublicKey)
                 or type(policy_signature) is not bytes
                 or len(policy_signature) != 64
+                or type(expected_role) is not str
                 or expected_role not in ROLES
                 or type(minimum_epoch) is not int or minimum_epoch < 1
                 or type(minimum_sequence) is not int or minimum_sequence < 1

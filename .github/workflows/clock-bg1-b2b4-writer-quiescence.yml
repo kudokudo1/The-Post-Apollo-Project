@@ -20,6 +20,8 @@ jobs:
   local-drain-no-authority:
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    env:
+      TZ: America/New_York
     steps:
       - uses: actions/checkout@v4
         with:

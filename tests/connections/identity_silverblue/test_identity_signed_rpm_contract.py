@@ -914,5 +914,48 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         )
 
 
+    def test_30_parent_rebinds_serial_for_full_cleanup_and_host_bounds_stall(self):
+        import subprocess
+
+        guest = (AREA / "guest_identity_ostree_cycle.sh").read_text()
+        host = (AREA / "run_official_silverblue_identity.sh").read_text()
+        for marker in (
+            'exec >/dev/ttyS0 2>&1',
+            'C4B_ID_STAGE // parent_uart_descriptors_refreshed',
+            'C4B_ID_STAGE // local_probe_watchdog_reaped',
+            'C4B_ID_STAGE // independent_probe_witness_stop_started',
+            'C4B_ID_STAGE // independent_probe_witness_stopped',
+        ):
+            self.assertIn(marker, guest)
+        parent_start = guest.index('C4B_ID_STAGE // after_service_probe rc=%s')
+        rebind = guest.index('C4B_ID_STAGE // parent_uart_descriptors_refreshed')
+        watchdog = guest.index('C4B_ID_STAGE // local_probe_watchdog_reaped')
+        independent = guest.index('C4B_ID_STAGE // independent_probe_witness_stopped')
+        rollback = guest.index('echo rollback_pending > "$stage"')
+        self.assertLess(parent_start, rebind)
+        self.assertLess(rebind, watchdog)
+        self.assertLess(watchdog, independent)
+        self.assertLess(independent, rollback)
+        self.assertIn('post_probe_return_seen=0', host)
+        self.assertIn(
+            'C4B_ID_BLOCKED // GUEST_SILENT_AFTER_SUCCESSFUL_PROBE_BEFORE_ROLLBACK',
+            host,
+        )
+        self.assertIn('SECONDS - post_probe_return_seen > 180', host)
+        self.assertIn('C4B_ID_STAGE // rollback_command_started', host)
+        self.assertLess(
+            host.index('GUEST_SILENT_AFTER_SUCCESSFUL_PROBE_BEFORE_ROLLBACK'),
+            host.index('C4B_ID_HOST_HEARTBEAT // poll='),
+        )
+        subprocess.run(
+            ["/usr/bin/bash", "-n"], input=guest, text=True,
+            capture_output=True, check=True, timeout=3,
+        )
+        subprocess.run(
+            ["/usr/bin/bash", "-n"], input=host, text=True,
+            capture_output=True, check=True, timeout=3,
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -71,7 +71,7 @@ DENIED_FRAME = _canonical(DENIED)
 
 def _private_directory(directory: object) -> Path:
     try:
-        if type(directory) is not Path or not directory.is_absolute():
+        if not isinstance(directory, Path) or not directory.is_absolute():
             _deny()
         info = directory.lstat()
         if (not stat.S_ISDIR(info.st_mode)
@@ -164,6 +164,9 @@ def serve_status_only(
         server.settimeout(ACCEPT_TIMEOUT)
         try:
             server.bind(str(path))
+            current = path.lstat()
+            if stat.S_ISSOCK(current.st_mode):
+                own_inode = (current.st_dev, current.st_ino)
             os.chmod(path, 0o600, follow_symlinks=False)
             current = path.lstat()
             if (not stat.S_ISSOCK(current.st_mode)

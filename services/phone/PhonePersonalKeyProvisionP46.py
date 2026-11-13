@@ -117,7 +117,7 @@ def store_prepared_for_protected_host(
             "key-id", prepared.key_id,
         ]
         # Key passes ONLY on stdin, never command arguments or an env var.
-        result = run(argv, input=encoded + b"\n",
+        result = run(argv, input=encoded,
                      capture_output=True, timeout=TIMEOUT_SECONDS, check=False)
         if (type(result.returncode) is not int or result.returncode != 0
                 or type(result.stdout) is not bytes

@@ -859,7 +859,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         for required in (
             'parent_line_file=/run/postapollo-id-ci-cycle-lastline',
             'PARENT_LINE_WITNESS_START_REFUSED',
-            'trap \'printf "%s:%s',
+            'trap \'if (( LINENO > 1 )); then printf "%s:%s',
             '$BASHPID',
             '$LINENO',
             'SEPARATE_PROBE_PARENT_LASTLINE',
@@ -878,7 +878,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             guest.index('systemctl stop "$independent_unit"'),
         )
         self.assertNotIn('BASH_COMMAND', guest.split(
-            'trap \'printf "%s:%s', 1
+            'trap \'if (( LINENO > 1 )); then printf "%s:%s', 1
         )[1].split(' DEBUG', 1)[0])
         subprocess.run(
             ["/usr/bin/bash", "-n"], input=guest,

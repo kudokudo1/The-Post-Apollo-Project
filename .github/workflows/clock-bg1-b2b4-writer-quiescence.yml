@@ -1,0 +1,53 @@
+name: Clock BG1-B2B4 local writer quiescence preflight (deny-only)
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmManagerService.qml"
+      - "services/time/AlarmWriterQuiescencePolicy.js"
+      - "services/time/BG1-ALARM-WRITER-QUIESCENCE.md"
+      - "tests/time/test_clock_bg1_b2b4_writer_quiescence.cjs"
+      - ".github/workflows/clock-bg1-b2b4-writer-quiescence.yml"
+  push:
+    paths:
+      - "services/time/AlarmManagerService.qml"
+      - "services/time/AlarmWriterQuiescencePolicy.js"
+      - "services/time/BG1-ALARM-WRITER-QUIESCENCE.md"
+      - "tests/time/test_clock_bg1_b2b4_writer_quiescence.cjs"
+      - ".github/workflows/clock-bg1-b2b4-writer-quiescence.yml"
+permissions:
+  contents: read
+jobs:
+  local-drain-no-authority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate denied ownership and live QML writer path
+        run: node --test tests/time/test_clock_bg1_b2b4_writer_quiescence.cjs
+      - name: Preserve current Clock alarm and note recovery contracts
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_manager_v2_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_note_recovery_contract.py' -v
+      - name: Preserve synthetic ownership/peer and shadow contracts
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_broker_protocol.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2_shadow_transactions.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+      - name: Enforce exact scoped QML + pure policy patch
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          paths=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],
+              text=True).splitlines())
+          expected={
+              "services/time/AlarmManagerService.qml",
+              "services/time/AlarmWriterQuiescencePolicy.js",
+              "services/time/BG1-ALARM-WRITER-QUIESCENCE.md",
+              "tests/time/test_clock_bg1_b2b4_writer_quiescence.cjs",
+              ".github/workflows/clock-bg1-b2b4-writer-quiescence.yml"}
+          assert paths==expected, f"Scope changed: {paths ^ expected}"
+          print("No broker/Identity/Connections/active background mode changes: PASS")
+          PY

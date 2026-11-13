@@ -892,7 +892,7 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         guest = (AREA / "guest_identity_ostree_cycle.sh").read_text()
         target = (
             "printf 'C4B_ID_STAGE // after_service_probe rc=%s\\n'"
-            ' "$probe_rc" >/dev/ttyS0 ||\\n'
+            ' "$probe_rc" >/dev/ttyS0 ||\n'
             '      fail "PARENT_POST_SERVICE_UART_WRITE_REFUSED"'
         )
         self.assertIn(target, guest)

@@ -140,7 +140,6 @@ class CanonicalHandoffFixtureTests(unittest.TestCase):
         self.assertEqual(self.state_from_sqlite()["revision"], 0)
         self.refusal(lambda: self.writer.prepare(a["sourceDigest"], 7),
                      "CANDIDATE_ALREADY_PREPARED")
-        self.released if False else None
         proof = Handoff.synthetic_release_proof(
             self.secret, a["scope"], a["sourceDigest"], 7, a["challenge"])
         self.assertEqual(

@@ -422,7 +422,13 @@ C4B_SEPARATE_WITNESS
     probe_rc=0
     timeout --signal=TERM --kill-after=10s 420s /usr/bin/bash "$service_probe" ||
       probe_rc="$?"
-    printf 'C4B_ID_STAGE // after_service_probe rc=%s\n' "$probe_rc"
+    # Genuine guest evidence identifies this exact parent progress write as
+    # the last command before systemd exit 1 after child SELinux teardown.
+    # Open the UART anew rather than relying on an inherited descriptor that
+    # may have become unwritable across the policy transition. A failed fresh
+    # write is a hard refusal, never rollback permission.
+    printf 'C4B_ID_STAGE // after_service_probe rc=%s\n' "$probe_rc" >/dev/ttyS0 ||
+      fail "PARENT_POST_SERVICE_UART_WRITE_REFUSED"
     kill "$probe_watchdog_pid" >/dev/null 2>&1 || true
     wait "$probe_watchdog_pid" 2>/dev/null || true
     trap - DEBUG

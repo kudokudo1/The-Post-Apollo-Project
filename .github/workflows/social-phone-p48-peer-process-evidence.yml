@@ -1,0 +1,44 @@
+name: Social PHONE P48 Real Linux Peer Process Evidence, Deny-Only
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhonePersonalHostSocketP47.py'
+      - 'services/phone/PhonePersonalPeerEvidenceP48.py'
+      - 'tests/phone/test_phone_personal_peer_evidence_p48.py'
+      - 'MODEL/contracts/social-phone-p48-linux-peer-process-evidence-v0.md'
+      - '.github/workflows/social-phone-p48-peer-process-evidence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhonePersonalHostSocketP47.py'
+      - 'services/phone/PhonePersonalPeerEvidenceP48.py'
+      - 'tests/phone/test_phone_personal_peer_evidence_p48.py'
+      - 'MODEL/contracts/social-phone-p48-linux-peer-process-evidence-v0.md'
+      - '.github/workflows/social-phone-p48-peer-process-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-kernel-peer-process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile real Linux kernel peer observer and socket
+        run: |
+          python -m py_compile services/phone/PhonePersonalPeerEvidenceP48.py
+          python -m py_compile services/phone/PhonePersonalHostSocketP47.py
+      - name: Real pidfd /proc starttime cgroup executable and socket denial
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_peer_evidence_p48.py' -v
+      - name: P47 real Linux AF_UNIX SO_PEERCRED regression
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_host_socket_p47.py' -v
+      - name: Existing P45 and P46 mainline completeness and locked QML
+        run: |
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_mainline_completeness_p45.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_transaction_review_p44.py' -v

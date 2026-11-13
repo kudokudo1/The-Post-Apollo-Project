@@ -27,6 +27,7 @@ Rectangle {
         {id:"templates", label:"TEMPLATES"},
         {id:"calendar", label:"CALENDAR"},
         {id:"queue", label:"QUEUE"},
+        {id:"access", label:"ACCESS"},
         {id:"history", label:"HISTORY"}
     ]
 
@@ -300,6 +301,13 @@ Rectangle {
                 calendarMode: publisher.activeSection === "calendar"
                 visible: publisher.activeSection === "calendar"
                          || publisher.activeSection === "queue"
+            }
+
+            PublisherAccessPane {
+                id: publisherAccessPane
+                anchors.fill: parent
+                anchors.margins: 10
+                visible: publisher.activeSection === "access"
             }
 
             Column {

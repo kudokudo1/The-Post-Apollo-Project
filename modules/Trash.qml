@@ -2419,6 +2419,7 @@ PanelWindow {
                                             readonly property bool managedRow:
                                                 modelData.kind === "SAVED RESEARCH"
                                                 || modelData.kind === "SAVED EVENT"
+                                            visible: managedRow
                                             width: parent.width
                                             height: 30
                                             actionWidth: width

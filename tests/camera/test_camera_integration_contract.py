@@ -127,7 +127,15 @@ class CameraWidgetContracts(unittest.TestCase):
         self.assertIn("function confirmSelectedTrash()", PANEL)
         self.assertIn('run("previewSelected", ["preview-selected", selectedPath])', PANEL)
         self.assertIn('run("trashSelected", ["trash-selected", plan.planId, "MOVE_TO_TRASH"])', PANEL)
-        self.assertIn('label: "CONFIRM TRASH"', PANEL)
+        # U5 preserves preview/confirmation semantics through the U1
+        # review-only deck, rather than the former bespoke button.
+        self.assertIn('id: cameraSelectedTrashReviewDeck', PANEL)
+        self.assertIn('resourceRevisionKind: "camera-plan"', PANEL)
+        self.assertIn('onTrashReviewRequested:', PANEL)
+        self.assertIn('function reviewSelectedCameraTrash(', PANEL)
+        self.assertIn('return confirmSelectedTrash();', PANEL)
+        self.assertIn('showRestore: false', PANEL)
+        self.assertIn('showBurn: false', PANEL)
         self.assertIn("galleryFolderInput", PANEL)
 
     def test_batch_trash_needs_preview_and_separate_confirmation(self):

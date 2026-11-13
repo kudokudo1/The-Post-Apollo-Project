@@ -631,9 +631,9 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             'vm_raw="$RUNNER_TEMP/c4b-identity-vm-full-ci.log"',
             '2>&1 | tee "$vm_raw"',
             'vm_rc="${PIPESTATUS[0]}"',
-            'C4B_ID_(PASS|FAIL|BLOCKED|STAGE|SELINUX_[A-Z_]+|SERVICE_[A-Z_]+)',
-            'tail -n 180 >"$vm_evidence"',
-            'C4B_ID_VM_PROCESS_EXIT // %s',
+            'sanitize_guest_marker_artifact.py',
+            '"$vm_raw" "$vm_evidence" "$vm_rc"',
+            'GUEST_MARKER_ARTIFACT_SANITIZATION_REFUSED',
             'exit "$vm_rc"',
             'Preserve bounded real-guest C4b marker evidence',
             'if: always()',
@@ -963,6 +963,56 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             ["/usr/bin/bash", "-n"], input=host, text=True,
             capture_output=True, check=True, timeout=3,
         )
+
+
+    def test_31_c4b_guest_evidence_filter_strips_only_serial_prefix_and_crlf(self):
+        import runpy
+
+        script = AREA / "sanitize_guest_marker_artifact.py"
+        self.assertTrue(script.is_file())
+        source = script.read_text()
+        self.assertIn('MAX_MARKER_LINES = 200', source)
+        self.assertIn('MAX_ARTIFACT_BYTES = 65536', source)
+        self.assertIn('os.O_NOFOLLOW', source)
+        mod = runpy.run_path(str(script), run_name="c4b_contract_test")
+        sanitize = mod["sanitize_marker_artifact"]
+        refused = mod["MarkerArtifactRefused"]
+        dirty = (
+            b"serial noise before evidence\r\n"
+            b"\x1b]3008;user=root;hostname=ci-vm;machineid=secret\x1b\\"
+            b"C4B_ID_STAGE // initial\r\n"
+            b"C4B_ID_SELINUX_NEGATIVE_DETAIL // "
+            b"C4B_ID_PASS // NESTED_MUST_NOT_GRANT\r\n"
+            b"C4B_ID_PASS // REAL_SILVERBLUE_IDENTITY_RPM_LAYER_REMOVED\r\n"
+        )
+        output = sanitize(dirty, 0)
+        self.assertEqual(
+            output,
+            b"C4B_ID_STAGE // initial\n"
+            b"C4B_ID_SELINUX_NEGATIVE_DETAIL // "
+            b"C4B_ID_PASS // NESTED_MUST_NOT_GRANT\n"
+            b"C4B_ID_PASS // REAL_SILVERBLUE_IDENTITY_RPM_LAYER_REMOVED\n"
+            b"C4B_ID_VM_PROCESS_EXIT // 0\n",
+        )
+        self.assertNotIn(b"\r", output)
+        self.assertNotIn(b"\x1b", output)
+        self.assertNotIn(b"machineid", output)
+        self.assertEqual(
+            sanitize(b"C4B_ID_FAIL // DENIED\r\n", 2),
+            b"C4B_ID_FAIL // DENIED\nC4B_ID_VM_PROCESS_EXIT // 2\n",
+        )
+        for bad in (
+            b"C4B_ID_PASS // BAD\x1b[0m\r\n",
+            b"C4B_ID_STAGE // INVALID\rMID\n",
+            b"C4B_ID_PASS // " + b"A" * 1537 + b"\n",
+            b"C4B_ID_STAGE // initial\n" * 201,
+        ):
+            with self.assertRaises(refused):
+                sanitize(bad, 0)
+        with self.assertRaises(refused):
+            sanitize(b"C4B_ID_STAGE // initial\n", 256)
+        with self.assertRaises(refused):
+            sanitize(b"unrelated and untrusted\r\n", 0)
 
 
 if __name__ == "__main__":

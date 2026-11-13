@@ -178,6 +178,37 @@ class QueueP14Tests(unittest.TestCase):
         self.assertEqual(len({v["id"] for v in results}),1)
         self.assertEqual(len(self.call("status")["jobs"]),1)
 
+    def test_headless_watch_marks_due_without_social_window(self):
+        # A fake past due timestamp represents the scheduler waking after an
+        # offline period. This process has no Quickshell or platform accounts.
+        self.call("schedule")
+        with sqlite3.connect(self.db) as connection:
+            connection.execute("UPDATE jobs SET due_ms=? WHERE id=1",
+                               (queue.now_ms() - 1000,))
+        args = [sys.executable,"-I","-B",str(SOURCE),"watch",
+                "--db",str(self.db),"--drafts",str(self.drafts),
+                "--interval-seconds","5"]
+        child = subprocess.Popen(args,stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE,text=True)
+        try:
+            import time
+            status = ""
+            for _ in range(80):
+                with sqlite3.connect(self.db) as connection:
+                    status = connection.execute(
+                        "SELECT status FROM jobs WHERE id=1").fetchone()[0]
+                if status == "needs_review":
+                    break
+                self.assertIsNone(child.poll(),
+                                  "headless scheduler exited unexpectedly")
+                time.sleep(0.05)
+            self.assertEqual(status, "needs_review")
+            self.assertEqual(self.call("status")["jobs"][0]["status"],
+                             "needs_review")
+        finally:
+            child.terminate()
+            child.communicate(timeout=3)
+
     def test_symlinked_queue_file_refused(self):
         target = Path(self.temp.name) / "other.sqlite3"
         target.write_text("not a db")

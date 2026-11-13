@@ -174,6 +174,7 @@ pid="$!"
 final=0
 selinux_load_started=0
 service_cleanup_seen=0
+post_probe_return_seen=0
 for n in $(seq 1 700); do
   if [[ -r "$tmp/identity-guest-serial.log" ]]; then
     if grep -Fq 'C4B_ID_FAIL //' "$tmp/identity-guest-serial.log"; then
@@ -184,6 +185,25 @@ for n in $(seq 1 700); do
         "$tmp/identity-guest-serial.log"; then
       final=1
       break
+    fi
+    # The probe may return successfully but the parent can stall in watchdog
+    # reaping or rollback setup. A returned probe alone is NEVER acceptance.
+    # Bound this second, independently observed handoff on the disposable host.
+    if grep -aFq 'C4B_ID_STAGE // after_service_probe rc=0' \
+        "$tmp/identity-guest-serial.log" &&
+       ! grep -aFq 'C4B_ID_STAGE // rollback_command_started' \
+        "$tmp/identity-guest-serial.log"; then
+      if (( post_probe_return_seen == 0 )); then
+        post_probe_return_seen=$SECONDS
+      fi
+      if (( SECONDS - post_probe_return_seen > 180 )); then
+        echo "C4B_ID_BLOCKED // GUEST_SILENT_AFTER_SUCCESSFUL_PROBE_BEFORE_ROLLBACK"
+        ps -o pid=,ppid=,stat=,wchan:24=,etime=,comm= -p "$pid" 2>/dev/null |
+          awk 'NR <= 2 {print "C4B_ID_STAGE // HOST_POST_PROBE_QEMU_PROCESS // " $0}' || true
+        break
+      fi
+    else
+      post_probe_return_seen=0
     fi
     # A guest policy unload can stall scheduling AFTER emitting the cleanup
     # marker: the guest watchdog then cannot speak, while the outer 700-poll

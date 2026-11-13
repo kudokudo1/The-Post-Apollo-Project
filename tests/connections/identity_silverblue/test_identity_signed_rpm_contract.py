@@ -886,5 +886,33 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
         )
 
 
+    def test_29_parent_post_selinux_handoff_opens_uart_and_fails_closed(self):
+        import subprocess
+
+        guest = (AREA / "guest_identity_ostree_cycle.sh").read_text()
+        target = (
+            "printf 'C4B_ID_STAGE // after_service_probe rc=%s\\n'"
+            ' "$probe_rc" >/dev/ttyS0 ||\\n'
+            '      fail "PARENT_POST_SERVICE_UART_WRITE_REFUSED"'
+        )
+        self.assertIn(target, guest)
+        self.assertLess(
+            guest.index(target),
+            guest.index('echo rollback_pending > "$stage"'),
+        )
+        self.assertLess(
+            guest.index(target),
+            guest.index('[[ "$probe_rc" == 0 ]]'),
+        )
+        self.assertEqual(
+            guest.count("C4B_ID_STAGE // after_service_probe rc=%s"),
+            1,
+        )
+        subprocess.run(
+            ["/usr/bin/bash", "-n"],
+            input=guest, text=True, capture_output=True, check=True, timeout=3,
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

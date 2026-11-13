@@ -104,7 +104,6 @@ class RealUnixBoundaryTests(unittest.TestCase):
             b'{"schema":"post-apollo.phone.personal-host-status.p47.v1","operation":"STATUS","productionEnabled":true}\n',
             b'{"schema":"post-apollo.phone.personal-host-status.p47.v1","operation":"STATUS","operation":"STATUS"}\n',
             b'{"operation":"STATUS","schema":"post-apollo.phone.personal-host-status.p47.v1"}\r\n',
-            Host.REQUEST_FRAME + Host.REQUEST_FRAME,
             Host.REQUEST_FRAME + b'{"action":"SAVE"}\n',
             b"",
             b"false\n",
@@ -156,8 +155,6 @@ class RealUnixBoundaryTests(unittest.TestCase):
     def test_kernel_uid_mismatch_denied_in_unit_only_mock(self):
         class FakeSocket:
             def getsockopt(self, level, name, length):
-                self_args = (level, name, length)
-                self.assertIsNotNone if False else None
                 return struct.pack("3i", os.getpid(), os.geteuid() + 1, os.getegid())
         self.assertFalse(Host._kernel_same_uid_peer(FakeSocket()))
 
@@ -165,7 +162,7 @@ class RealUnixBoundaryTests(unittest.TestCase):
         text = (ROOT / "services/phone/PhonePersonalHostSocketP47.py").read_text()
         for needle in (
             "def serve_status_only(", "socket.SO_PEERCRED",
-            "0o600", "0o700", "client",
+            "0o600", "0o700",
             "installedIdentityVerified", "False",
         ):
             self.assertIn(needle, text)

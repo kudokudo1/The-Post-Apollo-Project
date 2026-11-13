@@ -59,6 +59,16 @@ PanelWindow {
     property string cleanupMediaFilter: "all"
     property string galleryRequestedView: "gallery"
     property var batchPaths: []
+    // U6 // Monotonic, UI-only witness for the shared queue across
+    // Batch/Grid/Swipe/Hunt. Every queue mutation replaces the array;
+    // no selection gesture ever triggers an actual GIO move.
+    property int cleanupQueueRevision: 0
+    onBatchPathsChanged: {
+        // Saturate rather than wrapping a request token and risking ABA.
+        // Once exhausted, the review handler refuses until a fresh session.
+        if (cleanupQueueRevision < 2147483647)
+            cleanupQueueRevision += 1;
+    }
     property var batchPreview: null
     property string batchReviewKey: ""
     property string batchReceipt: ""
@@ -1316,6 +1326,36 @@ PanelWindow {
             "trash-batch-now", JSON.stringify(batchPaths),
             "MOVE_TO_TRASH", "--folder", cleanupCustomFolder
         ]);
+    }
+
+    // U6 // One explicit queue-button review. This handler never accepts
+    // file paths or operations from the generic ActionDeck. It validates
+    // the current queue generation and hands off to the SAME Camera-owned
+    // one-click backend, which performs its one-use plan and GIO checks.
+    function reviewQueuedCameraTrash(ownerId, resourceId, expectedRevision) {
+        if (ownerId !== "camera-gio"
+                || resourceId !== "camera-cleanup-queue"
+                || !/^(0|[1-9][0-9]{0,9})$/.test(expectedRevision)
+                || cleanupQueueRevision >= 2147483647
+                || expectedRevision !== String(cleanupQueueRevision)
+                || !hostedCleanupActive || !cleanupQueueOpen
+                || !batchMode || activeView !== "cleanup"
+                || cleanupTechnique === "desktop"
+                || busy || nativeRegionSelecting || zoomWebBusy
+                || batchPaths.length === 0 || batchPaths.length > 500
+                || cleanupCustomFolder !== cleanupLoadedFolder
+                || cleanupCustomFolder !== galleryRequestedFolder
+                || galleryRequestedView !== "cleanup")
+            return false;
+        // Queue remains Camera-owned. It can contain records from older
+        // gallery pages, so do NOT require membership in the current page.
+        // The backend independently re-scans allowed roots and signatures.
+        if (batchPaths.some(function(path, i) {
+            return typeof path !== "string" || !path.startsWith("/")
+                   || batchPaths.indexOf(path) !== i;
+        }))
+            return false;
+        return trashQueuedNow();
     }
 
     function previewBatchTrash() {

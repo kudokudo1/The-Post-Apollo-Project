@@ -115,6 +115,8 @@ test("shared deck keeps default SHA witness and accepts explicit safe decimal op
     assert.match(deck,/\^\(0\|\[1-9\]\[0-9\]\{0,9\}\)\$/);
     assert.match(deck,/&& revisionReady/);
     assert.match(qml,/id: managedCopyLifecycleActions/);
+    // Non-managed source/V2 rows must not reserve invisible control height.
+    assert.match(qml,/visible: managedRow/);
     assert.match(qml,/resourceRevisionKind: "store-counter"/);
     assert.match(qml,/showBurn: false/);
     assert.match(qml,/onTrashReviewRequested:/);

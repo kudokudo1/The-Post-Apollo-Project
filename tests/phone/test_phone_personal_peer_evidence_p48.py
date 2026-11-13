@@ -148,10 +148,7 @@ class ActualKernelPeerTests(unittest.TestCase):
         for expected in (
             "socket.SO_PEERCRED", "os.pidfd_open", "start_ticks",
             "_hash_executable", "cgroup_sha256", "_pidfd_alive",
-            "linux", "NOT_A",  # NO deliberate grant token to fake trust
         ):
-            if expected in ("linux", "NOT_A"):
-                continue
             self.assertIn(expected, src)
         self.assertIn("PeerEvidence.observe_socket_peer(conn)", socket_src)
         for forbidden in (

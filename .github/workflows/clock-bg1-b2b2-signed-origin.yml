@@ -1,0 +1,56 @@
+name: Clock BG1-B2B2 signed process-origin observation (deny-only)
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmSignedRoleOrigin.py"
+      - "services/time/BG1-ALARM-SIGNED-ROLE-ORIGIN.md"
+      - "tests/time/test_clock_bg1_b2b2_signed_role_origin.py"
+      - ".github/workflows/clock-bg1-b2b2-signed-origin.yml"
+  push:
+    paths:
+      - "services/time/AlarmSignedRoleOrigin.py"
+      - "services/time/BG1-ALARM-SIGNED-ROLE-ORIGIN.md"
+      - "tests/time/test_clock_bg1_b2b2_signed_role_origin.py"
+      - ".github/workflows/clock-bg1-b2b2-signed-origin.yml"
+permissions:
+  contents: read
+jobs:
+  signed-role-observation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Use the existing Identity Center pinned crypto test dependency
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Signed independent role + live peer child + negative trust tests
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b2_signed_role_origin.py' -v
+      - name: Preserve prior BG1 peer and broker tests
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2_shadow_transactions.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_broker_protocol.py' -v
+      - name: Scope gate forbids live owner, Identity or Connections changes
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],
+              text=True).splitlines())
+          expected={
+              "services/time/AlarmSignedRoleOrigin.py",
+              "services/time/BG1-ALARM-SIGNED-ROLE-ORIGIN.md",
+              "tests/time/test_clock_bg1_b2b2_signed_role_origin.py",
+              ".github/workflows/clock-bg1-b2b2-signed-origin.yml"}
+          assert changed == expected, f"Unexpected file scope: {changed ^ expected}"
+          assert not any(s.startswith(("services/identity/","tests/connections/",
+              "services/time/AlarmManager","services/time/AlarmOwnershipBroker"))
+              for s in changed)
+          print("BG1 signed role observer is isolated, non-actuating: PASS")
+          PY

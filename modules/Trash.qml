@@ -952,7 +952,7 @@ PanelWindow {
             ? filteredItems.map(function(item) {
                 return {entryType:"file", name:item.name,
                         originLabel:item.originLabel, uri:item.uri,
-                        original:item.original};
+                        original:item.original, reviewId:item.reviewId};
             }) : [];
         const needle = String(trashSearch.text || "").trim().toLowerCase();
         const copyRows = researchBinRows.filter(function(row) {
@@ -1111,10 +1111,36 @@ PanelWindow {
         }
     }
 
+    // U4 // Request-only GIO review adapter. A per-row SHA-256 review ID
+    // matches the exact currently displayed URI+original tuple; it is not
+    // a source identity credential or a substitute for backend GIO checks.
+    function reviewGioFileRestore(ownerId, resourceId, expectedRevision) {
+        if (!menuOpen || activeMode !== "trash" || !indexReady || lastError
+                || busy || researchBusy || archiveBusy || archiveV2Busy
+                || snapshotBusy || researchBurnId !== ""
+                || confirmMode !== "" || burnUiStage !== ""
+                || ownerId !== "filesystem-gio"
+                || !/^[0-9a-f]{64}$/.test(resourceId)
+                || !/^[0-9a-f]{64}$/.test(expectedRevision)
+                || expectedRevision !== revision)
+            return false;
+        const matching = items.filter(function(item) {
+            return item.reviewId === resourceId
+                   && typeof item.uri === "string"
+                   && item.uri.startsWith("trash:///")
+                   && typeof item.original === "string"
+                   && item.original.startsWith("/");
+        });
+        if (matching.length !== 1)
+            return false;
+        const item = matching[0];
+        return restoreItem(item) === true;
+    }
+
     function restoreItem(item) {
-        if (busy || !item) return;
+        if (busy || !item) return false;
         clearConfirmation();
-        run("restore", ["restore", String(item.uri), String(item.original)]);
+        return run("restore", ["restore", String(item.uri), String(item.original)]);
     }
 
     function armBurn(item) {
@@ -1782,22 +1808,60 @@ PanelWindow {
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 5
 
+                            // The original managed-copy restore remains
+                            // owned by its separate revision-checked backend.
                             ActionButton {
                                 width: 68
                                 height: 31
+                                visible: trashEntry.modelData.entryType === "record"
                                 label: "RESTORE"
                                 labelPixelSize: 10
                                 accentColor: Colors.green
                                 available: !trashLauncher.busy
                                            && !trashLauncher.researchBusy
                                            && trashLauncher.researchBurnId === ""
-                                onLeftClicked: {
-                                    if (trashEntry.modelData.entryType === "record")
-                                        trashLauncher.restoreResearchCopy(
-                                            trashEntry.modelData.record);
-                                    else
-                                        trashLauncher.restoreItem(
-                                            trashEntry.modelData);
+                                onLeftClicked: trashLauncher.restoreResearchCopy(
+                                    trashEntry.modelData.record)
+                            }
+
+                            // GIO system-file Restore uses the same U1
+                            // request deck as the managed-copy pilot.
+                            // This does not add a new delete or Burn path.
+                            TrashLifecycleActionDeck {
+                                id: gioRestoreReviewDeck
+                                readonly property bool isGioFile:
+                                    trashEntry.modelData.entryType === "file"
+                                visible: isGioFile
+                                width: 68
+                                height: 31
+                                actionWidth: width
+                                actionHeight: 31
+                                ownerId: "filesystem-gio"
+                                resourceId: String(trashEntry.modelData.reviewId || "")
+                                resourceRevision: String(trashLauncher.revision)
+                                showRestore: isGioFile
+                                restoreCapable: isGioFile
+                                showTrash: false
+                                showBurn: false
+                                ownerApproved: isGioFile
+                                policyReviewed: isGioFile
+                                protectedResource: !isGioFile
+                                retentionHold: !isGioFile
+                                requestInFlight: !trashLauncher.menuOpen
+                                    || trashLauncher.activeMode !== "trash"
+                                    || !trashLauncher.indexReady
+                                    || trashLauncher.lastError
+                                    || trashLauncher.busy
+                                    || trashLauncher.researchBusy
+                                    || trashLauncher.archiveBusy
+                                    || trashLauncher.archiveV2Busy
+                                    || trashLauncher.snapshotBusy
+                                    || trashLauncher.researchBurnId !== ""
+                                    || trashLauncher.confirmMode !== ""
+                                    || trashLauncher.burnUiStage !== ""
+                                onRestoreReviewRequested: function(ownerId, resourceId, expectedRevision) {
+                                    trashLauncher.reviewGioFileRestore(
+                                        ownerId, resourceId, expectedRevision);
                                 }
                             }
 

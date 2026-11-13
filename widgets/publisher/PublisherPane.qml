@@ -27,6 +27,7 @@ Rectangle {
         {id:"templates", label:"TEMPLATES"},
         {id:"calendar", label:"CALENDAR"},
         {id:"queue", label:"QUEUE"},
+        {id:"access", label:"ACCESS"},
         {id:"history", label:"HISTORY"}
     ]
 
@@ -292,29 +293,28 @@ Rectangle {
                 }
             }
 
-            Column {
-                anchors.centerIn: parent
-                width: parent.width - 50
-                spacing: 12
+            PublisherQueuePane {
+                id: publisherQueuePane
+                anchors.fill: parent
+                anchors.margins: 10
+                activeDraftId: publisher.selectedDraftId
+                calendarMode: publisher.activeSection === "calendar"
                 visible: publisher.activeSection === "calendar"
                          || publisher.activeSection === "queue"
-                         || publisher.activeSection === "history"
-                Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    color: Colors.yellow
-                    font.pixelSize: 18
-                    text: publisher.activeSection.toUpperCase()
-                }
-                Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                    color: Colors.white
-                    font.pixelSize: 12
-                    text: "P1 FUTURE STEP // NOT ENABLED.\n"
-                          + "NO SCHEDULE, QUEUE, UPLOAD OR POSTING AUTHORITY."
-                }
+            }
+
+            PublisherAccessPane {
+                id: publisherAccessPane
+                anchors.fill: parent
+                anchors.margins: 10
+                visible: publisher.activeSection === "access"
+            }
+
+            PublisherHistoryPane {
+                id: publisherHistoryPane
+                anchors.fill: parent
+                anchors.margins: 10
+                visible: publisher.activeSection === "history"
             }
         }
         Text {

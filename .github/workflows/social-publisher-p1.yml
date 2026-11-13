@@ -40,6 +40,18 @@ jobs:
         run: node tests/publisher/test_publisher_template_policy.cjs
       - name: Guard P1.3 template storage and compose integration
         run: python3 tests/publisher/test_publisher_template_integration.py
+      - name: Test real SQLite queue, idempotency, timezone and recovery
+        run: python3 tests/publisher/test_publisher_queue_cli.py
+      - name: Guard deny-only queue integration and SocialW routing
+        run: python3 tests/publisher/test_publisher_queue_integration.py
+      - name: Test deny-only account-specific publishing intents
+        run: node tests/publisher/test_publisher_access_intent_policy.cjs
+      - name: Guard Social and Connections authority boundaries
+        run: python3 tests/publisher/test_publisher_access_intent_integration.py
+      - name: Exercise P1.6 local history, crash rollback and v1 migration
+        run: python3 tests/publisher/test_publisher_history_cli.py
+      - name: Guard P1.6 history/recovery UI and deny-only boundary
+        run: python3 tests/publisher/test_publisher_history_integration.py
       - name: Guard Social companion routing and single writer
         run: python3 tests/publisher/test_publisher_social_integration.py
       - name: Re-run existing Social Settings contracts

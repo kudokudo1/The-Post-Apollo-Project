@@ -624,6 +624,28 @@ PanelWindow {
         return run("trashSelected", ["trash-selected", plan.planId, "MOVE_TO_TRASH"]);
     }
 
+    // Trash++ U5 // The shared control requests Camera's existing one-use
+    // Gallery plan only. The plan and selected path stay inside Camera, never
+    // inside the generic UI event. Camera still owns every validation and
+    // the backend still consumes its short-lived plan before recoverable GIO.
+    function reviewSelectedCameraTrash(ownerId, resourceId, expectedRevision) {
+        if (!menuOpen || activeView !== "gallery" || busy
+                || nativeRegionSelecting || zoomWebBusy
+                || ownerId !== "camera-gio"
+                || resourceId !== "camera-gallery-selection"
+                || !/^[0-9a-f]{32}$/.test(expectedRevision)
+                || !selectedPath || !selectedRecord
+                || String(selectedRecord.path || "") !== selectedPath
+                || !selectedTrashPreview
+                || String(selectedTrashPreview.planId || "") !== expectedRevision
+                || selectedTrashPreview.path !== selectedPath
+                || galleryFiles.findIndex(function(record) {
+                    return record && record.path === selectedPath;
+                }) < 0)
+            return false;
+        return confirmSelectedTrash();
+    }
+
     // The queue is presentation-neutral. Batch checkboxes, Swipe and Hunt
     // must all mark/unmark here, NEVER call gio directly.
     function batchContains(path) {
@@ -3155,15 +3177,38 @@ PanelWindow {
                                 accentColor: Colors.cyan
                                 onLeftClicked: camera.selectedTrashPreview = null
                             }
-                            ActionButton {
+                            // U5 // One scoped, recoverable Camera Gallery
+                            // TRASH action. This never offers RESTORE/BURN and
+                            // cannot operate before a backend preview plan.
+                            TrashLifecycleActionDeck {
+                                id: cameraSelectedTrashReviewDeck
                                 width: (parent.width - parent.spacing) / 2
                                 height: 33
-                                label: "CONFIRM TRASH"
-                                labelPixelSize: 10
-                                accentColor: Colors.red
-                                destructive: true
-                                available: !camera.busy
-                                onLeftClicked: camera.confirmSelectedTrash()
+                                actionWidth: width
+                                actionHeight: 33
+                                ownerId: "camera-gio"
+                                resourceId: "camera-gallery-selection"
+                                resourceRevisionKind: "camera-plan"
+                                resourceRevision: camera.selectedTrashPreview
+                                    ? String(camera.selectedTrashPreview.planId || "")
+                                    : ""
+                                showTrash: camera.selectedTrashPreview !== null
+                                trashCapable: camera.selectedTrashPreview !== null
+                                showRestore: false
+                                showBurn: false
+                                ownerApproved: camera.selectedTrashPreview !== null
+                                policyReviewed: camera.selectedTrashPreview !== null
+                                protectedResource: camera.selectedTrashPreview === null
+                                retentionHold: camera.selectedTrashPreview === null
+                                requestInFlight: !camera.menuOpen
+                                    || camera.activeView !== "gallery"
+                                    || camera.busy
+                                    || camera.nativeRegionSelecting
+                                    || camera.zoomWebBusy
+                                onTrashReviewRequested: function(ownerId, resourceId, expectedRevision) {
+                                    camera.reviewSelectedCameraTrash(
+                                        ownerId, resourceId, expectedRevision);
+                                }
                             }
                         }
 

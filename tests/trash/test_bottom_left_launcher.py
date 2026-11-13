@@ -304,7 +304,13 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('archiveRows.concat(researchRows)', TRASH)
         self.assertIn('sourceObservedAt', TRASH)
         self.assertIn('label: "BURN COPY"', TRASH)
-        self.assertIn('label: "TRASH COPY"', TRASH) if 'label: "TRASH COPY"' in TRASH else self.assertIn('? "RESTORE" : "TRASH COPY"', TRASH)
+        # U3 now uses the shared review-only action deck instead of an
+        # immediately executable per-row managed-copy button.
+        self.assertIn('id: managedCopyLifecycleActions', TRASH)
+        self.assertIn('resourceRevisionKind: "store-counter"', TRASH)
+        self.assertIn('function reviewManagedCopyAction(', TRASH)
+        self.assertIn('onTrashReviewRequested:', TRASH)
+        self.assertIn('onRestoreReviewRequested:', TRASH)
         self.assertIn('label: "RECORD BIN " + trashLauncher.researchBinRows.length', TRASH)
         self.assertIn('trashLauncher.trashViewFilter = "records"', TRASH)
         self.assertIn('id: researchBurnReview', TRASH)

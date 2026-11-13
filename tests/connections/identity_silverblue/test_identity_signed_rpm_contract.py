@@ -661,18 +661,26 @@ class IdentitySilverblueSignedRpmContract(unittest.TestCase):
             host.index('C4B_ID_PASS // REAL_ENFORCING_DEDICATED_SELINUX_DOMAIN_OBSERVED'),
             host.index('C4B_ID_LIMITATION // CI_ONLY_CONFIRMED_CONFINEMENT'),
         )
+        # A completed real VM proves the *combined* C4b CI-only lifecycle
+        # test, not independently enrolled production host/release trust.
+        # Never require stale "unverified" wording to keep this test green.
         for required in (
             'postapollo_identity_ci_t',
-            'independent AF_INET SELinux denial',
-            'combined two-boot rollback remain unverified together',
-            'startup_failure',
-            'C5 human consent',
+            'Phase 5 combined SELinux/network-denial/rollback',
+            'run #43355333805',
+            'independent kernel AF_INET socket refusal',
+            'genuine second-boot rollback',
+            'C3e and Identity DOC',
+            'C5 consent',
+            'production sign-in is disabled',
         ):
             self.assertIn(required, document)
-        self.assertNotIn(
+        for stale in (
+            'combined two-boot rollback remain unverified together',
+            'Next combined SELinux/rollback gate: STILL BLOCKED',
             'Current C4b process-continuity checks and separate compile-only custom policy prototype are pending',
-            document,
-        )
+        ):
+            self.assertNotIn(stale, document)
 
 
     def test_22_real_service_probe_return_must_precede_rollback(self):

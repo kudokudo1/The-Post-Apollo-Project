@@ -135,6 +135,7 @@ class ClockSignedRoleTests(unittest.TestCase):
             {"purpose": "post-apollo.identity.native-command-gateway.v0"},
             {"schema": "post-apollo.identity.gateway-enrollment.experimental-v0"},
             {"role": "identity-gateway"},
+            {"role": ["clock-ui-bridge"]},
             {"uid": True},
             {"releaseSequence": False},
             {"entrypointPath": "/../../tmp/clock"},
@@ -151,6 +152,8 @@ class ClockSignedRoleTests(unittest.TestCase):
                             "SIGNED_POLICY_FIELDS")
         self.denied(lambda: self.probe(signature=b"\x00" * 64),
                     "UNTRUSTED_RELEASE_SIGNATURE")
+        self.denied(lambda: self.probe(expected_role=["clock-ui-bridge"]),
+                    "INDEPENDENT_ROLE_PINS_REQUIRED")
 
     def test_canonical_policy_and_pinned_independent_pid_required(self):
         self.denied(lambda: self.probe(

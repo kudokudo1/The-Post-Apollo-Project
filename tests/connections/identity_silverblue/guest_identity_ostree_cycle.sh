@@ -429,17 +429,25 @@ C4B_SEPARATE_WITNESS
     # write is a hard refusal, never rollback permission.
     printf 'C4B_ID_STAGE // after_service_probe rc=%s\n' "$probe_rc" >/dev/ttyS0 ||
       fail "PARENT_POST_SERVICE_UART_WRITE_REFUSED"
+    # The parent inherited stdout/stderr before the SELinux policy reload.
+    # Re-open both descriptors for the REST of the cycle, not just one
+    # progress message. Failure must never authorize rollback.
+    exec >/dev/ttyS0 2>&1
+    echo "C4B_ID_STAGE // parent_uart_descriptors_refreshed"
     kill "$probe_watchdog_pid" >/dev/null 2>&1 || true
     wait "$probe_watchdog_pid" 2>/dev/null || true
+    echo "C4B_ID_STAGE // local_probe_watchdog_reaped"
     trap - DEBUG
     rm -f -- "$parent_line_file"
     [[ ! -e "$parent_line_file" ]] ||
       fail "PARENT_LINE_WITNESS_RESIDUE"
     # Stop and remove independent transient diagnostics before advancing any
     # rollback stage. A failed stop cannot become an authorized rollback.
+    echo "C4B_ID_STAGE // independent_probe_witness_stop_started"
     timeout --signal=TERM --kill-after=3s 15s \
       systemctl stop "$independent_unit" ||
       fail "INDEPENDENT_PROBE_WITNESS_STOP_REFUSED"
+    echo "C4B_ID_STAGE // independent_probe_witness_stopped"
     rm -f -- "$independent_script"
     [[ ! -e "$independent_script" ]] ||
       fail "INDEPENDENT_PROBE_WITNESS_SCRIPT_REMAINS"

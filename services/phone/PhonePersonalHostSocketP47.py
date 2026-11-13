@@ -24,6 +24,7 @@ from threading import Event
 SCHEMA = "post-apollo.phone.personal-host-status.p47.v1"
 SOCKET_NAME = "phone-personal-status-p47.sock"
 MAX_REQUEST = 512
+MAX_DRAIN = 4096  # Limited read-ahead after an oversized frame, to send DENIED.
 UNIX_PATH_MAX = 107
 ACCEPT_TIMEOUT = 0.1
 PEER_TIMEOUT = 0.5
@@ -116,15 +117,18 @@ def _read_exact_status(conn: socket.socket) -> bool:
     buf = bytearray()
     try:
         conn.settimeout(PEER_TIMEOUT)
-        while len(buf) <= MAX_REQUEST:
-            chunk = conn.recv(MAX_REQUEST + 1 - len(buf))
+        # Drain at most 4 KiB through a delimiter even after the 512-byte
+        # protocol limit has been violated. Closing a Unix stream with
+        # unread pending bytes can reset it before DENIED is delivered.
+        # This does not accept or parse the invalid/private payload.
+        while len(buf) <= MAX_DRAIN:
+            chunk = conn.recv(min(1024, MAX_DRAIN + 1 - len(buf)))
             if not chunk:
                 return False
             buf.extend(chunk)
-            if len(buf) > MAX_REQUEST:
-                return False
             if b"\n" in chunk:
-                return bytes(buf) == REQUEST_FRAME
+                return (len(buf) <= MAX_REQUEST
+                        and bytes(buf) == REQUEST_FRAME)
         return False
     except (OSError, TimeoutError, ValueError):
         return False

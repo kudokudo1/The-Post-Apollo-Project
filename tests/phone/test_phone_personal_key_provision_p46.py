@@ -85,7 +85,7 @@ class ProvisionTests(unittest.TestCase):
             "key-id", p.key_id,
         ])
         self.assertEqual(kw["input"],
-                         base64.urlsafe_b64encode(MASTER).rstrip(b"=") + b"\n")
+                         base64.urlsafe_b64encode(MASTER).rstrip(b"="))
         self.assertEqual(kw["timeout"], 5)
         self.assertTrue(kw["capture_output"])
         self.assertFalse(kw["check"])

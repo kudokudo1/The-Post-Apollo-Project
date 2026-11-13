@@ -80,3 +80,36 @@ reconciliation. P1.5: account permissions. P1.6: history and recovery.
 An unmerged P1.2 branch can be closed without affecting production.
 Existing P1.1 drafts require **no schema migration**. The new media file is
 independent and no media originals are altered by this feature.
+
+## P1.3 // Local reusable templates and locked source facts
+
+- **Dependency:** P1.3 is stacked on P1.2's draft branch. Do not merge P1.3
+  independently while the media-library dependency remains unaccepted.
+- **Storage:** one separate local `PublisherTemplateStore` and
+  `publisher-templates-v1.json`. No change to P1.1 draft or P1.2 media data.
+- **Template fields:** name, category (recruitment/resource/announcement/
+  creator), informational language code, freeform wording, and up to twelve
+  explicit `key = value` factual fields. Versioned strict schema, bounded
+  file, single-writer FileView, atomic-write acknowledgement. Unencrypted.
+- **Mechanism:** `{{key}}` substitutes the exact supplied value. Unknown,
+  malformed, missing, duplicated or unused locked fields reject the render.
+  Recruitment requires `role`, `location`, `apply_url`; resource entries
+  require `resource` and `contact`. Starter formats contain intentionally
+  blank values: they cannot pass preview until the user fills them.
+- **Interface:** Social → PUBLISHER → TEMPLATES → choose category → LOAD
+  STARTER → fill facts → VALIDATE & PREVIEW → SAVE TEMPLATE. USE IN COMPOSE
+  creates a new, **unsaved**, manually editable text draft. Existing unsaved
+  Compose edits block replacement to prevent data loss.
+- **Limits:** no AI rewrite, translation, platform API, authenticated facts,
+  outreach automation or outgoing posts. Language is metadata only. Factual
+  fields are preserved by deterministic rendering, but a user may subsequently
+  edit the resulting freeform draft. Later publish gates must revalidate source
+  claims and permissions; P1.3 does **not** provide that gate.
+- **Verify:** Node executes the real template policy (positive rendering,
+  missing fact refusal, unknown placeholders, immutable saves, corruption,
+  version mismatches, language and category limits). Python source checks
+  preserve the Social companion and existing draft/media writers. Native
+  Quickshell UI acceptance remains separate.
+
+**Recovery:** Close or discard the P1.3 branch without changing deployed
+components. No original media or prior draft file requires migration.

@@ -36,6 +36,10 @@ jobs:
         run: node tests/publisher/test_publisher_media_policy.cjs
       - name: Verify read-only local media inspection and source checks
         run: python3 -m unittest discover -s tests/publisher -p 'test_publisher_media_*.py' -v
+      - name: Validate locked facts and render-safe templates
+        run: node tests/publisher/test_publisher_template_policy.cjs
+      - name: Guard P1.3 template storage and compose integration
+        run: python3 tests/publisher/test_publisher_template_integration.py
       - name: Guard Social companion routing and single writer
         run: python3 tests/publisher/test_publisher_social_integration.py
       - name: Re-run existing Social Settings contracts

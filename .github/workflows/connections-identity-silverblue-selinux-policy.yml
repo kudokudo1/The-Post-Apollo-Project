@@ -1,0 +1,45 @@
+name: C4b Identity Silverblue test SELinux domain compile (no installation)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/selinux/**'
+      - '.github/workflows/connections-identity-silverblue-selinux-policy.yml'
+  push:
+    branches: [main, 'feat/c4b-identity-silverblue-ci-*']
+    paths:
+      - 'tests/connections/identity_silverblue/selinux/**'
+      - '.github/workflows/connections-identity-silverblue-selinux-policy.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  selinux-policy-source-only:
+    name: Compile own Fedora 44 CI-only confined daemon module without loading
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      POST_APOLLO_ID_SILVERBLUE_CI_ONLY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce disposable hosted runner and own policy-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_ACTOR" = kudokudo1
+          bash -n tests/connections/identity_silverblue/selinux/build_policy_ci.sh
+          grep -Fqx 'init_daemon_domain(postapollo_identity_ci_t, postapollo_identity_ci_exec_t)' tests/connections/identity_silverblue/selinux/postapollo_identity_ci.te
+      - name: Build Fedora SELinux module in isolated container, discard output
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/selinux/build_policy_ci.sh
+          echo "C4B_ID_SELINUX_LIMITATION // SOURCE_COMPILE_ONLY_NOT_GUEST_LOADED"

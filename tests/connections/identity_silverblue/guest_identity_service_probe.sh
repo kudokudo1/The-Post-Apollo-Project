@@ -1,0 +1,455 @@
+#!/usr/bin/bash
+# C4b Identity Silverblue: disposable *running* installed gateway probe.
+# Runs only INSIDE the actual offline official Silverblue VM, after the signed
+# RPM and installed-file checks. No operator desktop or production credentials.
+set -Eeuo pipefail
+[[ "$(id -u)" == 0 && -e /run/ostree-booted &&
+   "$(getenforce)" == Enforcing && -f /var/lib/postapollo-id-ci-stage &&
+   "$(cat /var/lib/postapollo-id-ci-stage)" == layer_pending ]] ||
+  { echo "C4B_ID_FAIL // IDENTITY_SERVICE_PROBE_WRONG_GUEST_OR_STAGE"; exit 2; }
+
+pkg=post-apollo-identity-silverblue-ci
+unit=post-apollo-identity-silverblue-ci.service
+name=postapollo-identity-ci
+base=/run/postapollo-identity-silverblue-ci-only
+runtime=$base/native
+signer=$base/signer.ed25519
+socket=$runtime/identity-command-v0.sock
+pid=0
+user_created=0
+policy_loaded=0
+policyfile=/var/lib/postapollo-id-ci-assets/postapollo_identity_ci.pp
+dropindir="/run/systemd/system/$unit.d"
+launcher="$base/ci-python3"
+negative_unit=postapollo-identity-ci-net-denial.service
+negative_unit_file="/run/systemd/system/$negative_unit"
+negative_log=/var/tmp/c4b-id-selinux-negative.log
+negative_journal=/var/tmp/c4b-id-selinux-negative-journal.log
+
+cleanup() {
+  # The policy and drop-in are VM-only; never let either reach rollback.
+  timeout --signal=TERM --kill-after=2s 12s systemctl stop "$negative_unit" >/dev/null 2>&1 || true
+  timeout --signal=TERM --kill-after=2s 12s systemctl stop "$unit" >/dev/null 2>&1 || true
+  rm -f -- "$negative_unit_file"
+  rm -f -- "$dropindir/10-disposable-selinux.conf"
+  rmdir "$dropindir" 2>/dev/null || true
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  rm -rf -- "$base"
+  if [[ "$user_created" == 1 ]]; then
+    userdel "$name" >/dev/null 2>&1 || true
+  fi
+  if [[ "$policy_loaded" == 1 ]]; then
+    echo "C4B_ID_SELINUX_STAGE // before_module_unload" >/dev/ttyS0
+    unload_rc=0
+    timeout --signal=TERM --kill-after=4s 150s semodule -r postapollo_identity_ci >/var/tmp/c4b-id-selinux-unload.log 2>&1 ||
+      unload_rc="$?"
+    printf 'C4B_ID_SELINUX_STAGE // after_module_unload rc=%s\n' "$unload_rc" >/dev/ttyS0
+    if [[ "$unload_rc" != 0 ]]; then
+      sed -n '1,24p' /var/tmp/c4b-id-selinux-unload.log |
+        sed 's/^/C4B_ID_SELINUX_UNLOAD_DETAIL \/\/ /' >/dev/ttyS0 || true
+    fi
+  fi
+  systemctl reset-failed "$negative_unit" >/dev/null 2>&1 || true
+  systemctl reset-failed "$unit" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+fail() {
+  # The old stdout-only fail marker was hidden in the systemd journal.
+  # The host reads only the QEMU serial channel after failure.
+  printf 'C4B_ID_FAIL // IDENTITY_SERVICE_%s\n' "$1" >/dev/ttyS0 || true
+  echo "C4B_ID_FAIL // IDENTITY_SERVICE_$1"
+  journalctl -b -u "$unit" --no-pager -n 24 2>&1 |
+    sed -E 's/^/C4B_ID_SERVICE_JOURNAL \/\//g' | head -n 24 >/dev/ttyS0 || true
+  exit 2
+}
+on_unhandled_error() {
+  local rc="$1" source_line="$2"
+  trap - ERR
+  # Only a numeric line and status go to the durable UART. Never leak any
+  # private signing seed, runtime environment or command-line key material.
+  printf 'C4B_ID_FAIL // IDENTITY_SERVICE_UNHANDLED_SHELL_ERROR line=%s rc=%s\n' \
+    "$source_line" "$rc" >/dev/ttyS0 || true
+  exit 2
+}
+trap 'on_unhandled_error "$?" "$LINENO"' ERR
+
+[[ "$(rpm -q --qf '%{NAME}' "$pkg")" == "$pkg" &&
+    ! -e "$base" && ! -S "$socket" ]] ||
+  fail "PREREQUISITES_OR_PREEXISTING_RUNTIME"
+if getent passwd "$name" >/dev/null; then
+  fail "NON_DISPOSABLE_USER_PREEXISTS"
+fi
+
+# Explicitly probe the unit's negative activation condition in the real guest.
+systemctl daemon-reload || fail "DAEMON_RELOAD_DENIED"
+timeout --signal=TERM --kill-after=2s 12s systemctl start "$unit" ||
+  fail "MISSING_MARKER_SYSTEMCTL_UNEXPECTED_ERROR"
+pre_pid="$(systemctl show "$unit" --property=MainPID --value)"
+pre_active="$(systemctl show "$unit" --property=ActiveState --value)"
+[[ "$pre_pid" == 0 && "$pre_active" != active ]] ||
+  fail "UNIT_ACTIVATED_WITHOUT_CI_MARKER"
+echo "C4B_ID_PASS // REAL_SYSTEMD_UNIT_REFUSED_WITHOUT_MARKER"
+
+# Load the compiled C4b-owned test domain solely inside this disposable VM.
+# No persistent policy is installed on the workstation or accepted by C3e.
+[[ -f "$policyfile" && ! -L "$policyfile" &&
+   "$(stat -c '%u:%g:%a' "$policyfile")" == '0:0:600' ]] ||
+  fail "OFFLINE_COMPILED_SELINUX_MODULE_NOT_PRESENT"
+command -v semodule >/dev/null 2>&1 && command -v chcon >/dev/null 2>&1 ||
+  fail "FEDORA_SELINUX_GUEST_TOOLS_ABSENT"
+if semodule -l | grep -Eq '^postapollo_identity_ci([[:space:]]|$)'; then
+  fail "IDENTITY_SELINUX_MODULE_ALREADY_LOADED"
+fi
+# Mark the potentially expensive kernel policy transition BEFORE invoking
+# semodule. The QEMU host has an independent bounded stall detector to avoid
+# repeatedly waiting for a hung kernel policy reload.
+printf 'C4B_ID_SELINUX_STAGE // before_module_install\n' >/dev/ttyS0
+policy_rc=0
+timeout --signal=TERM --kill-after=4s 150s semodule -i "$policyfile" >/var/tmp/c4b-id-selinux-load.log 2>&1 ||
+  policy_rc="$?"
+printf 'C4B_ID_SELINUX_STAGE // after_module_install rc=%s\n' "$policy_rc" >/dev/ttyS0
+if [[ "$policy_rc" != 0 ]]; then
+  sed -n '1,24p' /var/tmp/c4b-id-selinux-load.log |
+    sed 's/^/C4B_ID_SELINUX_LOAD_DETAIL \/\/ /' >/dev/ttyS0 || true
+  fail "COMPILED_SELINUX_MODULE_LOAD_REFUSED"
+fi
+policy_loaded=1
+# Capture the actual module listing before evaluating the strict expected
+# installed identity module. No broadening of name/version acceptance.
+module_list=/var/tmp/c4b-id-selinux-module-list.log
+list_rc=0
+timeout --signal=TERM --kill-after=3s 25s semodule -l >"$module_list" 2>&1 ||
+  list_rc="$?"
+printf 'C4B_ID_SELINUX_STAGE // module_list_rc=%s\n' "$list_rc" >/dev/ttyS0
+if [[ "$list_rc" != 0 ]]; then
+  sed -n '1,20p' "$module_list" |
+    sed 's/^/C4B_ID_SELINUX_MODULE_DETAIL \/\/ /' >/dev/ttyS0 || true
+  fail "COMPILED_SELINUX_MODULE_LIST_REFUSED"
+fi
+if ! grep -Eq '^postapollo_identity_ci([[:space:]]|$)' "$module_list"; then
+  sed -n '1,20p' "$module_list" |
+    sed 's/^/C4B_ID_SELINUX_MODULE_DETAIL \/\/ /' >/dev/ttyS0 || true
+  fail "COMPILED_SELINUX_MODULE_NOT_ACTIVE"
+fi
+printf 'C4B_ID_SELINUX_STAGE // module_name_verified\n' >/dev/ttyS0
+enforcing_state="$(getenforce)" ||
+  fail "SELINUX_ENFORCING_READ_FAILED"
+printf 'C4B_ID_SELINUX_STAGE // enforcing_state=%.40s\n' "$enforcing_state" >/dev/ttyS0
+[[ "$enforcing_state" == Enforcing ]] ||
+  fail "SELINUX_ENFORCING_LOST_AFTER_MODULE_INSTALL"
+echo "C4B_ID_PASS // DEDICATED_TEST_SELINUX_MODULE_LOADED_ENFORCING" >/dev/ttyS0
+printf 'C4B_ID_SELINUX_STAGE // before_nonroot_runtime_preparation\n' >/dev/ttyS0
+
+# This fixture requires Fedora's system Python Ed25519 support. Never pip
+# install a mutable dependency into the offline guest or weaken import pins.
+if ! /usr/bin/python3 -I -B -c 'from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey'; then
+  fail "OS_PINNED_ED25519_PYTHON_DEPENDENCY_ABSENT"
+fi
+useradd --system --no-create-home --home-dir /nonexistent \
+  --shell /usr/sbin/nologin "$name" || fail "CI_SYSTEM_USER_CREATE"
+user_created=1
+uid="$(id -u "$name")"
+gid="$(id -g "$name")"
+[[ "$uid" =~ ^[1-9][0-9]*$ && "$gid" =~ ^[1-9][0-9]*$ ]] ||
+  fail "NONROOT_SERVICE_IDENTITY_INVALID"
+printf 'C4B_ID_SELINUX_STAGE // nonroot_user_prepared\n' >/dev/ttyS0
+
+mkdir -m 0711 "$base"
+mkdir -m 0700 "$runtime"
+chown "$uid:$gid" "$runtime"
+chmod 0700 "$runtime"
+# An ephemeral random 32-byte Ed25519 seed; not a production receipt signer.
+# Use no network, persistent host key, real provider account or C5 approval.
+python3 -I -B - "$signer" <<'PY'
+import os,sys
+fd=os.open(sys.argv[1],os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+try:
+    os.write(fd,os.urandom(32))
+finally:
+    os.close(fd)
+PY
+chown "$uid:$gid" "$signer"
+chmod 0600 "$signer"
+printf '%s\n' \
+  "POST_APOLLO_ID_CI_RUNTIME=$runtime" \
+  "POST_APOLLO_ID_CI_SIGNING_KEY=$signer" >"$base/runtime.env"
+chmod 0600 "$base/runtime.env"
+printf '%s\n' 'CI-ONLY-SUPERVISED-NATIVE-IDENTITY-GATE' >"$base/authorized-test.marker"
+chmod 0444 "$base/authorized-test.marker"
+chown root:root "$base" "$base/runtime.env" "$base/authorized-test.marker"
+chmod 0711 "$base"
+printf 'C4B_ID_SELINUX_STAGE // runtime_and_signer_prepared\n' >/dev/ttyS0
+# The original /usr RPM files stay immutable. A byte-identical copy of the
+# Fedora-provided Python executable is a temporary test-specific transition
+# entrypoint. It is NOT a production Python or policy installation.
+install -m 0555 /usr/bin/python3 "$launcher" ||
+  fail "CI_ONLY_PYTHON_ENTRYPOINT_COPY_REFUSED"
+cmp -s /usr/bin/python3 "$launcher" ||
+  fail "CI_ONLY_PYTHON_ENTRYPOINT_NOT_BYTE_IDENTICAL"
+chcon -t postapollo_identity_ci_run_t   "$base" "$runtime" "$signer" "$base/runtime.env" "$base/authorized-test.marker" ||
+  fail "CI_ONLY_RUNTIME_LABEL_REFUSED"
+chcon -t postapollo_identity_ci_exec_t "$launcher" ||
+  fail "CI_ONLY_PYTHON_ENTRYPOINT_LABEL_REFUSED"
+[[ "$(stat -c '%u:%g:%a' "$launcher")" == '0:0:555' ]] ||
+  fail "CI_ONLY_PYTHON_ENTRYPOINT_NOT_ROOT_IMMUTABLE"
+ls -Z "$launcher" | grep -Fq ':postapollo_identity_ci_exec_t:' ||
+  fail "CI_ONLY_PYTHON_ENTRYPOINT_WRONG_SELINUX_TYPE"
+mkdir -m 0755 -p "$dropindir"
+cat >"$dropindir/10-disposable-selinux.conf" <<'CI_ID_SELINUX_UNIT'
+[Service]
+ExecStart=
+ExecStart=/run/postapollo-identity-silverblue-ci-only/ci-python3 -I -B /usr/libexec/post-apollo/identity/identity-gateway-ci
+CI_ID_SELINUX_UNIT
+chmod 0644 "$dropindir/10-disposable-selinux.conf"
+systemctl daemon-reload || fail "CI_ONLY_DAEMON_RELOAD_WITH_CUSTOM_ENTRYPOINT_FAILED"
+echo "C4B_ID_PASS // SEPARATE_LABELED_IDENTITY_EXECUTABLE_AND_EPHEMERAL_SYSTEMD_OVERRIDE" >/dev/ttyS0
+printf 'C4B_ID_SELINUX_STAGE // before_confined_systemd_start\n' >/dev/ttyS0
+
+systemctl reset-failed "$unit" >/dev/null 2>&1 || true
+timeout --signal=TERM --kill-after=2s 12s systemctl start "$unit" ||
+  fail "ACTUAL_SIGNED_INSTALLED_SERVICE_START_REFUSED"
+for i in $(seq 1 70); do
+  pid="$(systemctl show "$unit" --property=MainPID --value || echo 0)"
+  if [[ "$pid" =~ ^[1-9][0-9]+$ && -S "$socket" ]]; then break; fi
+  sleep .2
+done
+[[ "$pid" =~ ^[1-9][0-9]+$ && -S "$socket" ]] ||
+  fail "ACTUAL_SIGNED_INSTALLED_SERVICE_SOCKET_UNAVAILABLE"
+active="$(systemctl show "$unit" --property=ActiveState --value)"
+identity_user="$(systemctl show "$unit" --property=User --value)"
+cgroup="$(systemctl show "$unit" --property=ControlGroup --value)"
+[[ "$active" == active && "$identity_user" == "$name" &&
+   "$cgroup" == "/system.slice/$unit" ]] ||
+  fail "SUPERVISOR_IDENTITY_MISMATCH"
+[[ "$(stat -c '%u:%g:%a' "$socket")" == "$uid:$gid:600" ]] ||
+  fail "KERNEL_SOCKET_OWNERSHIP_OR_MODE_MISMATCH"
+read -r u1 u2 u3 u4 < <(awk '/^Uid:/ {print $2,$3,$4,$5}' "/proc/$pid/status")
+read -r g1 g2 g3 g4 < <(awk '/^Gid:/ {print $2,$3,$4,$5}' "/proc/$pid/status")
+[[ "$u1:$u2:$u3:$u4" == "$uid:$uid:$uid:$uid" &&
+   "$g1:$g2:$g3:$g4" == "$gid:$gid:$gid:$gid" ]] ||
+  fail "KERNEL_PROCESS_UID_GID_MISMATCH"
+tr '\0' ' ' <"/proc/$pid/cmdline" |
+  grep -Fq '/usr/libexec/post-apollo/identity/identity-gateway-ci' ||
+  fail "KERNEL_PROCESS_COMMAND_MISMATCH"
+selinux="$(cat "/proc/$pid/attr/current")"
+printf 'C4B_ID_SELINUX_OBSERVED // %.180s\n' "$selinux" >/dev/ttyS0
+[[ "$selinux" == 'system_u:system_r:postapollo_identity_ci_t:s0' &&
+   "$(getenforce)" == Enforcing ]] ||
+  fail "DEDICATED_ENFORCING_IDENTITY_DOMAIN_NOT_ACTIVE"
+echo "C4B_ID_PASS // REAL_ENFORCING_DEDICATED_SELINUX_DOMAIN_OBSERVED" >/dev/ttyS0
+printf 'C4B_ID_SERVICE_OBSERVED // pid=%s uid=%s gid=%s cgroup=%s selinux=%s\n' \
+  "$pid" "$uid" "$gid" "$cgroup" "$selinux" >/dev/ttyS0
+echo "C4B_ID_PASS // REAL_SYSTEMD_IDENTITY_GATEWAY_SOCKET_AND_PROCESS_OBSERVED" >/dev/ttyS0
+
+# The real installed gateway, not an imitation server, must sign four
+# UNAVAILABLE receipts. The verifier sees the disposable signer public key
+# from its own test-only seed; this is NOT independently enrolled host trust.
+# Preserve bounded guest Python errors on the serial evidence channel before
+# the surrounding lifecycle powers down. The previous CI only exposed a generic
+# probe failure, forcing a costly full reinstall to identify its cause.
+probe_log=/var/tmp/c4b-id-service-probe.log
+probe_rc=0
+python3 -I -B - "$socket" "$signer" "$pid" "$uid" "$gid" "$cgroup" "$selinux" >"$probe_log" 2>&1 <<'PY' || probe_rc="$?"
+import secrets,socket,struct,subprocess,sys
+from pathlib import Path
+sys.path.insert(0,"/usr/libexec/post-apollo/identity")
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from signed_command_receipt_v0 import build_request,verify_receipt
+sockpath,signerpath=sys.argv[1:3]
+pid,uid,gid=map(int,sys.argv[3:6])
+expected_cgroup,expected_lsm=sys.argv[6:8]
+key=Ed25519PrivateKey.from_private_bytes(Path(signerpath).read_bytes()).public_key()
+
+def start_ticks():
+    # /proc/<pid>/stat field 22, with a parenthesized process name
+    # that can itself contain spaces. Read from the kernel, never JSON.
+    data=Path(f"/proc/{pid}/stat").read_text()
+    if ") " not in data: raise RuntimeError("malformed kernel process stat")
+    fields=data.rsplit(") ",1)[1].split()
+    if len(fields)<20:raise RuntimeError("truncated kernel process stat")
+    return int(fields[19])
+
+pinned_start=start_ticks()
+if pinned_start<=0:raise RuntimeError("invalid kernel process start time")
+
+def read_kernel_lsm(path):
+    # Linux /proc/PID/attr/current emits one NUL-terminated LSM context.
+    # Bash command substitution removes that NUL when initially pinning
+    # the label; Python's str.strip() does NOT. Normalize only a single
+    # terminal NUL, reject embedded NULs, control newlines or bad encoding.
+    raw=path.read_bytes()
+    if raw.endswith(b"\x00"):
+        raw=raw[:-1]
+    if not raw or b"\x00" in raw or b"\n" in raw:
+        raise RuntimeError("malformed kernel SELinux context bytes")
+    return raw.decode("ascii")
+
+def check_origin(stage):
+    current=subprocess.check_output([
+        "/usr/bin/systemctl","show",
+        "post-apollo-identity-silverblue-ci.service",
+        "--property=MainPID","--value"],timeout=3,text=True).strip()
+    if current!=str(pid) or start_ticks()!=pinned_start:
+        raise RuntimeError(f"{stage}: supervisor PID/start changed")
+    observed_lsm=read_kernel_lsm(Path(f"/proc/{pid}/attr/current"))
+    if observed_lsm!=expected_lsm:
+        raise RuntimeError(
+            f"{stage}: kernel SELinux context changed "
+            f"expected={expected_lsm!r} observed={observed_lsm!r}")
+    groups=Path(f"/proc/{pid}/status").read_text().splitlines()
+    for tag,value in (("Uid:",uid),("Gid:",gid)):
+        field=next((x for x in groups if x.startswith(tag)),None)
+        if field is None or field.split()[1:]!=[str(value)]*4:
+            raise RuntimeError(f"{stage}: kernel service {tag} changed")
+    raw=Path(f"/proc/{pid}/cgroup").read_text()
+    groups=[line.split(":",2) for line in raw.splitlines()]
+    if len(groups)!=1 or len(groups[0])!=3 or groups[0][2]!=expected_cgroup:
+        raise RuntimeError(f"{stage}: kernel service cgroup changed")
+
+for action in ("BEGIN","STATUS","CANCEL","RECOVER"):
+    check_origin(f"before {action}")
+    nonce=secrets.token_urlsafe(32)
+    rid=None if action=="BEGIN" else "CI_NO_LOGIN_REQUEST_01234567"
+    request=build_request(action,rid,nonce)
+    with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as conn:
+        conn.settimeout(3)
+        conn.connect(sockpath)
+        # SO_PEERCRED comes from the Linux kernel, not a service JSON claim.
+        peer=struct.unpack("3i",conn.getsockopt(
+            socket.SOL_SOCKET,socket.SO_PEERCRED,struct.calcsize("3i")))
+        if peer!=(pid,uid,gid):
+            raise RuntimeError(f"{action}: kernel socket peer changed")
+        conn.sendall(request)
+        out=b""
+        while not out.endswith(b"\n"):
+            fragment=conn.recv(1024)
+            if not fragment:break
+            out+=fragment
+            if len(out)>1024:raise RuntimeError("oversize signed receipt")
+    receipt=verify_receipt(out,pinned_key=key,action=action,
+                           command_request_id=rid,client_nonce=nonce)
+    if receipt["state"]!="UNAVAILABLE" or receipt["requestId"] is not None:
+        raise RuntimeError("identity command was not denied")
+    check_origin(f"after {action}")
+    print(f"C4B_ID_PASS // INSTALLED_SIGNED_UNAVAILABLE_{action}")
+print("C4B_ID_PASS // KERNEL_PEER_PID_START_AND_SUPERVISOR_RECHECKED_FOR_FOUR_SIGNED_DENIALS")
+PY
+# Bounded, prefix-tagged diagnostic lines survive the host's evidence filter;
+# retain exact PASS markers for authoritative host-side stage checks.
+while IFS= read -r line; do
+  case "$line" in
+    C4B_ID_PASS\ //*) echo "$line" >/dev/ttyS0 ;;
+    *) printf 'C4B_ID_SERVICE_PROBE_DETAIL // %.500s\n' "$line" >/dev/ttyS0 ;;
+  esac
+done < <(sed -n '1,28p' "$probe_log")
+[[ "$probe_rc" == 0 ]] || {
+  echo "C4B_ID_SERVICE_PROBE_RC // $probe_rc" >/dev/ttyS0
+  fail "KERNEL_OR_SIGNED_RECEIPT_CONTINUITY_REFUSED"
+}
+if [[ -e "$runtime/identity-display-v0.sock" ]]; then
+  fail "UNAPPROVED_BROWSER_HOST_SOCKET_EXISTS"
+fi
+
+# Independently start a short-lived process under the same dedicated
+# SELinux entrypoint to prove a *kernel* AF_INET socket-create denial.
+# This transient unit has NO systemd RestrictAddressFamilies, network
+# namespace, or PrivateNetwork restriction that could fake SELinux denial.
+denial="$base/deny-network.py"
+cat >"$denial" <<'PY'
+import errno, socket
+from pathlib import Path
+expected=b"system_u:system_r:postapollo_identity_ci_t:s0"
+label=Path("/proc/self/attr/current").read_bytes()
+if label.endswith(b"\x00"):
+    label=label[:-1]
+if label!=expected:
+    raise SystemExit("C4B_ID_FAIL // SELINUX_NEGATIVE_PROBE_WRONG_DOMAIN")
+try:
+    conn=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+except OSError as exc:
+    if exc.errno not in (errno.EACCES,errno.EPERM):
+        raise SystemExit("C4B_ID_FAIL // SELINUX_NEGATIVE_PROBE_OTHER_ERROR")
+    # Raw journal witness is intentionally NOT the host-facing final PASS.
+    # The host requires exactly one final PASS marker in the guest serial.
+    print("C4B_ID_NEGATIVE_WITNESS // KERNEL_AF_INET_CREATE_DENIED",flush=True)
+else:
+    conn.close()
+    raise SystemExit("C4B_ID_FAIL // SELINUX_DOMAIN_ALLOWED_INET_SOCKET_CREATE")
+PY
+chmod 0444 "$denial"
+chcon -t postapollo_identity_ci_run_t "$denial" ||
+  fail "SELINUX_NEGATIVE_HELPER_LABEL_REFUSED"
+# A disposable explicit oneshot unit avoids systemd-run --pipe's
+# "Remote peer disconnected" failure while keeping journald as an independent
+# witness for the Python helper. Unlike the installed main gateway unit, this
+# helper intentionally has NO RestrictAddressFamilies, PrivateNetwork, socket
+# seccomp filter, or network namespace. Only SELinux may deny AF_INET creation.
+[[ ! -e "$negative_unit_file" && ! -L "$negative_unit_file" ]] ||
+  fail "SELINUX_NEGATIVE_UNIT_PREEXISTS"
+cat >"$negative_unit_file" <<'CI_ID_NEGATIVE_UNIT'
+[Unit]
+Description=Disposable C4b kernel SELinux network socket refusal proof
+
+[Service]
+Type=oneshot
+User=postapollo-identity-ci
+Group=postapollo-identity-ci
+NoNewPrivileges=true
+ExecStart=/run/postapollo-identity-silverblue-ci-only/ci-python3 -I -B /run/postapollo-identity-silverblue-ci-only/deny-network.py
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=25
+CI_ID_NEGATIVE_UNIT
+chmod 0644 "$negative_unit_file"
+systemctl daemon-reload || fail "SELINUX_NEGATIVE_UNIT_RELOAD_REFUSED"
+printf 'C4B_ID_SELINUX_STAGE // before_independent_negative_unit_start\n' >/dev/ttyS0
+negative_rc=0
+timeout --signal=TERM --kill-after=4s 35s systemctl start "$negative_unit" >"$negative_log" 2>&1 ||
+  negative_rc="$?"
+printf 'C4B_ID_SELINUX_STAGE // after_negative_unit_start rc=%s\n' "$negative_rc" >/dev/ttyS0
+timeout --signal=TERM --kill-after=3s 10s journalctl --sync >/dev/null 2>&1 ||
+  fail "SELINUX_NEGATIVE_JOURNAL_SYNC_REFUSED"
+timeout --signal=TERM --kill-after=3s 15s journalctl -b -u "$negative_unit" \
+  --no-pager -o cat -n 48 >"$negative_journal" 2>&1 ||
+  fail "SELINUX_NEGATIVE_JOURNAL_READ_REFUSED"
+for evidence in "$negative_log" "$negative_journal"; do
+  sed -n '1,30p' "$evidence" |
+    sed 's/^/C4B_ID_SELINUX_NEGATIVE_DETAIL \/\/ /' >/dev/ttyS0 || true
+done
+negative_result="$(systemctl show "$negative_unit" --property=Result --value)" ||
+  fail "SELINUX_NEGATIVE_UNIT_RESULT_UNAVAILABLE"
+[[ "$negative_rc" == 0 && "$negative_result" == success &&
+   "$(grep -Fc 'C4B_ID_NEGATIVE_WITNESS // KERNEL_AF_INET_CREATE_DENIED' "$negative_journal")" == 1 ]] &&
+   ! grep -Fq 'C4B_ID_FAIL //' "$negative_journal" ||
+  fail "REAL_ENFORCING_SELINUX_NETWORK_DENIAL_NOT_PROVEN"
+echo "C4B_ID_PASS // REAL_SELINUX_DOMAIN_DENIED_INET_SOCKET_CREATE" >/dev/ttyS0
+systemctl stop "$negative_unit" >/dev/null 2>&1 ||
+  fail "SELINUX_NEGATIVE_UNIT_STOP_REFUSED"
+rm -f -- "$negative_unit_file" "$denial" "$negative_log" "$negative_journal"
+systemctl daemon-reload ||
+  fail "SELINUX_NEGATIVE_UNIT_REMOVE_RELOAD_REFUSED"
+systemctl reset-failed "$negative_unit" >/dev/null 2>&1 || true
+[[ ! -e "$negative_unit_file" ]] ||
+  fail "SELINUX_NEGATIVE_UNIT_STILL_PRESENT"
+
+# Verify teardown of the *running* service before rpm-ostree rollback.
+systemctl stop "$unit" || fail "SERVICE_STOP_REFUSED"
+for i in $(seq 1 30); do
+  [[ ! -S "$socket" && "$(systemctl show "$unit" --property=MainPID --value)" == 0 ]] && break
+  sleep .2
+done
+[[ ! -S "$socket" && "$(systemctl show "$unit" --property=MainPID --value)" == 0 ]] ||
+  fail "SOCKET_OR_PROCESS_REMAINS_AFTER_STOP"
+cleanup
+trap - EXIT
+[[ ! -e "$base" && ! -e "$dropindir" && ! -e "$negative_unit_file" ]] &&
+  ! getent passwd "$name" >/dev/null ||
+  fail "TEMPORARY_USER_OR_PRIVATE_KEY_REMAINS"
+if semodule -l | grep -Eq '^postapollo_identity_ci([[:space:]]|$)'; then
+  fail "DISPOSABLE_SELINUX_MODULE_REMAINS_AFTER_STOP"
+fi
+[[ "$(getenforce)" == Enforcing ]] ||
+  fail "SELINUX_ENFORCING_LOST_DURING_TEARDOWN"
+echo "C4B_ID_PASS // DEDICATED_SELINUX_MODULE_REMOVED_AFTER_SERVICE_STOP" >/dev/ttyS0
+echo "C4B_ID_PASS // REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP" >/dev/ttyS0
+echo "C4B_ID_LIMITATION // NO_PRODUCTION_RELEASE_ENROLLMENT_OR_C5_OPERATOR_CONSENT" >/dev/ttyS0

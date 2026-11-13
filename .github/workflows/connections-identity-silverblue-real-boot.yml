@@ -1,0 +1,179 @@
+name: C4b Identity real official Silverblue signed RPM boot/rollback (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/**'
+      - '.github/workflows/connections-identity-silverblue-real-boot.yml'
+  push:
+    branches: [main, 'feat/c4b-identity-silverblue-ci-*']
+    paths:
+      - 'tests/connections/identity_silverblue/**'
+      - '.github/workflows/connections-identity-silverblue-real-boot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  official-silverblue-identity:
+    name: Actual offline KVM Silverblue + signed Identity RPM + two-reboot rollback
+    # Match the genuine C2v/C4b signed Silverblue VM runner with /dev/kvm.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      POST_APOLLO_ID_SILVERBLUE_CI_ONLY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject non-disposable CI and unverified source syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_ACTOR" = kudokudo1
+          test -c /dev/kvm || { echo "C4B_ID_BLOCKED // OFFICIAL_VM_KVM_DEVICE_MISSING"; exit 2; }
+          # Exactly the disposable GitHub-hosted KVM setup in the passing
+          # shared C4b workflow. Never performed on the operator machine.
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm ||
+            { echo "C4B_ID_BLOCKED // OFFICIAL_VM_KVM_PERMISSION_REFUSED"; exit 2; }
+          bash -n tests/connections/identity_silverblue/build_signed_identity_gateway.sh
+          bash -n tests/connections/identity_silverblue/verify_signed_identity_gateway.sh
+          bash -n tests/connections/identity_silverblue/guest_identity_service_probe.sh
+          bash -n tests/connections/identity_silverblue/fetch_offline_fedora_crypto.sh
+          bash -n tests/connections/identity_silverblue/selinux/build_policy_ci.sh
+          bash -n tests/connections/identity_silverblue/run_official_silverblue_identity.sh
+          bash -n tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh
+          python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
+          python3 -B tests/connections/identity_silverblue/test_identity_booted_rpm_mtime_only.py
+      - name: Build the exact existing Identity gateway RPM on disposable Fedora 44
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c4b-identity-boot-rpm"
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-boot-rpm,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/build_signed_identity_gateway.sh
+      - name: Obtain exact official Fedora 44 signed offline Ed25519 runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c4b-identity-fedora-crypto"
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-fedora-crypto,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/fetch_offline_fedora_crypto.sh
+          (cd "$RUNNER_TEMP/c4b-identity-fedora-crypto" &&
+           sha256sum --check --status identity-fedora44-runtime-manifest.sha256)
+          test "$(find "$RUNNER_TEMP/c4b-identity-fedora-crypto" -maxdepth 1 -type f | wc -l)" -eq 5
+      - name: Compile test-only SELinux daemon domain into verified offline VM seed
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c4b-identity-selinux-policy"
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-selinux-policy,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/selinux/build_policy_ci.sh
+          (cd "$RUNNER_TEMP/c4b-identity-selinux-policy" &&
+           sha256sum --check --status postapollo_identity_ci.sha256)
+          test "$(find "$RUNNER_TEMP/c4b-identity-selinux-policy" -maxdepth 1 -type f | wc -l)" -eq 2
+      - name: Independently verify disposable RPM signer is untrusted before isolated import
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-boot-rpm,dst=/input,readonly" \
+            fedora:44 /usr/bin/bash /src/tests/connections/identity_silverblue/verify_signed_identity_gateway.sh
+      - name: Real official offline Silverblue VM in disposable Fedora 44 KVM container
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The GitHub Ubuntu host's APT DNS was unavailable even on official
+          # signed HTTPS fallback. Fedora 44 package installation already
+          # succeeds in our isolated build steps, so isolate QEMU there too.
+          # Host /dev/kvm is the ONLY additional passed-through device.
+          # The Silverblue *guest* still receives -nic none (no network).
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_ACTOR" = kudokudo1
+          test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm ||
+            { echo "C4B_ID_BLOCKED // HOST_KVM_NOT_AVAILABLE_FOR_CONTAINER"; exit 2; }
+          # Capture the VM's already-visible stdout/stderr only on this
+          # disposable runner; publish a *bounded, prefix-filtered* excerpt
+          # rather than exposing the complete build/VM transcript as an artifact.
+          vm_raw="$RUNNER_TEMP/c4b-identity-vm-full-ci.log"
+          vm_evidence="$RUNNER_TEMP/c4b-identity-vm-guest-markers.log"
+          : >"$vm_evidence"
+          set +e
+          timeout --signal=TERM --kill-after=20s 4200s \
+            docker run --rm \
+              --device=/dev/kvm \
+              --env GITHUB_ACTIONS=true \
+              --env RUNNER_ENVIRONMENT=github-hosted \
+              --env GITHUB_ACTOR="$GITHUB_ACTOR" \
+              --env POST_APOLLO_ID_SILVERBLUE_CI_ONLY=1 \
+              --env RUNNER_TEMP=/tmp \
+              --mount "type=bind,src=$PWD,dst=/src,readonly" \
+              --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-boot-rpm,dst=/evidence/rpm,readonly" \
+              --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-fedora-crypto,dst=/evidence/crypto,readonly" \
+              --mount "type=bind,src=$RUNNER_TEMP/c4b-identity-selinux-policy,dst=/evidence/selinux,readonly" \
+              --workdir /src \
+              fedora:44 /usr/bin/bash -c '
+                set -euo pipefail
+                test "$GITHUB_ACTIONS" = true
+                test "$RUNNER_ENVIRONMENT" = github-hosted
+                test "$GITHUB_ACTOR" = kudokudo1
+                test "$POST_APOLLO_ID_SILVERBLUE_CI_ONLY" = 1
+                test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm ||
+                  { echo "C4B_ID_BLOCKED // FEDORA_CONTAINER_KVM_NOT_ACCESSIBLE"; exit 2; }
+                dnf -y --setopt=install_weak_deps=False --setopt=gpgcheck=1 install \
+                  curl qemu-system-x86 qemu-img xorriso genisoimage ||
+                  { echo "C4B_ID_BLOCKED // FEDORA_SIGNED_QEMU_TOOLING_UNAVAILABLE"; exit 2; }
+                for required in curl qemu-system-x86_64 qemu-img xorriso genisoimage; do
+                  command -v "$required" >/dev/null ||
+                    { echo "C4B_ID_BLOCKED // FEDORA_QEMU_TOOLING_INCOMPLETE"; exit 2; }
+                done
+                echo "C4B_ID_PASS // FEDORA44_SIGNED_QEMU_TOOLING_READY"
+                /usr/bin/bash /src/tests/connections/identity_silverblue/run_official_silverblue_identity.sh \
+                  /evidence/rpm /evidence/crypto /evidence/selinux
+              ' 2>&1 | tee "$vm_raw"
+          vm_rc="${PIPESTATUS[0]}"
+          set -e
+          # Keep only printable, bounded first-marker lines. QEMU's serial
+          # port emits CRLF and terminal OSC/CSI prefixes; those must not
+          # reach the downstream C3e-AB diagnostic or uploaded evidence.
+          # The filter neither grants host authority nor alters VM success.
+          python3 -B tests/connections/identity_silverblue/sanitize_guest_marker_artifact.py \
+            "$vm_raw" "$vm_evidence" "$vm_rc" ||
+            { echo "C4B_ID_BLOCKED // GUEST_MARKER_ARTIFACT_SANITIZATION_REFUSED"; exit 2; }
+          exit "$vm_rc"
+      - name: Preserve bounded real-guest C4b marker evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: c4b-identity-silverblue-guest-markers
+          path: ${{ runner.temp }}/c4b-identity-vm-guest-markers.log
+          if-no-files-found: warn
+          retention-days: 1
+      - name: Confirm test did not activate sign-in or production authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
+          node tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs
+          echo "C4B_ID_PASS // PRODUCTION_SIGN_IN_AUTHORITY_NOT_ENABLED"

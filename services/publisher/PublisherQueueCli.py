@@ -168,11 +168,13 @@ def connect(db_path: Path) -> sqlite3.Connection:
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=FULL")
-        version = conn.execute("PRAGMA user_version").fetchone()[0]
-        require(version in (0, 1, VERSION), "UNSUPPORTED_QUEUE_VERSION")
-        if version == 0:
-            conn.execute("BEGIN IMMEDIATE")
-            try:
+        # Every process must recheck schema under ONE database-wide write
+        # transaction. A pre-lock version read races other initializers.
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            version = conn.execute("PRAGMA user_version").fetchone()[0]
+            require(version in (0, 1, VERSION), "UNSUPPORTED_QUEUE_VERSION")
+            if version == 0:
                 conn.execute("""CREATE TABLE IF NOT EXISTS jobs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     key TEXT NOT NULL UNIQUE,
@@ -195,16 +197,9 @@ def connect(db_path: Path) -> sqlite3.Connection:
                 )""")
                 conn.execute("CREATE INDEX IF NOT EXISTS due_jobs "
                              "ON jobs(status,due_ms)")
-                conn.execute("PRAGMA user_version=1")
-                conn.execute("COMMIT")
-            except Exception:
-                conn.execute("ROLLBACK")
-                raise
-        if version in (0, 1):
-            # P1.6: atomic migration. Legacy records get an explicitly
-            # UNVERIFIED baseline, not invented prior operation receipts.
-            conn.execute("BEGIN IMMEDIATE")
-            try:
+            if version in (0, 1):
+                # Existing v1 jobs get a single explicitly UNVERIFIED snapshot,
+                # not fabricated prior events. The entire upgrade is atomic.
                 conn.execute("""CREATE TABLE IF NOT EXISTS queue_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE RESTRICT,
@@ -217,17 +212,18 @@ def connect(db_path: Path) -> sqlite3.Connection:
                 )""")
                 conn.execute("""CREATE INDEX IF NOT EXISTS events_by_job
                     ON queue_events(job_id,id)""")
-                for row in conn.execute("SELECT id,status,updated_ms,occurrence FROM jobs"):
+                for row in conn.execute(
+                        "SELECT id,status,updated_ms,occurrence FROM jobs"):
                     conn.execute("""INSERT INTO queue_events
                         (job_id,action,from_state,to_state,occurred_ms,occurrence,detail)
                         VALUES (?,'legacy_snapshot','unknown',?,?,?,
                                 'LEGACY_BASELINE_UNVERIFIED')""",
                         (row["id"],row["status"],row["updated_ms"],row["occurrence"]))
                 conn.execute("PRAGMA user_version=2")
-                conn.execute("COMMIT")
-            except Exception:
-                conn.execute("ROLLBACK")
-                raise
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
         safe_file(db_path)
         return conn
     except (sqlite3.Error, OSError):

@@ -1,0 +1,54 @@
+name: Social PHONE P46 Host-Private Key Provision and Recovery (No Activation)
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhonePersonalKeyProvisionP46.py'
+      - 'services/phone/PhonePersonalRecoveryEnvelopeP46.py'
+      - 'tests/phone/test_phone_personal_key_provision_p46.py'
+      - 'tests/phone/test_phone_personal_recovery_envelope_p46.py'
+      - 'MODEL/contracts/social-phone-p46-host-private-key-lifecycle-v0.md'
+      - '.github/workflows/social-phone-p46-key-recovery.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhonePersonalKeyProvisionP46.py'
+      - 'services/phone/PhonePersonalRecoveryEnvelopeP46.py'
+      - 'tests/phone/test_phone_personal_key_provision_p46.py'
+      - 'tests/phone/test_phone_personal_recovery_envelope_p46.py'
+      - 'MODEL/contracts/social-phone-p46-host-private-key-lifecycle-v0.md'
+      - '.github/workflows/social-phone-p46-key-recovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-private-key-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install disposable AES-GCM dependency
+        run: python -m pip install cryptography==50.0.2
+      - name: Compile protected key management and encrypted recovery modules
+        run: |
+          python -m py_compile services/phone/PhonePersonalKeyProvisionP46.py
+          python -m py_compile services/phone/PhonePersonalRecoveryEnvelopeP46.py
+      - name: Test mocked Secret Service first-use write and exact verification
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_key_provision_p46.py' -v
+      - name: Test encrypted recovery and P35 real disposable AES-GCM vault
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_recovery_envelope_p46.py' -v
+      - name: P45 existing key provider and mainline completeness
+        run: |
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_protected_key_p45.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_mainline_completeness_p45.py' -v
+      - name: Existing encrypted host fixture and uncertain write regressions
+        run: |
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_contact_vault.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_host_gate_p36.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_save_orchestrator_p44.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_vault_recovery_p40r.py' -v

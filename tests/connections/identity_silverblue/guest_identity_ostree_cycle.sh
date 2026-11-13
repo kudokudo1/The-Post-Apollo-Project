@@ -391,7 +391,10 @@ C4B_SEPARATE_WITNESS
     parent_line_file=/run/postapollo-id-ci-cycle-lastline
     (umask 077; printf '0:0\n' > "$parent_line_file") ||
       fail "PARENT_LINE_WITNESS_START_REFUSED"
-    trap 'printf "%s:%s\n" "$BASHPID" "$LINENO" > /run/postapollo-id-ci-cycle-lastline || true' DEBUG
+    # DEBUG is also invoked while Bash tears down traps; in Fedora the last
+    # invocation can report line 1, destroying the useful parent source line.
+    # Preserve only plausible non-trap lines in this guest script.
+    trap 'if (( LINENO > 1 )); then printf "%s:%s\n" "$BASHPID" "$LINENO" > /run/postapollo-id-ci-cycle-lastline || true; fi' DEBUG
     # A separate guest-local watchdog provides a bounded kernel-process
     # observation even if the synchronous timeout itself never returns.
     # It emits process names/states only, never argv, signing key or payload.

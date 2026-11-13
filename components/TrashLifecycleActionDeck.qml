@@ -14,7 +14,8 @@ Row {
     property string resourceRevision: ""
     // The default remains the 64-hex source witness. Local managed-copy
     // revisions use a strict decimal store counter. Camera's independently
-    // owned one-use preview issues a 32-hex plan ID. Both are request tokens,
+    // owned one-use preview issues a 32-hex plan ID. The Camera Cleanup
+    // queue has a separate incrementing revision. These are request tokens,
     // NEVER independent authentication or permission to delete.
     property string resourceRevisionKind: "sha256"
 
@@ -45,6 +46,8 @@ Row {
             && /^(0|[1-9][0-9]{0,9})$/.test(resourceRevision))
         || (resourceRevisionKind === "camera-plan"
             && /^[0-9a-f]{32}$/.test(resourceRevision))
+        || (resourceRevisionKind === "queue-counter"
+            && /^(0|[1-9][0-9]{0,9})$/.test(resourceRevision))
 
     readonly property bool identityReady:
         /^[A-Za-z0-9._:-]{1,96}$/.test(ownerId)

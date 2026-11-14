@@ -50,7 +50,9 @@ After U5, U6 and U7 obtain independent merge approval and are synchronized onto 
 - [x] Reuse U1 shared deck and U5 Camera-plan request revision
 - [x] Add strict Desktop-only review adapter, preserving original backend
 - [x] Add synthetic regression and Trash workflow step
-- [ ] Exact-head CI, legacy test updates if needed, failure diagnosis
+- [x] Existing U5/U6 Desktop button and Camera M1 preview-count contract assertions updated for the new control
+- [x] Camera M1 offline capture/library safety CI passed on `b52fd80dc08ef88937b52a542bf663f3d9f53ff0`; GitHub Grammar also passed
+- [ ] Final exact-head Trash Python/Node + Camera/Grammar/Fedora checks and failure diagnosis
 - [ ] Operator decision on stacked U5 → U6 → U7 merges; U4 separately
 - [ ] Native all-size Camera/Trash++ visual and disposable-file end-to-end Restore acceptance
 - [ ] U8 independently audit Media owner delete/clear/trash paths before integration

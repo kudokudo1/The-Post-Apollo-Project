@@ -1,0 +1,54 @@
+name: Clock BG1-B2B5 signed old-writer receipt (fixture only)
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmSignedWriterReleaseFixture.py"
+      - "services/time/BG1-ALARM-SIGNED-RELEASE-HANDSHAKE.md"
+      - "tests/time/test_clock_bg1_b2b5_signed_release.py"
+      - ".github/workflows/clock-bg1-b2b5-signed-release.yml"
+  push:
+    paths:
+      - "services/time/AlarmSignedWriterReleaseFixture.py"
+      - "services/time/BG1-ALARM-SIGNED-RELEASE-HANDSHAKE.md"
+      - "tests/time/test_clock_bg1_b2b5_signed_release.py"
+      - ".github/workflows/clock-bg1-b2b5-signed-release.yml"
+permissions:
+  contents: read
+jobs:
+  signed-release-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing audited cryptographic fixture dependency
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Real AF_UNIX old-writer process and Ed25519 one-use receipts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b5_signed_release.py' -v
+      - name: Preserve BG1-B2B1/B2A/B1 and owner claims regression
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2_shadow_transactions.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_broker_protocol.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_owner_fencing_contract.py' -v
+      - name: Four-file Clock-only boundary guard
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],text=True
+          ).splitlines())
+          expected={
+              "services/time/AlarmSignedWriterReleaseFixture.py",
+              "services/time/BG1-ALARM-SIGNED-RELEASE-HANDSHAKE.md",
+              "tests/time/test_clock_bg1_b2b5_signed_release.py",
+              ".github/workflows/clock-bg1-b2b5-signed-release.yml"}
+          assert changed == expected, f"Unapproved file changes: {changed ^ expected}"
+          print("No QML, broker, Identity, Connections, BG2 or installation edits: PASS")
+          PY

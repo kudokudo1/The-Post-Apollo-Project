@@ -158,3 +158,43 @@ components. No original media or prior draft file requires migration.
 branch from which this work is stacked but was not yet present in the inspected
 \`main\` tree. Restore/land that code through its own accepted path before
 P1.4 can land. Do not treat a merged PR label as proof of mainline ancestry.
+
+
+## P1.5 // Account-specific access intent foundation (grant gate CLOSED)
+
+- **Dependency:** Stack on P1.4 draft PR #1961. No merge or workstation
+  activation without explicit operator authorization. The P1.3 mainline
+  continuity problem remains a separate dependency.
+- **Scope:** Social → PUBLISHER → ACCESS. Select one of the *local Social layout
+  identities* and enter an unverified account display alias, a supported
+  provider and a narrowly defined operation such as \`post.video\`.
+  This creates a local **request intent** only.
+- **Storage:** \`Quickshell.dataDir/publisher-access-intents-v1.json\`,
+  versioned, bounded, single-writer, FileView atomicWrites. Records store
+  only a request ID, local layout identity ID, personal/organization context,
+  provider identifier, account alias, one requested scope, request status and
+  timestamps. No cookies, tokens, credentials, bearer claims, or access grants.
+  Account aliases can still be private metadata, so do not enter secrets.
+- **Statuses:** REQUESTED and WITHDRAWN. The interface requires a second click
+  to withdraw; it retains local history. A matching repeat request is
+  idempotent. A withdrawn request may be followed by a new request with a
+  new identifier, but neither record conveys any authority.
+- **Fail-closed:** Policy and singleton publish-decision methods return
+  \`allowed:false\` regardless of any supplied fake approval, token,
+  host-connected flag or signed receipt. \`canPublish\` is false and the
+  granted-capabilities list is empty by construction.
+- **Why:** A saved Social identity is an organizer layout, and account
+  labels are not verified provider accounts. A browser profile or keyring
+  service being available also does not verify the account owner.
+- **Future trusted boundary (not implemented here):** A separate
+  Connections/Identity-owned, protected host broker must independently bind
+  (a) verified invoking signed program, (b) real provider account identity,
+  (c) explicit operator consent and exact provider scope, (d) permitted
+  personal/organization tenant, (e) expiry and revocation, and (f) a fresh
+  evidence check at each publish/refresh/retry boundary. Publisher must use a
+  host-owned broker result, never mutable QML flags or local JSON as a grant.
+  Coordinate host ownership instead of modifying the existing broker now.
+- **No publishing:** P1.4 due items remain NEEDS_REVIEW. P1.5 does not change
+  SQLite jobs, add target accounts, upload content, or activate P2 APIs.
+- **Recovery:** Discard P1.5 branch without touching P1.1–P1.4 data,
+  provider credentials, active Social sessions, or desktop state.

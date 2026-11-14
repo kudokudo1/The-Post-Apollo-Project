@@ -1,0 +1,52 @@
+name: Clock BG1-B2B3 canonical writer handoff rehearsal (fixture only)
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmCanonicalHandoffFixture.py"
+      - "services/time/BG1-ALARM-CANONICAL-HANDOFF-REHEARSAL.md"
+      - "tests/time/test_clock_bg1_b2b3_canonical_handoff.py"
+      - ".github/workflows/clock-bg1-b2b3-canonical-handoff.yml"
+  push:
+    paths:
+      - "services/time/AlarmCanonicalHandoffFixture.py"
+      - "services/time/BG1-ALARM-CANONICAL-HANDOFF-REHEARSAL.md"
+      - "tests/time/test_clock_bg1_b2b3_canonical_handoff.py"
+      - ".github/workflows/clock-bg1-b2b3-canonical-handoff.yml"
+permissions:
+  contents: read
+jobs:
+  canonical-handoff-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compile candidate and existing BG1 dependencies
+        run: |
+          python3 -I -B -c 'import ast,pathlib;[ast.parse(pathlib.Path(p).read_text()) for p in ["services/time/AlarmCanonicalHandoffFixture.py","services/time/AlarmShadowTransactions.py","services/time/AlarmBackgroundObserver.py"]]'
+      - name: Run real SQLite migration, concurrent writers and crash recovery
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b3_canonical_handoff.py' -v
+      - name: Preserve original shadow, broker, peer and owner contracts
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2_shadow_transactions.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_broker_protocol.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_owner_fencing_contract.py' -v
+      - name: Verify four-file fixture-only diff and no production paths
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],
+              text=True).splitlines())
+          expected={
+              "services/time/AlarmCanonicalHandoffFixture.py",
+              "services/time/BG1-ALARM-CANONICAL-HANDOFF-REHEARSAL.md",
+              "tests/time/test_clock_bg1_b2b3_canonical_handoff.py",
+              ".github/workflows/clock-bg1-b2b3-canonical-handoff.yml"}
+          assert changed == expected, f"Unexpected file scope: {changed ^ expected}"
+          print("BG1-B2B3 no live Clock, broker or external lane changes: PASS")
+          PY

@@ -67,7 +67,11 @@ test("drain preflight refuses pending/queued saves, previews and ringing",()=>{
         {migrationRequested:true},{ringingCount:1},
         {previewing:true},{audioState:"QT PLAYING"},
         {audioState:"QT STARTING"},
-        {notificationOutcome:"DELIVERY PENDING"}
+        {notificationOutcome:"DELIVERY PENDING"},
+        {notificationOutcome:undefined},
+        {notificationOutcome:null},
+        {notificationOutcome:1},
+        {notificationOutcome:""}
     ];
     for(const change of disallowed) {
         assert.equal(policy.canBeginQuiescing(ready(change)),false,

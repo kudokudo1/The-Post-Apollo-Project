@@ -49,6 +49,10 @@ jobs:
         run: node --test tests/trash/test_u3_managed_copy_review.cjs
       - name: Verify U4 GIO file Restore only matches exact indexed review token
         run: node --test tests/trash/test_u4_gio_restore_review.cjs
+      - name: Verify U5 Camera Gallery one-use file-to-Trash review stays recoverable
+        run: node --test tests/trash/test_u5_camera_gallery_trash_review.cjs
+      - name: Verify U6 Camera Cleanup queue scoped review and explicit one-click GIO handoff
+        run: node --test tests/trash/test_u6_camera_cleanup_queue_review.cjs
       - name: Verify Camera Cleanup handoff preserves shared queue and authority
         run: node --test tests/trash/test_camera_cleanup_handoff.cjs
       - name: Verify V2 pilot snapshots require preview, confirmation and owner scope

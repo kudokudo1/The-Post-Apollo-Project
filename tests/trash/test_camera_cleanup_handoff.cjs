@@ -198,7 +198,7 @@ test("Hunt and Swipe keep their gestures but get independent scroll controls",()
     assert.match(cleanupSource,/id: swipeDeck/);
     assert.match(cleanupSource,/id: huntArena/);
     assert.match(cleanupSource,/camera\.selectCleanupTechnique\(modelData\.id\)/);
-    assert.match(cleanupSource,/camera\.trashQueuedNow\(\)/);
+    assert.match(cleanupSource,/camera\.reviewQueuedCameraTrash\(/);
     assert.match(cleanupSource,/id: cleanupQueuedList/);
 });
 
@@ -226,7 +226,7 @@ test("VIEW QUEUE uses existing shared Camera selection without cloning it",()=>{
     assert.equal(ctx.cleanupTechnique,"swipe");
     assert.equal(ctx.batchPaths,before);
     assert.deepEqual(Array.from(ctx.calls),[]);
-    assert.match(cleanupSource,/onLeftClicked: camera.trashQueuedNow\(\)/);
+    assert.match(cleanupSource,/camera\.reviewQueuedCameraTrash\(/);
     assert.match(cameraSource,/"trash-batch-now", JSON.stringify\(batchPaths\)/);
 });
 

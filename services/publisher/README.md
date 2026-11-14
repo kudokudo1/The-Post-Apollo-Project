@@ -198,3 +198,51 @@ P1.4 can land. Do not treat a merged PR label as proof of mainline ancestry.
   SQLite jobs, add target accounts, upload content, or activate P2 APIs.
 - **Recovery:** Discard P1.5 branch without touching P1.1–P1.4 data,
   provider credentials, active Social sessions, or desktop state.
+
+
+## P1.6 // Local operation history, crash recovery and integrity audit
+
+- **Dependency:** P1.6 is stacked on P1.5 PR #1964, which is stacked on P1.4
+  PR #1961. Do not merge out of sequence or bypass review/visual acceptance.
+- **What HISTORY means:** only local queue activity. A stored event is NOT a
+  platform post, delivery receipt, Instagram/YouTube upload, OAuth permission,
+  or actual provider confirmation. Each history response advertises
+  \`source=LOCAL_QUEUE_ONLY\`, \`canPublish=false\`, \`posted=0\`, and
+  \`providerReceipt=null\`.
+- **Atomic history:** queue SQLite schema v2 adds an append-only application
+  event ledger. New scheduled jobs, due/review decisions, source blocks,
+  pause/resume, cancellation, acknowledgments and recurring rearm append a
+  matching event within the same BEGIN IMMEDIATE transaction as the job
+  mutation. Repeated idempotent scheduling produces no duplicate event.
+- **Version-1 migration:** a preexisting v1 queue gets an explicit
+  \`legacy_snapshot\` event for each surviving job. Its detail is
+  \`LEGACY_BASELINE_UNVERIFIED\`. It does not manufacture operation history
+  that was not recorded. New empty databases are created and migrated to v2.
+- **Audit:** checks SQLite integrity, verifies last event/current job status
+  and occurrence, scans the local event continuity trail, and compares saved
+  draft revision+digest for active local jobs. Reports inconsistent history
+  and stale source files without silently editing or deleting anything.
+  This is consistency checking, not cryptographic tamper evidence against
+  an attacker with write access to the same user-owned database.
+- **Explicit reconcile:** after inspection, the operator may select a
+  two-step BLOCK STALE action. It transactionally changes *only* scheduled
+  or paused jobs whose original draft no longer matches to BLOCKED and
+  records a local event. It cannot recreate a missing draft, re-enable
+  publishing, delete a file, or bypass an inconsistent history ledger.
+- **Recovery after restart:** committed jobs and local events survive process
+  restart. An aborted transaction rolls back both records; repeated schedule
+  calls use the original idempotency key. The headless due checker remains
+  opt-in only and never dispatches posts.
+- **UI:** Social → PUBLISHER → HISTORY → RELOAD HISTORY or
+  AUDIT STORAGE & SOURCES; if there are stale jobs and consistent records,
+  BLOCK STALE requires a second click. This view does not install services.
+- **Limits:** 500 jobs and 4,000 local events; list returns the latest
+  200 events. When capacity is reached, mutations fail closed instead of
+  silently discarding history. The queue is owner-local, unencrypted.
+- **P2 gate:** a future, separately authorized platform dispatch service
+  will need verified per-account consent, immutable source/media snapshots,
+  provider receipt reconciliation, retry idempotency, and security review.
+  No current P1 state may be relabeled as DELIVERED/PUBLISHED.
+- **Recovery:** discard this unmerged source branch without affecting P1.1
+  draft, P1.2 media, P1.3 template or P1.5 request files. No live desktop
+  state has been changed by this PR. Native visual acceptance is separate.

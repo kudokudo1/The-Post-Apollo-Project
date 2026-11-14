@@ -310,27 +310,11 @@ Rectangle {
                 visible: publisher.activeSection === "access"
             }
 
-            Column {
-                anchors.centerIn: parent
-                width: parent.width - 50
-                spacing: 12
+            PublisherHistoryPane {
+                id: publisherHistoryPane
+                anchors.fill: parent
+                anchors.margins: 10
                 visible: publisher.activeSection === "history"
-                Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    color: Colors.yellow
-                    font.pixelSize: 18
-                    text: publisher.activeSection.toUpperCase()
-                }
-                Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                    color: Colors.white
-                    font.pixelSize: 12
-                    text: "P1 FUTURE STEP // NOT ENABLED.\n"
-                          + "NO UPLOAD, PROVIDER DISPATCH OR POSTING AUTHORITY."
-                }
             }
         }
         Text {

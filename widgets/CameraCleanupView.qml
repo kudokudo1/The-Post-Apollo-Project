@@ -317,15 +317,44 @@ Column {
                         text: "QUEUE EMPTY // SELECT MEDIA IN ANY MODE"
                     }
                 }
-                ActionButton {
+                // U6 // Unified TRASH, but only for the user's explicit
+                // queue review click. Swipe and Hunt merely mark files.
+                // The actual one-use plan/GIO move stays Camera-owned.
+                TrashLifecycleActionDeck {
+                    id: cleanupQueueTrashReviewDeck
                     width: parent.width
                     height: 36
-                    label: "MOVE " + camera.batchPaths.length + " TO TRASH"
-                    labelPixelSize: 12
-                    accentColor: Colors.red
-                    destructive: true
-                    available: !camera.busy && camera.batchPaths.length > 0
-                    onLeftClicked: camera.trashQueuedNow()
+                    actionWidth: width
+                    actionHeight: 36
+                    ownerId: "camera-gio"
+                    resourceId: "camera-cleanup-queue"
+                    resourceRevisionKind: "queue-counter"
+                    resourceRevision: String(camera.cleanupQueueRevision)
+                    showTrash: true
+                    trashCapable: camera.batchPaths.length > 0
+                                  && camera.batchPaths.length <= 500
+                                  && camera.cleanupQueueRevision < 2147483647
+                    showRestore: false
+                    showBurn: false
+                    ownerApproved: camera.cleanupQueueOpen
+                                   && camera.hostedCleanupActive
+                    policyReviewed: camera.galleryRequestedView === "cleanup"
+                                    && camera.cleanupCustomFolder
+                                       === camera.cleanupLoadedFolder
+                                    && camera.cleanupCustomFolder
+                                       === camera.galleryRequestedFolder
+                    protectedResource: false
+                    retentionHold: false
+                    requestInFlight: camera.busy
+                        || camera.nativeRegionSelecting || camera.zoomWebBusy
+                        || !camera.hostedCleanupActive
+                        || !camera.cleanupQueueOpen
+                        || camera.activeView !== "cleanup"
+                        || camera.cleanupTechnique === "desktop"
+                    onTrashReviewRequested: function(ownerId, resourceId, expectedRevision) {
+                        camera.reviewQueuedCameraTrash(
+                            ownerId, resourceId, expectedRevision);
+                    }
                 }
             }
         }

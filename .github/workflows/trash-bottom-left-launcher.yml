@@ -6,6 +6,7 @@ on:
       - shell.qml
       - modules/Trash.qml
       - components/TrashLifecycleActionDeck.qml
+      - components/qmldir
       - widgets/CameraW.qml
       - widgets/CameraCleanupView.qml
       - modules/Power.qml
@@ -18,6 +19,7 @@ on:
       - shell.qml
       - modules/Trash.qml
       - components/TrashLifecycleActionDeck.qml
+      - components/qmldir
       - widgets/CameraW.qml
       - widgets/CameraCleanupView.qml
       - modules/Power.qml

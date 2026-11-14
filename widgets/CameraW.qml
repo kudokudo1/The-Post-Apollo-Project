@@ -1486,6 +1486,30 @@ PanelWindow {
         return run("trash", ["trash", id, "MOVE_TO_TRASH"]);
     }
 
+    // Trash++ U7 // Only the Desktop preview's final explicit click enters
+    // the shared request deck. No paths or arbitrary operations are accepted
+    // from the generic component. Camera's original one-use Desktop plan
+    // remains the sole scope/authorization check for recoverable GIO Trash.
+    function reviewDesktopCameraTrash(ownerId, resourceId, expectedRevision) {
+        const plan = trashPreview;
+        if (ownerId !== "camera-gio"
+                || resourceId !== "camera-desktop-screenshots"
+                || !/^[0-9a-f]{32}$/.test(expectedRevision)
+                || !hostedCleanupActive || activeView !== "cleanup"
+                || cleanupTechnique !== "desktop" || cleanupQueueOpen
+                || busy || nativeRegionSelecting || zoomWebBusy
+                || !plan || String(plan.planId || "") !== expectedRevision
+                || plan.source !== "Desktop screenshot-like PNG/JPEG/WEBP"
+                || !Number.isInteger(plan.count)
+                || plan.count < 1 || plan.count > 20000
+                || typeof plan.bytes !== "number"
+                || !Number.isFinite(plan.bytes) || plan.bytes < 0)
+            return false;
+        // The existing method consumes the preview UI state and delegates
+        // to the original plan-ID/confirmation Camera backend.
+        return confirmCleanup();
+    }
+
     function consume(raw) {
         const action = pendingAction;
         if (!action)

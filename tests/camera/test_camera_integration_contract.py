@@ -144,7 +144,14 @@ class CameraWidgetContracts(unittest.TestCase):
         self.assertIn("function confirmCleanup()", PANEL)
         self.assertIn('run("trash", ["trash", id, "MOVE_TO_TRASH"])', PANEL)
         self.assertIn('label: "PREVIEW MATCHES"', CLEANUP)
-        self.assertIn('label: camera.trashPreview', CLEANUP)
+        # U7 preserves the real preview count in the display text while
+        # the final confirmation moves into the shared review-only control.
+        self.assertIn('text: camera.trashPreview', CLEANUP)
+        self.assertIn('id: desktopScreenshotTrashReviewDeck', CLEANUP)
+        self.assertIn('camera.reviewDesktopCameraTrash(', CLEANUP)
+        self.assertIn('function reviewDesktopCameraTrash(', PANEL)
+        self.assertIn('return confirmCleanup();', PANEL)
+        self.assertNotIn('onLeftClicked: camera.confirmCleanup()', CLEANUP)
         self.assertIn("destructive: true", PANEL)
         self.assertIn("accentColor: Colors.red", PANEL)
         self.assertIn("camera.trashPreview.sample.join", CLEANUP)

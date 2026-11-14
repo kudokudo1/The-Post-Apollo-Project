@@ -51,6 +51,8 @@ jobs:
         run: node --test tests/trash/test_u5_camera_gallery_trash_review.cjs
       - name: Verify U6 Camera Cleanup queue scoped review and explicit one-click GIO handoff
         run: node --test tests/trash/test_u6_camera_cleanup_queue_review.cjs
+      - name: Verify U7 Desktop preview plan and final shared TRASH click stay owner-scoped
+        run: node --test tests/trash/test_u7_desktop_screenshot_review.cjs
       - name: Verify Camera Cleanup handoff preserves shared queue and authority
         run: node --test tests/trash/test_camera_cleanup_handoff.cjs
       - name: Verify V2 pilot snapshots require preview, confirmation and owner scope

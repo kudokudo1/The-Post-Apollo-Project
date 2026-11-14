@@ -141,7 +141,9 @@ test("Camera preview and independent Cleanup/queue pathways are preserved",()=>{
     assert.match(camera,/function trashQueuedNow\(\)/);
     assert.match(camera,/"trash-batch-now", JSON\.stringify\(batchPaths\)/);
     assert.match(cleanup,/camera\.reviewQueuedCameraTrash\(/);
-    assert.match(cleanup,/onLeftClicked: camera\.confirmCleanup\(\)/);
+    assert.match(cleanup,/id: desktopScreenshotTrashReviewDeck/);
+    assert.match(cleanup,/camera\.reviewDesktopCameraTrash\(/);
+    assert.doesNotMatch(cleanup,/onLeftClicked: camera\.confirmCleanup\(\)/);
     assert.match(camera,/function confirmCleanup\(\)/);
     assert.doesNotMatch(camera,/onLeftClicked: camera\.confirmSelectedTrash\(\)/);
 });

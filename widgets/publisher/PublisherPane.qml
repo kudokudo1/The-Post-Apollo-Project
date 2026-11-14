@@ -24,6 +24,7 @@ Rectangle {
         {id:"compose", label:"COMPOSE"},
         {id:"library", label:"LIBRARY"},
         {id:"media", label:"MEDIA"},
+        {id:"templates", label:"TEMPLATES"},
         {id:"calendar", label:"CALENDAR"},
         {id:"queue", label:"QUEUE"},
         {id:"history", label:"HISTORY"}
@@ -43,6 +44,17 @@ Rectangle {
         draftBody.text = item.body;
         activeSection = "compose";
         feedback = "EDIT LOCAL " + item.id + " // SAVE TO CONFIRM";
+    }
+    function composerHasUnsavedChanges() {
+        if (selectedDraftId === "")
+            return draftTitle.text.trim() !== "" || draftBody.text !== "";
+        for (var i = 0; i < storeSnapshot.drafts.length; i++) {
+            var saved = storeSnapshot.drafts[i];
+            if (saved.id === selectedDraftId)
+                return draftTitle.text.trim() !== saved.title
+                    || draftBody.text !== saved.body;
+        }
+        return true;
     }
     function saveEditor() {
         if (PublisherDraftStore.saveDraft(selectedDraftId,
@@ -258,6 +270,26 @@ Rectangle {
                 anchors.margins: 10
                 activeDraftId: publisher.selectedDraftId
                 visible: publisher.activeSection === "media"
+            }
+
+            PublisherTemplatePane {
+                id: publisherTemplatePane
+                anchors.fill: parent
+                anchors.margins: 10
+                visible: publisher.activeSection === "templates"
+                onGenerated: function(title, body) {
+                    // Do not destroy an unsaved Compose edit when applying a
+                    // preview. Explicitly save or clear it first.
+                    if (publisher.composerHasUnsavedChanges()) {
+                        publisherTemplatePane.feedback =
+                            "COMPOSE HAS UNSAVED CHANGES // SAVE OR CLEAR IT FIRST";
+                        return;
+                    }
+                    publisher.newDraft();
+                    draftTitle.text = title;
+                    draftBody.text = body;
+                    publisher.feedback = "TEMPLATE APPLIED // REVIEW FACTS & SAVE";
+                }
             }
 
             Column {

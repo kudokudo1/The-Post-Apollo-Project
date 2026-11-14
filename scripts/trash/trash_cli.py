@@ -53,6 +53,17 @@ def _revision(rows):
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+def _review_id(uri, original):
+    """Opaque UI row match token; not identity proof or restore permission.
+
+    It binds BOTH exact GIO fields as delimited JSON, rather than exposing
+    paths through the cross-widget ActionDeck. GIO remains the sole executor.
+    """
+    raw = json.dumps([uri, original], ensure_ascii=False,
+                     separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
 def _display(raw):
     return _error_text(raw)[:170]
 
@@ -85,7 +96,8 @@ def parse_listing(output):
         name = Path(original).name or unquote(uri.rsplit("/", 1)[-1])
         rows.append({"uri": uri, "original": original,
                      "name": _display(name),
-                     "originLabel": _display(original)})
+                     "originLabel": _display(original),
+                     "reviewId": _review_id(uri, original)})
     rows.sort(key=lambda item: (item["original"].casefold(), item["uri"]))
     return rows
 

@@ -36,6 +36,8 @@ function canBeginQuiescing(snapshot) {
             || snapshot.ringingCount !== 0
             || snapshot.previewing !== false
             || snapshot.audioState !== "IDLE"
+            || typeof snapshot.notificationOutcome !== "string"
+            || snapshot.notificationOutcome.length === 0
             || snapshot.notificationOutcome === "DELIVERY PENDING")
         return false;
     return true;

@@ -158,7 +158,9 @@ test("the single-file Gallery confirmation and desktop screenshot plan are indep
     assert.match(camera,/function confirmSelectedTrash\(\)/);
     assert.match(camera,/function reviewSelectedCameraTrash\(/); // stacked U5
     assert.match(camera,/function confirmCleanup\(\)/);
-    assert.match(cleanup,/onLeftClicked: camera\.confirmCleanup\(\)/);
+    assert.match(cleanup,/id: desktopScreenshotTrashReviewDeck/);
+    assert.match(cleanup,/camera\.reviewDesktopCameraTrash\(/);
+    assert.doesNotMatch(cleanup,/onLeftClicked: camera\.confirmCleanup\(\)/);
     assert.match(cleanup,/label: "PREVIEW MATCHES"/);
     assert.match(camera,/"trash-batch-now", JSON\.stringify\(batchPaths\)/);
 });

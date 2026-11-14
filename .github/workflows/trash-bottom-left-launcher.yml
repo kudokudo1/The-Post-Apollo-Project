@@ -47,6 +47,8 @@ jobs:
           python3 -c 'import json,sys; d=json.load(open(sys.argv[1], encoding="utf-8")); print("U1 STATE:", d["state"]); print("CANDIDATE LOCATIONS:", d["totals"]["candidateLocations"]); print("BY FAMILY:", d["totals"]["byFamily"]); print("INCOMPLETE PATHS:", len(d["incompletePaths"])); print("CANDIDATE FILES:", sorted(set(x["path"] for x in d["candidates"]))[:80])' "$RUNNER_TEMP/trashpp-u1.json"
       - name: Verify U3 managed-copy ActionDeck review maps to original owned backend
         run: node --test tests/trash/test_u3_managed_copy_review.cjs
+      - name: Verify U4 GIO file Restore only matches exact indexed review token
+        run: node --test tests/trash/test_u4_gio_restore_review.cjs
       - name: Verify Camera Cleanup handoff preserves shared queue and authority
         run: node --test tests/trash/test_camera_cleanup_handoff.cjs
       - name: Verify V2 pilot snapshots require preview, confirmation and owner scope

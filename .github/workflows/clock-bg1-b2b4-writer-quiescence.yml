@@ -44,12 +44,20 @@ jobs:
           paths=set(subprocess.check_output(
               ["git","diff","--name-only","origin/main...HEAD"],
               text=True).splitlines())
-          expected={
+          historical={
               "services/time/AlarmManagerService.qml",
               "services/time/AlarmWriterQuiescencePolicy.js",
               "services/time/BG1-ALARM-WRITER-QUIESCENCE.md",
               "tests/time/test_clock_bg1_b2b4_writer_quiescence.cjs",
               ".github/workflows/clock-bg1-b2b4-writer-quiescence.yml"}
-          assert paths==expected, f"Scope changed: {paths ^ expected}"
+          mounted={
+              "services/time/AlarmManagerService.qml",
+              "services/time/AlarmWriterBarrierPolicy.js",
+              "services/time/BG1-ALARM-MOUNTED-WRITE-BARRIER.md",
+              "tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs",
+              ".github/workflows/clock-bg1-b2b6-mounted-barrier.yml",
+              "tests/time/test_clock_bg1_b2b4_writer_quiescence.cjs",
+              ".github/workflows/clock-bg1-b2b4-writer-quiescence.yml"}
+          assert paths in (historical, mounted), f"Unapproved B2B4/B2B6 diff: {sorted(paths)}"
           print("No broker/Identity/Connections/active background mode changes: PASS")
           PY

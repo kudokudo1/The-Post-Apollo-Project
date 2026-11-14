@@ -114,7 +114,7 @@ test("future writer barrier model denies both new writes and ticks outside ACTIV
     }
 });
 
-test("live AlarmManager only exposes passive probe and keeps original writer routes",()=>{
+test("live AlarmManager retains passive B2B4 probe alongside guarded B2B6 write routes",()=>{
     const qml=read("services/time/AlarmManagerService.qml");
     assert.match(qml,/import "AlarmWriterQuiescencePolicy.js" as WriterQuiescence/);
     assert.match(qml,/readonly property bool writerReleaseAcknowledged: false/);
@@ -132,13 +132,17 @@ test("live AlarmManager only exposes passive probe and keeps original writer rou
             "request.send", "Process {", "FileView {", "stage(", "write("]) {
         assert(!requestBlock.includes(forbidden),"release request mutates: "+forbidden);
     }
-    assert.match(qml,/function saveDocument\(next\) \{\s*if \(!canEdit \|\| !Policy\.validDocument\(next\)\)/);
-    assert.match(qml,/function beginWrite\(next\) \{\s*storageState = "saving";/);
+    assert.match(qml,/function saveDocument\(next\) \{\s*if \(!alarmWriterMaySave \|\| !canEdit \|\| !Policy\.validDocument\(next\)\)/);
+    assert.match(qml,/function beginWrite\(next\) \{[\s\S]*?if \(!alarmWriterMaySave \|\| !Policy\.validDocument\(next\)\)[\s\S]*?storageState = "saving";/);
     assert.match(qml,/if \(queued !== null\s*&& JSON\.stringify\(saved\) !== JSON\.stringify\(queued\)\)\s*manager\.beginWrite\(queued\);/);
-    assert.match(qml,/function checkDue\(\) \{\s*if \(!canEdit\) return;/);
+    assert.match(qml,/function checkDue\(\) \{\s*if \(!alarmWriterMayTick \|\| !canEdit\) return;/);
     assert.match(qml,/if \(!canEdit\) \{\s*document = r\.document;\s*syncSound\(\);/);
     assert.match(qml,/atomicWrites: true/);
     assert.match(qml,/blockWrites: false/);
+    assert.match(qml,/readonly property string alarmWriterBarrierPhase: "ACTIVE"/);
+    assert.match(qml,/return WriterBarrier\.requestPause\(writerPauseSnapshot\(\)\)/);
+    assert.match(qml,/if \(!alarmWriterMayAnnounce\) return;/);
+    assert.match(qml,/if \(!alarmWriterMayAudioStart\)/);
     assert.equal(qml.match(/alarmFile\.setText\(/g)?.length,1);
     assert(!qml.includes("AlarmOwnershipBroker"));
     assert(!qml.includes("AlarmSignedRoleOrigin"));

@@ -1978,19 +1978,43 @@ Column {
                           ? "EXAMPLES // " + camera.trashPreview.sample.join(" // ")
                           : "Preview before moving screenshot files to Trash."
                 }
-                ActionButton {
+                // U7 // The preview and its count stay visible above.
+                // Only this explicit final user click can request a move;
+                // the Camera backend still verifies its one-use plan.
+                TrashLifecycleActionDeck {
+                    id: desktopScreenshotTrashReviewDeck
                     width: 225
                     height: 43
-                    label: camera.trashPreview
-                           ? "MOVE " + camera.trashPreview.count + " TO TRASH"
-                           : "TRASH REQUIRES PREVIEW"
-                    labelPixelSize: 11
-                    accentColor: Colors.red
-                    destructive: true
-                    available: !camera.busy && camera.trashPreview !== null
-                               && Number(camera.trashPreview.count) > 0
-                               && !!camera.trashPreview.planId
-                    onLeftClicked: camera.confirmCleanup()
+                    actionWidth: width
+                    actionHeight: 43
+                    ownerId: "camera-gio"
+                    resourceId: "camera-desktop-screenshots"
+                    resourceRevisionKind: "camera-plan"
+                    resourceRevision: camera.trashPreview
+                        ? String(camera.trashPreview.planId || "") : ""
+                    showTrash: true
+                    trashCapable: camera.trashPreview !== null
+                        && Number(camera.trashPreview.count) > 0
+                        && Number(camera.trashPreview.count) <= 20000
+                    showRestore: false
+                    showBurn: false
+                    ownerApproved: camera.hostedCleanupActive
+                                   && camera.activeView === "cleanup"
+                                   && camera.cleanupTechnique === "desktop"
+                    policyReviewed: camera.trashPreview !== null
+                                    && !camera.cleanupQueueOpen
+                    protectedResource: camera.trashPreview === null
+                    retentionHold: false
+                    requestInFlight: camera.busy
+                        || camera.nativeRegionSelecting || camera.zoomWebBusy
+                        || !camera.hostedCleanupActive
+                        || camera.activeView !== "cleanup"
+                        || camera.cleanupTechnique !== "desktop"
+                        || camera.cleanupQueueOpen
+                    onTrashReviewRequested: function(ownerId, resourceId, expectedRevision) {
+                        camera.reviewDesktopCameraTrash(
+                            ownerId, resourceId, expectedRevision);
+                    }
                 }
                 GohuText {
                     width: parent.width

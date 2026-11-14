@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.services.sounds
 import "AlarmManagerPolicy.js" as Policy
 import "AlarmWriterQuiescencePolicy.js" as WriterQuiescence
+import "AlarmWriterBarrierPolicy.js" as WriterBarrier
 
 // V2 is the only mounted Alarm owner; V1 remains read-only migration input.
 // TimeW is just a view. No QtMultimedia dependency in the scheduler itself.
@@ -21,6 +22,35 @@ Scope {
     property var document: Policy.initialDocument()
     property var pendingDocument: null
     property var queuedDocument: null
+    // BG1-B2B6: read-only ACTIVE latch. No UI, IPC, or native process can
+    // currently switch this to QUIESCING/RELEASED. A trusted installed
+    // writer authority and durable save receipt must exist first.
+    readonly property string alarmWriterBarrierPhase: "ACTIVE"
+    readonly property bool alarmWriterMaySave:
+        WriterBarrier.allowDiskMutation(alarmWriterBarrierPhase)
+    readonly property bool alarmWriterMayTick:
+        WriterBarrier.allowSchedulerTick(alarmWriterBarrierPhase)
+    readonly property bool alarmWriterMayAnnounce:
+        WriterBarrier.allowRingAnnouncement(alarmWriterBarrierPhase)
+    readonly property bool alarmWriterMayAudioStart:
+        WriterBarrier.allowAudioStart(alarmWriterBarrierPhase)
+    function writerPauseSnapshot() {
+        return {
+            storageState: storageState,
+            pendingWrite: pendingDocument !== null,
+            queuedWrite: queuedDocument !== null,
+            migrationRequested: migrationRequested,
+            ringingCount: ringingCount,
+            previewing: previewing,
+            audioState: audioState,
+            notificationOutcome: notificationOutcome
+        };
+    }
+    function requestAlarmWriterPause() {
+        // Status-only and always refuses. Never create a live pause or
+        // release capability from a QML method callable by other widgets.
+        return WriterBarrier.requestPause(writerPauseSnapshot());
+    }
     property bool v2Absent: false
     property bool legacyReadFinished: false
     property var legacyDocument: null
@@ -68,8 +98,8 @@ Scope {
     }
 
     readonly property bool canEdit:
-        storageState === "ready" || storageState === "empty"
-        || storageState === "saving"
+        alarmWriterMaySave && (storageState === "ready"
+        || storageState === "empty" || storageState === "saving")
     readonly property int count: document.alarms.length
     readonly property int ringingCount: document.alarms.filter(function(a) {
         return a.ringing;
@@ -84,12 +114,19 @@ Scope {
     }
 
     function beginWrite(next) {
+        // Last-resort barrier at the ONLY mounted V2 disk write call.
+        // Refuse even direct internal calls that bypass saveDocument.
+        if (!alarmWriterMaySave || !Policy.validDocument(next)) {
+            feedback = "ALARM WRITER BARRIER // SAVE REFUSED";
+            return false;
+        }
         storageState = "saving";
         pendingDocument = next;
         alarmFile.setText(JSON.stringify(next, null, 2) + "\n");
+        return true;
     }
     function saveDocument(next) {
-        if (!canEdit || !Policy.validDocument(next))
+        if (!alarmWriterMaySave || !canEdit || !Policy.validDocument(next))
             return false;
         document = next;
         if (pendingDocument !== null)
@@ -101,6 +138,7 @@ Scope {
     }
 
     function maybeInitialize() {
+        if (!alarmWriterMaySave) return;
         if (!v2Absent || !legacyReadFinished || storageState !== "loading")
             return;
         if (legacyError !== "") {
@@ -320,7 +358,8 @@ Scope {
     }
 
     function previewSound(soundId, volumePercent) {
-        if (ringingCount > 0 || !Policy.validSoundId(soundId)
+        if (!alarmWriterMayAudioStart
+                || ringingCount > 0 || !Policy.validSoundId(soundId)
                 || (SoundLibraryService.isImportedId(soundId)
                     && !SoundLibraryService.byId(soundId))
                 || !Number.isInteger(volumePercent)
@@ -340,6 +379,12 @@ Scope {
         syncSound();
     }
     function syncSound() {
+        // An old writer must not restart audio after a future release.
+        if (!alarmWriterMayAudioStart) {
+            audioLoader.active = false;
+            audioState = "IDLE";
+            return;
+        }
         // Deterministic first audible alarm if several alarms ring together.
         // Every ringing alarm remains visible and independently stoppable.
         const sourceId = previewing ? previewSoundId
@@ -365,6 +410,7 @@ Scope {
         }
     }
     function reportRingOccurrence(alarmId, startedMs) {
+        if (!alarmWriterMayAnnounce) return;
         lastFiredAlarmId = alarmId;
         lastFiredAtMs = startedMs;
         notificationOutcome = "DELIVERY PENDING";
@@ -377,7 +423,7 @@ Scope {
         notificationOutcome = String(outcome || "NO DELIVERY RESULT");
     }
     function announceRestoredRinging() {
-        if (!canEdit) return;
+        if (!alarmWriterMayAnnounce || !canEdit) return;
         const now = Date.now();
         for (let i = 0; i < document.alarms.length; i++) {
             const a = document.alarms[i];
@@ -390,7 +436,7 @@ Scope {
         }
     }
     function checkDue() {
-        if (!canEdit) return;
+        if (!alarmWriterMayTick || !canEdit) return;
         // Sample wall time HERE, not from a potentially stale 1s Timer
         // property. FileView restore also calls this path on startup.
         const prior = lastSchedulerTickMs;
@@ -448,7 +494,7 @@ Scope {
         active: false
         source: "AlarmAudioV2.qml"
         onLoaded: {
-            if (item) {
+            if (item && manager.alarmWriterMayAudioStart) {
                 const a = manager.firstSoundAlarm;
                 item.soundId = manager.previewing ? manager.previewSoundId
                                : a ? a.soundId : "chime";
@@ -515,6 +561,18 @@ Scope {
             const queued = manager.queuedDocument;
             manager.pendingDocument = null;
             manager.queuedDocument = null;
+            if (queued !== null
+                    && JSON.stringify(saved) !== JSON.stringify(queued)
+                    && !manager.alarmWriterMaySave) {
+                // Do not silently discard an unsaved queued edit. This
+                // would only occur if a future authority changed the phase
+                // without satisfying the required empty-queue preflight.
+                manager.queuedDocument = queued;
+                manager.storageState = "error";
+                manager.storageError = "WRITER_BARRIER_PENDING_QUEUE";
+                manager.feedback = "QUEUED ALARM SAVE REFUSED // NOT DURABLE";
+                return;
+            }
             if (queued !== null
                     && JSON.stringify(saved) !== JSON.stringify(queued))
                 manager.beginWrite(queued);

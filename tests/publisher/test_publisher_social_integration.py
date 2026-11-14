@@ -50,7 +50,7 @@ class PublisherP1Contracts(unittest.TestCase):
         self.assertIn("UNSUPPORTED_VERSION", policy)
         self.assertIn("DUPLICATE_DRAFT_ID", policy)
         self.assertIn("UNKNOWN_FIELDS", policy)
-        self.assertIn("NO SCHEDULE, QUEUE, UPLOAD OR POSTING AUTHORITY.", pane)
+        self.assertIn("NO UPLOAD, PROVIDER DISPATCH OR POSTING AUTHORITY.", pane)
         self.assertIn("LOCAL SAVE ACKNOWLEDGED", pane)
         self.assertNotIn("Qt.openUrlExternally", pane)
 

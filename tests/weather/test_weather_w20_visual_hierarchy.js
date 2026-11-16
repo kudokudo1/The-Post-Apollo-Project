@@ -9,7 +9,7 @@ const cards=fs.readFileSync("widgets/weather/StationHomeMetricCard.qml","utf8");
 const nativeOverview=fs.readFileSync("tests/weather/fixtures/W15FixedWeatherOverviewNative.qml","utf8");
 const nativeWeather=fs.readFileSync("tests/weather/fixtures/W9FixedWeatherTerminalNative.qml","utf8");
 function allocation(height) {
-  const row=Math.max(46,Math.min(51,Math.floor(height*0.15),
+  const row=Math.max(46,Math.min(48,Math.floor(height*0.15),
                    Math.floor(Math.max(0,height-195)/2)));
   const railHeight=height<286?31:56;
   const instrument=height-railHeight-2*row;
@@ -22,7 +22,7 @@ function allocation(height) {
 }
 test("W20 gives the six-hour forecast new vertical space without shrinking three-day or NOW",()=>{
  assert.match(home,/overviewCardRowHeight: Math.max\(/);
- assert.match(home,/51, Math.floor\(homeScroll.height \* 0.15\)/);
+ assert.match(home,/48, Math.floor\(homeScroll.height \* 0.15\)/);
  assert.match(overview,/anchoredExpansion: Math.min\(160, expansion\)/);
  assert.match(overview,/height: 52 \+ panel.anchoredExpansion \* 0.50/);
  assert.match(overview,/height: 45 \+ panel.expansion - panel.anchoredExpansion \* 0.67/);
@@ -30,12 +30,12 @@ test("W20 gives the six-hour forecast new vertical space without shrinking three
  for(const h of [275,300,400,500,650]) {
    const a=allocation(h);
    assert.equal(a.instrument+a.railHeight+2*a.row,h);
-   assert.ok(a.row>=46 && a.row<=51);
+   assert.ok(a.row>=46 && a.row<=48);
    assert.ok(a.now>=44 && a.hour>=40 && a.day>=24);
    assert.ok(Math.abs(a.now+a.hour+a.day-(121+a.instrument-164))<.001);
  }
  const tall=allocation(500);
- assert.equal(tall.row,51);
+ assert.equal(tall.row,48);
  assert.ok(tall.hour>=120);
  assert.ok(Math.abs(tall.now-132)<.01);
  assert.ok(Math.abs(tall.day-51.2)<.01);

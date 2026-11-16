@@ -18,7 +18,6 @@ import hashlib
 import os
 from pathlib import Path
 import signal
-import socket
 import stat
 import sys
 from threading import Event
@@ -73,21 +72,39 @@ def _self_source_snapshot() -> tuple[str, ...] | None:
 
 
 def _self_kernel_observed() -> bool:
-    """Observe this process through the actual P48 Linux pidfd/proc path."""
+    """Measure the running SERVER directly, not through client SO_PEERCRED.
+
+    Our own PID cannot be recycled until this process terminates, so unlike
+    P48's external peer checks a pidfd is unnecessary. This remains only a
+    consistency observation, not signed installed-host authentication.
+    """
     if not sys.platform.startswith("linux"):
         return False
     try:
-        with socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM) as (a, b):
-            evidence = Peer.observe_socket_peer(a)
+        pid = os.getpid()
+        proc = Path("/proc/self")
+        before = Peer._start_ticks(
+            Peer._bounded(proc / "stat", Peer.STAT_MAX), pid)
+        if not Peer._uids_gids(
+            Peer._bounded(proc / "status", Peer.STATUS_MAX),
+            os.geteuid(), os.getegid()
+        ):
+            return False
+        cgroup = Peer._bounded(proc / "cgroup", Peer.CGROUP_MAX)
+        if b"\\n" not in cgroup:
+            return False
+        digest, device, inode = Peer._hash_executable(proc / "exe")
+        after = Peer._start_ticks(
+            Peer._bounded(proc / "stat", Peer.STAT_MAX), pid)
+        cgroup_after = Peer._bounded(proc / "cgroup", Peer.CGROUP_MAX)
+        executable_after = (proc / "exe").stat()
         return (
-            evidence is not None
-            and evidence.pid == os.getpid()
-            and evidence.uid == os.geteuid()
-            and evidence.gid == os.getegid()
-            and evidence.start_ticks > 0
-            and len(evidence.executable_sha256) == 64
+            before > 0 and before == after and cgroup == cgroup_after
+            and (device, inode)
+                == (executable_after.st_dev, executable_after.st_ino)
+            and len(digest) == 64
         )
-    except (OSError, ValueError, TypeError):
+    except (OSError, ValueError, TypeError, AttributeError):
         return False
 
 

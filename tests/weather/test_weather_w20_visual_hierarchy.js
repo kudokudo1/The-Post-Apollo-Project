@@ -9,9 +9,9 @@ const cards=fs.readFileSync("widgets/weather/StationHomeMetricCard.qml","utf8");
 const nativeOverview=fs.readFileSync("tests/weather/fixtures/W15FixedWeatherOverviewNative.qml","utf8");
 const nativeWeather=fs.readFileSync("tests/weather/fixtures/W9FixedWeatherTerminalNative.qml","utf8");
 function allocation(height) {
-  const row=Math.max(height<286?46:48,Math.min(51,Math.floor(height*0.16),
+  const row=Math.max(46,Math.min(51,Math.floor(height*0.15),
                    Math.floor(Math.max(0,height-195)/2)));
-  const railHeight=height<286?31:49;
+  const railHeight=height<286?31:56;
   const instrument=height-railHeight-2*row;
   const expansion=Math.max(0,instrument-164);
   const pinned=Math.min(160,expansion);
@@ -22,7 +22,7 @@ function allocation(height) {
 }
 test("W20 gives the six-hour forecast new vertical space without shrinking three-day or NOW",()=>{
  assert.match(home,/overviewCardRowHeight: Math.max\(/);
- assert.match(home,/51, Math.floor\(homeScroll.height \* 0.16\)/);
+ assert.match(home,/51, Math.floor\(homeScroll.height \* 0.15\)/);
  assert.match(overview,/anchoredExpansion: Math.min\(160, expansion\)/);
  assert.match(overview,/height: 52 \+ panel.anchoredExpansion \* 0.50/);
  assert.match(overview,/height: 45 \+ panel.expansion - panel.anchoredExpansion \* 0.67/);

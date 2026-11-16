@@ -1,0 +1,49 @@
+name: Social PHONE P50 Signed Status Release and Real Process CI Preflight
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhonePersonalInstalledReleaseP50.py'
+      - 'services/phone/PhonePersonalStatusHostP49.py'
+      - 'tests/phone/test_phone_personal_installed_release_p50.py'
+      - 'MODEL/contracts/social-phone-p50-signed-release-origin-preflight-v0.md'
+      - '.github/workflows/social-phone-p50-signed-origin-preflight.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhonePersonalInstalledReleaseP50.py'
+      - 'services/phone/PhonePersonalStatusHostP49.py'
+      - 'tests/phone/test_phone_personal_installed_release_p50.py'
+      - 'MODEL/contracts/social-phone-p50-signed-release-origin-preflight-v0.md'
+      - '.github/workflows/social-phone-p50-signed-origin-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-origin-and-real-status-process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install disposable signature verifier
+        run: python -m pip install cryptography==50.0.2
+      - name: Compile exact signed release and status-only runner
+        run: |
+          python -m py_compile services/phone/PhonePersonalInstalledReleaseP50.py
+          python -m py_compile services/phone/PhonePersonalStatusHostP49.py
+      - name: Signed exact PHONE role, tampering/rollback, and actual Linux process
+        run: python -m unittest discover -s tests/phone -p 'test_phone_personal_installed_release_p50.py' -v
+      - name: P49 direct Linux supervisor and P47/P48 kernel regressions
+        run: |
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_status_host_p49.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_host_socket_p47.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_peer_evidence_p48.py' -v
+      - name: P45 recovered encrypted transaction and UI remain locked
+        run: |
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_mainline_completeness_p45.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_transaction_review_p44.py' -v

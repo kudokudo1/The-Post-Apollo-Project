@@ -43,7 +43,7 @@ ShellRoot {
             if(root.ticks>40)
                 return root.fail("TIMEOUT");
             const rail=magick.overviewRailItem;
-            if(!rail || !rail.visible || rail.height!==49 ||
+            if(!rail || !rail.visible || rail.height!==56 ||
                rail.buttonRepeater.count!==3)
                 return root.fail("MISSING_SHARED_MAGICK_RAIL");
             if(Math.abs(rail.width-(window.width-12))>1)
@@ -55,8 +55,12 @@ ShellRoot {
             for(let i=0;i<3;i++) {
                 const button=rail.buttonRepeater.itemAt(i);
                 if(!button || button.width<rail.width/3-7
-                   || button.height!==24)
+                   || button.height!==27)
                     return root.fail("MAGICK_LONG_BUTTON_GEOMETRY_"+i);
+                const dividerGap=rail.dividerItem.y
+                    - button.mapToItem(rail,0,button.height).y;
+                if(Math.abs(dividerGap-5)>0.1)
+                    return root.fail("W23_MAGICK_TAB_DIVIDER_GAP_"+dividerGap);
                 if(i>0) {
                     const prev=rail.buttonRepeater.itemAt(i-1);
                     const gap=button.mapToItem(rail,0,0).x

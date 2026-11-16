@@ -204,7 +204,8 @@ class StaticPackageTests(unittest.TestCase):
     def test_entrypoint_only_imports_source_status_and_kernel_observer(self):
         code = SERVICE.read_text()
         self.assertIn("SocketHost.serve_status_only(directory, stop=stop)", code)
-        self.assertIn("Peer.observe_socket_peer(a)", code)
+        self.assertIn("Peer._start_ticks(", code)
+        self.assertIn('Path("/proc/self")', code)
         self.assertIn("_self_source_snapshot() != expected", code)
         for forbidden in (
             "PhonePersonalContactVault", "PhonePersonalContactIdentity",

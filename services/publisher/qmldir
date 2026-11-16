@@ -3,3 +3,4 @@ module qs.services.publisher
 singleton PublisherDraftStore 1.0 PublisherDraftStore.qml
 singleton PublisherMediaStore 1.0 PublisherMediaStore.qml
 singleton PublisherTemplateStore 1.0 PublisherTemplateStore.qml
+singleton PublisherAccessIntentStore 1.0 PublisherAccessIntentStore.qml

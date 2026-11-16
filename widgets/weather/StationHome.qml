@@ -39,7 +39,7 @@ Rectangle {
     // header. Adjust only the two supporting row budgets; 440x275
     // still has its compact 31px rail and 46px cards without panning.
     readonly property real overviewCardRowHeight: Math.max(
-        46, Math.min(51, Math.floor(homeScroll.height * 0.15),
+        46, Math.min(48, Math.floor(homeScroll.height * 0.15),
         Math.floor(Math.max(0, homeScroll.height - 195) / 2)))
     readonly property real overviewInstrumentHeight: Math.max(
         0, homeScroll.height - weatherOverviewRail.height

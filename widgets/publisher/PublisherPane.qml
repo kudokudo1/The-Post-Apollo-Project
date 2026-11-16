@@ -292,13 +292,21 @@ Rectangle {
                 }
             }
 
+            PublisherQueuePane {
+                id: publisherQueuePane
+                anchors.fill: parent
+                anchors.margins: 10
+                activeDraftId: publisher.selectedDraftId
+                calendarMode: publisher.activeSection === "calendar"
+                visible: publisher.activeSection === "calendar"
+                         || publisher.activeSection === "queue"
+            }
+
             Column {
                 anchors.centerIn: parent
                 width: parent.width - 50
                 spacing: 12
-                visible: publisher.activeSection === "calendar"
-                         || publisher.activeSection === "queue"
-                         || publisher.activeSection === "history"
+                visible: publisher.activeSection === "history"
                 Text {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
@@ -313,7 +321,7 @@ Rectangle {
                     color: Colors.white
                     font.pixelSize: 12
                     text: "P1 FUTURE STEP // NOT ENABLED.\n"
-                          + "NO SCHEDULE, QUEUE, UPLOAD OR POSTING AUTHORITY."
+                          + "NO UPLOAD, PROVIDER DISPATCH OR POSTING AUTHORITY."
                 }
             }
         }

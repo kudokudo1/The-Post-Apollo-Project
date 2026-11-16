@@ -113,3 +113,48 @@ independent and no media originals are altered by this feature.
 
 **Recovery:** Close or discard the P1.3 branch without changing deployed
 components. No original media or prior draft file requires migration.
+
+
+## P1.4 // Durable queue and timezone scheduling (no publisher)
+
+- **Scope:** deny-only SQLite queue. The queue is independent from the
+  SocialW window; no external account, post, upload, or notification exists.
+- **Storage:** owner-local \`Quickshell.dataDir/publisher-queue-v1.sqlite3\`.
+  SQLite WAL, synchronous=FULL, serialized BEGIN IMMEDIATE mutations and
+  stable numeric job IDs. Job records contain source draft ID/revision/digest,
+  schedule details and review state, not tokens or post bodies.
+- **Source check:** every schedule references an already saved P1.1 draft.
+  On its due tick, its revision and SHA-256 source digest must match, otherwise
+  the job is BLOCKED rather than released for review. Edits never silently
+  replace a scheduled snapshot.
+- **Time:** local YYYY-MM-DDTHH:MM plus IANA zone (UTC is explicit default).
+  DST gaps/ambiguous times are refused on initial scheduling. Recurrences may
+  be once/daily/weekly; after a due item is manually marked reviewed, an
+  operator may explicitly REARM. A skipped DST gap is skipped, an ambiguous
+  future slot refuses rearm. No automatic resending or backlog replay.
+- **States:** scheduled, paused, needs_review, reviewed, blocked, cancelled.
+  Due detection transitions to needs_review, *never published*. Cancel keeps
+  history. No delete or hidden queuing.
+- **Idempotency:** duplicate scheduling intents share a stable DB key and
+  return the existing job, including when the original has become due.
+- **User controls:** Social → PUBLISHER → CALENDAR/QUEUE. Select a saved
+  draft, enter local date/time and zone, choose recurrence, and add schedule.
+  REFRESH and CHECK DUE run local state checks. Pause/resume, two-click
+  cancel, mark reviewed and explicit recurrence rearm are provided.
+- **Independent execution:** Python CLI exposes \`tick\` and opt-in \`watch\`
+  loop that can operate without an open SocialW. No systemd user unit is
+  installed or started by this PR, so unattended background ticking on the
+  user's actual desktop is **NOT active** until separately deployed. Queued
+  due times remain durable even without the loop; REFRESH alone never sends.
+- **Limitations:** \`needs_review\` is not a publication receipt. The queue
+  stores no authenticated destination, no outgoing payload and no permission
+  to send. P2 provider grants and transport result reconciliation are future
+  work. No production or live workstation changes occur from this branch.
+- **Recovery:** discard P1.4 branch without touching existing P1.1/1.2/1.3
+  records. SQLite file is separately created only on first CLI use after
+  deployment. An unfinished PR is not live acceptance.
+
+**Dependency warning:** P1.3 template code is present on the feature
+branch from which this work is stacked but was not yet present in the inspected
+\`main\` tree. Restore/land that code through its own accepted path before
+P1.4 can land. Do not treat a merged PR label as proof of mainline ancestry.

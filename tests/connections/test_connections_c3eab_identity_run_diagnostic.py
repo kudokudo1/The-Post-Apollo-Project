@@ -258,7 +258,7 @@ class C3eABIdentityRunDiagnosticTests(unittest.TestCase):
 
     def test_24_marker_control_and_malformed_kind_are_refused(self):
         cases = (
-            "C4B_ID_SERVICE_PROBE_DETAIL // invalid\\tcontrol",
+            "C4B_ID_SERVICE_PROBE_DETAIL // invalid\tcontrol",
             "C4B_ID_stage // lowercase-marker-kind",
             "C4B_ID_PASS// missing-separator",
         )

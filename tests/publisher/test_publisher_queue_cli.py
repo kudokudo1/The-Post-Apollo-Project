@@ -67,7 +67,7 @@ class QueueP14Tests(unittest.TestCase):
         self.assertFalse(self.call("status")["canPublish"])
         with sqlite3.connect(self.db) as connection:
             self.assertEqual(connection.execute("PRAGMA integrity_check").fetchone()[0],"ok")
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0],1)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0],2)
         self.assertEqual(self.db.stat().st_mode & 0o077, 0)
 
     def test_due_needs_review_never_posts_even_after_restart(self):

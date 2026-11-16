@@ -35,12 +35,11 @@ Rectangle {
     // W20 // Shorten only the two supporting card rows; do not touch
     // their existing internals or meter heights. Freed space goes to
     // the six-period forecast in the upper WEATHER instrument.
-    // W22 // A 49px C44-style title/tabs/divider stage is offset by
-    // compacting only the two supporting rows; the 275px viewport retains
-    // its W21 31px rail and 46px rows, preserving the one-page contract.
+    // W23 // Matching C44 5px divider gap adds 7px to the normal
+    // header. Adjust only the two supporting row budgets; 440x275
+    // still has its compact 31px rail and 46px cards without panning.
     readonly property real overviewCardRowHeight: Math.max(
-        homeScroll.height < 286 ? 46 : 46, Math.min(
-        51, Math.floor(homeScroll.height * 0.15),
+        46, Math.min(51, Math.floor(homeScroll.height * 0.15),
         Math.floor(Math.max(0, homeScroll.height - 195) / 2)))
     readonly property real overviewInstrumentHeight: Math.max(
         0, homeScroll.height - weatherOverviewRail.height

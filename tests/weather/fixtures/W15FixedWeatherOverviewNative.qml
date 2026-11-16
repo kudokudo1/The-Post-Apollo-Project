@@ -107,13 +107,14 @@ ShellRoot {
         if(content.implicitHeight>scroll.height+1)
             return "ONE_PAGE_CLIPPED "+content.implicitHeight
                 +" > "+scroll.height;
-        if(snap.height<(window.height<286 ? 46 : 48)
-           || autoCards.height<(window.height<286 ? 46 : 48))
+        // W23 // Normal 300px Overview uses the tested 46px compact
+        // support rows, recovering height for the C44 5px divider gap.
+        if(snap.height<46 || autoCards.height<46)
             return "CARDS_TOO_SMALL "+snap.height+"/"+autoCards.height;
         if(snap.height>51 || autoCards.height>51)
             return "OVERSIZED_EMPTY_CARDS "+snap.height+"/"+autoCards.height;
         const condensed=window.height<286;
-        if(rail.height!==(condensed ? 31 : 49)
+        if(rail.height!==(condensed ? 31 : 56)
            || rail.buttonRepeater.count!==3
            || rail.width<content.width-1)
             return "W21_OVERVIEW_RAIL_MISSING";
@@ -124,8 +125,12 @@ ShellRoot {
         for(let i=0;i<3;i++) {
             const button=rail.buttonRepeater.itemAt(i);
             if(!button || button.width<rail.width/3-7
-                || button.height!==(condensed ? 25 : 24))
+                || button.height!==(condensed ? 24 : 27))
                 return "W21_RAIL_BUTTON_NOT_FULL_WIDTH_"+i;
+            const dividerGap=rail.dividerItem.y
+                - button.mapToItem(rail,0,button.height).y;
+            if(Math.abs(dividerGap-5)>0.1)
+                return "W23_WEATHER_TAB_DIVIDER_GAP_"+dividerGap;
             if(i>0) {
                 const previous=rail.buttonRepeater.itemAt(i-1);
                 const left=button.mapToItem(rail,0,0).x;

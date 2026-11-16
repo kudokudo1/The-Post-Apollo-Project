@@ -20,6 +20,10 @@ Rectangle {
     // archive in a compact single viewport without wheel scrolling.
     readonly property bool compactHistory:
         subjectRoute === "" && workspaceSection === "history"
+    // W23 // HOME workspace only. CLASSIC HOME and WEATHER Overview keep
+    // their existing independent headers and layouts.
+    readonly property bool homeOverviewWorkspace:
+        subjectRoute === "" && workspaceSection === "overview"
     // W16 // WEATHER OVERVIEW: summary and BOTH full-width card groups.
     // Only an actual NWS alert may need extra vertical room.
     readonly property bool fixedWeatherOverview:
@@ -31,12 +35,11 @@ Rectangle {
     // W20 // Shorten only the two supporting card rows; do not touch
     // their existing internals or meter heights. Freed space goes to
     // the six-period forecast in the upper WEATHER instrument.
-    // W22 // A 49px C44-style title/tabs/divider stage is offset by
-    // compacting only the two supporting rows; the 275px viewport retains
-    // its W21 31px rail and 46px rows, preserving the one-page contract.
+    // W23 // Matching C44 5px divider gap adds 7px to the normal
+    // header. Adjust only the two supporting row budgets; 440x275
+    // still has its compact 31px rail and 46px cards without panning.
     readonly property real overviewCardRowHeight: Math.max(
-        homeScroll.height < 286 ? 46 : 48, Math.min(
-        51, Math.floor(homeScroll.height * 0.16),
+        46, Math.min(48, Math.floor(homeScroll.height * 0.15),
         Math.floor(Math.max(0, homeScroll.height - 195) / 2)))
     readonly property real overviewInstrumentHeight: Math.max(
         0, homeScroll.height - weatherOverviewRail.height
@@ -44,6 +47,7 @@ Rectangle {
     readonly property alias overviewViewportItem: homeScroll
     readonly property alias overviewContentItem: homeContent
     readonly property alias overviewRailItem: weatherOverviewRail
+    readonly property alias homeOverviewRailItem: homeOverviewRail
     readonly property alias overviewSummaryItem: weatherOverviewSummary
     readonly property alias overviewSnapshotItem: weatherSnapshotRow
     readonly property alias overviewRelevantItem: weatherRelevantRow
@@ -994,16 +998,21 @@ Rectangle {
         Column {
             id: homeContent
             objectName: "home-w3-content-column"
-            x: home.fixedWeatherOverview ? 3 : 24
+            x: home.fixedWeatherOverview ? 3
+               : home.homeOverviewWorkspace ? 6 : 24
             y: home.fixedWeatherOverview ? 0
+               : home.homeOverviewWorkspace ? 6
                : (home.compactHistory ? 5 : 24)
             width: Math.max(0, homeScroll.width
-                            -(home.fixedWeatherOverview ? 6 : 48))
+                -(home.fixedWeatherOverview ? 6
+                  : home.homeOverviewWorkspace ? 12 : 48))
             spacing: home.fixedWeatherOverview ? 0
+                     : home.homeOverviewWorkspace ? 3
                      : (home.compactHistory ? 3 : 14)
 
         Row {
             visible: home.sectionVisible("header") && !home.fixedWeatherOverview
+                     && !home.homeOverviewWorkspace
             width: parent.width
             height: home.compactHistory ? 22 : 28
 
@@ -1036,6 +1045,25 @@ Rectangle {
                       : home.sourcesWorkspace ? "SOURCE DIRECTORY" : "AUTO SNAPSHOT"
                 font.pixelSize: 12
                 color: Colors.orange
+            }
+        }
+
+        // W23 // HOME gets the same long top-navigation controls as the
+        // WEATHER and MAGICK overviews. These are existing HOME routes;
+        // the original bottom page rail, cards, providers and timer remain.
+        StationSubjectOverviewRail {
+            id: homeOverviewRail
+            objectName: "home-w23-overview-top-rail"
+            visible: home.homeOverviewWorkspace
+            width: parent.width
+            titleText: "HOME // OVERVIEW"
+            routes: [
+                {label:"AUTO",path:"home/auto"},
+                {label:"QUICK",path:"home/quick"},
+                {label:"SNAPSHOT",path:"home/snapshot"}
+            ]
+            onRouteRequested: function(path) {
+                home.routeRequested(path)
             }
         }
 

@@ -110,6 +110,9 @@ Rectangle {
             // Explicit OVERVIEW keeps legacy unscoped CLASSIC behavior
             // separate from the focused HOME workspace route.
             workspaceSection: surface.homeSection
+            // W23 // The new top buttons use the same central route owner
+            // as the existing bottom HOME tabs; no separate navigation state.
+            onRouteRequested: function(path) { surface.routeRequested(path); }
             weatherService: surface.weatherService
             spaceService: surface.spaceService
             nwsAlertSource: surface.nwsAlertSource

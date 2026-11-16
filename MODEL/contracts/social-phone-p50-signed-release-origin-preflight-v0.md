@@ -23,6 +23,8 @@ Dedicated P50 exact-head CI plus Meta Apollo Grammar. Verify that a real P49 pro
 
 **A caller-selected Ed25519 root is not a trusted release root.** An attacker who can supply source bytes, key and manifest can make P50 pass; the parser only proves consistency. **Do not use P50 for installed-host approval, production service admission, Secret Service release, real C5 human consent, or authorization of P35 edits**. No C4b/Identity test receipt, C3e marker log or CI runner can be silently promoted to a PHONE trusted origin. Even when the optional check passes, P47 STATUS reports `installedIdentityVerified:false`, `independentChallengeVerified:false`, `c5OneUseConsentVerified:false`, `personalSaveAuthorized:false` and `keyReadAuthorized:false`.
 
+**Import-order limitation:** Python loads P47/P48/P50 modules before P49's optional CI check executes. Therefore this preflight does not prevent malicious import-time code execution and must never be treated as a secure launcher or production package verification. A future trusted loader/OS package verification must occur *before* module execution.
+
 A real independent PHONE signer root must be enrolled outside the host/checkout and protected against rollback. The installed package must be bound to the exact active systemd MainPID, root-owned installed modules, RPM/OSTree deployment, SELinux policy, cgroup and logind seat, with signer custody and a separately verified complete rollback. P49's status-only service has neither an installed signer nor any C5 PHONE-specific one-action consent. No production UI SAVE.
 
 ## CHECKLIST

@@ -127,7 +127,7 @@ class CandidateTests(unittest.TestCase):
         code = (ROOT / "services/phone/PhonePersonalSystemdOriginP51.py").read_text()
         for required in (
             '"/usr/bin/systemctl"', '"MainPID"', '"ControlGroup"',
-            '"/proc"', 'os.O_NOFOLLOW', 'pwd.getpwnam',
+            '"/proc"', '"O_NOFOLLOW"', 'pwd.getpwnam',
             '"NoNewPrivs"', '"CapEff"', "systemdCandidateObserved",
         ):
             self.assertIn(required, code)

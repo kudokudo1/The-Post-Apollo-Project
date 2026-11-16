@@ -61,7 +61,7 @@ Rectangle {
         anchors.leftMargin: magickPane.subjectRoute === "magick/overview" ? 6 : 16
         anchors.rightMargin: magickPane.subjectRoute === "magick/overview" ? 6 : 16
         anchors.topMargin: magickPane.independentScreen ? 0
-                           : magickPane.subjectRoute === "magick/overview" ? 4 : 10
+                           : magickPane.subjectRoute === "magick/overview" ? 6 : 10
         spacing: magickPane.subjectRoute === "magick/overview" ? 3 : 7
 
         GohuText {

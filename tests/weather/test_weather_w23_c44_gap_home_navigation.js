@@ -52,12 +52,12 @@ test("W23 adds working HOME Overview nav without creating a second HOME or repla
 });
 test("W23 preserves one-page Weather Overview with exact header height at 275, 300, and 500px",()=>{
  for(const h of [275,300,400,500]) {
-   const row=Math.max(46,Math.min(51,Math.floor(h*.15),
+   const row=Math.max(46,Math.min(48,Math.floor(h*.15),
                  Math.floor(Math.max(0,h-195)/2)));
    const railHeight=h<286?31:56;
    const summary=h-railHeight-2*row;
    assert.equal(summary+railHeight+2*row,h);
-   assert.ok(summary>=152 && row>=46 && row<=51);
+   assert.ok(summary>=152 && row>=46 && row<=48);
  }
  assert.match(home,/homeScroll.height - weatherOverviewRail.height/);
  assert.match(home,/fixedWeatherOverview && officialAlertSummary.available/);

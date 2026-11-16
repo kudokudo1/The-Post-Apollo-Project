@@ -31,16 +31,21 @@ if str(BUNDLE) not in sys.path:
 
 import PhonePersonalHostSocketP47 as SocketHost
 import PhonePersonalPeerEvidenceP48 as Peer
+import PhonePersonalInstalledReleaseP50 as SignedRelease
 
 ROSTER = (
     "PhonePersonalStatusHostP49.py",
     "PhonePersonalHostSocketP47.py",
     "PhonePersonalPeerEvidenceP48.py",
+    "PhonePersonalInstalledReleaseP50.py",
 )
 MAX_SOURCE = 128 * 1024
 ENV_TEST = "POST_APOLLO_PHONE_STATUS_CI_ONLY"
 ENV_NO_SAVE = "POST_APOLLO_PHONE_STATUS_NO_SAVE"
 ARG = "--private-status-dir"
+CI_MANIFEST = "--ci-signed-manifest"
+CI_SIGNATURE = "--ci-signed-signature"
+CI_ROOT = "--ci-release-root"
 FAIL = 78
 
 
@@ -111,8 +116,12 @@ def _self_kernel_observed() -> bool:
 def run_status_only(args: object) -> int:
     """Launch only the non-authorizing P47 socket until SIGTERM/SIGINT."""
     try:
-        if (type(args) is not list or len(args) != 2
+        if (type(args) is not list or len(args) not in (2, 8)
                 or args[0] != ARG or type(args[1]) is not str
+                or (len(args) == 8 and
+                    (args[2] != CI_MANIFEST or type(args[3]) is not str
+                     or args[4] != CI_SIGNATURE or type(args[5]) is not str
+                     or args[6] != CI_ROOT or type(args[7]) is not str))
                 or os.environ.get(ENV_TEST) != "1"
                 or os.environ.get(ENV_NO_SAVE) != "1"
                 or os.getuid() != os.geteuid()
@@ -124,6 +133,19 @@ def run_status_only(args: object) -> int:
         expected = _self_source_snapshot()
         if expected is None or not _self_kernel_observed():
             return FAIL
+        # Additional CI-only signed source consistency. All three file paths
+        # and the public root come from the caller, so even a valid signature
+        # grants absolutely no installed-host, C3e/C5 or key authority.
+        release_paths = (
+            tuple(Path(x) for x in (args[3], args[5], args[7]))
+            if len(args) == 8 else None
+        )
+        if release_paths is not None:
+            if SignedRelease.verify_candidate_from_paths(
+                bundle=BUNDLE, manifest_path=release_paths[0],
+                signature_path=release_paths[1], root_path=release_paths[2]
+            ) != SignedRelease.RESULT:
+                return FAIL
         stop = Event()
 
         def shut_down(_signal: int, _frame: object) -> None:
@@ -135,6 +157,13 @@ def run_status_only(args: object) -> int:
             # Detect source tampering between preflight and socket creation.
             if _self_source_snapshot() != expected:
                 return FAIL
+            if release_paths is not None:
+                if SignedRelease.verify_candidate_from_paths(
+                    bundle=BUNDLE, manifest_path=release_paths[0],
+                    signature_path=release_paths[1],
+                    root_path=release_paths[2]
+                ) != SignedRelease.RESULT:
+                    return FAIL
             SocketHost.serve_status_only(directory, stop=stop)
             return 0
         finally:

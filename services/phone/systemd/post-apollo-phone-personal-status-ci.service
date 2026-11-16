@@ -1,0 +1,37 @@
+# PHONE P49 // inert, supervised, status-only test unit.
+# Source contract only. NO [Install], daemon-reload, enablement or package.
+# Requires separately provisioned test UID, root-owned immutable code, and
+# explicit root-owned marker. This is NOT an authenticated production host.
+[Unit]
+Description=Post Apollo PHONE Personal status boundary (CI-only, no key/save)
+ConditionPathExists=/run/postapollo-phone-status-test-only/explicit-test.marker
+After=local-fs.target
+
+[Service]
+Type=simple
+User=postapollo-phone-status-ci
+Group=postapollo-phone-status-ci
+RuntimeDirectory=postapollo-phone-status-ci
+RuntimeDirectoryMode=0700
+Environment=POST_APOLLO_PHONE_STATUS_CI_ONLY=1
+Environment=POST_APOLLO_PHONE_STATUS_NO_SAVE=1
+ExecStart=/usr/bin/python3 -I -B /usr/libexec/post-apollo/phone/PhonePersonalStatusHostP49.py --private-status-dir /run/postapollo-phone-status-ci
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+RestrictSUIDSGID=true
+ProtectControlGroups=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/run/postapollo-phone-status-ci
+TimeoutStopSec=5
+
+# Deliberately no [Install] section and no personal key/notes privileges.

@@ -49,7 +49,7 @@ test("W22 Weather and MAGICK Overview share the C44-style titled tab rail",()=>{
 });
 test("W22 title/gap stages do not remove one-page Weather Overview or lower card meters",()=>{
  function budget(h) {
-   const row=Math.max(46,Math.min(51,Math.floor(h*.15),
+   const row=Math.max(46,Math.min(48,Math.floor(h*.15),
                     Math.floor(Math.max(0,h-195)/2)));
    const railHeight=h<286?31:56;
    return {row,railHeight,summary:h-railHeight-2*row};
@@ -58,11 +58,11 @@ test("W22 title/gap stages do not remove one-page Weather Overview or lower card
    const v=budget(h);
    assert.equal(v.summary+v.railHeight+2*v.row,h);
    assert.ok(v.summary>=152);
-   assert.ok(v.row>=46 && v.row<=51);
+   assert.ok(v.row>=46 && v.row<=48);
  }
  assert.equal(budget(275).railHeight,31);
  assert.equal(budget(300).railHeight,56);
- assert.equal(budget(500).summary,342);
+ assert.equal(budget(500).summary,348);
  assert.match(home,/homeScroll.height - weatherOverviewRail.height/);
  assert.match(cards,/height: 7/);
  assert.match(compact,/panel.ratio\(hour.entry.chanceRain,100\)/);

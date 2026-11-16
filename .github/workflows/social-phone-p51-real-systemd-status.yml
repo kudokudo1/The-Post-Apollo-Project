@@ -1,0 +1,48 @@
+name: Social PHONE P51 Real systemd Status Candidate (Linux CI Only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhonePersonalSystemdOriginP51.py'
+      - 'tests/phone/test_phone_personal_systemd_origin_p51.py'
+      - 'tests/phone/p51_real_systemd_status_guest.sh'
+      - 'MODEL/contracts/social-phone-p51-real-systemd-status-candidate-v0.md'
+      - '.github/workflows/social-phone-p51-real-systemd-status.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhonePersonalSystemdOriginP51.py'
+      - 'tests/phone/test_phone_personal_systemd_origin_p51.py'
+      - 'tests/phone/p51_real_systemd_status_guest.sh'
+      - 'MODEL/contracts/social-phone-p51-real-systemd-status-candidate-v0.md'
+      - '.github/workflows/social-phone-p51-real-systemd-status.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-disposable-systemd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and deny-only parser invariants
+        run: |
+          python -m py_compile services/phone/PhonePersonalSystemdOriginP51.py
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_systemd_origin_p51.py' -v
+      - name: Actual isolated systemd unit, nonroot UID, root-owned staged modules, cleanup
+        run: |
+          sudo env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted             bash tests/phone/p51_real_systemd_status_guest.sh
+      - name: Existing real kernel peer and isolated service regressions
+        run: |
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_status_host_p49.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_host_socket_p47.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_personal_peer_evidence_p48.py' -v
+      - name: Locked QML mainline recovery regressions
+        run: |
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_mainline_completeness_p45.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_transaction_review_p44.py' -v

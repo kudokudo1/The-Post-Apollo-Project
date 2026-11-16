@@ -91,7 +91,7 @@ def _self_kernel_observed() -> bool:
         ):
             return False
         cgroup = Peer._bounded(proc / "cgroup", Peer.CGROUP_MAX)
-        if b"\\n" not in cgroup:
+        if b"\n" not in cgroup:
             return False
         digest, device, inode = Peer._hash_executable(proc / "exe")
         after = Peer._start_ticks(

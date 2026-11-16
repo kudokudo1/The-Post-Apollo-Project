@@ -107,8 +107,9 @@ ShellRoot {
         if(content.implicitHeight>scroll.height+1)
             return "ONE_PAGE_CLIPPED "+content.implicitHeight
                 +" > "+scroll.height;
-        if(snap.height<(window.height<286 ? 46 : 48)
-           || autoCards.height<(window.height<286 ? 46 : 48))
+        // W23 // Normal 300px Overview uses the tested 46px compact
+        // support rows, recovering height for the C44 5px divider gap.
+        if(snap.height<46 || autoCards.height<46)
             return "CARDS_TOO_SMALL "+snap.height+"/"+autoCards.height;
         if(snap.height>51 || autoCards.height>51)
             return "OVERSIZED_EMPTY_CARDS "+snap.height+"/"+autoCards.height;

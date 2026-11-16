@@ -86,17 +86,19 @@ def _tokens(artifact: bytes):
             decoded = line.decode("ascii")
         except UnicodeError as exc:
             raise Refused("C4B_ARTIFACT_NON_ASCII_REFUSED") from exc
-        offset = decoded.find("C4B_ID_")
-        if offset == -1:
-            # No C4b marker means no positive evidence. Such lines may be
-            # harmless serial noise, but the artifact contract is marker-only.
-            _deny("C4B_ARTIFACT_NON_MARKER_LINE_REFUSED")
-        # The first C4B_ID_ tag is authoritative for DIAGNOSTIC parsing.
-        # A nested marker in a journal/detail line cannot satisfy a PASS.
-        marker = decoded[offset:].strip()
-        if "\n" in marker or "\r" in marker:
-            _deny("C4B_ARTIFACT_MARKER_DELIMITER_REFUSED")
-        tokens.append(marker)
+        # C4b now exports a sanitized *marker-only* artifact. Accepting
+        # arbitrary serial/journal prefixes once allowed an untrusted line
+        # such as "UNVERIFIED REPORT: C4B_ID_PASS // ..." to satisfy a stage.
+        # Refuse those frames instead of laundering them into clean markers.
+        if not decoded.startswith("C4B_ID_"):
+            _deny("C4B_ARTIFACT_UNSANITIZED_PREFIX_REFUSED")
+        if decoded != decoded.strip():
+            _deny("C4B_ARTIFACT_NONCANONICAL_WHITESPACE_REFUSED")
+        if re.fullmatch(r"C4B_ID_[A-Z_]+ // [ -~]+", decoded, re.ASCII) is None:
+            _deny("C4B_ARTIFACT_NONCANONICAL_MARKER_REFUSED")
+        # Do not interpret nested PASS markers in diagnostic detail values.
+        # FAIL/BLOCKED substrings within a detail still fail closed below.
+        tokens.append(decoded)
     return tokens
 
 

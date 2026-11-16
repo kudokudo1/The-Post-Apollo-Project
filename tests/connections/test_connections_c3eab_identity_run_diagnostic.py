@@ -186,13 +186,13 @@ class C3eABIdentityRunDiagnosticTests(unittest.TestCase):
         self.assertFalse(self.check(conclusion="startup_failure")[
             "completeMarkerSequenceConsistentInCI"])
 
-    def test_16_guest_serial_console_prefix_is_diagnostic_only(self):
+    def test_16_unsanitized_guest_serial_prefix_is_refused(self):
+        # C4b's new host filter exports only clean marker lines. Prefixes
+        # from an unfiltered UART must not be silently promoted into stages.
         original = list(D.REQUIRED_ORDER)
-        lines = [("fedora login: "+s if i%2 else s)
-                 for i,s in enumerate(original)]
-        out = self.check(bundle(*lines,"C4B_ID_VM_PROCESS_EXIT // 0"))
-        self.assertTrue(out["completeMarkerSequenceConsistentInCI"])
-        self.assertIs(out["artifactOriginCryptographicallyAuthenticated"],False)
+        lines = [("fedora login: " + item if i % 2 else item)
+                 for i, item in enumerate(original)]
+        self.refused(bundle(*lines, "C4B_ID_VM_PROCESS_EXIT // 0"))
 
     def test_17_no_real_issuer_os_access_or_production_authorization(self):
         code = (HERE/"C3eABIdentityRunDiagnostic.py").read_text()
@@ -204,14 +204,9 @@ class C3eABIdentityRunDiagnosticTests(unittest.TestCase):
             self.assertIs(val,False)
             self.assertIn('"' + key + '": False',code)
 
-    def test_18_log_with_false_prefix_marker_is_still_not_an_attestor(self):
-        lines = ["UNVERIFIED REPORT: " + s for s in D.REQUIRED_ORDER]
-        out=self.check(bundle(*lines, "C4B_ID_VM_PROCESS_EXIT // 0"))
-        self.assertTrue(out["completeMarkerSequenceConsistentInCI"])
-        self.assertFalse(out["artifactOriginCryptographicallyAuthenticated"])
-        self.assertFalse(out["githubWorkflowResultIndependentlyAuthenticated"])
-        self.assertFalse(out["installedIdentityHostAuthenticated"])
-
+    def test_18_unverified_report_prefix_cannot_satisfy_full_rollback(self):
+        lines = ["UNVERIFIED REPORT: " + item for item in D.REQUIRED_ORDER]
+        self.refused(bundle(*lines, "C4B_ID_VM_PROCESS_EXIT // 0"))
 
     def test_19_nested_guest_failure_inside_journal_detail_refuses(self):
         data = bundle(
@@ -244,6 +239,43 @@ class C3eABIdentityRunDiagnosticTests(unittest.TestCase):
         result=self.check(bundle(*lines,"C4B_ID_VM_PROCESS_EXIT // 0"))
         self.assertFalse(result["completeMarkerSequenceConsistentInCI"])
         self.assertIs(result["productionAuthority"], False)
+
+    def test_22_nested_marker_in_serial_noise_is_refused(self):
+        lines = ["journal: " + D.REQUIRED_ORDER[0],
+                 *D.REQUIRED_ORDER[1:],
+                 "C4B_ID_VM_PROCESS_EXIT // 0"]
+        self.refused(bundle(*lines))
+
+    def test_23_extra_whitespace_is_refused_in_marker_only_artifact(self):
+        for mutated in (
+            completed().replace(b"C4B_ID_STAGE // initial\n",
+                                b" C4B_ID_STAGE // initial\n", 1),
+            completed().replace(b"C4B_ID_STAGE // initial\n",
+                                b"C4B_ID_STAGE // initial \n", 1),
+        ):
+            with self.subTest(mutated=mutated[:60]):
+                self.refused(mutated)
+
+    def test_24_marker_control_and_malformed_kind_are_refused(self):
+        cases = (
+            "C4B_ID_SERVICE_PROBE_DETAIL // invalid\tcontrol",
+            "C4B_ID_stage // lowercase-marker-kind",
+            "C4B_ID_PASS// missing-separator",
+        )
+        for injected in cases:
+            with self.subTest(marker=injected):
+                self.refused(bundle(D.REQUIRED_ORDER[0], injected,
+                                    *D.REQUIRED_ORDER[1:],
+                                    "C4B_ID_VM_PROCESS_EXIT // 0"))
+
+    def test_25_canonical_extra_diagnostic_marker_is_consistency_only(self):
+        lines = list(D.REQUIRED_ORDER)
+        lines.insert(12, "C4B_ID_SERVICE_PROBE_DETAIL // signed-denial diagnostic only")
+        result = self.check(bundle(*lines, "C4B_ID_VM_PROCESS_EXIT // 0"))
+        self.assertIs(result["completeMarkerSequenceConsistentInCI"], True)
+        for flag in D.NEGATIVE:
+            self.assertIs(result[flag], False)
+
 
 
 if __name__ == "__main__":

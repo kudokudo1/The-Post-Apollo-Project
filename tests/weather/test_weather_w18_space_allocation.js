@@ -9,7 +9,7 @@ const native=fs.readFileSync("tests/weather/fixtures/W15FixedWeatherOverviewNati
 
 // Match the actual QML height budget, including the minimum W17 instrument.
 function heights(viewport) {
- const row=Math.max(46,Math.min(51,Math.floor(viewport*0.15),
+ const row=Math.max(46,Math.min(48,Math.floor(viewport*0.15),
                             Math.floor(Math.max(0,viewport-195)/2)));
  return {summary:viewport-(viewport<286?31:56)-2*row,row};
 }
@@ -22,7 +22,7 @@ test("W18 gives tall Overview space to WEATHER rather than empty cards",()=>{
    const {summary,row}=heights(viewport);
    assert.equal(summary+(viewport<286?31:56)+2*row,viewport);
    assert.ok(summary>=152);
-   assert.ok(row<=51);
+   assert.ok(row<=48);
  }
  assert.ok(heights(500).summary>=340);
  assert.ok(heights(500).row<heights(300).summary/2);

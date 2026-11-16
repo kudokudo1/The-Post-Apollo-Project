@@ -48,6 +48,10 @@ jobs:
         run: node tests/publisher/test_publisher_access_intent_policy.cjs
       - name: Guard Social and Connections authority boundaries
         run: python3 tests/publisher/test_publisher_access_intent_integration.py
+      - name: Exercise P1.6 local history, crash rollback and v1 migration
+        run: python3 tests/publisher/test_publisher_history_cli.py
+      - name: Guard P1.6 history/recovery UI and deny-only boundary
+        run: python3 tests/publisher/test_publisher_history_integration.py
       - name: Guard Social companion routing and single writer
         run: python3 tests/publisher/test_publisher_social_integration.py
       - name: Re-run existing Social Settings contracts

@@ -114,7 +114,7 @@ def _hash_regular(path: Path, size_limit: int) -> str:
 
 
 def _measured(bundle: Path) -> dict[str, str]:
-    if (type(bundle) is not Path or not bundle.is_absolute()
+    if (not isinstance(bundle, Path) or not bundle.is_absolute()
             or bundle.resolve(strict=True) != bundle
             or bundle.is_symlink()):
         _deny()
@@ -215,7 +215,7 @@ def verify_candidate_from_paths(
     """Explicit host-private test preflight. Paths are untrusted caller input."""
     try:
         paths = (manifest_path, signature_path, root_path)
-        if any(type(p) is not Path or not p.is_absolute() for p in paths):
+        if any(not isinstance(p, Path) or not p.is_absolute() for p in paths):
             _deny()
         return verify_candidate(
             manifest=_read_small_regular(manifest_path, MAX_FRAME),

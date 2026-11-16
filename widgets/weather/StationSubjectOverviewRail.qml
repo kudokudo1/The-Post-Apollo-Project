@@ -2,8 +2,8 @@ import QtQuick
 import "../../components"
 import "StationSubjectHeaderGeometry.js" as HeaderGeometry
 
-// W22 // Shared C44 title / full-width tabs / cyan rule. The 8px optical
-// tab gap clears neighboring button glows; no new provider or navigation owner.
+// W23 // Share the exact C44 title/tab/divider vertical grammar.
+// Keep W22's 8px optical horizontal gaps and real route ownership.
 Item {
     id: overviewRail
     objectName: "station-w21-shared-overview-rail"
@@ -11,11 +11,17 @@ Item {
     property string titleText: ""
     property bool condensed: false
     readonly property real buttonGap: HeaderGeometry.tabSpacing + 4
+    readonly property real dividerGap: HeaderGeometry.tabsToRule
     signal routeRequested(string path)
     readonly property alias buttonRepeater: actionRepeater
     readonly property alias titleItem: railHeading
     readonly property alias dividerItem: rule
-    height: visible ? (condensed ? 31 : 49) : 0
+    // Normal: 18px title + 4px gap + 27px tabs + 5px gap + 2px rule.
+    // Compact: 24px tabs + 5px gap + 2px rule (no title).
+    height: visible ? (condensed ? 31
+        : HeaderGeometry.titleHeight + HeaderGeometry.titleToTabs
+          + HeaderGeometry.tabHeight + dividerGap
+          + HeaderGeometry.ruleHeight) : 0
 
     GohuText {
         id: railHeading
@@ -37,8 +43,9 @@ Item {
         objectName: "station-w21-full-width-buttons"
         anchors.left: parent.left
         anchors.right: parent.right
-        y: overviewRail.condensed ? 0 : 20
-        height: overviewRail.condensed ? 25 : 24
+        y: overviewRail.condensed ? 0
+           : HeaderGeometry.titleHeight + HeaderGeometry.titleToTabs
+        height: overviewRail.condensed ? 24 : HeaderGeometry.tabHeight
         spacing: overviewRail.buttonGap
         Repeater {
             id: actionRepeater
@@ -63,7 +70,7 @@ Item {
         objectName: "station-w21-overview-divider"
         anchors.left: longButtons.left
         anchors.right: longButtons.right
-        y: overviewRail.condensed ? 28 : 46
+        y: longButtons.y + longButtons.height + overviewRail.dividerGap
         height: HeaderGeometry.ruleHeight
         color: Colors.cyan
     }

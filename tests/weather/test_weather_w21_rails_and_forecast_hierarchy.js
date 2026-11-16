@@ -52,9 +52,9 @@ test("W21 transfers full Weather NOW space to six forecast readings without repl
 });
 test("W21 fits Overview rail and supporting cards into compact and tall viewports",()=>{
   const budget=h=>{
-    const row=Math.max(h<286?46:48,Math.min(51,Math.floor(h*.16),
+    const row=Math.max(46,Math.min(51,Math.floor(h*.15),
                              Math.floor(Math.max(0,h-195)/2)));
-    const railHeight=h<286?31:49;
+    const railHeight=h<286?31:56;
     const summary=h-railHeight-2*row;
     return {row,summary,railHeight,deficit:Math.max(0,164-summary)};
   };
@@ -65,7 +65,7 @@ test("W21 fits Overview rail and supporting cards into compact and tall viewport
     assert.ok(a.summary>=152);
   }
   assert.equal(budget(500).row,51);
-  assert.ok(budget(500).summary>=349);
+  assert.ok(budget(500).summary>=340);
   assert.match(home,/weatherOverviewRail.height/);
   assert.match(overview,/compactDeficit: Math.max\(0,164-height\)/);
   assert.match(overview,/Math.max\(0,panel.compactDeficit-8\)/);

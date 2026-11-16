@@ -28,7 +28,7 @@ if [[ ! -f "$observer" || ! -f "$origin/PhonePersonalStatusHostP49.py" ||
   exit 78
 fi
 if [[ ! -x /usr/bin/systemctl || ! -x /usr/sbin/groupadd ||
-      ! -x /usr/sbin/useradd || ! -x /usr/bin/runuser ||
+      ! -x /usr/sbin/useradd || ! -x /usr/sbin/runuser ||
       ! -x /usr/bin/python3 ]]; then
   echo "P51_REFUSED // MISSING_OS_TOOLS" >&2
   exit 78
@@ -121,7 +121,7 @@ print("P51_PASS // REAL_SYSTEMD_CANDIDATE_OBSERVED_NO_TRUST")
 '
 
 # Actual client under the dedicated service UID should get STATUS only.
-/usr/bin/runuser -u "$user" -- /usr/bin/python3 -I -B -c '
+/usr/sbin/runuser -u "$user" -- /usr/bin/python3 -I -B -c '
 import json, socket
 s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
 s.settimeout(2)

@@ -24,7 +24,8 @@ import sys
 import time
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-VERSION = 1
+VERSION = 2
+MAX_EVENTS = 4000
 MAX_JOBS = 500
 MAX_ACTIVE = 150
 STATES = {"scheduled", "paused", "needs_review", "reviewed", "blocked", "cancelled"}
@@ -167,11 +168,13 @@ def connect(db_path: Path) -> sqlite3.Connection:
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=FULL")
-        version = conn.execute("PRAGMA user_version").fetchone()[0]
-        require(version in (0, VERSION), "UNSUPPORTED_QUEUE_VERSION")
-        if version == 0:
-            conn.execute("BEGIN IMMEDIATE")
-            try:
+        # Every process must recheck schema under ONE database-wide write
+        # transaction. A pre-lock version read races other initializers.
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            version = conn.execute("PRAGMA user_version").fetchone()[0]
+            require(version in (0, 1, VERSION), "UNSUPPORTED_QUEUE_VERSION")
+            if version == 0:
                 conn.execute("""CREATE TABLE IF NOT EXISTS jobs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     key TEXT NOT NULL UNIQUE,
@@ -194,20 +197,163 @@ def connect(db_path: Path) -> sqlite3.Connection:
                 )""")
                 conn.execute("CREATE INDEX IF NOT EXISTS due_jobs "
                              "ON jobs(status,due_ms)")
-                conn.execute("PRAGMA user_version=1")
-                conn.execute("COMMIT")
-            except Exception:
-                conn.execute("ROLLBACK")
-                raise
+            if version in (0, 1):
+                # Existing v1 jobs get a single explicitly UNVERIFIED snapshot,
+                # not fabricated prior events. The entire upgrade is atomic.
+                conn.execute("""CREATE TABLE IF NOT EXISTS queue_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE RESTRICT,
+                    action TEXT NOT NULL,
+                    from_state TEXT NOT NULL,
+                    to_state TEXT NOT NULL,
+                    occurred_ms INTEGER NOT NULL,
+                    occurrence INTEGER NOT NULL,
+                    detail TEXT NOT NULL
+                )""")
+                conn.execute("""CREATE INDEX IF NOT EXISTS events_by_job
+                    ON queue_events(job_id,id)""")
+                for row in conn.execute(
+                        "SELECT id,status,updated_ms,occurrence FROM jobs"):
+                    conn.execute("""INSERT INTO queue_events
+                        (job_id,action,from_state,to_state,occurred_ms,occurrence,detail)
+                        VALUES (?,'legacy_snapshot','unknown',?,?,?,
+                                'LEGACY_BASELINE_UNVERIFIED')""",
+                        (row["id"],row["status"],row["updated_ms"],row["occurrence"]))
+                conn.execute("PRAGMA user_version=2")
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
         safe_file(db_path)
         return conn
     except (sqlite3.Error, OSError):
         raise Refused("QUEUE_STORAGE_UNAVAILABLE") from None
 
 
+def history_problems(conn: sqlite3.Connection) -> list[dict]:
+    """Verify every job's current state/occurrence matches its last event.
+
+    This detects accidental divergence, not malicious same-user SQLite edits.
+    """
+    try:
+        rows = conn.execute("""SELECT j.id,j.status,j.occurrence,
+            (SELECT e.to_state FROM queue_events e
+             WHERE e.job_id=j.id ORDER BY e.id DESC LIMIT 1) AS event_status,
+            (SELECT e.occurrence FROM queue_events e
+             WHERE e.job_id=j.id ORDER BY e.id DESC LIMIT 1) AS event_occurrence
+            FROM jobs j ORDER BY j.id LIMIT 501""").fetchall()
+        problems = [
+            {"jobId":r["id"],"reason":"EVENT_STATE_MISMATCH"}
+            for r in rows if r["status"] != r["event_status"]
+            or r["occurrence"] != r["event_occurrence"]
+        ]
+        # An existing last-event state is not enough to prove the earlier
+        # local transition trail is internally continuous.
+        previous = {}
+        for event in conn.execute("""SELECT id,job_id,action,from_state,
+            to_state,occurrence FROM queue_events ORDER BY id LIMIT 4001"""):
+            ident = event["job_id"]
+            old = previous.get(ident)
+            if old is None:
+                valid_first = (event["action"] == "schedule"
+                    and event["from_state"] == "none"
+                    and event["to_state"] == "scheduled"
+                    and event["occurrence"] == 1) or (
+                    event["action"] == "legacy_snapshot"
+                    and event["from_state"] == "unknown"
+                    and event["to_state"] in STATES
+                    and event["occurrence"] >= 1)
+                if not valid_first:
+                    problems.append({"jobId":ident,"reason":"EVENT_ORIGIN_INVALID"})
+            else:
+                status, occurrence = old
+                ok = event["from_state"] == status and event["to_state"] in STATES
+                ok = ok and (
+                    (event["action"] == "rearm" and event["occurrence"] == occurrence + 1)
+                    or (event["action"] != "rearm" and event["occurrence"] == occurrence))
+                if not ok:
+                    problems.append({"jobId":ident,"reason":"EVENT_CHAIN_DIVERGENCE"})
+            previous[ident] = (event["to_state"], event["occurrence"])
+        orphans = conn.execute("""SELECT COUNT(*) FROM queue_events e
+            LEFT JOIN jobs j ON j.id=e.job_id WHERE j.id IS NULL""").fetchone()[0]
+        if orphans:
+            problems.append({"jobId":0,"reason":"ORPHAN_EVENTS"})
+        return problems
+    except sqlite3.Error:
+        return [{"jobId":0,"reason":"EVENT_LEDGER_UNAVAILABLE"}]
+
+
+def append_event(conn: sqlite3.Connection, job_id: int,
+                 action: str, before: str, after: str,
+                 occurred_ms: int, occurrence: int, detail: str):
+    n=conn.execute("SELECT count(*) FROM queue_events").fetchone()[0]
+    require(n < MAX_EVENTS,"HISTORY_CAPACITY_REACHED")
+    conn.execute("""INSERT INTO queue_events
+        (job_id,action,from_state,to_state,occurred_ms,occurrence,detail)
+        VALUES (?,?,?,?,?,?,?)""",
+        (job_id,action,before,after,occurred_ms,occurrence,detail))
+
+
+def history(conn: sqlite3.Connection, job_id: int = 0) -> dict:
+    require(job_id >= 0, "INVALID_JOB_ID")
+    rows=conn.execute("""SELECT id,job_id,action,from_state,to_state,
+        occurred_ms,occurrence,detail FROM queue_events
+        WHERE (?=0 OR job_id=?) ORDER BY id DESC LIMIT 200""",
+        (job_id,job_id)).fetchall()
+    return {"ok":True,"events":[{**dict(r),"providerReceipt":None}
+                                for r in rows],
+            "source":"LOCAL_QUEUE_ONLY","posted":0,"canPublish":False}
+
+
+def audit(conn: sqlite3.Connection, drafts: Path) -> dict:
+    check=conn.execute("PRAGMA integrity_check").fetchone()[0]
+    require(check == "ok", "QUEUE_INTEGRITY_FAILED")
+    problems=history_problems(conn)
+    source_problems=[]
+    for row in conn.execute("""SELECT id,draft_id,revision,digest FROM jobs
+        WHERE status IN ('scheduled','paused','needs_review')
+        ORDER BY id LIMIT 500"""):
+        try:
+            snap=draft_snapshot(drafts,row["draft_id"])
+            matches=snap["digest"]==row["digest"] and snap["revision"]==row["revision"]
+        except (Refused, UnicodeError):
+            matches=False
+        if not matches:
+            source_problems.append({"jobId":row["id"],"reason":"SOURCE_CHANGED_OR_MISSING"})
+    return {"ok":True,"ledgerConsistent":not problems,
+            "ledgerProblems":problems,"sourceProblems":source_problems,
+            "repairPerformed":False,"posted":0,"canPublish":False}
+
+
+def reconcile(conn: sqlite3.Connection, drafts: Path, now_ms: int) -> dict:
+    """Explicit fail-closed repair: block stale local jobs; never dispatch."""
+    def operation():
+        problems=history_problems(conn)
+        require(not problems,"HISTORY_DIVERGENCE")
+        blocked=0
+        for row in conn.execute("""SELECT id,status,draft_id,revision,digest,
+            occurrence FROM jobs WHERE status IN ('scheduled','paused')
+            ORDER BY id LIMIT 500""").fetchall():
+            try:
+                snap=draft_snapshot(drafts,row["draft_id"])
+                matches=snap["digest"]==row["digest"] and snap["revision"]==row["revision"]
+            except (Refused,UnicodeError):
+                matches=False
+            if not matches:
+                conn.execute("""UPDATE jobs SET status='blocked',updated_ms=?,
+                    note='SOURCE_CHANGED_OR_UNAVAILABLE' WHERE id=?""",
+                    (now_ms,row["id"]))
+                append_event(conn,row["id"],"reconcile",row["status"],"blocked",
+                             now_ms,row["occurrence"],"SOURCE_CHANGED_OR_UNAVAILABLE")
+                blocked+=1
+        return {"ok":True,"blocked":blocked,"posted":0,"canPublish":False}
+    return transaction(conn,operation)
+
+
 def transaction(conn: sqlite3.Connection, change):
     conn.execute("BEGIN IMMEDIATE")
     try:
+        require(not history_problems(conn), "HISTORY_DIVERGENCE")
         result = change()
         conn.execute("COMMIT")
         return result
@@ -241,6 +387,8 @@ def schedule(conn: sqlite3.Connection, drafts: Path, draft_id: str,
             VALUES (?,?,?,?,?,?,?,?,?,'scheduled',?,?)""",
             (key,draft_id,snapshot["title"],snapshot["revision"],
              snapshot["digest"],tz,local,recurrence,due,now_ms,now_ms))
+        append_event(conn,cur.lastrowid,"schedule","none","scheduled",
+                     now_ms,1,"LOCAL_SCHEDULE_ONLY")
         return {"ok":True,"id":cur.lastrowid,"status":"scheduled",
                 "idempotent":False}
     return transaction(conn, operation)
@@ -259,7 +407,7 @@ def job_list(conn: sqlite3.Connection, drafts: Path, now_ms: int) -> dict:
 
 def tick(conn: sqlite3.Connection, drafts: Path, now_ms: int) -> dict:
     def operation():
-        rows = conn.execute("""SELECT id,draft_id,revision,digest FROM jobs
+        rows = conn.execute("""SELECT id,draft_id,revision,digest,occurrence FROM jobs
             WHERE status='scheduled' AND due_ms<=? ORDER BY due_ms,id
             LIMIT 150""", (now_ms,)).fetchall()
         needs_review = blocked = 0
@@ -273,11 +421,15 @@ def tick(conn: sqlite3.Connection, drafts: Path, now_ms: int) -> dict:
                 conn.execute("""UPDATE jobs SET status='needs_review',
                     updated_ms=?,note='DUE_NO_DISPATCH' WHERE id=?""",
                     (now_ms,row["id"]))
+                append_event(conn,row["id"],"due","scheduled","needs_review",
+                             now_ms,row["occurrence"],"DUE_NO_DISPATCH")
                 needs_review += 1
             else:
                 conn.execute("""UPDATE jobs SET status='blocked',
                     updated_ms=?,note='SOURCE_CHANGED_OR_UNAVAILABLE' WHERE id=?""",
                     (now_ms,row["id"]))
+                append_event(conn,row["id"],"source_block","scheduled","blocked",
+                             now_ms,row["occurrence"],"SOURCE_CHANGED_OR_UNAVAILABLE")
                 blocked += 1
         return {"ok":True,"reviewRequired":needs_review,"blocked":blocked,
                 "posted":0,"executor":"DISABLED"}
@@ -324,6 +476,9 @@ def modify(conn: sqlite3.Connection, drafts: Path,
              changes.get("local_time",row["local_time"]),
              changes.get("due_ms",row["due_ms"]),
              changes.get("occurrence",row["occurrence"]),job_id))
+        append_event(conn,job_id,op,before,target,now_ms,
+                     changes.get("occurrence",row["occurrence"]),
+                     "REARMED_AFTER_REVIEW" if op=="rearm" else op.upper())
         return {"ok":True,"id":job_id,"status":target,"previous":before,
                 "posted":0}
     return transaction(conn, operation)
@@ -339,6 +494,12 @@ def execute(args, current_ms: int | None = None) -> dict:
     with closing(connect(Path(args.db))) as conn:
         if args.action == "status":
             return job_list(conn, Path(args.drafts), current_ms)
+        if args.action == "history":
+            return history(conn,args.id)
+        if args.action == "audit":
+            return audit(conn,Path(args.drafts))
+        if args.action == "reconcile":
+            return reconcile(conn,Path(args.drafts),current_ms)
         if args.action == "tick":
             return tick(conn, Path(args.drafts), current_ms)
         if args.action == "schedule":
@@ -352,7 +513,8 @@ def execute(args, current_ms: int | None = None) -> dict:
 def cli(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="P1.4 deny-only publisher queue")
     parser.add_argument("action", choices=[
-        "schedule","status","tick","cancel","pause","resume","acknowledge","rearm","watch"])
+        "schedule","status","tick","cancel","pause","resume",
+        "acknowledge","rearm","watch","history","audit","reconcile"])
     parser.add_argument("--db", required=True)
     parser.add_argument("--drafts", required=True)
     parser.add_argument("--draft", default="")

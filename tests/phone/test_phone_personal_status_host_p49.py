@@ -23,6 +23,7 @@ SERVICE = ROOT / "services/phone/PhonePersonalStatusHostP49.py"
 UNIT = ROOT / "services/phone/systemd/post-apollo-phone-personal-status-ci.service"
 sys.path.insert(0, str(ROOT / "services" / "phone"))
 import PhonePersonalHostSocketP47 as SocketHost
+import PhonePersonalStatusHostP49 as Runner
 
 ENV = {
     "POST_APOLLO_PHONE_STATUS_CI_ONLY": "1",
@@ -85,7 +86,7 @@ class ActualSubprocessTests(unittest.TestCase):
                 return proc
             if proc.poll() is not None:
                 err = proc.stderr.read().decode("utf-8", errors="replace")
-                self.fail("P49 child exited before private socket: " + err[:700])
+                self.fail("P49 child exit code " + str(proc.returncode) + ": " + err[:700])
             time.sleep(0.04)
         self.fail("P49 did not create its private status-only socket")
 
@@ -102,6 +103,14 @@ class ActualSubprocessTests(unittest.TestCase):
                     break
                 payload.extend(data)
         return json.loads(payload)
+
+    def test_preflight_source_and_kernel_are_observable(self):
+        self.assertIsNotNone(Runner._self_source_snapshot(),
+                             "P49 source roster preflight rejected checkout")
+        self.assertTrue(Runner._self_kernel_observed(),
+                        "P49 kernel self-observation failed")
+        self.assertEqual(SocketHost._private_directory(self.directory),
+                         self.directory)
 
     def test_spawned_process_status_only_no_keys_and_clean_shutdown(self):
         proc = self.start()

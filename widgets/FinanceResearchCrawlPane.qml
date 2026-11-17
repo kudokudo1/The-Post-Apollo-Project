@@ -110,9 +110,18 @@ Item {
                 contentHeight: pageRows.height
                 boundsBehavior: Flickable.StopAtBounds
 
+                NeonScrollBar {
+                    id: crawlPagesScrollBar
+                    flickable: pagesScroll
+                    mountingParent: pageList
+                    geometryMode: "viewport"
+                    handleStyle: "bar"
+                    rightInset: 2
+                }
+
                 Column {
                     id: pageRows
-                    width: pagesScroll.width
+                    width: Math.max(0, pagesScroll.width - 22)
                     spacing: 4
                     Repeater {
                         model: pane.pages
@@ -179,9 +188,18 @@ Item {
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
 
+                NeonScrollBar {
+                    id: crawlDetailsScrollBar
+                    flickable: detailsScroll
+                    mountingParent: detail
+                    geometryMode: "viewport"
+                    handleStyle: "bar"
+                    rightInset: 2
+                }
+
                 Column {
                     id: detailContents
-                    width: detailsScroll.width
+                    width: Math.max(0, detailsScroll.width - 22)
                     spacing: 10
                     GohuText {
                         width: parent.width

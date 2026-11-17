@@ -174,15 +174,16 @@ class RuntimeReceiptBindingTests(unittest.TestCase):
         with mock.patch.object(B, "_digest_file", side_effect=AssertionError("unexpected read")):
             with mock.patch.dict(os.environ, {"POST_APOLLO_C4B_TEST_GUEST":"1",
                                               "GITHUB_ACTIONS":"true"}):
-                with mock.patch.object(B.Path, "exists", return_value=True):
-                    with self.assertRaisesRegex(
-                        B.Refused, "C4B_BINDING_UNTRUSTED_RPM_ARCHIVE_PATH",
-                    ):
-                        B.rehearse_guest_local_ci_only(
-                            actual_runtime_receipt_public=self.runtime_pub,
-                            verified_actions=ACTIONS,
-                            signed_rpm_archive=Path("/tmp/untrusted.rpm"),
-                        )
+                with mock.patch.object(B.os, "geteuid", return_value=0):
+                    with mock.patch.object(B.Path, "exists", return_value=True):
+                        with self.assertRaisesRegex(
+                            B.Refused, "C4B_BINDING_UNTRUSTED_RPM_ARCHIVE_PATH",
+                        ):
+                            B.rehearse_guest_local_ci_only(
+                                actual_runtime_receipt_public=self.runtime_pub,
+                                verified_actions=ACTIONS,
+                                signed_rpm_archive=Path("/tmp/untrusted.rpm"),
+                            )
 
     def test_23_guest_probe_never_transports_private_key_to_rpm_or_uart(self):
         source=(Path(__file__).resolve().parent/"runtime_receipt_binding_ci.py").read_text()

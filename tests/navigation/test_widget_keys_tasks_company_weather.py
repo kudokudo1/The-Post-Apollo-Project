@@ -27,9 +27,14 @@ def check_window_local_modes(relative, frame, mode_count):
     assert "keyboardSelected: root.keyboardModeCursor === index" in source
     assert "keyboardActive: root.standardModeKeysAvailable" in source
     assert "property int keyboardModeCursor: 0" in source
-    assert source.count('context: Qt.WindowShortcut') == 6
-    for key in ("Tab", "Shift+Tab", "Up", "Down", "Enter", "Return"):
-        assert f'sequence: "{key}"' in source, (relative, key)
+    # TASKS security forbids window-wide shortcuts; Company follows the
+    # same frame-only approach to protect native map and editing controls.
+    assert 'context: Qt.WindowShortcut' not in source
+    assert "Shortcut {" not in source
+    assert "root.cycleMainMode(reverse ? -1 : 1)" in source
+    assert "root.moveNavigationCursor(-1)" in source
+    assert "root.moveNavigationCursor(1)" in source
+    assert "root.activateNavigationCursor()" in source
     for forbidden in ('sequence: "Ctrl+Left"', 'sequence: "Ctrl+Right"',
                       'sequence: "Shift+Left"', 'sequence: "Shift+Right"'):
         assert forbidden not in source, (relative, forbidden)

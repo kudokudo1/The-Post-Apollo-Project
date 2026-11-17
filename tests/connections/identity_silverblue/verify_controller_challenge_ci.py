@@ -14,6 +14,7 @@ attestation, outside witness custody, C5 consent or any production permission.
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import os
 from pathlib import Path
@@ -70,7 +71,7 @@ def _decode(value: bytes, limit: int) -> bytes:
         _deny("C4B_CONTROLLER_NONCANONICAL_BASE64URL")
     try:
         output = base64.urlsafe_b64decode(value + b"=" * (-len(value) % 4))
-    except (ValueError, base64.binascii.Error) as exc:
+    except (ValueError, binascii.Error) as exc:
         raise Refused("C4B_CONTROLLER_BASE64_DECODE_REFUSED") from exc
     if (base64.urlsafe_b64encode(output).rstrip(b"=") != value):
         _deny("C4B_CONTROLLER_BASE64_REENCODE_MISMATCH")
@@ -159,7 +160,10 @@ def _proof_bytes(serial: bytes):
 def inspect_ci_only(*, serial: bytes, controller_challenge: str):
     if type(controller_challenge) is not str:
         _deny("C4B_CONTROLLER_CHALLENGE_TYPE_REFUSED")
-    challenge = _validate_challenge(controller_challenge.encode("ascii"))
+    try:
+        challenge = _validate_challenge(controller_challenge.encode("ascii"))
+    except UnicodeEncodeError as exc:
+        raise Refused("C4B_CONTROLLER_CHALLENGE_ASCII_REQUIRED") from exc
     pub, frame = _proof_bytes(serial)
     try:
         signed = verify_receipt(
@@ -187,7 +191,10 @@ def inspect_ci_only(*, serial: bytes, controller_challenge: str):
     }
 
 def _main(argv):
-    if len(argv) != 3 or argv[0] not in ("issue", "verify"):
+    if ((len(argv) == 2 and argv[0] == "issue")
+            or (len(argv) == 3 and argv[0] == "verify")):
+        pass
+    else:
         _deny("C4B_CONTROLLER_COMMAND_SCOPE_REFUSED")
     _ci_guard()
     if argv[0] == "issue":

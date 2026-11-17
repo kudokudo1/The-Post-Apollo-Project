@@ -49,7 +49,8 @@ jobs:
           echo "C3EAD_PASS // CI_METADATA_AND_C4B_ARTIFACT_DIAGNOSTIC_ONLY_NO_HOST_TRUST"
 
   manual-real-c4b-readonly:
-    if: github.actor == 'kudokudo1' && github.event_name == 'workflow_dispatch' && inputs.c4b_run_id != '' && inputs.expected_c4b_head_sha != ''
+    # TEMPORARY one-time PR #1994 real-source smoke. Restore manual-only before merging.
+    if: github.actor == 'kudokudo1' && ((github.event_name == 'workflow_dispatch' && inputs.c4b_run_id != '' && inputs.expected_c4b_head_sha != '') || (github.event_name == 'pull_request' && github.event.pull_request.number == 1994))
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -60,8 +61,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          SOURCE_RUN: ${{ inputs.c4b_run_id }}
-          EXPECTED_SOURCE_SHA: ${{ inputs.expected_c4b_head_sha }}
+          SOURCE_RUN: ${{ github.event_name == 'pull_request' && '44050838865' || inputs.c4b_run_id }}
+          EXPECTED_SOURCE_SHA: ${{ github.event_name == 'pull_request' && 'b660efe31f1bf21a427e83320b34cf54a1e0ec44' || inputs.expected_c4b_head_sha }}
         run: |
           set -euo pipefail
           test "$GITHUB_ACTIONS" = true

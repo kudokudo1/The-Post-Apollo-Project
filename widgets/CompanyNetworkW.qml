@@ -198,44 +198,8 @@ PanelWindow {
         mapRect: root.activeVectorViewportRect
     }
 
-    // Guarded Qt WindowShortcut fallback. No top/bottom submodes are
-    // fabricated for the four real main-mode buttons.
-    Shortcut {
-        sequence: "Tab"
-        context: Qt.WindowShortcut
-        enabled: root.standardModeKeysAvailable
-        onActivated: root.cycleMainMode(1)
-    }
-    Shortcut {
-        sequence: "Shift+Tab"
-        context: Qt.WindowShortcut
-        enabled: root.standardModeKeysAvailable
-        onActivated: root.cycleMainMode(-1)
-    }
-    Shortcut {
-        sequence: "Up"
-        context: Qt.WindowShortcut
-        enabled: root.standardModeKeysAvailable
-        onActivated: root.moveNavigationCursor(-1)
-    }
-    Shortcut {
-        sequence: "Down"
-        context: Qt.WindowShortcut
-        enabled: root.standardModeKeysAvailable
-        onActivated: root.moveNavigationCursor(1)
-    }
-    Shortcut {
-        sequence: "Enter"
-        context: Qt.WindowShortcut
-        enabled: root.standardModeKeysAvailable
-        onActivated: root.activateNavigationCursor()
-    }
-    Shortcut {
-        sequence: "Return"
-        context: Qt.WindowShortcut
-        enabled: root.standardModeKeysAvailable
-        onActivated: root.activateNavigationCursor()
-    }
+    // Frame-local keys only. The embedded MapLibre/native viewport and
+    // its controls retain keyboard focus whenever Company frame is not active.
 
     WindowPanelFrame {
         id: companyFrame

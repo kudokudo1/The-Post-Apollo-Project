@@ -98,7 +98,7 @@ class SilverblueGuestSafety(unittest.TestCase):
         ):
             self.assertIn(required, probe)
         self.assertIn("NoNewPrivileges=true", UNIT.read_text())
-        self.assertNotIn("[Install]", UNIT.read_text().split("# Deliberately")[0])
+        self.assertNotRegex(UNIT.read_text(), r"(?m)^\[Install\]$")
         self.assertIn("post-apollo-phone-status-ci", PACKAGE.read_text())
         self.assertNotIn("PhonePersonalContactVault", probe)
 

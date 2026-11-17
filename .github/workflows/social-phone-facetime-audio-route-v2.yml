@@ -1,0 +1,61 @@
+name: Social PHONE FaceTime Audio V2 Read-only Bluetooth Route Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhoneFaceTimeAudioRouteProbe.py'
+      - 'widgets/messanger/PhoneFaceTimeHandoff.qml'
+      - 'tests/phone/test_phone_facetime_audio_route_v2.py'
+      - 'tests/messaging/test_social_phone_facetime_audio_route_v2_ui.py'
+      - 'MODEL/contracts/social-phone-facetime-audio-route-v2.md'
+      - '.github/workflows/social-phone-facetime-audio-route-v2.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhoneFaceTimeAudioRouteProbe.py'
+      - 'widgets/messanger/PhoneFaceTimeHandoff.qml'
+      - 'tests/phone/test_phone_facetime_audio_route_v2.py'
+      - 'tests/messaging/test_social_phone_facetime_audio_route_v2_ui.py'
+      - 'MODEL/contracts/social-phone-facetime-audio-route-v2.md'
+      - '.github/workflows/social-phone-facetime-audio-route-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-facetime-audio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compile new fail-closed private-output-free audio observer
+        run: |
+          python -m py_compile services/phone/PhoneFaceTimeAudioRouteProbe.py
+          python -m unittest discover -s tests/phone -p 'test_phone_facetime_audio_route_v2.py' -v
+      - name: Verify FT Audio UI is user initiated and never enables FaceTime call authority
+        run: |
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_facetime_audio_route_v2_ui.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_facetime_handoff_ui.py' -v
+      - name: Keep V1 FaceTime invite allowlist and contact handoff behavior
+        run: |
+          node --check widgets/messanger/PhoneFaceTimeLinks.js
+          node tests/messaging/test_social_phone_facetime_handoff_js.js
+      - name: Preserve existing cellular HFP and locked Personal editor
+        run: |
+          python -m unittest discover -s tests/phone -p 'test_phone_audio_controls.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_contact_details.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_contact_metadata_locked_p40.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_personal_draft_shell_p42.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_call_workspace_ui.py' -v
+      - name: Exact authority limit
+        run: |
+          echo 'FACETIME_AUDIO_V2_LIMITATION // LOCAL_HFP_CANDIDATE_ONLY'
+          echo 'FACETIME_AUDIO_V2_LIMITATION // NO_IPHONE_APP_IDENTITY_MIC_SPEAKER_PROOF_OR_NATIVE_CALL_CONTROL'
+          echo 'FACETIME_AUDIO_V2_LIMITATION // NO_LOCAL_DEPLOYMENT_OR_SAVED_PERSONAL_DATA'

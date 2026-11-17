@@ -22,6 +22,10 @@ MARKER_KINDS = frozenset({
     b"C4B_ID_RPM_VERIFY_RC", b"C4B_ID_RPM_VERIFY_DETAIL",
     b"C4B_ID_SERVICE_OBSERVED", b"C4B_ID_SERVICE_JOURNAL",
     b"C4B_ID_SERVICE_PROBE_DETAIL", b"C4B_ID_SERVICE_PROBE_RC",
+    # Public Ed25519 key and its signed UNAVAILABLE-BEGIN frame only.
+    # The controller verifies its fresh nonce against its own saved copy.
+    # The guest's private key NEVER appears in this marker.
+    b"C4B_ID_CHALLENGE_PROOF",
     b"C4B_ID_SELINUX_OBSERVED", b"C4B_ID_SELINUX_STAGE",
     b"C4B_ID_SELINUX_MODULE_DETAIL", b"C4B_ID_SELINUX_LOAD_DETAIL",
     b"C4B_ID_SELINUX_UNLOAD_DETAIL", b"C4B_ID_SELINUX_NEGATIVE_DETAIL",

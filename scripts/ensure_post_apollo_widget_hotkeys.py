@@ -209,11 +209,19 @@ def enable(config: Path, *, sway: str | None = None,
     valid, evidence = checked_config(config, candidate, validator)
     if not valid:
         return False, "SKIPPED // SwayPX validation failed; original untouched: " + evidence
+
+    def snapshot_unchanged() -> bool:
+        # Re-scan the *include graph*, not merely contents of paths we saw
+        # earlier. A new file in an include glob or a retargeted symlink can
+        # introduce an existing binding while Sway validates the candidate.
+        if config.resolve(strict=True) != target:
+            return False
+        new_collisions, new_loaded, new_snapshot = inspect(config, managed)
+        return not new_collisions and not new_loaded and new_snapshot == snapshot
+
     try:
-        if config.resolve(strict=True) != target or any(
-            p.read_text(encoding="utf-8") != old for p, old in snapshot.items()
-        ):
-            return False, "SKIPPED // config changed during validation"
+        if not snapshot_unchanged():
+            return False, "SKIPPED // config or included tree changed during validation"
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         backup = target.with_name(target.name + ".before-widget-hotkeys-" + timestamp + ".bak")
         serial = 2
@@ -231,10 +239,8 @@ def enable(config: Path, *, sway: str | None = None,
                 stream.flush()
                 os.fsync(stream.fileno())
             os.chmod(temp, stat.S_IMODE(target.stat().st_mode))
-            if config.resolve(strict=True) != target or any(
-                p.read_text(encoding="utf-8") != old for p, old in snapshot.items()
-            ):
-                return False, "SKIPPED // config changed before commit; backup retained"
+            if not snapshot_unchanged():
+                return False, "SKIPPED // config or included tree changed before commit; backup retained"
             os.replace(temp, target)
         finally:
             temp.unlink(missing_ok=True)

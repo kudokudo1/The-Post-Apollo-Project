@@ -15,7 +15,7 @@ V3d introduces offline cryptographic checkpoint verification in scripts/trash/ar
 - Verify a signed Archive-side V3b witness under its separately supplied test public key.
 - Verify BOTH the prior pinned checkpoint and the presented checkpoint with a third ephemeral test Ed25519 key, distinct from the Archive witness and V2w floor signers.
 - Domain-separate canonical checkpoint signatures, use fixed bounded strict schemas and exact owner/grant binding.
-- Compare signed checkpoint counters and predecessor digests; detect older signed replay, same-counter fork, missing history, mismatched witness digest/counter, release rollback, release content fork, revocation reversal and floor disagreement.
+- Compare signed checkpoint counters and predecessor digests; bind each forward V3b witness to the exact prior checkpoint's pinned witness SHA. Detect older signed replay, same-counter fork, missing history, broken signed witness predecessor, mismatched witness digest/counter, release rollback, release content fork, revocation reversal and floor disagreement.
 - Return immutable INDEPENDENT_AUTHORITY_HOLD with all capture, production, restore, burn, delete-original, retry, rollback and safe actions denied regardless of signature validity.
 - Expose no CLI, database, network client, key storage, host permissions, service, actual snapshot reader or writer.
 

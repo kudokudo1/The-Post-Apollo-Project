@@ -17,17 +17,20 @@ ShellRoot {
     property var weatherSamples: []
     Component.onCompleted: {
         const start=1794397200000-8*600000;
+        const a=[],w=[];
         for(let i=0;i<8;i++) {
             const ms=start+i*600000;
-            aqiSamples.push({
+            a.push({
                 observedAtMs:ms, receivedAtMs:ms,
                 payload:{aqi:32+i*4}
             });
-            weatherSamples.push({
+            w.push({
                 observedAtMs:ms, receivedAtMs:ms,
                 payload:{humidity:41+i*2,windMph:5+(i%3)*3}
             });
         }
+        aqiSamples=a;
+        weatherSamples=w;
     }
     readonly property var modeOrder: ["live","auto","quick","snapshot","live"]
     function fail(reason) {

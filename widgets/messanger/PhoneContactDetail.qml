@@ -8,6 +8,8 @@ Rectangle {
     id: detail
     property var contact: null
     property bool canPrepareCall: false
+    // FaceTime Audio/Video are reviewed handoffs, not native BlueFerry calls.
+    property string faceTimeMode: ""
     // P43: preview-only editor. It is only opened by a conscious EDIT
     // gesture on the selected card; real vault/host write remains hard false.
     property bool draftPreviewOpen: false
@@ -24,10 +26,20 @@ Rectangle {
         draftPreviewOpen = false;
     }
 
-    onContactChanged: closeDraftPreview()
+    function openFaceTimeMode(mode) {
+        if (visible && contact !== null && (mode === "audio" || mode === "video"))
+            faceTimeMode = mode;
+    }
+
+    onContactChanged: {
+        closeDraftPreview();
+        faceTimeMode = "";
+    }
     onVisibleChanged: {
-        if (!visible)
+        if (!visible) {
             closeDraftPreview();
+            faceTimeMode = "";
+        }
     }
 
     // P40: no installed signed host, C5 consent or authenticated encrypted
@@ -188,7 +200,7 @@ Rectangle {
                 width: parent.width
                 spacing: 6
                 ActionButton {
-                    width: Math.max(0, (contactActions.width - 18) / 4)
+                    width: Math.max(0, (contactActions.width - 12) / 3)
                     height: 34
                     label: "CALL"
                     labelPixelSize: 10
@@ -198,7 +210,7 @@ Rectangle {
                     onTriggered: detail.callRequested()
                 }
                 ActionButton {
-                    width: Math.max(0, (contactActions.width - 18) / 4)
+                    width: Math.max(0, (contactActions.width - 12) / 3)
                     height: 34
                     label: "MESSAGE"
                     labelPixelSize: 10
@@ -207,17 +219,9 @@ Rectangle {
                     interactive: detail.contact !== null
                     onTriggered: detail.messageRequested()
                 }
+                // FaceTime's explicit Audio/Video handoff is in its own row.
                 ActionButton {
-                    width: Math.max(0, (contactActions.width - 18) / 4)
-                    height: 34
-                    label: "FACETIME"
-                    labelPixelSize: 9
-                    labelMinimumPixelSize: 8
-                    accentColor: Colors.orange
-                    interactive: false // No BlueFerry FaceTime transport.
-                }
-                ActionButton {
-                    width: Math.max(0, (contactActions.width - 18) / 4)
+                    width: Math.max(0, (contactActions.width - 12) / 3)
                     height: 34
                     label: "EMAIL"
                     labelPixelSize: 9
@@ -226,6 +230,36 @@ Rectangle {
                     available: false
                     interactive: false // Email routing not connected.
                 }
+            }
+            Row {
+                id: faceTimeActions
+                width: parent.width
+                spacing: 8
+                ActionButton {
+                    width: Math.max(0, (faceTimeActions.width - 8) / 2)
+                    height: 34
+                    label: "FT AUDIO"
+                    labelPixelSize: 10
+                    accentColor: Colors.cyan
+                    interactive: detail.contact !== null
+                    onTriggered: detail.openFaceTimeMode("audio")
+                }
+                ActionButton {
+                    width: Math.max(0, (faceTimeActions.width - 8) / 2)
+                    height: 34
+                    label: "FT VIDEO"
+                    labelPixelSize: 10
+                    accentColor: Colors.orange
+                    interactive: detail.contact !== null
+                    onTriggered: detail.openFaceTimeMode("video")
+                }
+            }
+            PhoneFaceTimeHandoff {
+                width: detailColumn.width
+                visible: detail.faceTimeMode === "audio" || detail.faceTimeMode === "video"
+                mode: detail.faceTimeMode
+                contact: detail.contact
+                onCloseRequested: detail.faceTimeMode = ""
             }
             Text {
                 width: parent.width
@@ -502,7 +536,7 @@ Rectangle {
             }
             Text {
                 width: parent.width
-                text: "FACETIME unavailable: Linux BlueFerry HFP does not provide FaceTime. EMAIL remains unavailable until a verified route exists."
+                text: "FACETIME AUDIO / VIDEO opens an in-menu browser invitation or Apple-device link handoff, not a native Linux call. BlueFerry HFP cannot authenticate FaceTime or prove its audio route. EMAIL still has no verified route."
                 color: Colors.orange
                 textFormat: Text.PlainText
                 font.pixelSize: 10

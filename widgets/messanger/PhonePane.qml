@@ -90,6 +90,7 @@ Rectangle {
         callsRequireExplicitRefresh = true;
         callsConfirmDial = false;
         callsPendingDial = "";
+        callsFaceTimeMode = "";
         liveCalls = ([]);
         callsWorkspaceState = "IDENTITY_CHANGED";
         if (phoneCallsStatusProcess.running)
@@ -133,6 +134,9 @@ Rectangle {
     property bool callsRequireExplicitRefresh: false
     property bool callsConfirmDial: false
     property string callsPendingDial: ""
+    // FaceTime browser links and Apple-device handoffs are independent from
+    // BlueFerry cellular Calls1/HFP. No provider or microphone claim.
+    property string callsFaceTimeMode: ""
     // Strict, public tool identifiers only; never paths or process output.
     property var callSetupMissingTools: ([])
 
@@ -645,9 +649,11 @@ Rectangle {
             selectedPhoneContactId = "";
         if (selectedSection !== "DEVICE") closeStagedSetup();
         if (selectedSection !== "CALLS") {
+            callsFaceTimeMode = "";
             callsWorkspaceGeneration += 1;
             callsConfirmDial = false;
             callsPendingDial = "";
+            callsFaceTimeMode = "";
             liveCalls = ([]);
             if (phoneCallsStatusProcess.running)
                 phoneCallsStatusProcess.running = false;
@@ -750,6 +756,7 @@ Rectangle {
             callsWorkspaceGeneration += 1;
             callsConfirmDial = false;
             callsPendingDial = "";
+            callsFaceTimeMode = "";
             liveCalls = ([]);
             if (phoneCallsStatusProcess.running)
                 phoneCallsStatusProcess.running = false;
@@ -775,6 +782,7 @@ Rectangle {
             callsWorkspaceResult = "IDLE";
             callsConfirmDial = false;
             callsPendingDial = "";
+            callsFaceTimeMode = "";
             phoneStorageGeneration += 1;
             phoneStorageState = "UNKNOWN";
             phoneStoragePolicy = "unknown";
@@ -2809,7 +2817,7 @@ Rectangle {
 
     // CONTACTS is a read-only address-book workspace. Its selected detail
     // screen uses only the currently visible, approved, validated card fields.
-    // No guessed phone/email records, SMS join, FaceTime provider or call dial.
+    // No guessed addresses, SMS join, native FaceTime provider or auto dial.
     PhoneContactDetail {
         id: phoneContactDetail
         anchors.fill: phoneChatFeed
@@ -2887,6 +2895,36 @@ Rectangle {
                     font.bold: true
                     font.pixelSize: 17
                     wrapMode: Text.WordWrap
+                }
+                // FaceTime handoff does not use cellular CALLS1 or auto-dial.
+                Row {
+                    id: callsFaceTimeActions
+                    width: parent.width
+                    spacing: 8
+                    ActionButton {
+                        width: Math.max(0, (callsFaceTimeActions.width - 8) / 2)
+                        height: 34
+                        label: "FT AUDIO"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        onTriggered: phonePane.callsFaceTimeMode = "audio"
+                    }
+                    ActionButton {
+                        width: Math.max(0, (callsFaceTimeActions.width - 8) / 2)
+                        height: 34
+                        label: "FT VIDEO"
+                        labelPixelSize: 10
+                        accentColor: Colors.orange
+                        onTriggered: phonePane.callsFaceTimeMode = "video"
+                    }
+                }
+                PhoneFaceTimeHandoff {
+                    width: callsColumn.width
+                    visible: phonePane.callsFaceTimeMode === "audio"
+                             || phonePane.callsFaceTimeMode === "video"
+                    mode: phonePane.callsFaceTimeMode
+                    contact: null
+                    onCloseRequested: phonePane.callsFaceTimeMode = ""
                 }
                 Text {
                     width: parent.width

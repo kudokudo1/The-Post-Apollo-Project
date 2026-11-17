@@ -1,0 +1,59 @@
+name: Social PHONE FaceTime Audio and Video Reviewed Link Handoff
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/PhonePane.qml'
+      - 'widgets/messanger/PhoneContactDetail.qml'
+      - 'widgets/messanger/PhoneFaceTimeHandoff.qml'
+      - 'widgets/messanger/PhoneFaceTimeLinks.js'
+      - 'tests/messaging/test_social_phone_facetime_handoff_ui.py'
+      - 'tests/messaging/test_social_phone_facetime_handoff_js.js'
+      - 'MODEL/contracts/social-phone-facetime-audio-video-handoff-v1.md'
+      - '.github/workflows/social-phone-facetime-handoff.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/PhonePane.qml'
+      - 'widgets/messanger/PhoneContactDetail.qml'
+      - 'widgets/messanger/PhoneFaceTimeHandoff.qml'
+      - 'widgets/messanger/PhoneFaceTimeLinks.js'
+      - 'tests/messaging/test_social_phone_facetime_handoff_ui.py'
+      - 'tests/messaging/test_social_phone_facetime_handoff_js.js'
+      - 'MODEL/contracts/social-phone-facetime-audio-video-handoff-v1.md'
+      - '.github/workflows/social-phone-facetime-handoff.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  facetime-reviewed-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Parse and execute actual QML-imported FaceTime link logic, deny URL injection
+        run: |
+          node --check widgets/messanger/PhoneFaceTimeLinks.js
+          node --check tests/messaging/test_social_phone_facetime_handoff_js.js
+          node tests/messaging/test_social_phone_facetime_handoff_js.js
+      - name: Validate separate Audio/Video buttons, reviewed open, no native call or key authority
+        run: |
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_facetime_handoff_ui.py' -v
+      - name: Preserve existing CONTACTS/CALLS, conservative dialing and encrypted SAVE lock
+        run: |
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_call_workspace_ui.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_contact_details.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_contact_metadata_locked_p40.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_personal_draft_shell_p42.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_menu_readonly.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_call_workspace.py' -v
+          # P35/P44 vault tests run in their own crypto-enabled PHONE workflows.
+          # This browser handoff never imports or unlocks the contact vault.

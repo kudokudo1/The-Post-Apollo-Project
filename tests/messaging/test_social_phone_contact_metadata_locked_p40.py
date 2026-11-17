@@ -48,20 +48,26 @@ class LockedContactMetadataTests(unittest.TestCase):
         self.assertIn("accentColor: Colors.orange", header)
         self.assertIn("readonly property bool personalMetadataWritable: false",
                       self.detail)
-        self.assertIn("onContactChanged: closeDraftPreview()", self.detail)
+        self.assertIn("onContactChanged: {", self.detail)
+        self.assertIn("closeDraftPreview();", self.detail)
+        self.assertIn('faceTimeMode = "";', self.detail)
         self.assertIn("PhonePersonalDraftEditor {", self.detail)
 
-    def test_call_message_facetime_email_are_four_actions(self):
+    def test_call_message_email_and_separate_facetime_handoffs_stay_honest(self):
         row = self.part("id: contactActions", 'text: "PERSONAL // FAVORITE"')
-        for label in ("CALL", "MESSAGE", "FACETIME", "EMAIL"):
+        for label in ("CALL", "MESSAGE", "EMAIL", "FT AUDIO", "FT VIDEO"):
             self.assertIn('label: "' + label + '"', row)
-        self.assertEqual(row.count("(contactActions.width - 18) / 4"), 4)
+        self.assertEqual(row.count("(contactActions.width - 12) / 3"), 3)
+        self.assertEqual(row.count("(faceTimeActions.width - 8) / 2"), 2)
         self.assertIn("onTriggered: detail.callRequested()", row)
         self.assertIn("onTriggered: detail.messageRequested()", row)
-        self.assertIn("interactive: false // No BlueFerry FaceTime transport.", row)
+        self.assertIn('onTriggered: detail.openFaceTimeMode("audio")', row)
+        self.assertIn('onTriggered: detail.openFaceTimeMode("video")', row)
+        self.assertIn("PhoneFaceTimeHandoff {", row)
         self.assertIn("interactive: false // Email routing not connected.", row)
         self.assertIn("available: false", row)
-        self.assertIn("EMAIL remains unavailable", self.detail)
+        self.assertIn("EMAIL still has no verified route.", self.detail)
+        self.assertNotIn("Qt.openUrlExternally(", self.detail)
 
     def test_favorite_star_has_magenta_color_and_no_fake_toggle(self):
         favorite = self.part('text: "PERSONAL // FAVORITE"',

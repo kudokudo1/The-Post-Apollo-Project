@@ -69,17 +69,22 @@ class PhoneContactDetailsTests(unittest.TestCase):
         self.assertIn("text: detail.contact && detail.contact.hasPhoto", self.detail)
         self.assertIn("PHOTO REPORTED", self.detail)
 
-    def test_three_buttons_are_visible_and_real_actions_have_honest_limits(self):
+    def test_contact_actions_show_real_call_and_separate_facetime_handoffs(self):
         self.assertIn('label: "CALL"', self.detail)
         self.assertIn('label: "MESSAGE"', self.detail)
-        self.assertIn('label: "FACETIME"', self.detail)
+        self.assertIn('label: "FT AUDIO"', self.detail)
+        self.assertIn('label: "FT VIDEO"', self.detail)
         self.assertIn("interactive: detail.contact !== null && detail.canPrepareCall",
                       self.detail)
         self.assertIn("onTriggered: detail.callRequested()", self.detail)
         self.assertIn("onTriggered: detail.messageRequested()", self.detail)
-        self.assertIn("interactive: false // No BlueFerry FaceTime transport.", self.detail)
+        self.assertIn('onTriggered: detail.openFaceTimeMode("audio")', self.detail)
+        self.assertIn('onTriggered: detail.openFaceTimeMode("video")', self.detail)
+        self.assertIn("PhoneFaceTimeHandoff {", self.detail)
+        self.assertIn('faceTimeMode = "";', self.detail)
         self.assertIn("PHONE cannot safely link a contact card to a thread", self.detail)
-        self.assertIn("FACETIME unavailable", self.detail)
+        self.assertIn("not a native Linux call", self.detail)
+        self.assertIn("BlueFerry HFP cannot authenticate FaceTime", self.detail)
         self.assertIn("PhoneContactDetail {", self.phone)
         self.assertIn("onCallRequested: phonePane.openSelectedContactForCall()", self.phone)
         self.assertIn("onMessageRequested: phonePane.openSelectedContactMessages()", self.phone)

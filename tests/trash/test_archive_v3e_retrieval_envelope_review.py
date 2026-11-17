@@ -15,9 +15,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from scripts.trash import archive_v3e_retrieval_envelope_review as v3e
 from scripts.trash import archive_v3d_external_checkpoint_review as v3d
-from test_archive_v3d_external_checkpoint_review import (
-    V3dIndependentCheckpointReviewTests,
-)
+import test_archive_v3d_external_checkpoint_review as v3dtests
 
 
 def pub(key):
@@ -27,7 +25,7 @@ def pub(key):
 
 class V3eSignedRetrievalReviewTests(unittest.TestCase):
     def setUp(self):
-        self.fixture = V3dIndependentCheckpointReviewTests("runTest")
+        self.fixture = v3dtests.V3dIndependentCheckpointReviewTests("runTest")
         self.fixture.setUp()
         self.key = Ed25519PrivateKey.generate()
         self.responder_pin = {

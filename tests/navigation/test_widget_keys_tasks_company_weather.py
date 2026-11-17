@@ -53,7 +53,8 @@ def check_window_local_modes(relative, frame, mode_count):
     assert source.count("FileView {") == 0
     assert source.count("Process {") == 0
     assert source.count("property int selectedMainModeIndex") == 1
-    assert source.count("onTriggered: {") >= 1
+    assert ("onTriggered: {" in source
+            or "onTriggered: root.selectMainMode(index)" in source)
     labels = re.findall(r'\{ id: "([^"]+)", label: "([^"]+)"', source)
     assert len(labels) == mode_count, (relative, labels)
 

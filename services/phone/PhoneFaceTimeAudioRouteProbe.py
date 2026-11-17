@@ -37,6 +37,7 @@ _HFP_PROFILE = re.compile(
 _ALLOWED = frozenset({
     "AUDIO_INSPECTION_UNAVAILABLE", "PHONE_BRIDGE_UNAVAILABLE",
     "PHONE_CALL_STATUS_UNREPORTED", "PHONE_CALLS_NOT_READY",
+    "PHONE_CALLS_DISABLED",
     "HFP_PROFILE_NOT_OBSERVED",
     "HFP_PROFILE_AVAILABLE_ONLY", "HFP_SYSTEM_PROFILE_ACTIVE",
 })
@@ -199,6 +200,11 @@ def inspect(
     offered, active = audio
     if not observed:
         state = "PHONE_BRIDGE_UNAVAILABLE"
+    elif type(value) is dict and value.get("callsEnabled") is False:
+        # Upstream BlueFerry intentionally emits no calls_state when OFF.
+        # That is not a broken provider, nor does it say anything about
+        # whether an independent FaceTime session can use Bluetooth audio.
+        state = "PHONE_CALLS_DISABLED"
     elif not call_fields_reported:
         state = "PHONE_CALL_STATUS_UNREPORTED"
     elif not ready:

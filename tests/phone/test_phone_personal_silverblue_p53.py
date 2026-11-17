@@ -102,6 +102,35 @@ class SilverblueGuestSafety(unittest.TestCase):
         self.assertIn("post-apollo-phone-status-ci", PACKAGE.read_text())
         self.assertNotIn("PhonePersonalContactVault", probe)
 
+    def test_real_vm_post_selinux_stall_is_bounded_and_stage_specific(self):
+        host = FILES[0].read_text()
+        probe = FILES[2].read_text()
+        for marker in (
+            "P53_BLOCKED // PHONE_SERVICE_POST_POLICY_START_STALLED",
+            "P53_BLOCKED // PHONE_SERVICE_STATUS_CLIENT_STALLED",
+            "P53_BLOCKED // PHONE_SERVICE_CROSS_UID_REFUSAL_STALLED",
+            "P53_BLOCKED // PHONE_SERVICE_STOP_POLICY_UNLOAD_STALLED",
+            "P53_HOST_LAST_PHONE_STAGE",
+        ):
+            self.assertIn(marker, host)
+        for marker in (
+            "P53_STAGE // before_phone_ci_useradd",
+            "P53_STAGE // after_phone_ci_useradd",
+            "P53_STAGE // before_phone_ci_runtime_prepare",
+            "P53_STAGE // before_phone_ci_context_label",
+            "P53_STAGE // after_phone_ci_context_label",
+            "P53_STAGE // before_phone_ci_service_start",
+            "P53_STAGE // after_phone_ci_service_start",
+            "P53_STAGE // before_phone_ci_policy_unload",
+            "P53_STAGE // after_phone_ci_policy_unload",
+        ):
+            self.assertIn(marker, probe)
+        self.assertIn('timeout --signal=TERM --kill-after=3s 35s', probe)
+        self.assertIn('fail "TEMP_USER_CREATE_OR_TIMEOUT"', probe)
+        self.assertIn('fail "CONFINED_PHONE_START_OR_TIMEOUT"', probe)
+        self.assertIn("post_policy_started=0", host)
+        self.assertIn("post_cross_uid_started=0", host)
+
     def test_no_prod_root_or_operator_host_write_authorization(self):
         for f in FILES:
             text = f.read_text()

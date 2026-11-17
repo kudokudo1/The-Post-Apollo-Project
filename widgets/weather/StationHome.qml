@@ -33,14 +33,35 @@ Rectangle {
         + (homeInlineMode === "live" ? "overview" : homeInlineMode)
     readonly property real homeInlineAlertHeight:
         homeInlineDefault && officialAlertSummary.available ? 15 : 0
-    readonly property real homeInlineCardBudget: Math.max(0,
-        homeScroll.height - 12 - homeOverviewRail.height - 28
-        - 4 * homeContent.spacing - homeInlineAlertHeight
-        - (homeInlineAlertHeight > 0 ? homeContent.spacing : 0))
-    readonly property real homeInlineLiveHeight:
-        Math.max(46,Math.floor(homeInlineCardBudget * 0.55))
-    readonly property real homeInlineAutoHeight:
-        Math.max(46,homeInlineCardBudget - homeInlineLiveHeight)
+    // W25 // Reuse the existing HISTORY graph pair above the LIVE cards.
+    // 46px cards keep all original labels/values/bars without stretching
+    // mostly empty boxes. AUTO is anchored to the bottom with a spacer.
+    readonly property real homeInlineGraphHeight: 72
+    readonly property real homeInlineLiveHeight: 46
+    readonly property real homeInlineAutoHeight: 46
+    // Hide redundant section headings when a 275px viewport or a real
+    // NWS alert needs the space; graph titles and card labels remain.
+    readonly property bool homeInlineGraphHeading:
+        homeInlineDefault && homeScroll.height >= 290
+        && homeInlineAlertHeight === 0
+    readonly property bool homeInlineLiveHeading:
+        homeInlineDefault
+        && (homeScroll.height >= 290 || homeInlineAlertHeight === 0)
+    readonly property int homeInlineSectionCount: 5
+        + (homeInlineGraphHeading ? 1 : 0)
+        + (homeInlineLiveHeading ? 1 : 0)
+        + (homeInlineAlertHeight > 0 ? 1 : 0)
+    readonly property real homeInlineFixedContentHeight:
+        homeContent.y + homeOverviewRail.height + homeInlineGraphHeight
+        + homeInlineLiveHeight + homeInlineAutoHeight
+        + autoOverviewTitle.implicitHeight
+        + (homeInlineGraphHeading ? relationOverviewTitle.implicitHeight : 0)
+        + (homeInlineLiveHeading ? liveOverviewTitle.implicitHeight : 0)
+        + homeInlineAlertHeight
+        + (homeInlineSectionCount-1)*homeContent.spacing
+    readonly property real homeInlineAutoSpacerHeight:
+        Math.max(0,homeScroll.height-homeInlineFixedContentHeight
+            - homeContent.spacing - 1)
     readonly property real homeInlineSingleHeight:
         Math.max(70,Math.min(128,homeScroll.height
             - homeOverviewRail.height - 36))
@@ -48,6 +69,7 @@ Rectangle {
         Math.floor((homeScroll.height - 12 - homeOverviewRail.height
             - 14 - homeInlineSingleHeight - 3*homeContent.spacing) / 2))
     readonly property alias homeQuickItem: homeQuickRow
+    readonly property alias homeOverviewGraphItem: homeRelationsRow
     function chooseHomeInlinePane(path) {
         if(!homeOverviewWorkspace) return;
         const target=String(path||"");
@@ -90,7 +112,8 @@ Rectangle {
         if (homeOverviewWorkspace) {
             if(section === "header") return true;
             if(homeInlineMode === "live")
-                return section === "snapshot" || section === "relevant";
+                return section === "relations" || section === "snapshot"
+                    || section === "relevant";
             return section === (homeInlineMode === "auto"
                 ? "relevant" : homeInlineMode);
         }
@@ -1284,25 +1307,30 @@ Rectangle {
         }
 
         StationSectionDivider {
+            id: relationOverviewTitle
             visible: home.sectionVisible("relations") && !home.compactHistory
+                && (!home.homeInlineDefault || home.homeInlineGraphHeading)
             width: parent.width
             title: "LIVE HISTORY // AQI RELATIONSHIPS"
         }
 
         Row {
+            id: homeRelationsRow
             objectName: "home-w3-history-relations"
             visible: home.sectionVisible("relations")
             width: parent.width
-            // Keep W3 non-scrolling minimum while using spare height on larger screens.
-            height: home.compactHistory
-                    ? Math.max(72, Math.min(108, home.height - 188))
-                    : 188
-            spacing: 12
+            // Keep the exact two existing graph inspectors and their live
+            // history arrays. Only the HOME default gets a compact 72px row.
+            height: home.homeInlineDefault ? home.homeInlineGraphHeight
+                : home.compactHistory
+                ? Math.max(72, Math.min(108, home.height - 188))
+                : 188
+            spacing: home.homeInlineDefault ? 4 : 12
 
             WeatherTrendInspector {
-                width: (parent.width - 12) / 2
+                width: (parent.width - homeRelationsRow.spacing) / 2
                 height: parent.height
-                compact: home.compactHistory
+                compact: home.compactHistory || home.homeInlineDefault
                 title: "AQI ↔ HUMIDITY"
                 leftLabel: "AQI"
                 rightLabel: "HUMIDITY %"
@@ -1319,9 +1347,9 @@ Rectangle {
             }
 
             WeatherTrendInspector {
-                width: (parent.width - 12) / 2
+                width: (parent.width - homeRelationsRow.spacing) / 2
                 height: parent.height
-                compact: home.compactHistory
+                compact: home.compactHistory || home.homeInlineDefault
                 title: "AQI ↔ WIND"
                 leftLabel: "AQI"
                 rightLabel: "WIND MPH"
@@ -1347,8 +1375,9 @@ Rectangle {
         }
 
         StationSectionDivider {
+            id: liveOverviewTitle
             objectName: "home-w24-live-now-divider"
-            visible: home.homeInlineDefault
+            visible: home.homeInlineDefault && home.homeInlineLiveHeading
             width: parent.width
             title: "LIVE // NOW"
         }
@@ -1798,7 +1827,18 @@ Rectangle {
             }
         }
 
+        // Any spare height lives between the LIVE readings and AUTO,
+        // never inside the already legible graph or meter boxes.
+        Item {
+            objectName: "home-w25-auto-bottom-spacer"
+            visible: home.homeInlineDefault
+                && home.homeInlineAutoSpacerHeight > 0
+            width: parent.width
+            height: visible ? home.homeInlineAutoSpacerHeight : 0
+        }
+
         StationSectionDivider {
+            id: autoOverviewTitle
             visible: home.sectionVisible("relevant")
                      && !home.fixedWeatherOverview
             width: parent.width

@@ -192,6 +192,32 @@ class C3eAGIdentityKernelObserverTests(unittest.TestCase):
             with self.assertRaises(A.Refused):
                 self.observe()
 
+    def test_23_script_file_mutated_after_hashing_refused(self):
+        original = A._script
+
+        def change_after_hash(pins):
+            old_metadata = original(pins)
+            self.script.chmod(0o755)
+            self.script.write_text("import time\\ntime.sleep(58)\\n", encoding="ascii")
+            self.script.chmod(0o555)
+            return old_metadata
+
+        with patch.object(A, "_script", side_effect=change_after_hash):
+            self.refused()
+
+    def test_24_cgroup_changed_between_two_kernel_reads_refused(self):
+        original = A._cgroup
+        seen = [0]
+
+        def changed_later(pid):
+            seen[0] += 1
+            if seen[0] == 1:
+                return original(pid)
+            return "/system.slice/forged-replacement.service"
+
+        with patch.object(A, "_cgroup", side_effect=changed_later):
+            self.refused()
+
     def test_22_no_real_c4b_install_or_login_side_effects(self):
         source = (SOURCE / "C3eAGIdentityKernelObserver.py").read_text()
         for unsafe in ("systemctl start", "systemctl stop", "rpm-ostree install",

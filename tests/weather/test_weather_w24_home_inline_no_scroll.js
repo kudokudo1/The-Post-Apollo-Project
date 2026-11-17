@@ -45,7 +45,7 @@ test("W24 LIVE first view has LIVE on top, AUTO on bottom, and only existing dat
  assert.match(home,/home\.aqiReady/);
  assert.match(home,/homeInlineAlertHeight/);
  assert.match(home,/NWS ALERT \/\//);
- assert.match(fixture,/LIVE_TOP_AUTO_BOTTOM_LOST/);
+ assert.match(fixture,/W25_GRAPHS_TOP_LIVE_MIDDLE_AUTO_BOTTOM/);
 });
 test("W24 no-scrolling height budgets fit default, alert and focused modes",()=>{
  for(const h of [275,300,400,500]) {

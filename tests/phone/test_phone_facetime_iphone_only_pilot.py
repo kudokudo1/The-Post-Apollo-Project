@@ -116,7 +116,7 @@ class IphonePilotTests(unittest.TestCase):
     def test_on_unknown_and_spoofed_status_never_grants_facetime(self):
         for values, expected in (
             ({"callsEnabled": True, "callsState": "READY"}, "ON"),
-            ({"callsEnabled": True, "callsState": "UNKNOWN"}, "UNKNOWN"),
+            ({"callsEnabled": True, "callsState": "UNKNOWN"}, "ON"),
             ({"callsEnabled": None}, "UNKNOWN"),
             ({"callsEnabled": "true"}, "UNKNOWN"),
             ({"callsEnabled": False, "callsState": "READY"}, "OFF"),

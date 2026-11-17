@@ -205,6 +205,22 @@ class C3eAGIdentityKernelObserverTests(unittest.TestCase):
         with patch.object(A, "_script", side_effect=change_after_hash):
             self.refused()
 
+    def test_25_script_path_swapped_to_same_inode_symlink_after_hash_refused(self):
+        original = A._script
+
+        def symlink_after_hash(pins):
+            saved = original(pins)
+            original_file = self.directory / "preserved-script-inode"
+            self.script.rename(original_file)
+            self.script.symlink_to(original_file)
+            # os.stat() would follow this replacement and still match the
+            # previously hashed inode. Final os.lstat() must refuse it.
+            self.assertEqual(os.stat(self.script).st_ino, saved[1])
+            return saved
+
+        with patch.object(A, "_script", side_effect=symlink_after_hash):
+            self.refused()
+
     def test_24_cgroup_changed_between_two_kernel_reads_refused(self):
         original = A._cgroup
         seen = [0]

@@ -1206,7 +1206,8 @@ PanelWindow {
 
                         Column {
                             id: budgetList
-                            width: budgetScroll.width
+                            // Reserve the bar/gutter without changing scroll viewport sizing.
+                            width: Math.max(0, budgetScroll.width - 22)
                             spacing: 7
 
                             Grid {
@@ -2014,6 +2015,21 @@ Row {
                             }
                         }
                     }
+                }
+
+                // Budget content belongs to a Column. Mount the indicator on
+                // the enclosing non-positioning Rectangle to avoid layout
+                // moving it below the viewport. Never show it on other tabs.
+                NeonScrollBar {
+                    id: budgetScrollBar
+                    flickable: budgetScroll
+                    mountingParent: emptyPage
+                    geometryMode: "viewport"
+                    handleStyle: "bar"
+                    rightInset: 2
+                    visible: actualBudgetPage.visible
+                             && budgetScroll.visible
+                             && scrollable
                 }
 
                 // Non-Budget pages reserve a stable local host. Future

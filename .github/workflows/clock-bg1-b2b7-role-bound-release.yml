@@ -1,0 +1,56 @@
+name: Clock BG1-B2B7 signed-role + signed-reply chain (deny-only)
+on:
+  push:
+    paths:
+      - "services/time/AlarmRoleBoundReleasePreflight.py"
+      - "services/time/BG1-ALARM-ROLE-BOUND-RELEASE.md"
+      - "tests/time/test_clock_bg1_b2b7_role_bound_release.py"
+      - ".github/workflows/clock-bg1-b2b7-role-bound-release.yml"
+  pull_request:
+    paths:
+      - "services/time/AlarmRoleBoundReleasePreflight.py"
+      - "services/time/BG1-ALARM-ROLE-BOUND-RELEASE.md"
+      - "tests/time/test_clock_bg1_b2b7_role_bound_release.py"
+      - ".github/workflows/clock-bg1-b2b7-role-bound-release.yml"
+permissions:
+  contents: read
+jobs:
+  deny-only-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install existing Clock signature verification fixture dependency
+        run: python3 -m pip install cryptography==46.0.4
+      - name: New real AF_UNIX origin and reply chain regression
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b7_role_bound_release.py' -v
+      - name: Preserve B2B2 installed-origin observation and B2B5 one-use reply
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b2_signed_role_origin.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b5_signed_release.py' -v
+      - name: Preserve mounted QML barrier and kernel process identity
+        run: |
+          node --test tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+      - name: Strict four-file Clock-only scope
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          paths=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],text=True
+          ).splitlines())
+          expected={
+              "services/time/AlarmRoleBoundReleasePreflight.py",
+              "services/time/BG1-ALARM-ROLE-BOUND-RELEASE.md",
+              "tests/time/test_clock_bg1_b2b7_role_bound_release.py",
+              ".github/workflows/clock-bg1-b2b7-role-bound-release.yml"}
+          assert paths==expected, f"Unapproved file scope: {sorted(paths ^ expected)}"
+          print("No Clock live QML, broker, Identity, Connections, host install or BG2 edits: PASS")
+          PY

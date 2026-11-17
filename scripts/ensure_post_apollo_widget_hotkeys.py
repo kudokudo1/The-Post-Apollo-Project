@@ -80,6 +80,7 @@ def inspect(config: Path, include: Path) -> tuple[set[str], bool, dict[Path, str
     collisions: set[str] = set()
     loaded = False
     snapshot: dict[Path, str] = {}
+    visited: set[Path] = set()
     variables = {"HOME": str(Path.home()),
                  "XDG_CONFIG_HOME": str(config_path().parent.parent)}
     managed = include.resolve(strict=True)
@@ -88,16 +89,22 @@ def inspect(config: Path, include: Path) -> tuple[set[str], bool, dict[Path, str
         nonlocal loaded
         if depth > 20 or len(snapshot) >= 128:
             raise UnsafeConfig("Sway include tree too large")
-        path = path.expanduser().resolve(strict=True)
-        if path == managed:
+        # Resolve file content for race checks, but keep the *visible*
+        # include path's parent for Sway's relative-include semantics.
+        visible = path.expanduser().absolute()
+        real = visible.resolve(strict=True)
+        if real == managed:
             loaded = True
             return
-        if path in snapshot:
+        if visible in visited:
             return
-        if not path.is_file() or path.stat().st_size > 2_000_000:
-            raise UnsafeConfig("Uninspectable include " + str(path))
-        raw = path.read_text(encoding="utf-8")
-        snapshot[path] = raw
+        if real in snapshot and real.parent != visible.parent:
+            raise UnsafeConfig("Included symlink changes relative-path context")
+        visited.add(visible)
+        if not real.is_file() or real.stat().st_size > 2_000_000:
+            raise UnsafeConfig("Uninspectable include " + str(real))
+        raw = real.read_text(encoding="utf-8")
+        snapshot[real] = raw
         for line in logical_lines(raw):
             try:
                 words = shlex.split(line, comments=True, posix=True)
@@ -115,7 +122,7 @@ def inspect(config: Path, include: Path) -> tuple[set[str], bool, dict[Path, str
                     value = os.path.expanduser(expand_vars(arg, variables))
                     candidate = Path(value)
                     if not candidate.is_absolute():
-                        candidate = path.parent / candidate
+                        candidate = visible.parent / candidate
                     children = sorted(glob.glob(str(candidate)))
                     if not children and not any(x in str(candidate) for x in "*?["):
                         raise UnsafeConfig("Missing include " + str(candidate))

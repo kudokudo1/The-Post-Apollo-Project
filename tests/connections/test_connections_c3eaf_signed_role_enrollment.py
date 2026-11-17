@@ -59,6 +59,8 @@ class C3eAFRoleEnrollmentTests(unittest.TestCase):
             "releaseRootPublicHex": public_hex(self.z.root_key),
             "hostWitnessPublicHex": public_hex(self.z.y.witness_key),
             "receiptPublicHex": public_hex(self.z.y.pair.key),
+            "runtimeSnapshotSha256": hashlib.sha256(
+                A.Z.Y.X._canonical(self.z.y.pair.expected)).hexdigest(),
         }
         self.sign()
 
@@ -218,14 +220,41 @@ class C3eAFRoleEnrollmentTests(unittest.TestCase):
             self.verify()
         self.assertEqual(self.z.state()[0], "consumed")
 
+    def test_19_signed_enrollment_refuses_different_expected_pid(self):
+        different = dict(self.z.y.pair.expected)
+        different["pid"] += 1
+        self.denied(independently_measured=different)
+
+    def test_20_enrollment_snapshots_must_be_sha256_pinned(self):
+        self.doc["runtimeSnapshotSha256"] = "f" * 64
+        self.sign()
+        self.denied()
+
+    def test_21_boolean_or_partial_independent_runtime_snapshot_refused(self):
+        wrong = dict(self.z.y.pair.expected)
+        wrong["pid"] = True
+        self.denied(independently_measured=wrong)
+        wrong = dict(self.z.y.pair.expected)
+        wrong.pop("cgroup")
+        self.denied(independently_measured=wrong)
+
+    def test_22_new_root_signed_snapshot_still_cannot_replace_z_witness(self):
+        changed = dict(self.z.y.pair.expected)
+        changed["pid"] += 1
+        self.doc["runtimeSnapshotSha256"] = hashlib.sha256(
+            A.Z.Y.X._canonical(changed)).hexdigest()
+        self.sign()
+        self.denied(independently_measured=changed)
+
     def test_18_signed_enrollment_is_not_operator_custody_or_c5(self):
         accepted = A.verify_signed_enrollment_ci_only(
             enrollment=self.frame, signature=self.signature,
             independently_pinned_enrollment_root=self.anchor.public_key(),
             expected_host_id=HOST_ID, expected_release_epoch=self.z.y.epoch,
-            expected_release_sequence=self.z.y.sequence)
+            expected_release_sequence=self.z.y.sequence,
+            independently_measured_snapshot=self.z.y.pair.expected)
         self.assertEqual(set(accepted), {"release_root", "witness", "receipt",
-                                         "enrollmentSha256"})
+                                         "enrollmentSha256", "runtimeSnapshotSha256"})
         source = (SOURCE / "C3eAFSignedRoleEnrollment.py").read_text()
         for grant in ("\"hostAuthenticated\": True", "\"productionAuthority\": True",
                       "\"canBeginSignIn\": True", "\"credentialActionsEnabled\": True",

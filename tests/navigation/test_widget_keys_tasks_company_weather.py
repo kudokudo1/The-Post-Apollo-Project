@@ -98,7 +98,8 @@ def test_weather_actual_bottom_tabs():
     assert "chooseRoute(tabs[next].path)" in navigator
     assert "function cycleBottomSubMode(direction)" in station
     assert "subjectNavigator.cycleWorkspaceTab(direction)" in station
-    assert "if (!standardKeysAvailable || subjectNavigator.indexOpen)" in station
+    assert "if (!standardKeysAvailable || !weatherKeyboardAnchor.activeFocus" in station
+    assert "&& weatherKeyboardAnchor.activeFocus" in station
     for name in ("Ctrl+Left", "Ctrl+Right"):
         assert f'sequence: "{name}"' in station
     assert "Qt.ControlModifier" in station

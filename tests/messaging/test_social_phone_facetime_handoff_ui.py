@@ -67,7 +67,7 @@ class FaceTimeHandoffContract(unittest.TestCase):
         self.assertIn('onContactChanged: clear()', UI)
         self.assertIn('onVisibleChanged: {', UI)
         self.assertIn('NATIVE LINUX FACETIME // NOT CONNECTED', UI)
-        self.assertIn('No browser handoff'.upper().split()[0].lower(), UI.lower())
+        self.assertIn('NO BROWSER HANDOFF //', UI)
 
     def test_apple_link_builder_cannot_control_calls(self):
         self.assertIn('facetime-audio:', LINKS)

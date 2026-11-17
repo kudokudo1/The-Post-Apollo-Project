@@ -4,7 +4,7 @@ import Quickshell
 import "widgets/weather" as Weather
 
 // W24 // Disposable HOME layout and click-switch regression.
-// 520×300 + 440×275, synthetic/offline sources, no durable state writes.
+// 520×300, 440×275, and 520×500, synthetic/offline, no writes.
 ShellRoot {
     id: root
     property int ticks: 0
@@ -87,6 +87,7 @@ ShellRoot {
             const autoRow=home.overviewRelevantItem;
             const quick=home.homeQuickItem;
             const charts=home.homeOverviewGraphItem;
+            const autoTitle=home.homeAutoTitleItem;
             const mode=root.modeOrder[root.phase % 5];
             if(!home.homeOverviewWorkspace ||
                home.homeInlineMode!==mode || !rail || !scroll || !column)
@@ -123,18 +124,32 @@ ShellRoot {
             if(root.lastRoute!=="")
                 return root.fail("HOME_BUTTON_REDIRECTED_TO_"+root.lastRoute);
             if(mode==="live") {
-                if(!charts || !charts.visible || charts.height!==72
+                if(!charts || !charts.visible || charts.height<72
                     || !live.visible || !autoRow.visible || quick.visible
                     || charts.y+charts.height>=live.y
                     || live.y+live.height>=autoRow.y)
                     return root.fail("W25_GRAPHS_TOP_LIVE_MIDDLE_AUTO_BOTTOM");
-                if(Math.abs(live.height-46)>0.1 ||
-                   Math.abs(autoRow.height-46)>0.1)
-                    return root.fail("W25_CARD_ROWS_NOT_COMPACT");
+                if(live.height<46 || autoRow.height<46)
+                    return root.fail("W26_CARD_ROWS_BELOW_READABLE_MINIMUM");
+                if(live.height>101 || autoRow.height>71)
+                    return root.fail("W26_CARDS_TOO_TALL");
+                if(!autoTitle || autoTitle.y-(live.y+live.height)>4)
+                    return root.fail("W26_LARGE_EMPTY_AUTO_GAP");
+                if(scroll.height>=380 &&
+                   (charts.height<110 || live.height<63 || autoRow.height<50))
+                    return root.fail("W26_UNUSED_VERTICAL_VIEWPORT_SPACE");
+                if(scroll.height>=480 && charts.height<190)
+                    return root.fail("W26_GRAPH_NOT_RESPONSIVE_TO_TALL_VIEW");
                 if(charts.children.length<2
                    || !charts.children[0].chartReady
                    || !charts.children[1].chartReady)
                     return root.fail("W25_ORIGINAL_GRAPHS_NO_ALIGNED_LINES");
+                for(let g=0;g<2;g++) {
+                    const plot=charts.children[g].plotAreaItem;
+                    if(!plot || Math.abs(plot.height-
+                        Math.max(36,charts.height-36))>0.2)
+                        return root.fail("W26_GRAPH_PLOT_STILL_FIXED_36PX_"+g);
+                }
                 if(autoRow.mapToItem(home,0,autoRow.height).y
                     <scroll.height-5)
                     return root.fail("W25_AUTO_NOT_BOTTOM_ANCHORED");
@@ -153,23 +168,30 @@ ShellRoot {
             }
             root.capturing=true;
             const name="/tmp/weather-w24-home-"+
-                (root.phase>=5 ? "compact-" : "wide-")+mode+".png";
+                (root.phase>=10 ? "tall-" :
+                 root.phase>=5 ? "compact-" : "wide-")+mode+".png";
             window.contentItem.grabToImage(function(image) {
                 if(!image || !image.saveToFile(name))
                     return root.fail("SCREENSHOT_MISSING_"+name);
                 console.log("W24_HOME_CAPTURED // "+name);
                 root.phase++;
                 root.capturing=false;
-                if(root.phase>=10) {
+                if(root.phase>=15) {
                     root.finished=true;
                     console.log("W24_HOME_INLINE_NATIVE_PASS // FIVE_MODES_520_440_NO_SCROLL");
                     console.log("W25_HOME_GRAPHS_NATIVE_PASS // TWO_ORIGINAL_LINE_CHARTS_TOP_COMPACT_LIVE_AUTO_BOTTOM");
+                    console.log("W26_HOME_RESPONSIVE_NATIVE_PASS // THREE_VIEWPORTS_NO_EMPTY_GAP_AND_FLUID_PLOTS");
                     Qt.quit();
                     return;
                 }
                 if(root.phase===5) {
                     window.width=440;
                     window.height=275;
+                    return;
+                }
+                if(root.phase===10) {
+                    window.width=520;
+                    window.height=500;
                     return;
                 }
                 const next=root.modeOrder[root.phase%5];

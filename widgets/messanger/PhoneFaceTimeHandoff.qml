@@ -1,4 +1,6 @@
 import QtQuick
+import Quickshell
+import Quickshell.Io
 import "../../components"
 import "PhoneFaceTimeLinks.js" as FaceTimeLinks
 
@@ -12,6 +14,10 @@ Rectangle {
     property var contact: null
     property string reviewedInvite: ""
     property string result: "IDLE"
+    // Explicit local HFP observation is independent from FaceTime call state.
+    property string audioRouteState: "NOT_CHECKED"
+    property var audioRouteObservation: ({})
+    property int audioRouteGeneration: 0
     signal closeRequested()
 
     width: parent ? parent.width : 320
@@ -24,9 +30,111 @@ Rectangle {
     function clear() {
         reviewedInvite = "";
         result = "IDLE";
+        audioRouteGeneration += 1;
+        audioRouteState = "NOT_CHECKED";
+        audioRouteObservation = ({});
+        // No stale device status should survive contact, mode or view loss.
+        if (audioRouteProcess && audioRouteProcess.running)
+            audioRouteProcess.running = false;
         // Mode/contact initialization may precede child creation in QML.
         if (inviteInput)
             inviteInput.text = "";
+    }
+
+    function inspectAudioRoute() {
+        if (!visible || mode !== "audio" || audioRouteProcess.running)
+            return;
+        audioRouteGeneration += 1;
+        audioRouteState = "CHECKING";
+        audioRouteObservation = ({});
+        audioRouteProcess.generation = audioRouteGeneration;
+        audioRouteProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneFaceTimeAudioRouteProbe.py"),
+            "--status"
+        ];
+        audioRouteProcess.running = true;
+    }
+
+    function audioRouteMessage() {
+        switch (audioRouteState) {
+        case "CHECKING":
+            return "CHECKING LOCAL HANDS-FREE AUDIO // No call or device setting will change.";
+        case "HFP_SYSTEM_PROFILE_ACTIVE":
+            return "SYSTEM HFP PROFILE ACTIVE // A Bluetooth hands-free profile is selected on this PC, but it may belong to another device. FaceTime, microphone and speaker are NOT verified.";
+        case "HFP_PROFILE_AVAILABLE_ONLY":
+            return "HFP PROFILE AVAILABLE // Not selected in the observed audio card. Use the iPhone audio picker during a real FaceTime Audio call; routing remains unverified.";
+        case "HFP_PROFILE_NOT_OBSERVED":
+            return "HFP NOT OBSERVED IN PACTL CARDS // This is not proof FaceTime Audio is impossible. oFono may use a separate audio route.";
+        case "PHONE_CALLS_NOT_READY":
+            return "CELLULAR HFP NOT READY // BlueFerry does not report its hands-free call path ready. This does not diagnose an active FaceTime session.";
+        case "PHONE_BRIDGE_UNAVAILABLE":
+            return "BLUEFERRY STATUS UNAVAILABLE // Local audio profiles alone cannot prove iPhone or FaceTime connectivity.";
+        case "AUDIO_INSPECTION_UNAVAILABLE":
+        case "UNAVAILABLE":
+            return "AUDIO ROUTE CHECK UNAVAILABLE // Local status could not be read. No device settings changed.";
+        default:
+            return "FACETIME AUDIO NOT VERIFIED // Select CHECK AUDIO ROUTE to inspect existing BlueFerry and PipeWire observations without changing anything.";
+        }
+    }
+
+    Process {
+        id: audioRouteProcess
+        property int generation: 0
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!handoff.visible || handoff.mode !== "audio"
+                        || audioRouteProcess.generation !== handoff.audioRouteGeneration)
+                    return;
+                try {
+                    var observed = JSON.parse(String(text || ""));
+                    var allowed = ["AUDIO_INSPECTION_UNAVAILABLE", "PHONE_BRIDGE_UNAVAILABLE",
+                                   "PHONE_CALLS_NOT_READY", "HFP_PROFILE_NOT_OBSERVED",
+                                   "HFP_PROFILE_AVAILABLE_ONLY", "HFP_SYSTEM_PROFILE_ACTIVE"];
+                    var flags = ["phoneBackendObserved", "cellularHfpReadyReported",
+                                 "systemAudioObserved", "systemHfpProfileOffered",
+                                 "systemHfpProfileActive"];
+                    if (!observed
+                            || observed.schema !== "post-apollo.phone.facetime-audio-route.v1"
+                            || observed.execution !== "READ_ONLY_USER_INITIATED"
+                            || allowed.indexOf(observed.state) < 0
+                            || observed.faceTimeAudioVerified !== false
+                            || observed.faceTimeConnected !== false
+                            || observed.faceTimeCallControl !== false
+                            || observed.microphoneVerified !== false
+                            || observed.speakerVerified !== false
+                            || observed.canChangeRoute !== false
+                            || observed.providerAuthenticated !== false
+                            || observed.personalDataAccess !== false)
+                        throw new Error("invalid route response");
+                    for (var i = 0; i < flags.length; ++i) {
+                        if (typeof observed[flags[i]] !== "boolean")
+                            throw new Error("invalid route flag");
+                    }
+                    if (observed.systemHfpProfileActive
+                            && (!observed.systemHfpProfileOffered
+                                || !observed.systemAudioObserved))
+                        throw new Error("invalid HFP profile evidence");
+                    handoff.audioRouteObservation = ({
+                        state: observed.state,
+                        cellularHfpReadyReported: observed.cellularHfpReadyReported,
+                        systemHfpProfileActive: observed.systemHfpProfileActive
+                    });
+                    handoff.audioRouteState = observed.state;
+                } catch (error) {
+                    handoff.audioRouteObservation = ({});
+                    handoff.audioRouteState = "UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (handoff.visible && handoff.mode === "audio"
+                    && generation === handoff.audioRouteGeneration
+                    && code !== 0) {
+                handoff.audioRouteObservation = ({});
+                handoff.audioRouteState = "UNAVAILABLE";
+            }
+        }
     }
 
     function reviewInvite() {
@@ -89,6 +197,44 @@ Rectangle {
             text: FaceTimeLinks.supportMessage(handoff.mode)
             color: Colors.white
             font.pixelSize: 11
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        Text {
+            width: parent.width
+            visible: handoff.mode === "audio"
+            text: "IPHONE → BLUETOOTH → PC // READ-ONLY ROUTE CHECK"
+            color: Colors.cyan
+            font.bold: true
+            font.pixelSize: 11
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        ActionButton {
+            width: Math.min(230, handoffColumn.width)
+            height: 33
+            visible: handoff.mode === "audio"
+            label: audioRouteProcess.running ? "CHECKING AUDIO..." : "CHECK AUDIO ROUTE"
+            labelPixelSize: 10
+            accentColor: Colors.magenta
+            interactive: !audioRouteProcess.running
+            onTriggered: handoff.inspectAudioRoute()
+        }
+        Text {
+            width: parent.width
+            visible: handoff.mode === "audio"
+            text: handoff.audioRouteMessage()
+            color: Colors.orange
+            font.pixelSize: 10
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        Text {
+            width: parent.width
+            visible: handoff.mode === "audio"
+            text: "REAL TEST // Start FaceTime Audio on the iPhone, select the available PC/Bluetooth audio endpoint on the iPhone itself, and verify sound and microphone with a consenting caller. PHONE cannot observe which iPhone app owns the HFP stream."
+            color: Colors.white
+            font.pixelSize: 10
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
         }

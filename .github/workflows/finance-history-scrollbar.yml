@@ -1,0 +1,48 @@
+name: Finance stock history scrollbar contracts
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "widgets/FinanceStockHistoryPane.qml"
+      - "tests/components/test_finance_stock_history_scrollbar.py"
+      - ".github/workflows/finance-history-scrollbar.yml"
+  pull_request:
+    paths:
+      - "widgets/FinanceStockHistoryPane.qml"
+      - "tests/components/test_finance_stock_history_scrollbar.py"
+      - ".github/workflows/finance-history-scrollbar.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  containment:
+    name: Finance stock history rail and viewport clearance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify stock history rail and chart gutter
+        run: python3 -B tests/components/test_finance_stock_history_scrollbar.py
+      - name: Enumerate uncovered source panes before the strict census
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          exceptions = {"widgets/AppControlW.qml": 3,
+                        "widgets/GitBranchesView.qml": 1,
+                        "widgets/GitW.qml": 1}
+          missing = []
+          root = Path(".")
+          for path in sorted((root / "widgets").rglob("*.qml")):
+              name = path.as_posix()
+              source = path.read_text(encoding="utf-8")
+              count = len(re.findall(r"\b(?:Flickable|ListView|GridView)\s*\{", source))
+              bars = len(re.findall(r"\bNeonScrollBar\s*\{", source))
+              gap = count - bars - exceptions.get(name, 0)
+              if gap > 0:
+                  missing.append((name, gap))
+          for name, gap in missing:
+              print(f"UNCOVERED_SOURCE_PANE // {name} // {gap}")
+          print(f"UNCOVERED_WIDGET_FILES // {len(missing)}")
+          PY

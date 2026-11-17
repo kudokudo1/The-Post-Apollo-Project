@@ -1,0 +1,73 @@
+name: Connections C3e-AF independently signed role enrollment (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_release_trust/C3eAFSignedRoleEnrollment.py'
+      - 'tests/connections/test_connections_c3eaf_signed_role_enrollment.py'
+      - '.github/workflows/connections-c3eaf-signed-role-enrollment.yml'
+      - 'docs/connections-c3eaf-signed-role-enrollment.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-role-enrollment-ci-only:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact test-only public signature verification dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Verify source and unconditionally false production grants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eAFSignedRoleEnrollment.py \
+            tests/connections/test_connections_c3eaf_signed_role_enrollment.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/c3e_release_trust/C3eAFSignedRoleEnrollment.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          status=Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          for name in ("operatorEnrollmentRootCustodyVerified",
+                       "independentProductionHostAttested",
+                       "externalChallengeCustodyVerified",
+                       "externalRollbackResistanceVerified",
+                       "c5HumanConsentVerified", "hostAuthenticated",
+                       "canBeginSignIn", "credentialActionsEnabled",
+                       "productionAuthority"):
+              assert '"' + name + '": False' in source, name
+          assert "Z.inspect_release_and_consume(" in source
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "readonly property bool hostAuthenticated: false" in status
+          print("C3EAF_HOLD // NO_REAL_OPERATOR_ROOT_OR_SIGN_IN_AUTHORITY")
+          PY
+      - name: 22 signed enrollment role, runtime snapshot and issuer replay denial tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true "$(command -v python3)" -B \
+            tests/connections/test_connections_c3eaf_signed_role_enrollment.py
+          echo "C3EAF_PASS // 22_SIGNED_KEY_ROLE_AND_RUNTIME_BINDING_TESTS_NO_HOST_OR_C5"
+      - name: Preserve existing C3e-Z synthetic signed release and witness contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true "$(command -v python3)" -B \
+            tests/connections/test_connections_c3ez_release_bound_host_evidence.py
+          echo "C3EAF_HOLD // ROOT_LOCAL_CI_CHALLENGE_NOT_EXTERNAL_ISSUER"

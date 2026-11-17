@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'services/phone/PhoneFaceTimeShortcutRelay.py'
+      - 'services/phone/PhoneFaceTimeShortcutOperator.py'
       - 'tests/phone/test_phone_facetime_shortcuts_relay_v1.py'
       - 'MODEL/contracts/social-phone-facetime-iphone-shortcuts-relay-v1.md'
       - '.github/workflows/social-phone-facetime-shortcuts-relay-v1.yml'
@@ -11,6 +12,7 @@ on:
     branches: [main]
     paths:
       - 'services/phone/PhoneFaceTimeShortcutRelay.py'
+      - 'services/phone/PhoneFaceTimeShortcutOperator.py'
       - 'tests/phone/test_phone_facetime_shortcuts_relay_v1.py'
       - 'MODEL/contracts/social-phone-facetime-iphone-shortcuts-relay-v1.md'
       - '.github/workflows/social-phone-facetime-shortcuts-relay-v1.yml'
@@ -32,7 +34,7 @@ jobs:
         with:
           node-version: '22'
       - name: Compile disabled-by-default loopback relay
-        run: python -m py_compile services/phone/PhoneFaceTimeShortcutRelay.py
+        run: python -m py_compile services/phone/PhoneFaceTimeShortcutRelay.py services/phone/PhoneFaceTimeShortcutOperator.py
       - name: Real local HTTP exchange, auth, replay, bounds, TTL and private-response tests
         run: python -m unittest discover -s tests/phone -p 'test_phone_facetime_shortcuts_relay_v1.py' -v
       - name: Retain iPhone-only preflight and honest disabled-cellular status

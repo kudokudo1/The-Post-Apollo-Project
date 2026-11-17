@@ -17,6 +17,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "services" / "phone"))
 RelayModule = importlib.import_module("PhoneFaceTimeShortcutRelay")
+Operator = importlib.import_module("PhoneFaceTimeShortcutOperator")
 SRC = (ROOT / "services/phone/PhoneFaceTimeShortcutRelay.py").read_text()
 
 ADMIN = "A" * 48
@@ -215,6 +216,27 @@ class TestHttpRelay(unittest.TestCase):
         self.assertEqual(self.request("POST", "/v1/operator/cancel", IPHONE)[0], 403)
         self.assertEqual(self.request("GET", "/v1/operator/status", ADMIN)[1]["state"], "EMPTY")
 
+    def test_actual_local_operator_client_queues_checks_and_cancels(self):
+        port = self.server.server_port
+        invalid = Operator.request("queue-audio", ADMIN, port,
+                                   recipient="+15551234567", approved=False)
+        self.assertEqual(invalid["state"], "REFUSED")
+        self.assertEqual(self.relay.status()["state"], "EMPTY")
+        queued = Operator.request("queue-audio", ADMIN, port,
+                                  recipient="+15551234567", approved=True)
+        self.assertEqual(queued["state"], "QUEUED")
+        self.assertFalse(queued["faceTimeConnected"])
+        self.assertNotIn("+15551234567", str(queued))
+        self.assertEqual(Operator.request("status", ADMIN, port)["state"], "QUEUED")
+        self.assertEqual(Operator.request("status", IPHONE, port)["state"], "UNAVAILABLE")
+        self.assertEqual(Operator.request("cancel", ADMIN, port)["state"], "CANCELLED")
+        self.assertEqual(Operator.request("status", ADMIN, port)["state"], "CANCELLED")
+        self.assertEqual(self.request("GET", "/v1/iphone/next", IPHONE)[1]["state"], "NONE")
+        for target in ("15551234567", "javascript:alert(1)", "bad\\nrecipient"):
+            self.assertEqual(Operator.request("queue-video", ADMIN, port,
+                             recipient=target, approved=True)["state"], "REFUSED")
+        self.assertEqual(Operator.request("status", ADMIN, 0)["state"], "REFUSED")
+
     def test_only_loopback_can_bind(self):
         with self.assertRaises(ValueError):
             RelayModule._LoopbackOnly(("0.0.0.0", 0), self.relay)
@@ -239,6 +261,24 @@ class TestCredentialSafety(unittest.TestCase):
                 RelayModule._load_token(str(link))
         self.assertEqual(RelayModule.main([]), 2)
         self.assertEqual(RelayModule.main(["--serve", "--port", "8123"]), 2)
+
+    def test_operator_client_never_hands_credentials_to_redirect_or_argv(self):
+        code = (ROOT / "services/phone/PhoneFaceTimeShortcutOperator.py").read_text()
+        for required in (
+            "class _NoRedirect", "redirect_request", "getpass.getpass",
+            'Type PREPARE', "http://127.0.0.1:",
+            "faceTimeConnected", "PhoneFaceTimeShortcutRelay",
+        ):
+            if required == 'Type PREPARE':
+                self.assertIn('Type PREPARE:', code)
+            else:
+                self.assertIn(required, code)
+        for bad in (
+            '("--target"', "'--target'", "print(recipient)",
+            "print(token)", "systemctl", "Qt.openUrlExternally",
+            "https://facetime.apple.com", "shell=True",
+        ):
+            self.assertNotIn(bad, code)
 
     def test_forbidden_operations_absent_from_process(self):
         for bad in (

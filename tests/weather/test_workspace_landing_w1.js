@@ -105,7 +105,7 @@ test("left family rail and bottom workspace buttons switch immediate working pan
   assert.equal((workspace.match(/Repeater\s*\{/g)||[]).length,1);
   assert.match(familyRail,/model: Workspace\.FAMILIES/);
   assert.match(workspace,/model: surface\.activeTabs/);
-  assert.match(familyRail,/familyRail\.navigator\.chooseRoute\(modelData\.landing\)/);
+  assert.match(familyRail,/familyRail\.navigator\.chooseFamily\(modelData\.id\)/);
   assert.match(workspace,/onTriggered: surface\.routeRequested\(modelData\.path\)/);
   for(const name of ["Weather","Cosmos","Earth","Media","Magick","Tools"])
     assert.ok(workspace.includes("Station"+name+"SubjectPane {"),name);

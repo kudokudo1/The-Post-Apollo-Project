@@ -77,7 +77,9 @@ def project_audio_cards(payload: object) -> tuple[bool, bool] | None:
         profiles = card.get("profiles", [])
         if type(profiles) not in (list, dict) or len(profiles) > MAX_PROFILES:
             return None
-        choices = profiles.values() if type(profiles) is dict else profiles
+        # pactl versions may serialize profiles as a JSON list of objects
+        # or as a map keyed by profile name. Both are untrusted until parsed.
+        choices = profiles.keys() if type(profiles) is dict else profiles
         for profile in choices:
             value = _profile_name(profile)
             if value and _is_hfp(value):

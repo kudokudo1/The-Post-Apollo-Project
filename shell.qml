@@ -41,6 +41,25 @@ PanelWindow {
         Quickshell.watchFiles = false;
     }
 
+    // Widget hotkeys are installed once by a guarded Sway config helper.
+    // A custom user keybind always wins; on conflict the helper writes
+    // NOTHING. No Sway reload (it would kill and restart this Quickshell).
+    // Bindings are effective on the next Sway login. Set
+    // POST_APOLLO_AUTO_WIDGET_HOTKEYS=0 to disable automatic provisioning.
+    Process {
+        id: postApolloWidgetHotkeyBootstrap
+        running: String(Quickshell.env("POST_APOLLO_AUTO_WIDGET_HOTKEYS") || "1") !== "0"
+        command: ["python3",
+            Quickshell.shellPath("scripts/ensure_post_apollo_widget_hotkeys.py"),
+            "--install"]
+        stdout: StdioCollector {
+            onStreamFinished: console.log("POST_APOLLO_HOTKEYS // " + this.text.trim())
+        }
+        stderr: StdioCollector {
+            onStreamFinished: console.warn("POST_APOLLO_HOTKEYS // " + this.text.trim())
+        }
+    }
+
     // Register an in-shell graphical Polkit agent only during an explicitly
     // confirmed Clock/CPU++ resync. Keep ordinary shell startup unchanged and
     // release the authentication surface after the privileged command exits.

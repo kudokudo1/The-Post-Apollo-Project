@@ -167,6 +167,9 @@ PanelWindow {
     property var pendingReceptionRoundsSelection: null
     property string selectedDoctorId: ""
     property string selectedProviderId: ""
+    // Per-Room operator action; defaults and reopened views are read-only.
+    property string explicitRoomProviderId: ""
+    property string explicitRoomProviderTeam: ""
 
     readonly property bool operationsOpen:
         root.operationsSurface.length > 0
@@ -227,10 +230,26 @@ PanelWindow {
     function syncRoomAISelection() {
         const room = root.selectedRoomData || {};
         const roomDoctor = String(room.doctorId || "").trim();
-        const roomProvider = String(room.providerId || "").trim();
+        // PX Room records retain the saved provider; Git audit room rows
+        // may not carry provider staffing at all.
+        const storedRoomProvider =
+            roomChatView.roomId === root.selectedRoomTeam
+            ? String(roomChatView.storedProviderId || "").trim()
+            : "";
+        const roomProvider =
+            storedRoomProvider || String(room.providerId || "").trim();
 
         root.selectedDoctorId =
             roomDoctor || root.defaultDoctorIdForRoom();
+
+        const explicitRoomProvider =
+            root.explicitRoomProviderTeam === root.selectedRoomTeam
+            ? String(root.explicitRoomProviderId || "").trim()
+            : "";
+        if (explicitRoomProvider) {
+            root.selectedProviderId = explicitRoomProvider;
+            return;
+        }
 
         if (roomProvider
                 && (!providerService.loaded
@@ -1023,6 +1042,10 @@ PanelWindow {
     }
 
     onSelectedRoomTeamChanged: {
+        // A choice for Room A can never become a write for Room B.
+        root.explicitRoomProviderId = "";
+        root.explicitRoomProviderTeam = "";
+        root.selectedProviderId = "";
         root.leaveRoomControls();
         root.leaveBedControls();
         roomService.clearResult();
@@ -7553,6 +7576,10 @@ PanelWindow {
             bedPath: floorService.bedPath
             doctorId: root.selectedDoctorId
             providerId: root.selectedProviderId
+            explicitProviderIdToPersist:
+                root.explicitRoomProviderTeam === root.selectedRoomTeam
+                ? root.explicitRoomProviderId : ""
+            onStoredProviderIdChanged: root.syncRoomAISelection()
             assignmentId:
                 assignmentService.activeAssignment
                 ? String(assignmentService.activeAssignment.id || "")
@@ -7865,8 +7892,12 @@ PanelWindow {
                                 : Qt.ArrowCursor
 
                             onClicked: {
-                                root.selectedProviderId =
-                                    String(modelData.id || "");
+                                const provider = String(modelData.id || "").trim();
+                                if (!root.selectedRoomTeam || !provider)
+                                    return;
+                                root.explicitRoomProviderTeam = root.selectedRoomTeam;
+                                root.explicitRoomProviderId = provider;
+                                root.selectedProviderId = provider;
                             }
                         }
                     }

@@ -1,0 +1,31 @@
+name: Hospital Room provider persistence contracts
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "services/hospital/HospitalRoomConversationAdapter.qml"
+      - "widgets/HospitalRoomChatView.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/messaging/test_conversation_contracts.py"
+      - ".github/workflows/hospital-room-provider-persistence.yml"
+  push:
+    paths:
+      - "services/hospital/HospitalRoomConversationAdapter.qml"
+      - "widgets/HospitalRoomChatView.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/messaging/test_conversation_contracts.py"
+      - ".github/workflows/hospital-room-provider-persistence.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  provider-persistence:
+    name: Provider persistence and explicit-only writes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Room Chat and PX binding contracts
+        run: python3 -B tests/messaging/test_conversation_contracts.py

@@ -184,6 +184,8 @@ def review(reference_checkpoint, presented_checkpoint, signed_witness, *,
             holds.add("anchored_witness_same_sequence_fork")
     elif new["witnessSequence"] != old["witnessSequence"] + 1:
         holds.add("anchored_witness_chain_gap")
+    elif signed_claim["previousWitnessSha256"] != old["witnessSha256"]:
+        holds.add("signed_witness_predecessor_mismatch")
 
     if new["witnessSequence"] != signed_claim["witnessSequence"]:
         holds.add("current_witness_sequence_mismatch")

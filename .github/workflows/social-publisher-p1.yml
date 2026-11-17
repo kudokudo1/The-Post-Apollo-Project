@@ -1,4 +1,4 @@
-name: SocialW Publisher P1 local draft contracts
+name: SocialW Publisher P1 and P2.A offline adapter contracts
 
 on:
   pull_request:
@@ -52,6 +52,8 @@ jobs:
         run: python3 tests/publisher/test_publisher_history_cli.py
       - name: Guard P1.6 history/recovery UI and deny-only boundary
         run: python3 tests/publisher/test_publisher_history_integration.py
+      - name: Verify P2.A offline Discord Bluesky and owned-site adapters
+        run: python3 -m unittest -v tests.publisher.test_publisher_provider_adapters
       - name: Guard Social companion routing and single writer
         run: python3 tests/publisher/test_publisher_social_integration.py
       - name: Re-run existing Social Settings contracts

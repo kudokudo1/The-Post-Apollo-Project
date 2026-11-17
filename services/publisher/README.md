@@ -246,3 +246,14 @@ P1.4 can land. Do not treat a merged PR label as proof of mainline ancestry.
 - **Recovery:** discard this unmerged source branch without affecting P1.1
   draft, P1.2 media, P1.3 template or P1.5 request files. No live desktop
   state has been changed by this PR. Native visual acceptance is separate.
+
+## P2.A // Provider payload previews (no remote posting)
+
+New provider-specific offline contract: [P2-ADAPTER-CONTRACT.md](./P2-ADAPTER-CONTRACT.md).
+Discord webhook text, Bluesky text records and owned-site draft JSON can be
+prepared and tested without credentials or network. P1.5 grant gate is still
+closed. P1.4 queue is still deny-only. No source/media data migrations.
+
+Do not confuse a successful preview with a provider-confirmed post. Real
+transport, ownership consent, source/media rechecks, ambiguous-request
+reconciliation and separate runtime acceptance are P2.B/P2.C dependencies.

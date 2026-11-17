@@ -290,7 +290,11 @@ class _Handler(BaseHTTPRequestHandler):
 def _load_token(filename: str) -> str:
     """Read private token by fd to avoid a symlink swap after stat()."""
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(filename, flags)
+    try:
+        fd = os.open(filename, flags)
+    except OSError:
+        # Includes O_NOFOLLOW symlink refusal. Do not echo file paths.
+        raise ValueError("unsafe credentials file") from None
     try:
         info = os.fstat(fd)
         if (not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077

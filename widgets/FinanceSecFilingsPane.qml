@@ -213,9 +213,18 @@ Item {
                 contentWidth: width
                 contentHeight: filingRows.height
                 boundsBehavior: Flickable.StopAtBounds
+                NeonScrollBar {
+                    id: filingIndexScrollBar
+                    flickable: filingScroll
+                    mountingParent: filingList
+                    geometryMode: "viewport"
+                    handleStyle: "bar"
+                    rightInset: 2
+                }
+
                 Column {
                     id: filingRows
-                    width: filingScroll.width
+                    width: Math.max(0, filingScroll.width - 22)
                     spacing: 3
                     Repeater {
                         model: pane.filteredFilings

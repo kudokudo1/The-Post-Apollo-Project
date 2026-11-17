@@ -1,0 +1,33 @@
+name: Finance SEC Market Crawl scrollbar coverage
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "widgets/FinanceSecDocumentInspector.qml"
+      - "widgets/FinanceSecFilingsPane.qml"
+      - "widgets/FinanceMarketPane.qml"
+      - "widgets/FinanceResearchCrawlPane.qml"
+      - "tests/components/test_finance_research_scrollbar_coverage.py"
+      - ".github/workflows/finance-research-scrollbar-coverage.yml"
+  pull_request:
+    paths:
+      - "widgets/FinanceSecDocumentInspector.qml"
+      - "widgets/FinanceSecFilingsPane.qml"
+      - "widgets/FinanceMarketPane.qml"
+      - "widgets/FinanceResearchCrawlPane.qml"
+      - "tests/components/test_finance_research_scrollbar_coverage.py"
+      - ".github/workflows/finance-research-scrollbar-coverage.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-coverage:
+    name: Five Finance research viewport-mounted bar rails
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert Finance source host, gutter, and indicator coverage
+        run: python3 -B tests/components/test_finance_research_scrollbar_coverage.py

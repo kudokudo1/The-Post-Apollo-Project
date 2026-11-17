@@ -8,7 +8,7 @@ set -Eeuo pipefail
    "$(id -u)" == 0 && -d /input && -d /src/services/phone ]] ||
   { echo "P52_REFUSED // NOT_DISPOSABLE_VERIFIER"; exit 78; }
 
-dnf -y --setopt=install_weak_deps=False install rpm gnupg2 python3
+dnf -y --setopt=install_weak_deps=False install rpm gnupg2 python3 diffutils
 (cd /input && sha256sum --check --status phone-status-artifact-manifest.sha256) ||
   { echo "P52_REFUSED // ARTIFACT_HASH"; exit 78; }
 

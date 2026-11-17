@@ -27,7 +27,7 @@ C3e-AD RealC4bArtifactIntake performs these separate, read-only consistency chec
 
 1. GitHub repository numeric ID and name, C4b workflow numeric ID/path/name, successful completed push-to-main, and independently supplied exact run ID and SHA.
 2. Exactly one successful job for the same head/attempt, with the official Silverblue job identity and six critical PASS steps.
-   The GitHub run start, current job start/completion, and artifact creation timestamps are compared in UTC. An artifact uploaded before the latest successful attempt's job started is rejected, even if the run ID, ZIP checksum, and exact source commit still match.
+   The GitHub run start, current job start/completion, and artifact creation timestamps are compared in UTC. The artifact must be created within the successful job window: not before its start or after completion. Its expiration must be strictly later than creation. This refuses old-attempt replay, later forged uploads, and invalid expiry metadata, even if run ID, source commit and ZIP hash match.
 3. Exactly one nonexpired matching artifact with the same run/repository/commit, exact downloaded ZIP byte count and SHA-256 digest matching GitHub metadata.
 4. Exactly one bounded regular ZIP member with the exact expected filename, refusing symlink/traversal/extra/encrypted entries.
 5. Existing C3e-AB strict marker-only parser for every required two-boot rollback stage, terminal zero VM exit, and fail-closed denial on malformed/partial evidence.
@@ -44,16 +44,32 @@ Known example for this checkpoint: run 44050838865, commit b660efe31f1bf21a427e8
 
 No local Fedora, Quickshell, sign-in, secrets, host services or credential operations are touched.
 
+## REAL ARTIFACT SOURCE VERIFICATION // November 17, 2026
+
+A one-time **read-only** GitHub Actions PR check ran the **actual C3e-AD/AE parser** against the C4b postmerge Silverblue artifact before its expiration. The C3e-owned temporary PR-only dispatch was removed again after success, leaving no permanent dependency on the short-lived artifact.
+
+- GitHub workflow run: https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/44103137628
+- Real C4b source intake job: 134108219949, **SUCCESS**
+- Checkpoint source head: ecf6a17418c0d0136bb1fbc6ee136b9b950d4a3d
+- C4b source: run 44050838865, commit b660efe31f1bf21a427e83320b34cf54a1e0ec44, artifact 14314862260
+- Exact source ZIP digest and extracted marker digest match the original postmerge C4b handoff.
+- Positive result: CI GitHub run/job/artifact metadata consistent with independently pinned source and **complete two-boot rollback marker sequence consistent**.
+- Mandatory negatives: installedIdentityHostAuthenticated, canBeginSignIn, credentialActionsEnabled, productionAuthority and all other C3e-AB authority flags remained FALSE.
+
+This **does not** establish independent cryptographic GitHub-run authentication in the library, installed Linux process/seat attestation, external issuer, or C5 human consent. The real-source proof is a historical diagnostic checkpoint, not permission to retain or replay the expiring raw artifact.
+
 ## VERIFY
 
-- [ ] Exact-head 20 C3e-AD regression cases, existing C3e-AB 25 and triggered workflows
+- [ ] Exact-head 24 C3e-AD/AE regression cases, existing C3e-AB 25 and triggered workflows
 - [ ] Independent Nurse 2 review before protected DOC merge
 - [ ] Optional real GitHub-source manual workflow intake of unexpired artifact
 - [x] External read-only inspection: genuine postmerge C4b run/job/ZIP metadata and full 21/21 stage consistency
 
+- [x] First real C4b GitHub-source ZIP intake: SUCCESS on run 44103137628 with all authority flags FALSE
+
 ## WATCH OUT FOR
 
-GitHub reruns may reuse the same run ID but advance the attempt number. An older attempt's artifact is not proof of the latest successful attempt; C3e-AD compares its creation time against the matching job start and fails closed on missing or inconsistent timestamps.
+GitHub reruns may reuse the same run ID but advance the attempt number. An older attempt's artifact is not proof of the latest successful attempt; C3e-AD/AE compares creation against BOTH matching job start and completion, requires a later expiration, and fails closed on missing or inconsistent timestamps.
 
 Caller-provided GitHub JSON is not inherently trusted. In the manual workflow, metadata comes through GitHub's own read-only token; the library itself is an offline consistency validator, not a cryptographic attestor. A correct GitHub CI run does NOT establish enrolled production keys, independent Linux installed-host/seat identity, protected challenge custody, C5 one-use human approval, or credentials. None of those powers is created by this branch.
 

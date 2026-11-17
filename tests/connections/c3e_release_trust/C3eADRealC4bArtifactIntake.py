@@ -157,10 +157,15 @@ def _artifact_record(artifacts, run, job, archive):
              association.get("head_sha") == run["head_sha"],
              "GITHUB_ARTIFACT_RUN_BINDING_MISMATCH")
     # An older run attempt can leave an otherwise valid artifact visible.
-    # Refuse when the ZIP was uploaded before this successful job started.
-    _require(_github_utc(artifact.get("created_at")) >=
-             _github_utc(job.get("started_at")),
-             "GITHUB_ARTIFACT_STALE_ATTEMPT_REFUSED")
+    # Bind its creation to the actual successful job window, not merely
+    # the run ID (which survives GitHub workflow reruns). This also denies
+    # a later upload masquerading as output of the completed attempt.
+    created = _github_utc(artifact.get("created_at"))
+    _require(_github_utc(job.get("started_at")) <= created <=
+             _github_utc(job.get("completed_at")),
+             "GITHUB_ARTIFACT_OUTSIDE_SUCCESSFUL_ATTEMPT_REFUSED")
+    _require(_github_utc(artifact.get("expires_at")) > created,
+             "GITHUB_ARTIFACT_EXPIRY_INVALID")
     _require(type(archive) is bytes and 0 < len(archive) <= MAX_ZIP_BYTES,
              "GITHUB_ARCHIVE_SIZE_REFUSED")
     _require(type(artifact.get("size_in_bytes")) is int and

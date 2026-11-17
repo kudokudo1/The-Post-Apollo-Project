@@ -89,7 +89,7 @@ uid="$(id -u "$name")"
 gid="$(id -g "$name")"
 [[ "$uid" =~ ^[1-9][0-9]*$ && "$gid" =~ ^[1-9][0-9]*$ ]] ||
   fail "TEMP_USER_IS_ROOT"
-install -d -m 0700 -o root -g root "$root"
+install -d -m 0711 -o root -g root "$root"
 printf 'P53 CI ONLY NO SAVE\n' > "$marker"
 chmod 0600 "$marker"
 install -m 0555 -o root -g root /usr/bin/python3 "$launcher"

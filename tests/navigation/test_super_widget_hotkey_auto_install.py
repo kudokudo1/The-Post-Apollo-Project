@@ -133,6 +133,20 @@ with tempfile.TemporaryDirectory() as root:
             assert not ok and "changed during validation" in msg
         assert main.read_text()=='include "'+str(nested)+'"\n'
 
+        # A dotfiles manager can add a NEW file to an include glob during
+        # validation; scanning only the previous files would miss it.
+        main.write_text("include "+str(included_dir)+"/*.conf\n")
+        (included_dir/"01-user.conf").write_text("bindsym Mod1+b exec safe\n")
+        newcomer=included_dir/"02-just-added.conf"
+        def create_conflict(config, candidate, binary):
+            newcomer.write_text("bindsym Mod4+r exec my-radio\n")
+            return True,"valid"
+        with patch.object(installer,"checked_config",side_effect=create_conflict):
+            ok,msg=installer.enable(main,sway="swaypx")
+            assert not ok and "changed during validation" in msg
+        assert main.read_text()=="include "+str(included_dir)+"/*.conf\n"
+        newcomer.unlink()
+
         # The helper never creates a missing Sway config.
         missing=swaydir/"missing"
         ok,msg=installer.enable(missing,sway="swaypx")

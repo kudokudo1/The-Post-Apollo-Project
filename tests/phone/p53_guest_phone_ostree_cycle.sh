@@ -47,7 +47,7 @@ case "$phase" in
       fail "OFFLINE_PHONE_ARTIFACT_DIGEST_MISMATCH"
 
     rpmfile="$data/phone-status-ci.rpm"
-    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$rpmfile")" ==
+    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$rpmfile")" == \
        "$pkg 0.1 noarch" ]] || fail "WRONG_SIGNED_PHONE_RPM"
     [[ -z "$(rpm -qp --scripts "$rpmfile")" &&
        -z "$(rpm -qp --triggers "$rpmfile")" ]] ||
@@ -153,7 +153,7 @@ PHONE_MONITOR
     fail "UNAUTHORIZED_REBOOT_BEFORE_PENDING_STATUS"
     ;;
   layer_pending)
-    [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}' "$pkg")" ==
+    [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}' "$pkg")" == \
        "$pkg 0.1 noarch" ]] || fail "SIGNED_PHONE_RPM_NOT_BOOTED"
     [[ -f "$prefix/PhonePersonalStatusHostP49.py" &&
        -f "/usr/lib/systemd/system/$unit" ]] ||

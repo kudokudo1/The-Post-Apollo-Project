@@ -1,0 +1,60 @@
+name: Clock BG1-B2B10 native AF_UNIX supervisor (deny-only)
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmNativeClockSupervisor.py"
+      - "services/time/BG1-ALARM-NATIVE-SUPERVISOR.md"
+      - "tests/time/test_clock_bg1_b2b10_native_supervisor.py"
+      - ".github/workflows/clock-bg1-b2b10-native-supervisor.yml"
+  push:
+    paths:
+      - "services/time/AlarmNativeClockSupervisor.py"
+      - "services/time/BG1-ALARM-NATIVE-SUPERVISOR.md"
+      - "tests/time/test_clock_bg1_b2b10_native_supervisor.py"
+      - ".github/workflows/clock-bg1-b2b10-native-supervisor.yml"
+permissions:
+  contents: read
+jobs:
+  real-supervisor-socket:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned existing Clock signed-origin dependency
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Foreground Unix-socket supervisor and default-deny integration
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b10_native_supervisor.py' -v
+      - name: Preserve dependent B2B9 signed installed origin verification
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b9_installed_role_trust.py' -v
+      - name: Preserve mounted Clock no-release barrier and kernel PID identity
+        run: |
+          node --test tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+      - name: Four-file B2B10 scope even while B2B9 awaits merge
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          paths=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],
+              text=True).splitlines())
+          own={
+              "services/time/AlarmNativeClockSupervisor.py",
+              "services/time/BG1-ALARM-NATIVE-SUPERVISOR.md",
+              "tests/time/test_clock_bg1_b2b10_native_supervisor.py",
+              ".github/workflows/clock-bg1-b2b10-native-supervisor.yml"}
+          dependency={
+              "services/time/AlarmInstalledRoleTrustPreflight.py",
+              "services/time/BG1-ALARM-INSTALLED-ROLE-TRUST.md",
+              "tests/time/test_clock_bg1_b2b9_installed_role_trust.py",
+              ".github/workflows/clock-bg1-b2b9-installed-role-trust.yml"}
+          assert paths in (own,own|dependency), (
+              f"Unapproved Clock file scope: {sorted(paths ^ (own|dependency))}")
+          print("B2B10 4-file scope, B2B9 unmodified dependency: PASS")
+          PY

@@ -264,6 +264,19 @@ Rectangle {
         return chooseFamily(tabs[(Math.max(0,idx)+step+tabs.length)%tabs.length].id);
     }
 
+    // Unified lower-submode keys: cycle the *existing* bottom workspace
+    // tabs. INDEX stays a separate navigation tree and owns its arrows.
+    function cycleWorkspaceTab(direction) {
+        if(indexOpen) return false;
+        const tabs=Workspace.tabsFor(currentPath);
+        if(tabs.length<2) return false;
+        const selected=Workspace.selectedGroup(currentPath);
+        const now=tabs.findIndex(function(item){return item.key===selected;});
+        const step=Number(direction)<0 ? -1 : 1;
+        const next=(Math.max(0,now)+step+tabs.length)%tabs.length;
+        return chooseRoute(tabs[next].path);
+    }
+
     function moveCursor(direction) {
         const count = indexOpen ? childrenRoutes.length
                                 : Workspace.tabsFor(currentPath).length;

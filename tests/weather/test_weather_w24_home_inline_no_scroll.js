@@ -33,7 +33,8 @@ test("W24 four HOME buttons switch existing middle panels without redirecting",(
 });
 test("W24 LIVE first view has LIVE on top, AUTO on bottom, and only existing data",()=>{
  assert.match(home,/homeInlineMode === "live"/);
- assert.match(home,/section === "snapshot" \|\| section === "relevant"/);
+ assert.match(home,/section === "relations" \|\| section === "snapshot"/);
+ assert.match(home,/\|\| section === "relevant"/);
  assert.match(home,/title: "LIVE \/\/ NOW"/);
  assert.match(home,/title: "SNAPSHOT \/\/ NOW"/);
  assert.match(home,/id: weatherSnapshotRow/);
@@ -44,7 +45,7 @@ test("W24 LIVE first view has LIVE on top, AUTO on bottom, and only existing dat
  assert.match(home,/home\.aqiReady/);
  assert.match(home,/homeInlineAlertHeight/);
  assert.match(home,/NWS ALERT \/\//);
- assert.match(fixture,/LIVE_TOP_AUTO_BOTTOM_LOST/);
+ assert.match(fixture,/W25_GRAPHS_TOP_LIVE_MIDDLE_AUTO_BOTTOM/);
 });
 test("W24 no-scrolling height budgets fit default, alert and focused modes",()=>{
  for(const h of [275,300,400,500]) {

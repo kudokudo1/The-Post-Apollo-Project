@@ -307,7 +307,16 @@ def observe_ci_only(*, expected: dict, mode="fixture"):
         interpreter_inode = _executable(pid, pins)
         script_inode = _script(pins)
         process_exe_stat = os.stat(f"/proc/{pid}/exe")
-        script_stat = os.stat(pins["scriptPath"])
+        # Unlike stat(), lstat() cannot quietly follow a symlink swapped
+        # into the pathname after the earlier O_NOFOLLOW byte inspection.
+        # Recheck parent directories and final file ownership/mode too.
+        _safe_path(Path(pins["scriptPath"]))
+        script_stat = os.lstat(pins["scriptPath"])
+        if (not stat.S_ISREG(script_stat.st_mode) or
+                script_stat.st_uid != 0 or script_stat.st_gid != 0 or
+                script_stat.st_nlink != 1 or
+                stat.S_IMODE(script_stat.st_mode) != 0o555):
+            _deny("C3EAG_SCRIPT_PATH_REPLACED_AFTER_HASH")
         if ((process_exe_stat.st_dev, process_exe_stat.st_ino,
              process_exe_stat.st_size, process_exe_stat.st_mtime_ns,
              process_exe_stat.st_ctime_ns) != interpreter_inode or

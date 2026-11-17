@@ -52,17 +52,21 @@ def fixture(archive=None):
         "head_repository": {"id": A.REPO_ID, "full_name": A.REPO},
         "head_branch": "main", "head_sha": PIN, "event": "push",
         "run_attempt": 1, "status": "completed", "conclusion": "success",
+        "run_started_at": "2026-11-17T08:55:09Z",
     }
     jobs = {"total_count": 1, "jobs": [{
         "run_id": RUN, "head_sha": PIN, "head_branch": "main",
         "run_attempt": 1, "workflow_name": A.WORKFLOW_NAME,
         "name": A.JOB_NAME, "status": "completed", "conclusion": "success",
+        "started_at": "2026-11-17T08:55:12Z",
+        "completed_at": "2026-11-17T09:16:15Z",
         "steps": [{"name": name, "status": "completed", "conclusion": "success"}
                   for name in CRITICAL],
     }]}
     artifact = {
         "id": 14314862260, "name": A.ARTIFACT_NAME,
         "expired": False, "size_in_bytes": len(archive),
+        "created_at": "2026-11-17T09:16:13Z",
         "digest": "sha256:" + hashlib.sha256(archive).hexdigest(),
         "workflow_run": {
             "id": RUN, "repository_id": A.REPO_ID,
@@ -254,6 +258,40 @@ class C3eADTests(unittest.TestCase):
                 rc = A.main(argv)
             self.assertEqual(rc, 0)
             self.assertFalse(json.loads(out.getvalue())["productionAuthority"])
+
+    def test_18_previous_attempt_artifact_cannot_be_reused(self):
+        # The latest successful attempt starts after this artifact was made.
+        # Matching archive digest and workflow run ID alone are insufficient.
+        d = fixture()
+        d["jobs"]["jobs"][0]["started_at"] = "2026-11-17T09:16:14Z"
+        self.refuse(d)
+
+    def test_19_job_time_must_follow_run_start_and_precede_completion(self):
+        for target, value in (
+            ("started_at", "2026-11-17T08:55:08Z"),
+            ("completed_at", "2026-11-17T08:55:11Z"),
+        ):
+            d = fixture()
+            d["jobs"]["jobs"][0][target] = value
+            with self.subTest(target=target):
+                self.refuse(d)
+
+    def test_20_missing_invalid_and_non_utc_github_times_refused(self):
+        for location, field, value in (
+            ("run", "run_started_at", None),
+            ("run", "run_started_at", "2026-11-17T08:55:09-05:00"),
+            ("job", "started_at", ""),
+            ("job", "completed_at", "2026-11-17T99:99:99Z"),
+            ("artifact", "created_at", "2026-11-17T09:16:13+00:00"),
+            ("artifact", "created_at", 5),
+        ):
+            d = fixture()
+            obj = (d["run"] if location == "run" else
+                   d["jobs"]["jobs"][0] if location == "job" else
+                   d["artifacts"]["artifacts"][0])
+            obj[field] = value
+            with self.subTest(location=location, field=field, value=value):
+                self.refuse(d)
 
     def test_17_no_network_or_permission_side_effects(self):
         source = (AREA / "C3eADRealC4bArtifactIntake.py").read_text()

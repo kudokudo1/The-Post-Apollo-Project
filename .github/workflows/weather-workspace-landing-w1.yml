@@ -9,6 +9,7 @@ on:
       - 'widgets/weather/StationSubjectNavigator.qml'
       - 'widgets/weather/WeatherStationW.qml'
       - 'tests/weather/test_workspace_landing_w1.js'
+      - 'tests/weather/test_workspace_services_family_switch_w27.js'
       - '.github/workflows/weather-workspace-landing-w1.yml'
   workflow_dispatch:
 
@@ -36,3 +37,4 @@ jobs:
           node --test tests/weather/test_magick_subject_panels_g1.js
           node --test tests/weather/test_tools_subject_panels_t1.js
           node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_services_family_switch_w27.js

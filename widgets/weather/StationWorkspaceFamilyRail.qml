@@ -25,7 +25,7 @@ Column {
                          === modelData.id
             onTriggered: {
                 if (familyRail.navigator)
-                    familyRail.navigator.chooseRoute(modelData.landing);
+                    familyRail.navigator.chooseFamily(modelData.id);
             }
         }
     }

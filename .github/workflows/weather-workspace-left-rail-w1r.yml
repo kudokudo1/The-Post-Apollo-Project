@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - 'widgets/weather/StationWorkspaceFamilyRail.qml'
+      - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
       - 'widgets/weather/StationWorkspaceSurface.qml'
       - 'widgets/weather/WeatherStationW.qml'
       - 'widgets/weather/StationSubjectNavigator.qml'
       - 'tests/weather/test_workspace_landing_w1.js'
       - 'tests/weather/test_workspace_left_rail_w1r.js'
+      - 'tests/weather/test_workspace_services_family_switch_w27.js'
       - '.github/workflows/weather-workspace-left-rail-w1r.yml'
   workflow_dispatch:
 
@@ -28,5 +30,6 @@ jobs:
         run: |
           node --test tests/weather/test_workspace_landing_w1.js
           node --test tests/weather/test_workspace_left_rail_w1r.js
+          node --test tests/weather/test_workspace_services_family_switch_w27.js
           node --test tests/weather/subject_navigation_contract.test.js
           node --test tests/weather/subject_navigation_browser.test.js

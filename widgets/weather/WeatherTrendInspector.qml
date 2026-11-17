@@ -12,6 +12,10 @@ Rectangle {
 
     // W3 // Shrink only when HOME HISTORY is selected; keep same samples.
     property bool compact: false
+    // W26 // Only HOME LIVE opts in. HISTORY retains its 36px compact
+    // plot, and the full inspector keeps its 94px plotting area.
+    property bool fluidCompactPlot: false
+    readonly property alias plotAreaItem: plotArea
     property string title: "RELATIONSHIP"
     property string leftLabel: "LEFT"
     property string rightLabel: "RIGHT"
@@ -108,9 +112,14 @@ Rectangle {
         }
 
         Rectangle {
+            id: plotArea
             width: parent.width
-            // Reclaim the compact legend row for meaningful plotted area.
-            height: inspector.compact ? 36 : 94
+            // HOME LIVE uses the actual extra height for chart lines,
+            // not a taller frame around the same tiny 36px plot.
+            height: inspector.compact
+                ? (inspector.fluidCompactPlot
+                   ? Math.max(36,inspector.height - 36) : 36)
+                : 94
             color: Colors.black
             border.width: 1
             border.color: Colors.blue

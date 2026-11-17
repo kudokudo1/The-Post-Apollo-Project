@@ -54,6 +54,10 @@ jobs:
         run: python3 tests/publisher/test_publisher_history_integration.py
       - name: Verify P2.A offline Discord Bluesky and owned-site adapters
         run: python3 -m unittest -v tests.publisher.test_publisher_provider_adapters
+      - name: Verify P2.B account binding and mock timeout reconciliation
+        run: python3 -m unittest -v tests.publisher.test_publisher_transport_boundary
+      - name: Guard P2.B denied host and queue ownership boundaries
+        run: python3 tests/publisher/test_publisher_transport_source.py
       - name: Guard Social companion routing and single writer
         run: python3 tests/publisher/test_publisher_social_integration.py
       - name: Re-run existing Social Settings contracts

@@ -257,3 +257,15 @@ closed. P1.4 queue is still deny-only. No source/media data migrations.
 Do not confuse a successful preview with a provider-confirmed post. Real
 transport, ownership consent, source/media rechecks, ambiguous-request
 reconciliation and separate runtime acceptance are P2.B/P2.C dependencies.
+
+## P2.B // Deny-only binding and transport rehearsal
+
+The [P2.B transport boundary](./P2-B-TRANSPORT-BOUNDARY.md) validates a
+local provider/account/destination candidate against the P2.A payload
+fingerprint without granting permission. Local Social identity labels are not
+verified accounts. The protected Connections/Identity host is not connected.
+
+Simulated delivery tests distinguish confirmed mock acknowledgments from
+uncertain timeouts and refuse duplicate automatic retry. No simulated receipt
+is reported as a real platform delivery. No P1 stores, UI, actual credentials
+or provider network operations are modified by this slice.

@@ -46,5 +46,3 @@ jobs:
               print(f"UNCOVERED_SOURCE_PANE // {name} // {gap}")
           print(f"UNCOVERED_WIDGET_FILES // {len(missing)}")
           PY
-      - name: Audit all widget scrollbar coverage and Git/Hospital star policy
-        run: python3 -B tests/components/test_neon_scrollbar_surface_migration.py

@@ -13,6 +13,7 @@ manual workflow separately fetches these records via its read-only token.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import hashlib
 import importlib.util
 import io
@@ -44,6 +45,7 @@ MAX_ZIP_BYTES = 131072
 MAX_JSON_BYTES = 524288
 SHA40 = re.compile(r"[0-9a-f]{40}\Z", re.ASCII)
 SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z", re.ASCII)
+GITHUB_UTC = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?Z\Z", re.ASCII)
 REQUIRED_JOB_STEPS = (
     "Reject non-disposable CI and unverified source syntax",
     "Build the exact existing Identity gateway RPM on disposable Fedora 44",
@@ -66,6 +68,16 @@ def _id(value):
 def _dict(value, code):
     _require(type(value) is dict, code)
     return value
+
+def _github_utc(value):
+    # GitHub metadata is caller-supplied to this offline checker; require
+    # strict UTC and compare exact attempt-time boundaries, never local time.
+    _require(type(value) is str and GITHUB_UTC.fullmatch(value) is not None,
+             "GITHUB_TIMESTAMP_INVALID")
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise Refused("GITHUB_TIMESTAMP_INVALID") from exc
 
 def _source_identity(run, expected_run_id, expected_sha):
     _require(_id(expected_run_id), "EXPECTED_RUN_ID_REQUIRED")
@@ -108,6 +120,10 @@ def _require_jobs(jobs, run):
     _require(job.get("status") == "completed" and
              job.get("conclusion") == "success",
              "GITHUB_JOB_NOT_SUCCESSFUL")
+    _require(_github_utc(run.get("run_started_at")) <=
+             _github_utc(job.get("started_at")) <=
+             _github_utc(job.get("completed_at")),
+             "GITHUB_JOB_TIME_BINDING_MISMATCH")
     steps = job.get("steps")
     _require(type(steps) is list and len(steps) > 0 and len(steps) <= 64,
              "GITHUB_JOB_STEPS_INVALID")
@@ -119,8 +135,9 @@ def _require_jobs(jobs, run):
              "GITHUB_JOB_STEP_FAILED_OR_INCOMPLETE")
     _require(all(name in names for name in REQUIRED_JOB_STEPS),
              "GITHUB_REQUIRED_JOB_STEP_MISSING")
+    return job
 
-def _artifact_record(artifacts, run, archive):
+def _artifact_record(artifacts, run, job, archive):
     _dict(artifacts, "GITHUB_ARTIFACT_LIST_MISSING")
     records = artifacts.get("artifacts")
     _require(type(records) is list and len(records) == 1 and
@@ -139,6 +156,11 @@ def _artifact_record(artifacts, run, archive):
              association.get("head_branch") == "main" and
              association.get("head_sha") == run["head_sha"],
              "GITHUB_ARTIFACT_RUN_BINDING_MISMATCH")
+    # An older run attempt can leave an otherwise valid artifact visible.
+    # Refuse when the ZIP was uploaded before this successful job started.
+    _require(_github_utc(artifact.get("created_at")) >=
+             _github_utc(job.get("started_at")),
+             "GITHUB_ARTIFACT_STALE_ATTEMPT_REFUSED")
     _require(type(archive) is bytes and 0 < len(archive) <= MAX_ZIP_BYTES,
              "GITHUB_ARCHIVE_SIZE_REFUSED")
     _require(type(artifact.get("size_in_bytes")) is int and
@@ -178,8 +200,8 @@ def assess_readonly(*, run, jobs, artifacts, archive,
     """Classify exact C4b CI evidence without creating any host authority."""
     _dict(run, "GITHUB_RUN_RECORD_MISSING")
     _source_identity(run, expected_run_id, expected_sha)
-    _require_jobs(jobs, run)
-    artifact = _artifact_record(artifacts, run, archive)
+    job = _require_jobs(jobs, run)
+    artifact = _artifact_record(artifacts, run, job, archive)
     payload = _exact_zip_payload(archive)
     try:
         diagnostic = D.require_complete_untrusted_markers(

@@ -121,7 +121,7 @@ class LiveMountedDraftTests(unittest.TestCase):
     def test_draft_is_revoked_on_current_card_or_view_loss(self):
         for needle in (
             'property bool draftPreviewOpen: false',
-            'onContactChanged: closeDraftPreview()',
+            'onContactChanged: {',
             'onVisibleChanged: {',
             'if (!visible)',
             'closeDraftPreview();',

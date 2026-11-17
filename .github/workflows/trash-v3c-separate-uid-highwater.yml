@@ -1,0 +1,32 @@
+name: Trash++ V3c synthetic separate-UID high-water crash contract
+
+on:
+  pull_request:
+    paths:
+      - scripts/trash/archive_v3c_separate_uid_highwater_fixture.py
+      - tests/trash/test_archive_v3c_separate_uid_highwater_fixture.py
+      - scripts/trash/ARCHIVE-SEPARATE-UID-HIGHWATER-V3C.md
+      - .github/workflows/trash-v3c-separate-uid-highwater.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-uid-authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install CI fixture signature verification dependency
+        run: python3 -m pip install 'cryptography>=44,<48'
+      - name: Root-only disposable distinct UID high-water, SQLite crash and replay tests
+        run: sudo -n python3 -B -I tests/trash/test_archive_v3c_separate_uid_highwater_fixture.py
+      - name: Rerun the signed V3b, V2w and deny-only V3a contracts
+        run: |
+          python3 -B -m unittest discover -s tests/trash -p 'test_archive_v3b_signed_rollback_witness.py' -v
+          python3 -B -m unittest discover -s tests/trash -p 'test_archive_v2_external_floor_reader.py' -v
+          python3 -B -m unittest discover -s tests/trash -p 'test_archive_v3a_cutover_readiness_review.py' -v

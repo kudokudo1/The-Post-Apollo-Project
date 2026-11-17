@@ -1,0 +1,33 @@
+name: Trash++ V3d offline independent checkpoint verification
+
+on:
+  pull_request:
+    paths:
+      - scripts/trash/archive_v3d_external_checkpoint_review.py
+      - tests/trash/test_archive_v3d_external_checkpoint_review.py
+      - scripts/trash/ARCHIVE-INDEPENDENT-CHECKPOINT-V3D.md
+      - .github/workflows/trash-v3d-independent-checkpoint.yml
+      - scripts/trash/archive_v3b_signed_rollback_witness.py
+      - scripts/trash/archive_v3a_cutover_readiness_review.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-checkpoint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install offline test signing verifier
+        run: python3 -m pip install 'cryptography>=44,<48'
+      - name: Signed independent test root, stale replay and denial matrix
+        run: python3 -B -m unittest discover -s tests/trash -p 'test_archive_v3d_external_checkpoint_review.py' -v
+      - name: Existing V3b signer and V3a cutover safety regressions
+        run: |
+          python3 -B -m unittest discover -s tests/trash -p 'test_archive_v3b_signed_rollback_witness.py' -v
+          python3 -B -m unittest discover -s tests/trash -p 'test_archive_v3a_cutover_readiness_review.py' -v

@@ -24,6 +24,38 @@ Rectangle {
     // their existing independent headers and layouts.
     readonly property bool homeOverviewWorkspace:
         subjectRoute === "" && workspaceSection === "overview"
+    // W24 // Presentation state only. The original HOME instance, data and
+    // bottom navigation stay mounted as the middle content changes.
+    property string homeInlineMode: "live"
+    readonly property bool homeInlineDefault:
+        homeOverviewWorkspace && homeInlineMode === "live"
+    readonly property string homeInlinePath: "home/"
+        + (homeInlineMode === "live" ? "overview" : homeInlineMode)
+    readonly property real homeInlineAlertHeight:
+        homeInlineDefault && officialAlertSummary.available ? 15 : 0
+    readonly property real homeInlineCardBudget: Math.max(0,
+        homeScroll.height - 12 - homeOverviewRail.height - 28
+        - 4 * homeContent.spacing - homeInlineAlertHeight
+        - (homeInlineAlertHeight > 0 ? homeContent.spacing : 0))
+    readonly property real homeInlineLiveHeight:
+        Math.max(46,Math.floor(homeInlineCardBudget * 0.55))
+    readonly property real homeInlineAutoHeight:
+        Math.max(46,homeInlineCardBudget - homeInlineLiveHeight)
+    readonly property real homeInlineSingleHeight:
+        Math.max(70,Math.min(180,homeScroll.height
+            - homeOverviewRail.height - 36))
+    readonly property real homeInlineFocusLead: Math.max(0,
+        Math.floor((homeScroll.height - 12 - homeOverviewRail.height
+            - 14 - homeInlineSingleHeight - 3*homeContent.spacing) / 2))
+    readonly property alias homeQuickItem: homeQuickRow
+    function chooseHomeInlinePane(path) {
+        if(!homeOverviewWorkspace) return;
+        const target=String(path||"");
+        if(target === "home/overview") homeInlineMode="live";
+        else if(target === "home/auto") homeInlineMode="auto";
+        else if(target === "home/quick") homeInlineMode="quick";
+        else if(target === "home/snapshot") homeInlineMode="snapshot";
+    }
     // W16 // WEATHER OVERVIEW: summary and BOTH full-width card groups.
     // Only an actual NWS alert may need extra vertical room.
     readonly property bool fixedWeatherOverview:
@@ -55,6 +87,13 @@ Rectangle {
         subjectRoute === "" && (workspaceSection === "sources"
             || workspaceSection === "runtime" || workspaceSection === "health")
     function sectionVisible(section) {
+        if (homeOverviewWorkspace) {
+            if(section === "header") return true;
+            if(homeInlineMode === "live")
+                return section === "snapshot" || section === "relevant";
+            return section === (homeInlineMode === "auto"
+                ? "relevant" : homeInlineMode);
+        }
         if (subjectRoute === "" && workspaceSection !== "") {
             if (section === "header") return true;
             if (workspaceSection === "overview")
@@ -74,6 +113,7 @@ Rectangle {
         return SubjectPanelPolicy.visibleFor("home", subjectRoute, section);
     }
     onWorkspaceSectionChanged: {
+        if(workspaceSection === "overview") homeInlineMode="live";
         if (homeScroll) homeScroll.contentY = 0;
     }
     onSubjectRouteChanged: {
@@ -984,12 +1024,13 @@ Rectangle {
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        interactive: !home.compactHistory
+        interactive: !home.compactHistory && !home.homeOverviewWorkspace
                      && (!home.fixedWeatherOverview
                          || home.overviewRequiresScroll)
         contentWidth: width
-        contentHeight: home.fixedWeatherOverview
-                       && !home.overviewRequiresScroll ? height : Math.max(
+        contentHeight: (home.homeOverviewWorkspace ||
+            (home.fixedWeatherOverview && !home.overviewRequiresScroll))
+            ? height : Math.max(
             height,
             homeContent.y + homeContent.implicitHeight
                 + (home.compactHistory ? 4 : 24)
@@ -1048,23 +1089,47 @@ Rectangle {
             }
         }
 
-        // W23 // HOME gets the same long top-navigation controls as the
-        // WEATHER and MAGICK overviews. These are existing HOME routes;
-        // the original bottom page rail, cards, providers and timer remain.
+        // W24 // HOME top buttons switch the center presentation without
+        // redirecting the workspace or replacing any source or control.
         StationSubjectOverviewRail {
             id: homeOverviewRail
             objectName: "home-w23-overview-top-rail"
             visible: home.homeOverviewWorkspace
             width: parent.width
             titleText: "HOME // OVERVIEW"
+            selectedPath: home.homeInlinePath
             routes: [
+                {label:"LIVE",path:"home/overview"},
                 {label:"AUTO",path:"home/auto"},
                 {label:"QUICK",path:"home/quick"},
                 {label:"SNAPSHOT",path:"home/snapshot"}
             ]
             onRouteRequested: function(path) {
-                home.routeRequested(path)
+                home.chooseHomeInlinePane(path)
             }
+        }
+
+        // Focused HOME tabs use one existing row and center it vertically.
+        Item {
+            objectName: "home-w24-focus-centering"
+            visible: home.homeOverviewWorkspace && !home.homeInlineDefault
+            width: parent.width
+            height: visible ? home.homeInlineFocusLead : 0
+        }
+
+        // Never let a real NWS alert disappear merely to prevent scrolling.
+        // The default HOME first view shows its event/severity in one line.
+        GohuText {
+            objectName: "home-w24-live-alert-strip"
+            visible: home.homeInlineAlertHeight > 0
+            width: parent.width
+            height: visible ? home.homeInlineAlertHeight : 0
+            verticalAlignment: Text.AlignVCenter
+            font.pixelSize: 9
+            elide: Text.ElideRight
+            color: Colors.orange
+            text: "NWS ALERT // " + home.officialAlertSummary.event
+                + " // " + home.officialAlertSummary.severity
         }
 
         // W21 // C44-style long, real route buttons with a cyan divider.
@@ -1277,7 +1342,8 @@ Rectangle {
             visible: home.sectionVisible("snapshot")
                      && !home.fixedWeatherOverview
             width: parent.width
-            title: "SNAPSHOT // NOW"
+            title: home.homeInlineDefault ? "LIVE // NOW"
+                : "SNAPSHOT // NOW"
         }
 
         Row {
@@ -1860,6 +1926,7 @@ Rectangle {
         handleStyle: "star"
         geometryHost: home
         visible: scrollable && !home.compactHistory
+                 && !home.homeOverviewWorkspace
                  && (!home.fixedWeatherOverview
                      || home.overviewRequiresScroll)
     }

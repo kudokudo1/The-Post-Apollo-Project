@@ -28,7 +28,7 @@
 
 - `tests/messaging/test_social_phone_facetime_handoff_js.js` executes actual QML JavaScript functions under Node, with valid Apple invite, trailing slash, malformed token, redirect/query, host spoofing, username, scheme, port, newline/injected URL, excessive length, no primary-only recipient, malicious email/number and audio/video URI tests.
 - `tests/messaging/test_social_phone_facetime_handoff_ui.py` checks new buttons and modes, only second confirmed click may call `Qt.openUrlExternally`, no native Apple protocol execution, contact/identity clearing, read-only Apple-device text and unchanged false saving/cellular grant.
-- `.github/workflows/social-phone-facetime-handoff.yml` executes both plus existing CALLS workspace, current contact details, P40 metadata lock, P42 editor shell, PHONE read-only menu, BlueFerry HFP call workspace and P44 encrypted synthetic save regressions. Exact-head CI required before accepting.
+- `.github/workflows/social-phone-facetime-handoff.yml` executes both plus existing CALLS workspace, current contact details, P40 metadata lock, P42 editor shell, PHONE read-only menu, BlueFerry HFP call workspace and P40/P42 locked Personal editor regressions. Exact-head CI required before accepting.
 - Native live Quickshell rendering, actual FaceTime browser join, explicit Apple-device URL handoff and real Bluetooth FaceTime audio routing **have not been verified**. Any failure requires correction; neither source tests nor accepted `Qt.openUrlExternally` means call connection.
 
 ## WATCH OUT FOR

@@ -134,14 +134,59 @@ class FaceTimeAudioRouteTests(unittest.TestCase):
                 if status.get("result") != "OBSERVED" or \
                         status.get("trustedPhoneLink") != "UNVERIFIED" or \
                         status.get("contentAccessEnabled") is not False or \
-                        status.get("callsState") == "UNKNOWN" or \
-                        type(status.get("callsEnabled")) is not bool or \
                         type(status.get("ofonoActive")) is not bool:
                     self.assertEqual(result["state"], "PHONE_BRIDGE_UNAVAILABLE")
+                elif status.get("callsState") == "UNKNOWN" or \
+                        type(status.get("callsEnabled")) is not bool:
+                    self.assertEqual(result["state"], "PHONE_CALL_STATUS_UNREPORTED")
+                    self.assertIs(result["phoneBackendObserved"], True)
+                    self.assertIs(result["cellularHfpReadyReported"], False)
         # An unrelated FaceTime field in BlueFerry status MUST NOT let us
         # claim provider-integrated FaceTime call state.
         self.assertIs(mod.inspect(provider=lambda:provider(faceTimeEnabled=True),
                                   cards=lambda:(True, True))["faceTimeConnected"], False)
+
+    def test_real_getstatus_partial_call_state_is_not_a_dead_daemon(self):
+        # Operator observed a valid D-Bus GetStatus: api_version=2,
+        # daemon=true, phone_audio_route is str, calls_state is NOT str.
+        # Feed those raw fields through the ACTUAL PhoneAudioControls parser.
+        for raw_state in (None, False, 0, [], "new-future-call-enum"):
+            raw = {
+                "api_version": 2, "daemon": True,
+                "phone_audio_preference": "pc",
+                "phone_audio_route": "pc",
+                "calls_enabled": True, "calls_state": raw_state,
+            }
+            projected = Audio._project(raw)
+            self.assertIsNotNone(projected)
+            self.assertEqual(projected["calls_state"], "UNKNOWN")
+            observed = Audio._output(
+                "OBSERVED", projected, can_adjust=True, ofono=True)
+            result = mod.inspect(
+                provider=lambda: observed, cards=lambda: (True, True))
+            self.assert_locked(result)
+            self.assertEqual(result["state"], "PHONE_CALL_STATUS_UNREPORTED")
+            self.assertIs(result["phoneBackendObserved"], True)
+            self.assertIs(result["cellularHfpReadyReported"], False)
+            self.assertIs(result["systemHfpProfileActive"], True)
+            # HFP profile active does NOT license FaceTime to connect.
+            self.assertIs(result["faceTimeAudioVerified"], False)
+
+        for raw in (
+            {"api_version": 2, "daemon": True,
+             "phone_audio_route": "pc", "calls_enabled": True},
+            {"api_version": 2, "daemon": True,
+             "phone_audio_route": "pc", "calls_state": "ready"},
+        ):
+            projected = Audio._project(raw)
+            observed = Audio._output(
+                "OBSERVED", projected, can_adjust=True, ofono=True)
+            result = mod.inspect(
+                provider=lambda: observed, cards=lambda: (False, False))
+            self.assert_locked(result)
+            self.assertEqual(result["state"], "PHONE_CALL_STATUS_UNREPORTED")
+            self.assertIs(result["phoneBackendObserved"], True)
+            self.assertIs(result["cellularHfpReadyReported"], False)
 
     def test_ready_report_requires_true_hfp_cellular_and_ofono(self):
         for change in (

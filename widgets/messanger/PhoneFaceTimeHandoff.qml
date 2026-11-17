@@ -66,8 +66,10 @@ Rectangle {
             return "HFP PROFILE AVAILABLE // Not selected in the observed audio card. Use the iPhone audio picker during a real FaceTime Audio call; routing remains unverified.";
         case "HFP_PROFILE_NOT_OBSERVED":
             return "HFP NOT OBSERVED IN PACTL CARDS // This is not proof FaceTime Audio is impossible. oFono may use a separate audio route.";
+        case "PHONE_CALL_STATUS_UNREPORTED":
+            return "BLUEFERRY RESPONDING // Cellular call state was not reported in a recognized format. Audio preferences may be available, but HFP and FaceTime Audio are NOT verified.";
         case "PHONE_CALLS_NOT_READY":
-            return "CELLULAR HFP NOT READY // BlueFerry does not report its hands-free call path ready. This does not diagnose an active FaceTime session.";
+            return "CELLULAR HFP NOT READY // BlueFerry reports its hands-free call path is not ready. This does not diagnose an active FaceTime session.";
         case "PHONE_BRIDGE_UNAVAILABLE":
             return "BLUEFERRY STATUS UNAVAILABLE // Local audio profiles alone cannot prove iPhone or FaceTime connectivity.";
         case "AUDIO_INSPECTION_UNAVAILABLE":
@@ -89,7 +91,8 @@ Rectangle {
                 try {
                     var observed = JSON.parse(String(text || ""));
                     var allowed = ["AUDIO_INSPECTION_UNAVAILABLE", "PHONE_BRIDGE_UNAVAILABLE",
-                                   "PHONE_CALLS_NOT_READY", "HFP_PROFILE_NOT_OBSERVED",
+                                   "PHONE_CALL_STATUS_UNREPORTED", "PHONE_CALLS_NOT_READY",
+                                   "HFP_PROFILE_NOT_OBSERVED",
                                    "HFP_PROFILE_AVAILABLE_ONLY", "HFP_SYSTEM_PROFILE_ACTIVE"];
                     var flags = ["phoneBackendObserved", "cellularHfpReadyReported",
                                  "systemAudioObserved", "systemHfpProfileOffered",

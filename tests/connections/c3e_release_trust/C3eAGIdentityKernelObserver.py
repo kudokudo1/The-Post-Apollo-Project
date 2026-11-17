@@ -159,11 +159,15 @@ def _executable(pid, expected):
         fd = os.open(f"/proc/{pid}/exe", os.O_RDONLY | os.O_CLOEXEC)
         observed, st = _hash_fd(fd, MAX_EXE)
         pinned = os.stat(expected["exePath"])
+        if (st.st_uid != 0 or st.st_gid != 0 or st.st_nlink != 1 or
+                stat.S_IMODE(st.st_mode) & 0o022):
+            _deny("C3EAG_EXECUTABLE_OWNER_OR_MODE_UNSAFE")
         if (st.st_dev, st.st_ino) != (pinned.st_dev, pinned.st_ino):
             _deny("C3EAG_KERNEL_INTERPRETER_INODE_MISMATCH")
         if not hmac.compare_digest(observed, expected["exeSha256"]):
             _deny("C3EAG_KERNEL_INTERPRETER_HASH_MISMATCH")
-        return st.st_dev, st.st_ino
+        return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns,
+                st.st_ctime_ns)
     except OSError as exc:
         raise Refused("C3EAG_KERNEL_INTERPRETER_UNAVAILABLE") from exc
     finally:
@@ -182,7 +186,8 @@ def _script(expected):
             _deny("C3EAG_SCRIPT_NOT_ROOT_OWNED_IMMUTABLE")
         if not hmac.compare_digest(observed, expected["entrypointSha256"]):
             _deny("C3EAG_SCRIPT_HASH_MISMATCH")
-        return st.st_dev, st.st_ino
+        return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns,
+                st.st_ctime_ns)
     except OSError as exc:
         raise Refused("C3EAG_SCRIPT_OPEN_REFUSED") from exc
     finally:
@@ -301,10 +306,13 @@ def observe_ci_only(*, expected: dict, mode="fixture"):
         commandline = _cmdline(pid, pins)
         interpreter_inode = _executable(pid, pins)
         script_inode = _script(pins)
-        if (os.stat(f"/proc/{pid}/exe").st_ino != interpreter_inode[1] or
-                (os.stat(f"/proc/{pid}/exe").st_dev != interpreter_inode[0]) or
-                (os.stat(pins["scriptPath"]).st_dev,
-                 os.stat(pins["scriptPath"]).st_ino) != script_inode or
+        process_exe_stat = os.stat(f"/proc/{pid}/exe")
+        script_stat = os.stat(pins["scriptPath"])
+        if ((process_exe_stat.st_dev, process_exe_stat.st_ino,
+             process_exe_stat.st_size, process_exe_stat.st_mtime_ns,
+             process_exe_stat.st_ctime_ns) != interpreter_inode or
+                (script_stat.st_dev, script_stat.st_ino, script_stat.st_size,
+                 script_stat.st_mtime_ns, script_stat.st_ctime_ns) != script_inode or
                 _start(pid) != pins["startTicks"] or
                 _identity(pid) != identity or
                 _cgroup(pid) != pins["cgroup"] or

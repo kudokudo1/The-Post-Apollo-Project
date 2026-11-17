@@ -7,6 +7,7 @@ import "../services/hospital"
 import qs.services.notifications
 import "../services/notifications/HospitalCertificationNotificationPolicy.js" as CertificationNotificationPolicy
 import "../services/hospital/HospitalWorkforceRosterPolicy.js" as WorkforceRosterPolicy
+import "../services/hospital/HospitalWorkforceViewPolicy.js" as WorkforceViewPolicy
 import "../services/hospital/HospitalWorkerAttentionPolicy.js" as WorkerAttentionPolicy
 import "../services/hospital/HospitalWorkerConnectionPolicy.js" as WorkerConnectionPolicy
 import "../services/hospital/HospitalSurgeryStartupPolicy.js" as SurgeryStartupPolicy
@@ -130,6 +131,13 @@ PanelWindow {
         responsibilityService.durableSessions,
         doctorService.doctors
     )
+    // A view over the complete PX registry. Original IDs and actions stay unchanged.
+    // "ACTIVE" means an ACTIVE PX Assignment, NOT a verified running AI.
+    property string workforceRosterView: "ACTIVE"
+    readonly property var workforceViewCounts:
+        WorkforceViewPolicy.counts(root.workforceRosterRows)
+    readonly property var workforceShownRows:
+        WorkforceViewPolicy.filter(root.workforceRosterRows, root.workforceRosterView)
     readonly property int workforceAttentionCount:
         WorkerAttentionPolicy.countAttention(root.workforceRosterRows)
     readonly property int workforceConnectionGaps:
@@ -6289,8 +6297,9 @@ PanelWindow {
                     width: parent.width - (root.workforceRosterVisible ? 239 : 143)
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.workforceRosterVisible
-                        ? "WORKERS // " + root.workforceRosterRows.length
-                            + "  ATTN // " + root.workforceAttentionCount
+                        ? "WORKERS // " + root.workforceShownRows.length
+                            + "/" + root.workforceRosterRows.length
+                            + "  ATTN ALL // " + root.workforceAttentionCount
                         : "OPERATING ROOMS // GIT"
                     elide: Text.ElideRight
                 }
@@ -6400,6 +6409,65 @@ PanelWindow {
                 width: parent.width
                 spacing: 7
 
+                // Operator-only filters: never modify PX, worker identity, or jobs.
+                Row {
+                    visible: root.workforceRosterVisible
+                    width: parent.width
+                    height: visible ? 29 : 0
+                    spacing: 6
+
+                    Repeater {
+                        model: [
+                            { key: "ACTIVE", label: "ACTIVE WORK" },
+                            { key: "STAGED", label: "STAGED" },
+                            { key: "HISTORY", label: "HISTORY / UNSTAFFED" },
+                            { key: "ALL", label: "ALL ROOMS" }
+                        ]
+                        Rectangle {
+                            required property var modelData
+                            readonly property bool selectedView:
+                                root.workforceRosterView === modelData.key
+                            width: (roomsColumn.width - 18) / 4
+                            height: 29
+                            color: selectedView ? Colors.yellow : Colors.black
+                            border.width: selectedView ? 2 : 1
+                            border.color: selectedView ? Colors.magenta : Colors.cyan
+
+                            GohuText {
+                                anchors.fill: parent
+                                anchors.leftMargin: 4
+                                anchors.rightMargin: 4
+                                text: modelData.label + " // "
+                                    + String(root.workforceViewCounts[modelData.key] || 0)
+                                font.pixelSize: 9
+                                color: parent.selectedView ? Colors.magenta : Colors.cyan
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.workforceRosterView = modelData.key;
+                                    hospitalScroll.contentY = 0;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    visible: root.workforceRosterVisible
+                    height: visible ? implicitHeight : 0
+                    text: "PX ASSIGNMENT STATUS ONLY // NOT VERIFIED LIVE AI"
+                        + " // EMPTY/HISTORICAL ROOMS ARE PRESERVED"
+                    font.pixelSize: 9
+                    color: Colors.blue
+                    elide: Text.ElideRight
+                }
+
                 GohuText {
                     width: parent.width
                     visible: root.workforceRosterVisible
@@ -6489,7 +6557,7 @@ PanelWindow {
 
                 Repeater {
                     model: root.workforceRosterVisible
-                        ? root.workforceRosterRows : []
+                        ? root.workforceShownRows : []
                     WorkforceRosterRow {
                         rosterData: modelData
                     }
@@ -6499,11 +6567,17 @@ PanelWindow {
                     width: parent.width
                     height: 64
                     visible: root.workforceRosterVisible
-                        && root.workforceRosterRows.length === 0
+                        && root.workforceShownRows.length === 0
                     text: responsibilityService.graphError
                         || (responsibilityService.graphLoading
                             ? "READING REGISTERED HOSPITAL ROOMS..."
-                            : "NO REGISTERED PX ROOMS // SHOW BRANCHES FOR GIT DISCOVERY")
+                            : root.workforceRosterRows.length === 0
+                              ? "NO REGISTERED PX ROOMS // SHOW BRANCHES FOR GIT DISCOVERY"
+                              : root.workforceRosterView === "ACTIVE"
+                                ? "NO RECORDED ACTIVE ASSIGNMENTS // VIEW STAGED OR HISTORY"
+                                : root.workforceRosterView === "STAGED"
+                                  ? "NO STAGED ASSIGNMENTS // VIEW HISTORY / UNSTAFFED"
+                                  : "NO ROOMS IN THIS VIEW // ALL ROOMS REMAIN PRESERVED")
                     font.pixelSize: 10
                     color: responsibilityService.graphError ? Colors.red : Colors.orange
                     wrapMode: Text.Wrap

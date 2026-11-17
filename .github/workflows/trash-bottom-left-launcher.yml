@@ -43,6 +43,10 @@ jobs:
         run: python3 -m pip install 'cryptography>=44,<48' 'dbus-next==0.2.3'
       - name: Verify Trash launcher, scoped GIO adapter, and deletion safeguards
         run: python3 -m unittest discover -s tests/trash -p 'test_*.py' -v
+      - name: Inventory Media queue versus file deletion boundary (U8 read-only, no owner writes)
+        run: |
+          python3 -I -B scripts/trash/media_delete_inventory_u8.py > "$RUNNER_TEMP/trashpp-u8-media.json"
+          python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8")); print("MEDIA U8 STATE:",d["state"]); print("READ ONLY:",d["readOnly"]); print("ACTION AUTHORITY:",d["actionAuthority"]); print("MEDIA FILE DELETE SUPPORTED:",d["mediaFileDeleteSupported"]); print("BOUNDARIES:",[(b["kind"],b["operation"]) for b in d["boundaries"]]); print("SOURCE DRIFT:",d["problems"])' "$RUNNER_TEMP/trashpp-u8-media.json"
       - name: Inventory unreviewed Delete Trash Burn UI sites (read-only)
         run: |
           python3 -I -B scripts/trash/universal_delete_inventory_u1.py > "$RUNNER_TEMP/trashpp-u1.json"

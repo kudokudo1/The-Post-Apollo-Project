@@ -1,0 +1,514 @@
+#!/usr/bin/bash
+# C4b Identity-specific official Fedora Silverblue 44 real OSTree lifecycle.
+# Installed only by the separate GitHub disposable VM controller. No desktop use.
+set -Eeuo pipefail
+exec >/dev/ttyS0 2>&1
+stage=/var/lib/postapollo-id-ci-stage
+store=/var/lib/postapollo-id-ci-assets
+pkg=post-apollo-identity-silverblue-ci
+unit=post-apollo-identity-silverblue-ci.service
+prefix=/usr/libexec/post-apollo/identity
+marker=/run/postapollo-identity-silverblue-ci-only/authorized-test.marker
+data=/mnt/postapollo-id-ci-offline
+fail() {
+  echo "C4B_ID_FAIL // $1"
+  timeout --signal=TERM --kill-after=3s 12s rpm-ostree status || true
+  systemctl poweroff --no-block || true
+  exit 2
+}
+trap 'rc=$?; if [[ "$rc" != 0 ]]; then echo "C4B_ID_FAIL // UNEXPECTED_EXIT_$rc-LINE_$LINENO"; systemctl poweroff --no-block || true; fi' EXIT
+[[ -e /run/ostree-booted && "$(getenforce)" == Enforcing ]] ||
+  fail "REAL_ENFORCING_OSTREE_REQUIRED"
+grep -Fq 'Fedora release 44' /etc/fedora-release ||
+  fail "FEDORA_44_REQUIRED"
+ostree admin status | grep -iq silverblue || fail "OFFICIAL_SILVERBLUE_REF_REQUIRED"
+[[ -z "$(find /sys/class/net -maxdepth 1 -type l ! -name lo -printf '%f ')" ]] ||
+  fail "OFFLINE_NO_NETWORK_REQUIRED"
+[[ ! -e "$marker" ]] || fail "TEST_SERVICE_MARKER_MUST_BE_ABSENT"
+phase="$(cat "$stage" 2>/dev/null || echo missing)"
+echo "C4B_ID_STAGE // $phase"
+case "$phase" in
+  initial)
+    if rpm -q "$pkg" >/dev/null 2>&1; then fail "PACKAGE_PREEXISTS"; fi
+    for vendorpkg in python3-cryptography python3-cffi python3-pycparser; do
+      if rpm -q "$vendorpkg" >/dev/null 2>&1; then
+        fail "FEDORA_RUNTIME_PREEXISTS_AND_CANNOT_PROVE_ROLLBACK"
+      fi
+    done
+    [[ ! -e "$prefix/identity-gateway-ci" &&
+       ! -e /usr/lib/systemd/system/"$unit" ]] ||
+      fail "IDENTITY_GATEWAY_PREEXISTS"
+    mkdir -p "$data" "$store"
+    chmod 0700 "$store"
+    mount -o ro /dev/disk/by-label/ID4BCI "$data" ||
+      fail "OFFLINE_ASSET_MEDIA_MISSING"
+    (
+      cd "$data"
+      sha256sum --check --status identity-artifact-manifest.sha256 &&
+      sha256sum --check --status identity-fedora44-runtime-manifest.sha256 &&
+      sha256sum --check --status postapollo_identity_ci.sha256
+    ) || fail "OFFLINE_ARTIFACT_SHA_REFUSED"
+    rpmfile="$data/identity-silverblue-ci.rpm"
+    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$rpmfile")" == "$pkg 0.1 noarch" ]] ||
+      fail "WRONG_SIGNED_RPM_ROLE"
+    [[ -z "$(rpm -qp --scripts "$rpmfile")" &&
+       -z "$(rpm -qp --triggers "$rpmfile")" ]] ||
+      fail "AUTOEXEC_SCRIPTLET_REFUSED"
+    # An isolated disposable key database, not the guest's system rpmdb.
+    keydb="$store/isolated-rpmdb"
+    mkdir -m 0700 "$keydb"
+    rpm --dbpath "$keydb" --initdb || fail "ISOLATED_KEYDB_FAILED"
+    pretrust="$(rpmkeys --dbpath "$keydb" --checksig -v "$rpmfile" 2>&1 || true)"
+    printf '%s\n' "$pretrust" | grep -Eiq 'NOKEY|NOTTRUSTED|MISSING' ||
+      fail "SIGNED_RPM_PRETRUST_MUST_FAIL"
+    rpmkeys --dbpath "$keydb" --import "$data/identity-disposable-rpm-public.asc" ||
+      fail "ISOLATED_KEY_IMPORT_FAILED"
+    verified="$(rpmkeys --dbpath "$keydb" --checksig -v "$rpmfile" 2>&1)" ||
+      fail "ISOLATED_SIGNED_RPM_VERIFICATION_FAILED"
+    printf '%s\n' "$verified" | grep -Eiq 'Signature.*OK|RSA.*OK|PGP.*OK|Header.*OK' ||
+      fail "RPM_SIGNATURE_NOT_CONFIRMED"
+    if printf '%s\n' "$verified" | grep -Eiq 'NOKEY|NOTTRUSTED|NOT OK|MISSING|BAD'; then
+      fail "SIGNATURE_CONTAINS_UNTRUSTED_MARKER"
+    fi
+    # Official Fedora 44 package signer is NOT the disposable Identity signer.
+    # All three packages are exact NEVRA and hash-pinned on the read-only ISO.
+    vendordb="$store/vendor-rpmdb"
+    mkdir -m 0700 "$vendordb"
+    rpm --dbpath "$vendordb" --initdb || fail "VENDOR_RPMDB_INIT_FAILED"
+    for vendor_spec in \
+      'identity-python3-cryptography-f44.rpm|python3-cryptography|50.0.0|1.fc44|x86_64' \
+      'identity-python3-cffi-f44.rpm|python3-cffi|2.0.0|3.fc44|x86_64' \
+      'identity-python3-pycparser-f44.rpm|python3-pycparser|2.22|8.fc44|noarch'; do
+      IFS='|' read -r filename name version release arch <<< "$vendor_spec"
+      candidate="$data/$filename"
+      [[ -f "$candidate" && ! -L "$candidate" ]] ||
+        fail "SIGNED_FEDORA_VENDOR_RPM_MISSING"
+      [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$candidate")" == \
+         "$name $version $release $arch" ]] ||
+        fail "WRONG_VENDOR_RUNTIME_ROLE"
+      [[ -z "$(rpm -qp --scripts "$candidate")" &&
+         -z "$(rpm -qp --triggers "$candidate")" ]] ||
+        fail "VENDOR_RUNTIME_HAS_AUTOEXEC_SCRIPTLET"
+      vendor_pre="$(rpmkeys --dbpath "$vendordb" --checksig -v "$candidate" 2>&1 || true)"
+      printf '%s\n' "$vendor_pre" | grep -Eiq 'NOKEY|NOTTRUSTED|MISSING' ||
+        fail "VENDOR_SIGNER_PRETRUST_REFUSAL_MISSING"
+    done
+    rpmkeys --dbpath "$vendordb" --import "$data/identity-fedora44-runtime-public.asc" ||
+      fail "VENDOR_PUBLIC_KEY_IMPORT_FAILED"
+    for vendor_spec in \
+      'identity-python3-cryptography-f44.rpm|python3-cryptography|50.0.0|1.fc44|x86_64' \
+      'identity-python3-cffi-f44.rpm|python3-cffi|2.0.0|3.fc44|x86_64' \
+      'identity-python3-pycparser-f44.rpm|python3-pycparser|2.22|8.fc44|noarch'; do
+      IFS='|' read -r filename name version release arch <<< "$vendor_spec"
+      candidate="$data/$filename"
+      vendor_result="$(rpmkeys --dbpath "$vendordb" --checksig -v "$candidate" 2>&1)" ||
+        fail "VENDOR_RPM_SIGNATURE_INVALID"
+      printf '%s\n' "$vendor_result" | grep -Eiq 'Signature.*OK|RSA.*OK|PGP.*OK|Header.*OK' ||
+        fail "VENDOR_RPM_SIGNATURE_NOT_CONFIRMED"
+      if printf '%s\n' "$vendor_result" | grep -Eiq 'NOKEY|NOTTRUSTED|NOT OK|MISSING|BAD'; then
+        fail "VENDOR_RPM_SIGNATURE_NOT_TRUSTED"
+      fi
+      install -m 0600 "$candidate" "$store/$filename"
+    done
+    echo "C4B_ID_PASS // SIGNED_OFFLINE_FEDORA44_ED25519_DEPENDENCY_VERIFIED"
+    [[ -f "$data/postapollo_identity_ci.pp" &&
+       ! -L "$data/postapollo_identity_ci.pp" ]] ||
+      fail "SELINUX_OFFLINE_COMPILED_POLICY_MISSING"
+    install -m 0600 "$data/postapollo_identity_ci.pp" "$store/postapollo_identity_ci.pp"
+    [[ -s "$store/postapollo_identity_ci.pp" ]] ||
+      fail "SELINUX_OFFLINE_COMPILED_POLICY_EMPTY"
+    echo "C4B_ID_PASS // OFFLINE_TEST_SELINUX_MODULE_HASH_BOUND_BEFORE_LAYER"
+    install -m 0600 "$rpmfile" "$store/identity-silverblue-ci.rpm"
+    install -m 0600 "$data/identity-artifact-manifest.sha256" "$store/seed-manifest"
+    echo "C4B_ID_PASS // SIGNED_IDENTITY_RPM_VERIFIED_OFFLINE_BEFORE_LAYER"
+    # Never let disabled Internet repositories supply a replacement package.
+    backup="$store/original-repos"
+    mkdir -m 0700 -p "$backup"
+    shopt -s nullglob
+    for file in /etc/yum.repos.d/*.repo; do
+      cp -a "$file" "$backup/$(basename "$file")"
+      sed -i -E 's/^[[:space:]]*enabled[[:space:]]*=[[:space:]]*[01][[:space:]]*$/enabled=0/' "$file"
+    done
+    echo "C4B_ID_PASS // NETWORKLESS_REPOSITORIES_DISABLED"
+    echo installing > "$stage"
+    # The original C2v observed a real rpm-ostree transition outliving
+    # the original oneshot. Use an independent monitor and installer cgroup;
+    # a worker exit code by itself cannot authorize a reboot.
+    cat >/run/id-ci-layer-worker.sh <<'ID_WORKER'
+#!/usr/bin/bash
+set +e
+timeout --signal=TERM --kill-after=15s 480s \
+  rpm-ostree install --cache-only \
+    /var/lib/postapollo-id-ci-assets/identity-silverblue-ci.rpm \
+    /var/lib/postapollo-id-ci-assets/identity-python3-cryptography-f44.rpm \
+    /var/lib/postapollo-id-ci-assets/identity-python3-cffi-f44.rpm \
+    /var/lib/postapollo-id-ci-assets/identity-python3-pycparser-f44.rpm \
+  >/var/tmp/id-ci-install.log 2>&1
+printf '%s\n' "$?" >/run/id-ci-worker-result
+ID_WORKER
+    chmod 0700 /run/id-ci-layer-worker.sh
+    cat >/run/id-ci-layer-monitor.sh <<'ID_MONITOR'
+#!/usr/bin/bash
+set -Eeuo pipefail
+exec >/var/tmp/id-ci-monitor.log 2>&1
+pkg=post-apollo-identity-silverblue-ci
+for n in $(seq 1 56); do
+  if timeout --signal=TERM --kill-after=3s 12s \
+      rpm-ostree status --json >/run/id-ci-status.json 2>/dev/null; then
+    if python3 - /run/id-ci-status.json "$pkg" <<'ID_PENDING'
+import json, re, sys
+with open(sys.argv[1], encoding="utf-8") as fp:
+    doc=json.load(fp)
+ds=doc.get("deployments") or []
+if len(ds) < 2 or doc.get("transaction") is not None:
+    sys.exit(1)
+head=ds[0]
+pending=bool(head.get("staged") or head.get("pending")) or head.get("booted") is False
+refs=head.get("requested-local-packages") or []
+expected=r"^(?:sha256:[0-9a-fA-F]{64}:)?"+re.escape(sys.argv[2])+r"-0\.1-1\.fc44\.noarch$"
+vendor=r"^(?:sha256:[0-9a-fA-F]{64}:)?python3-cryptography-50\.0\.0-1\.fc44\.x86_64$"
+cffi=r"^(?:sha256:[0-9a-fA-F]{64}:)?python3-cffi-2\.0\.0-3\.fc44\.x86_64$"
+pycparser=r"^(?:sha256:[0-9a-fA-F]{64}:)?python3-pycparser-2\.22-8\.fc44\.noarch$"
+if not pending or not isinstance(refs,list) or not all(
+        any(isinstance(v,str) and re.fullmatch(pattern,v) for v in refs)
+        for pattern in (expected,vendor,cffi,pycparser)):
+    sys.exit(1)
+print("C4B_ID_PENDING_EXACT_IDENTITY_DEPLOYMENT")
+ID_PENDING
+    then
+      if [[ -s /run/id-ci-worker-result ]]; then
+        [[ "$(cat /run/id-ci-worker-result)" == 0 ]] || break
+      fi
+      echo layer_pending >/var/lib/postapollo-id-ci-stage
+      echo "C4B_ID_PASS // REAL_IDENTITY_RPM_OSTREE_PENDING_DEPLOYMENT" >/dev/ttyS0
+      sync
+      systemctl reboot --no-block
+      exit 0
+    fi
+  fi
+  if [[ -s /run/id-ci-worker-result ]] &&
+     [[ "$(cat /run/id-ci-worker-result)" != 0 ]]; then
+    break
+  fi
+  sleep 15
+done
+echo "C4B_ID_FAIL // RPM_OSTREE_IDENTITY_PENDING_NEVER_PROVEN" >/dev/ttyS0
+tail -n 35 /var/tmp/id-ci-install.log >/dev/ttyS0 || true
+tail -n 35 /var/tmp/id-ci-monitor.log >/dev/ttyS0 || true
+systemctl poweroff --no-block || true
+exit 2
+ID_MONITOR
+    chmod 0700 /run/id-ci-layer-monitor.sh
+    # The monitor is launched first, before any RPM composition begins.
+    systemd-run --quiet --unit=id-ci-layer-monitor --property=Type=exec \
+      /usr/bin/bash /run/id-ci-layer-monitor.sh ||
+      fail "MONITOR_UNIT_START_REFUSED"
+    systemd-run --quiet --unit=id-ci-layer-worker --property=Type=exec \
+      /usr/bin/bash /run/id-ci-layer-worker.sh ||
+      fail "WORKER_UNIT_START_REFUSED"
+    echo "C4B_ID_PASS // SEPARATE_INSTALL_WORKER_AND_MONITOR_STARTED"
+    ;;
+  installing)
+    # If first-boot monitor exited without verified pending deployment, fail
+    # rather than treating a reboot as proof.
+    fail "UNAUTHORIZED_REBOOT_DURING_INSTALL"
+    ;;
+  layer_pending)
+    [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}' "$pkg")" == "$pkg 0.1 noarch" ]] ||
+      fail "LAYER_NOT_IN_BOOTED_RPMDB"
+    for vendor_spec in \
+      'python3-cryptography|50.0.0|1.fc44|x86_64' \
+      'python3-cffi|2.0.0|3.fc44|x86_64' \
+      'python3-pycparser|2.22|8.fc44|noarch'; do
+      IFS='|' read -r name version release arch <<< "$vendor_spec"
+      [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$name")" == \
+         "$name $version $release $arch" ]] ||
+        fail "FEDORA_SIGNED_RUNTIME_NOT_IN_BOOTED_RPMDB"
+      vendor_verify="/var/tmp/id-ci-$name-rpm-verify.log"
+      vendor_rc=0
+      timeout --signal=TERM --kill-after=3s 35s rpm -V --nomtime "$name" >"$vendor_verify" 2>&1 ||
+        vendor_rc="$?"
+      if [[ "$vendor_rc" != 0 || -s "$vendor_verify" ]]; then
+        printf 'C4B_ID_VENDOR_VERIFY_RC // %s=%s\n' "$name" "$vendor_rc" >/dev/ttyS0
+        sed -n '1,24p' "$vendor_verify" |
+          sed 's/^/C4B_ID_VENDOR_VERIFY_DETAIL \/\/ /' >/dev/ttyS0 || true
+        fail "SIGNED_FEDORA_RUNTIME_BOOTED_FILE_INTEGRITY_REFUSED"
+      fi
+    done
+    /usr/bin/python3 -I -B -c 'from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey' ||
+      fail "FEDORA_SIGNED_RUNTIME_ED25519_IMPORT_REFUSED"
+    echo "C4B_ID_PASS // OFFLINE_SIGNED_FEDORA_ED25519_RUNTIME_BOOTED_AND_VERIFIED"
+    [[ -e "$prefix/identity-gateway-ci" &&
+       -f "/usr/lib/systemd/system/$unit" ]] ||
+      fail "IDENTITY_ENTRYPOINT_OR_UNIT_NOT_BOOTED"
+    # No condition marker is installed and user/group do not exist. This unit
+    # must remain unable to start; separately proving a real confined service
+    # is the next C4b milestone, NOT inferred from successful RPM layering.
+    if systemctl is-active --quiet "$unit"; then
+      fail "DENY_ONLY_IDENTITY_UNIT_UNEXPECTEDLY_ACTIVE"
+    fi
+    # A unit with no [Install] section is "static"; systemctl is-enabled
+    # may return success for that legitimate inert state. Inspect the actual
+    # state rather than treating exit code zero as auto-enablement.
+    enabled_state="$(systemctl is-enabled "$unit" 2>/dev/null || true)"
+    [[ "$enabled_state" == static || "$enabled_state" == disabled ]] ||
+      fail "IDENTITY_UNIT_WAS_AUTOENABLED_OR_MASKED"
+    [[ ! -e "$marker" ]] || fail "SERVICE_MARKER_UNEXPECTEDLY_PRESENT"
+    count="$(rpm -ql "$pkg" | grep -E '^/usr/lib(exec)?/' | wc -l)"
+    [[ "$count" == 9 ]] || fail "IDENTITY_BOOTED_PAYLOAD_NOT_NINE_FILES"
+    # rpm-ostree may check out immutable /usr files as hardlinks to objects
+    # in its content-addressed OSTree store. A link count >1 is therefore not
+    # evidence of a writable or replaced Identity file. The original RPM
+    # was signature-verified with an isolated keyring before composition;
+    # verify every installed file's size, digest, mode, ownership, and type
+    # against the booted RPM database before accepting this CI boot.
+    verify_file=/var/tmp/id-ci-booted-rpm-verify.log
+    verify_rc=0
+    # Durable bounded diagnostics before a deliberate poweroff. Last failure
+    # left an empty captured value and no readable rpm -V refusal specifics.
+    timeout --signal=TERM --kill-after=3s 35s rpm -V "$pkg" >"$verify_file" 2>&1 ||
+      verify_rc="$?"
+    if [[ "$verify_rc" != 0 || -s "$verify_file" ]]; then
+      printf 'C4B_ID_RPM_VERIFY_RC // %s\n' "$verify_rc" >/dev/ttyS0
+      # Preserve every bounded diagnostic record through the host collector.
+      sed -n '1,24p' "$verify_file" |
+        sed -E 's/^/C4B_ID_RPM_VERIFY_DETAIL \/\/ /' >/dev/ttyS0 || true
+      if [[ ! -s "$verify_file" ]]; then
+        echo "C4B_ID_RPM_VERIFY_DETAIL // NO_STDOUT_OR_STDERR" >/dev/ttyS0
+      fi
+    fi
+    # Full signed-rpmdb verification above must show ONLY timestamp changes
+    # on exact allowlisted file paths. Invalid flags, unknown or duplicate
+    # paths and unexplained nonzero errors still fail closed. This is not
+    # permission to suppress payload digest, owner, mode or path checks.
+    helper=/usr/local/libexec/postapollo-id-ci-verify-rpm.py
+    [[ -f "$helper" && ! -L "$helper" && "$(stat -c '%u:%g:%a' "$helper")" == '0:0:444' ]] ||
+      fail "GUEST_RPM_VERIFIER_HELPER_MISSING_OR_MODIFIED_MODE"
+    python3 -I -B "$helper" "$verify_file" "$verify_rc" ||
+      fail "SIGNED_IDENTITY_BOOTED_RPM_VERIFY_REFUSED"
+    # Secondary RPM verifier must return strictly clean when mtime-only
+    # comparison is excluded; never override a rejection above.
+    nomtime_file=/var/tmp/id-ci-booted-rpm-nomtime.log
+    nomtime_rc=0
+    timeout --signal=TERM --kill-after=3s 35s rpm -V --nomtime "$pkg" >"$nomtime_file" 2>&1 ||
+      nomtime_rc="$?"
+    if [[ "$nomtime_rc" != 0 || -s "$nomtime_file" ]]; then
+      echo "C4B_ID_RPM_NOMTIME_RC // $nomtime_rc" >/dev/ttyS0
+      sed -n '1,24p' "$nomtime_file" |
+        sed -E 's/^/C4B_ID_RPM_NOMTIME_DETAIL \/\/ /' >/dev/ttyS0 || true
+      fail "SIGNED_IDENTITY_BOOTED_RPM_NON_TIMESTAMP_DISCREPANCY"
+    fi
+    echo "C4B_ID_PASS // SIGNED_INSTALLED_IDENTITY_RPM_FILE_DIGESTS_AND_MODES"
+    for name in identity-gateway-ci desktop_command_gateway_v0.py \
+      desktop_host_lifecycle_v0.py desktop_context_projection_v0.py \
+      desktop_session_host_v0.py native_loopback_callback_v0.py \
+      private_context_ipc_v0.py signed_command_receipt_v0.py; do
+      path="$prefix/$name"
+      [[ -f "$path" && ! -L "$path" ]] ||
+        fail "INSTALLED_IDENTITY_MODULE_MISSING"
+      observed="$(stat -c '%u:%g:%a:%h' "$path")" ||
+        fail "INSTALLED_IDENTITY_MODULE_STAT_REFUSED"
+      printf 'C4B_ID_INSTALLED_FILE_OBSERVED // %s %s\n' "$name" "$observed"
+      [[ "$observed" =~ ^0:0:555:[1-9][0-9]*$ ]] ||
+        fail "INSTALLED_IDENTITY_MODULE_MODE_WRONG"
+      [[ "$(rpm -qf --qf '%{NAME}' "$path")" == "$pkg" ]] ||
+        fail "INSTALLED_IDENTITY_MODULE_PACKAGE_OWNER_WRONG"
+    done
+    echo "C4B_ID_PASS // REAL_SILVERBLUE_BOOTED_SIGNED_IDENTITY_RPM_INERT"
+    # A separate opt-in CI-only, deny-all running-service probe must be
+    # completed and fully torn down BEFORE any rollback is considered.
+    service_probe=/usr/local/libexec/postapollo-id-ci-service-probe.sh
+    [[ -f "$service_probe" && ! -L "$service_probe" &&
+       "$(stat -c '%u:%g:%a' "$service_probe")" == '0:0:700' ]] ||
+      fail "CI_ONLY_REAL_IDENTITY_SERVICE_PROBE_MISSING"
+    # A completed probe must actually return to this parent before the
+    # persistent rollback stage is advanced. Previously the probe printed its
+    # cleanup markers but the parent never reached this boundary, leaving an
+    # unobserved hang until the outer QEMU watchdog. The bounded child return
+    # preserves a nonzero/timeout as FAIL, never as rollback authorization.
+    echo "C4B_ID_STAGE // before_service_probe"
+    # This witness MUST be outside this oneshot service's process cgroup.
+    # The prior same-cgroup Bash watchdog went silent together with the
+    # verifier. A transient systemd unit observes only numeric kernel process
+    # states and unit state, never arguments, credentials, or guest payloads.
+    # It has no sign-in, rollback, or acceptance authority.
+    independent_unit=postapollo-id-ci-probe-witness.service
+    independent_script=/run/postapollo-id-ci-probe-witness.sh
+    [[ ! -e "$independent_script" ]] ||
+      fail "INDEPENDENT_PROBE_WITNESS_SCRIPT_PREEXISTS"
+    cat > "$independent_script" <<'C4B_SEPARATE_WITNESS'
+#!/usr/bin/bash
+set -euo pipefail
+sleep 90
+for interval in 90 145; do
+  printf 'C4B_ID_STAGE // SEPARATE_PROBE_WITNESS_%sS\n' "$interval" >/dev/ttyS0
+  timeout --signal=TERM --kill-after=2s 6s \
+    ps -eo pid,ppid,stat,wchan:24,comm 2>/dev/null |
+    awk 'NR == 1 || $5 ~ /^(bash|timeout|systemctl|semodule|journalctl|rpm-ostree)$/ {
+      print "C4B_ID_STAGE // SEPARATE_PROBE_PROCESS " $0
+      if (++n >= 25) exit
+    }' >/dev/ttyS0 || true
+  timeout --signal=TERM --kill-after=2s 6s \
+    systemctl show postapollo-id-ci-cycle.service \
+      --property=ActiveState,SubState,MainPID,Result,ExecMainPID,ExecMainCode,ExecMainStatus,ControlPID --no-pager 2>/dev/null |
+    awk -F= '/^(ActiveState|SubState|MainPID|Result|ExecMainPID|ExecMainCode|ExecMainStatus|ControlPID)=/ {
+      if ($2 ~ /^[a-zA-Z0-9_-]{1,40}$/ || $2 ~ /^[0-9]{1,10}$/)
+        print "C4B_ID_STAGE // SEPARATE_PROBE_CYCLE " $1 "=" $2
+    }' >/dev/ttyS0 || true
+  # Journal is a second observation of why the unit failed. Emit ONLY fixed
+  # systemd status categories; never forward arbitrary journal entries.
+  timeout --signal=TERM --kill-after=2s 6s \
+    journalctl -b -u postapollo-id-ci-cycle.service -n 48 --no-pager -o cat 2>/dev/null |
+    awk '
+      /Failed with result .timeout./ { print "C4B_ID_STAGE // SEPARATE_PROBE_SYSTEMD_RESULT timeout" }
+      /Failed with result .exit-code./ { print "C4B_ID_STAGE // SEPARATE_PROBE_SYSTEMD_RESULT exit-code" }
+      /Failed with result .signal./ { print "C4B_ID_STAGE // SEPARATE_PROBE_SYSTEMD_RESULT signal" }
+      /Failed with result .core-dump./ { print "C4B_ID_STAGE // SEPARATE_PROBE_SYSTEMD_RESULT core-dump" }
+      /start operation timed out/ { print "C4B_ID_STAGE // SEPARATE_PROBE_SYSTEMD_START_TIMEOUT" }
+    ' | sort -u | head -n 8 >/dev/ttyS0 || true
+  if [[ -f /run/postapollo-id-ci-cycle-lastline ]]; then
+    trace="$(cat /run/postapollo-id-ci-cycle-lastline 2>/dev/null || true)"
+    if [[ "$trace" =~ ^[0-9]{1,10}:[0-9]{1,5}$ ]]; then
+      printf 'C4B_ID_STAGE // SEPARATE_PROBE_PARENT_LASTLINE %s\n' \
+        "$trace" >/dev/ttyS0
+    fi
+  fi
+  sleep 55
+done
+C4B_SEPARATE_WITNESS
+    chmod 0700 "$independent_script"
+    timeout --signal=TERM --kill-after=3s 20s \
+      systemd-run --quiet --collect --unit=postapollo-id-ci-probe-witness \
+      --property=NoNewPrivileges=yes --property=PrivateNetwork=yes \
+      --property=ProtectHome=yes /usr/bin/bash "$independent_script" ||
+      fail "INDEPENDENT_PROBE_WITNESS_START_REFUSED"
+    echo "C4B_ID_STAGE // separate_probe_witness_started"
+    # The real verifier exited status=1 before returning from the probe.
+    # Keep only the executing parent's Bash PID and source line in a 0600
+    # volatile /run file; the independent cgroup can read it after an
+    # unexpected exit. Never record BASH_COMMAND, command arguments, env,
+    # identities or signing data. This does not influence acceptance.
+    parent_line_file=/run/postapollo-id-ci-cycle-lastline
+    (umask 077; printf '0:0\n' > "$parent_line_file") ||
+      fail "PARENT_LINE_WITNESS_START_REFUSED"
+    # DEBUG is also invoked while Bash tears down traps; in Fedora the last
+    # invocation can report line 1, destroying the useful parent source line.
+    # Preserve only plausible non-trap lines in this guest script.
+    trap 'if (( LINENO > 1 )); then printf "%s:%s\n" "$BASHPID" "$LINENO" > /run/postapollo-id-ci-cycle-lastline || true; fi' DEBUG
+    # A separate guest-local watchdog provides a bounded kernel-process
+    # observation even if the synchronous timeout itself never returns.
+    # It emits process names/states only, never argv, signing key or payload.
+    # The independent fail marker powers off this disposable guest without
+    # advancing rollback, preserving the host's strict missing-stage refusal.
+    probe_parent_pid="$BASHPID"
+    (
+      sleep 120
+      if [[ "$(cat "$stage" 2>/dev/null || true)" == layer_pending ]]; then
+        echo "C4B_ID_STAGE // SERVICE_PROBE_STILL_WAITING_120S" >/dev/ttyS0
+        timeout --signal=TERM --kill-after=2s 5s \
+          ps -eo pid,ppid,stat,wchan:24,comm 2>/dev/null |
+          awk 'NR == 1 || $5 ~ /^(bash|timeout|systemctl|semodule|journalctl|userdel|rpm-ostree)$/ {
+            print "C4B_ID_STAGE // SERVICE_PROBE_KERNEL_PROCESS " $0
+            if (++n >= 24) exit
+          }' >/dev/ttyS0 || true
+      fi
+      sleep 340
+      if [[ "$(cat "$stage" 2>/dev/null || true)" == layer_pending ]]; then
+        echo "C4B_ID_FAIL // SERVICE_PROBE_PARENT_STUCK_AFTER_460S" >/dev/ttyS0
+        systemctl poweroff --no-block || true
+      fi
+    ) &
+    probe_watchdog_pid="$!"
+    probe_rc=0
+    timeout --signal=TERM --kill-after=10s 420s /usr/bin/bash "$service_probe" ||
+      probe_rc="$?"
+    # Genuine guest evidence identifies this exact parent progress write as
+    # the last command before systemd exit 1 after child SELinux teardown.
+    # Open the UART anew rather than relying on an inherited descriptor that
+    # may have become unwritable across the policy transition. A failed fresh
+    # write is a hard refusal, never rollback permission.
+    printf 'C4B_ID_STAGE // after_service_probe rc=%s\n' "$probe_rc" >/dev/ttyS0 ||
+      fail "PARENT_POST_SERVICE_UART_WRITE_REFUSED"
+    # The parent inherited stdout/stderr before the SELinux policy reload.
+    # Re-open both descriptors for the REST of the cycle, not just one
+    # progress message. Failure must never authorize rollback.
+    exec >/dev/ttyS0 2>&1
+    echo "C4B_ID_STAGE // parent_uart_descriptors_refreshed"
+    kill "$probe_watchdog_pid" >/dev/null 2>&1 || true
+    wait "$probe_watchdog_pid" 2>/dev/null || true
+    echo "C4B_ID_STAGE // local_probe_watchdog_reaped"
+    trap - DEBUG
+    rm -f -- "$parent_line_file"
+    [[ ! -e "$parent_line_file" ]] ||
+      fail "PARENT_LINE_WITNESS_RESIDUE"
+    # Stop and remove independent transient diagnostics before advancing any
+    # rollback stage. A failed stop cannot become an authorized rollback.
+    echo "C4B_ID_STAGE // independent_probe_witness_stop_started"
+    timeout --signal=TERM --kill-after=3s 15s \
+      systemctl stop "$independent_unit" ||
+      fail "INDEPENDENT_PROBE_WITNESS_STOP_REFUSED"
+    echo "C4B_ID_STAGE // independent_probe_witness_stopped"
+    rm -f -- "$independent_script"
+    [[ ! -e "$independent_script" ]] ||
+      fail "INDEPENDENT_PROBE_WITNESS_SCRIPT_REMAINS"
+    [[ "$probe_rc" == 0 ]] ||
+      fail "REAL_SYSTEMD_DENY_ONLY_IDENTITY_SERVICE_PROBE_REFUSED_RC_$probe_rc"
+    [[ "$(cat "$stage")" == layer_pending ]] ||
+      fail "SERVICE_PROBE_CHANGED_OSTREE_STAGE"
+    echo "C4B_ID_PASS // REAL_IDENTITY_SERVICE_PROBE_FINISHED_BEFORE_ROLLBACK"
+    echo rollback_pending > "$stage"
+    echo "C4B_ID_STAGE // rollback_command_started"
+    rpm-ostree rollback --reboot || fail "REAL_IDENTITY_ROLLBACK_COMMAND_FAILED"
+    ;;
+  rollback_pending)
+    for vendorpkg in python3-cryptography python3-cffi python3-pycparser; do
+      if rpm -q "$vendorpkg" >/dev/null 2>&1; then
+        fail "FEDORA_ED25519_TEST_RUNTIME_REMAINS_AFTER_ROLLBACK"
+      fi
+    done
+    if rpm -q "$pkg" >/dev/null 2>&1; then
+      fail "IDENTITY_RPM_REMAINS_AFTER_ROLLBACK"
+    fi
+    [[ ! -e "$prefix/identity-gateway-ci" &&
+       ! -e "/usr/lib/systemd/system/$unit" ]] ||
+      fail "IDENTITY_EXEC_OR_UNIT_REMAINS_AFTER_ROLLBACK"
+    for name in desktop_command_gateway_v0.py desktop_host_lifecycle_v0.py \
+      desktop_context_projection_v0.py desktop_session_host_v0.py \
+      native_loopback_callback_v0.py private_context_ipc_v0.py \
+      signed_command_receipt_v0.py; do
+      [[ ! -e "$prefix/$name" ]] ||
+        fail "IDENTITY_MODULE_REMAINS_AFTER_ROLLBACK"
+    done
+    [[ "$(getenforce)" == Enforcing && ! -e "$marker" ]] ||
+      fail "POSTROLLBACK_SELINUX_OR_MARKER_FAILED"
+    [[ ! -e /run/postapollo-identity-silverblue-ci-only ]] ||
+      fail "POSTROLLBACK_TEST_PRIVATE_KEY_OR_RUNTIME_LEFTOVER"
+    if getent passwd postapollo-identity-ci >/dev/null; then
+      fail "POSTROLLBACK_DISPOSABLE_TEST_USER_LEFTOVER"
+    fi
+    if command -v semodule >/dev/null 2>&1 &&
+       semodule -l | grep -Eq '^postapollo_identity_ci([[:space:]]|$)'; then
+      fail "POSTROLLBACK_TEST_SELINUX_MODULE_REMAINS"
+    fi
+    [[ ! -d /run/systemd/system/post-apollo-identity-silverblue-ci.service.d ]] ||
+      fail "POSTROLLBACK_SELINUX_UNIT_OVERRIDE_LEFTOVER"
+    # Remove separately staged test keyring, local RPM and repo modifications.
+    for original in "$store"/original-repos/*.repo; do
+      [[ -f "$original" ]] || continue
+      cp -a "$original" "/etc/yum.repos.d/$(basename "$original")"
+    done
+    rm -rf -- "$store"
+    [[ ! -e "$store" ]] || fail "IDENTITY_TEST_SIGNER_KEYRING_RESIDUE"
+    echo complete > "$stage"
+    echo "C4B_ID_PASS // REAL_SILVERBLUE_IDENTITY_RPM_LAYER_REMOVED"
+    echo "C4B_ID_PASS // TEST_KEYRING_REMOVED_AND_PRODUCTION_DISABLED"
+    systemctl poweroff --no-block || fail "FINAL_POWEROFF_FAILED"
+    ;;
+  complete)
+    echo "C4B_ID_PASS // COMPLETED_REQUIRES_ALREADY_VERIFIED_LOG"
+    systemctl poweroff --no-block
+    ;;
+  *)
+    fail "INVALID_STAGE"
+    ;;
+esac

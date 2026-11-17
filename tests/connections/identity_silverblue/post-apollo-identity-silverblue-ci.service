@@ -1,0 +1,25 @@
+[Unit]
+Description=Post Apollo Identity command gateway (disposable CI, deny only)
+ConditionPathExists=/run/postapollo-identity-silverblue-ci-only/authorized-test.marker
+After=local-fs.target
+
+[Service]
+Type=simple
+User=postapollo-identity-ci
+Group=postapollo-identity-ci
+Environment=POST_APOLLO_ID_INSTALL_CI_ONLY=1
+Environment=GITHUB_ACTIONS=true
+Environment=RUNNER_ENVIRONMENT=github-hosted
+EnvironmentFile=/run/postapollo-identity-silverblue-ci-only/runtime.env
+ExecStart=/usr/bin/python3 -I -B /usr/libexec/post-apollo/identity/identity-gateway-ci
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+ReadWritePaths=/run/postapollo-identity-silverblue-ci-only
+
+# Deliberately no [Install] section: CI must explicitly create the marker,
+# separate secret-free runtime environment and supervised service invocation.
+# A separate confined SELinux domain and actual guest denial tests remain gates.

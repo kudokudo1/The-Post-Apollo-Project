@@ -84,6 +84,29 @@ function landingFor(family) {
 function tabsFor(path) {
     return GROUPS[familyFor(path)].slice();
 }
+// W27 // SERVICES is the only cross-family selection that follows a
+// family switch. Resolve existing bottom-tab routes from the canonical
+// table rather than inventing a second services route registry.
+// TOOLS has SOURCES, not SERVICES, and retains its ordinary landing.
+function servicesTabFor(family) {
+    var tabs=GROUPS[family]||[];
+    for(var i=0;i<tabs.length;i++)
+        if(tabs[i].label==="SERVICES") return tabs[i];
+    return null;
+}
+function familySwitchTarget(currentPath,targetFamily) {
+    var landing=landingFor(targetFamily);
+    var sourceFamily=familyFor(currentPath);
+    var destinationFamily=familyFor(landing);
+    // Pressing the currently selected family keeps its existing behavior.
+    if(sourceFamily===destinationFamily) return landing;
+    var activeServices=servicesTabFor(sourceFamily);
+    var destinationServices=servicesTabFor(destinationFamily);
+    if(activeServices && destinationServices
+            && selectedGroup(currentPath)===activeServices.key)
+        return destinationServices.path;
+    return landing;
+}
 function homeSectionFor(path) {
     if (familyFor(path)!=="home") return "";
     var key=String(path||"").split("/")[1]||"overview";

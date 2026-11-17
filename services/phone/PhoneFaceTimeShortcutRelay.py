@@ -288,14 +288,21 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 def _load_token(filename: str) -> str:
-    """Refuse shared/group-readable files, symlinks or unsafe token content."""
-    file = Path(filename)
-    info = file.lstat()
-    if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077:
-        raise ValueError("unsafe credentials file")
-    if info.st_uid != os.getuid() or info.st_size > 256:
-        raise ValueError("unsafe credentials file")
-    raw = file.read_text(encoding="ascii").strip()
+    """Read private token by fd to avoid a symlink swap after stat()."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(filename, flags)
+    try:
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077
+                or info.st_uid != os.getuid()
+                or not 43 <= info.st_size <= 256):
+            raise ValueError("unsafe credentials file")
+        with os.fdopen(fd, "r", encoding="ascii") as stream:
+            fd = -1
+            raw = stream.read(257).strip()
+    finally:
+        if fd >= 0:
+            os.close(fd)
     if len(raw) < 43 or re.fullmatch(r"[A-Za-z0-9_-]{43,128}", raw) is None:
         raise ValueError("invalid credentials")
     return raw

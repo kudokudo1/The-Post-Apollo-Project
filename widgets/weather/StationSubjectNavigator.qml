@@ -201,6 +201,14 @@ Rectangle {
         return true;
     }
 
+    // W27 // Only cross-family SERVICE mode is synchronized.
+    // All non-SERVICES selections keep the original Overview landing.
+    function chooseFamily(targetFamily) {
+        return chooseRoute(
+            Workspace.familySwitchTarget(currentPath,targetFamily)
+        );
+    }
+
     function selectSubject(subjectId) {
         if (subjectId === "home") {
             if (indexOpen) {
@@ -209,7 +217,7 @@ Rectangle {
                 if (routeScroll) routeScroll.contentY = 0;
                 return true;
             }
-            return chooseRoute(Workspace.landingFor("home"));
+            return chooseFamily("home");
         }
         if (indexOpen) {
             const subject = SubjectRoutes.findRoute(subjectId);
@@ -220,7 +228,7 @@ Rectangle {
             routeScroll.contentY = 0;
             return true;
         }
-        return chooseRoute(Workspace.landingFor(subjectId));
+        return chooseFamily(subjectId);
     }
 
     function openIndex() {
@@ -253,7 +261,7 @@ Rectangle {
         const tabs = Workspace.FAMILIES;
         const now = Workspace.familyFor(currentPath);
         const idx = tabs.findIndex(function(x){return x.id === now;});
-        return chooseRoute(tabs[(Math.max(0,idx)+step+tabs.length)%tabs.length].landing);
+        return chooseFamily(tabs[(Math.max(0,idx)+step+tabs.length)%tabs.length].id);
     }
 
     function moveCursor(direction) {

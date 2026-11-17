@@ -1351,14 +1351,18 @@ Rectangle {
             visible: home.sectionVisible("snapshot")
             width: parent.width
             height: home.fixedWeatherOverview
-                    ? home.overviewCardRowHeight : 118
-            spacing: home.fixedWeatherOverview ? 4 : 12
+                    ? home.overviewCardRowHeight
+                    : home.homeOverviewWorkspace
+                      ? (home.homeInlineDefault ? home.homeInlineLiveHeight
+                          : home.homeInlineSingleHeight) : 118
+            spacing: home.fixedWeatherOverview
+                || home.homeOverviewWorkspace ? 4 : 12
 
             StationHomeMetricCard {
                 width: (parent.width - parent.spacing*2) / 3
                 height: parent.height
-                compact: home.fixedWeatherOverview
-                overviewDense: home.fixedWeatherOverview
+                compact: home.fixedWeatherOverview || home.homeOverviewWorkspace
+                overviewDense: home.fixedWeatherOverview || home.homeOverviewWorkspace
 
                 title: "CURRENT WEATHER"
                 valueText:
@@ -1385,8 +1389,8 @@ Rectangle {
             StationHomeMetricCard {
                 width: (parent.width - parent.spacing*2) / 3
                 height: parent.height
-                compact: home.fixedWeatherOverview
-                overviewDense: home.fixedWeatherOverview
+                compact: home.fixedWeatherOverview || home.homeOverviewWorkspace
+                overviewDense: home.fixedWeatherOverview || home.homeOverviewWorkspace
 
                 title: "NEXT HOURS"
                 valueText:
@@ -1423,8 +1427,8 @@ Rectangle {
             StationHomeMetricCard {
                 width: (parent.width - parent.spacing*2) / 3
                 height: parent.height
-                compact: home.fixedWeatherOverview
-                overviewDense: home.fixedWeatherOverview
+                compact: home.fixedWeatherOverview || home.homeOverviewWorkspace
+                overviewDense: home.fixedWeatherOverview || home.homeOverviewWorkspace
 
                 title: "AIR QUALITY"
                 valueText:
@@ -1659,14 +1663,19 @@ Rectangle {
         }
 
         Row {
+            id: homeQuickRow
+            objectName: "home-w24-quick-row"
             visible: home.sectionVisible("quick")
             width: parent.width
-            height: 106
-            spacing: 12
+            height: home.homeOverviewWorkspace
+                ? home.homeInlineSingleHeight : 106
+            spacing: home.homeOverviewWorkspace ? 4 : 12
 
             StationHomeMetricCard {
-                width: (parent.width - 36) / 4
+                width: (parent.width - parent.spacing*3) / 4
                 height: parent.height
+                compact: home.homeOverviewWorkspace
+                overviewDense: home.homeOverviewWorkspace
 
                 title: "HUMIDITY"
                 valueText:
@@ -1682,8 +1691,10 @@ Rectangle {
             }
 
             StationHomeMetricCard {
-                width: (parent.width - 36) / 4
+                width: (parent.width - parent.spacing*3) / 4
                 height: parent.height
+                compact: home.homeOverviewWorkspace
+                overviewDense: home.homeOverviewWorkspace
 
                 title: "WIND"
                 valueText:
@@ -1704,8 +1715,10 @@ Rectangle {
             }
 
             StationHomeMetricCard {
-                width: (parent.width - 36) / 4
+                width: (parent.width - parent.spacing*3) / 4
                 height: parent.height
+                compact: home.homeOverviewWorkspace
+                overviewDense: home.homeOverviewWorkspace
 
                 title: "UV INDEX"
                 valueText:
@@ -1721,8 +1734,10 @@ Rectangle {
             }
 
             StationHomeMetricCard {
-                width: (parent.width - 36) / 4
+                width: (parent.width - parent.spacing*3) / 4
                 height: parent.height
+                compact: home.homeOverviewWorkspace
+                overviewDense: home.homeOverviewWorkspace
 
                 title: "SPACE WEATHER"
                 valueText:
@@ -1788,8 +1803,12 @@ Rectangle {
             visible: home.sectionVisible("relevant")
             width: parent.width
             height: home.fixedWeatherOverview
-                    ? home.overviewCardRowHeight : 118
-            spacing: home.fixedWeatherOverview ? 4 : 12
+                    ? home.overviewCardRowHeight
+                    : home.homeOverviewWorkspace
+                      ? (home.homeInlineDefault ? home.homeInlineAutoHeight
+                          : home.homeInlineSingleHeight) : 118
+            spacing: home.fixedWeatherOverview
+                || home.homeOverviewWorkspace ? 4 : 12
 
             Repeater {
                 model: home.watchItems
@@ -1811,8 +1830,8 @@ Rectangle {
                             home.watchItems.length
                         )
                     height: parent.height
-                    compact: home.fixedWeatherOverview
-                    overviewDense: home.fixedWeatherOverview
+                    compact: home.fixedWeatherOverview || home.homeOverviewWorkspace
+                    overviewDense: home.fixedWeatherOverview || home.homeOverviewWorkspace
 
                     title: modelData.title
                     valueText: modelData.value
@@ -1838,7 +1857,8 @@ Rectangle {
                     meterValue: modelData.meterValue
                     meterFillColor:
                         home.sourceMeterFill(modelData.source)
-                    provenanceText: home.fixedWeatherOverview ? ""
+                    provenanceText: home.fixedWeatherOverview
+                        || home.homeOverviewWorkspace ? ""
                         : home.homeFavoritesStore
                           ? CardProvenance.provenance(
                                 modelData, home.sourceHealthRows
@@ -1868,6 +1888,7 @@ Rectangle {
             spacing: 6
             visible: home.sectionVisible("relevant")
                      && !home.fixedWeatherOverview
+                     && !home.homeOverviewWorkspace
                      && home.homeFavoritesStore
                      && home.pinnedCardRows.length > 0
             GohuText {
@@ -1908,6 +1929,7 @@ Rectangle {
             width: parent.width
             visible: home.sectionVisible("relevant")
                      && !home.fixedWeatherOverview
+                     && !home.homeOverviewWorkspace
                      && home.homeFavoritesStore
                      && (home.homeFavoritesStore.storageState === "error"
                          || home.homeFavoritesStore.storageState === "unsupported")

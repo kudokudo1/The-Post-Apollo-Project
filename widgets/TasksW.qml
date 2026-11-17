@@ -355,11 +355,10 @@ PanelWindow {
                     selected: root.selectedMainModeIndex === index
                     keyboardActive: root.standardModeKeysAvailable
                     keyboardSelected: root.keyboardModeCursor === index
-                    onTriggered: {
-                        root.selectMainMode(index);
-                        if (root.menuOpen)
-                            tasksFrame.forceActiveFocus();
-                    }
+                    // Preserve the original pointer path and editor focus.
+                    // Only a keyboard activation explicitly selects the
+                    // highlighted item; clicking does not steal input focus.
+                    onTriggered: root.selectMainMode(index)
                 }
             }
         }

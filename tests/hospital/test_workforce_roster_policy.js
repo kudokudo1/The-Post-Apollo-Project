@@ -84,3 +84,41 @@ assert.equal(renamed[0].hasActiveSession, false);
 assert.equal(policy.buildRoster([{ id: "branch-only" }], [], []).length, 1);
 assert.equal(policy.buildRoster([], [{ roomId: "phantom" }], []).length, 0);
 console.log("HOSPITAL WORKFORCE ROSTER // PASS // durable rooms only, session precedence, no phantom workers");
+
+// View policy is a pure projection; no recorded WAITING session makes work live.
+const viewSource = fs.readFileSync(path.join(__dirname,
+    "../../services/hospital/HospitalWorkforceViewPolicy.js"), "utf8");
+const views = vm.createContext({});
+vm.runInContext(viewSource, views);
+const groupedRooms = [
+    {roomId: "active", assignmentId: "1", assignmentStatus: "ACTIVE",
+     sessionStatus: "IDLE", sessionId: "s1"},
+    {roomId: "draft", assignmentId: "2", assignmentStatus: "DRAFT"},
+    {roomId: "paused", assignmentId: "3", assignmentStatus: "PAUSED"},
+    {roomId: "unknown", assignmentId: "4", assignmentStatus: ""},
+    {roomId: "complete", assignmentId: "5", assignmentStatus: "COMPLETE"},
+    {roomId: "legacy", doctorId: "doctor-legacy", sessionId: "s-old",
+     sessionStatus: "WAITING", hasActiveSession: true},
+    {roomId: "blank", doctorId: "", sessionStatus: "NO SESSION"},
+    {roomId: "branch", team: "feature/old-work"}
+];
+assert.equal(views.category(groupedRooms[0]), "ACTIVE");
+assert.equal(views.category(groupedRooms[1]), "STAGED");
+assert.equal(views.category(groupedRooms[2]), "STAGED");
+assert.equal(views.category(groupedRooms[3]), "STAGED");
+assert.equal(views.category(groupedRooms[4]), "HISTORY");
+assert.equal(views.category(groupedRooms[5]), "HISTORY");
+assert.equal(views.category(groupedRooms[6]), "HISTORY");
+assert.equal(views.category(groupedRooms[7]), "HISTORY");
+const counts = views.counts(groupedRooms);
+assert.equal(counts.ACTIVE, 1);
+assert.equal(counts.STAGED, 3);
+assert.equal(counts.HISTORY, 4);
+assert.equal(counts.ALL, 8);
+assert.equal(views.filter(groupedRooms, "ACTIVE").length, 1);
+assert.equal(views.filter(groupedRooms, "STAGED").length, 3);
+assert.equal(views.filter(groupedRooms, "HISTORY").length, 4);
+assert.equal(views.filter(groupedRooms, "ALL").length, 8);
+assert.equal(views.filter(groupedRooms, "unknown-mode").length, 1);
+assert.equal(views.filter(groupedRooms, "ALL")[0].roomId, "active");
+console.log("HOSPITAL WORKFORCE VIEWS // PASS // PX assignment state, no fake live sessions");

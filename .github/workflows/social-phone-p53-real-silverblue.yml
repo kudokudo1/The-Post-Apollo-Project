@@ -1,0 +1,117 @@
+name: Social PHONE P53 Official Fedora 44 Silverblue Signed RPM Boot/SELinux/Rollback (CI Only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/phone/p52_*'
+      - 'tests/phone/p53_*'
+      - 'services/phone/PhonePersonalStatusHostP49.py'
+      - 'services/phone/systemd/post-apollo-phone-personal-status-ci.service'
+      - 'MODEL/contracts/social-phone-p53-real-silverblue-v0.md'
+      - '.github/workflows/social-phone-p53-real-silverblue.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-offline-silverblue-phone:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      POST_APOLLO_PHONE_RPM_CI_ONLY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse non-disposable host or absent KVM and check PHONE scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_ACTOR" = kudokudo1
+          test -c /dev/kvm || {
+            echo 'P53_BLOCKED // OFFICIAL_KVM_UNAVAILABLE'
+            exit 78
+          }
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+          bash -n tests/phone/p52_build_signed_phone_status.sh
+          bash -n tests/phone/p52_verify_installed_phone_rpm.sh
+          bash -n tests/phone/p53_selinux/build_policy_ci.sh
+          bash -n tests/phone/p53_guest_phone_service_probe.sh
+          bash -n tests/phone/p53_guest_phone_ostree_cycle.sh
+          bash -n tests/phone/p53_run_official_silverblue_phone.sh
+          python3 -B -m unittest discover -s tests/phone -p 'test_phone_personal_silverblue_p53.py' -v
+          python3 -B -m unittest discover -s tests/phone -p 'test_phone_personal_signed_rpm_p52.py' -v
+      - name: Build separate disposable signed PHONE status-only RPM
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/p53-phone-rpm"
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_PHONE_RPM_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/p53-phone-rpm,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/phone/p52_build_signed_phone_status.sh
+          (cd "$RUNNER_TEMP/p53-phone-rpm" &&
+           sha256sum --check --status phone-status-artifact-manifest.sha256)
+      - name: Compile dedicated PHONE no-save SELinux test module in Fedora
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/p53-phone-selinux"
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_PHONE_RPM_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/p53-phone-selinux,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/phone/p53_selinux/build_policy_ci.sh
+          (cd "$RUNNER_TEMP/p53-phone-selinux" &&
+           sha256sum --check --status postapollo_phone_ci.sha256)
+      - name: Real offline official Fedora Silverblue VM and PHONE signed RPM layer/boot/rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_ACTOR" = kudokudo1
+          test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm ||
+            { echo 'P53_BLOCKED // NO_DISPOSABLE_KVM'; exit 78; }
+          timeout --signal=TERM --kill-after=20s 4200s \
+            docker run --rm \
+              --device=/dev/kvm \
+              --env GITHUB_ACTIONS=true \
+              --env RUNNER_ENVIRONMENT=github-hosted \
+              --env GITHUB_ACTOR="$GITHUB_ACTOR" \
+              --env POST_APOLLO_PHONE_RPM_CI_ONLY=1 \
+              --env RUNNER_TEMP=/tmp \
+              --mount "type=bind,src=$PWD,dst=/src,readonly" \
+              --mount "type=bind,src=$RUNNER_TEMP/p53-phone-rpm,dst=/input/rpm,readonly" \
+              --mount "type=bind,src=$RUNNER_TEMP/p53-phone-selinux,dst=/input/selinux,readonly" \
+              --workdir /src \
+              fedora:44 /usr/bin/bash -c '
+                set -euo pipefail
+                test "$GITHUB_ACTIONS" = true
+                test "$RUNNER_ENVIRONMENT" = github-hosted
+                test "$GITHUB_ACTOR" = kudokudo1
+                test "$POST_APOLLO_PHONE_RPM_CI_ONLY" = 1
+                test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm
+                dnf -y --setopt=install_weak_deps=False --setopt=gpgcheck=1 install \
+                  curl qemu-system-x86 qemu-img xorriso genisoimage
+                for app in curl qemu-system-x86_64 qemu-img xorriso genisoimage; do
+                  command -v "$app" >/dev/null
+                done
+                /usr/bin/bash /src/tests/phone/p53_run_official_silverblue_phone.sh \
+                  /input/rpm /input/selinux
+              '
+      - name: Production PHONE save still disabled after CI
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest discover -s tests/phone -p 'test_phone_personal_signed_rpm_p52.py' -v
+          echo 'P53_LIMITATION // TEST_GUEST_SIGNING_ROOT_NOT_PRODUCTION_ENROLLED'
+          echo 'P53_LIMITATION // NO_C3E_ONE_USE_OR_C5_HUMAN_APPROVAL_OR_PERSONAL_SAVE'

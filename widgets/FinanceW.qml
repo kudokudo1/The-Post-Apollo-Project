@@ -186,6 +186,23 @@ PanelWindow {
         return true;
     }
 
+    // Unified lower-submode keys for the four *existing* Budget section
+    // buttons. Never bypass the guarded selectBudgetSection write/editor
+    // checks; a focused money or date input retains Ctrl+word navigation.
+    readonly property bool lowerSectionKeysAvailable:
+        standardKeysAvailable && selectedMainMode === "budget"
+        && selectedBudgetSubMode === "budget"
+        && financeKeyboardAnchor.activeFocus
+        && !quickAddPane.open
+    function cycleBudgetSection(direction) {
+        if (!lowerSectionKeysAvailable) return false;
+        const sections = ["budget","transactions","accounts","categories"];
+        const current = Math.max(0,sections.indexOf(budgetSection));
+        const step = Number(direction) < 0 ? -1 : 1;
+        return selectBudgetSection(
+            sections[(current + step + sections.length) % sections.length]);
+    }
+
     function accountTotalCents() {
         const data = financeBudget.snapshot;
         if (!data || !Array.isArray(data.accounts))
@@ -437,7 +454,12 @@ PanelWindow {
             if (!root.standardKeysAvailable)
                 return;
             if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
-                    || event.key === Qt.Key_Escape)
+                    || event.key === Qt.Key_Escape
+                    || (root.lowerSectionKeysAvailable
+                        && (event.modifiers & Qt.ControlModifier) !== 0
+                        && (event.modifiers & (Qt.ShiftModifier | Qt.AltModifier)) === 0
+                        && (event.key === Qt.Key_Left
+                            || event.key === Qt.Key_Right)))
                 event.accepted = true;
         }
         Keys.onPressed: function(event) {
@@ -451,6 +473,13 @@ PanelWindow {
                 const reverse = event.key === Qt.Key_Backtab
                     || (event.modifiers & Qt.ShiftModifier) !== 0;
                 root.cycleMainMode(reverse ? -1 : 1);
+                event.accepted = true;
+            } else if (root.lowerSectionKeysAvailable
+                       && (event.modifiers & Qt.ControlModifier) !== 0
+                       && (event.modifiers & (Qt.ShiftModifier | Qt.AltModifier)) === 0
+                       && (event.key === Qt.Key_Left
+                           || event.key === Qt.Key_Right)) {
+                root.cycleBudgetSection(event.key === Qt.Key_Right ? 1 : -1);
                 event.accepted = true;
             }
         }
@@ -479,6 +508,18 @@ PanelWindow {
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable
         onActivated: root.cycleBudgetSubMode(1)
+    }
+    Shortcut {
+        sequence: "Ctrl+Left"
+        context: Qt.WindowShortcut
+        enabled: root.lowerSectionKeysAvailable
+        onActivated: root.cycleBudgetSection(-1)
+    }
+    Shortcut {
+        sequence: "Ctrl+Right"
+        context: Qt.WindowShortcut
+        enabled: root.lowerSectionKeysAvailable
+        onActivated: root.cycleBudgetSection(1)
     }
     Shortcut {
         sequence: "Up"

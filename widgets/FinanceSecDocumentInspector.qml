@@ -181,9 +181,18 @@ Item {
         boundsBehavior: Flickable.StopAtBounds
         clip: true
 
+        NeonScrollBar {
+            id: secDocumentScrollBar
+            flickable: scroller
+            mountingParent: inspector
+            geometryMode: "viewport"
+            handleStyle: "bar"
+            rightInset: 2
+        }
+
         Column {
             id: contents
-            width: scroller.width
+            width: Math.max(0, scroller.width - 22)
             spacing: 10
 
             GohuText {

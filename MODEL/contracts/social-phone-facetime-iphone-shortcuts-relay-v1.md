@@ -17,6 +17,12 @@
 - Operator-only `GET /v1/operator/status` reports only `EMPTY`, `QUEUED`, `DELIVERED_TO_SHORTCUT`, `PHONE_REPORTED_OPEN_REQUEST`, `PHONE_DECLINED`, `CANCELLED` or `EXPIRED`. It intentionally never returns phone number, contact, email, invitation token or request ID. `POST /v1/operator/cancel` is supported. All statuses always hardcode **FaceTime connected, incoming, answer, hangup, mic, audio, video, Personal and Apple FaceTime authentication to false**.
 - All HTTP body sizes <=512 bytes, methods/paths fixed, no content echo, no request access logging, no client socket/internet on import or by default, no permissive scheme or redirect.
 
+### Local operator client, not yet deployed
+
+`services/phone/PhoneFaceTimeShortcutOperator.py` can explicitly queue, inspect or cancel a request against the already-running **loopback** relay. Supported CLI actions are `--queue-audio`, `--queue-video`, `--status` and `--cancel`, plus `--port PORT --admin-token-file FILE`. The operator request does not accept a recipient or bearer token on the command line; it prompts for a private recipient (not echoed) and separately requires typing `PREPARE`. The fixed HTTP client refuses redirects, validates the returned schema and every false authority flag, and prints only bounded status without recipient or secret.
+
+**Developer-only, after separately approved credentials and relay activation:** the CLI operation uses the approved private admin credential file. It does not start the relay and cannot reach the iPhone directly. An iPhone Shortcut must independently fetch the queued request over an approved HTTPS gateway. No real call occurs merely because the operator CLI reports `QUEUED` or the phone role reports `OPEN_URL_REQUESTED`.
+
 ### Functional boundary
 
 This is a **working loopback relay protocol**, but **not yet a working PC↔iPhone FaceTime integration**. It requires all of the following, each separately approved and verified:
@@ -44,7 +50,7 @@ Once HTTPS is genuinely reachable and token is privately provisioned:
 
 ## VERIFY
 
-New `tests/phone/test_phone_facetime_shortcuts_relay_v1.py` exercises **actual loopback HTTP** operator request → phone retrieval → phone ACK, separate token roles and rejection, exact FaceTime URI, strict target/mode allowlist, TTL expiry, one pending request, cancel, replay/fake call state rejection, malformed methods/bodies, no public bind, private file/symlink refusal, and unconditional negative FaceTime control/media claims. Dedicated workflow `.github/workflows/social-phone-facetime-shortcuts-relay-v1.yml` reruns existing iPhone pilot, FaceTime links, HFP route, PHONE audio and locked Personal editor tests. Exact-head GitHub checks must be verified.
+New `tests/phone/test_phone_facetime_shortcuts_relay_v1.py` exercises **actual loopback HTTP** operator CLI request/status/cancel → phone retrieval → phone ACK, separate token roles and rejection, exact FaceTime URI, strict target/mode allowlist, TTL expiry, one pending request, cancel, replay/fake call state rejection, malformed methods/bodies, no public bind, private file/symlink refusal, and unconditional negative FaceTime control/media claims. Dedicated workflow `.github/workflows/social-phone-facetime-shortcuts-relay-v1.yml` reruns existing iPhone pilot, FaceTime links, HFP route, PHONE audio and locked Personal editor tests. Exact-head GitHub checks must be verified.
 
 ## WATCH OUT FOR
 

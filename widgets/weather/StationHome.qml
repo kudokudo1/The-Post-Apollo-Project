@@ -33,12 +33,14 @@ Rectangle {
         + (homeInlineMode === "live" ? "overview" : homeInlineMode)
     readonly property real homeInlineAlertHeight:
         homeInlineDefault && officialAlertSummary.available ? 15 : 0
-    // W25 // Reuse the existing HISTORY graph pair above the LIVE cards.
-    // 46px cards keep all original labels/values/bars without stretching
-    // mostly empty boxes. AUTO is anchored to the bottom with a spacer.
-    readonly property real homeInlineGraphHeight: 72
-    readonly property real homeInlineLiveHeight: 46
-    readonly property real homeInlineAutoHeight: 46
+    // W26 // No empty height sink. Distribute the usable HOME viewport
+    // among the original graphs, LIVE readings and AUTO. At the 275px
+    // floor, retain W25's legible 72/46/46 minimums. As the viewport
+    // grows, prioritize useful plotted area; cap card growth so we do
+    // not replace the giant gap with giant mostly empty metric boxes.
+    readonly property real homeInlineMinimumGraphHeight: 72
+    readonly property real homeInlineMinimumLiveHeight: 46
+    readonly property real homeInlineMinimumAutoHeight: 46
     // Hide redundant section headings when a 275px viewport or a real
     // NWS alert needs the space; graph titles and card labels remain.
     readonly property bool homeInlineGraphHeading:
@@ -51,17 +53,30 @@ Rectangle {
         + (homeInlineGraphHeading ? 1 : 0)
         + (homeInlineLiveHeading ? 1 : 0)
         + (homeInlineAlertHeight > 0 ? 1 : 0)
-    readonly property real homeInlineFixedContentHeight:
-        homeContent.y + homeOverviewRail.height + homeInlineGraphHeight
-        + homeInlineLiveHeight + homeInlineAutoHeight
+    // The LIVE default has five always-visible items: rail, graph row,
+    // LIVE row, AUTO heading and AUTO row. Optional titles and alerts
+    // each contribute one item plus one column spacing interval.
+    readonly property real homeInlineChromeHeight:
+        homeContent.y + homeOverviewRail.height
         + autoOverviewTitle.implicitHeight
         + (homeInlineGraphHeading ? relationOverviewTitle.implicitHeight : 0)
         + (homeInlineLiveHeading ? liveOverviewTitle.implicitHeight : 0)
         + homeInlineAlertHeight
-        + (homeInlineSectionCount-1)*homeContent.spacing
-    readonly property real homeInlineAutoSpacerHeight:
-        Math.max(0,homeScroll.height-homeInlineFixedContentHeight
-            - homeContent.spacing - 1)
+        + (homeInlineSectionCount-1)*homeContent.spacing + 1
+    readonly property real homeInlineUsableHeight: Math.max(0,
+        homeScroll.height - homeInlineChromeHeight)
+    readonly property real homeInlineGrowth: Math.max(0,
+        homeInlineUsableHeight - homeInlineMinimumGraphHeight
+            - homeInlineMinimumLiveHeight - homeInlineMinimumAutoHeight)
+    readonly property real homeInlineLiveHeight:
+        homeInlineMinimumLiveHeight + Math.min(54,
+            Math.floor(homeInlineGrowth * 0.30))
+    readonly property real homeInlineAutoHeight:
+        homeInlineMinimumAutoHeight + Math.min(24,
+            Math.floor(homeInlineGrowth * 0.10))
+    readonly property real homeInlineGraphHeight: Math.max(
+        homeInlineMinimumGraphHeight,
+        homeInlineUsableHeight - homeInlineLiveHeight - homeInlineAutoHeight)
     readonly property real homeInlineSingleHeight:
         Math.max(70,Math.min(128,homeScroll.height
             - homeOverviewRail.height - 36))
@@ -70,6 +85,7 @@ Rectangle {
             - 14 - homeInlineSingleHeight - 3*homeContent.spacing) / 2))
     readonly property alias homeQuickItem: homeQuickRow
     readonly property alias homeOverviewGraphItem: homeRelationsRow
+    readonly property alias homeAutoTitleItem: autoOverviewTitle
     function chooseHomeInlinePane(path) {
         if(!homeOverviewWorkspace) return;
         const target=String(path||"");
@@ -1319,8 +1335,8 @@ Rectangle {
             objectName: "home-w3-history-relations"
             visible: home.sectionVisible("relations")
             width: parent.width
-            // Keep the exact two existing graph inspectors and their live
-            // history arrays. Only the HOME default gets a compact 72px row.
+            // Keep both original inspectors and the live history arrays.
+            // The HOME default grows their actual plotted area with height.
             height: home.homeInlineDefault ? home.homeInlineGraphHeight
                 : home.compactHistory
                 ? Math.max(72, Math.min(108, home.height - 188))
@@ -1331,6 +1347,7 @@ Rectangle {
                 width: (parent.width - homeRelationsRow.spacing) / 2
                 height: parent.height
                 compact: home.compactHistory || home.homeInlineDefault
+                fluidCompactPlot: home.homeInlineDefault
                 title: "AQI ↔ HUMIDITY"
                 leftLabel: "AQI"
                 rightLabel: "HUMIDITY %"
@@ -1350,6 +1367,7 @@ Rectangle {
                 width: (parent.width - homeRelationsRow.spacing) / 2
                 height: parent.height
                 compact: home.compactHistory || home.homeInlineDefault
+                fluidCompactPlot: home.homeInlineDefault
                 title: "AQI ↔ WIND"
                 leftLabel: "AQI"
                 rightLabel: "WIND MPH"
@@ -1827,15 +1845,8 @@ Rectangle {
             }
         }
 
-        // Any spare height lives between the LIVE readings and AUTO,
-        // never inside the already legible graph or meter boxes.
-        Item {
-            objectName: "home-w25-auto-bottom-spacer"
-            visible: home.homeInlineDefault
-                && home.homeInlineAutoSpacerHeight > 0
-            width: parent.width
-            height: visible ? home.homeInlineAutoSpacerHeight : 0
-        }
+        // W26 // No artificial spacer. AUTO follows LIVE immediately;
+        // dynamic graphs and compact cards use all available height.
 
         StationSectionDivider {
             id: autoOverviewTitle

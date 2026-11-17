@@ -1,0 +1,55 @@
+name: Social PHONE FaceTime iPhone Shortcut Relay V1
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhoneFaceTimeShortcutRelay.py'
+      - 'tests/phone/test_phone_facetime_shortcuts_relay_v1.py'
+      - 'MODEL/contracts/social-phone-facetime-iphone-shortcuts-relay-v1.md'
+      - '.github/workflows/social-phone-facetime-shortcuts-relay-v1.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhoneFaceTimeShortcutRelay.py'
+      - 'tests/phone/test_phone_facetime_shortcuts_relay_v1.py'
+      - 'MODEL/contracts/social-phone-facetime-iphone-shortcuts-relay-v1.md'
+      - '.github/workflows/social-phone-facetime-shortcuts-relay-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  one-shot-iphone-request-relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compile disabled-by-default loopback relay
+        run: python -m py_compile services/phone/PhoneFaceTimeShortcutRelay.py
+      - name: Real local HTTP exchange, auth, replay, bounds, TTL and private-response tests
+        run: python -m unittest discover -s tests/phone -p 'test_phone_facetime_shortcuts_relay_v1.py' -v
+      - name: Retain iPhone-only preflight and honest disabled-cellular status
+        run: |
+          python -m unittest discover -s tests/phone -p 'test_phone_facetime_iphone_only_pilot.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_facetime_audio_route_v2.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_facetime_iphone_only_pilot_ui.py' -v
+      - name: Keep FaceTime invite URL allowlist, PHONE call controls, locked Personal data
+        run: |
+          node tests/messaging/test_social_phone_facetime_handoff_js.js
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_facetime_handoff_ui.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_facetime_audio_route_v2_ui.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_audio_controls.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_contact_metadata_locked_p40.py' -v
+      - name: No live iOS or desktop authority
+        run: |
+          echo 'FACETIME_SHORTCUT_RELAY // SOURCE_ONLY'
+          echo 'FACETIME_SHORTCUT_RELAY // LOCAL_LOOPBACK_HTTP_TEST_NOT_REMOTE_IPHONE'
+          echo 'FACETIME_SHORTCUT_RELAY // NO_NATIVE_ANSWER_END_VIDEO_OR_CALL_CONNECTED_PROOF'
+          echo 'FACETIME_SHORTCUT_RELAY // NO_HOST_NETWORK_CONFIG_OR_PRODUCTION_ACTIVATION'

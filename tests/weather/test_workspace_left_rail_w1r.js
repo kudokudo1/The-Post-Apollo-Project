@@ -18,7 +18,7 @@ test("seven main family ModeButtons use the original Station left rail",()=>{
   assert.match(rail,/height: 48/);
   assert.match(rail,/labelText: modelData\.label/);
   assert.match(rail,/Workspace\.familyFor\(familyRail\.navigator\.currentPath\)/);
-  assert.match(rail,/familyRail\.navigator\.chooseRoute\(modelData\.landing\)/);
+  assert.match(rail,/familyRail\.navigator\.chooseFamily\(modelData\.id\)/);
   assert.match(station,/StationWorkspaceFamilyRail\s*\{/);
   assert.match(station,/visible: weatherStation\.subjectNavigationOpen\s*&& !subjectNavigator\.indexOpen/);
   assert.match(station,/navigator: subjectNavigator/);

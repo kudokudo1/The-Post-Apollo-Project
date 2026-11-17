@@ -34,14 +34,17 @@ cleanup() {
   rmdir -- "$dropin" >/dev/null 2>&1 || true
   systemctl daemon-reload >/dev/null 2>&1 || true
   if (( policy_loaded )); then
+    echo "P53_STAGE // before_phone_ci_policy_unload"
     timeout --signal=TERM --kill-after=4s 150s \
       semodule -r postapollo_phone_ci >/var/tmp/p53-selinux-unload.log 2>&1 ||
       { echo "P53_FAIL // POLICY_UNLOAD_REFUSED"; rc=78; }
+    echo "P53_STAGE // after_phone_ci_policy_unload"
   fi
   rm -f -- "$marker" "$launcher"
   rmdir -- "$root" >/dev/null 2>&1 || true
   if (( user_created )); then
-    userdel "$name" >/dev/null 2>&1 ||
+    timeout --signal=TERM --kill-after=3s 25s \
+      userdel "$name" >/dev/null 2>&1 ||
       { echo "P53_FAIL // TEMP_USER_DELETE_REFUSED"; rc=78; }
   fi
   if (( rc != 0 )); then echo "P53_FAIL // SERVICE_PROBE_EXIT_$rc"; fi
@@ -82,23 +85,41 @@ semodule -l | grep -Eq '^postapollo_phone_ci([[:space:]]|$)' ||
 [[ "$(getenforce)" == Enforcing ]] || fail "SELINUX_NOT_ENFORCING"
 echo "P53_PASS // DISTINCT_PHONE_SELINUX_TEST_DOMAIN_LOADED_ENFORCING"
 
-useradd --system --no-create-home --home-dir /nonexistent \
-  --shell /usr/sbin/nologin "$name" || fail "TEMP_USER_CREATE"
+# Account creation follows an expensive SELinux policy load. Its real
+# NSS/filesystem transaction must not hang the entire offline guest run.
+echo "P53_STAGE // before_phone_ci_useradd"
+timeout --signal=TERM --kill-after=3s 35s \
+  useradd --system --no-create-home --home-dir /nonexistent \
+  --shell /usr/sbin/nologin "$name" || fail "TEMP_USER_CREATE_OR_TIMEOUT"
 user_created=1
-uid="$(id -u "$name")"
-gid="$(id -g "$name")"
+echo "P53_STAGE // after_phone_ci_useradd"
+uid="$(timeout --signal=TERM --kill-after=2s 12s id -u "$name")" ||
+  fail "TEMP_USER_UID_LOOKUP_TIMEOUT"
+gid="$(timeout --signal=TERM --kill-after=2s 12s id -g "$name")" ||
+  fail "TEMP_USER_GID_LOOKUP_TIMEOUT"
 [[ "$uid" =~ ^[1-9][0-9]*$ && "$gid" =~ ^[1-9][0-9]*$ ]] ||
   fail "TEMP_USER_IS_ROOT"
-install -d -m 0711 -o root -g root "$root"
+echo "P53_STAGE // before_phone_ci_runtime_prepare"
+timeout --signal=TERM --kill-after=2s 20s \
+  install -d -m 0711 -o root -g root "$root" ||
+  fail "ROOT_TEST_RUNTIME_CREATE_TIMEOUT"
 printf 'P53 CI ONLY NO SAVE\n' > "$marker"
 chmod 0600 "$marker"
-install -m 0555 -o root -g root /usr/bin/python3 "$launcher"
+timeout --signal=TERM --kill-after=2s 20s \
+  install -m 0555 -o root -g root /usr/bin/python3 "$launcher" ||
+  fail "PYTHON_LAUNCHER_COPY_TIMEOUT"
 cmp -s /usr/bin/python3 "$launcher" || fail "PYTHON_LAUNCHER_BYTE_DRIFT"
-install -d -m 0700 -o "$uid" -g "$gid" /run/postapollo-phone-status-ci
-chcon -t postapollo_phone_ci_run_t "$root" "$marker" /run/postapollo-phone-status-ci ||
-  fail "PHONE_RUNTIME_CONTEXT"
-chcon -t postapollo_phone_ci_exec_t "$launcher" ||
-  fail "PHONE_PYTHON_EXEC_CONTEXT"
+timeout --signal=TERM --kill-after=2s 20s \
+  install -d -m 0700 -o "$uid" -g "$gid" /run/postapollo-phone-status-ci ||
+  fail "PRIVATE_SOCKET_DIR_PREPARE_TIMEOUT"
+echo "P53_STAGE // before_phone_ci_context_label"
+timeout --signal=TERM --kill-after=2s 20s \
+  chcon -t postapollo_phone_ci_run_t "$root" "$marker" /run/postapollo-phone-status-ci ||
+  fail "PHONE_RUNTIME_CONTEXT_OR_TIMEOUT"
+timeout --signal=TERM --kill-after=2s 20s \
+  chcon -t postapollo_phone_ci_exec_t "$launcher" ||
+  fail "PHONE_PYTHON_EXEC_CONTEXT_OR_TIMEOUT"
+echo "P53_STAGE // after_phone_ci_context_label"
 [[ "$(stat -c '%u:%g:%a' "$launcher")" == '0:0:555' ]] ||
   fail "PHONE_LAUNCHER_OWNER_MODE"
 ls -Z "$launcher" | grep -Fq ':postapollo_phone_ci_exec_t:' ||
@@ -111,10 +132,15 @@ ExecStart=
 ExecStart=/run/postapollo-phone-status-test-only/ci-python3 -I -B /usr/libexec/post-apollo/phone/PhonePersonalStatusHostP49.py --private-status-dir /run/postapollo-phone-status-ci
 PHONE_CI_OVERRIDE
 chmod 0644 "$dropin/10-phone-ci-selinux.conf"
-systemctl daemon-reload || fail "PHONE_OVERRIDE_RELOAD"
+echo "P53_STAGE // before_phone_ci_override_reload"
+timeout --signal=TERM --kill-after=3s 35s \
+  systemctl daemon-reload || fail "PHONE_OVERRIDE_RELOAD_OR_TIMEOUT"
 systemctl reset-failed "$unit" >/dev/null 2>&1 || true
-systemctl start "$unit" || fail "CONFINED_PHONE_START"
+echo "P53_STAGE // before_phone_ci_service_start"
+timeout --signal=TERM --kill-after=3s 35s \
+  systemctl start "$unit" || fail "CONFINED_PHONE_START_OR_TIMEOUT"
 started=1
+echo "P53_STAGE // after_phone_ci_service_start"
 for n in $(seq 1 60); do
   pid="$(systemctl show "$unit" --property=MainPID --value || echo 0)"
   [[ "$pid" =~ ^[1-9][0-9]+$ && -S "$socket" ]] && break
@@ -178,7 +204,9 @@ except (PermissionError, ConnectionRefusedError):
 PY
 echo "P53_PASS // CROSS_UID_HOST_ACCESS_REFUSED"
 
-systemctl stop "$unit" || fail "STOP_PHONE_SERVICE"
+echo "P53_STAGE // before_phone_ci_stop_and_cleanup"
+timeout --signal=TERM --kill-after=3s 30s \
+  systemctl stop "$unit" || fail "STOP_PHONE_SERVICE_OR_TIMEOUT"
 started=0
 for n in $(seq 1 30); do
   [[ ! -S "$socket" &&

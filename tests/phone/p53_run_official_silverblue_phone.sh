@@ -162,6 +162,10 @@ qemu-system-x86_64 \
 pid="$!"
 completed=0
 policy_started=0
+post_policy_started=0
+post_process_started=0
+post_status_started=0
+post_cross_uid_started=0
 for n in $(seq 1 1850); do
   if [[ -r "$tmp/guest-serial.log" ]]; then
     if grep -aFq 'P53_FAIL //' "$tmp/guest-serial.log"; then
@@ -183,6 +187,53 @@ for n in $(seq 1 1850); do
       fi
     else
       policy_started=0
+    fi
+
+    # The first full VM reached a successfully installed PHONE policy and
+    # then made no further serial progress until the 70-minute CI cutoff.
+    # Separate post-policy deadlines are diagnostic and fail closed: unlike
+    # a long outer KVM timer, these identify the *physical* stalled phase.
+    if grep -aFq 'P53_PASS // DISTINCT_PHONE_SELINUX_TEST_DOMAIN_LOADED_ENFORCING' "$tmp/guest-serial.log" &&
+       ! grep -aFq 'P53_PASS // REAL_ENFORCING_PHONE_DOMAIN_AND_SYSTEMD_PROCESS_OBSERVED' "$tmp/guest-serial.log"; then
+      if (( post_policy_started == 0 )); then post_policy_started=$SECONDS; fi
+      if (( SECONDS - post_policy_started > 210 )); then
+        echo "P53_BLOCKED // PHONE_SERVICE_POST_POLICY_START_STALLED"
+        echo "P53_HOST_LAST_PHONE_STAGE // $(grep -aF 'P53_STAGE //' "$tmp/guest-serial.log" | tail -n 1 | cut -c1-155)"
+        break
+      fi
+    else
+      post_policy_started=0
+    fi
+    if grep -aFq 'P53_PASS // REAL_ENFORCING_PHONE_DOMAIN_AND_SYSTEMD_PROCESS_OBSERVED' "$tmp/guest-serial.log" &&
+       ! grep -aFq 'P53_PASS // REAL_INSTALLED_PHONE_STATUS_RESPONSE_ALL_SAVE_FLAGS_FALSE' "$tmp/guest-serial.log"; then
+      if (( post_process_started == 0 )); then post_process_started=$SECONDS; fi
+      if (( SECONDS - post_process_started > 70 )); then
+        echo "P53_BLOCKED // PHONE_SERVICE_STATUS_CLIENT_STALLED"
+        break
+      fi
+    else
+      post_process_started=0
+    fi
+    if grep -aFq 'P53_PASS // REAL_INSTALLED_PHONE_STATUS_RESPONSE_ALL_SAVE_FLAGS_FALSE' "$tmp/guest-serial.log" &&
+       ! grep -aFq 'P53_PASS // CROSS_UID_HOST_ACCESS_REFUSED' "$tmp/guest-serial.log"; then
+      if (( post_status_started == 0 )); then post_status_started=$SECONDS; fi
+      if (( SECONDS - post_status_started > 70 )); then
+        echo "P53_BLOCKED // PHONE_SERVICE_CROSS_UID_REFUSAL_STALLED"
+        break
+      fi
+    else
+      post_status_started=0
+    fi
+    if grep -aFq 'P53_PASS // CROSS_UID_HOST_ACCESS_REFUSED' "$tmp/guest-serial.log" &&
+       ! grep -aFq 'P53_PASS // REAL_PHONE_ENFORCING_SERVICE_PROBE_FINISHED_AND_CLEAN' "$tmp/guest-serial.log"; then
+      if (( post_cross_uid_started == 0 )); then post_cross_uid_started=$SECONDS; fi
+      if (( SECONDS - post_cross_uid_started > 275 )); then
+        echo "P53_BLOCKED // PHONE_SERVICE_STOP_POLICY_UNLOAD_STALLED"
+        echo "P53_HOST_LAST_PHONE_STAGE // $(grep -aF 'P53_STAGE //' "$tmp/guest-serial.log" | tail -n 1 | cut -c1-155)"
+        break
+      fi
+    else
+      post_cross_uid_started=0
     fi
   fi
   kill -0 "$pid" 2>/dev/null || break

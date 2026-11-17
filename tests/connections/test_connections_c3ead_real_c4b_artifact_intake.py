@@ -67,6 +67,7 @@ def fixture(archive=None):
         "id": 14314862260, "name": A.ARTIFACT_NAME,
         "expired": False, "size_in_bytes": len(archive),
         "created_at": "2026-11-17T09:16:13Z",
+        "expires_at": "2026-11-18T09:16:12Z",
         "digest": "sha256:" + hashlib.sha256(archive).hexdigest(),
         "workflow_run": {
             "id": RUN, "repository_id": A.REPO_ID,
@@ -291,6 +292,33 @@ class C3eADTests(unittest.TestCase):
                    d["artifacts"]["artifacts"][0])
             obj[field] = value
             with self.subTest(location=location, field=field, value=value):
+                self.refuse(d)
+
+    def test_21_artifact_uploaded_after_successful_job_finished_refused(self):
+        d = fixture()
+        d["artifacts"]["artifacts"][0]["created_at"] = "2026-11-17T09:16:16Z"
+        self.refuse(d)
+
+    def test_22_artifact_upload_at_job_completion_boundary_consistent(self):
+        d = fixture()
+        d["artifacts"]["artifacts"][0]["created_at"] = "2026-11-17T09:16:15Z"
+        result = A.assess_readonly(**d)
+        self.assertTrue(result["c4bTwoBootRollbackMarkersConsistentInCI"])
+        self.assertFalse(result["productionAuthority"])
+
+    def test_23_artifact_expiry_not_after_creation_refused(self):
+        for value in ("2026-11-17T09:16:12Z", "2026-11-17T09:16:13Z"):
+            d = fixture()
+            d["artifacts"]["artifacts"][0]["expires_at"] = value
+            with self.subTest(expiry=value):
+                self.refuse(d)
+
+    def test_24_missing_or_invalid_expiration_refused(self):
+        for value in (None, "", "2026-11-18T04:16:12-05:00",
+                      "2026-11-99T09:16:12Z"):
+            d = fixture()
+            d["artifacts"]["artifacts"][0]["expires_at"] = value
+            with self.subTest(value=value):
                 self.refuse(d)
 
     def test_17_no_network_or_permission_side_effects(self):

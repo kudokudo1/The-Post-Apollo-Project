@@ -55,6 +55,8 @@ class TestRelayStateMachine(unittest.TestCase):
         self.assertEqual(command["state"], "DELIVERED_TO_SHORTCUT")
         self.assertFalse(command["faceTimeConnected"])
         rid = command["requestId"]
+        self.assertEqual(self.relay.claim()["state"], "NONE",
+                         "second claim must never redeliver URI")
         self.assertFalse(self.relay.acknowledge({"requestId": rid, "event": "CONNECTED"}))
         self.assertFalse(self.relay.acknowledge({"requestId": "Z" * len(rid),
                                                  "event": "OPEN_URL_REQUESTED"}))
@@ -63,6 +65,8 @@ class TestRelayStateMachine(unittest.TestCase):
         self.assert_denials(self.relay.status())
         self.assertTrue(self.relay.status()["iphoneWorkflowReportedRequest"])
         self.assertEqual(self.relay.status()["state"], "PHONE_REPORTED_OPEN_REQUEST")
+        self.assertEqual(self.relay._request.target, "",
+                         "recipient erased after terminal phone report")
         self.assertFalse(self.relay.acknowledge(
             {"requestId": rid, "event": "OPEN_URL_REQUESTED"}))
         self.assertEqual(self.relay.claim()["state"], "NONE")
@@ -73,6 +77,7 @@ class TestRelayStateMachine(unittest.TestCase):
     def test_decline_cancel_and_expiry_are_terminal(self):
         self.assertTrue(self.relay.prepare({"mode": "video", "target": "+15551234567"}))
         self.assertTrue(self.relay.cancel())
+        self.assertEqual(self.relay._request.target, "")
         self.assertFalse(self.relay.cancel())
         self.assertEqual(self.relay.claim()["state"], "NONE")
         self.assertTrue(self.relay.prepare({"mode": "video", "target": "+15551234567"}))
@@ -83,6 +88,7 @@ class TestRelayStateMachine(unittest.TestCase):
         self.assertTrue(self.relay.prepare({"mode": "audio", "target": "+15551234567"}))
         self.now[0] += RelayModule.REQUEST_TTL_SECONDS
         self.assertEqual(self.relay.status()["state"], "EXPIRED")
+        self.assertEqual(self.relay._request.target, "")
         self.assert_denials(self.relay.status())
         self.assertEqual(self.relay.claim()["state"], "NONE")
         self.assertFalse(self.relay.acknowledge(
@@ -183,6 +189,7 @@ class TestHttpRelay(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(cmd["faceTimeUri"], "facetime:+15551234567")
         self.assertFalse(cmd["faceTimeConnected"])
+        self.assertEqual(self.request("GET", "/v1/iphone/next", IPHONE)[1]["state"], "NONE")
         self.assertEqual(self.request("POST", "/v1/iphone/ack", ADMIN,
             {"requestId": cmd["requestId"], "event": "OPEN_URL_REQUESTED"})[0], 403)
         status, report = self.request("POST", "/v1/iphone/ack", IPHONE,

@@ -1,0 +1,76 @@
+name: Connections C3e-AH C4b signed source plus real Linux gateway process (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_release_trust/C3eAHSignedReleaseLiveOrigin.py'
+      - 'tests/connections/test_connections_c3eah_signed_release_live_origin.py'
+      - '.github/workflows/connections-c3eah-signed-release-live-origin.yml'
+      - 'docs/connections-c3eah-signed-release-live-origin.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-source-plus-real-kernel-ci-only:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned signature verification dependency for disposable CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Verify syntax, provenance boundaries and hard false grants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eAHSignedReleaseLiveOrigin.py \
+            tests/connections/test_connections_c3eah_signed_release_live_origin.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/c3e_release_trust/C3eAHSignedReleaseLiveOrigin.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          status=Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          assert 'I.assess_synthetic_release(' in source
+          assert 'AG.observe_ci_only(expected=pins, mode=mode)' in source
+          for key in ("independentlySignedRemoteKernelWitnessVerified",
+                      "independentlyInstalledSilverblueGatewayAuthenticated",
+                      "independentlyEnrolledOperatorReleaseRoot",
+                      "externalIssuerCustodyVerified", "externalRollbackResistanceVerified",
+                      "c5HumanConsentVerified", "hostAuthenticated", "canBeginSignIn",
+                      "credentialActionsEnabled", "productionAuthority"):
+              assert '"' + key + '": False' in source
+          assert 'readonly property bool credentialActionsEnabled: false' in broker
+          assert 'readonly property bool hostAuthenticated: false' in status
+          print("C3EAH_HOLD // SIGNED_CI_RELEASE_AND_LOCAL_PROCESS_NOT_REMOTE_HOST_TRUST")
+          PY
+      - name: Twenty-two signed release and actual Linux process composition cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B \
+            tests/connections/test_connections_c3eah_signed_release_live_origin.py
+          echo "C3EAH_PASS // 22_SIGNED_RELEASE_AND_REAL_PROCESS_TEST_CASES"
+      - name: Preserve C3e-AG kernel checks and Identity release candidate contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            /usr/bin/python3 -B \
+            tests/connections/test_connections_c3eag_identity_kernel_observer.py
+          python3 -B tests/identity/test_silverblue_release_candidate_v1.py
+          echo "C3EAH_HOLD // NO_SILVERBLUE_GUEST_ADMISSION_OR_NATIVE_LOGIN"

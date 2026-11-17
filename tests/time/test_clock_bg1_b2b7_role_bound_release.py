@@ -221,13 +221,19 @@ class ClockB2B7RoleBoundRelease(unittest.TestCase):
         for fields in [
             {"releaseEpoch":6},
             {"releaseSequence":15},
-            {"role":"clock-background-worker"},
             {"gid":os.getgid()+1},
         ]:
             with self.subTest(fields=fields):
                 policy=dict(self.release_policy,**fields)
                 self.refused(lambda:self.make_chain(release_policy=policy),
                              "SIGNED_ROLE_RELEASE_PINS_MISMATCH")
+        # B2B5 independently refuses a background-worker receipt before
+        # B2B7 can compose it; this is the stronger upstream refusal.
+        background=dict(self.release_policy,role="clock-background-worker")
+        with self.assertRaises(Receipt.Refused) as caught:
+            self.make_chain(release_policy=background)
+        self.assertEqual(str(caught.exception),
+                         "WRONG_SIGNED_CLOCK_RELEASE_POLICY")
 
     def test_process_pin_mismatch_rejected_before_any_challenge(self):
         self.refused(lambda:self.make_chain(

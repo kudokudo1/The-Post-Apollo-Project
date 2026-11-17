@@ -1,0 +1,73 @@
+name: Connections C3e-AG Identity real kernel process observation (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_release_trust/C3eAGIdentityKernelObserver.py'
+      - 'tests/connections/test_connections_c3eag_identity_kernel_observer.py'
+      - '.github/workflows/connections-c3eag-identity-kernel-observer.yml'
+      - 'docs/connections-c3eag-identity-kernel-observer.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-linux-kernel-observer-ci-only:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exact Identity service scope and no-grants review
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eAGIdentityKernelObserver.py \
+            tests/connections/test_connections_c3eag_identity_kernel_observer.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/c3e_release_trust/C3eAGIdentityKernelObserver.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          status=Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          assert "post-apollo-identity-silverblue-ci.service" in source
+          assert "/usr/libexec/post-apollo/identity/identity-gateway-ci" in source
+          assert "/proc/" in source
+          assert "os.pidfd_open(" in source
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "readonly property bool hostAuthenticated: false" in status
+          for k in ("independentInstalledHostAttested", "signedHostOriginAuthenticated",
+                    "operatorReleaseRootEnrolled",
+                    "externallyProtectedChallengeIssuerVerified",
+                    "externalRollbackResistanceVerified",
+                    "c5HumanConsentVerified", "hostAuthenticated",
+                    "canBeginSignIn", "credentialActionsEnabled", "productionAuthority"):
+              assert '"' + k + '": False' in source
+          print("C3EAG_HOLD // OS_PROCESS_SNAPSHOT_IS_NOT_SIGNED_HOST_AUTHORITY")
+          PY
+      - name: Actual nonroot Linux Python PID, kernel source and mutation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            /usr/bin/python3 -B \
+            tests/connections/test_connections_c3eag_identity_kernel_observer.py
+          echo "C3EAG_PASS // 22_REAL_KERNEL_OBSERVER_DENY_ONLY_TESTS"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Preserve C3e-AF signed enrollment and C3e-Z one-use CI denial
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+          sudo -n env GITHUB_ACTIONS=true \
+            "$(command -v python3)" -B \
+            tests/connections/test_connections_c3eaf_signed_role_enrollment.py
+          echo "C3EAG_HOLD // SIGNED_CI_ENROLLMENT_NO_REAL_OPERATOR_CUSTODY"

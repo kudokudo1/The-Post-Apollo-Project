@@ -16,6 +16,24 @@ Item {
     property string providerId: ""
     property string assignmentId: ""
 
+    // A default provider is not consent to overwrite the persisted Room choice.
+    property string explicitProviderIdToPersist: ""
+    readonly property string storedProviderId: {
+        const rooms =
+            Array.isArray(adapter.conversations)
+            ? adapter.conversations : [];
+        for (let i = 0; i < rooms.length; ++i) {
+            const room = rooms[i] || {};
+            if (String(room.id || "") === String(root.roomId || ""))
+                return String(room.providerId || "").trim();
+        }
+        return "";
+    }
+    readonly property string effectiveProviderId:
+        String(root.explicitProviderIdToPersist
+            || root.storedProviderId
+            || root.providerId || "").trim()
+
     readonly property string activeSessionId: adapter.activeSessionId
 
     readonly property var displayMessages: {
@@ -62,8 +80,8 @@ Item {
             id: root.roomId,
             displayNameInProfile: root.roomId,
             nickname:
-                root.providerId
-                ? String(root.providerId).toUpperCase()
+                root.effectiveProviderId
+                ? root.effectiveProviderId.toUpperCase()
                 : ""
         };
     }
@@ -90,11 +108,11 @@ Item {
         if (root.activeSessionId)
             return "CONNECTED";
 
-        return root.providerId ? "READY TO CONNECT" : "ROOM CHAT";
+        return root.effectiveProviderId ? "READY TO CONNECT" : "ROOM CHAT";
     }
 
     function roomBinding() {
-        return {
+        const binding = {
             id: root.roomId,
             repository: root.repository,
             patientId: root.patientId,
@@ -105,6 +123,12 @@ Item {
             doctorId: root.doctorId,
             assignmentId: root.assignmentId
         };
+        // PX preserves stored provider when the explicit field is omitted.
+        const explicitProvider =
+            String(root.explicitProviderIdToPersist || "").trim();
+        if (explicitProvider)
+            binding.providerId = explicitProvider;
+        return binding;
     }
 
     function syncRoomBinding() {
@@ -140,6 +164,7 @@ Item {
     onBedPathChanged: scheduleRoomBinding()
     onDoctorIdChanged: scheduleRoomBinding()
     onAssignmentIdChanged: scheduleRoomBinding()
+    onExplicitProviderIdToPersistChanged: scheduleRoomBinding()
 
     HospitalChatActionService {
         id: chatActionService
@@ -150,7 +175,7 @@ Item {
         id: adapter
 
         doctorId: root.doctorId
-        providerId: root.providerId
+        providerId: root.effectiveProviderId
         workingDirectory: root.bedPath
     }
 

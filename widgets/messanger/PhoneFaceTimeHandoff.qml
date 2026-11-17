@@ -24,7 +24,9 @@ Rectangle {
     function clear() {
         reviewedInvite = "";
         result = "IDLE";
-        inviteInput.text = "";
+        // Mode/contact initialization may precede child creation in QML.
+        if (inviteInput)
+            inviteInput.text = "";
     }
 
     function reviewInvite() {

@@ -67,15 +67,17 @@ def isolated_environment(root: Path, inherited: dict[str, str]) -> dict[str, str
         "PATH": inherited.get("PATH", "/usr/bin:/bin"),
         "LANG": "C.UTF-8",
         "LC_ALL": "C.UTF-8",
-        "GIO_USE_VFS": "local",
+        "GIO_USE_VFS": "gvfs",
+        **({"DBUS_SESSION_BUS_ADDRESS": inherited["DBUS_SESSION_BUS_ADDRESS"]}
+           if inherited.get("DBUS_SESSION_BUS_ADDRESS") else {}),
     }
 
 
-def command(argv: list[str], env: dict[str, str]) -> subprocess.CompletedProcess:
+def command(argv: list[str], env: dict[str, str], timeout: int = TIMEOUT) -> subprocess.CompletedProcess:
     try:
         return subprocess.run(
             argv, env=env, capture_output=True, text=True, encoding="utf-8",
-            errors="replace", timeout=TIMEOUT, check=False
+            errors="replace", timeout=timeout, check=False
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise RoundTripError("COMMAND_EXECUTION_OR_TIMEOUT") from exc
@@ -205,16 +207,56 @@ def run_roundtrip(root: Path, inherited: dict[str, str]) -> dict:
     }
 
 
+def validated_child_root(raw: str, runner_temp: Path,
+                         inherited: dict[str, str]) -> Path:
+    """Never accept a child fixture directory outside this CI scratch root."""
+    if not inherited.get("DBUS_SESSION_BUS_ADDRESS"):
+        raise RoundTripError("PRIVATE_DBUS_SESSION_REQUIRED")
+    if not raw or not os.path.isabs(raw):
+        raise RoundTripError("CHILD_ROOT_INVALID")
+    path = Path(raw)
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise RoundTripError("CHILD_ROOT_NOT_FOUND") from exc
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid()
+            or not path.name.startswith("trashpp-u9-")
+            or path.resolve().parent != runner_temp.resolve()):
+        raise RoundTripError("CHILD_ROOT_OUTSIDE_RUNNER")
+    return path.resolve()
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) != 1:
+    if len(argv) != 1 and not (len(argv) == 3 and argv[1] == "--ci-child"):
         print(json.dumps({"ok": False, "error": "NO_ARGUMENTS_ALLOWED"}))
         return 2
     try:
-        runner_temp = ci_runner_temp(dict(os.environ))
-        # TemporaryDirectory is under GH-provided runner scratch space ONLY.
-        # Its cleanup cannot touch any source file or operator workstation.
-        with tempfile.TemporaryDirectory(prefix="trashpp-u9-", dir=runner_temp) as tmp:
-            result = run_roundtrip(Path(tmp), dict(os.environ))
+        inherited = dict(os.environ)
+        runner_temp = ci_runner_temp(inherited)
+        if len(argv) == 3:
+            root = validated_child_root(argv[2], runner_temp, inherited)
+            result = run_roundtrip(root, inherited)
+        else:
+            # DBus and the GVfs trash service are launched *after* the private
+            # HOME and XDG storage exist. Activated daemons inherit the same
+            # private paths; they must not observe the generic runner's HOME.
+            with tempfile.TemporaryDirectory(prefix="trashpp-u9-", dir=runner_temp) as tmp:
+                root = Path(tmp)
+                env = isolated_environment(root, inherited)
+                env["GITHUB_ACTIONS"] = "true"
+                env["CI"] = "true"
+                env["RUNNER_TEMP"] = str(runner_temp)
+                proc = command(
+                    ["dbus-run-session", "--", sys.executable, "-I", "-B",
+                     str(Path(__file__).resolve()), "--ci-child", str(root)],
+                    env, timeout=210
+                )
+                try:
+                    result = json.loads(proc.stdout)
+                except (ValueError, TypeError) as exc:
+                    raise RoundTripError("DBUS_CHILD_OUTPUT_INVALID") from exc
+                if not isinstance(result, dict) or ((proc.returncode == 0) is not (result.get("ok") is True)):
+                    raise RoundTripError("DBUS_CHILD_RESULT_MISMATCH")
     except RoundTripError as exc:
         result = {"schema": SCHEMA, "ok": False, "error": str(exc)}
     except (OSError, ValueError, KeyError, TypeError) as exc:

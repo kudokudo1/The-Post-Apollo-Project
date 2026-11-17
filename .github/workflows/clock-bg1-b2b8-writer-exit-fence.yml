@@ -1,0 +1,56 @@
+name: Clock BG1-B2B8 durable signed-writer exit evidence (fixture only)
+on:
+  push:
+    paths:
+      - "services/time/AlarmWriterExitFenceFixture.py"
+      - "services/time/BG1-ALARM-EXIT-FENCE.md"
+      - "tests/time/test_clock_bg1_b2b8_writer_exit_fence.py"
+      - ".github/workflows/clock-bg1-b2b8-writer-exit-fence.yml"
+  pull_request:
+    paths:
+      - "services/time/AlarmWriterExitFenceFixture.py"
+      - "services/time/BG1-ALARM-EXIT-FENCE.md"
+      - "tests/time/test_clock_bg1_b2b8_writer_exit_fence.py"
+      - ".github/workflows/clock-bg1-b2b8-writer-exit-fence.yml"
+permissions:
+  contents: read
+jobs:
+  real-pidfd-exit-deny-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned cryptographic fixture dependency
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Real signed process exit + durable epoch refusal (synthetic)
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b8_writer_exit_fence.py' -v
+      - name: Preserve signed same-peer B2B7 chain and B2B5 replay regression
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b7_role_bound_release.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b5_signed_release.py' -v
+      - name: Preserve kernel pidfd witness and active QML file barrier
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+          node --test tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs
+      - name: Strict four-file Clock-only scope boundary
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],
+              text=True).splitlines())
+          expected={
+              "services/time/AlarmWriterExitFenceFixture.py",
+              "services/time/BG1-ALARM-EXIT-FENCE.md",
+              "tests/time/test_clock_bg1_b2b8_writer_exit_fence.py",
+              ".github/workflows/clock-bg1-b2b8-writer-exit-fence.yml"}
+          assert changed==expected, f"Unexpected files: {sorted(changed ^ expected)}"
+          print("No QML, Identity, Connections, systemd, broker, background-ring or host edits: PASS")
+          PY

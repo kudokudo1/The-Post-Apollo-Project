@@ -56,6 +56,11 @@ curl --fail --location --retry 2 --connect-timeout 20 --max-time 660 \
 printf '%s  %s\n' "$iso_sha" "$tmp/$iso" | sha256sum --check --status ||
   { echo "C4B_ID_BLOCKED // OFFICIAL_SILVERBLUE_ISO_SHA256_MISMATCH"; exit 2; }
 mkdir "$tmp/pxe" "$tmp/seed"
+# A fresh, controller-held nonce is issued BEFORE building the offline ISO.
+# It is public challenge data, never a signing secret or production credential.
+python3 -B "$repo/tests/connections/identity_silverblue/verify_controller_challenge_ci.py" \
+  issue "$tmp/controller-challenge.txt" ||
+  { echo "C4B_ID_BLOCKED // HOST_CONTROLLER_CHALLENGE_ISSUE_REFUSED"; exit 2; }
 xorriso -osirrox on -indev "$tmp/$iso" \
   -extract /images/pxeboot/vmlinuz "$tmp/pxe/vmlinuz" \
   -extract /images/pxeboot/initrd.img "$tmp/pxe/initrd.img" \
@@ -75,6 +80,10 @@ done
 for file in postapollo_identity_ci.pp postapollo_identity_ci.sha256; do
   install -m 0644 "$policy_dir/$file" "$tmp/seed/$file"
 done
+# The nonce must be identical to the controller's private-on-runner
+# reference copy. It is safe to read by the isolated guest; the receipt
+# signature binds it to the live gateway test signer.
+install -m 0644 "$tmp/controller-challenge.txt" "$tmp/seed/controller-challenge.txt"
 payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh")"
 helper_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/verify_booted_rpm_mtime_only.py")"
 service_probe_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/guest_identity_service_probe.sh")"
@@ -404,5 +413,10 @@ for evidence in \
 done
 ! grep -aFq 'C4B_ID_FAIL //' "$tmp/identity-guest-serial.log" ||
   { echo "C4B_ID_BLOCKED // GUEST_FAILURE_MARKER"; exit 2; }
+# The proof is checked by the separate Fedora CI controller AFTER the
+# genuine rollback. A guest-authored PASS marker is not sufficient.
+python3 -B "$repo/tests/connections/identity_silverblue/verify_controller_challenge_ci.py" \
+  verify "$tmp/controller-challenge.txt" "$tmp/identity-guest-serial.log" ||
+  { echo "C4B_ID_BLOCKED // ACTUAL_GATEWAY_EXTERNAL_NONCE_PROOF_REFUSED"; exit 2; }
 echo "C4B_ID_PASS // REAL_OFFICIAL_SILVERBLUE_SIGNED_IDENTITY_RPM_TWO_REBOOTS_AND_ROLLBACK"
 echo "C4B_ID_LIMITATION // CI_ONLY_CONFIRMED_CONFINEMENT_NO_INDEPENDENT_RELEASE_ROOT_SEAT_OR_C5_CONSENT"

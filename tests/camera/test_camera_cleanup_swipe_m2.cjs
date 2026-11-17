@@ -119,9 +119,16 @@ test("Batch lives in Cleanup, Gallery remains a viewing surface", () => {
     assert.match(toolbar, /label: camera\.cleanupQueueOpen/);
     assert.match(toolbar, /onLeftClicked: camera\.cleanupToggleQueue\(\)/);
     assert.doesNotMatch(toolbar, /onLeftClicked: camera\.trashQueuedNow\(\)/);
-    assert.match(queue, /label: "MOVE " \+ camera\.batchPaths\.length \+ " TO TRASH"/);
-    assert.match(queue, /onLeftClicked: camera\.trashQueuedNow\(\)/);
-    assert.match(queue, /available: !camera\.busy && camera\.batchPaths\.length > 0/);
+    // U6 replaces the historical direct queue button, but it remains
+    // an explicit final click; only the Camera owner executes the GIO move.
+    assert.match(queue, /id: cleanupQueueTrashReviewDeck/);
+    assert.match(queue, /resourceRevisionKind: "queue-counter"/);
+    assert.match(queue, /trashCapable: camera\.batchPaths\.length > 0/);
+    assert.match(queue, /onTrashReviewRequested:/);
+    assert.match(queue, /camera\.reviewQueuedCameraTrash\(/);
+    assert.match(queue, /showRestore: false/);
+    assert.match(queue, /showBurn: false/);
+    assert.doesNotMatch(queue, /onLeftClicked: camera\.trashQueuedNow\(\)/);
     assert.doesNotMatch(cleanup, /label: "REVIEW FOR TRASH/);
     assert.doesNotMatch(cleanup, /label: "CANCEL REVIEW"/);
     assert.match(cleanup, /label: "CLEAR MARKS"/);

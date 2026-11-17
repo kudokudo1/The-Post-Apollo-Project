@@ -59,6 +59,16 @@ PanelWindow {
     property string cleanupMediaFilter: "all"
     property string galleryRequestedView: "gallery"
     property var batchPaths: []
+    // U6 // Monotonic, UI-only witness for the shared queue across
+    // Batch/Grid/Swipe/Hunt. Every queue mutation replaces the array;
+    // no selection gesture ever triggers an actual GIO move.
+    property int cleanupQueueRevision: 0
+    onBatchPathsChanged: {
+        // Saturate rather than wrapping a request token and risking ABA.
+        // Once exhausted, the review handler refuses until a fresh session.
+        if (cleanupQueueRevision < 2147483647)
+            cleanupQueueRevision += 1;
+    }
     property var batchPreview: null
     property string batchReviewKey: ""
     property string batchReceipt: ""
@@ -622,6 +632,28 @@ PanelWindow {
             return false;
         selectedTrashPreview = null;
         return run("trashSelected", ["trash-selected", plan.planId, "MOVE_TO_TRASH"]);
+    }
+
+    // Trash++ U5 // The shared control requests Camera's existing one-use
+    // Gallery plan only. The plan and selected path stay inside Camera, never
+    // inside the generic UI event. Camera still owns every validation and
+    // the backend still consumes its short-lived plan before recoverable GIO.
+    function reviewSelectedCameraTrash(ownerId, resourceId, expectedRevision) {
+        if (!menuOpen || activeView !== "gallery" || busy
+                || nativeRegionSelecting || zoomWebBusy
+                || ownerId !== "camera-gio"
+                || resourceId !== "camera-gallery-selection"
+                || !/^[0-9a-f]{32}$/.test(expectedRevision)
+                || !selectedPath || !selectedRecord
+                || String(selectedRecord.path || "") !== selectedPath
+                || !selectedTrashPreview
+                || String(selectedTrashPreview.planId || "") !== expectedRevision
+                || selectedTrashPreview.path !== selectedPath
+                || galleryFiles.findIndex(function(record) {
+                    return record && record.path === selectedPath;
+                }) < 0)
+            return false;
+        return confirmSelectedTrash();
     }
 
     // The queue is presentation-neutral. Batch checkboxes, Swipe and Hunt
@@ -1296,6 +1328,36 @@ PanelWindow {
         ]);
     }
 
+    // U6 // One explicit queue-button review. This handler never accepts
+    // file paths or operations from the generic ActionDeck. It validates
+    // the current queue generation and hands off to the SAME Camera-owned
+    // one-click backend, which performs its one-use plan and GIO checks.
+    function reviewQueuedCameraTrash(ownerId, resourceId, expectedRevision) {
+        if (ownerId !== "camera-gio"
+                || resourceId !== "camera-cleanup-queue"
+                || !/^(0|[1-9][0-9]{0,9})$/.test(expectedRevision)
+                || cleanupQueueRevision >= 2147483647
+                || expectedRevision !== String(cleanupQueueRevision)
+                || !hostedCleanupActive || !cleanupQueueOpen
+                || !batchMode || activeView !== "cleanup"
+                || cleanupTechnique === "desktop"
+                || busy || nativeRegionSelecting || zoomWebBusy
+                || batchPaths.length === 0 || batchPaths.length > 500
+                || cleanupCustomFolder !== cleanupLoadedFolder
+                || cleanupCustomFolder !== galleryRequestedFolder
+                || galleryRequestedView !== "cleanup")
+            return false;
+        // Queue remains Camera-owned. It can contain records from older
+        // gallery pages, so do NOT require membership in the current page.
+        // The backend independently re-scans allowed roots and signatures.
+        if (batchPaths.some(function(path, i) {
+            return typeof path !== "string" || !path.startsWith("/")
+                   || batchPaths.indexOf(path) !== i;
+        }))
+            return false;
+        return trashQueuedNow();
+    }
+
     function previewBatchTrash() {
         if (busy || !batchMode || batchPaths.length === 0)
             return false;
@@ -1422,6 +1484,30 @@ PanelWindow {
         const id = plan.planId;
         trashPreview = null;
         return run("trash", ["trash", id, "MOVE_TO_TRASH"]);
+    }
+
+    // Trash++ U7 // Only the Desktop preview's final explicit click enters
+    // the shared request deck. No paths or arbitrary operations are accepted
+    // from the generic component. Camera's original one-use Desktop plan
+    // remains the sole scope/authorization check for recoverable GIO Trash.
+    function reviewDesktopCameraTrash(ownerId, resourceId, expectedRevision) {
+        const plan = trashPreview;
+        if (ownerId !== "camera-gio"
+                || resourceId !== "camera-desktop-screenshots"
+                || !/^[0-9a-f]{32}$/.test(expectedRevision)
+                || !hostedCleanupActive || activeView !== "cleanup"
+                || cleanupTechnique !== "desktop" || cleanupQueueOpen
+                || busy || nativeRegionSelecting || zoomWebBusy
+                || !plan || String(plan.planId || "") !== expectedRevision
+                || plan.source !== "Desktop screenshot-like PNG/JPEG/WEBP"
+                || !Number.isInteger(plan.count)
+                || plan.count < 1 || plan.count > 20000
+                || typeof plan.bytes !== "number"
+                || !Number.isFinite(plan.bytes) || plan.bytes < 0)
+            return false;
+        // The existing method consumes the preview UI state and delegates
+        // to the original plan-ID/confirmation Camera backend.
+        return confirmCleanup();
     }
 
     function consume(raw) {
@@ -3155,15 +3241,38 @@ PanelWindow {
                                 accentColor: Colors.cyan
                                 onLeftClicked: camera.selectedTrashPreview = null
                             }
-                            ActionButton {
+                            // U5 // One scoped, recoverable Camera Gallery
+                            // TRASH action. This never offers RESTORE/BURN and
+                            // cannot operate before a backend preview plan.
+                            TrashLifecycleActionDeck {
+                                id: cameraSelectedTrashReviewDeck
                                 width: (parent.width - parent.spacing) / 2
                                 height: 33
-                                label: "CONFIRM TRASH"
-                                labelPixelSize: 10
-                                accentColor: Colors.red
-                                destructive: true
-                                available: !camera.busy
-                                onLeftClicked: camera.confirmSelectedTrash()
+                                actionWidth: width
+                                actionHeight: 33
+                                ownerId: "camera-gio"
+                                resourceId: "camera-gallery-selection"
+                                resourceRevisionKind: "camera-plan"
+                                resourceRevision: camera.selectedTrashPreview
+                                    ? String(camera.selectedTrashPreview.planId || "")
+                                    : ""
+                                showTrash: camera.selectedTrashPreview !== null
+                                trashCapable: camera.selectedTrashPreview !== null
+                                showRestore: false
+                                showBurn: false
+                                ownerApproved: camera.selectedTrashPreview !== null
+                                policyReviewed: camera.selectedTrashPreview !== null
+                                protectedResource: camera.selectedTrashPreview === null
+                                retentionHold: camera.selectedTrashPreview === null
+                                requestInFlight: !camera.menuOpen
+                                    || camera.activeView !== "gallery"
+                                    || camera.busy
+                                    || camera.nativeRegionSelecting
+                                    || camera.zoomWebBusy
+                                onTrashReviewRequested: function(ownerId, resourceId, expectedRevision) {
+                                    camera.reviewSelectedCameraTrash(
+                                        ownerId, resourceId, expectedRevision);
+                                }
                             }
                         }
 

@@ -1,0 +1,25 @@
+policy_module(postapollo_phone_ci, 1.0.0)
+
+# Disposable PHONE STATUS-only daemon, NOT a protected save host.
+# No C4b Identity/Connections role, no private keyring, provider or C5.
+type postapollo_phone_ci_t;
+type postapollo_phone_ci_exec_t;
+init_daemon_domain(postapollo_phone_ci_t, postapollo_phone_ci_exec_t)
+init_nnp_daemon_domain(postapollo_phone_ci_t)
+
+type postapollo_phone_ci_run_t;
+files_pid_file(postapollo_phone_ci_run_t)
+
+allow postapollo_phone_ci_t self:unix_stream_socket create_stream_socket_perms;
+allow postapollo_phone_ci_t self:process { fork sigchld };
+manage_dirs_pattern(postapollo_phone_ci_t, postapollo_phone_ci_run_t, postapollo_phone_ci_run_t)
+manage_files_pattern(postapollo_phone_ci_t, postapollo_phone_ci_run_t, postapollo_phone_ci_run_t)
+manage_sock_files_pattern(postapollo_phone_ci_t, postapollo_phone_ci_run_t, postapollo_phone_ci_run_t)
+
+libs_use_ld_so(postapollo_phone_ci_t)
+libs_use_shared_libs(postapollo_phone_ci_t)
+files_read_usr_files(postapollo_phone_ci_t)
+files_read_etc_files(postapollo_phone_ci_t)
+dev_read_urand(postapollo_phone_ci_t)
+miscfiles_read_localization(postapollo_phone_ci_t)
+kernel_read_system_state(postapollo_phone_ci_t)

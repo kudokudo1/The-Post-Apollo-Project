@@ -62,7 +62,19 @@ def _self_source_snapshot() -> tuple[str, ...] | None:
         for name in ROSTER:
             path = BUNDLE / name
             metadata = path.lstat()
-            if (not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1
+            # Real rpm-ostree can check out an immutable /usr RPM file
+            # as a content-addressed hardlink with st_nlink > 1.
+            # Permit that layout ONLY under our exact root-owned installed
+            # STATUS bundle with immutable 0555 files. This is not a
+            # production package signature or independent host trust.
+            installed_ostree_link = (
+                BUNDLE == Path("/usr/libexec/post-apollo/phone")
+                and metadata.st_uid == 0
+                and stat.S_IMODE(metadata.st_mode) == 0o555
+                and metadata.st_nlink >= 1
+            )
+            if (not stat.S_ISREG(metadata.st_mode)
+                    or not (metadata.st_nlink == 1 or installed_ostree_link)
                     or stat.S_IMODE(metadata.st_mode) & 0o022
                     or not 0 < metadata.st_size <= MAX_SOURCE
                     or metadata.st_uid not in (0, os.geteuid())):

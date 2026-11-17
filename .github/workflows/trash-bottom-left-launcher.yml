@@ -43,6 +43,13 @@ jobs:
         run: python3 -m pip install 'cryptography>=44,<48' 'dbus-next==0.2.3'
       - name: Verify Trash launcher, scoped GIO adapter, and deletion safeguards
         run: python3 -m unittest discover -s tests/trash -p 'test_*.py' -v
+      - name: Verify one real disposable GIO Trash and exact file Restore (CI sandbox ONLY)
+        env:
+          GIO_USE_VFS: local
+        run: |
+          test "$GITHUB_ACTIONS" = "true"
+          test -d "$RUNNER_TEMP"
+          python3 -I -B scripts/trash/gio_disposable_roundtrip_u9.py
       - name: Inventory Media queue versus file deletion boundary (U8 read-only, no owner writes)
         run: |
           python3 -I -B scripts/trash/media_delete_inventory_u8.py > "$RUNNER_TEMP/trashpp-u8-media.json"

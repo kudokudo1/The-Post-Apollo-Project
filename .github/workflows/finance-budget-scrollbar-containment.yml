@@ -1,0 +1,27 @@
+name: Finance Budget scrollbar containment
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "widgets/FinanceW.qml"
+      - "tests/components/test_finance_budget_scrollbar_containment.py"
+      - ".github/workflows/finance-budget-scrollbar-containment.yml"
+  pull_request:
+    paths:
+      - "widgets/FinanceW.qml"
+      - "tests/components/test_finance_budget_scrollbar_containment.py"
+      - ".github/workflows/finance-budget-scrollbar-containment.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  budget-rail:
+    name: Finance Budget bar host and mode gating
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Budget local mount and mode visibility
+        run: python3 -B tests/components/test_finance_budget_scrollbar_containment.py

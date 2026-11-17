@@ -28,6 +28,7 @@ on:
       - 'tests/weather/test_weather_w21_rails_and_forecast_hierarchy.js'
       - 'tests/weather/test_weather_w22_icon_and_overview_header.js'
       - 'tests/weather/test_weather_w23_c44_gap_home_navigation.js'
+      - 'tests/weather/test_weather_w24_home_inline_no_scroll.js'
       - 'tests/weather/test_weather_w10_three_band_solar.js'
       - 'widgets/weather/StationSky.qml'
       - 'tests/weather/test_weather_w9_fixed_paged_terminal.js'
@@ -69,6 +70,7 @@ jobs:
           node --test tests/weather/test_weather_w21_rails_and_forecast_hierarchy.js
           node --test tests/weather/test_weather_w22_icon_and_overview_header.js
           node --test tests/weather/test_weather_w23_c44_gap_home_navigation.js
+          node --test tests/weather/test_weather_w24_home_inline_no_scroll.js
           node --test tests/weather/test_weather_w8_unified_terminal.js
           node --test tests/weather/test_weather_subject_panels_m2a.js
           node --test tests/weather/test_weather_subject_panels_m2b.js
@@ -172,7 +174,7 @@ jobs:
           if grep -E 'W21_MAGICK_RAIL_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi
-      - name: Native W23 original HOME Overview C44 rail and route
+      - name: Native W24 HOME inline LIVE/AUTO/QUICK/SNAPSHOT at 520x300 and 440x275
         shell: bash
         run: |
           set -euo pipefail
@@ -195,8 +197,8 @@ jobs:
             > "$work/native.log" 2>&1 || rc=$?
           cat "$work/native.log"
           test "$rc" -eq 0
-          grep -F "W23_HOME_RAIL_NATIVE_PASS // C44_FIVE_PIXEL_GAP_AND_ROUTE" "$work/native.log"
-          if grep -E 'W23_HOME_RAIL_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+          grep -F "W24_HOME_INLINE_NATIVE_PASS // FIVE_MODES_520_440_NO_SCROLL" "$work/native.log"
+          if grep -E 'W24_HOME_INLINE_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi
       - name: Upload optional native WEATHER visual preview
@@ -225,12 +227,12 @@ jobs:
           path: /tmp/weather-w21-magick-overview.png
           if-no-files-found: warn
           retention-days: 14
-      - name: Upload W23 native HOME Overview screenshot
+      - name: Upload W24 native HOME Overview four-panel screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: weather-w23-home-overview
-          path: /tmp/weather-w23-home-overview.png
+          name: weather-w24-home-inline
+          path: /tmp/weather-w24-home-*.png
           if-no-files-found: warn
           retention-days: 14
       - name: Upload native W16 single-page overview previews

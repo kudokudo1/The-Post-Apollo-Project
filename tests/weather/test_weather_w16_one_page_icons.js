@@ -52,7 +52,8 @@ test("W16 keeps normal overview still; rare NWS alerts retain full detail by all
  assert.match(home,/readonly property bool overviewRequiresScroll:/);
  assert.match(home,/fixedWeatherOverview && officialAlertSummary\.available/);
  assert.match(home,/!home\.fixedWeatherOverview\s+\|\| home\.overviewRequiresScroll/);
- assert.match(home,/!home\.overviewRequiresScroll \? height : Math\.max/);
+ assert.match(home,/contentHeight: \(home\.homeOverviewWorkspace \|\|/);
+ assert.match(home,/home\.fixedWeatherOverview && !home\.overviewRequiresScroll/);
  assert.match(home,/visible: home\.officialAlertSummary\.available/);
  assert.match(home,/height: 108/);
  assert.match(home,/visible: scrollable && !home\.compactHistory/);

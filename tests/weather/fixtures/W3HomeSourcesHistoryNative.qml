@@ -85,8 +85,12 @@ ShellRoot {
                 root.phase=2;return;
             }
             if(root.phase===2) {
+                // W24 // HOME Overview deliberately no longer scrolls;
+                // HISTORY and SOURCES remain under their unchanged routes.
                 if(services.visible || sources.visible || runtime.visible || health.visible
-                    ||!scroll.interactive || !scroll.visible)
+                    ||scroll.interactive || !scroll.visible
+                    ||Math.abs(scroll.contentHeight-scroll.height)>1
+                    ||home.homeInlineMode!=="live")
                     return root.fail("OVERVIEW_LEAKS_SOURCES");
                 // Existing legacy HOME aliases may be selected without a
                 // second service. Source-only layout remains the same.

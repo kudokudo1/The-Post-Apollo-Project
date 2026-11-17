@@ -1,0 +1,75 @@
+name: Social PHONE P52 Signed Fedora Status RPM, Actual Install and Erase (CI Only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/phone/p52_signed_phone_status.spec'
+      - 'tests/phone/p52_build_signed_phone_status.sh'
+      - 'tests/phone/p52_verify_installed_phone_rpm.sh'
+      - 'tests/phone/test_phone_personal_signed_rpm_p52.py'
+      - 'MODEL/contracts/social-phone-p52-signed-fedora-rpm-install-v0.md'
+      - '.github/workflows/social-phone-p52-signed-fedora-rpm.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/phone/p52_signed_phone_status.spec'
+      - 'tests/phone/p52_build_signed_phone_status.sh'
+      - 'tests/phone/p52_verify_installed_phone_rpm.sh'
+      - 'tests/phone/test_phone_personal_signed_rpm_p52.py'
+      - 'MODEL/contracts/social-phone-p52-signed-fedora-rpm-install-v0.md'
+      - '.github/workflows/social-phone-p52-signed-fedora-rpm.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-signed-fedora-status-rpm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      POST_APOLLO_PHONE_RPM_CI_ONLY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guarded source syntax, exact roster, no scriptlet and no activation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          bash -n tests/phone/p52_build_signed_phone_status.sh
+          bash -n tests/phone/p52_verify_installed_phone_rpm.sh
+          python3 -B -m unittest discover -s tests/phone -p 'test_phone_personal_signed_rpm_p52.py' -v
+      - name: Build signed PHONE status-only RPM in disposable Fedora 44 container
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/p52-phone-rpm"
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_PHONE_RPM_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/p52-phone-rpm,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/phone/p52_build_signed_phone_status.sh
+          (cd "$RUNNER_TEMP/p52-phone-rpm" &&
+           sha256sum --check --status phone-status-artifact-manifest.sha256)
+          test "$(find "$RUNNER_TEMP/p52-phone-rpm" -maxdepth 1 -type f | wc -l)" -eq 4
+      - name: Fresh Fedora verifier, untrusted signer then public import, actual RPM install and erase
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --env GITHUB_ACTIONS=true \
+            --env RUNNER_ENVIRONMENT=github-hosted \
+            --env POST_APOLLO_PHONE_RPM_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/p52-phone-rpm,dst=/input,readonly" \
+            fedora:44 /usr/bin/bash /src/tests/phone/p52_verify_installed_phone_rpm.sh
+      - name: Existing actual systemd source evidence and encrypted editor remain locked
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest discover -s tests/phone -p 'test_phone_personal_systemd_origin_p51.py' -v
+          python3 -B -m unittest discover -s tests/messaging -p 'test_social_phone_mainline_completeness_p45.py' -v
+          echo 'P52_LIMITATION // NO_PHONE_SILVERBLUE_BOOT_OR_INDEPENDENT_PRODUCTION_ROOT'

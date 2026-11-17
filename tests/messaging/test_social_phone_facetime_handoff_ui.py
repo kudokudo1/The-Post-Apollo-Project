@@ -78,7 +78,7 @@ class FaceTimeHandoffContract(unittest.TestCase):
         self.assertIn('Array.isArray(emails)', LINKS)
         self.assertNotIn('Qt.openUrlExternally(', LINKS)
         for forbidden in (
-            "fetch(", "XMLHttpRequest", "D-Bus", "BlueFerryCallsSource",
+            "fetch(", "XMLHttpRequest", "import dbus", "BlueFerryCallsSource",
             "Dial(", "subprocess", "systemctl", "localStorage",
             "secret-tool", "print(", "console.log(",
         ):

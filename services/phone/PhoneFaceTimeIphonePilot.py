@@ -17,12 +17,6 @@ import PhoneFaceTimeAudioRouteProbe as Route
 
 SCHEMA = "post-apollo.phone.facetime-iphone-only-preflight.v1"
 EXECUTION = "READ_ONLY_EXPLICIT_USER_TEST"
-_CALL_STATES = frozenset({
-    "DISABLED", "UNAVAILABLE", "SEARCHING", "CONNECTING",
-    "READY", "BLUEZ_CONFLICT", "UNKNOWN",
-})
-
-
 def _provider_state(status: object) -> tuple[bool, str]:
     """Never infer that an optional cellular preference controls FaceTime."""
     if (type(status) is not dict
@@ -34,12 +28,14 @@ def _provider_state(status: object) -> tuple[bool, str]:
             or type(status.get("ofonoActive")) is not bool):
         return False, "UNKNOWN"
     setting = status.get("callsEnabled")
-    state = status.get("callsState")
     if setting is False:
         # Official BlueFerry CallsController.snapshot() omits calls_state
         # when calls_enabled is false. Do not mark its daemon broken.
         return True, "OFF"
-    if setting is True and type(state) is str and state in _CALL_STATES:
+    if setting is True:
+        # Preference ON does not mean Calls1 HFP ready or FaceTime active.
+        # A separate, independently validated calls_state is needed for
+        # cellular readiness (handled by PhoneFaceTimeAudioRouteProbe).
         return True, "ON"
     return True, "UNKNOWN"
 

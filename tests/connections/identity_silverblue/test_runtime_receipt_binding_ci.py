@@ -175,7 +175,9 @@ class RuntimeReceiptBindingTests(unittest.TestCase):
             with mock.patch.dict(os.environ, {"POST_APOLLO_C4B_TEST_GUEST":"1",
                                               "GITHUB_ACTIONS":"true"}):
                 with mock.patch.object(B.Path, "exists", return_value=True):
-                    with self.assertRaises(B.Refused):
+                    with self.assertRaisesRegex(
+                        B.Refused, "C4B_BINDING_UNTRUSTED_RPM_ARCHIVE_PATH",
+                    ):
                         B.rehearse_guest_local_ci_only(
                             actual_runtime_receipt_public=self.runtime_pub,
                             verified_actions=ACTIONS,
@@ -190,6 +192,13 @@ class RuntimeReceiptBindingTests(unittest.TestCase):
             "private_bytes(", "subprocess.run(", "requests.get(",
         ):
             self.assertNotIn(forbidden, source)
+
+    def test_25_release_root_cannot_be_same_as_runtime_receipt_signer(self):
+        signed = self.runtime.sign(B.I.DOMAIN + self.raw)
+        self.refused(
+            independently_pinned_release_root=self.runtime.public_key(),
+            release_signature=signed,
+        )
 
     def test_24_source_signer_role_is_not_c4b_rpm_signer_or_prod_key(self):
         self.assertEqual(B.I.PACKAGE, "post-apollo-identity-silverblue-ci")

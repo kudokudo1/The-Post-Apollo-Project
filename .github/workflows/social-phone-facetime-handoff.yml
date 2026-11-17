@@ -55,4 +55,5 @@ jobs:
           python -m unittest discover -s tests/messaging -p 'test_social_phone_personal_draft_shell_p42.py' -v
           python -m unittest discover -s tests/messaging -p 'test_social_phone_menu_readonly.py' -v
           python -m unittest discover -s tests/phone -p 'test_phone_call_workspace.py' -v
-          python -m unittest discover -s tests/phone -p 'test_phone_personal_save_orchestrator_p44.py' -v
+          # P35/P44 vault tests run in their own crypto-enabled PHONE workflows.
+          # This browser handoff never imports or unlocks the contact vault.

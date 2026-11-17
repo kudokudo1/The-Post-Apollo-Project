@@ -24,3 +24,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify stock history rail and chart gutter
         run: python3 -B tests/components/test_finance_stock_history_scrollbar.py
+      - name: Audit all widget scrollbar coverage and Git/Hospital star policy
+        run: python3 -B tests/components/test_neon_scrollbar_surface_migration.py

@@ -32,7 +32,221 @@ failure() {
   systemctl poweroff --no-block || true
   exit 1
 }
+# C2v-owned, failure-only rollback evidence. This function never changes a
+# deployment, selects a reboot, weakens the next-boot gate or grants success.
+# The command's exact output and numeric rc are captured before the existing
+# fail-closed poweroff path. Use root-owned /run, not writable /var/tmp aliases.
+c2v_rollback_failure_diagnostic() {
+  local rollback_rc="$1"
+  local rollback_output=/run/c2v-rpm-ostree-rollback-command.log
+  local evidence=/run/c2v-rpm-ostree-rollback-failure.log
+  {
+    printf 'C2V_DIAG_ROLLBACK_COMMAND_RC // %s\n' "$rollback_rc"
+    echo 'C2V_DIAG_ROLLBACK_STDOUT_STDERR_BEGIN'
+    if [[ -r "$rollback_output" ]]; then
+      tail -c 6000 "$rollback_output" || true
+    else
+      echo 'C2V_DIAG_ROLLBACK_COMMAND_OUTPUT_UNREADABLE'
+    fi
+    echo 'C2V_DIAG_ROLLBACK_STDOUT_STDERR_END'
+    echo 'C2V_DIAG_ROLLBACK_RPM_OSTREE_JSON_BEGIN'
+    timeout --signal=TERM --kill-after=2s 8s rpm-ostree status --json || true
+    echo 'C2V_DIAG_ROLLBACK_RPM_OSTREE_JSON_END'
+    echo 'C2V_DIAG_ROLLBACK_OSTREE_ADMIN_BEGIN'
+    timeout --signal=TERM --kill-after=2s 8s ostree admin status || true
+    echo 'C2V_DIAG_ROLLBACK_OSTREE_ADMIN_END'
+    echo 'C2V_DIAG_ROLLBACK_SYSTEMD_UNITS_BEGIN'
+    timeout --signal=TERM --kill-after=2s 6s systemctl show \
+      c2v-ostree-cycle.service rpm-ostreed.service \
+      --property=ActiveState --property=SubState --property=Result \
+      --property=ExecMainCode --property=ExecMainStatus \
+      --property=MainPID --no-pager || true
+    echo 'C2V_DIAG_ROLLBACK_SYSTEMD_UNITS_END'
+    echo 'C2V_DIAG_ROLLBACK_RPM_OSTREE_JOURNAL_BEGIN'
+    timeout --signal=TERM --kill-after=2s 6s journalctl -b \
+      -u rpm-ostreed.service -u c2v-ostree-cycle.service \
+      --no-pager -n 45 || true
+    echo 'C2V_DIAG_ROLLBACK_RPM_OSTREE_JOURNAL_END'
+  } > "$evidence" 2>&1 || true
+  # Neither serial channel is authoritative. Emit a bounded report before
+  # failure() powers off this networkless CI guest.
+  echo 'C2V_DIAG_ROLLBACK_FAILURE_REPORT_BEGIN'
+  timeout --signal=TERM --kill-after=2s 8s \
+    head -c 15000 "$evidence" >/dev/ttyS0 2>&1 || true
+  echo 'C2V_DIAG_ROLLBACK_FAILURE_REPORT_END'
+  if [[ -f "$c4b_mode" && -c /dev/ttyS1 ]]; then
+    timeout --signal=TERM --kill-after=2s 8s \
+      head -c 15000 "$evidence" >/dev/ttyS1 2>&1 || true
+  fi
+}
 trap 'rc=$?; if [[ "$rc" -ne 0 ]]; then c4b_controller_failure_relay "SCRIPT_EXIT_$rc-line-$LINENO"; echo "C2V_FAIL // SCRIPT_EXIT_$rc line $LINENO"; systemctl poweroff --no-block || true; fi' EXIT
+# Observe a possibly non-returning rollback from an independent systemd
+# cgroup. Diagnostic only, C4b disposable offline VM only. No rollback,
+# reboot, transaction or second-boot decision is made by this observer.
+c2v_rollback_observer_start() {
+  [[ -f "$c4b_mode" && -c /dev/ttyS1 ]] || return 0
+  local observer=/run/c2v-rpm-rollback-observer.sh
+  if ! cat > "$observer" <<'C2V_ROLLBACK_OBSERVER'
+#!/usr/bin/bash
+set -u
+printf 'ready\n' > /run/c2v-rpm-rollback-observer-ready
+trap 'rc=$?; printf "C2V_DIAG_ROLLBACK_OBSERVER_EXIT // rc=%s\n" "$rc" >/dev/ttyS1 2>/dev/null || true' EXIT
+for n in $(seq 1 55); do
+  {
+    printf 'C2V_DIAG_ROLLBACK_OBSERVER_TICK // n=%s ts=%s\n' "$n" "$(date --iso-8601=seconds)"
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_PROCESSES_BEGIN'
+    timeout --signal=TERM --kill-after=2s 4s ps -eo pid,ppid,stat,etime,wchan:20,comm |
+      grep -E '(^ *PID|[r]pm-ostree|[r]pm-ostreed)' | head -n 12 || true
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_PROCESSES_END'
+    if (( n == 1 || n % 4 == 0 )); then
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_UNIT_BEGIN'
+      timeout --signal=TERM --kill-after=2s 5s systemctl show \
+        c2v-ostree-cycle.service rpm-ostreed.service --no-pager \
+        -p ActiveState -p SubState -p Result -p MainPID \
+        -p ExecMainCode -p ExecMainStatus || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_UNIT_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_OSTREE_BEGIN'
+      timeout --signal=TERM --kill-after=2s 5s ostree admin status 2>&1 |
+        head -c 1500 || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_OSTREE_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_RPM_OSTREE_BEGIN'
+      timeout --signal=TERM --kill-after=2s 5s rpm-ostree status --json 2>&1 |
+        head -c 1800 || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_RPM_OSTREE_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_JOURNAL_BEGIN'
+      timeout --signal=TERM --kill-after=2s 5s journalctl -b \
+        -u rpm-ostreed.service -u c2v-ostree-cycle.service \
+        --no-pager -n 10 2>&1 | head -c 2000 || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_JOURNAL_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_COMMAND_OUTPUT_BEGIN'
+      if [[ -r /run/c2v-rpm-ostree-rollback-command.log ]]; then
+        tail -c 900 /run/c2v-rpm-ostree-rollback-command.log || true
+      fi
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_COMMAND_OUTPUT_END'
+      # Rpm-ostree's automatic reboot can fail while querying logind
+      # inhibitors. Identify a live D-Bus/logind error without bypassing
+      # inhibitors, altering policies, or initiating a separate reboot.
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_UNIT_BEGIN'
+      timeout --signal=TERM --kill-after=2s 5s systemctl show \
+        systemd-logind.service dbus-broker.service --no-pager \
+        -p ActiveState -p SubState -p Result -p MainPID \
+        -p ExecMainCode -p ExecMainStatus || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_UNIT_END'
+      # Distinguish a reachable D-Bus service owner from a logind method
+      # that accepts connections but cannot answer inhibitor queries.
+      # Read-only D-Bus metadata, bounded, and never a success signal.
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_OWNER_BEGIN'
+      if timeout --signal=TERM --kill-after=2s 6s \
+          busctl --system --no-pager status org.freedesktop.login1 \
+          > /run/c2v-login1-owner-probe.log 2>&1; then
+        echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_OWNER_RC // 0'
+      else
+        probe_rc="$?"
+        echo "C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_OWNER_RC // $probe_rc"
+      fi
+      head -c 1400 /run/c2v-login1-owner-probe.log 2>/dev/null || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_OWNER_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_INHIBITORS_BEGIN'
+      if timeout --signal=TERM --kill-after=2s 7s \
+          systemd-inhibit --list --no-pager > /run/c2v-inhibitor-probe.log 2>&1; then
+        echo 'C2V_DIAG_ROLLBACK_OBSERVER_INHIBITORS_RC // 0'
+      else
+        probe_rc="$?"
+        echo "C2V_DIAG_ROLLBACK_OBSERVER_INHIBITORS_RC // $probe_rc"
+      fi
+      head -c 1800 /run/c2v-inhibitor-probe.log 2>/dev/null || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_INHIBITORS_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_BUS_BEGIN'
+      if timeout --signal=TERM --kill-after=2s 7s \
+          busctl --system --timeout=5s call \
+            org.freedesktop.login1 /org/freedesktop/login1 \
+            org.freedesktop.login1.Manager ListInhibitors \
+            > /run/c2v-login1-bus-probe.log 2>&1; then
+        echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_BUS_RC // 0'
+      else
+        probe_rc="$?"
+        echo "C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_BUS_RC // $probe_rc"
+      fi
+      head -c 1800 /run/c2v-login1-bus-probe.log 2>/dev/null || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_BUS_END'
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_JOURNAL_BEGIN'
+      timeout --signal=TERM --kill-after=2s 5s journalctl -b \
+        -u systemd-logind.service -u dbus-broker.service \
+        --no-pager -n 16 2>&1 | head -c 2200 || true
+      echo 'C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_JOURNAL_END'
+    fi
+  } >/dev/ttyS1 2>&1 || true
+  [[ -e /run/c2v-rpm-rollback-observer-finished ]] && break
+  sleep 20
+done
+C2V_ROLLBACK_OBSERVER
+  then
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_FILE_CREATE_FAILED // non-authoritative'
+    return 0
+  fi
+  if ! chmod 0700 "$observer"; then
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_CHMOD_FAILED // non-authoritative'
+    return 0
+  fi
+  if ! rm -f /run/c2v-rpm-rollback-observer-ready \
+      /run/c2v-rpm-rollback-observer-finished; then
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_RESET_FAILED // non-authoritative'
+    return 0
+  fi
+  if ! timeout --signal=TERM --kill-after=2s 14s systemd-run --quiet \
+      --unit=c2v-rpm-rollback-observer --property=Type=exec \
+      --property=TimeoutStartSec=1240 /usr/bin/bash "$observer"; then
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_START_FAILED // non-authoritative'
+    return 0
+  fi
+  local ready=0
+  for _ in $(seq 1 8); do
+    if [[ -e /run/c2v-rpm-rollback-observer-ready ]]; then
+      ready=1
+      break
+    fi
+    sleep 1
+  done
+  if [[ "$ready" == 1 ]]; then
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_STARTED // non-authoritative'
+  else
+    echo 'C2V_DIAG_ROLLBACK_OBSERVER_NOT_READY // non-authoritative'
+  fi
+}
+# Compare the logind D-Bus name before and after C4b's test-only
+# policy/runtime sequence. This is observation, not a repair or gate.
+c4b_logind_phase_probe() {
+  [[ -f "$c4b_mode" && -c /dev/ttyS1 ]] || return 0
+  local checkpoint="$1" probe_rc
+  local owner_output=/run/c4b-logind-phase-owner.log
+  {
+    printf 'C4B_DIAG_LOGIND_PHASE_BEGIN // %s\n' "$checkpoint"
+    # Ask the bus broker itself for the name owner. This does not
+    # activate login1 or request a reboot.
+    if timeout --signal=TERM --kill-after=1s 5s \
+        busctl --system --timeout=3s call \
+          org.freedesktop.DBus /org/freedesktop/DBus \
+          org.freedesktop.DBus GetNameOwner s org.freedesktop.login1 \
+          > "$owner_output" 2>&1; then
+      echo 'C4B_DIAG_LOGIND_PHASE_OWNER_RC // 0'
+    else
+      probe_rc="$?"
+      echo "C4B_DIAG_LOGIND_PHASE_OWNER_RC // $probe_rc"
+    fi
+    head -c 500 "$owner_output" 2>/dev/null || true
+    echo
+    echo 'C4B_DIAG_LOGIND_PHASE_UNITS_BEGIN'
+    timeout --signal=TERM --kill-after=1s 4s systemctl show \
+      systemd-logind.service dbus-broker.service --no-pager \
+      -p ActiveState -p SubState -p MainPID -p Result 2>&1 |
+      head -c 900 || true
+    echo
+    echo 'C4B_DIAG_LOGIND_PHASE_UNITS_END'
+    printf 'C4B_DIAG_LOGIND_PHASE_END // %s\n' "$checkpoint"
+  } >/dev/ttyS1 2>&1 || true
+  return 0
+}
+
 stagefile=/var/lib/c2v-transaction-stage
 pkg=postapollo-connections-c2t-fixture
 data=/mnt/c2v-offline
@@ -597,14 +811,31 @@ C2V_WORKER
     if [[ -f "$c4b_mode" ]]; then
       [[ -s "$c4b_gate" && -s "$c4b_policy_gate" ]] ||
         failure "C4B_RUNTIME_OR_SIGNED_POLICY_GATE_LOST_AFTER_REBOOT"
+      c4b_logind_phase_probe BEFORE_C4B_POLICY
       /usr/bin/bash "$c4b_policy_gate" booted ||
         failure "C4B_SIGNED_COMPOSED_POLICY_NOT_VALID_AFTER_REBOOT"
+      c4b_logind_phase_probe AFTER_C4B_POLICY
       c4b_execute booted ||
         failure "C4B_CONFINED_RUNTIME_NOT_VERIFIED"
+      c4b_logind_phase_probe AFTER_C4B_RUNTIME
     fi
     echo "C2V_PASS // LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT"
     echo rollback_pending > "$stagefile"
-    rpm-ostree rollback --reboot || failure "RPM_OSTREE_ROLLBACK_FAILED"
+    c2v_rollback_observer_start
+    echo "C2V_ROLLBACK_COMMAND_BEGIN // actual rpm-ostree rollback --reboot"
+    # Keep this exact authoritative OS rollback command and the independent
+    # second real boot/absence checks. The diagnostics are a failure-only
+    # recorder, never a substitute success path or a simulated reboot.
+    rollback_output=/run/c2v-rpm-ostree-rollback-command.log
+    if rpm-ostree rollback --reboot > "$rollback_output" 2>&1; then
+      echo "C2V_ROLLBACK_COMMAND_RETURNED_ZERO // second_boot_still_required"
+      touch /run/c2v-rpm-rollback-observer-finished ||
+        echo 'C2V_DIAG_ROLLBACK_OBSERVER_FINISH_MARK_FAILED // non-authoritative'
+    else
+      rollback_rc="$?"
+      c2v_rollback_failure_diagnostic "$rollback_rc"
+      failure "RPM_OSTREE_ROLLBACK_FAILED"
+    fi
     ;;
   rollback_pending)
     if rpm -q "$pkg" >/dev/null 2>&1; then

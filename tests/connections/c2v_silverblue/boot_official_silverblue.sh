@@ -206,7 +206,64 @@ qemu-system-x86_64 \
 pid="$!"
 result=""
 last_serial_bytes=0
+last_c4b_serial_bytes=0
+last_main_progress_bytes=0
+last_guest_byte_progress_iteration=0
+guest_phase=AWAITING_FIRST_BOOT
+# Phase reporting is observational. Silence never counts as an OS failure:
+# the actual QEMU guest may be in a legitimate offline RPM compose or reboot.
 for i in $(seq 1 700); do
+  if (( i % 10 == 0 )); then
+    if [[ -r "$tmp/guest-serial.log" ]]; then
+      last_phase_marker="$(
+        grep -a -E 'C2V_GUEST_BOOT //|C2V_INSTALL_COMMAND_BEGIN //|C2V_MONITOR_REBOOT_REQUESTED //|C2V_PASS // LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT|C2V_ROLLBACK_COMMAND_BEGIN //|C2V_ROLLBACK_COMMAND_RETURNED_ZERO //|C2V_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER' \
+          "$tmp/guest-serial.log" | tail -n 1 || true
+      )"
+      case "$last_phase_marker" in
+        *'C2V_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER'*)
+          guest_phase=SECOND_BOOT_ROLLBACK_VERIFIED ;;
+        *'C2V_ROLLBACK_COMMAND_RETURNED_ZERO //'*)
+          guest_phase=AWAITING_SECOND_BOOT ;;
+        *'C2V_ROLLBACK_COMMAND_BEGIN //'*)
+          guest_phase=ROLLBACK_AND_REBOOT_REQUEST ;;
+        *'C2V_PASS // LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT'*)
+          guest_phase=SIGNED_RUNTIME_OR_ROLLBACK ;;
+        *'C2V_MONITOR_REBOOT_REQUESTED //'*)
+          guest_phase=AWAITING_FIRST_LAYERED_BOOT ;;
+        *'C2V_INSTALL_COMMAND_BEGIN //'*) guest_phase=OFFLINE_LAYER_COMPOSITION ;;
+        *'C2V_GUEST_BOOT //'*) guest_phase=GUEST_BOOT_OR_PRELAYER ;;
+      esac
+    fi
+    echo "C2V_HOST_PHASE // iteration=$i guest_phase=$guest_phase"
+    if [[ -r "$tmp/guest-serial.log" ]]; then
+      current_main_progress_bytes="$(wc -c < "$tmp/guest-serial.log")"
+      if [[ "$current_main_progress_bytes" != "$last_main_progress_bytes" ]]; then
+        last_guest_byte_progress_iteration="$i"
+        last_main_progress_bytes="$current_main_progress_bytes"
+      fi
+    fi
+    if [[ "$c4b_requested" == 1 && -r "$tmp/c4b-diagnostic-serial.log" ]]; then
+      current_c4b_bytes="$(wc -c < "$tmp/c4b-diagnostic-serial.log")"
+      echo "C4B_HOST_OBSERVER_BYTES // iteration=$i current=$current_c4b_bytes previous=$last_c4b_serial_bytes"
+      if [[ "$current_c4b_bytes" != "$last_c4b_serial_bytes" ]]; then
+        last_guest_byte_progress_iteration="$i"
+      fi
+      last_c4b_serial_bytes="$current_c4b_bytes"
+      last_c4b_marker="$(
+        grep -a -E 'C2V_DIAG_ROLLBACK_OBSERVER_(TICK|INHIBITORS_RC|LOGIND_BUS_RC|EXIT)|C4B_DIAG_CONTROLLER_FATAL' \
+          "$tmp/c4b-diagnostic-serial.log" | tail -n 1 || true
+      )"
+      if [[ -n "$last_c4b_marker" ]]; then
+        echo "C4B_HOST_RECENT_OBSERVER_MARKER // $last_c4b_marker"
+      fi
+    fi
+    # Six minutes of unchanged *both* serial files earns a warning, not a
+    # synthetic failure. RPM composition or a real reboot can be silent.
+    # A terminal OS error or the existing 700-cycle deadline remains fatal.
+    if (( i - last_guest_byte_progress_iteration >= 180 && i % 30 == 0 )); then
+      echo "C2V_HOST_STALL_WARNING // no_serial_growth_for_at_least_360s guest_phase=$guest_phase diagnostic_only"
+    fi
+  fi
   if (( i % 20 == 0 )); then
     echo "C2V_HOST_GUEST_HEARTBEAT // $i"
     ps -p "$pid" -o pid=,stat=,etime=,%cpu=,%mem=,rss=,vsz=,comm= || true
@@ -227,6 +284,44 @@ for i in $(seq 1 700); do
       result=FAIL; break
     fi
   fi
+  # A *captured OS error* in the independent UART is stronger than silence.
+  # Exit the guest observation loop early only on the exact signed C4b
+  # rollback/logind error already witnessed in the disposable VM. Do not
+  # conclude success or simulate a second reboot. Retain full diagnostics.
+  if [[ "$c4b_requested" == 1 &&
+        -r "$tmp/c4b-diagnostic-serial.log" &&
+        -r "$tmp/guest-serial.log" ]] &&
+     grep -a -Fq 'C2V_ROLLBACK_COMMAND_BEGIN // actual rpm-ostree rollback --reboot' "$tmp/guest-serial.log" &&
+     grep -a -Fq 'error: Checking systemd inhibitor locks: Timeout was reached' "$tmp/c4b-diagnostic-serial.log"; then
+    echo 'C4B_HOST_KNOWN_OS_ERROR // logind inhibitor timeout during actual rollback, no real second-boot PASS'
+    result=LOGIND_INHIBITOR_TIMEOUT
+    # The observer may have just recorded the CLI error but still be inside
+    # its read-only logind probes. Preserve up to 32s of bounded evidence;
+    # NEVER accept a second-boot PASS after this terminal OS error.
+    c4b_evidence_complete=0
+    for sample_wait in $(seq 1 16); do
+      if awk '
+        index($0, "error: Checking systemd inhibitor locks: Timeout was reached") {
+          seen_error=1; sample_done=0
+        }
+        seen_error && index($0, "C2V_DIAG_ROLLBACK_OBSERVER_LOGIND_JOURNAL_END") {
+          sample_done=1
+        }
+        END { exit !(seen_error && sample_done) }
+      ' "$tmp/c4b-diagnostic-serial.log"; then
+        c4b_evidence_complete=1
+        break
+      fi
+      if ! kill -0 "$pid" 2>/dev/null; then break; fi
+      sleep 2
+    done
+    if [[ "$c4b_evidence_complete" == 1 ]]; then
+      echo 'C4B_HOST_KNOWN_OS_ERROR_EVIDENCE // sample_complete'
+    else
+      echo 'C4B_HOST_KNOWN_OS_ERROR_EVIDENCE // incomplete_bounded'
+    fi
+    break
+  fi
   if ! kill -0 "$pid" 2>/dev/null; then
     result=VM_EXITED; break
   fi
@@ -238,6 +333,12 @@ grep -a -E 'C2V_(MONITOR_|PENDING_DEPLOYMENT_AUTHORITY|INSTALL_FAILED_EXIT|PROBE
 grep -a 'C2V_' "$tmp/guest-serial.log" 2>/dev/null | tail -n 70 || true
 if [[ "$result" != PASS ]]; then
   echo "C2V_BLOCKED // SILVERBLUE_LAYER_REBOOT_ROLLBACK_RESULT=$result"
+  echo "C2V_HOST_FAILURE_PHASE // $guest_phase"
+  if [[ -z "$result" ]]; then
+    echo 'C2V_HOST_FAILURE_REASON // OBSERVATION_DEADLINE_EXHAUSTED'
+  else
+    echo "C2V_HOST_FAILURE_REASON // $result"
+  fi
   if [[ "$c4b_requested" == 1 ]]; then
     echo "C4B_HOST_DIAGNOSTIC_UART_BEGIN"
     if [[ -r "$tmp/c4b-diagnostic-serial.log" ]]; then

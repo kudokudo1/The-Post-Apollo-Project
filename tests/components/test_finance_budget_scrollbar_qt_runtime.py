@@ -13,6 +13,7 @@ os.environ.setdefault("QT_QUICK_BACKEND", "software")
 from PySide6.QtCore import QObject, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
+from PySide6.QtTest import QTest
 
 app = QGuiApplication([])
 engine = QQmlEngine()
@@ -74,10 +75,17 @@ try:
     verify_alignment("original compact Budget")
     old_y = float(host.property("y"))
     assert root.setProperty("headerHeight", 142)
-    app.processEvents()
+    for _ in range(5):
+        app.processEvents()
+        QTest.qWait(25)  # Let Qt Quick finish Column polish/layout.
     verify_alignment("grown header")
-    assert float(host.property("y")) > old_y + 50, (
-        "Rail did not follow Column viewport after header grew"
+    new_y = float(host.property("y"))
+    print("HEADER_RELAYOUT // old rail y", old_y,
+          "new rail y", new_y,
+          "viewport y", viewport.property("y"),
+          "control height", obj("budgetColumn").property("height"), flush=True)
+    assert new_y > old_y + 50, (
+        f"Rail did not follow Column viewport after header grew: {old_y} -> {new_y}"
     )
     assert root.setProperty("summaryHeight", 10)
     app.processEvents()

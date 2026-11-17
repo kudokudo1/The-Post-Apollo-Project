@@ -16,7 +16,7 @@ The observation function reads an **actual Linux process** through a stable pidf
 1. Fixed expected PID/startTicks, the complete kernel effective/real/saved/filesystem UID/GID records (must be nonroot), and a living pinned pidfd before and after the observation.
 2. Actual Linux cgroup v2 and actual LSM/SELinux process context from /proc, both matching independently provided *test* pins.
 3. Kernel executable inode from /proc/PID/exe, matching the pinned interpreter's actual inode, and bounded exact executable SHA-256.
-4. Exact Python isolated invocation `interpreter -I -B script` from /proc/PID/cmdline, and root-owned mode-0555, single-link, nofollow script with root-owned nonwritable parents and independently supplied SHA-256. It rereads start, identities, cgroup, label, cmdline, and executable/script inode, size, modification and change timestamps to fail closed on replacement or post-read mutation during the observation.
+4. Exact Python isolated invocation `interpreter -I -B script` from /proc/PID/cmdline, and root-owned mode-0555, single-link, nofollow script with root-owned nonwritable parents and independently supplied SHA-256. It rereads start, identities, cgroup, label, cmdline, and executable/script inode, size, modification and change timestamps to fail closed on replacement or post-read mutation during the observation. It also rechecks the final script pathname using **lstat**, not stat, and refuses symlink substitution even where the replacement resolves to the same original inode, plus unsafe parent-directory changes.
 5. In the **optional C4b official Silverblue guest candidate mode**, require an explicit owner-provided test marker, ostree-booted guest, enforcing SELinux, exact C4b Identity test unit, runtime interpreter, installed source path, dedicated systemd cgroup/domain, and read-only `systemctl show` checks of `MainPID`, `ControlGroup` and `ActiveState` before and after the same observation.
 
 The default fixture observes a **real** unprivileged Python child process under disposable Ubuntu GitHub Actions, with a root-owned read-only Identity-named test script at a bounded /run/c3eag-ci-* location. It does NOT claim that child is C4b's signed Silverblue-installed host. The additional adversarial cases deliberately change the script after hashing and change the reported kernel cgroup between reads, requiring refusal. The CI root supervisor supplies expected pins. No independent cross-host attestation exists.
@@ -33,7 +33,7 @@ That future integration must independently verify expected release-root provenan
 
 ## VERIFY
 
-- [ ] Exact-head 24 test cases covering one real UID 65534 Python subprocess, kernel start, process identity, cgroup, LSM, executable, script bytes, path/symlink/mode, process exit, CI guard and no-grant flag refusal
+- [ ] Exact-head 25 test cases covering one real UID 65534 Python subprocess, kernel start, process identity, cgroup, LSM, executable, script bytes, path/symlink/mode, process exit, CI guard and no-grant flag refusal
 - [ ] Previous 22 C3e-AF signed enrollment and 20 C3e-Z signed witness cases
 - [ ] Grammar, release admission and other triggered GitHub regressions
 - [ ] NRS-2 independent source review and operator-controlled merge

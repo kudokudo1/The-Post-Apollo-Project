@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import shutil
@@ -80,15 +81,18 @@ def command(argv: list[str], env: dict[str, str]) -> subprocess.CompletedProcess
         raise RoundTripError("COMMAND_EXECUTION_OR_TIMEOUT") from exc
 
 
-def json_response(process: subprocess.CompletedProcess, expected_ok: bool) -> dict:
+def json_response(process: subprocess.CompletedProcess, expected_ok: bool, phase: str = "UNIT") -> dict:
     try:
         data = json.loads(process.stdout)
     except (ValueError, TypeError) as exc:
         raise RoundTripError("BACKEND_JSON_INVALID") from exc
     if not isinstance(data, dict) or data.get("ok") is not expected_ok:
-        raise RoundTripError("BACKEND_RESULT_UNEXPECTED")
+        raw_code = str(data.get("error", "")) if isinstance(data, dict) else ""
+        match = re.match(r"[A-Z][A-Z_]{2,60}", raw_code)
+        safe_code = match.group(0) if match else "UNSPECIFIED"
+        raise RoundTripError("BACKEND_RESULT_UNEXPECTED_" + phase + "_" + safe_code)
     if (process.returncode == 0) is not expected_ok:
-        raise RoundTripError("BACKEND_EXIT_UNEXPECTED")
+        raise RoundTripError("BACKEND_EXIT_UNEXPECTED_" + phase)
     return data
 
 
@@ -131,20 +135,20 @@ def run_roundtrip(root: Path, inherited: dict[str, str]) -> dict:
     original.chmod(0o600)
     digest = hashlib.sha256(payload).hexdigest()
 
-    def index() -> dict:
+    def index(phase: str) -> dict:
         return json_response(command(
             [sys.executable, "-I", "-B", str(backend), "index"], env
-        ), True)
+        ), True, phase)
 
     # This gate runs before any file is moved. Never touch an existing trash.
-    assert_empty_index(index())
+    assert_empty_index(index("INITIAL"))
 
     moved = command([gio, "trash", str(original)], env)
     if moved.returncode != 0:
         raise RoundTripError("GIO_TRASH_FAILED")
     if original.exists() or original.is_symlink():
         raise RoundTripError("GIO_DID_NOT_MOVE_SOURCE")
-    item = reviewed_item(index(), original)
+    item = reviewed_item(index("AFTER_TRASH"), original)
     uri = item["uri"]
 
     # Existing-destination refusal must leave both entries unchanged.
@@ -153,29 +157,29 @@ def run_roundtrip(root: Path, inherited: dict[str, str]) -> dict:
     refusal = json_response(command(
         [sys.executable, "-I", "-B", str(backend), "restore",
          uri, str(original)], env
-    ), False)
+    ), False, "COLLISION")
     if refusal.get("error") != "RESTORE_TARGET_EXISTS":
         raise RoundTripError("EXISTING_TARGET_NOT_REFUSED")
     if original.read_bytes() != collision:
         raise RoundTripError("COLLISION_TARGET_CHANGED")
-    reviewed_item(index(), original)
+    reviewed_item(index("AFTER_COLLISION"), original)
     original.unlink()  # Only the sentinel created inside private runner sandbox.
 
     receipt = json_response(command(
         [sys.executable, "-I", "-B", str(backend), "restore",
          uri, str(original)], env
-    ), True)
+    ), True, "RESTORE")
     if receipt.get("kind") != "restore" or receipt.get("message") != "RESTORED":
         raise RoundTripError("RESTORE_RECEIPT_UNEXPECTED")
     if not original.is_file() or hashlib.sha256(original.read_bytes()).hexdigest() != digest:
         raise RoundTripError("RESTORED_BYTES_CHANGED")
-    assert_empty_index(index())
+    assert_empty_index(index("AFTER_RESTORE"))
 
     # A prior row must not be restored twice.
     stale = json_response(command(
         [sys.executable, "-I", "-B", str(backend), "restore",
          uri, str(original)], env
-    ), False)
+    ), False, "REPLAY")
     if stale.get("error") != "STALE_OR_UNKNOWN_TRASH_ITEM":
         raise RoundTripError("STALE_RESTORE_NOT_DENIED")
     if hashlib.sha256(original.read_bytes()).hexdigest() != digest:

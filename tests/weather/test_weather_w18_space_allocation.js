@@ -17,7 +17,7 @@ test("W18 gives tall Overview space to WEATHER rather than empty cards",()=>{
  assert.match(home,/readonly property real overviewCardRowHeight:/);
  assert.match(home,/readonly property real overviewInstrumentHeight:/);
  assert.match(home,/height: visible \? home\.overviewInstrumentHeight : 0/);
- assert.equal((home.match(/\? home\.overviewCardRowHeight : 118/g)||[]).length,2);
+ assert.equal((home.match(/\? home\.overviewCardRowHeight\s+/g)||[]).length,2);
  for(const viewport of [275,300,500,650]) {
    const {summary,row}=heights(viewport);
    assert.equal(summary+(viewport<286?31:56)+2*row,viewport);

@@ -1,0 +1,79 @@
+name: C4b Identity guest runtime receipt-key release continuity (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/runtime_receipt_binding_ci.py'
+      - 'tests/connections/identity_silverblue/test_runtime_receipt_binding_ci.py'
+      - 'tests/connections/identity_silverblue/guest_identity_service_probe.sh'
+      - 'tests/connections/identity_silverblue/run_official_silverblue_identity.sh'
+      - '.github/workflows/connections-identity-silverblue-receipt-binding.yml'
+      - 'docs/connections-c4b-runtime-receipt-binding-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-receipt-key-continuity-tests:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact pinned public-key dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: CI helper grammar and immutable installed probe contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/identity_silverblue/runtime_receipt_binding_ci.py \
+            tests/connections/identity_silverblue/test_runtime_receipt_binding_ci.py
+          bash -n tests/connections/identity_silverblue/guest_identity_service_probe.sh
+          bash -n tests/connections/identity_silverblue/run_official_silverblue_identity.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("tests/connections/identity_silverblue/guest_identity_service_probe.sh").read_text()
+          h=Path("tests/connections/identity_silverblue/run_official_silverblue_identity.sh").read_text()
+          s=Path("tests/connections/identity_silverblue/runtime_receipt_binding_ci.py").read_text()
+          b=Path("services/connections/ConnectionsBroker.qml").read_text()
+          for token in ("rehearse_guest_local_ci_only(", "GUEST_LOCAL_RELEASE_BOUND_TO_ACTUAL_GATEWAY_RECEIPT_KEY",
+                        "SUBSTITUTE_RECEIPT_PUBLIC_KEY_EXPLICITLY_REFUSED",
+                        'receipt=verify_receipt(out,pinned_key=key'):
+              assert token in p, token
+          assert "postapollo_id_ci_runtime_receipt.py" in h
+          assert "postapollo-id-ci-release-candidate.py" in h
+          assert "C4B_ID_PASS // GUEST_LOCAL_RELEASE_BOUND_TO_ACTUAL_GATEWAY_RECEIPT_KEY" in h
+          assert "C4B_ID_PASS // SUBSTITUTE_RECEIPT_PUBLIC_KEY_EXPLICITLY_REFUSED" in h
+          for name in ("operatorEnrollmentRootCustodyVerified",
+                       "independentlySignedRemoteHostWitnessVerified",
+                       "installedHostAuthenticated", "externalChallengeIssuerVerified",
+                       "externalRollbackResistanceVerified", "c5HumanConsentVerified",
+                       "hostAuthenticated", "canBeginSignIn",
+                       "credentialActionsEnabled", "productionAuthority"):
+              assert '"' + name + '": False' in s, name
+          assert "readonly property bool credentialActionsEnabled: false" in b
+          print("C4B_HOLD // GUEST_SELF_SIGNED_CI_ROOT_IS_NOT_EXTERNAL_ENROLLMENT")
+          PY
+      - name: 25 signed release to runtime receipt signer negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_runtime_receipt_binding_ci.py
+          echo "C4B_ID_PASS // 25_RUNTIME_RECEIPT_KEY_BINDING_NEGATIVE_AND_ROLE_TESTS"
+      - name: Existing Identity Silverblue source and rollback contract remains intact
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
+          python3 -B tests/identity/test_silverblue_release_candidate_v1.py
+          echo "C4B_ID_HOLD // NO_PRODUCTION_HOST_LOGIN_OR_KEY_ENROLLMENT"

@@ -148,9 +148,12 @@ with tempfile.TemporaryDirectory() as root:
 # The active config cannot be reloaded automatically because this operator's
 # Sway exec_always chain kills/restarts Quickshell.
 shell=(ROOT/"shell.qml").read_text()
-assert 'POST_APOLLO_AUTO_WIDGET_HOTKEYS' in shell
-assert 'ensure_post_apollo_widget_hotkeys.py' in shell
-assert 'StdioCollector' in shell
-assert 'swaymsg reload' not in shell
+bootstrap=(ROOT/"services/system/SwayWidgetHotkeyBootstrap.qml").read_text()
+assert "SwayWidgetHotkeyBootstrap {" in shell
+assert "Process {" not in shell
+assert "POST_APOLLO_AUTO_WIDGET_HOTKEYS" in bootstrap
+assert "ensure_post_apollo_widget_hotkeys.py" in bootstrap
+assert "StdioCollector" in bootstrap
+assert "swaymsg reload" not in bootstrap
 assert 'Quickshell.watchFiles = false' in shell
 print("W28 SAFE AUTO-WIDGET-HOTKEY INSTALL // PASS")

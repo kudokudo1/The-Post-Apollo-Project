@@ -58,7 +58,7 @@ jobs:
           sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
             /usr/bin/python3 -B \
             tests/connections/test_connections_c3eag_identity_kernel_observer.py
-          echo "C3EAG_PASS // 24_REAL_KERNEL_OBSERVER_DENY_ONLY_TESTS"
+          echo "C3EAG_PASS // 25_REAL_KERNEL_OBSERVER_DENY_ONLY_TESTS"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

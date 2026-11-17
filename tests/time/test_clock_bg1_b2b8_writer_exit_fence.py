@@ -23,8 +23,14 @@ def load(path,name):
     spec.loader.exec_module(module)
     return module
 
-Harness=load(B2B7,"b2b8_test_fixture").ClockB2B7RoleBoundRelease
 Exit=load(SOURCE,"b2b8_exit_fixture")
+# Reuse the *same* audited classes: B2B7 and B2B8 both deliberately
+# enforce exact class identity, not a duck-typed caller-supplied object.
+FixtureModule=load(B2B7,"b2b8_test_fixture")
+FixtureModule.Chain=Exit.Chain
+FixtureModule.Role=Exit.Chain.Role
+FixtureModule.Receipt=Exit.Chain.Receipt
+Harness=FixtureModule.ClockB2B7RoleBoundRelease
 
 
 class ClockB2B8DurableExit(unittest.TestCase):

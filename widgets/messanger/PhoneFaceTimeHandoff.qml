@@ -18,6 +18,10 @@ Rectangle {
     property string audioRouteState: "NOT_CHECKED"
     property var audioRouteObservation: ({})
     property int audioRouteGeneration: 0
+    // A preflight checks only local prerequisites, not FaceTime operation.
+    property string iphonePilotState: "NOT_CHECKED"
+    property var iphonePilotObservation: ({})
+    property int iphonePilotGeneration: 0
     signal closeRequested()
 
     width: parent ? parent.width : 320
@@ -33,12 +37,121 @@ Rectangle {
         audioRouteGeneration += 1;
         audioRouteState = "NOT_CHECKED";
         audioRouteObservation = ({});
+        iphonePilotGeneration += 1;
+        iphonePilotState = "NOT_CHECKED";
+        iphonePilotObservation = ({});
+        if (iphonePilotProcess && iphonePilotProcess.running)
+            iphonePilotProcess.running = false;
         // No stale device status should survive contact, mode or view loss.
         if (audioRouteProcess && audioRouteProcess.running)
             audioRouteProcess.running = false;
         // Mode/contact initialization may precede child creation in QML.
         if (inviteInput)
             inviteInput.text = "";
+    }
+
+    function inspectIphonePilot() {
+        if (!visible || iphonePilotProcess.running)
+            return;
+        iphonePilotGeneration += 1;
+        iphonePilotState = "CHECKING";
+        iphonePilotObservation = ({});
+        iphonePilotProcess.generation = iphonePilotGeneration;
+        iphonePilotProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneFaceTimeIphonePilot.py"),
+            "--preflight"
+        ];
+        iphonePilotProcess.running = true;
+    }
+
+    function pilotMessage() {
+        if (iphonePilotState === "CHECKING")
+            return "READING LOCAL CAPABILITIES // No phone action will be sent.";
+        if (iphonePilotState === "UNAVAILABLE")
+            return "PREFLIGHT UNAVAILABLE // No FaceTime or Bluetooth controls were changed.";
+        if (iphonePilotState !== "CHECKED")
+            return "NOT TESTED // Check local support before an iPhone-initiated trial.";
+        var o = iphonePilotObservation;
+        var bridge = o.blueferryResponding
+            ? "BlueFerry responded; cellular calls preference: " + o.cellularCallsPreference + "."
+            : "BlueFerry response not confirmed.";
+        var notify = o.notificationAppInventoryAdvertised
+            ? "iPhone notification APP INVENTORY supported; FaceTime incoming call NOT detected."
+            : "iPhone notification app inventory not advertised; FaceTime incoming call NOT detected.";
+        var audio = o.localHfpActive
+            ? "A PC Bluetooth hands-free profile is selected, not verified as the iPhone."
+            : o.localHfpOffered
+              ? "A PC Bluetooth hands-free profile is available, not selected."
+              : "No PC hands-free profile was confirmed in this preflight.";
+        return bridge + " " + notify + " " + audio
+             + " No PC FaceTime dial, answer, end or video transport exists.";
+    }
+
+    Process {
+        id: iphonePilotProcess
+        property int generation: 0
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!handoff.visible
+                        || iphonePilotProcess.generation !== handoff.iphonePilotGeneration)
+                    return;
+                try {
+                    var result = JSON.parse(String(text || ""));
+                    var booleanKeys = [
+                        "blueferryResponding", "iphoneDataLinkSelfReported",
+                        "notificationAppInventoryAdvertised", "localHfpOffered",
+                        "localHfpActive", "outboundIphoneShortcutVerified",
+                        "outboundPcDispatchAvailable", "incomingFaceTimeDetected",
+                        "answerFaceTimeAvailable", "endFaceTimeAvailable",
+                        "liveFaceTimeVideoAvailable", "twoWayFaceTimeAudioVerified",
+                        "iphoneCompanionAuthenticated", "faceTimeConnected",
+                        "canChangeRoute", "contentAccessEnabled", "personalSaveAuthorized"
+                    ];
+                    if (!result
+                            || result.schema !== "post-apollo.phone.facetime-iphone-only-preflight.v1"
+                            || result.execution !== "READ_ONLY_EXPLICIT_USER_TEST"
+                            || ["OFF", "ON", "UNKNOWN"].indexOf(result.cellularCallsPreference) < 0)
+                        throw new Error("invalid pilot schema");
+                    for (var i = 0; i < booleanKeys.length; ++i) {
+                        if (typeof result[booleanKeys[i]] !== "boolean")
+                            throw new Error("invalid pilot flag");
+                    }
+                    var denied = [
+                        "outboundIphoneShortcutVerified", "outboundPcDispatchAvailable",
+                        "incomingFaceTimeDetected", "answerFaceTimeAvailable",
+                        "endFaceTimeAvailable", "liveFaceTimeVideoAvailable",
+                        "twoWayFaceTimeAudioVerified", "iphoneCompanionAuthenticated",
+                        "faceTimeConnected", "canChangeRoute",
+                        "contentAccessEnabled", "personalSaveAuthorized"
+                    ];
+                    for (var j = 0; j < denied.length; ++j) {
+                        if (result[denied[j]] !== false)
+                            throw new Error("unauthorized FaceTime capability");
+                    }
+                    if (result.localHfpActive && !result.localHfpOffered)
+                        throw new Error("invalid HFP evidence");
+                    handoff.iphonePilotObservation = ({
+                        blueferryResponding: result.blueferryResponding,
+                        cellularCallsPreference: result.cellularCallsPreference,
+                        notificationAppInventoryAdvertised: result.notificationAppInventoryAdvertised,
+                        localHfpOffered: result.localHfpOffered,
+                        localHfpActive: result.localHfpActive
+                    });
+                    handoff.iphonePilotState = "CHECKED";
+                } catch (error) {
+                    handoff.iphonePilotObservation = ({});
+                    handoff.iphonePilotState = "UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (handoff.visible
+                    && generation === handoff.iphonePilotGeneration && code !== 0) {
+                handoff.iphonePilotObservation = ({});
+                handoff.iphonePilotState = "UNAVAILABLE";
+            }
+        }
     }
 
     function inspectAudioRoute() {
@@ -66,6 +179,8 @@ Rectangle {
             return "HFP PROFILE AVAILABLE // Not selected in the observed audio card. Use the iPhone audio picker during a real FaceTime Audio call; routing remains unverified.";
         case "HFP_PROFILE_NOT_OBSERVED":
             return "HFP NOT OBSERVED IN PACTL CARDS // This is not proof FaceTime Audio is impossible. oFono may use a separate audio route.";
+        case "PHONE_CALLS_DISABLED":
+            return "BLUEFERRY RESPONDING // CALLS ON PC IS OFF. BlueFerry intentionally omits calls_state while cellular calls are disabled. FaceTime Audio remains a separate, unverified route.";
         case "PHONE_CALL_STATUS_UNREPORTED":
             return "BLUEFERRY RESPONDING // Cellular call state was not reported in a recognized format. Audio preferences may be available, but HFP and FaceTime Audio are NOT verified.";
         case "PHONE_CALLS_NOT_READY":
@@ -92,7 +207,7 @@ Rectangle {
                     var observed = JSON.parse(String(text || ""));
                     var allowed = ["AUDIO_INSPECTION_UNAVAILABLE", "PHONE_BRIDGE_UNAVAILABLE",
                                    "PHONE_CALL_STATUS_UNREPORTED", "PHONE_CALLS_NOT_READY",
-                                   "HFP_PROFILE_NOT_OBSERVED",
+                                   "PHONE_CALLS_DISABLED", "HFP_PROFILE_NOT_OBSERVED",
                                    "HFP_PROFILE_AVAILABLE_ONLY", "HFP_SYSTEM_PROFILE_ACTIVE"];
                     var flags = ["phoneBackendObserved", "cellularHfpReadyReported",
                                  "systemAudioObserved", "systemHfpProfileOffered",
@@ -200,6 +315,40 @@ Rectangle {
             text: FaceTimeLinks.supportMessage(handoff.mode)
             color: Colors.white
             font.pixelSize: 11
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        Text {
+            width: parent.width
+            text: "IPHONE-ONLY PILOT // LOCAL CAPABILITY CHECK"
+            color: Colors.cyan
+            font.bold: true
+            font.pixelSize: 11
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        ActionButton {
+            width: Math.min(250, handoffColumn.width)
+            height: 33
+            label: iphonePilotProcess.running ? "CHECKING IPHONE SUPPORT..." : "CHECK IPHONE SUPPORT"
+            labelPixelSize: 10
+            accentColor: Colors.magenta
+            interactive: !iphonePilotProcess.running
+            onTriggered: handoff.inspectIphonePilot()
+        }
+        Text {
+            width: parent.width
+            text: handoff.pilotMessage()
+            color: Colors.orange
+            font.pixelSize: 10
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        Text {
+            width: parent.width
+            text: "REAL IPHONE TRIAL // 1. On your iPhone, try a FaceTime Shortcut by number. 2. Ask a consenting person to place an incoming FaceTime call and check whether PHONE sees an alert. 3. For FaceTime Audio, select PC/Bluetooth on the iPhone and confirm microphone and speakers. A local profile alone proves none of these."
+            color: Colors.white
+            font.pixelSize: 10
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
         }

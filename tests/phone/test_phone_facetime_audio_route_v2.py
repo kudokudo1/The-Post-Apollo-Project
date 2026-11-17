@@ -198,8 +198,34 @@ class FaceTimeAudioRouteTests(unittest.TestCase):
             data = mod.inspect(provider=lambda: provider(**change),
                                cards=lambda: (True, True))
             self.assert_locked(data)
-            self.assertEqual(data["state"], "PHONE_CALLS_NOT_READY")
+            expected = ("PHONE_CALLS_DISABLED"
+                        if change.get("callsEnabled") is False
+                        else "PHONE_CALLS_NOT_READY")
+            self.assertEqual(data["state"], expected)
             self.assertIs(data["cellularHfpReadyReported"], False)
+
+    def test_upstream_disabled_call_field_omission_has_dedicated_status(self):
+        # Official BlueFerry CallsController.snapshot() returns only
+        # calls_enabled:false when calls are off.
+        raw = {
+            "api_version": 2, "daemon": True,
+            "calls_enabled": False,
+            "phone_audio_preference": "auto",
+            "phone_audio_route": "pc",
+        }
+        projected = Audio._project(raw)
+        self.assertEqual(projected["calls_state"], "UNKNOWN")
+        observed = Audio._output(
+            "OBSERVED", projected, can_adjust=True, ofono=True)
+        for audio in ((True, True), (False, False)):
+            with self.subTest(audio=audio):
+                result = mod.inspect(
+                    provider=lambda: observed, cards=lambda: audio)
+                self.assert_locked(result)
+                self.assertEqual(result["state"], "PHONE_CALLS_DISABLED")
+                self.assertIs(result["phoneBackendObserved"], True)
+                self.assertIs(result["cellularHfpReadyReported"], False)
+                self.assertIs(result["faceTimeConnected"], False)
 
     def test_pactl_invocation_is_fixed_readonly_and_does_not_expose_device(self):
         run = Mock(return_value=Mock(

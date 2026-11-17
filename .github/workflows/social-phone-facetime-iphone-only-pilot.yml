@@ -1,0 +1,65 @@
+name: Social PHONE FaceTime iPhone-only Pilot V1
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhoneFaceTimeIphonePilot.py'
+      - 'services/phone/PhoneFaceTimeAudioRouteProbe.py'
+      - 'widgets/messanger/PhoneFaceTimeHandoff.qml'
+      - 'tests/phone/test_phone_facetime_iphone_only_pilot.py'
+      - 'tests/phone/test_phone_facetime_audio_route_v2.py'
+      - 'tests/messaging/test_social_phone_facetime_iphone_only_pilot_ui.py'
+      - 'MODEL/contracts/social-phone-facetime-iphone-only-pilot-v1.md'
+      - '.github/workflows/social-phone-facetime-iphone-only-pilot.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhoneFaceTimeIphonePilot.py'
+      - 'services/phone/PhoneFaceTimeAudioRouteProbe.py'
+      - 'widgets/messanger/PhoneFaceTimeHandoff.qml'
+      - 'tests/phone/test_phone_facetime_iphone_only_pilot.py'
+      - 'tests/phone/test_phone_facetime_audio_route_v2.py'
+      - 'tests/messaging/test_social_phone_facetime_iphone_only_pilot_ui.py'
+      - 'MODEL/contracts/social-phone-facetime-iphone-only-pilot-v1.md'
+      - '.github/workflows/social-phone-facetime-iphone-only-pilot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  facetime-iphone-only-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: iPhone-only actual sanitized preflight and upstream calls OFF
+        run: |
+          python -m py_compile services/phone/PhoneFaceTimeIphonePilot.py services/phone/PhoneFaceTimeAudioRouteProbe.py
+          python -m unittest discover -s tests/phone -p 'test_phone_facetime_iphone_only_pilot.py' -v
+          python -m unittest discover -s tests/phone -p 'test_phone_facetime_audio_route_v2.py' -v
+      - name: Explicit in-menu control and no native FaceTime fake authority
+        run: |
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_facetime_iphone_only_pilot_ui.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_facetime_audio_route_v2_ui.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_facetime_handoff_ui.py' -v
+      - name: Existing Apple invite and contact source checks
+        run: |
+          node tests/messaging/test_social_phone_facetime_handoff_js.js
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_contact_details.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_contact_metadata_locked_p40.py' -v
+      - name: Existing cellular audio opt-in and protected personal editor
+        run: |
+          python -m unittest discover -s tests/phone -p 'test_phone_audio_controls.py' -v
+          python -m unittest discover -s tests/messaging -p 'test_social_phone_personal_draft_shell_p42.py' -v
+      - name: Real-device limitation
+        run: |
+          echo 'IPHONE_ONLY_FACE_TIME // PREFLIGHT_NO_IPHONE_COMPANION_OR_LIVE_CALL'
+          echo 'IPHONE_ONLY_FACE_TIME // NO_REMOTE_START_INCOMING_ANSWER_END_VIDEO_OR_AUDIO_PROOF'
+          echo 'IPHONE_ONLY_FACE_TIME // NO_DESKTOP_UPDATE_NO_SERVICE_OR_PERSONAL_DATA_MUTATION'

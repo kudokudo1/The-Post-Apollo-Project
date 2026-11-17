@@ -37,18 +37,19 @@ test("W23 adds working HOME Overview nav without creating a second HOME or repla
  assert.match(home,/readonly property bool homeOverviewWorkspace:/);
  assert.match(home,/id: homeOverviewRail/);
  assert.match(home,/titleText: "HOME \/\/ OVERVIEW"/);
- for(const path of ["home/auto","home/quick","home/snapshot"]) {
+ for(const path of ["home/overview","home/auto","home/quick","home/snapshot"]) {
    assert.match(home,new RegExp('path:"'+path+'"'));
    assert.match(workspace,new RegExp('path:"'+path+'"'));
  }
- assert.match(home,/home.routeRequested\(path\)/);
+ assert.match(home,/home.chooseHomeInlinePane\(path\)/);
  assert.match(surface,/id: originalHome/);
  assert.match(surface,/workspaceSection: surface.homeSection/);
  assert.match(surface,/onRouteRequested: function\(path\) \{ surface.routeRequested\(path\); \}/);
  assert.match(surface,/id: bottomRail/);
  assert.match(home,/visible: home.sectionVisible\("header"\) && !home.fixedWeatherOverview/);
  assert.match(home,/&& !home.homeOverviewWorkspace/);
- assert.match(homeNative,/HOME_BUTTON_NOT_ROUTED_/);
+ assert.match(homeNative,/HOME_BUTTON_REDIRECTED_TO_/);
+ assert.match(homeNative,/W24_HOME_INLINE_NATIVE_PASS/);
 });
 test("W23 preserves one-page Weather Overview with exact header height at 275, 300, and 500px",()=>{
  for(const h of [275,300,400,500]) {

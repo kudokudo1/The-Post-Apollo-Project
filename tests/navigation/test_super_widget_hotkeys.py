@@ -33,7 +33,22 @@ assert dict(chords) == expected, chords
 assert len({chord for chord, _ in chords}) == len(expected), "duplicate chord"
 assert "Mod4+grave" not in SWAY, "Koinoikos prefix must stay untouched"
 assert not re.search(r"^(include|mode|exec_always|bindcode)\b", SWAY, re.M)
-assert "OPT-IN" in SWAY, "never install in a live Sway config silently"
+assert "guarded" in SWAY, "include must remain conflict-gated"
+assert "No automatic reload" in SWAY
+INSTALLER = (ROOT / "scripts/ensure_post_apollo_widget_hotkeys.py").read_text(
+    encoding="utf-8")
+assert 'def inspect(' in INSTALLER
+assert 'checked_config(config, candidate, validator)' in INSTALLER
+assert 'return False, "SKIPPED // user shortcuts take priority:' in INSTALLER
+assert 'os.replace(temp, target)' in INSTALLER
+assert 'swaymsg reload' not in INSTALLER
+assert 'Quickshell.watchFiles = false;' in SHELL
+BOOTSTRAP = (ROOT / "services/system/SwayWidgetHotkeyBootstrap.qml").read_text(encoding="utf-8")
+assert "SwayWidgetHotkeyBootstrap {" in SHELL
+assert "Process {" not in SHELL, "root must remain process-free"
+assert "POST_APOLLO_AUTO_WIDGET_HOTKEYS" in BOOTSTRAP
+assert '"--install"' in BOOTSTRAP
+assert "ensure_post_apollo_widget_hotkeys.py" in BOOTSTRAP
 
 # Reuse the one existing controlMenus endpoint. No second widget instance.
 assert SHELL.count('target: "controlMenus"') == 1

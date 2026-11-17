@@ -41,6 +41,13 @@ PanelWindow {
         Quickshell.watchFiles = false;
     }
 
+    // User-Sway hotkeys: the system-owned bootstrap performs an isolated,
+    // one-shot safety audit. Never start arbitrary Processes in shell.qml
+    // (Tasks/Connections owns that root security boundary).
+    SwayWidgetHotkeyBootstrap {
+        id: postApolloWidgetHotkeyBootstrap
+    }
+
     // Register an in-shell graphical Polkit agent only during an explicitly
     // confirmed Clock/CPU++ resync. Keep ordinary shell startup unchanged and
     // release the authentication surface after the privileged command exits.

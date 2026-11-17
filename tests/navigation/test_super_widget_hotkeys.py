@@ -43,9 +43,12 @@ assert 'return False, "SKIPPED // user shortcuts take priority:' in INSTALLER
 assert 'os.replace(temp, target)' in INSTALLER
 assert 'swaymsg reload' not in INSTALLER
 assert 'Quickshell.watchFiles = false;' in SHELL
-assert 'POST_APOLLO_AUTO_WIDGET_HOTKEYS' in SHELL
-assert '"--install"' in SHELL
-assert 'ensure_post_apollo_widget_hotkeys.py' in SHELL
+BOOTSTRAP = (ROOT / "services/system/SwayWidgetHotkeyBootstrap.qml").read_text(encoding="utf-8")
+assert "SwayWidgetHotkeyBootstrap {" in SHELL
+assert "Process {" not in SHELL, "root must remain process-free"
+assert "POST_APOLLO_AUTO_WIDGET_HOTKEYS" in BOOTSTRAP
+assert '"--install"' in BOOTSTRAP
+assert "ensure_post_apollo_widget_hotkeys.py" in BOOTSTRAP
 
 # Reuse the one existing controlMenus endpoint. No second widget instance.
 assert SHELL.count('target: "controlMenus"') == 1

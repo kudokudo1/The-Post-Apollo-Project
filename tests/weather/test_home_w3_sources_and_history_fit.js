@@ -72,7 +72,11 @@ test("W3 compact HISTORY keeps graphs, yesterday, 7-day summary and daily cards 
     assert.ok(home.includes('home.compactHistory ? 5 : 24'));
     assert.ok(home.includes('compact: home.compactHistory'));
     assert.ok(trend.includes('property bool compact: false'));
-    assert.ok(trend.includes('height: inspector.compact ? 36 : 94'));
+    // W26 only HOME LIVE opts into fluidCompactPlot. The default HISTORY
+    // inspector still uses its original 36px compact canvas.
+    assert.ok(trend.includes('property bool fluidCompactPlot: false'));
+    assert.ok(trend.includes('Math.max(36,inspector.height - 36) : 36'));
+    assert.ok(trend.includes(': 94'));
     assert.ok(metric.includes('property bool compact: false'));
     assert.ok(metric.includes('card.compact ? 15 : 20'));
     assert.ok(home.includes('title: "RECENT HISTORY // ARCHIVED MODEL"'));

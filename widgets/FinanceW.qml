@@ -2017,19 +2017,13 @@ Row {
                     }
                 }
 
-                // Budget content belongs to a Column. Mount the indicator on
-                // the enclosing non-positioning Rectangle to avoid layout
-                // moving it below the viewport. Never show it on other tabs.
-                NeonScrollBar {
+                // A reactive overlay follows the real Budget viewport rather
+                // than caching a mapToItem() coordinate through the Column.
+                // It stays outside the Column so no extra layout row appears.
+                FinanceBudgetScrollRail {
                     id: budgetScrollBar
-                    flickable: budgetScroll
-                    mountingParent: emptyPage
-                    geometryMode: "viewport"
-                    handleStyle: "bar"
-                    rightInset: 2
-                    visible: actualBudgetPage.visible
-                             && budgetScroll.visible
-                             && scrollable
+                    scrollTarget: budgetScroll
+                    layoutHost: actualBudgetPage
                 }
 
                 // Non-Budget pages reserve a stable local host. Future

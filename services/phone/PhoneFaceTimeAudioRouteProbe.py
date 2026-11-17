@@ -36,7 +36,8 @@ _HFP_PROFILE = re.compile(
 )
 _ALLOWED = frozenset({
     "AUDIO_INSPECTION_UNAVAILABLE", "PHONE_BRIDGE_UNAVAILABLE",
-    "PHONE_CALLS_NOT_READY", "HFP_PROFILE_NOT_OBSERVED",
+    "PHONE_CALL_STATUS_UNREPORTED", "PHONE_CALLS_NOT_READY",
+    "HFP_PROFILE_NOT_OBSERVED",
     "HFP_PROFILE_AVAILABLE_ONLY", "HFP_SYSTEM_PROFILE_ACTIVE",
 })
 
@@ -117,26 +118,36 @@ def _pactl_cards(
         return None
 
 
-def _blueferry_ready(observation: object) -> tuple[bool, bool]:
-    """An existing provider's *self report*, not an iPhone trust grant."""
+def _blueferry_ready(observation: object) -> tuple[bool, bool, bool]:
+    """Separate a reachable BlueFerry daemon from its optional call status.
+
+    PhoneAudioControls.inspect() explicitly projects missing/non-string
+    calls_state as UNKNOWN. That is an observed *partial* provider response,
+    not proof the D-Bus daemon is offline or cellular HFP is ready.
+    Returns (provider_observed, cellular_hfp_ready, call_fields_reported).
+    """
     if (type(observation) is not dict
             or observation.get("schema") != Audio.SCHEMA
             or observation.get("execution") != "READ_ONLY"
             or observation.get("result") != "OBSERVED"
             or observation.get("trustedPhoneLink") != "UNVERIFIED"
             or observation.get("contentAccessEnabled") is not False
-            or type(observation.get("callsEnabled")) is not bool
-            or type(observation.get("callsState")) is not str
-            or observation.get("callsState") not in (
-                "READY", "SEARCHING", "CONNECTING", "BLUEZ_CONFLICT",
-                "UNAVAILABLE", "DISABLED")
             or type(observation.get("ofonoActive")) is not bool):
-        return False, False
+        return False, False, False
+    reported = (
+        type(observation.get("callsEnabled")) is bool
+        and type(observation.get("callsState")) is str
+        and observation.get("callsState") in (
+            "READY", "SEARCHING", "CONNECTING", "BLUEZ_CONFLICT",
+            "UNAVAILABLE", "DISABLED")
+    )
+    if not reported:
+        return True, False, False
     return True, (
         observation["callsEnabled"] is True
         and observation["callsState"] == "READY"
         and observation["ofonoActive"] is True
-    )
+    ), True
 
 
 def _response(state: str, *, provider: bool = False,
@@ -173,9 +184,9 @@ def inspect(
     # to the selected iPhone, so neither can ever become FaceTime verification.
     try:
         value = provider()
-        observed, ready = _blueferry_ready(value)
+        observed, ready, call_fields_reported = _blueferry_ready(value)
     except Exception:
-        observed, ready = False, False
+        observed, ready, call_fields_reported = False, False, False
     try:
         audio = cards()
     except Exception:
@@ -188,6 +199,8 @@ def inspect(
     offered, active = audio
     if not observed:
         state = "PHONE_BRIDGE_UNAVAILABLE"
+    elif not call_fields_reported:
+        state = "PHONE_CALL_STATUS_UNREPORTED"
     elif not ready:
         state = "PHONE_CALLS_NOT_READY"
     elif active:

@@ -9,6 +9,8 @@ Item {
     objectName: "station-w21-shared-overview-rail"
     property var routes: []
     property string titleText: ""
+    // Optional local selection; empty preserves the other subject rails.
+    property string selectedPath: ""
     property bool condensed: false
     readonly property real buttonGap: HeaderGeometry.tabSpacing + 4
     readonly property real dividerGap: HeaderGeometry.tabsToRule
@@ -58,6 +60,8 @@ Item {
                        /Math.max(1,overviewRail.routes.length))
                 height: longButtons.height
                 label: modelData.label
+                selected: overviewRail.selectedPath !== ""
+                    && modelData.path === overviewRail.selectedPath
                 labelPixelSize: 10
                 contentPadding: 1
                 accentColor: Colors.cyan

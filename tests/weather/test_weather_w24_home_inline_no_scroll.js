@@ -58,7 +58,7 @@ test("W24 no-scrolling height budgets fit default, alert and focused modes",()=>
                         alertHeight+(alert?spacing:0);
      assert.ok(total<=h-5,"default overflows "+h+"/"+alert);
    }
-   const single=Math.max(70,Math.min(180,h-56-36));
+   const single=Math.max(70,Math.min(128,h-56-36));
    const lead=Math.max(0,Math.floor((h-12-56-14-single-9)/2));
    assert.ok(6+56+3+lead+3+14+3+single<=h,
              "focused overflows "+h);

@@ -112,8 +112,32 @@ def test_weather_actual_bottom_tabs():
     assert "function servicesTabFor(" in policy
 
 
+def test_finance_actual_lower_sections():
+    source = read("widgets/FinanceW.qml")
+    assert "function cycleBudgetSection(direction)" in source
+    assert "function selectBudgetSection(section)" in source
+    assert "return selectBudgetSection(" in source
+    assert 'const sections = ["budget","transactions","accounts","categories"]' in source
+    assert "selectedMainMode === \"budget\"" in source
+    assert "selectedBudgetSubMode === \"budget\"" in source
+    assert "financeKeyboardAnchor.activeFocus" in source
+    assert "!quickAddPane.open" in source
+    assert "root.lowerSectionKeysAvailable" in source
+    assert "Qt.ControlModifier" in source
+    for key in ("Ctrl+Left", "Ctrl+Right"):
+        assert f'sequence: "{key}"' in source
+    assert "financeWrite.state===\"pending\"" in source.replace(" ", "") or (
+        "financeWrite.state===\"pending\"" in source.replace(" ", "")
+    )
+    assert "transactionDraftPane.open && section!==\"transactions\"" in source.replace(" ", "")
+    assert 'onLeftClicked: root.selectBudgetSection(modelData.key)' in source
+    assert "onActivated: root.cycleBudgetSection(-1)" in source
+    assert "onActivated: root.cycleBudgetSection(1)" in source
+
+
 if __name__ == "__main__":
-    tests = [test_tasks, test_company, test_weather_actual_bottom_tabs]
+    tests = [test_tasks, test_company, test_weather_actual_bottom_tabs,
+             test_finance_actual_lower_sections]
     for test in tests:
         test()
     print(f"UNIFIED WIDGET KEYS // {len(tests)} focused source contracts PASS")

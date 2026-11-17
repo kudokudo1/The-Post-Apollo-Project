@@ -271,7 +271,8 @@ Item {
         boundsBehavior: Flickable.StopAtBounds
         Column {
             id: body
-            width: scroll.width
+            // Reserve an unobstructed right gutter for the proportional rail.
+            width: Math.max(0, scroll.width - 24)
             spacing: 13
             GohuText {
                 width: parent.width
@@ -474,5 +475,16 @@ Item {
                 color: Colors.orange
             }
         }
+    }
+
+    // Finance uses the ordinary bar, not the Git/Hospital star family.
+    // Mount on the visible pane host and follow the Flickable's viewport.
+    NeonScrollBar {
+        id: stockHistoryScrollBar
+        flickable: scroll
+        mountingParent: stocks
+        geometryMode: "viewport"
+        handleStyle: "bar"
+        rightInset: 2
     }
 }

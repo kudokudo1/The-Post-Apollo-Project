@@ -4,7 +4,7 @@
 
 ## What installs automatically
 
-On Quickshell startup, `shell.qml` invokes `scripts/ensure_post_apollo_widget_hotkeys.py --install` once. The helper does **not** replace the user's Sway config. If the session runs its normal `$XDG_CONFIG_HOME/sway/config`, and **all eight** requested chords are free, it appends exactly one line:
+On Quickshell startup, `shell.qml` instantiates `services/system/SwayWidgetHotkeyBootstrap.qml`, which invokes `scripts/ensure_post_apollo_widget_hotkeys.py --install` once. The root `shell.qml` keeps the shared Tasks/Connections process boundary intact. The helper does **not** replace the user's Sway config. If the session runs its normal `$XDG_CONFIG_HOME/sway/config`, and **all eight** requested chords are free, it appends exactly one line:
 
 ```sway
 include "/absolute/path/to/quickshell/config/sway/post-apollo-widget-hotkeys.conf"

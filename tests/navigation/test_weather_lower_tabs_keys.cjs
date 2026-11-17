@@ -45,7 +45,8 @@ test("Mode cycles are strictly window-local and preview/action remain separate",
   assert.match(navigator,/if\(indexOpen\) return false/);
   assert.match(navigator,/return chooseRoute\(tabs\[next\]\.path\)/);
   assert.match(station,/function cycleBottomSubMode\(direction\)/);
-  assert.match(station,/if \(!standardKeysAvailable \|\| subjectNavigator\.indexOpen\)/);
+  assert.match(station,/!standardKeysAvailable \|\| !weatherKeyboardAnchor\.activeFocus/);
+  assert.match(station,/&& weatherKeyboardAnchor\.activeFocus/);
   assert.match(station,/Qt\.ControlModifier/);
   for(const key of ["Ctrl+Left","Ctrl+Right"])
     assert.match(station,new RegExp('sequence: "'+key.replace("+","\\+")+'"'));

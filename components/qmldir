@@ -15,6 +15,7 @@ ModeActuator 1.0 ModeActuator.qml
 ModeButton 1.0 ModeButton.qml
 
 NeonScrollBar 1.0 NeonScrollBar.qml
+NeonScrollPaneV2 1.0 NeonScrollPaneV2.qml
 DockButton 1.0 DockButton.qml
 ActionButton 1.0 ActionButton.qml
 TrashLifecycleActionDeck 1.0 TrashLifecycleActionDeck.qml

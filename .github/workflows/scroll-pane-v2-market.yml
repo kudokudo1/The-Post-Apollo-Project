@@ -1,0 +1,56 @@
+name: ScrollPane V2 Market viewport and layout
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "components/NeonScrollPaneV2.qml"
+      - "components/qmldir"
+      - "widgets/FinanceMarketPane.qml"
+      - "tests/components/test_neon_scroll_pane_v2_source.py"
+      - "tests/components/test_neon_scroll_pane_v2_qt.py"
+      - "tests/components/neon_scroll_pane_v2_harness.qml"
+      - ".github/workflows/scroll-pane-v2-market.yml"
+  push:
+    paths:
+      - "components/NeonScrollPaneV2.qml"
+      - "components/qmldir"
+      - "widgets/FinanceMarketPane.qml"
+      - "tests/components/test_neon_scroll_pane_v2_source.py"
+      - "tests/components/test_neon_scroll_pane_v2_qt.py"
+      - "tests/components/neon_scroll_pane_v2_harness.qml"
+      - ".github/workflows/scroll-pane-v2-market.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    name: Market full/split/fixed layout source contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -B tests/components/test_neon_scroll_pane_v2_source.py
+      - run: python3 -B tests/components/test_finance_research_scrollbar_coverage.py
+
+  qt-runtime:
+    name: Real ScrollPane V2 dynamic viewport / track geometry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Qt offscreen prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+      - name: Install Qt bindings
+        run: python -m pip install "PySide6>=6.10,<6.12"
+      - name: Render shared host and verify resize/scroll/policy
+        run: python3 tests/components/test_neon_scroll_pane_v2_qt.py

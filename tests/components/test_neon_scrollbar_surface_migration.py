@@ -110,8 +110,11 @@ all_neon_bars = 0
 for path in (ROOT / "widgets").rglob("*.qml"):
     rel = path.relative_to(ROOT).as_posix()
     content = path.read_text(encoding="utf-8")
-    targets = len(re.findall(r"\b(?:Flickable|ListView|GridView)\s*\{", content))
-    bars = len(re.findall(r"\bNeonScrollBar\s*\{", content))
+    # V2 encloses one real Flickable and one Neon rail behind a wrapper.
+    # Count BOTH, so a composite pane cannot silently disappear from census.
+    wrappers = len(re.findall(r"\bNeonScrollPaneV2\s*\{", content))
+    targets = len(re.findall(r"\b(?:Flickable|ListView|GridView)\s*\{", content)) + wrappers
+    bars = len(re.findall(r"\bNeonScrollBar\s*\{", content)) + wrappers
     exceptions = SPECIALIZED_SCROLL_TRACKS.get(rel, 0)
     assert targets <= bars + exceptions, (
         f"{rel}: {targets} scrollable panes but only {bars} NeonScrollBar "

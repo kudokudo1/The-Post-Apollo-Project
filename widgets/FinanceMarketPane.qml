@@ -15,9 +15,20 @@ Item {
     readonly property var selected:
         selectedIndex >= 0 && selectedIndex < markets.length
             ? markets[selectedIndex] : null
+    // The scroll viewport, not the independent market-detail panel, owns
+    // the track. FULL is the preferred narrow-window layout.
+    property string marketScrollPolicy: "fill" // fill | split | fixed
+    property int fixedMarketListHeight: 210
+    property bool narrowDetailOpen: false
+    onMarketScrollPolicyChanged: narrowDetailOpen = false
+    onWideChanged: { if (wide) narrowDetailOpen = false; }
     // Tool selection is independent of FinanceW main modes and window size.
     property string activeTool: "markets"
-    onMarketsChanged: selectedIndex = 0
+    onActiveToolChanged: { if (activeTool !== "markets") narrowDetailOpen = false; }
+    onMarketsChanged: {
+        selectedIndex = 0;
+        narrowDetailOpen = false;
+    }
 
     Row {
         id: marketToolStrip
@@ -106,10 +117,40 @@ Item {
             text: marketFeed ? marketFeed.message : "Market feed is not connected."
         }
 
+        // Layout control changes the viewport allocation, not track geometry.
+        Row {
+            id: marketLayoutControls
+            anchors.top: status.bottom
+            anchors.topMargin: 5
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: visible ? 25 : 0
+            spacing: 5
+            visible: !pane.wide
+            Repeater {
+                model: [
+                    {mode:"fill", label:"FULL"},
+                    {mode:"split", label:"SPLIT"},
+                    {mode:"fixed", label:"FIXED"}
+                ]
+                delegate: ActionButton {
+                    required property var modelData
+                    width: Math.max(0, (marketLayoutControls.width - 10) / 3)
+                    height: 24
+                    label: modelData.label
+                    labelPixelSize: 9
+                    accentColor: Colors.magenta
+                    selected: pane.marketScrollPolicy === modelData.mode
+                    onLeftClicked: pane.marketScrollPolicy = modelData.mode
+                }
+            }
+        }
+
         Item {
             id: body
-            anchors.top: status.bottom
-            anchors.topMargin: 12
+            anchors.top: marketLayoutControls.visible
+                         ? marketLayoutControls.bottom : status.bottom
+            anchors.topMargin: marketLayoutControls.visible ? 8 : 12
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: footer.top
@@ -120,7 +161,9 @@ Item {
                 anchors.left: parent.left
                 anchors.top: parent.top
                 width: pane.wide ? Math.max(245, Math.round(parent.width * 0.39)) : parent.width
-                height: pane.wide ? parent.height : Math.max(120, Math.round(parent.height * 0.46))
+                height: pane.wide ? parent.height : marketScrollPane.preferredExtent
+                visible: pane.wide || pane.marketScrollPolicy !== "fill"
+                         || !pane.narrowDetailOpen
                 color: Colors.dark
                 border.color: Colors.cyan
                 border.width: 1
@@ -136,31 +179,26 @@ Item {
                     text: "ACTIVE BINARY MARKETS // " + pane.markets.length
                 }
 
-                Flickable {
-                    id: marketScroller
+                NeonScrollPaneV2 {
+                    id: marketScrollPane
+                    objectName: "financeMarketScrollPane"
                     anchors.top: marketListTitle.bottom
                     anchors.topMargin: 7
                     anchors.bottom: parent.bottom
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.margins: 4
-                    clip: true
-                    contentWidth: width
-                    contentHeight: marketRows.height
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    NeonScrollBar {
-                        id: marketIndexScrollBar
-                        flickable: marketScroller
-                        mountingParent: marketList
-                        geometryMode: "viewport"
-                        handleStyle: "bar"
-                        rightInset: 2
-                    }
+                    viewportPolicy: pane.wide ? "fill" : pane.marketScrollPolicy
+                    availableExtent: body.height
+                    splitFraction: 0.46
+                    fixedExtent: pane.fixedMarketListHeight
+                    contentExtent: marketRows.height
+                    handleStyle: "bar"
+                    rightInset: 2
 
                     Column {
                         id: marketRows
-                        width: Math.max(0, marketScroller.width - 22)
+                        width: Math.max(0, marketScrollPane.flickable.width - marketScrollPane.contentGutter)
                         spacing: 3
                         Repeater {
                             model: pane.markets
@@ -209,7 +247,11 @@ Item {
                                     color: Colors.orange
                                 }
                                 TapHandler {
-                                    onTapped: pane.selectedIndex = marketRow.index
+                                    onTapped: {
+                                        pane.selectedIndex = marketRow.index;
+                                        if (!pane.wide && pane.marketScrollPolicy === "fill")
+                                            pane.narrowDetailOpen = true;
+                                    }
                                 }
                             }
                         }
@@ -219,8 +261,12 @@ Item {
 
             Rectangle {
                 id: marketDetail
-                anchors.top: pane.wide ? parent.top : marketList.bottom
-                anchors.topMargin: pane.wide ? 0 : 8
+                visible: pane.wide || pane.marketScrollPolicy !== "fill"
+                         || pane.narrowDetailOpen
+                anchors.top: (pane.wide || pane.marketScrollPolicy === "fill")
+                             ? parent.top : marketList.bottom
+                anchors.topMargin: (pane.wide || pane.marketScrollPolicy === "fill")
+                                   ? 0 : 8
                 anchors.left: pane.wide ? marketList.right : parent.left
                 anchors.leftMargin: pane.wide ? 8 : 0
                 anchors.right: parent.right
@@ -230,11 +276,28 @@ Item {
                 border.width: 1
                 clip: true
 
+                ActionButton {
+                    id: backToMarketList
+                    visible: !pane.wide && pane.marketScrollPolicy === "fill"
+                             && pane.narrowDetailOpen
+                    anchors.right: parent.right
+                    anchors.rightMargin: 8
+                    anchors.top: parent.top
+                    anchors.topMargin: 6
+                    width: 61
+                    height: 24
+                    label: "BACK"
+                    labelPixelSize: 9
+                    accentColor: Colors.cyan
+                    onLeftClicked: pane.narrowDetailOpen = false
+                }
+
                 GohuText {
                     id: detailTitle
                     anchors.top: parent.top
                     anchors.left: parent.left
-                    anchors.right: parent.right
+                    anchors.right: backToMarketList.visible
+                                   ? backToMarketList.left : parent.right
                     anchors.margins: 10
                     font.pixelSize: 11
                     color: Colors.white

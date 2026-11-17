@@ -17,7 +17,11 @@ assert 'FinanceOsirisPane {' in market
 assert 'visible: pane.activeTool === "osiris"' in market
 assert 'shown: pane.activeTool === "osiris" && pane.visible' in market
 assert 'id: marketsView' in market  # Old Polymarket view persists
-assert 'id: marketScroller' in market
+# The market reader remains in-place, but V2 owns the viewport and rail.
+assert 'NeonScrollPaneV2 {' in market
+assert 'id: marketScrollPane' in market
+assert 'contentExtent: marketRows.height' in market
+assert 'id: marketsView' in market
 assert 'onLeftClicked: marketFeed.refresh()' in market
 
 # Quickshell's root never imports QtWebEngine, so missing web engine must not

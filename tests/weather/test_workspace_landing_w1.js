@@ -114,7 +114,8 @@ test("left family rail and bottom workspace buttons switch immediate working pan
   assert.match(station,/label: "INDEX"/);
   assert.ok(!station.includes('id: subjectBrowserToggle'));
   assert.match(browser,/property string currentPath: "home\/overview"/);
-  assert.match(browser,/Workspace\.landingFor\(subjectId\)/);
+  assert.match(browser,/return chooseFamily\(subjectId\)/);
+  assert.match(browser,/Workspace\.familySwitchTarget\(currentPath,targetFamily\)/);
   assert.match(browser,/id: indexLayer/);
   assert.match(browser,/if \(indexOpen && !home && candidate\.group\)/);
   assert.match(browser,/function returnToWorkspace\(\)/);

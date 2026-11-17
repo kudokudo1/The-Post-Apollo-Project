@@ -591,7 +591,11 @@ PanelWindow {
 
             if (event.key === Qt.Key_Tab
                     || event.key === Qt.Key_Backtab
-                    || event.key === Qt.Key_Escape) {
+                    || event.key === Qt.Key_Escape
+                    || ((event.modifiers & Qt.ControlModifier) !== 0
+                        && (event.modifiers & (Qt.ShiftModifier | Qt.AltModifier)) === 0
+                        && (event.key === Qt.Key_Left
+                            || event.key === Qt.Key_Right))) {
                 event.accepted = true;
             }
         }
@@ -608,6 +612,12 @@ PanelWindow {
                     event.key === Qt.Key_Backtab
                     || (event.modifiers & Qt.ShiftModifier) !== 0;
                 weatherStation.cycleMainMode(reverse ? -1 : 1);
+            } else if ((event.modifiers & Qt.ControlModifier) !== 0
+                       && (event.modifiers & (Qt.ShiftModifier | Qt.AltModifier)) === 0
+                       && (event.key === Qt.Key_Left
+                           || event.key === Qt.Key_Right)) {
+                weatherStation.cycleBottomSubMode(
+                    event.key === Qt.Key_Right ? 1 : -1);
             } else if (event.key === Qt.Key_Up) {
                 weatherStation.moveNavigationCursor(-1);
             } else if (event.key === Qt.Key_Down) {
@@ -660,6 +670,11 @@ PanelWindow {
     function cycleMainMode(direction) {
         subjectNavigator.cycleSubjects(direction);
     }
+    function cycleBottomSubMode(direction) {
+        if (!standardKeysAvailable || subjectNavigator.indexOpen)
+            return false;
+        return subjectNavigator.cycleWorkspaceTab(direction);
+    }
     function moveNavigationCursor(direction) {
         subjectNavigator.moveCursor(direction);
     }
@@ -678,6 +693,18 @@ PanelWindow {
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
         onActivated: weatherStation.cycleMainMode(-1)
+    }
+    Shortcut {
+        sequence: "Ctrl+Left"
+        context: Qt.WindowShortcut
+        enabled: weatherStation.standardKeysAvailable
+        onActivated: weatherStation.cycleBottomSubMode(-1)
+    }
+    Shortcut {
+        sequence: "Ctrl+Right"
+        context: Qt.WindowShortcut
+        enabled: weatherStation.standardKeysAvailable
+        onActivated: weatherStation.cycleBottomSubMode(1)
     }
     Shortcut {
         sequence: "Up"

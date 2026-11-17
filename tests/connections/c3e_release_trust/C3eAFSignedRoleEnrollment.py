@@ -36,7 +36,7 @@ HEX_PUBLIC = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 FIELDS = frozenset((
     "schema", "role", "purpose", "hostId", "releaseEpoch",
     "releaseSequence", "releaseRootPublicHex", "hostWitnessPublicHex",
-    "receiptPublicHex",
+    "receiptPublicHex", "runtimeSnapshotSha256",
 ))
 NEGATIVE = {
     "operatorEnrollmentRootCustodyVerified": False,
@@ -87,7 +87,7 @@ def verify_signed_enrollment_ci_only(
     *, enrollment: bytes, signature: bytes,
     independently_pinned_enrollment_root: Ed25519PublicKey,
     expected_host_id: str, expected_release_epoch: int,
-    expected_release_sequence: int,
+    expected_release_sequence: int, independently_measured_snapshot: dict,
 ):
     """Return pinned *CI* role keys, not an authenticated production host.
 
@@ -99,6 +99,17 @@ def verify_signed_enrollment_ci_only(
             or type(signature) is not bytes or len(signature) != 64):
         _deny("C3EAF_ENROLLMENT_FRAME_BOUNDS_REFUSED")
     root_raw = _public_bytes(independently_pinned_enrollment_root)
+    # Expected process pins are copied from the independently supplied CI
+    # source and cryptographically bound to the signed enrollment. A real
+    # producer and independent admission source DO NOT exist in this fixture.
+    if type(independently_measured_snapshot) is not dict:
+        _deny("C3EAF_INDEPENDENT_RUNTIME_SNAPSHOT_REQUIRED")
+    measured = dict(independently_measured_snapshot)
+    try:
+        Z.Y.X._validate_pins(measured)
+    except Z.Y.X.Refused as exc:
+        raise Refused("C3EAF_RUNTIME_SNAPSHOT_PINS_REFUSED") from exc
+    snapshot_sha = hashlib.sha256(Z.Y.X._canonical(measured)).hexdigest()
     if (type(expected_host_id) is not str
             or HOST.fullmatch(expected_host_id) is None
             or type(expected_release_epoch) is not int
@@ -122,7 +133,8 @@ def verify_signed_enrollment_ci_only(
             or type(doc["releaseEpoch"]) is not int
             or doc["releaseEpoch"] != expected_release_epoch
             or type(doc["releaseSequence"]) is not int
-            or doc["releaseSequence"] != expected_release_sequence):
+            or doc["releaseSequence"] != expected_release_sequence
+            or doc["runtimeSnapshotSha256"] != snapshot_sha):
         _deny("C3EAF_ENROLLMENT_SCOPE_OR_FLOOR_REFUSED")
     release = _key_from_hex(doc["releaseRootPublicHex"])
     witness = _key_from_hex(doc["hostWitnessPublicHex"])
@@ -140,6 +152,7 @@ def verify_signed_enrollment_ci_only(
         "witness": witness,
         "receipt": receipt,
         "enrollmentSha256": hashlib.sha256(enrollment).hexdigest(),
+        "runtimeSnapshotSha256": snapshot_sha,
     }
 
 def inspect_enrolled_ci_only(
@@ -158,12 +171,19 @@ def inspect_enrolled_ci_only(
     A malformed enrollment is rejected before the root-local challenge is
     consumed. An accepted role enrollment is STILL NOT PRODUCTION CUSTODY.
     """
+    # Freeze the exact expected snapshot for BOTH enrollment pin-check and
+    # C3e-Z consumption. A callback cannot mutate expected data between
+    # the two separate signature-verification stages.
+    if type(independently_measured) is not dict:
+        _deny("C3EAF_INDEPENDENT_RUNTIME_SNAPSHOT_REQUIRED")
+    frozen_snapshot = dict(independently_measured)
     roles = verify_signed_enrollment_ci_only(
         enrollment=enrollment, signature=enrollment_signature,
         independently_pinned_enrollment_root=independently_pinned_enrollment_root,
         expected_host_id=expected_host_id,
         expected_release_epoch=expected_release_epoch,
         expected_release_sequence=expected_release_sequence,
+        independently_measured_snapshot=frozen_snapshot,
     )
     try:
         outcome = Z.inspect_release_and_consume(
@@ -179,7 +199,7 @@ def inspect_enrolled_ci_only(
             independently_pinned_receipt_key=roles["receipt"],
             evidence_line=evidence_line,
             signed_receipts=signed_receipts,
-            independently_measured=independently_measured,
+            independently_measured=frozen_snapshot,
             expected_release_epoch=expected_release_epoch,
             expected_release_sequence=expected_release_sequence,
         )
@@ -196,6 +216,7 @@ def inspect_enrolled_ci_only(
         "releaseAndSignedHostEvidenceBoundToEnrolledRolesInCI": True,
         "oneUseChallengeConsumedInRootLocalCI": True,
         "enrollmentSha256": roles["enrollmentSha256"],
+        "runtimeSnapshotSha256": roles["runtimeSnapshotSha256"],
         **Z.NEGATIVE,
         **Z.Y.X.NEGATIVE,
         **NEGATIVE,

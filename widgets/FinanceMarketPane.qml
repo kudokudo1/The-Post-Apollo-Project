@@ -149,9 +149,18 @@ Item {
                     contentHeight: marketRows.height
                     boundsBehavior: Flickable.StopAtBounds
 
+                    NeonScrollBar {
+                        id: marketIndexScrollBar
+                        flickable: marketScroller
+                        mountingParent: marketList
+                        geometryMode: "viewport"
+                        handleStyle: "bar"
+                        rightInset: 2
+                    }
+
                     Column {
                         id: marketRows
-                        width: marketScroller.width
+                        width: Math.max(0, marketScroller.width - 22)
                         spacing: 3
                         Repeater {
                             model: pane.markets

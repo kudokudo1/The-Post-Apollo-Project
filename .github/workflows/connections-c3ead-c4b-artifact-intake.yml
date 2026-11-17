@@ -1,0 +1,97 @@
+name: Connections C3e-AD real C4b CI artifact intake (diagnostic only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_release_trust/C3eADRealC4bArtifactIntake.py'
+      - 'tests/connections/test_connections_c3ead_real_c4b_artifact_intake.py'
+      - '.github/workflows/connections-c3ead-c4b-artifact-intake.yml'
+      - 'docs/connections-c3ead-real-c4b-ci-artifact-intake.md'
+  workflow_dispatch:
+    inputs:
+      c4b_run_id:
+        description: 'Completed successful C4b official Silverblue push-to-main run ID'
+        type: string
+        required: false
+      expected_c4b_head_sha:
+        description: 'Separately verified exact 40-character commit SHA for that C4b run'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  fail-closed-intake-tests:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run bounded C3e-AD metadata, artifact and marker tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eADRealC4bArtifactIntake.py \
+            tests/connections/test_connections_c3ead_real_c4b_artifact_intake.py
+          python3 -B tests/connections/test_connections_c3ead_real_c4b_artifact_intake.py
+          python3 -B tests/connections/test_connections_c3eab_identity_run_diagnostic.py
+          grep -Fq "readonly property bool credentialActionsEnabled: false" \
+            services/connections/ConnectionsBroker.qml
+          grep -Fq "readonly property bool hostAuthenticated: false" \
+            services/connections/ConnectionsRequestStatus.qml
+          echo "C3EAD_PASS // CI_METADATA_AND_C4B_ARTIFACT_DIAGNOSTIC_ONLY_NO_HOST_TRUST"
+
+  manual-real-c4b-readonly:
+    if: github.actor == 'kudokudo1' && github.event_name == 'workflow_dispatch' && inputs.c4b_run_id != '' && inputs.expected_c4b_head_sha != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read exact C4b run/job/artifact metadata and archive through GitHub only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.c4b_run_id }}
+          EXPECTED_SOURCE_SHA: ${{ inputs.expected_c4b_head_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_REPOSITORY" = "kudokudo1/The-Post-Apollo-Project"
+          [[ "$SOURCE_RUN" =~ ^[1-9][0-9]{0,15}$ ]] || { echo "C3EAD_REFUSED // RUN_ID_INVALID"; exit 2; }
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "C3EAD_REFUSED // SHA_PIN_INVALID"; exit 2; }
+          dir="$RUNNER_TEMP/c3ead-readonly"
+          mkdir -m 0700 "$dir"
+          gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" > "$dir/run.json"
+          gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/jobs?per_page=100" > "$dir/jobs.json"
+          gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/artifacts?per_page=100" > "$dir/artifacts.json"
+          artifact_id="$(python3 - "$dir/artifacts.json" <<'PY'
+          import json,sys
+          a=json.load(open(sys.argv[1],encoding="utf-8"))
+          matches=[v for v in a.get("artifacts",[])
+                   if v.get("name")=="c4b-identity-silverblue-guest-markers"
+                   and v.get("expired") is False]
+          if a.get("total_count")!=1 or len(matches)!=1:
+              raise SystemExit("C3EAD_REFUSED // ARTIFACT_NOT_UNIQUE_OR_EXPIRED")
+          print(matches[0]["id"])
+          PY
+          )"
+          [[ "$artifact_id" =~ ^[1-9][0-9]{0,15}$ ]] || exit 2
+          gh api -X GET "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > "$dir/artifact.zip"
+          python3 -B tests/connections/c3e_release_trust/C3eADRealC4bArtifactIntake.py \
+            --run-json "$dir/run.json" \
+            --jobs-json "$dir/jobs.json" \
+            --artifacts-json "$dir/artifacts.json" \
+            --artifact-zip "$dir/artifact.zip" \
+            --expected-run-id "$SOURCE_RUN" \
+            --expected-sha "$EXPECTED_SOURCE_SHA"
+          echo "C3EAD_HOLD // REAL_GITHUB_CI_DIAGNOSTIC_ONLY_NO_HOST_OR_CREDENTIAL_AUTHORITY"

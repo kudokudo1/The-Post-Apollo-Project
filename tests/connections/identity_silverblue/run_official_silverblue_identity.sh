@@ -78,6 +78,10 @@ done
 payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh")"
 helper_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/verify_booted_rpm_mtime_only.py")"
 service_probe_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/guest_identity_service_probe.sh")"
+# Static verifier code only. No private key or runtime release-signing seed
+# is transferred to the offline ISO, RPM or GitHub artifact.
+receipt_binding_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/runtime_receipt_binding_ci.py")"
+release_candidate_payload="$(base64 -w0 "$repo/services/identity/silverblue_release_candidate_v1.py")"
 cat >"$tmp/seed/ks.cfg" <<EOF
 # CI-only disposable offline Silverblue for C4b Identity gateway package.
 cmdline
@@ -113,6 +117,17 @@ base64 -d >/usr/local/libexec/postapollo-id-ci-service-probe.sh <<'C4B_ID_SERVIC
 $service_probe_payload
 C4B_ID_SERVICE_PROBE
 chmod 0700 /usr/local/libexec/postapollo-id-ci-service-probe.sh
+# Read-only code ships in a disposable seed image, never the signer private
+# key. The receipt-binding helper mints a separate in-memory guest-local CI
+# root and refuses a swapped controller/guest receipt key.
+base64 -d >/usr/local/libexec/postapollo_id_ci_runtime_receipt.py <<'C4B_RUNTIME_BINDING'
+$receipt_binding_payload
+C4B_RUNTIME_BINDING
+chmod 0444 /usr/local/libexec/postapollo_id_ci_runtime_receipt.py
+base64 -d >/usr/local/libexec/postapollo-id-ci-release-candidate.py <<'C4B_RELEASE_VERIFIER'
+$release_candidate_payload
+C4B_RELEASE_VERIFIER
+chmod 0444 /usr/local/libexec/postapollo-id-ci-release-candidate.py
 cat > /etc/systemd/system/postapollo-id-ci-cycle.service <<'C4B_ID_BOOT_UNIT'
 [Unit]
 Description=Disposable C4b Identity Silverblue RPM/rollback lifecycle
@@ -376,6 +391,8 @@ for evidence in \
   'C4B_ID_PASS // INSTALLED_SIGNED_UNAVAILABLE_CANCEL' \
   'C4B_ID_PASS // INSTALLED_SIGNED_UNAVAILABLE_RECOVER' \
   'C4B_ID_PASS // KERNEL_PEER_PID_START_AND_SUPERVISOR_RECHECKED_FOR_FOUR_SIGNED_DENIALS' \
+  'C4B_ID_PASS // GUEST_LOCAL_RELEASE_BOUND_TO_ACTUAL_GATEWAY_RECEIPT_KEY' \
+  'C4B_ID_PASS // SUBSTITUTE_RECEIPT_PUBLIC_KEY_EXPLICITLY_REFUSED' \
   'C4B_ID_PASS // DEDICATED_SELINUX_MODULE_REMOVED_AFTER_SERVICE_STOP' \
   'C4B_ID_PASS // REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP' \
   'C4B_ID_PASS // REAL_IDENTITY_SERVICE_PROBE_FINISHED_BEFORE_ROLLBACK' \

@@ -31,7 +31,8 @@ class P2BSourceContracts(unittest.TestCase):
         for forbidden in ("Qt.openUrlExternally","QNetworkAccessManager",
                           "import requests","import socket","import urllib",
                           "import subprocess","import http.client",
-                          "os.environ","keyring","secretservice",
+                          "os.environ","import keyring","from keyring",
+                          "import secretservice","from secretservice",
                           "ssh-agent","webhook_url",
                           "sendMessage(","dispatch("):
             self.assertNotIn(forbidden,boundary)

@@ -82,6 +82,7 @@ class Relay:
         if req is not None and req.state not in TERMINAL:
             if int(self._clock()) >= req.expires:
                 req.state = "EXPIRED"
+                req.target = ""  # Erase private recipient immediately on expiry.
 
     @staticmethod
     def _public(req: _Request | None) -> dict[str, object]:
@@ -134,7 +135,8 @@ class Relay:
         with self._lock:
             self._expire()
             req = self._request
-            if req is None or req.state in TERMINAL:
+            if req is None or req.state != "QUEUED":
+                # One-time delivery: duplicate polls must not dial twice.
                 return {"schema": SCHEMA, "state": "NONE"}
             req.state = "DELIVERED_TO_SHORTCUT"
             uri = ("facetime-audio:" if req.mode == "audio" else "facetime:") + req.target
@@ -165,6 +167,7 @@ class Relay:
                 return False
             req.state = ("PHONE_REPORTED_OPEN_REQUEST"
                          if event == "OPEN_URL_REQUESTED" else "PHONE_DECLINED")
+            req.target = ""  # Wipe recipient; acknowledgment is not a call.
             return True
 
     def cancel(self) -> bool:
@@ -174,6 +177,7 @@ class Relay:
             if req is None or req.state in TERMINAL:
                 return False
             req.state = "CANCELLED"
+            req.target = ""  # No retained destination on cancellation.
             return True
 
 

@@ -44,8 +44,8 @@ required(
 )
 required(
     "model: root.workforceRosterVisible" in host
-    and "? root.workforceRosterRows : []" in host,
-    "Worker rows must not be aliases of the branch audit",
+    and "? root.workforceShownRows : []" in host,
+    "Worker rows must be filtered PX entries, not aliases of the branch audit",
 )
 required(
     "rosterCurrentRoomIndex" in host

@@ -45,11 +45,15 @@ class ControllerFreshChallengeTests(unittest.TestCase):
         return (V.PROOF_PREFIX + b"pub=" + encoded(pub) +
                 b" frame=" + encoded(frame) + b"\n")
 
-    def check(self, serial=None, challenge=None):
+    _MISSING=object()
+
+    def check(self, serial=None, challenge=_MISSING):
         return V.inspect_ci_only(
             serial=self.serial if serial is None else serial,
+            # Explicit None is an adversarial value and must not be replaced
+            # with the ordinary challenge. Only absence selects the default.
             controller_challenge=(
-                self.challenge if challenge is None else challenge
+                self.challenge if challenge is self._MISSING else challenge
             ),
         )
 

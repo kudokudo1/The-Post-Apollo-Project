@@ -44,12 +44,28 @@ Known example for this checkpoint: run 44050838865, commit b660efe31f1bf21a427e8
 
 No local Fedora, Quickshell, sign-in, secrets, host services or credential operations are touched.
 
+## REAL ARTIFACT SOURCE VERIFICATION // November 17, 2026
+
+A one-time **read-only** GitHub Actions PR check ran the **actual C3e-AD/AE parser** against the C4b postmerge Silverblue artifact before its expiration. The C3e-owned temporary PR-only dispatch was removed again after success, leaving no permanent dependency on the short-lived artifact.
+
+- GitHub workflow run: https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/44103137628
+- Real C4b source intake job: 134108219949, **SUCCESS**
+- Checkpoint source head: ecf6a17418c0d0136bb1fbc6ee136b9b950d4a3d
+- C4b source: run 44050838865, commit b660efe31f1bf21a427e83320b34cf54a1e0ec44, artifact 14314862260
+- Exact source ZIP digest and extracted marker digest match the original postmerge C4b handoff.
+- Positive result: CI GitHub run/job/artifact metadata consistent with independently pinned source and **complete two-boot rollback marker sequence consistent**.
+- Mandatory negatives: installedIdentityHostAuthenticated, canBeginSignIn, credentialActionsEnabled, productionAuthority and all other C3e-AB authority flags remained FALSE.
+
+This **does not** establish independent cryptographic GitHub-run authentication in the library, installed Linux process/seat attestation, external issuer, or C5 human consent. The real-source proof is a historical diagnostic checkpoint, not permission to retain or replay the expiring raw artifact.
+
 ## VERIFY
 
 - [ ] Exact-head 24 C3e-AD/AE regression cases, existing C3e-AB 25 and triggered workflows
 - [ ] Independent Nurse 2 review before protected DOC merge
 - [ ] Optional real GitHub-source manual workflow intake of unexpired artifact
 - [x] External read-only inspection: genuine postmerge C4b run/job/ZIP metadata and full 21/21 stage consistency
+
+- [x] First real C4b GitHub-source ZIP intake: SUCCESS on run 44103137628 with all authority flags FALSE
 
 ## WATCH OUT FOR
 

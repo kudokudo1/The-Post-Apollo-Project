@@ -671,7 +671,10 @@ PanelWindow {
         subjectNavigator.cycleSubjects(direction);
     }
     function cycleBottomSubMode(direction) {
-        if (!standardKeysAvailable || subjectNavigator.indexOpen)
+        // These keys are used by text editors for word navigation. Only
+        // the station's actual Qt navigation anchor may consume them.
+        if (!standardKeysAvailable || !weatherKeyboardAnchor.activeFocus
+                || subjectNavigator.indexOpen)
             return false;
         return subjectNavigator.cycleWorkspaceTab(direction);
     }
@@ -698,12 +701,14 @@ PanelWindow {
         sequence: "Ctrl+Left"
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
+                 && weatherKeyboardAnchor.activeFocus
         onActivated: weatherStation.cycleBottomSubMode(-1)
     }
     Shortcut {
         sequence: "Ctrl+Right"
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
+                 && weatherKeyboardAnchor.activeFocus
         onActivated: weatherStation.cycleBottomSubMode(1)
     }
     Shortcut {

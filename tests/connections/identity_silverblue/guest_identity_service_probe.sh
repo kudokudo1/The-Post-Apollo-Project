@@ -249,12 +249,16 @@ echo "C4B_ID_PASS // REAL_SYSTEMD_IDENTITY_GATEWAY_SOCKET_AND_PROCESS_OBSERVED" 
 # probe failure, forcing a costly full reinstall to identify its cause.
 probe_log=/var/tmp/c4b-id-service-probe.log
 probe_rc=0
+POST_APOLLO_C4B_TEST_GUEST=1 GITHUB_ACTIONS=true \
 python3 -I -B - "$socket" "$signer" "$pid" "$uid" "$gid" "$cgroup" "$selinux" >"$probe_log" 2>&1 <<'PY' || probe_rc="$?"
 import secrets,socket,struct,subprocess,sys
 from pathlib import Path
 sys.path.insert(0,"/usr/libexec/post-apollo/identity")
+sys.path.insert(0,"/usr/local/libexec")
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from signed_command_receipt_v0 import build_request,verify_receipt
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from postapollo_id_ci_runtime_receipt import rehearse_guest_local_ci_only
 sockpath,signerpath=sys.argv[1:3]
 pid,uid,gid=map(int,sys.argv[3:6])
 expected_cgroup,expected_lsm=sys.argv[6:8]
@@ -333,6 +337,31 @@ for action in ("BEGIN","STATUS","CANCEL","RECOVER"):
     check_origin(f"after {action}")
     print(f"C4B_ID_PASS // INSTALLED_SIGNED_UNAVAILABLE_{action}")
 print("C4B_ID_PASS // KERNEL_PEER_PID_START_AND_SUPERVISOR_RECHECKED_FOR_FOUR_SIGNED_DENIALS")
+# The signed release and actual runtime receipt signer were previously
+# separate CI fixtures. After verifying FOUR signed responses from the
+# actual SO_PEERCRED-pinned service, rehearse a separate, guest-local
+# Ed25519-signed source manifest naming this EXACT runtime public key.
+# Its root is minted in this isolated guest, NOT externally enrolled.
+# A substituted controller/public key must be explicitly refused.
+check_origin("before signed-runtime-key binding")
+bound=rehearse_guest_local_ci_only(
+    actual_runtime_receipt_public=key.public_bytes(Encoding.Raw,PublicFormat.Raw),
+    verified_actions=("BEGIN","STATUS","CANCEL","RECOVER"),
+    signed_rpm_archive=Path(
+        "/var/lib/postapollo-id-ci-assets/identity-silverblue-ci.rpm"
+    ),
+)
+for name in ("operatorEnrollmentRootCustodyVerified",
+             "independentlySignedRemoteHostWitnessVerified",
+             "installedHostAuthenticated", "externalChallengeIssuerVerified",
+             "externalRollbackResistanceVerified", "c5HumanConsentVerified",
+             "hostAuthenticated", "canBeginSignIn",
+             "credentialActionsEnabled", "productionAuthority"):
+    if bound.get(name) is not False:
+        raise RuntimeError("guest binding tried to grant authority: "+name)
+check_origin("after signed-runtime-key binding")
+print("C4B_ID_PASS // GUEST_LOCAL_RELEASE_BOUND_TO_ACTUAL_GATEWAY_RECEIPT_KEY")
+print("C4B_ID_PASS // SUBSTITUTE_RECEIPT_PUBLIC_KEY_EXPLICITLY_REFUSED")
 PY
 # Bounded, prefix-tagged diagnostic lines survive the host's evidence filter;
 # retain exact PASS markers for authoritative host-side stage checks.

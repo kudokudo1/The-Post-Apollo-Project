@@ -8,6 +8,7 @@ on:
       - "config/sway/post-apollo-widget-hotkeys.conf"
       - "scripts/ensure_post_apollo_widget_hotkeys.py"
       - "scripts/enable_koinoikos_focus.py"
+      - "services/system/SwayWidgetHotkeyBootstrap.qml"
       - "tests/navigation/test_super_widget_hotkeys.py"
       - "tests/navigation/test_super_widget_hotkey_auto_install.py"
       - ".github/workflows/post-apollo-super-widget-hotkeys.yml"

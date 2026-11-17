@@ -1158,6 +1158,9 @@ Item {
                             NeonScrollBar {
                                 handleStyle: "star"
                                 flickable: changesScroll1
+                                // This pane mounts the rail outside its layout Column.
+                                mountingParent: changesScroll1.parent.parent
+                                geometryMode: "viewport"
                             }
 }
                     }
@@ -1309,6 +1312,9 @@ Item {
                             NeonScrollBar {
                                 handleStyle: "star"
                                 flickable: changesScroll2
+                                // This pane mounts the rail outside its layout Column.
+                                mountingParent: changesScroll2.parent.parent
+                                geometryMode: "viewport"
                             }
 }
                     }
@@ -1500,6 +1506,9 @@ Item {
                             NeonScrollBar {
                                 handleStyle: "star"
                                 flickable: changesScroll3
+                                // This pane mounts the rail outside its layout Column.
+                                mountingParent: changesScroll3.parent.parent
+                                geometryMode: "viewport"
                             }
 }
                     }
@@ -1906,6 +1915,9 @@ Item {
                             NeonScrollBar {
                                 handleStyle: "star"
                                 flickable: changesScroll4
+                                // This pane mounts the rail outside its layout Column.
+                                mountingParent: changesScroll4.parent.parent
+                                geometryMode: "viewport"
                             }
                         }
                     }
@@ -2031,6 +2043,9 @@ Item {
                         NeonScrollBar {
                             handleStyle: "star"
                             flickable: changesScroll5
+                            // This pane mounts the rail outside its layout Column.
+                            mountingParent: changesScroll5.parent
+                            geometryMode: "viewport"
                         }
 }
                 }
@@ -2152,6 +2167,9 @@ Item {
                             NeonScrollBar {
                                 handleStyle: "star"
                                 flickable: changesScroll6
+                                // This pane mounts the rail outside its layout Column.
+                                mountingParent: changesScroll6.parent.parent
+                                geometryMode: "viewport"
                             }
 }
                     }
@@ -2318,6 +2336,9 @@ Item {
                             NeonScrollBar {
                                 handleStyle: "star"
                                 flickable: changesScroll7
+                                // This pane mounts the rail outside its layout Column.
+                                mountingParent: changesScroll7.parent.parent
+                                geometryMode: "viewport"
                             }
 }
                     }

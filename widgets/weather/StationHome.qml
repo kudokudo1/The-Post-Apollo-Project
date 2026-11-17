@@ -42,7 +42,7 @@ Rectangle {
     readonly property real homeInlineAutoHeight:
         Math.max(46,homeInlineCardBudget - homeInlineLiveHeight)
     readonly property real homeInlineSingleHeight:
-        Math.max(70,Math.min(180,homeScroll.height
+        Math.max(70,Math.min(128,homeScroll.height
             - homeOverviewRail.height - 36))
     readonly property real homeInlineFocusLead: Math.max(0,
         Math.floor((homeScroll.height - 12 - homeOverviewRail.height

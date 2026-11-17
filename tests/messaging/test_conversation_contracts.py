@@ -110,10 +110,10 @@ room_chat = ROOM_CHAT.read_text()
 assert 'property string providerId: ""' in room_chat
 assert 'property string doctorId: ""' in room_chat
 assert "readonly property string activeSessionId: adapter.activeSessionId" in room_chat
-assert "providerId: root.providerId" in room_chat
+assert "providerId: root.effectiveProviderId" in room_chat
 assert "doctorId: root.doctorId" in room_chat
 assert "workingDirectory: root.bedPath" in room_chat
-assert 'return root.providerId ? "READY TO CONNECT" : "ROOM CHAT";' in room_chat
+assert 'return root.effectiveProviderId ? "READY TO CONNECT" : "ROOM CHAT";' in room_chat
 
 print("hospital live doctor chat view contract: PASS")
 
@@ -164,6 +164,40 @@ assert 'root.openRoomChat();' in hospital
 assert 'root.openRoomDoctor();' in hospital
 assert "Quickshell.execDetached" not in hospital[hospital.find("id: roomAiDock"):hospital.find("id: roomInspectActions")]
 
+# Room recovery reads PX rooms rather than assuming Git audit supplies providerId.
+# Only an explicit user-selected provider may be written to PX room-bind.
+assert 'property string explicitRoomProviderId: ""' in hospital
+assert 'property string explicitRoomProviderTeam: ""' in hospital
+assert 'roomChatView.storedProviderId' in hospital
+assert 'onStoredProviderIdChanged: root.syncRoomAISelection()' in hospital
+assert 'root.explicitRoomProviderTeam = "";' in hospital
+assert 'root.explicitRoomProviderId = "";' in hospital
+assert 'root.selectedProviderId = "";' in hospital
+assert 'root.explicitRoomProviderTeam = root.selectedRoomTeam;' in hospital
+assert 'root.explicitRoomProviderId = provider;' in hospital
+assert 'root.explicitRoomProviderTeam === root.selectedRoomTeam' in hospital
+assert 'explicitProviderIdToPersist:' in hospital
+
+assert 'readonly property string storedProviderId:' in room_chat
+assert 'readonly property string effectiveProviderId:' in room_chat
+assert 'property string explicitProviderIdToPersist: ""' in room_chat
+assert 'onExplicitProviderIdToPersistChanged: scheduleRoomBinding()' in room_chat
+assert 'providerId: root.effectiveProviderId' in room_chat
+binding = room_chat.split("function roomBinding()", 1)[1].split(
+    "function syncRoomBinding()", 1
+)[0]
+assert 'const explicitProvider =' in binding
+assert 'if (explicitProvider)' in binding
+assert 'binding.providerId = explicitProvider;' in binding
+assert 'return binding;' in binding
+assert 'root.providerId' not in binding
+
+assert 'const roomProviderId = String(room.providerId || "").trim();' in adapter
+assert 'if (roomProviderId) {' in adapter
+assert 'args.push("--provider-id");' in adapter
+assert 'args.push(roomProviderId);' in adapter
+
+print("hospital Room provider recovery and explicit-write contracts: PASS")
 print("hospital room AI dock contracts: PASS")
 
 

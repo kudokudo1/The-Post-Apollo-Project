@@ -7,6 +7,10 @@ on:
       - "widgets/GitW.qml"
       - "widgets/HospitalW.qml"
       - "widgets/CpuPlusW.qml"
+      - "widgets/TasksW.qml"
+      - "widgets/CompanyNetworkW.qml"
+      - "widgets/weather/StationSubjectNavigator.qml"
+      - "widgets/weather/StationWorkspaceNavigationPolicy.js"
       - "widgets/weather/WeatherStationW.qml"
       - "widgets/notifications/NotificationsHubW.qml"
       - "widgets/messanger/MessagingW.qml"
@@ -18,6 +22,10 @@ on:
     paths:
       - "widgets/GitW.qml"
       - "widgets/CpuPlusW.qml"
+      - "widgets/TasksW.qml"
+      - "widgets/CompanyNetworkW.qml"
+      - "widgets/weather/StationSubjectNavigator.qml"
+      - "widgets/weather/StationWorkspaceNavigationPolicy.js"
       - "widgets/weather/WeatherStationW.qml"
       - "widgets/notifications/NotificationsHubW.qml"
       - "widgets/messanger/MessagingW.qml"
@@ -36,4 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run read-only navigation source contracts
-        run: python3 tests/navigation/test_unified_widget_keys.py
+        run: |
+          python3 tests/navigation/test_unified_widget_keys.py
+          python3 tests/navigation/test_widget_keys_tasks_company_weather.py
+          node --test tests/navigation/test_weather_lower_tabs_keys.cjs

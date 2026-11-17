@@ -63,7 +63,7 @@ def _deny(code):
 def _digest_file(path: Path, *, ceiling: int, mode: int):
     # Only caller-allowlisted absolute paths. Immutable guest /usr may be
     # hardlinked into OSTree objects; do not forbid a legitimate nlink > 1.
-    if type(path) is not Path or not path.is_absolute():
+    if not isinstance(path, Path) or not path.is_absolute():
         _deny("C4B_BINDING_NONABSOLUTE_SOURCE_PATH")
     fd = None
     try:
@@ -124,6 +124,13 @@ def verify_runtime_binding_ci_only(
         release_receipt_public, actual_runtime_receipt_public,
     ):
         _deny("C4B_BINDING_SIGNED_RELEASE_KEY_NOT_RUNTIME_SIGNER")
+    if not isinstance(independently_pinned_release_root, Ed25519PublicKey):
+        _deny("C4B_BINDING_SEPARATE_RELEASE_ROOT_REQUIRED")
+    root_raw = independently_pinned_release_root.public_bytes(
+        Encoding.Raw, PublicFormat.Raw,
+    )
+    if hmac.compare_digest(root_raw, release_receipt_public):
+        _deny("C4B_BINDING_RELEASE_ROOT_MUST_DIFFER_FROM_RECEIPT_SIGNER")
     try:
         candidate = I.assess_synthetic_release(
             signed_release=signed_release,
@@ -172,7 +179,12 @@ def rehearse_guest_local_ci_only(
             os.environ.get("GITHUB_ACTIONS") != "true" or
             not Path("/run/ostree-booted").exists()):
         _deny("C4B_BINDING_OFFICIAL_GUEST_CI_SCOPE_REQUIRED")
-    if (type(signed_rpm_archive) is not Path or
+    try:
+        if Path("/sys/fs/selinux/enforce").read_bytes().strip() != b"1":
+            _deny("C4B_BINDING_ENFORCING_SELINUX_REQUIRED")
+    except OSError as exc:
+        raise Refused("C4B_BINDING_SELINUX_OBSERVATION_UNAVAILABLE") from exc
+    if (not isinstance(signed_rpm_archive, Path) or
             signed_rpm_archive != Path(
                 "/var/lib/postapollo-id-ci-assets/identity-silverblue-ci.rpm"
             )):

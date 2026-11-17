@@ -54,7 +54,7 @@ jobs:
           assert "readonly property bool hostAuthenticated: false" in status
           print("C3EAF_HOLD // NO_REAL_OPERATOR_ROOT_OR_SIGN_IN_AUTHORITY")
           PY
-      - name: 18 signed enrollment role and issuer replay denial tests
+      - name: 22 signed enrollment role, runtime snapshot and issuer replay denial tests
         shell: bash
         run: |
           set -euo pipefail
@@ -63,7 +63,7 @@ jobs:
           sudo -n test "$(sudo -n id -u)" -eq 0
           sudo -n env GITHUB_ACTIONS=true "$(command -v python3)" -B \
             tests/connections/test_connections_c3eaf_signed_role_enrollment.py
-          echo "C3EAF_PASS // 18_SIGNED_KEY_ROLE_ENROLLMENT_TESTS_NO_HOST_OR_C5"
+          echo "C3EAF_PASS // 22_SIGNED_KEY_ROLE_AND_RUNTIME_BINDING_TESTS_NO_HOST_OR_C5"
       - name: Preserve existing C3e-Z synthetic signed release and witness contract
         shell: bash
         run: |

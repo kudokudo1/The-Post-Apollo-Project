@@ -45,6 +45,40 @@ PanelWindow {
     ]
     property int selectedMainModeIndex: 0
     readonly property var activeMode: mainModes[selectedMainModeIndex]
+
+    // Local navigation only. The embedded map and its own/native input
+    // remain authoritative whenever they (rather than the frame) have focus.
+    property int keyboardModeCursor: 0
+    readonly property bool standardModeKeysAvailable:
+        root.menuOpen && root.activeFocusItem === companyFrame
+    onSelectedMainModeIndexChanged: keyboardModeCursor = selectedMainModeIndex
+
+    function selectMainMode(index) {
+        if(index >= 0 && index < mainModes.length) {
+            selectedMainModeIndex = index;
+            keyboardModeCursor = index;
+        }
+    }
+
+    function cycleMainMode(direction) {
+        if(!standardModeKeysAvailable || mainModes.length < 1) return;
+        const count=mainModes.length;
+        const step=Number(direction) < 0 ? -1 : 1;
+        selectMainMode((selectedMainModeIndex+step+count)%count);
+    }
+
+    // Arrow preview never starts MapLibre or mutates company data.
+    function moveNavigationCursor(direction) {
+        if(!standardModeKeysAvailable || mainModes.length < 1) return;
+        const step=Number(direction) < 0 ? -1 : 1;
+        keyboardModeCursor=(keyboardModeCursor+step+mainModes.length)
+            %mainModes.length;
+    }
+
+    function activateNavigationCursor() {
+        if(!standardModeKeysAvailable) return;
+        selectMainMode(keyboardModeCursor);
+    }
     // M18 // One candidate viewport in Company FRAME-local coordinates,
     // deliberately NOT native/output-global. Stage Director must separately
     // authenticate the paired Company layer and validate its output epoch.
@@ -107,6 +141,7 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (menuOpen) {
+            keyboardModeCursor = selectedMainModeIndex;
             // Load the geographic map only after first explicit opening.
             // Keep it alive thereafter to preserve view while switching modes.
             coverageLoaded = true;
@@ -163,6 +198,45 @@ PanelWindow {
         mapRect: root.activeVectorViewportRect
     }
 
+    // Guarded Qt WindowShortcut fallback. No top/bottom submodes are
+    // fabricated for the four real main-mode buttons.
+    Shortcut {
+        sequence: "Tab"
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
+        onActivated: root.cycleMainMode(1)
+    }
+    Shortcut {
+        sequence: "Shift+Tab"
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
+        onActivated: root.cycleMainMode(-1)
+    }
+    Shortcut {
+        sequence: "Up"
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
+        onActivated: root.moveNavigationCursor(-1)
+    }
+    Shortcut {
+        sequence: "Down"
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
+        onActivated: root.moveNavigationCursor(1)
+    }
+    Shortcut {
+        sequence: "Enter"
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
+        onActivated: root.activateNavigationCursor()
+    }
+    Shortcut {
+        sequence: "Return"
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
+        onActivated: root.activateNavigationCursor()
+    }
+
     WindowPanelFrame {
         id: companyFrame
         anchors.fill: parent
@@ -172,6 +246,31 @@ PanelWindow {
         anchors.bottomMargin: root.bottomScreenGap
         visible: root.menuOpen
         focus: root.menuOpen
+        Keys.priority: Keys.BeforeItem
+        Keys.onShortcutOverride: function(event) {
+            if(!root.standardModeKeysAvailable) return;
+            if(event.key===Qt.Key_Tab || event.key===Qt.Key_Backtab)
+                event.accepted=true;
+        }
+        Keys.onPressed: function(event) {
+            if(!root.standardModeKeysAvailable) return;
+            if(event.key===Qt.Key_Tab || event.key===Qt.Key_Backtab) {
+                const reverse=event.key===Qt.Key_Backtab
+                    || (event.modifiers & Qt.ShiftModifier)!==0;
+                root.cycleMainMode(reverse ? -1 : 1);
+            } else if(event.modifiers===Qt.NoModifier
+                    && event.key===Qt.Key_Up) {
+                root.moveNavigationCursor(-1);
+            } else if(event.modifiers===Qt.NoModifier
+                    && event.key===Qt.Key_Down) {
+                root.moveNavigationCursor(1);
+            } else if(event.modifiers===Qt.NoModifier
+                    && (event.key===Qt.Key_Enter ||
+                        event.key===Qt.Key_Return)) {
+                root.activateNavigationCursor();
+            } else return;
+            event.accepted=true;
+        }
         Keys.onEscapePressed: function(event) {
             if (!root.menuOpen)
                 return;
@@ -361,11 +460,17 @@ PanelWindow {
                     labelFontSize: 11
                     bordered: false
                     selected: root.selectedMainModeIndex === index
+                    keyboardActive: root.standardModeKeysAvailable
+                    keyboardSelected: root.keyboardModeCursor === index
                     idlePrimaryColor: Colors.yellow
                     hoverPrimaryColor: Colors.blue
                     selectedPrimaryColor: Colors.blue
                     perimeterGlowColor: Colors.blue
-                    onTriggered: root.selectedMainModeIndex = index
+                    onTriggered: {
+                        root.selectMainMode(index);
+                        if(root.menuOpen)
+                            companyFrame.forceActiveFocus();
+                    }
                 }
             }
         }

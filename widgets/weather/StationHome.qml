@@ -1341,9 +1341,16 @@ Rectangle {
         StationSectionDivider {
             visible: home.sectionVisible("snapshot")
                      && !home.fixedWeatherOverview
+                     && !home.homeInlineDefault
             width: parent.width
-            title: home.homeInlineDefault ? "LIVE // NOW"
-                : "SNAPSHOT // NOW"
+            title: "SNAPSHOT // NOW"
+        }
+
+        StationSectionDivider {
+            objectName: "home-w24-live-now-divider"
+            visible: home.homeInlineDefault
+            width: parent.width
+            title: "LIVE // NOW"
         }
 
         Row {

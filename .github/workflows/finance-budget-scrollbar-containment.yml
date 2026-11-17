@@ -5,12 +5,18 @@ on:
   push:
     paths:
       - "widgets/FinanceW.qml"
+      - "widgets/FinanceBudgetScrollRail.qml"
       - "tests/components/test_finance_budget_scrollbar_containment.py"
+      - "tests/components/finance_budget_scrollbar_runtime_harness.qml"
+      - "tests/components/test_finance_budget_scrollbar_qt_runtime.py"
       - ".github/workflows/finance-budget-scrollbar-containment.yml"
   pull_request:
     paths:
       - "widgets/FinanceW.qml"
+      - "widgets/FinanceBudgetScrollRail.qml"
       - "tests/components/test_finance_budget_scrollbar_containment.py"
+      - "tests/components/finance_budget_scrollbar_runtime_harness.qml"
+      - "tests/components/test_finance_budget_scrollbar_qt_runtime.py"
       - ".github/workflows/finance-budget-scrollbar-containment.yml"
 
 permissions:
@@ -18,10 +24,31 @@ permissions:
 
 jobs:
   budget-rail:
-    name: Finance Budget bar host and mode gating
+    name: Finance Budget bar source and viewport contract
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: Verify Budget local mount and mode visibility
         run: python3 -B tests/components/test_finance_budget_scrollbar_containment.py
+
+  reactive-runtime:
+    name: Finance Budget real rail QML dynamic geometry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install headless Qt prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+      - name: Install PySide6 Qt bindings
+        run: python -m pip install "PySide6>=6.10,<6.12"
+      - name: Exercise actual Finance Budget rail layout and mode changes
+        run: python tests/components/test_finance_budget_scrollbar_qt_runtime.py

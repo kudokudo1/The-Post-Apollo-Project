@@ -30,6 +30,7 @@ on:
       - 'tests/weather/test_weather_w23_c44_gap_home_navigation.js'
       - 'tests/weather/test_weather_w24_home_inline_no_scroll.js'
       - 'tests/weather/test_weather_w25_home_graphs_first_view.js'
+      - 'tests/weather/test_weather_w26_home_responsive_content.js'
       - 'tests/weather/test_weather_w10_three_band_solar.js'
       - 'widgets/weather/StationSky.qml'
       - 'tests/weather/test_weather_w9_fixed_paged_terminal.js'
@@ -73,6 +74,7 @@ jobs:
           node --test tests/weather/test_weather_w23_c44_gap_home_navigation.js
           node --test tests/weather/test_weather_w24_home_inline_no_scroll.js
           node --test tests/weather/test_weather_w25_home_graphs_first_view.js
+          node --test tests/weather/test_weather_w26_home_responsive_content.js
           node --test tests/weather/test_weather_w8_unified_terminal.js
           node --test tests/weather/test_weather_subject_panels_m2a.js
           node --test tests/weather/test_weather_subject_panels_m2b.js
@@ -176,7 +178,7 @@ jobs:
           if grep -E 'W21_MAGICK_RAIL_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi
-      - name: Native W25 HOME relationship graphs above LIVE/AUTO at 520x300 and 440x275
+      - name: Native W26 HOME responsive graphs at 520x300, 440x275, 520x500
         shell: bash
         run: |
           set -euo pipefail
@@ -201,6 +203,7 @@ jobs:
           test "$rc" -eq 0
           grep -F "W24_HOME_INLINE_NATIVE_PASS // FIVE_MODES_520_440_NO_SCROLL" "$work/native.log"
           grep -F "W25_HOME_GRAPHS_NATIVE_PASS // TWO_ORIGINAL_LINE_CHARTS_TOP_COMPACT_LIVE_AUTO_BOTTOM" "$work/native.log"
+          grep -F "W26_HOME_RESPONSIVE_NATIVE_PASS // THREE_VIEWPORTS_NO_EMPTY_GAP_AND_FLUID_PLOTS" "$work/native.log"
           if grep -E 'W24_HOME_INLINE_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
             exit 1
           fi
@@ -230,11 +233,11 @@ jobs:
           path: /tmp/weather-w21-magick-overview.png
           if-no-files-found: warn
           retention-days: 14
-      - name: Upload W25 native HOME graphs and inline panel screenshots
+      - name: Upload W26 responsive HOME screenshot set
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: weather-w25-home-graphs
+          name: weather-w26-home-responsive
           path: /tmp/weather-w24-home-*.png
           if-no-files-found: warn
           retention-days: 14

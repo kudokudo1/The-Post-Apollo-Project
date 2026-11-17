@@ -45,7 +45,11 @@ test("SERVICES reuses existing telemetry without additional fetching", () => {
 test("HOME HISTORY improves the actual plot, keeps no-scroll minimum", () => {
     assert.match(home,/Math\.max\(72, Math\.min\(108, home\.height - 188\)\)/);
     assert.match(home,/interactive: !home\.compactHistory/);
-    assert.match(chart,/height: inspector\.compact \? 36 : 94/);
+    // W26 HOME LIVE opts into the taller plot. HISTORY still defaults
+    // to exactly 36px of compact plotting area.
+    assert.match(chart,/property bool fluidCompactPlot: false/);
+    assert.match(chart,/Math.max\(36,inspector.height - 36\) : 36/);
+    assert.match(chart,/: 94/);
     assert.match(chart,/visible: !inspector\.compact/);
     assert.match(chart,/anchors\.margins: inspector\.compact \? 3 : 7/);
 });

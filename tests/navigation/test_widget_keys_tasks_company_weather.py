@@ -126,10 +126,9 @@ def test_finance_actual_lower_sections():
     assert "Qt.ControlModifier" in source
     for key in ("Ctrl+Left", "Ctrl+Right"):
         assert f'sequence: "{key}"' in source
-    assert "financeWrite.state===\"pending\"" in source.replace(" ", "") or (
-        "financeWrite.state===\"pending\"" in source.replace(" ", "")
-    )
-    assert "transactionDraftPane.open && section!==\"transactions\"" in source.replace(" ", "")
+    compact = source.replace(" ", "").replace("\\n", "")
+    assert 'financeWrite.state==="pending"' in compact
+    assert 'transactionDraftPane.open&&section!=="transactions"' in compact
     assert 'onLeftClicked: root.selectBudgetSection(modelData.key)' in source
     assert "onActivated: root.cycleBudgetSection(-1)" in source
     assert "onActivated: root.cycleBudgetSection(1)" in source

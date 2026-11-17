@@ -73,7 +73,14 @@ class CameraM2ViewerContracts(unittest.TestCase):
         self.assertIn('["preview-selected", selectedPath]', PANEL)
         self.assertIn('["trash-selected", plan.planId, "MOVE_TO_TRASH"]', PANEL)
         self.assertIn('label: "MOVE SELECTED TO TRASH"', PANEL)
-        self.assertIn('label: "CONFIRM TRASH"', PANEL)
+        # U5 uses a generic request-only TRASH control for the final click;
+        # Camera still owns the two-phase preview/one-use backend plan.
+        self.assertIn('id: cameraSelectedTrashReviewDeck', PANEL)
+        self.assertIn('onTrashReviewRequested:', PANEL)
+        self.assertIn('resourceRevisionKind: "camera-plan"', PANEL)
+        self.assertIn('function reviewSelectedCameraTrash(', PANEL)
+        self.assertIn('return confirmSelectedTrash();', PANEL)
+        self.assertIn('showBurn: false', PANEL)
         self.assertIn('label: "CANCEL"', PANEL)
         self.assertIn("selectedTrashPreview = null", PANEL)
         self.assertIn("def preview_selected_trash(raw_path):", BACKEND)

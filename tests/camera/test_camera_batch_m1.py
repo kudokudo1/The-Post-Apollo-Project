@@ -249,7 +249,7 @@ class CameraBatchM1Tests(unittest.TestCase):
         self.assertEqual(receipt["error"], "PLAN_EXPIRED_OR_INVALID")
         self.assertEqual(run.call_count, 0)
 
-    def test_batch_always_review_first_and_never_direct_file_delete_in_qml(self):
+    def test_batch_queue_has_explicit_review_click_and_no_direct_file_delete_in_qml(self):
         qml = QML.read_text() + (ROOT / "widgets/CameraCleanupView.qml").read_text()
         for snippet in ('property var batchPaths: []',
                         'function batchToggle(record)',
@@ -260,10 +260,15 @@ class CameraBatchM1Tests(unittest.TestCase):
                         '"trash-batch"',
                         'galleryFiles.length',
                         'label: "SELECT LOADED"',
-                        'label: "MOVE " + camera.batchPaths.length + " TO TRASH"',
-                        'onLeftClicked: camera.trashQueuedNow()'):
+                        'id: cleanupQueueTrashReviewDeck',
+                        'resourceRevisionKind: "queue-counter"',
+                        'onTrashReviewRequested:',
+                        'camera.reviewQueuedCameraTrash('):
             self.assertIn(snippet, qml)
         self.assertIn('batchReviewKey !== JSON.stringify(batchPaths)', qml)
+        self.assertIn('"trash-batch-now", JSON.stringify(batchPaths)', qml)
+        self.assertIn('"MOVE_TO_TRASH", "--folder", cleanupCustomFolder', qml)
+        self.assertNotIn('onLeftClicked: camera.trashQueuedNow()', qml)
         self.assertIn('batchPreview = null;', qml)
         self.assertNotIn('rm -rf', qml)
 

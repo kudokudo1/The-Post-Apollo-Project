@@ -34,7 +34,8 @@ test("W24 four HOME buttons switch existing middle panels without redirecting",(
 test("W24 LIVE first view has LIVE on top, AUTO on bottom, and only existing data",()=>{
  assert.match(home,/homeInlineMode === "live"/);
  assert.match(home,/section === "snapshot" \|\| section === "relevant"/);
- assert.match(home,/title: home\.homeInlineDefault \? "LIVE \/\/ NOW"/);
+ assert.match(home,/title: "LIVE \/\/ NOW"/);
+ assert.match(home,/title: "SNAPSHOT \/\/ NOW"/);
  assert.match(home,/id: weatherSnapshotRow/);
  assert.match(home,/id: weatherRelevantRow/);
  assert.match(home,/model: home\.watchItems/);

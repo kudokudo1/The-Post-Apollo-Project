@@ -175,44 +175,8 @@ PanelWindow {
         height: root.menuOpen ? root.frameHeight : 0
     }
 
-    // Window-local shortcut fallback: only the active frame may receive
-    // navigation. No invented top/bottom modes, no destructive Enter action.
-    Shortcut {
-        sequence: "Tab"
-        context: Qt.WindowShortcut
-        enabled: root.standardModeKeysAvailable
-        onActivated: root.cycleMainMode(1)
-    }
-    Shortcut {
-        sequence: "Shift+Tab"
-        context: Qt.WindowShortcut
-        enabled: root.standardModeKeysAvailable
-        onActivated: root.cycleMainMode(-1)
-    }
-    Shortcut {
-        sequence: "Up"
-        context: Qt.WindowShortcut
-        enabled: root.standardModeKeysAvailable
-        onActivated: root.moveNavigationCursor(-1)
-    }
-    Shortcut {
-        sequence: "Down"
-        context: Qt.WindowShortcut
-        enabled: root.standardModeKeysAvailable
-        onActivated: root.moveNavigationCursor(1)
-    }
-    Shortcut {
-        sequence: "Enter"
-        context: Qt.WindowShortcut
-        enabled: root.standardModeKeysAvailable
-        onActivated: root.activateNavigationCursor()
-    }
-    Shortcut {
-        sequence: "Return"
-        context: Qt.WindowShortcut
-        enabled: root.standardModeKeysAvailable
-        onActivated: root.activateNavigationCursor()
-    }
+    // The focused frame alone handles keys. Do not use WindowShortcut:
+    // TASKS editors retain Qt's native Tab/Enter/arrow ownership.
 
     WindowPanelFrame {
         id: tasksFrame

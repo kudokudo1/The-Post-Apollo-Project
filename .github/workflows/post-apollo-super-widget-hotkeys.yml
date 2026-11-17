@@ -6,7 +6,10 @@ on:
       - "shell.qml"
       - "modules/Mediaplayer.qml"
       - "config/sway/post-apollo-widget-hotkeys.conf"
+      - "scripts/ensure_post_apollo_widget_hotkeys.py"
+      - "scripts/enable_koinoikos_focus.py"
       - "tests/navigation/test_super_widget_hotkeys.py"
+      - "tests/navigation/test_super_widget_hotkey_auto_install.py"
       - ".github/workflows/post-apollo-super-widget-hotkeys.yml"
   workflow_dispatch:
 
@@ -20,5 +23,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Compile widget installer and contracts
+        run: python3 -m py_compile scripts/ensure_post_apollo_widget_hotkeys.py tests/navigation/test_super_widget_hotkey_auto_install.py
       - name: Assert global chord map and existing owner IPC toggles
         run: python3 tests/navigation/test_super_widget_hotkeys.py
+      - name: Guarded automatic install, idempotence and collision regression
+        run: python3 tests/navigation/test_super_widget_hotkey_auto_install.py

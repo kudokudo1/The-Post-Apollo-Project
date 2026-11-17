@@ -58,7 +58,7 @@ jobs:
           sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
             /usr/bin/python3 -B \
             tests/connections/test_connections_c3eag_identity_kernel_observer.py
-          echo "C3EAG_PASS // 22_REAL_KERNEL_OBSERVER_DENY_ONLY_TESTS"
+          echo "C3EAG_PASS // 24_REAL_KERNEL_OBSERVER_DENY_ONLY_TESTS"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -70,4 +70,8 @@ jobs:
           sudo -n env GITHUB_ACTIONS=true \
             "$(command -v python3)" -B \
             tests/connections/test_connections_c3eaf_signed_role_enrollment.py
+          sudo -n env GITHUB_ACTIONS=true \
+            "$(command -v python3)" -B \
+            tests/connections/test_connections_c3ez_release_bound_host_evidence.py
+          echo "C3EAG_HOLD // SIGNED_CI_RELEASE_AND_WITNESS_ARE_NOT_REAL_HOST_AUTHORITY"
           echo "C3EAG_HOLD // SIGNED_CI_ENROLLMENT_NO_REAL_OPERATOR_CUSTODY"

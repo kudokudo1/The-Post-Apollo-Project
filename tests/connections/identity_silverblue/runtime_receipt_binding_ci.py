@@ -179,16 +179,16 @@ def rehearse_guest_local_ci_only(
             os.environ.get("GITHUB_ACTIONS") != "true" or
             not Path("/run/ostree-booted").exists()):
         _deny("C4B_BINDING_OFFICIAL_GUEST_CI_SCOPE_REQUIRED")
-    try:
-        if Path("/sys/fs/selinux/enforce").read_bytes().strip() != b"1":
-            _deny("C4B_BINDING_ENFORCING_SELINUX_REQUIRED")
-    except OSError as exc:
-        raise Refused("C4B_BINDING_SELINUX_OBSERVATION_UNAVAILABLE") from exc
     if (not isinstance(signed_rpm_archive, Path) or
             signed_rpm_archive != Path(
                 "/var/lib/postapollo-id-ci-assets/identity-silverblue-ci.rpm"
             )):
         _deny("C4B_BINDING_UNTRUSTED_RPM_ARCHIVE_PATH")
+    try:
+        if Path("/sys/fs/selinux/enforce").read_bytes().strip() != b"1":
+            _deny("C4B_BINDING_ENFORCING_SELINUX_REQUIRED")
+    except OSError as exc:
+        raise Refused("C4B_BINDING_SELINUX_OBSERVATION_UNAVAILABLE") from exc
     # C4b parent already verifies signed RPM in an isolated rpmdb and rpm -V
     # against the installed OSTree deployment before invoking this helper.
     rpm_sha = _digest_file(signed_rpm_archive, ceiling=MAX_RPM, mode=0o600)

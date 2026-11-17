@@ -48,6 +48,10 @@ class FaceTimeIphonePilotUI(unittest.TestCase):
         ):
             self.assertIn(value, PANEL)
         self.assertIn(value, PANEL + BACKEND)
+        self.assertIn('case "PHONE_CALLS_DISABLED":', PANEL)
+        self.assertIn('"PHONE_CALLS_DISABLED"', PANEL)
+        self.assertIn('CALLS ON PC IS OFF.', PANEL)
+        self.assertIn('"PHONE_CALLS_DISABLED"', (ROOT / "services/phone/PhoneFaceTimeAudioRouteProbe.py").read_text())
         self.assertIn("No phone action will be sent", PANEL)
         self.assertIn("FaceTime incoming call NOT detected", PANEL)
         self.assertIn("select PC/Bluetooth on the iPhone", PANEL)

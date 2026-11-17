@@ -224,6 +224,21 @@ class V3dIndependentCheckpointReviewTests(unittest.TestCase):
         self.assertIn("anchored_witness_same_sequence_fork",
                       response["holdReasons"])
 
+    def test_signed_witness_step_requires_prior_checkpoint_digest(self):
+        next_checkpoint, _ = self.advanced()
+        broken = copy.deepcopy(self.witness_claim)
+        broken["witnessSequence"] = 2
+        broken["previousWitnessSha256"] = "f" * 64
+        next_checkpoint["witnessSha256"] = self.witness_sha(broken)
+        result = self.evaluate(
+            current=self.sign_checkpoint(next_checkpoint),
+            witness=self.sign_witness(broken))
+        self.assert_hold(result)
+        self.assertIn("signed_witness_predecessor_mismatch",
+                      result["holdReasons"])
+        self.assertNotIn("current_witness_digest_mismatch",
+                         result["holdReasons"])
+
     def test_wrong_anchor_signer_cannot_forge_checkpoint(self):
         rogue = Ed25519PrivateKey.generate()
         with self.assertRaisesRegex(v3d.CheckpointRefused,

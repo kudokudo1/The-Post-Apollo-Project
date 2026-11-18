@@ -9,7 +9,7 @@
 
 ## IMPLEMENTATION // Actual mechanism
 
-A desktop app must never be able to produce an authorization by presenting `Room ID + revision + confirmed:true`. The new bounded native service does not accept a public key or a grant from the caller. The **only** request from a desktop client is canonical JSON:
+A desktop app must never be able to produce an authorization by presenting `Room ID + revision + confirmed:true`. The new bounded native service does not accept a public key or a grant from the caller. After connecting, the desktop client **must receive the native service's bounded READY packet before sending anything**. This ensures SO_PASSCRED is configured before the request packet is sent; premature/unsigned packets fail closed. The **only** request from a desktop client is canonical JSON:
 
 `{"schema":"postapollo.connections.hospital.native-request.v1","action":"TRASH","roomId":"hospital-room-01"}`
 
@@ -50,7 +50,7 @@ For developer review, the GitHub workflow `.github/workflows/connections-hospita
 ## VERIFY
 
 - [ ] Native signer source compiles under pinned Python 3.12 and `cryptography==46.0.4`
-- [ ] 41 native signing/source/receipt/fail-closed security cases pass
+- [ ] 42 native signing/source/receipt/fail-closed security cases pass
 - [ ] Same signed grant verifies in exact PX #130 owner implementation
 - [ ] Existing 40 C5-H1 scope denial tests still pass
 - [ ] Independent Nurse 2 review of native interface, identity, logind, Polkit/retention and private key handling

@@ -1,0 +1,91 @@
+name: C4b-C3eAF signed role and controller enrollment alignment (deny-only CI)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/c4b_c3eaf_enrollment_alignment_ci.py'
+      - 'tests/connections/identity_silverblue/test_c4b_c3eaf_enrollment_alignment_ci.py'
+      - 'tests/connections/identity_silverblue/controller_owned_policy_intake_ci.py'
+      - 'tests/connections/c3e_release_trust/C3eAFSignedRoleEnrollment.py'
+      - '.github/workflows/connections-c4b-c3eaf-enrollment-alignment-ci.yml'
+      - 'docs/connections-c4b-c3eaf-enrollment-alignment-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cross-enrollment-consistency-only:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin test-only Ed25519 implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Compile and verify source ownership and all hard-false grants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/identity_silverblue/c4b_c3eaf_enrollment_alignment_ci.py \
+            tests/connections/identity_silverblue/test_c4b_c3eaf_enrollment_alignment_ci.py \
+            tests/connections/identity_silverblue/controller_owned_policy_intake_ci.py
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path("tests/connections/identity_silverblue/c4b_c3eaf_enrollment_alignment_ci.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          status=Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          for token in ("P.inspect_controller_owned_ci_only(",
+                        "A.verify_signed_enrollment_ci_only(",
+                        "C4B_C3EAF_CROSS_ENROLLMENT_RECEIPT_KEY_MISMATCH",
+                        "C4B_C3EAF_CONTROLLER_AND_C3E_ENROLLMENT_ROOTS_ALIAS",
+                        "crossReleaseArtifactDigestAuthenticated"):
+              assert token in src, token
+          for flag in ("operatorControlledEnrollmentRootsVerified",
+                       "independentlyEnrolledProductionHostVerified",
+                       "independentlySignedKernelProcessSeatVerified",
+                       "crossReleaseArtifactDigestAuthenticated",
+                       "protectedRevocationHistoryVerified",
+                       "externalChallengeLedgerCustodyVerified",
+                       "rollbackResistantVersionFloorVerified",
+                       "c5HumanConsentVerified", "hostAuthenticated",
+                       "canBeginSignIn", "credentialActionsEnabled",
+                       "productionAuthority"):
+              assert '"' + flag + '": False' in src, flag
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "readonly property bool hostAuthenticated: false" in status
+          print("C4B_C3EAF_HOLD // NO_OPERATOR_ROOT_OR_CROSS_RELEASE_PROVENANCE")
+          PY
+      - name: 26 cross-enrollment host, signer, epoch and adversarial denial cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_c4b_c3eaf_enrollment_alignment_ci.py
+          echo "C4B_C3EAF_PASS // 26_CROSS_ENROLLMENT_REFUSAL_CASES_CI_ONLY"
+      - name: C4b source intake, signed enrollment and UART/receipt regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_controller_owned_policy_intake_ci.py
+          python3 -B tests/connections/identity_silverblue/test_controller_pinned_enrollment_gate_ci.py
+          python3 -B tests/connections/identity_silverblue/test_controller_challenge_ci.py
+          python3 -B tests/connections/identity_silverblue/test_runtime_receipt_binding_ci.py
+      - name: Unmodified C3e-AF signed key-role and one-use challenge regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true "$(command -v python3)" -B \
+            tests/connections/test_connections_c3eaf_signed_role_enrollment.py
+          echo "C4B_C3EAF_HOLD // ROOT_LOCAL_CI_ONLY_NO_LIVE_AUTHORITY"

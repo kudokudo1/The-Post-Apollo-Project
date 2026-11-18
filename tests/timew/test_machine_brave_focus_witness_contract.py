@@ -59,6 +59,6 @@ assert pilot_manifest["host_permissions"] == []
 assert pilot_manifest["optional_permissions"] == ["nativeMessaging", "tabs"]
 assert pilot_manifest["incognito"] == "not_allowed"
 assert "SCHEMA_VERSION = 1" in legacy
-assert qml.count("Process {") == 15
+assert qml.count("Process {") == 16  # isolated V2 review; no Brave permission bridge
 
 print("MACHINE Brave focus // no host binding, move or identity grant PASS")

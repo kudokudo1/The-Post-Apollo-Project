@@ -192,6 +192,23 @@ class ClockFinalV2SourceWitness:
                     or _snapshot(before) != _snapshot(by_path)
                     or bytes(again) != raw):
                 raise Refused("FINAL_V2_CHANGED_DURING_SYNC")
+            # A held dirfd still points to the OLD directory after an
+            # attacker renames its absolute path. Reopen the approved
+            # full path to prove the source directory itself was not
+            # swapped during our sync snapshot.
+            renewed_fd = None
+            try:
+                renewed_fd = _open_parent(
+                    self.source.parent, uid=self.expected_uid,
+                    synthetic=self.synthetic)
+                old_parent = os.fstat(directory_fd)
+                new_parent = os.fstat(renewed_fd)
+                if ((old_parent.st_dev, old_parent.st_ino) !=
+                        (new_parent.st_dev, new_parent.st_ino)):
+                    raise Refused("FINAL_V2_DIRECTORY_REPLACED")
+            finally:
+                if renewed_fd is not None:
+                    os.close(renewed_fd)
             return {
                 "finalV2RevisionObserved": True,
                 "sourceDigestMatched": True,

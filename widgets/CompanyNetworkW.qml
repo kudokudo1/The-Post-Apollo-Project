@@ -51,7 +51,15 @@ PanelWindow {
     property int keyboardModeCursor: 0
     readonly property bool standardModeKeysAvailable:
         root.menuOpen && root.activeFocusItem === companyFrame
-    onSelectedMainModeIndexChanged: keyboardModeCursor = selectedMainModeIndex
+    readonly property alias contentKeyboardSelectorItem: companyContentKeys
+    onSelectedMainModeIndexChanged: {
+        keyboardModeCursor=selectedMainModeIndex;
+        companyContentKeys.reset();
+        Qt.callLater(function() {
+            if(companyContentKeys.navigationActive)
+                companyContentKeys.selectInitial();
+        });
+    }
 
     function selectMainMode(index) {
         if(index >= 0 && index < mainModes.length) {
@@ -67,17 +75,19 @@ PanelWindow {
         selectMainMode((selectedMainModeIndex+step+count)%count);
     }
 
-    // Arrow preview never starts MapLibre or mutates company data.
-    function moveNavigationCursor(direction) {
-        if(!standardModeKeysAvailable || mainModes.length < 1) return;
-        const step=Number(direction) < 0 ? -1 : 1;
-        keyboardModeCursor=(keyboardModeCursor+step+mainModes.length)
-            %mainModes.length;
+    // Arrows and HJKL navigate the current Company CONTENT pane.
+    // Only Tab/Shift+Tab may move the main-mode rail.
+    function moveContentKey(key,modifiers) {
+        if(!standardModeKeysAvailable) return false;
+        return companyContentKeys.handleDirectionKey(key,modifiers);
     }
-
+    function moveNavigationCursor(direction) {
+        if(!standardModeKeysAvailable) return false;
+        return companyContentKeys.move(0,Number(direction)<0?-1:1);
+    }
     function activateNavigationCursor() {
-        if(!standardModeKeysAvailable) return;
-        selectMainMode(keyboardModeCursor);
+        if(!standardModeKeysAvailable) return false;
+        return companyContentKeys.activate();
     }
     // M18 // One candidate viewport in Company FRAME-local coordinates,
     // deliberately NOT native/output-global. Stage Director must separately
@@ -146,8 +156,13 @@ PanelWindow {
             // Keep it alive thereafter to preserve view while switching modes.
             coverageLoaded = true;
             Qt.callLater(function() {
-                if (root.menuOpen)
+                if (root.menuOpen) {
                     companyFrame.forceActiveFocus();
+                    Qt.callLater(function() {
+                        if(companyContentKeys.navigationActive)
+                            companyContentKeys.selectInitial();
+                    });
+                }
             });
         }
     }
@@ -213,7 +228,16 @@ PanelWindow {
         Keys.priority: Keys.BeforeItem
         Keys.onShortcutOverride: function(event) {
             if(!root.standardModeKeysAvailable) return;
-            if(event.key===Qt.Key_Tab || event.key===Qt.Key_Backtab)
+            if(event.key===Qt.Key_Tab || event.key===Qt.Key_Backtab
+                    || (event.modifiers===Qt.NoModifier
+                        && (event.key===Qt.Key_Left
+                            || event.key===Qt.Key_Right
+                            || event.key===Qt.Key_Up
+                            || event.key===Qt.Key_Down
+                            || event.key===Qt.Key_H
+                            || event.key===Qt.Key_J
+                            || event.key===Qt.Key_K
+                            || event.key===Qt.Key_L)))
                 event.accepted=true;
         }
         Keys.onPressed: function(event) {
@@ -223,15 +247,19 @@ PanelWindow {
                     || (event.modifiers & Qt.ShiftModifier)!==0;
                 root.cycleMainMode(reverse ? -1 : 1);
             } else if(event.modifiers===Qt.NoModifier
-                    && event.key===Qt.Key_Up) {
-                root.moveNavigationCursor(-1);
-            } else if(event.modifiers===Qt.NoModifier
-                    && event.key===Qt.Key_Down) {
-                root.moveNavigationCursor(1);
+                    && (event.key===Qt.Key_Left
+                        || event.key===Qt.Key_Right
+                        || event.key===Qt.Key_Up
+                        || event.key===Qt.Key_Down
+                        || event.key===Qt.Key_H
+                        || event.key===Qt.Key_J
+                        || event.key===Qt.Key_K
+                        || event.key===Qt.Key_L)) {
+                if(!root.moveContentKey(event.key,event.modifiers)) return;
             } else if(event.modifiers===Qt.NoModifier
                     && (event.key===Qt.Key_Enter ||
                         event.key===Qt.Key_Return)) {
-                root.activateNavigationCursor();
+                if(!root.activateNavigationCursor()) return;
             } else return;
             event.accepted=true;
         }
@@ -460,6 +488,13 @@ PanelWindow {
             anchors.rightMargin: 20
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 18
+
+            WidgetContentKeyboardNavigator {
+                id: companyContentKeys
+                anchors.fill: parent
+                contentRoot: contentPane
+                navigationActive: root.standardModeKeysAvailable
+            }
 
             Loader {
                 id: coverageLoader

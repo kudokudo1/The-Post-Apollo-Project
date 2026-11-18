@@ -18,6 +18,11 @@ Rectangle {
     property bool interactive: available
     property bool selected: false
     property bool keyboardSelected: false
+    // Content navigators may point at this button without changing its
+    // existing keyboardSelected binding or mouse interaction. Activation
+    // requires a deliberate per-button opt-in ("leftClicked"/"triggered").
+    property bool keyboardNavTarget: true
+    property string keyboardActivationSignal: ""
     property bool suppressHover: false
     property bool hoverWhenUnavailable: false
     property bool destructive: false

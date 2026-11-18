@@ -500,8 +500,19 @@ class ClockNativeSupervisor:
             # The original pinned SO_PEERPIDFD survives this request so
             # the supervisor can later witness actual exit, not infer it
             # from PID reuse or from a signed response.
+            # If this signed peer has already been observed on another
+            # connection, the ORIGINAL pinned kernel process must still
+            # be alive and identify the very same pidfd inode. PID/ticks
+            # alone do not permit replacement with a restarted process.
+            previous = self._test_pidfds.get(pin.pid)
+            if previous is not None:
+                prior_stat=os.fstat(previous)
+                current_stat=os.fstat(witness["pidfd"])
+                if (Peer._exited(previous)
+                        or (prior_stat.st_dev,prior_stat.st_ino)
+                           != (current_stat.st_dev,current_stat.st_ino)):
+                    return False
             retained = os.dup(witness["pidfd"])
-            previous = self._test_pidfds.pop(pin.pid, None)
             if previous is not None:
                 os.close(previous)
             self._test_pidfds[pin.pid] = retained

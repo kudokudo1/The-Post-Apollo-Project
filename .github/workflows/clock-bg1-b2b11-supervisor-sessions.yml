@@ -60,8 +60,16 @@ jobs:
               "services/time/AlarmSupervisorSessionLedger.py",
               "services/time/BG1-ALARM-SUPERVISOR-SESSIONS.md",
               "tests/time/test_clock_bg1_b2b11_durable_supervisor_sessions.py"}
-          assert changed in (b2b11, b2b10|b2b11), (
-              f"Unexpected clock session changes: {sorted(changed ^ (b2b10|b2b11))}")
-          print("B2B10 main integration and B2B11 scope: PASS")
+          b2b12={
+              ".github/workflows/clock-bg1-b2b10-native-supervisor.yml",
+              ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml",
+              ".github/workflows/clock-bg1-b2b12-protected-session.yml",
+              "services/time/AlarmNativeClockSupervisor.py",
+              "services/time/AlarmProtectedSessionEnrollment.py",
+              "services/time/BG1-ALARM-PROTECTED-SESSION-ENROLLMENT.md",
+              "tests/time/test_clock_bg1_b2b12_protected_enrollment.py"}
+          assert changed in (b2b11,b2b10|b2b11,b2b12), (
+              f"Unexpected clock session changes: {sorted(changed ^ (b2b10|b2b11|b2b12))}")
+          print("B2B10, B2B11 and exact B2B12 inherited scope: PASS")
           print("No live QML, Identity, Connections, systemd, audio or BG2 edits: PASS")
           PY

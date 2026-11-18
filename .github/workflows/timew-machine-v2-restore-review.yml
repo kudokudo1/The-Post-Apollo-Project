@@ -1,0 +1,32 @@
+name: TimeW MACHINE V2 read-only restoration review
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineRestoreReviewV2.py"
+      - "tests/timew/test_machine_restore_review_v2.py"
+      - "docs/timew-machine-v2-restore-review.md"
+      - ".github/workflows/timew-machine-v2-restore-review.yml"
+      - "services/time/MachineGeometryStoreV2.py"
+      - "services/time/MachineCaptureSaveV2.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-read-only-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: New V2 read-only review with disposable SQLite and fake Sway
+        run: python3 -B -I tests/timew/test_machine_restore_review_v2.py
+      - name: Atomic V1/V2 geometry store regression
+        run: python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+      - name: Existing save bridge and duplicate Brave capture contracts
+        run: python3 -B -I tests/timew/test_machine_save_bridge_v2.py
+      - name: Existing one-click restore orchestration unchanged
+        run: python3 -B -I tests/timew/test_machine_one_click_restore.py
+      - name: Existing one-click TimeW UI unchanged
+        run: python3 -B -I tests/timew/test_machine_one_click_restore_ui.py

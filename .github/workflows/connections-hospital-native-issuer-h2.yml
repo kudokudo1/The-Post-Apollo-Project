@@ -1,0 +1,88 @@
+name: Connections C5-H2 native Hospital issuer source and PX signature contract
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/hospital/HospitalNativeIssuerCore.py'
+      - 'services/connections/hospital/HospitalNativeIssuerService.py'
+      - 'services/connections/hospital/native/**'
+      - 'tests/connections/test_connections_hospital_native_issuer_h2.py'
+      - '.github/workflows/connections-hospital-native-issuer-h2.yml'
+      - 'docs/connections-hospital-native-issuer-h2.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-issuer-source-without-installation:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch exact PX owner v12 signed verifier and transition source
+        uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: 878f083a8334624fbeb870c29cc48bca4215d257
+          path: px-source
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install reviewed test-only Ed25519 and system bus dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check \
+            cryptography==46.0.4 dbus-next==0.2.3
+      - name: Compile signer and verify real trust boundaries and production holds
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/hospital/HospitalNativeIssuerCore.py \
+            services/connections/hospital/HospitalNativeIssuerService.py \
+            tests/connections/test_connections_hospital_native_issuer_h2.py
+          python3 - <<'PY'
+          from pathlib import Path
+          core=Path("services/connections/hospital/HospitalNativeIssuerCore.py").read_text()
+          service=Path("services/connections/hospital/HospitalNativeIssuerService.py").read_text()
+          ui=Path("services/hospital/HospitalRoomLifecycleService.qml").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          px=Path("px-source/bin/px_hospital_room_authority.py").read_text()
+          policy=Path("services/connections/hospital/native/org.postapollo.hospital.policy").read_text()
+          for token in ("socket.SO_PEERCRED", "call_get_session_by_pid",
+                        "--allow-user-interaction", "C.load_installed_key()",
+                        'kind": "commit"', "C.WRITER_SOCKET"):
+              assert token in service, token
+          assert "Ed25519PrivateKey.generate" not in core+service
+          assert "grant" not in service.split("client.sendall(C.canonical(response))")[1]
+          assert "review.operatorAuthenticated === true" in ui
+          assert "review.requiresOwnerReview === false" in ui
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "room-lifecycle-issuer.pub" in px
+          assert policy.count("<allow_active>auth_self</allow_active>") == 2
+          assert "auth_self_keep" not in policy
+          assert "HOSPITAL_NATIVE_HOLD" in core and "HOSPITAL_NATIVE_HOLD" in service
+          print("C5H2_HOLD // SOURCE_ONLY_NO_INSTALLED_KEY_NO_PROTECTED_PX_WRITER")
+          PY
+      - name: 38 native signer exact PX v12 frame and staged hostile-origin cases
+        shell: bash
+        env:
+          C5H_PX_AUTH_SOURCE: ${{ github.workspace }}/px-source/bin/px_hospital_room_authority.py
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_hospital_native_issuer_h2.py
+          echo "C5H2_PASS // 38_NATIVE_ISSUER_SOURCE_AND_PX_SIGNATURE_TESTS"
+      - name: Preserve previously merged C5-H1 signed grant and scope checks
+        shell: bash
+        env:
+          C5H_PX_AUTH_SOURCE: ${{ github.workspace }}/px-source/bin/px_hospital_room_authority.py
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_hospital_room_grant_admission_ci.py
+          echo "C5H2_HOLD // C5_H1_SOURCE_CONSISTENCY_NOT_PRODUCTION_AUTHORITY"

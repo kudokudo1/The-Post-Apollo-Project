@@ -49,10 +49,10 @@ def _text(raw, length):
 def valid_alarm(a):
     if type(a) is not dict:
         return False
-    if not (integer(a.get("id"), 1, MAX_SAFE-2)
+    if not (integer(a.get("id"), 1, MAX_SAFE-1)
             and _text(a.get("name"), 40) and a["name"]
-            and (a.get("favorite") is None or type(a.get("favorite")) is bool)
-            and (a.get("note") is None or _text(a.get("note"), 256))
+            and ("favorite" not in a or type(a["favorite"]) is bool)
+            and ("note" not in a or _text(a["note"], 256))
             and a.get("lastEventKind", "none") in EVENTS
             and all(integer(a.get(k,0)) for k in (
                 "lastEventAtMs", "lastExpectedAtMs", "lastFiredAtMs",
@@ -94,7 +94,7 @@ def valid_alarm(a):
 
 def valid_document(doc):
     if (type(doc) is not dict or doc.get("version") != 2
-            or not integer(doc.get("nextId"),1,MAX_SAFE-2)
+            or not integer(doc.get("nextId"),1,MAX_SAFE-1)
             or type(doc.get("alarms")) is not list
             or len(doc["alarms"]) > 100):
         return False

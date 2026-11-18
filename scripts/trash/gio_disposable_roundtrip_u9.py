@@ -9,6 +9,7 @@ The CI-only guard prevents accidental use, not a hostile actor forging CI vars.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -19,6 +20,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+from unittest.mock import patch
 
 SCHEMA = "post-apollo.trash-gio-roundtrip.u9"
 TIMEOUT = 25
@@ -173,6 +175,44 @@ def run_roundtrip(root: Path, inherited: dict[str, str]) -> dict:
     reviewed_item(index("AFTER_COLLISION"), original)
     original.unlink()  # Only the sentinel created inside private runner sandbox.
 
+    # U10b // Actual no-force race: create a CI-only occupied destination
+    # after the reviewed backend's SECOND index/metadata/lexists preflight,
+    # precisely when it invokes the real GIO restore subprocess.
+    # Do not replace this with a mock command or invoke against user files.
+    spec = importlib.util.spec_from_file_location("u10b_real_trash_cli", backend)
+    target = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(target)
+    raw_run = target._run
+    late_sentinel = b"U10B_LATE_COLLISION_MUST_NOT_BE_REPLACED"
+    late_collision_reached = False
+
+    def inject_collision(args, timeout=20):
+        nonlocal late_collision_reached
+        if (len(args) == 4 and args[1:3] == ["trash", "--restore"]
+                and args[3] == uri):
+            if (late_collision_reached or original.exists()
+                    or original.is_symlink()):
+                raise RoundTripError("LATE_COLLISION_FIXTURE_STATE_INVALID")
+            original.write_bytes(late_sentinel)
+            late_collision_reached = True
+        return raw_run(args, timeout=timeout)
+
+    with patch.object(target, "_run", side_effect=inject_collision):
+        try:
+            target.restore_reviewed(
+                uri, str(original), revision, review_id)
+        except target.TrashError as exc:
+            if not str(exc).startswith("GIO_RESTORE_FAILED"):
+                raise RoundTripError("LATE_COLLISION_UNEXPECTED_ERROR") from exc
+        else:
+            raise RoundTripError("LATE_COLLISION_UNEXPECTED_RESTORE")
+
+    if (not late_collision_reached or not original.is_file()
+            or original.read_bytes() != late_sentinel):
+        raise RoundTripError("LATE_COLLISION_DESTINATION_OVERWRITTEN")
+    reviewed_item(index("AFTER_LATE_COLLISION"), original)
+    original.unlink()  # Remove only the CI-generated collision sentinel.
+
     receipt = json_response(command(
         [sys.executable, "-I", "-B", str(backend), "restore-reviewed",
          uri, str(original), revision, review_id], env
@@ -203,6 +243,8 @@ def run_roundtrip(root: Path, inherited: dict[str, str]) -> dict:
         "trashIngress": "gio trash (one disposable file)",
         "restoreAdapter": "scripts/trash/trash_cli.py",
         "reviewedRestoreRevisionChecked": True,
+        "gioMetadataCompared": True,
+        "lateCollisionPreserved": True,
         "initialInventoryEmpty": True,
         "exactOneItemIndexed": True,
         "collisionDenied": True,

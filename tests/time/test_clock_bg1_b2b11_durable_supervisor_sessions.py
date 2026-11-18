@@ -40,6 +40,12 @@ class ClockB2B11DurableSupervisorSessionTests(unittest.TestCase):
             methodName="test_real_af_unix_signed_client_is_only_observed_never_authorized")
         self.addCleanup(self.h.doCleanups)
         self.h.setUp()
+        # Keep the signed test peer alive long enough to test the
+        # "still running" branch deterministically on loaded CI hosts.
+        self.h.script.write_text(
+            self.h.script.read_text().replace("time.sleep(.5)",
+                                              "time.sleep(1.5)"),
+            encoding="utf-8")
         self.server=self.h.server
         self.ledger=self.server._session_ledger
         self.assertIsNotNone(self.ledger)
@@ -261,21 +267,17 @@ class ClockB2B11DurableSupervisorSessionTests(unittest.TestCase):
             pid=5000,ticks=1,epoch=True,
             release_root_sha256=self.h.fingerprint),
             "INVALID_INDEPENDENT_SESSION_PINS")
-        self.assertFalse(self.server._response("DENY")["ok"]) if hasattr(
-            self.server,"_response") else self.assertFalse(Server._response("DENY")["ok"])
+        self.assertFalse(Server._response("DENY")["ok"])
         live=(ROOT/"services/time/AlarmManagerService.qml").read_text()
         self.assertIn('alarmWriterBarrierPhase: "ACTIVE"',live)
         self.assertNotIn("AlarmSupervisorSessionLedger",live)
         for code in (
             (ROOT/"services/time/AlarmSupervisorSessionLedger.py").read_text(),
-            MODULE_TEXT()):
+            (ROOT/"services/time/AlarmNativeClockSupervisor.py").read_text()):
             for word in ("notify-send","alarmFile.setText",
                          "systemctl --user enable","canRing=True"):
                 self.assertNotIn(word,code)
 
-
-def MODULE_TEXT():
-    return MODULE.read_text() if (MODULE := ROOT/"services/time/AlarmNativeClockSupervisor.py") else ""
 
 
 if __name__=="__main__":

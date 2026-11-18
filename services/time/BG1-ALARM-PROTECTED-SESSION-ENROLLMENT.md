@@ -103,7 +103,9 @@ boot, release mismatch, duplicate/malformed session fields,
 symlinks, writable trust files, modified installed executable,
 process exit and mid-inspection manifest replacement. Existing
 B2B9/B2B10/B2B11, kernel identity and QML barrier regressions run
-again. The review diff is restricted to five Clock files.
+again. The review diff is restricted to seven Clock files, including two
+existing native-supervisor workflow guards updated to accept the
+exact new B2B12 integration scope.
 
 There is **no test of an installed root-owned production session
 controller on Silverblue** and no claim that it currently exists.
@@ -135,7 +137,8 @@ PATIENT // The-Post-Apollo-Project
 ROOM // Clock Reliable Background Alarm Ownership
 STAFF ROLE // External Hospital-compatible DOC, live registration unverified
 ASSIGNMENT // BG1-B2B12 protected signed session enrollment observer
-SCOPE // 5 Clock files: new verifier, existing supervisor gate, CI, tests, docs
+SCOPE // 7 Clock files: new verifier, supervisor gate, CI, tests,
+          docs and two inherited workflow-scope adjustments
 PERMISSIONS // Draft PR only; no host edits, keys, merge or activation
 HOW TO USE // No new UI; current Clock unmodified
 VERIFY // CI exact head and separate native host acceptance required

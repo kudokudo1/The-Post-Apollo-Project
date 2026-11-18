@@ -410,7 +410,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('id: gioRestoreReviewDeck', TRASH)
         self.assertIn('resourceRevision: String(trashLauncher.revision)', TRASH)
         self.assertIn('onRestoreReviewRequested:', TRASH)
-        self.assertIn('return restoreItem(item) === true;', TRASH)
+        self.assertIn('return restoreItem(item, expectedRevision, resourceId) === true;', TRASH)
         self.assertIn('trashLauncher.armBurn(', TRASH)
         self.assertIn('trashLauncher.trashShowsFiles', TRASH)
         self.assertIn('"BURN COPY" : "BURN"', TRASH)

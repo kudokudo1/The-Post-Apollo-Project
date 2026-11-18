@@ -755,12 +755,14 @@ PanelWindow {
         sequence: "Tab"
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
+                 && weatherKeyboardAnchor.activeFocus
         onActivated: weatherStation.cycleMainMode(1)
     }
     Shortcut {
         sequence: "Shift+Tab"
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
+                 && weatherKeyboardAnchor.activeFocus
         onActivated: weatherStation.cycleMainMode(-1)
     }
     Shortcut {

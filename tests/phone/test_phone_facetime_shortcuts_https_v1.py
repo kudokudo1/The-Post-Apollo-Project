@@ -6,6 +6,8 @@ credential, network listener installation, Apple app or production connection.
 from __future__ import annotations
 
 from http.client import RemoteDisconnected
+from contextlib import redirect_stdout
+import io
 import importlib
 import json
 from pathlib import Path
@@ -16,6 +18,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest import mock
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPSHandler, Request, build_opener, urlopen
 
@@ -234,6 +237,82 @@ class TestNoUnapprovedDeployment(unittest.TestCase):
                 Gate._tls_context(str(cert), str(bad))
             with self.assertRaises(ValueError):
                 Gate._tls_context(str(Path(folder) / "missing"), str(key))
+
+    def test_local_configuration_check_never_starts_a_socket(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            cert, key = test_certificate(root)
+            admin, phone = root / "admin", root / "phone"
+            admin.write_text(ADMIN)
+            phone.write_text(PHONE)
+            admin.chmod(0o600)
+            phone.chmod(0o600)
+            args = [
+                "--check-configuration",
+                "--operator-port", "8123",
+                "--phone-bind", "192.168.20.10",
+                "--phone-port", "8124",
+                "--iphone-client-ip", "192.168.20.11",
+                "--certificate-file", str(cert),
+                "--private-key-file", str(key),
+                "--admin-token-file", str(admin),
+                "--iphone-token-file", str(phone),
+            ]
+            stream = io.StringIO()
+            with mock.patch.object(Gate, "serve",
+                                   side_effect=AssertionError("server started")), \
+                 mock.patch.object(Gate, "_LoopbackOnly",
+                                   side_effect=AssertionError("operator socket")), \
+                 mock.patch.object(Gate, "_PrivateIphoneHTTPSServer",
+                                   side_effect=AssertionError("iPhone socket")), \
+                 mock.patch("socket.socket",
+                            side_effect=AssertionError("socket created")), \
+                 redirect_stdout(stream):
+                self.assertEqual(Gate.main(args), 0)
+            result = json.loads(stream.getvalue())
+            self.assertEqual(result, {
+                "schema": Gate.CONFIG_SCHEMA,
+                "execution": "READ_ONLY_LOCAL_FILES_ONLY",
+                "state": "LOCAL_MATERIAL_ACCEPTED",
+                "networkListenerStarted": False,
+                "iphoneReachableVerified": False,
+                "iphoneCertificateTrustVerified": False,
+                "iphoneShortcutConfigured": False,
+                "faceTimeConnected": False,
+                "faceTimeCallControl": False,
+                "videoAvailable": False,
+                "personalDataAuthorized": False,
+            })
+            for sensitive in (str(root), "192.168.20", ADMIN, PHONE):
+                self.assertNotIn(sensitive, stream.getvalue())
+            # Even when permission check fails, never open a socket or
+            # leak which secret/configuration item was responsible.
+            phone.chmod(0o644)
+            stream = io.StringIO()
+            with mock.patch.object(Gate, "serve",
+                                   side_effect=AssertionError("server started")), \
+                 mock.patch("socket.socket",
+                            side_effect=AssertionError("socket created")), \
+                 redirect_stdout(stream):
+                self.assertEqual(Gate.main(args), 2)
+            result = json.loads(stream.getvalue())
+            self.assertEqual(result["state"], "CONFIGURATION_REJECTED")
+            self.assertFalse(result["networkListenerStarted"])
+            self.assertFalse(result["iphoneReachableVerified"])
+            self.assertNotIn(str(root), stream.getvalue())
+            self.assertNotIn(PHONE, stream.getvalue())
+
+    def test_readiness_refuses_invalid_tls_key_not_reopened_from_path(self):
+        src = (ROOT / "services/phone/PhoneFaceTimeShortcutHttps.py").read_text()
+        for required in (
+            "os.O_RDONLY", '"O_NOFOLLOW"', "os.fstat(keyfd)",
+            'keyfile=f"/proc/self/fd/{keyfd}"', "os.close(keyfd)",
+            'option.add_argument("--check-configuration"',
+            '"READ_ONLY_LOCAL_FILES_ONLY"',
+        ):
+            self.assertIn(required, src)
+        self.assertNotIn(
+            "context.load_cert_chain(certfile=certfile, keyfile=keyfile)", src)
 
     def test_no_entrypoint_auto_starts_network(self):
         self.assertEqual(Gate.main([]), 2)

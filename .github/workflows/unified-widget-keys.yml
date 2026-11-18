@@ -3,6 +3,10 @@ name: Syntagma unified widget key contracts
 on:
   pull_request:
     paths:
+      - "components/ActionButton.qml"
+      - "components/WidgetContentKeyboardNavigator.qml"
+      - "components/WidgetContentSpatialPolicy.js"
+      - "widgets/weather/StationSubjectOverviewRail.qml"
       - "widgets/AppControlW.qml"
       - "widgets/GitW.qml"
       - "widgets/HospitalW.qml"
@@ -50,3 +54,56 @@ jobs:
           python3 tests/navigation/test_unified_widget_keys.py
           python3 tests/navigation/test_widget_keys_tasks_company_weather.py
           node --test tests/navigation/test_weather_lower_tabs_keys.cjs
+          node --test tests/navigation/test_widget_content_spatial_keys.cjs
+
+  native-spatial-content:
+    name: Native Quickshell content cursor, HJKL and safe Enter
+    runs-on: ubuntu-latest
+    container:
+      image: debian:unstable
+    timeout-minutes: 12
+    steps:
+      - name: Install isolated Qt6 Quickshell runtime
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git quickshell qt6-qpa-plugins \
+            qml6-module-qtquick-effects qml6-module-qtquick-dialogs \
+            qml6-module-qt5compat-graphicaleffects coreutils findutils
+      - uses: actions/checkout@v4
+      - name: Verify actual rendered selector and HOME navigation in disposable shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(pwd)"
+          work="$(mktemp -d /tmp/widget-content-keys.XXXXXXXX)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -m 700 "$work/home" "$work/runtime" "$work/cache" "$work/config"
+          mkdir -p "$work/config/widgets"
+          cp -a "$root/components" "$work/config/components"
+          cp -a "$root/widgets/weather" "$work/config/widgets/weather"
+          cp -a "$root/widgets/tasks" "$work/config/widgets/tasks"
+          cp -a "$root/services" "$work/config/services"
+          cp "$root/tests/navigation/fixtures/WidgetContentKeyboardNative.qml" "$work/config/shell.qml"
+          rc=0
+          timeout --signal=TERM --kill-after=3s 35s \
+            env HOME="$work/home" XDG_RUNTIME_DIR="$work/runtime" \
+            XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            quickshell --no-color -p "$work/config/shell.qml" \
+            >"$work/native.log" 2>&1 || rc=$?
+          cat "$work/native.log"
+          test "$rc" -eq 0
+          grep -F "CONTENT_SPATIAL_NATIVE_PASS // REAL_HOME_HJKL_ARROW_SELECTOR_SAFE_ENTER" "$work/native.log"
+          if grep -E 'CONTENT_SPATIAL_NATIVE_FAIL|Failed to load configuration|ReferenceError|TypeError|Cannot assign' "$work/native.log"; then
+            exit 1
+          fi
+      - name: Upload optional selector preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: widget-content-spatial-keyboard
+          path: /tmp/widget-content-keyboard-native.png
+          if-no-files-found: warn
+          retention-days: 14

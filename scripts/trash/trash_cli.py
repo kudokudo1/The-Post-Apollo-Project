@@ -19,6 +19,12 @@ MAX_ITEMS = 2500
 MAX_LIST_BYTES = 1048576
 MAX_ARG = 8192
 ACTION_TIMEOUT = 75
+# U10b // Query only the selected reviewed GIO item. Never scan Trash paths.
+RESTORE_INFO_LIMIT = 32768
+RESTORE_ATTRIBUTES = (
+    "trash::orig-path", "trash::deletion-date", "id::file",
+    "standard::type", "standard::size",
+)
 
 
 class TrashError(Exception):
@@ -137,6 +143,42 @@ def _sha256_token(value):
             and all(char in "0123456789abcdef" for char in value))
 
 
+def _restore_identity(gio, row):
+    """Bounded GIO-provided secondary evidence for ONE listed Trash URI.
+
+    These attributes are not signed, permanent inode proofs or authorization.
+    If the provider cannot supply the original path plus a secondary witness,
+    fail closed rather than treating a reused URI+name as the same item.
+    """
+    process = _run([gio, "info", "--attributes=" + ",".join(RESTORE_ATTRIBUTES),
+                    row["uri"]])
+    if process.returncode != 0:
+        raise TrashError("RESTORE_SOURCE_INFO_UNAVAILABLE")
+    raw = process.stdout
+    if not isinstance(raw, str) or len(raw.encode("utf-8")) > RESTORE_INFO_LIMIT:
+        raise TrashError("RESTORE_SOURCE_INFO_INVALID")
+    fields = {}
+    in_attributes = False
+    for line in raw.splitlines():
+        if line.strip() == "attributes:":
+            if in_attributes:
+                raise TrashError("RESTORE_SOURCE_INFO_INVALID")
+            in_attributes = True
+            continue
+        if not in_attributes or not line.startswith(("  ", "\t")):
+            continue
+        key, separator, value = line.strip().partition(": ")
+        if separator and key in RESTORE_ATTRIBUTES:
+            if key in fields or not value or "\r" in value or "\x00" in value:
+                raise TrashError("RESTORE_SOURCE_INFO_INVALID")
+            fields[key] = value
+    if not in_attributes or fields.get("trash::orig-path") != row["original"]:
+        raise TrashError("RESTORE_SOURCE_ORIGINAL_CHANGED")
+    if not (fields.get("trash::deletion-date") or fields.get("id::file")):
+        raise TrashError("RESTORE_SOURCE_IDENTITY_UNAVAILABLE")
+    return tuple(fields.get(key, "") for key in RESTORE_ATTRIBUTES)
+
+
 def restore_reviewed(uri, original, expected_revision, expected_review_id):
     """U10 UI-reviewed Restore: revalidate twice, refuse stale observations.
 
@@ -155,6 +197,7 @@ def restore_reviewed(uri, original, expected_revision, expected_review_id):
         raise TrashError("TRASH_CHANGED_REFRESH_REQUIRED")
     if os.path.lexists(row["original"]):
         raise TrashError("RESTORE_TARGET_EXISTS")
+    first_identity = _restore_identity(gio, row)
 
     # Detect a replacement/reordered inventory or a late destination collision
     # before GIO is launched. A later concurrent change remains possible.
@@ -165,6 +208,9 @@ def restore_reviewed(uri, original, expected_revision, expected_review_id):
     if (_revision(latest) != expected_revision
             or current["reviewId"] != expected_review_id):
         raise TrashError("TRASH_CHANGED_REFRESH_REQUIRED")
+    second_identity = _restore_identity(gio, current)
+    if second_identity != first_identity:
+        raise TrashError("RESTORE_SOURCE_IDENTITY_CHANGED")
     if os.path.lexists(current["original"]):
         raise TrashError("RESTORE_TARGET_EXISTS")
 

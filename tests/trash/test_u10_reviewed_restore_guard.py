@@ -36,6 +36,12 @@ class ReviewedRestoreTests(unittest.TestCase):
         self.gio = patch.object(trash, "_gio", return_value="/usr/bin/gio")
         self.gio.start()
         self.addCleanup(self.gio.stop)
+        # Existing U10 tests isolate revision/destination logic from the
+        # distinct U10b metadata parser and two-read identity tests.
+        self.identity = patch.object(
+            trash, "_restore_identity", return_value=("original", "stable"))
+        self.identity.start()
+        self.addCleanup(self.identity.stop)
 
     def run_guard(self, **kwargs):
         return trash.restore_reviewed(

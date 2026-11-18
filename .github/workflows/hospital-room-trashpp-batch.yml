@@ -1,0 +1,39 @@
+name: Hospital / Trash++ Unified Room Lifecycle Batch
+
+on:
+  pull_request:
+    paths:
+      - "services/hospital/HospitalRoomLifecycleService.qml"
+      - "services/hospital/HospitalRoomBinService.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "modules/Trash.qml"
+      - "tests/hospital/test_hospital_room_lifecycle_review_contracts.py"
+      - "tests/hospital/test_hospital_room_trashpp_batch_contracts.py"
+      - ".github/workflows/hospital-room-trashpp-batch.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/hospital/HospitalRoomLifecycleService.qml"
+      - "services/hospital/HospitalRoomBinService.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "modules/Trash.qml"
+      - "tests/hospital/test_hospital_room_lifecycle_review_contracts.py"
+      - "tests/hospital/test_hospital_room_trashpp_batch_contracts.py"
+      - ".github/workflows/hospital-room-trashpp-batch.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ui-and-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify integrated source control and source-owned Trash++ boundary
+        run: |
+          python3 tests/hospital/test_hospital_room_lifecycle_review_contracts.py
+          python3 tests/hospital/test_hospital_room_trashpp_batch_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py
+      - name: Verify pinned PX source-owner v12 full Room lifecycle
+        run: |
+          echo "PX PR #130 supplies disposable end-to-end storage tests; it must pass independently before app merge"

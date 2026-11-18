@@ -144,8 +144,10 @@ class ClockB2B16NativeFinalV2Tests(unittest.TestCase):
         self.refused(self.fresh().observe,"UNSAFE_FINAL_V2_SOURCE")
         self.source.chmod(0o600)
         self.source_dir.chmod(0o777)
-        self.refused(self.fresh().observe,
-                     "UNSAFE_FINAL_V2_DIRECTORY_CHAIN")
+        # The disposable harness must refuse the unsafe directory at
+        # construction, before even attempting the path chain open.
+        self.refused(lambda:self.fresh().observe(),
+                     "UNSAFE_DISPOSABLE_FINAL_V2_DIRECTORY")
         self.source_dir.chmod(0o700)
 
     def test_directory_replacement_link_or_foreign_owner_is_rejected(self):
@@ -155,8 +157,8 @@ class ClockB2B16NativeFinalV2Tests(unittest.TestCase):
         target.mkdir(mode=0o700)
         (target/Final.SOURCE_NAME).write_bytes(self.raw)
         self.source_dir.symlink_to(target)
-        self.refused(self.fresh().observe,
-                     "UNSAFE_FINAL_V2_DIRECTORY_CHAIN")
+        self.refused(lambda:self.fresh().observe(),
+                     "UNSAFE_DISPOSABLE_FINAL_V2_DIRECTORY")
         self.source_dir.unlink()
         self.source_dir.mkdir(mode=0o700)
         self.source.write_bytes(self.raw)

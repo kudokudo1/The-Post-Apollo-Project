@@ -1019,7 +1019,8 @@ PanelWindow {
             }) : [];
         const needle = String(trashSearch.text || "").trim().toLowerCase();
         const copyRows = researchBinRows.filter(function(row) {
-            if (trashViewFilter === "files") return false;
+            if (trashViewFilter === "files"
+                    || trashViewFilter === "hospital") return false;
             if (trashViewFilter === "events" && row.kind !== "SAVED EVENT")
                 return false;
             if (trashViewFilter === "research" && row.kind !== "SAVED RESEARCH")
@@ -1871,12 +1872,30 @@ PanelWindow {
                 }
             }
 
+            GohuText {
+                width: parent.width
+                height: 20
+                visible: trashLauncher.activeMode === "trash"
+                    && (!!trashLauncher.hospitalSelectedRoomId
+                        || !!hospitalBin.lastError)
+                text: hospitalBin.lastError
+                    || trashLauncher.hospitalOutcome
+                    || (hospitalRestore.lastError
+                        || "HOSPITAL SOURCE // REVIEW HELD")
+                font.pixelSize: 9
+                color: hospitalBin.lastError || hospitalRestore.lastError
+                    ? Colors.red : Colors.orange
+                elide: Text.ElideMiddle
+            }
+
             Item {
                 id: trashListBox
                 visible: trashLauncher.activeMode === "trash"
                 width: parent.width
                 height: Math.max(90, trashMenu.height - 323
-                                 - (trashLauncher.confirmMode === "item" ? 46 : 0))
+                                 - (trashLauncher.confirmMode === "item" ? 46 : 0)
+                                 - (trashLauncher.hospitalSelectedRoomId
+                                    || hospitalBin.lastError ? 20 : 0))
 
                 ListView {
                     id: trashFileList
@@ -2055,7 +2074,9 @@ PanelWindow {
                           && trashLauncher.researchBinRows.length === 0
                           && hospitalBin.loaded && hospitalBin.rows.length === 0
                           ? "TRASH EMPTY // NOTHING TO RESTORE"
-                          : "NO MATCHES // CHOOSE A SOURCE FILTER"
+                          : !hospitalBin.loaded && trashLauncher.trashViewFilter === "hospital"
+                            ? "HOSPITAL BIN // NOT VERIFIED"
+                            : "NO MATCHES // CHOOSE A SOURCE FILTER"
                 }
             }
 

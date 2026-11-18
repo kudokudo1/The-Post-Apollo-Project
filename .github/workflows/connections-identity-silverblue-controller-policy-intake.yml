@@ -1,0 +1,79 @@
+name: C4b controller-owned signed enrollment policy intake (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/controller_owned_policy_intake_ci.py'
+      - 'tests/connections/identity_silverblue/test_controller_owned_policy_intake_ci.py'
+      - '.github/workflows/connections-identity-silverblue-controller-policy-intake.yml'
+      - 'docs/connections-c4b-controller-owned-policy-intake-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  controller-owned-signed-enrollment-policy-refusal-ci:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin fixture Ed25519 implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Reject unsafe read-only source and unsupported authority claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/identity_silverblue/controller_owned_policy_intake_ci.py \
+            tests/connections/identity_silverblue/test_controller_owned_policy_intake_ci.py
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path("tests/connections/identity_silverblue/controller_owned_policy_intake_ci.py").read_text()
+          base=Path("tests/connections/identity_silverblue/controller_pinned_enrollment_gate_ci.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          status=Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          for term in ("O_NOFOLLOW", "O_DIRECTORY", "dir_fd=parent_fd",
+                       "controller-root-public.ed25519", "controller-policy.json",
+                       "gateway-enrollment.ed25519",
+                       "E.inspect_enrolled_controller_challenge_ci_only",
+                       "C4B_POLICY_FILE_CHANGED_DURING_READ"):
+              assert term in code, term
+          for field in ("operatorControlledRootEnrollmentVerified",
+                        "independentlyAuthenticatedHostEvidenceVerified",
+                        "protectedRevocationLedgerVerified",
+                        "rollbackResistantSourceVerified",
+                        "operatorC5ConsentVerified", "hostAuthenticated",
+                        "canBeginSignIn", "credentialActionsEnabled",
+                        "productionAuthority"):
+              assert '"' + field + '": False' in code, field
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "readonly property bool hostAuthenticated: false" in status
+          assert '"productionAuthority": False' in base
+          print("C4B_POLICY_HOLD // FILE_OWNER_AND_MODE_NOT_INDEPENDENT_OPERATOR_ROOT_CUSTODY")
+          PY
+      - name: 28 independent controller bundle source and false-grant adversarial cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_controller_owned_policy_intake_ci.py
+          echo "C4B_POLICY_PASS // 28_CONTROLLER_FILE_INTAKE_NEGATIVE_CASES"
+      - name: Existing C4b enrollment, UART challenge, receipt and signed release regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_controller_pinned_enrollment_gate_ci.py
+          python3 -B tests/connections/identity_silverblue/test_controller_challenge_ci.py
+          python3 -B tests/connections/identity_silverblue/test_runtime_receipt_binding_ci.py
+          python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
+          python3 -B tests/identity/test_silverblue_release_candidate_v1.py
+          echo "C4B_POLICY_HOLD // NO_APPROVED_REAL_ROOT_OR_HOST_LOGIN"

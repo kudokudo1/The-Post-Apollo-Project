@@ -143,6 +143,14 @@ class ClockPairedKernelHandoffTests(unittest.TestCase):
         for field in Pair.NO_AUTHORITY:
             self.assertEqual(record[field], Pair.NO_AUTHORITY[field], field)
 
+    def acknowledge_pair(self, pair):
+        nonce = pair.prepare_pair_challenge()
+        self.assertRegex(nonce, r"^[0-9a-f]{64}$")
+        confirmed = pair.acknowledge_pair_challenge(nonce)
+        self.assertTrue(confirmed["oneUseNativeRoundTripObserved"])
+        self.assert_no_rights(confirmed)
+        return nonce
+
     def test_real_two_process_pair_and_final_source_sync_are_observation_only(self):
         pair = self.start_pair()
         pair.connect_native(self.native_conn)
@@ -152,6 +160,8 @@ class ClockPairedKernelHandoffTests(unittest.TestCase):
         self.assertTrue(result["qmlKernelPeerObserved"])
         self.assertTrue(result["pairedProcessesAlive"])
         self.assert_no_rights(result)
+        self.assertFalse(result["oneUseNativeRoundTripObserved"])
+        self.acknowledge_pair(pair)
         final = pair.inspect_final_candidate(
             candidate_generation=7, expected_generation=7,
             candidate_digest=self.digest)
@@ -172,23 +182,39 @@ class ClockPairedKernelHandoffTests(unittest.TestCase):
                            "SIGNED_NATIVE_REQUIRED_FIRST")
         self.assert_denied(pair.inspect_pair, "BOTH_PINNED_PEERS_REQUIRED")
 
-    def test_wrong_native_or_qml_process_pins_refuse(self):
-        for target in ("native", "qml"):
-            with self.subTest(target=target):
-                # A fresh fixture is required because a connection keeps
-                # one exact OS process and signed release identity.
-                if target == "native":
-                    pair = self.start_pair(native_pin_updates={"ticks": 1})
-                    self.assert_denied(
-                        lambda: pair.connect_native(self.native_conn),
-                        "KERNEL_PEER_DOES_NOT_MATCH_PIN")
-                else:
-                    pair = self.start_pair(qml_pin_updates={"ticks": 1})
-                    pair.connect_native(self.native_conn)
-                    self.assert_denied(
-                        lambda: pair.connect_qml_standin(self.qml_conn),
-                        "KERNEL_PEER_DOES_NOT_MATCH_PIN")
-                break
+    def test_wrong_native_process_start_ticks_refuses(self):
+        pair = self.start_pair(native_pin_updates={"ticks": 1})
+        self.assert_denied(
+            lambda: pair.connect_native(self.native_conn),
+            "KERNEL_PEER_DOES_NOT_MATCH_PIN")
+
+    def test_wrong_qml_process_start_ticks_refuses(self):
+        pair = self.start_pair(qml_pin_updates={"ticks": 1})
+        pair.connect_native(self.native_conn)
+        self.assert_denied(
+            lambda: pair.connect_qml_standin(self.qml_conn),
+            "KERNEL_PEER_DOES_NOT_MATCH_PIN")
+
+    def test_one_use_pair_challenge_replay_and_wrong_nonce_refuse(self):
+        pair = self.start_pair()
+        pair.connect_native(self.native_conn)
+        pair.connect_qml_standin(self.qml_conn)
+        original = pair.prepare_pair_challenge()
+        wrong = ("f" if original[0] != "f" else "e") + original[1:]
+        self.assert_denied(
+            lambda: pair.acknowledge_pair_challenge(wrong),
+            "CLOCK_BRIDGE_CHALLENGE_MISMATCH")
+        self.assert_denied(
+            lambda: pair.acknowledge_pair_challenge(original),
+            "CLOCK_BRIDGE_CHALLENGE_NOT_PENDING")
+        self.assert_denied(
+            pair.prepare_pair_challenge,
+            "CLOCK_BRIDGE_CHALLENGE_ALREADY_ISSUED")
+        self.assert_denied(
+            lambda: pair.inspect_final_candidate(
+                candidate_generation=3, expected_generation=3,
+                candidate_digest=self.digest),
+            "ONE_USE_NATIVE_ROUND_TRIP_REQUIRED")
 
     def test_distinct_process_roles_required_at_construction(self):
         self.native, self.native_conn, native_ticks = self.connect_child(
@@ -228,6 +254,7 @@ class ClockPairedKernelHandoffTests(unittest.TestCase):
         pair = self.start_pair()
         pair.connect_native(self.native_conn)
         pair.connect_qml_standin(self.qml_conn)
+        self.acknowledge_pair(pair)
         for kwargs in (
             dict(candidate_generation=3, expected_generation=4,
                  candidate_digest=self.digest),
@@ -247,6 +274,7 @@ class ClockPairedKernelHandoffTests(unittest.TestCase):
         pair = self.start_pair()
         pair.connect_native(self.native_conn)
         pair.connect_qml_standin(self.qml_conn)
+        self.acknowledge_pair(pair)
         self.source.write_bytes(b'{"version":2,"nextId":1,"alarms":[]}\n')
         self.source.chmod(0o600)
         before = self.source.read_bytes()

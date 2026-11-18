@@ -9,6 +9,7 @@ on:
       - "modules/Trash.qml"
       - "tests/hospital/test_hospital_room_lifecycle_review_contracts.py"
       - "tests/hospital/test_hospital_room_trashpp_batch_contracts.py"
+      - "tests/hospital/test_hospital_room_px_v12_crossrepo.py"
       - ".github/workflows/hospital-room-trashpp-batch.yml"
   push:
     branches: [main]
@@ -34,6 +35,13 @@ jobs:
           python3 tests/hospital/test_hospital_room_lifecycle_review_contracts.py
           python3 tests/hospital/test_hospital_room_trashpp_batch_contracts.py
           python3 tests/hospital/test_workforce_roster_ui_contracts.py
-      - name: Verify pinned PX source-owner v12 full Room lifecycle
+      - name: Check out exact PX PR #130 head without modifying its branch
+        uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: 3ab56fb88a7290ec0651446cdd685e842f5c6120
+          path: px-source
+          persist-credentials: false
+      - name: Verify PX/Trash++ JSON contract using fresh disposable database
         run: |
-          echo "PX PR #130 supplies disposable end-to-end storage tests; it must pass independently before app merge"
+          python3 tests/hospital/test_hospital_room_px_v12_crossrepo.py

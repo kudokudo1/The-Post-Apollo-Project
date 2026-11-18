@@ -10,6 +10,7 @@ family_rail = (root / "widgets/weather/StationWorkspaceFamilyRail.qml").read_tex
 index_rail = (root / "widgets/weather/StationSubjectRail.qml").read_text(encoding="utf-8")
 workspace = (root / "widgets/weather/StationWorkspaceSurface.qml").read_text(encoding="utf-8")
 navigation = (root / "widgets/weather/StationWorkspaceNavigationPolicy.js").read_text(encoding="utf-8")
+station_nav = (root / "widgets/weather/StationSubjectNavigator.qml").read_text(encoding="utf-8")
 
 assert station.count("ModeButton {") == 0
 assert "id: railColumn" not in station
@@ -22,7 +23,11 @@ assert family_rail.count("ModeButton {") == 1
 assert index_rail.count("ModeButton {") == 1
 assert "model: Workspace.FAMILIES" in family_rail
 assert 'onTriggered:' in family_rail
-assert 'familyRail.navigator.chooseRoute(modelData.landing)' in family_rail
+# This was changed in the merged W27 SERVICES-follow-family feature.
+# Recheck that current family switching owns its real canonical policy.
+assert 'familyRail.navigator.chooseFamily(modelData.id)' in family_rail
+assert "function chooseFamily(targetFamily)" in station_nav
+assert "Workspace.familySwitchTarget(currentPath,targetFamily)" in station_nav
 assert "model: surface.activeTabs" in workspace
 
 family_ids = re.findall(r'\{id:"(home|weather|cosmos|earth|media|magick|tools)",label:', navigation)

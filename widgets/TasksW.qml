@@ -55,6 +55,13 @@ PanelWindow {
     property int selectedMainModeIndex: 0
     readonly property var activeMode: mainModes[selectedMainModeIndex]
 
+    // Unified internal widget keys. Only the actual TASKS frame may own
+    // shortcuts; active text inputs and child task editors keep their keys.
+    property int keyboardModeCursor: 0
+    readonly property bool standardModeKeysAvailable:
+        root.menuOpen && root.activeFocusItem === tasksFrame
+    onSelectedMainModeIndexChanged: keyboardModeCursor = selectedMainModeIndex
+
     // Keep task storage shared with ApolloHub. This menu does not create a
     // FileView, storage service, or parallel task document.
     readonly property string taskStoreState:
@@ -76,8 +83,32 @@ PanelWindow {
         : Colors.orange
 
     function selectMainMode(index) {
-        if (index >= 0 && index < mainModes.length)
+        if (index >= 0 && index < mainModes.length) {
             selectedMainModeIndex = index;
+            keyboardModeCursor = index;
+        }
+    }
+
+    function cycleMainMode(direction) {
+        if (!standardModeKeysAvailable) return;
+        const count = mainModes.length;
+        if (count < 1) return;
+        const step = Number(direction) < 0 ? -1 : 1;
+        selectMainMode((selectedMainModeIndex + step + count) % count);
+    }
+
+    // Vertical arrows preview without opening a task, changing a field,
+    // or saving a draft. Enter alone commits the highlighted main mode.
+    function moveNavigationCursor(direction) {
+        if (!standardModeKeysAvailable || mainModes.length < 1) return;
+        const step = Number(direction) < 0 ? -1 : 1;
+        keyboardModeCursor =
+            (keyboardModeCursor + step + mainModes.length) % mainModes.length;
+    }
+
+    function activateNavigationCursor() {
+        if (!standardModeKeysAvailable) return;
+        selectMainMode(keyboardModeCursor);
     }
 
     function expandChassis() {
@@ -96,6 +127,7 @@ PanelWindow {
     // close behavior; never register an application-wide Escape shortcut.
     onMenuOpenChanged: {
         if (menuOpen) {
+            keyboardModeCursor = selectedMainModeIndex;
             Qt.callLater(function() {
                 if (root.menuOpen)
                     tasksFrame.forceActiveFocus();
@@ -143,6 +175,9 @@ PanelWindow {
         height: root.menuOpen ? root.frameHeight : 0
     }
 
+    // The focused frame alone handles keys. Do not use WindowShortcut:
+    // TASKS editors retain Qt's native Tab/Enter/arrow ownership.
+
     WindowPanelFrame {
         id: tasksFrame
         anchors.fill: parent
@@ -150,6 +185,34 @@ PanelWindow {
         anchors.topMargin: root.frameTopInset
         visible: root.menuOpen
         focus: root.menuOpen
+        Keys.priority: Keys.BeforeItem
+        Keys.onShortcutOverride: function(event) {
+            if (!root.standardModeKeysAvailable) return;
+            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab)
+                event.accepted = true;
+        }
+        Keys.onPressed: function(event) {
+            if (!root.standardModeKeysAvailable) return;
+            if (event.key === Qt.Key_Tab
+                    || event.key === Qt.Key_Backtab) {
+                const reverse = event.key === Qt.Key_Backtab
+                    || (event.modifiers & Qt.ShiftModifier) !== 0;
+                root.cycleMainMode(reverse ? -1 : 1);
+            } else if (event.modifiers === Qt.NoModifier
+                    && event.key === Qt.Key_Up) {
+                root.moveNavigationCursor(-1);
+            } else if (event.modifiers === Qt.NoModifier
+                    && event.key === Qt.Key_Down) {
+                root.moveNavigationCursor(1);
+            } else if (event.modifiers === Qt.NoModifier
+                    && (event.key === Qt.Key_Enter
+                        || event.key === Qt.Key_Return)) {
+                root.activateNavigationCursor();
+            } else {
+                return;
+            }
+            event.accepted = true;
+        }
 
         // Child text editors may consume Escape first (for example, BACK
         // from renaming a task). Otherwise close only this Tasks window.
@@ -290,6 +353,11 @@ PanelWindow {
                     labelFontSize: 12
                     bordered: false
                     selected: root.selectedMainModeIndex === index
+                    keyboardActive: root.standardModeKeysAvailable
+                    keyboardSelected: root.keyboardModeCursor === index
+                    // Preserve the original pointer path and editor focus.
+                    // Only a keyboard activation explicitly selects the
+                    // highlighted item; clicking does not steal input focus.
                     onTriggered: root.selectMainMode(index)
                 }
             }

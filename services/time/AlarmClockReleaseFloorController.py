@@ -321,6 +321,8 @@ class ClockReleaseFloorController:
                     raise Refused("MONOTONIC_CLOCK_RELEASE_REPLAY")
                 if old is not None and old[5]!=self.root_pin:
                     raise Refused("CLOCK_RELEASE_ROOT_CHANGED_WITHOUT_APPROVAL")
+                if old is not None and (pid,ticks)==(old[3],old[4]):
+                    raise Refused("OLD_CLOCK_PROCESS_ALREADY_ENROLLED")
                 db.execute("""INSERT INTO release_floor
                     (slot,epoch,sequence,boot_id,old_writer_pid,
                      old_writer_ticks,signer_digest,session_digest)

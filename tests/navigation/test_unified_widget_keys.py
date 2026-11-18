@@ -121,7 +121,9 @@ def test_weather_domains_are_first_class_subject_families():
     assert "function moveNavigationCursor(direction)" in src
     assert "function activateNavigationCursor()" in src
     assert "subjectNavigator.cycleSubjects(direction);" in src
-    assert "subjectNavigator.moveCursor(direction);" in src
+    assert "return weatherContentKeys.handleDirectionKey(key,modifiers);" in src
+    assert "return weatherContentKeys.activate();" in src
+    assert "subjectNavigator.moveCursor(-1);" in src
     assert "subjectNavigator.activateCursor();" in src
     for name in ("Weather","Cosmos","Earth","Media","Magick","Tools"):
         assert "Station" + name + "SubjectPane {" in workspace

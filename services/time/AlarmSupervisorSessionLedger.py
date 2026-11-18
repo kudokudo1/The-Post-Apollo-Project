@@ -204,6 +204,8 @@ class ClockSessionLedger:
             raise Refused("INVALID_PIDFD_EXIT_PINS")
         try:
             os.fstat(pidfd)
+            if os.readlink(f"/proc/self/fd/{pidfd}") != "anon_inode:[pidfd]":
+                raise Refused("ORIGINAL_KERNEL_PIDFD_UNVERIFIED")
             exited = Peer._exited(pidfd)
         except (OSError, ValueError, Peer.Refused) as exc:
             raise Refused("ORIGINAL_KERNEL_PIDFD_UNVERIFIED") from exc

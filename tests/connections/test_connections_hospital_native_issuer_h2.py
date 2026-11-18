@@ -302,6 +302,7 @@ class NativeIssuerSecurity(unittest.TestCase):
              patch.object(S,"_writer_exchange",side_effect=writer), \
              patch.object(S,"_polkit_approve",side_effect=polkit), \
              patch.object(C,"host_fingerprint",return_value="c"*64), \
+             patch.object(C,"read_policy",return_value=self.policy), \
              patch.object(C,"load_installed_key",return_value=self.key), \
              patch.object(S.os,"urandom",side_effect=lambda n:bytes(range(n))):
             # _native_step generates its own nonce before calling PX.
@@ -406,6 +407,23 @@ class NativeIssuerSecurity(unittest.TestCase):
             tx.send(b"other-process-packet")
             forged=(os.getpid()+1,os.getuid(),os.getgid())
             self.denied(S._packet_recv,rx,expected_sender=forged)
+
+    def test_43_changed_issuer_policy_after_polkit_refuses_before_key(self):
+        peer=(4321,1000,1000,54321)
+        stale=dict(self.policy,minimumPolicyGeneration=10)
+        with patch.object(S,"_peer",return_value=peer),\
+             patch.object(S,"_same_peer",return_value=peer),\
+             patch.object(S,"_packet_recv",return_value=C.canonical(self.request)),\
+             patch.object(S,"_active_seat",return_value="logind-seat0-c1"),\
+             patch.object(S,"_writer_exchange",return_value=C.canonical(self.prepared)),\
+             patch.object(S,"_polkit_approve") as approval,\
+             patch.object(C,"host_fingerprint",return_value="c"*64),\
+             patch.object(C,"read_policy",return_value=stale),\
+             patch.object(C,"load_installed_key") as keys,\
+             patch.object(S.os,"urandom",side_effect=lambda n:bytes(range(n))):
+            self.denied(S._native_step,object(),self.policy)
+            approval.assert_called_once()
+            keys.assert_not_called()
 
     def test_42_native_ready_handshake_precedes_client_packet(self):
         """SO_PASSCRED must be installed before a peer sends any request."""

@@ -1,0 +1,30 @@
+# Source-only candidate, not installed. Privileged service requires pinned owner
+# release, signer key/public fingerprint, protected PX writer, real Polkit and
+# logind before it can ever sign or commit a Room lifecycle action.
+[Unit]
+Description=Post Apollo Hospital protected Room authorization issuer
+Requires=post-apollo-hospital-issuer.socket
+After=systemd-logind.service polkit.service post-apollo-hospital-issuer.socket
+
+[Service]
+Type=exec
+User=root
+Group=root
+ExecStart=/usr/bin/python3 -B /usr/libexec/post-apollo/hospital/HospitalNativeIssuerService.py
+TimeoutStartSec=50
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+# No installation or [Install] section; no runtime override to enable grants.

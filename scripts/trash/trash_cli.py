@@ -19,6 +19,13 @@ MAX_ITEMS = 2500
 MAX_LIST_BYTES = 1048576
 MAX_ARG = 8192
 ACTION_TIMEOUT = 75
+# Supplemental GIO item evidence only. Providers may omit these attributes;
+# the already-merged U10 reviewed revision and post-state checks remain intact.
+RESTORE_METADATA_LIMIT = 32768
+RESTORE_METADATA_ATTRS = (
+    "trash::orig-path", "trash::deletion-date",
+    "id::file", "standard::type", "standard::size",
+)
 
 
 class TrashError(Exception):
@@ -137,6 +144,48 @@ def _sha256_token(value):
             and all(char in "0123456789abcdef" for char in value))
 
 
+def _restore_metadata(gio, row):
+    """Read bounded, provider-supplied GIO metadata for one reviewed item.
+
+    None means this provider cannot supply a useful witness. Do not turn a
+    missing attribute into a new blanket Restore refusal across mounts.
+    Observable metadata conflicts (including a different original) fail closed.
+    Neither this witness nor GIO's URI is an atomic identity token.
+    """
+    process = _run([
+        gio, "info", "--attributes=" + ",".join(RESTORE_METADATA_ATTRS),
+        row["uri"],
+    ])
+    if process.returncode != 0:
+        return None
+    raw = process.stdout
+    if not isinstance(raw, str) or len(raw.encode("utf-8")) > RESTORE_METADATA_LIMIT:
+        raise TrashError("RESTORE_METADATA_MALFORMED")
+    fields = {}
+    in_attributes = False
+    for line in raw.splitlines():
+        if line.strip() == "attributes:":
+            if in_attributes:
+                raise TrashError("RESTORE_METADATA_MALFORMED")
+            in_attributes = True
+            continue
+        if not in_attributes or not line.startswith(("  ", "\t")):
+            continue
+        key, sep, value = line.lstrip(" \t").partition(": ")
+        if not sep or key not in RESTORE_METADATA_ATTRS:
+            continue
+        if key in fields or not value or "\x00" in value or "\r" in value:
+            raise TrashError("RESTORE_METADATA_MALFORMED")
+        fields[key] = value
+    if not fields:
+        return None
+    if ("trash::orig-path" in fields
+            and fields["trash::orig-path"] != row["original"]):
+        raise TrashError("RESTORE_SOURCE_ORIGINAL_CHANGED")
+    # Stable field order, not stdout order; ignore unrelated GIO attributes.
+    return tuple((key, fields[key]) for key in RESTORE_METADATA_ATTRS if key in fields)
+
+
 def restore_reviewed(uri, original, expected_revision, expected_review_id):
     """U10 UI-reviewed Restore: revalidate twice, refuse stale observations.
 
@@ -155,6 +204,7 @@ def restore_reviewed(uri, original, expected_revision, expected_review_id):
         raise TrashError("TRASH_CHANGED_REFRESH_REQUIRED")
     if os.path.lexists(row["original"]):
         raise TrashError("RESTORE_TARGET_EXISTS")
+    first_metadata = _restore_metadata(gio, row)
 
     # Detect a replacement/reordered inventory or a late destination collision
     # before GIO is launched. A later concurrent change remains possible.
@@ -165,6 +215,9 @@ def restore_reviewed(uri, original, expected_revision, expected_review_id):
     if (_revision(latest) != expected_revision
             or current["reviewId"] != expected_review_id):
         raise TrashError("TRASH_CHANGED_REFRESH_REQUIRED")
+    second_metadata = _restore_metadata(gio, current)
+    if first_metadata != second_metadata:
+        raise TrashError("RESTORE_SOURCE_METADATA_CHANGED")
     if os.path.lexists(current["original"]):
         raise TrashError("RESTORE_TARGET_EXISTS")
 
@@ -186,7 +239,13 @@ def restore_reviewed(uri, original, expected_revision, expected_review_id):
                    for item in after)):
         raise TrashError("RESTORE_RESULT_UNVERIFIED")
     return {"ok": True, "kind": "restore", "name": current["name"],
-            "message": "RESTORED", "verified": True}
+            "message": "RESTORED", "verified": True,
+            # Supplemental evidence, not a security certification. When absent
+            # U10's previous revision+post-state guarantees are unchanged.
+            "metadataWitness": "observed" if second_metadata else "unavailable",
+            "secondaryIdentityObserved": bool(second_metadata and any(
+                key in ("trash::deletion-date", "id::file")
+                for key, _ in second_metadata))}
 
 
 def item_action(action, uri, original, confirmation=""):

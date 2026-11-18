@@ -84,6 +84,18 @@ def _final_source_component():
 
 FinalV2=_final_source_component()
 
+def _bridge_component():
+    path=Path(__file__).resolve().with_name("AlarmBridgeChallengeLedger.py")
+    spec=importlib.util.spec_from_file_location("clock_b2b17_bridge",path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Clock bridge preflight unavailable")
+    module=importlib.util.module_from_spec(spec)
+    sys.modules[spec.name]=module
+    spec.loader.exec_module(module)
+    return module
+
+Bridge=_bridge_component()
+
 # Intentionally unprovisioned. Only a separately approved protected
 # Clock installation may pin these values in reviewed source/package
 # provenance. NO socket request, environment setting, or CLI flag can
@@ -103,6 +115,7 @@ TEST_RUNTIME = "bg1-clock-supervisor-fixture"
 MAX_FRAME = 1024
 PROTOCOL = 1
 ACTIONS = frozenset(("INSPECT_ORIGIN", "INSPECT_FINAL_V2",
+                     "PREPARE_BRIDGE_CHALLENGE", "ACK_BRIDGE_CHALLENGE",
                      "REQUEST_PAUSE",
                      "RELEASE_WRITER", "TAKE_OWNERSHIP", "RING_ALARM"))
 
@@ -164,7 +177,7 @@ def _unique(pairs):
 
 def _decode_request(line):
     if (type(line) is not bytes or not 1 < len(line) <= MAX_FRAME
-            or not line.endswith(b"\n") or b"\n" in line[:-1]):
+            or not line.endswith(b"\\n") or b"\\n" in line[:-1]):
         raise Refused("CLOCK_REQUEST_FRAME_INVALID")
     raw = line[:-1]
     try:
@@ -174,16 +187,24 @@ def _decode_request(line):
                                  Refused("CLOCK_NONFINITE_NUMBER")))
     except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
         raise Refused("CLOCK_REQUEST_JSON_INVALID") from exc
-    if (type(request) is not dict or set(request) != {"v", "action"}
-            or type(request["v"]) is not int or request["v"] != PROTOCOL
-            or type(request["action"]) is not str
+    if (type(request) is not dict or type(request.get("v")) is not int
+            or request["v"] != PROTOCOL
+            or type(request.get("action")) is not str
             or request["action"] not in ACTIONS):
+        raise Refused("CLOCK_REQUEST_OPERATION_REFUSED")
+    action = request["action"]
+    fields = ({"v", "action", "challenge"}
+              if action == "ACK_BRIDGE_CHALLENGE" else {"v", "action"})
+    if (set(request) != fields
+            or (action == "ACK_BRIDGE_CHALLENGE"
+                and (type(request.get("challenge")) is not str
+                     or not Bridge.HEX64.fullmatch(request["challenge"])))):
         raise Refused("CLOCK_REQUEST_OPERATION_REFUSED")
     expected = json.dumps(request, sort_keys=True, separators=(",", ":"),
                           ensure_ascii=True).encode("ascii")
     if expected != raw:
         raise Refused("CLOCK_REQUEST_NOT_CANONICAL")
-    return request["action"]
+    return action, request.get("challenge")
 
 
 def _response(reason, observed=False):
@@ -202,6 +223,18 @@ def _final_response(reason, *, observed=False, final=False):
         "fileSyncObserved": bool(final),
         "parentDirectorySyncObserved": bool(final),
         "sourceExclusive": False,
+        "finalRevisionDurablyLocked": False,
+        "oldWriterRestartPrevented": False,
+    })
+    return result
+
+def _bridge_response(reason, *, observed=False, issued=False, round_trip=False):
+    result = _response(reason, observed=observed)
+    result.update({
+        "channelChallengeIssued": bool(issued),
+        "channelRoundTripObserved": bool(round_trip),
+        "nativeToQmlChannelAuthenticated": False,
+        "quickshellDrainObserved": False,
         "finalRevisionDurablyLocked": False,
         "oldWriterRestartPrevented": False,
     })
@@ -229,6 +262,10 @@ class ClockNativeSupervisor:
         # Only test code may set a disposable source. The installed
         # source and pinned digest are intentionally unprovisioned.
         self._test_final_source = None
+        # B2B17: disposable signed-process challenge only, NOT QML auth.
+        # Production has no challenge issuer or bridge enrollment.
+        self._bridge_challenges = (Bridge.ClockBridgeChallengeLedger()
+                                   if self.synthetic else None)
 
     def add_synthetic_session(self, pin):
         """Only isolated tests can enroll a test subprocess. No CLI for this."""
@@ -308,6 +345,32 @@ class ClockNativeSupervisor:
                     and result["canRing"] is False)
         except (FinalV2.Refused, Peer.Refused, ValueError, OSError):
             return False
+
+    def _bridge_identity(self, conn):
+        """Observe signed peer and bind a challenge to its live kernel pidfd.
+
+        Test mode only. Socket bytes cannot choose the process, epoch or root.
+        There is deliberately no installed QML bridge or real pause path.
+        """
+        if not self.synthetic or self._bridge_challenges is None:
+            return None
+        if not self._observe(conn):
+            return None
+        try:
+            raw=conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,
+                                struct.calcsize("3i"))
+            pid, uid, gid=struct.unpack("3i", raw)
+            pin=self._test_pins.get(pid)
+            held=self._test_pidfds.get(pid)
+            if (pin is None or held is None or pin.pid != pid
+                    or uid != os.getuid() or gid != os.getgid()
+                    or Peer._exited(held)):
+                return None
+            st=os.fstat(held)
+            return (pin.pid, pin.ticks, pin.epoch,
+                    pin.pinned_root_sha256, st.st_dev, st.st_ino)
+        except (OSError, Peer.Refused, ValueError, struct.error):
+            return None
 
     def bind(self):
         if self._listener is not None:
@@ -477,7 +540,7 @@ class ClockNativeSupervisor:
         try:
             with conn.makefile("rb") as reader:
                 frame = reader.readline(MAX_FRAME + 1)
-            action = _decode_request(frame)
+            action, challenge = _decode_request(frame)
             if action == "INSPECT_ORIGIN":
                 observed = self._observe(conn)
                 result = _response(
@@ -491,6 +554,29 @@ class ClockNativeSupervisor:
                     "FINAL_V2_SYNC_OBSERVED_ONLY_NOT_AUTHORIZED" if final
                     else "NO_TRUSTED_FINAL_V2_SOURCE_WITNESS",
                     observed=observed, final=final)
+            elif action in ("PREPARE_BRIDGE_CHALLENGE",
+                            "ACK_BRIDGE_CHALLENGE"):
+                identity=self._bridge_identity(conn)
+                if identity is None:
+                    result=_bridge_response("CLOCK_BRIDGE_SIGNED_PEER_REQUIRED")
+                else:
+                    try:
+                        if action == "PREPARE_BRIDGE_CHALLENGE":
+                            token=self._bridge_challenges.issue(identity)
+                            result=_bridge_response(
+                                "BRIDGE_CHALLENGE_ISSUED_NO_QML_AUTHORITY",
+                                observed=True, issued=True)
+                            # A one-use challenge goes only over this
+                            # independently signed peer's accepted socket.
+                            result["challenge"]=token
+                        else:
+                            self._bridge_challenges.acknowledge(
+                                identity, challenge)
+                            result=_bridge_response(
+                                "BRIDGE_ROUND_TRIP_ONLY_NO_QML_AUTHORITY",
+                                observed=True, round_trip=True)
+                    except Bridge.Refused as exc:
+                        result=_bridge_response(str(exc), observed=True)
             else:
                 result = _response("NATIVE_WRITER_HANDOFF_NOT_AUTHORIZED")
         except (Refused, OSError, socket.timeout, ValueError) as exc:
@@ -537,6 +623,8 @@ class ClockNativeSupervisor:
                 pass
         self._test_pidfds.clear()
         self._session_ledger = None
+        if self._bridge_challenges is not None:
+            self._bridge_challenges.clear()
 
     def serve_forever(self):
         self.bind()

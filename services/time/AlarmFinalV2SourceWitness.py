@@ -118,7 +118,7 @@ class ClockFinalV2SourceWitness:
         if (type(synthetic_only) is not bool
                 or type(pinned_sha256) is not str or not HEX.fullmatch(pinned_sha256)
                 or type(expected_uid) is not int or expected_uid < 0
-                or type(source_path) not in (str, Path)):
+                or not isinstance(source_path, (str, Path))):
             raise Refused("INDEPENDENT_FINAL_V2_PIN_REQUIRED")
         self.source = Path(source_path)
         if (not self.source.is_absolute()

@@ -91,7 +91,20 @@ jobs:
               ".github/workflows/clock-bg1-b2b12-protected-session.yml",
               ".github/workflows/clock-bg1-b2b13-release-floor-controller.yml",
               ".github/workflows/clock-bg1-b2b14-current-floor-admission.yml"}
-          assert changed in (b2b11,b2b10|b2b11,b2b12,b2b14,b2b16), (
+          b2b17={
+              "services/time/AlarmBridgeChallengeLedger.py",
+              "services/time/AlarmNativeClockSupervisor.py",
+              "services/time/BG1-ALARM-SIGNED-BRIDGE-CHANNEL.md",
+              "tests/time/test_clock_bg1_b2b17_signed_bridge_channel.py",
+              ".github/workflows/clock-bg1-b2b17-signed-bridge-channel.yml",
+              ".github/workflows/clock-bg1-b2b10-native-supervisor.yml",
+              ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml",
+              ".github/workflows/clock-bg1-b2b12-protected-session.yml",
+              ".github/workflows/clock-bg1-b2b13-release-floor-controller.yml",
+              ".github/workflows/clock-bg1-b2b14-current-floor-admission.yml",
+              ".github/workflows/clock-bg1-b2b16-native-final-v2.yml",
+          }
+          assert changed in (b2b11,b2b10|b2b11,b2b12,b2b14,b2b16,b2b17), (
               f"Unexpected clock session changes: {sorted(changed ^ (b2b10|b2b11|b2b12))}")
           print("B2B10, B2B11 and exact B2B12 inherited scope: PASS")
           print("No live QML, Identity, Connections, systemd, audio or BG2 edits: PASS")

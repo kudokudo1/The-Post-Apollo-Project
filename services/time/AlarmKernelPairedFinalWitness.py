@@ -33,6 +33,7 @@ def _module(filename, name):
 Peer = _module("AlarmPeerIdentity.py", "clock_b2b19_peer")
 Origin = _module("AlarmInstalledRoleTrustPreflight.py", "clock_b2b19_origin")
 Final = _module("AlarmFinalV2SourceWitness.py", "clock_b2b19_source")
+Bridge = _module("AlarmBridgeChallengeLedger.py", "clock_b2b19_one_use")
 
 
 class Refused(ValueError):
@@ -121,6 +122,7 @@ class ClockKernelPairedFinalWitness:
             raise Refused("INDEPENDENT_FINAL_SOURCE_PIN_REQUIRED") from exc
         self.native = None
         self.qml = None
+        self.challenge = Bridge.ClockBridgeChallengeLedger()
 
     def _signed_probe(self, connection, witness):
         pin = self.native_pin
@@ -196,12 +198,41 @@ class ClockKernelPairedFinalWitness:
         except (Peer.Refused, Refused, Origin.Refused, OSError) as exc:
             raise Refused("CLOCK_PAIRED_PROCESS_CONTINUITY_LOST") from exc
 
+    def _native_binding(self):
+        self._check()
+        try:
+            retained = os.fstat(self.native[1]["pidfd"])
+        except OSError as exc:
+            raise Refused("PINNED_NATIVE_PIDFD_UNAVAILABLE") from exc
+        pin = self.native_pin
+        return (pin.pid, pin.ticks, pin.epoch,
+                pin.pinned_root_sha256, retained.st_dev, retained.st_ino)
+
+    def prepare_pair_challenge(self):
+        # Synthetic-only one-use token. Not a QML delivery/authentication.
+        try:
+            return self.challenge.issue(self._native_binding())
+        except Bridge.Refused as exc:
+            raise Refused(str(exc)) from exc
+
+    def acknowledge_pair_challenge(self, token):
+        # Must revalidate both real OS peers before consuming the token.
+        try:
+            self.challenge.acknowledge(self._native_binding(), token)
+        except Bridge.Refused as exc:
+            raise Refused(str(exc)) from exc
+        return {
+            "oneUseNativeRoundTripObserved": True,
+            **NO_AUTHORITY,
+        }
+
     def inspect_pair(self):
         self._check()
         return {
             "signedNativeOriginObserved": True,
             "qmlKernelPeerObserved": True,
             "pairedProcessesAlive": True,
+            "oneUseNativeRoundTripObserved": self.challenge.round_trip_observed,
             "fixtureOnly": True,
             **NO_AUTHORITY,
         }
@@ -216,6 +247,8 @@ class ClockKernelPairedFinalWitness:
         pins. Even equal values and real fsync do not lock the old writer.
         """
         self._check()
+        if not self.challenge.round_trip_observed:
+            raise Refused("ONE_USE_NATIVE_ROUND_TRIP_REQUIRED")
         if (type(candidate_generation) is not int
                 or type(expected_generation) is not int
                 or not 0 < candidate_generation == expected_generation
@@ -237,6 +270,7 @@ class ClockKernelPairedFinalWitness:
             "qmlKernelPeerObserved": True,
             "pairedProcessesAlive": True,
             "candidateGenerationMatchesPin": True,
+            "oneUseNativeRoundTripObserved": True,
             "fileSyncObserved": True,
             "parentDirectorySyncObserved": True,
             "fixtureOnly": True,
@@ -244,6 +278,7 @@ class ClockKernelPairedFinalWitness:
         }
 
     def close(self):
+        self.challenge.clear()
         # The caller retains ownership of accepted sockets. This component
         # owns and closes only the kernel pidfd witnesses.
         for name in ("native", "qml"):

@@ -51,7 +51,7 @@ assert 'a.note' not in sql
 assert 'MachineCheckpointAnnotations' not in legacy
 assert 'SCHEMA_VERSION = 1' in legacy
 assert 'id: machineSaveBridgeProcess' in qml
-assert qml.count('Process {') == 15, "No new Quickshell process is authorized"
+assert qml.count('Process {') == 16, "One explicitly clicked V2 read-only review process is authorized"
 assert qml.count('onTextEdited:') == 20  # Includes durable MARK name field
 assert 'onTextEdited: timew.machineBraveTabDraft = text' in qml
 assert 'SAVE DESKTOP' in qml and 'VERIFY SAVED GEOMETRY' in qml

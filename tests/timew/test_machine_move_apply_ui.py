@@ -51,7 +51,7 @@ required_ui = (
 for key in required_ui:
     assert key in qml, key
 
-assert qml.count("Process {") == 15
+assert qml.count("Process {") == 16
 assert "id: machineSaveBridgeProcess" in qml
 assert qml.count('Quickshell.shellPath("services/time/MachineMoveApply.py")') == 1
 assert qml.count("onLeftClicked: timew.machineRestoreOneWindow()") == 1

@@ -921,7 +921,8 @@ PanelWindow {
     function machineBeginSaveBridge(action, request, origin) {
         if (!menuOpen || selectedMode !== "machine"
                 || machineSaveBridgeBusy || machineStoreBusy
-                || machineCaptureBusy || machineAutoRestoreBusy)
+                || machineCaptureBusy || machineAutoRestoreBusy
+                || machineV2ReviewBusy)
             return false;
         if (action !== "inspect" && action !== "save")
             return false;
@@ -940,7 +941,8 @@ PanelWindow {
     function machineVerifySelectedGeometry() {
         if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
                 || !machineSavedItem || machineSaveBridgeBusy
-                || machineStoreBusy || machineAutoRestoreBusy)
+                || machineStoreBusy || machineAutoRestoreBusy
+                || machineV2ReviewBusy)
             return;
         machineGeometryVerifyId = machineSavedItem.id;
         machineGeometryVerifyResult = null;
@@ -1448,6 +1450,49 @@ PanelWindow {
         machineSavedIndex >= 0 && machineSavedIndex < machineSavedCheckpoints.length
         ? machineSavedCheckpoints[machineSavedIndex] : null
 
+    // V2 restored-layout inspection is a separate, explicit read-only step.
+    // The checkpoint UUID is a result freshness key, never a move grant.
+    property bool machineV2ReviewBusy: false
+    property string machineV2ReviewKey: ""
+    property string machineV2ReviewStatus: "V2 REVIEW NOT RUN // READ ONLY"
+    property var machineV2ReviewResult: null
+    property int machineV2ReviewIndex: 0
+    readonly property var machineV2ReviewItem:
+        machineV2ReviewResult && machineV2ReviewResult.status === "review_only"
+        && machineSavedItem && machineV2ReviewKey === machineSavedItem.id
+        && machineV2ReviewIndex >= 0
+        && machineV2ReviewIndex < machineV2ReviewResult.items.length
+        ? machineV2ReviewResult.items[machineV2ReviewIndex] : null
+
+    function machineInvalidateV2Review() {
+        machineV2ReviewKey = "";
+        machineV2ReviewResult = null;
+        machineV2ReviewIndex = 0;
+        machineV2ReviewStatus = "V2 REVIEW NOT RUN // READ ONLY";
+    }
+    function machineRequestV2Review() {
+        if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
+                || !machineSavedItem || machineV2ReviewBusy || machineStoreBusy
+                || machineSaveBridgeBusy || machineAutoRestoreBusy || machineApplyBusy
+                || machineCaptureBusy || machineNotesDirty)
+            return;
+        machineV2ReviewKey = machineSavedItem.id;
+        machineV2ReviewResult = null;
+        machineV2ReviewIndex = 0;
+        machineV2ReviewStatus = "V2 REVIEW // READING SAVED + LIVE GEOMETRY";
+        machineV2ReviewBusy = true;
+        machineV2ReviewProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineRestoreReviewV2.py"),
+            "review", machineV2ReviewKey]);
+    }
+    function machineStepV2ReviewItem(delta) {
+        const count = machineV2ReviewResult
+                    && machineV2ReviewResult.status === "review_only"
+                    ? machineV2ReviewResult.items.length : 0;
+        if (count > 0)
+            machineV2ReviewIndex = (machineV2ReviewIndex + delta + count) % count;
+    }
+
     // An explicit, bounded comparison of a saved metadata snapshot against
     // an explicit current capture. No Sway reads, writes, or restore operations.
     property var machineLayoutComparison: null
@@ -1641,6 +1686,7 @@ PanelWindow {
                 || machineApplyBusy || machineConfirmationBusy
                 || machineMoveReviewBusy || machineResolverBusy
                 || machineStoreBusy || machineCaptureBusy
+                || machineV2ReviewBusy
                 || !machineReviewReadyForConfirmation
                 || machineConfirmationTyped === ""
                 || machineConfirmationTyped !== machineConfirmationPhrase
@@ -1649,6 +1695,7 @@ PanelWindow {
                 || !machineResolverItem
                 || machineResolverItem.status !== "candidate")
             return;
+        machineInvalidateV2Review();
         machineApplyKey = machineMoveCandidateKey;
         machineApplySubmittedText = machineConfirmationTyped;
         machineApplyPayload = JSON.stringify({
@@ -1668,8 +1715,10 @@ PanelWindow {
     function machineRestoreSelectedCheckpoint() {
         if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
                 || !machineSavedItem || machineStoreBusy
-                || machineAutoRestoreBusy || machineApplyBusy)
+                || machineAutoRestoreBusy || machineApplyBusy
+                || machineV2ReviewBusy)
             return;
+        machineInvalidateV2Review();
         // A checkpoint selection and this click are the full operator flow.
         // The backend loads the persisted snapshot and rechecks each move.
         machineAutoRestoreKey = machineSavedItem.id;
@@ -1735,7 +1784,8 @@ PanelWindow {
 
     function machineStoreRequest(action, data, id) {
         if (!menuOpen || selectedMode !== "machine" || machineStoreBusy
-                || machineSaveBridgeBusy || machineAutoRestoreBusy)
+                || machineSaveBridgeBusy || machineAutoRestoreBusy
+                || machineV2ReviewBusy)
             return;
         if (action !== "save" && action !== "list" && action !== "load")
             return;
@@ -1775,6 +1825,7 @@ PanelWindow {
             return;
         }
         machineNotesDiscard();
+        machineInvalidateV2Review();
         machineNotesNameOverlay = ({});
         machineGeometryVerifyId = "";
         machineGeometryVerifyResult = null;
@@ -1784,6 +1835,7 @@ PanelWindow {
     function machineOpenSavedCheckpoint() {
         if (!machineSavedItem)
             return;
+        machineInvalidateV2Review();
         machineOpenedCheckpoint = null;
         machineLayoutComparison = null;
         machineRestorePlan = null;
@@ -1791,13 +1843,15 @@ PanelWindow {
         machineStoreRequest("load", null, machineSavedItem.id);
     }
     function machineStepSavedCheckpoint(delta) {
-        if (machineAutoRestoreBusy || machineSaveBridgeBusy || machineStoreBusy)
+        if (machineAutoRestoreBusy || machineSaveBridgeBusy || machineStoreBusy
+                || machineV2ReviewBusy)
             return;
         if (machineNotesDirty) {
             machineNotesStatus = "UNSAVED NOTES // SAVE OR CANCEL FIRST";
             return;
         }
         machineNotesDiscard();
+        machineInvalidateV2Review();
         machineGeometryVerifyId = "";
         machineGeometryVerifyResult = null;
         machineGeometryVerifyStatus = "NOT VERIFIED // READ-ONLY CHECK AVAILABLE";
@@ -2011,6 +2065,7 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!menuOpen) {
+            machineInvalidateV2Review();
             universalFavoritesOpen = false;
             dismissWorldSearchPopup();
             closeConverterDropdowns();
@@ -2032,6 +2087,8 @@ PanelWindow {
         }
     }
     onSelectedModeChanged: {
+        if (selectedMode !== "machine")
+            machineInvalidateV2Review();
         if (resyncPopupOpen)
             dismissResyncPopup();
         if (selectedMode !== "clock")
@@ -2482,6 +2539,102 @@ PanelWindow {
                 timew.machineApplyStatus =
                     "MOVE REFUSED OR INTERRUPTED // CHECK INTERRUPTS";
             }
+        }
+    }
+
+    // An explicit, one-shot V2 review uses the merged read-only planner.
+    // Never treat a geometry match or stored UUID as restore authorization.
+    Process {
+        id: machineV2ReviewProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!timew.menuOpen || timew.selectedMode !== "machine"
+                        || !timew.machineStoredViewOpen || !timew.machineSavedItem
+                        || timew.machineV2ReviewKey === ""
+                        || timew.machineV2ReviewKey !== timew.machineSavedItem.id)
+                    return;
+                try {
+                    const data = JSON.parse(this.text);
+                    const counts = data ? data.counts : null;
+                    const items = data ? data.items : null;
+                    const statuses = [
+                        "OBSERVED_GEOMETRY_AGREEMENT_UNTRUSTED",
+                        "TARGET_OUTPUT_MISSING", "TARGET_OUTPUT_GEOMETRY_CHANGED",
+                        "TARGET_WORKSPACE_MISSING", "TARGET_WORKSPACE_MOVED",
+                        "AMBIGUOUS_APP_INSTANCES", "APP_NOT_RUNNING",
+                        "WINDOW_STATE_DIFFERENT", "CURRENT_OUTPUT_DIFFERENT",
+                        "CURRENT_WORKSPACE_DIFFERENT", "CURRENT_RECTANGLE_DIFFERENT"
+                    ];
+                    const saneCount = function(value) {
+                        return typeof value === "number" && value >= 0
+                            && value <= 512 && Math.floor(value) === value;
+                    };
+                    const validCounts = counts
+                        && saneCount(counts.saved_windows)
+                        && saneCount(counts.observed_untrusted)
+                        && saneCount(counts.needs_attention)
+                        && counts.saved_windows === timew.machineSavedItem.counts.windows
+                        && counts.observed_untrusted + counts.needs_attention
+                           === counts.saved_windows;
+                    const validItems = Array.isArray(items) && items.length <= 512
+                        && items.every(function(item) {
+                            return item && typeof item.app_id === "string"
+                                && item.app_id.length > 0 && item.app_id.length <= 128
+                                && typeof item.target_output === "string"
+                                && item.target_output.length > 0
+                                && item.target_output.length <= 128
+                                && typeof item.target_workspace === "string"
+                                && item.target_workspace.length > 0
+                                && item.target_workspace.length <= 128
+                                && typeof item.checkpoint_window_key === "string"
+                                && /^[0-9a-f-]{36}$/.test(item.checkpoint_window_key)
+                                && statuses.indexOf(item.classification) !== -1
+                                && item.identity_verified === false
+                                && item.action_allowed === false;
+                        });
+                    const valid = data
+                        && data.kind === "machine-v2-restore-review-v1"
+                        && data.checkpoint_id === timew.machineV2ReviewKey
+                        && data.read_only === true && data.restore_allowed === false
+                        && data.browser_tabs_restorable === false
+                        && data.exact_geometry_restore_verified === false
+                        && data.live_window_identity_verified === false
+                        && data.checkpoint_keys_are_live_identity === false
+                        && data.requires_fresh_recheck === true
+                        && Array.isArray(data.safe_actions)
+                        && data.safe_actions.length === 0
+                        && validCounts && validItems
+                        && ((data.status === "review_only"
+                             && items.length === counts.saved_windows
+                             && items.filter(function(item) {
+                                 return item.classification
+                                     === "OBSERVED_GEOMETRY_AGREEMENT_UNTRUSTED";
+                             }).length === counts.observed_untrusted)
+                            || (data.status === "legacy_only"
+                                && items.length === 0
+                                && counts.observed_untrusted === 0));
+                    if (!valid)
+                        throw new Error("INVALID V2 REVIEW");
+                    timew.machineV2ReviewResult = data;
+                    timew.machineV2ReviewIndex = 0;
+                    timew.machineV2ReviewStatus = data.status === "legacy_only"
+                        ? "LEGACY CHECKPOINT // NO V2 GEOMETRY"
+                        : "V2 REVIEW // " + counts.observed_untrusted
+                          + " OBSERVED ONLY // " + counts.needs_attention
+                          + " NEED REVIEW";
+                } catch (error) {
+                    timew.machineV2ReviewResult = null;
+                    timew.machineV2ReviewStatus = "V2 REVIEW UNAVAILABLE // NO APPROVAL";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.machineV2ReviewBusy = false;
+            if (exitCode !== 0 && timew.machineV2ReviewKey !== ""
+                    && !timew.machineV2ReviewResult)
+                timew.machineV2ReviewStatus =
+                    "V2 REVIEW UNAVAILABLE // NO APPROVAL";
         }
     }
 
@@ -6150,6 +6303,7 @@ PanelWindow {
                                            && !timew.machineSaveBridgeBusy
                                 onLeftClicked: {
                                     timew.machineNotesDiscard();
+                                    timew.machineInvalidateV2Review();
                                     timew.machineStoredViewOpen = false;
                                 }
                             }
@@ -6159,7 +6313,8 @@ PanelWindow {
                                 label: "REFRESH STORED"
                                 labelPixelSize: 10
                                 accentColor: timew.semanticColor
-                                available: !timew.machineStoreBusy
+                                available: !timew.machineV2ReviewBusy
+                                           && !timew.machineStoreBusy
                                            && !timew.machineSaveBridgeBusy
                                            && !timew.machineNotesDirty
                                 onLeftClicked: timew.machineListCheckpoints()
@@ -6175,6 +6330,7 @@ PanelWindow {
                                 label: "<"
                                 accentColor: timew.semanticColor
                                 available: timew.machineSavedCheckpoints.length > 1
+                                           && !timew.machineV2ReviewBusy
                                            && !timew.machineNotesDirty
                                            && !timew.machineSaveBridgeBusy
                                            && !timew.machineStoreBusy
@@ -6197,6 +6353,7 @@ PanelWindow {
                                 label: ">"
                                 accentColor: timew.semanticColor
                                 available: timew.machineSavedCheckpoints.length > 1
+                                           && !timew.machineV2ReviewBusy
                                            && !timew.machineNotesDirty
                                            && !timew.machineSaveBridgeBusy
                                            && !timew.machineStoreBusy
@@ -6390,6 +6547,7 @@ PanelWindow {
                                 labelPixelSize: 11
                                 accentColor: Colors.cyan
                                 available: !!timew.machineSavedItem
+                                           && !timew.machineV2ReviewBusy
                                            && !timew.machineSaveBridgeBusy
                                            && !timew.machineStoreBusy
                                            && !timew.machineAutoRestoreBusy
@@ -6413,6 +6571,93 @@ PanelWindow {
                         }
                         Row {
                             width: parent.width
+                            height: 34
+                            spacing: 8
+                            ActionButton {
+                                width: parent.width
+                                height: parent.height
+                                label: timew.machineV2ReviewBusy
+                                       ? "REVIEWING V2..." : "REVIEW V2 // READ ONLY"
+                                labelPixelSize: 11
+                                accentColor: Colors.cyan
+                                available: !!timew.machineSavedItem
+                                           && !timew.machineV2ReviewBusy
+                                           && !timew.machineStoreBusy
+                                           && !timew.machineSaveBridgeBusy
+                                           && !timew.machineAutoRestoreBusy
+                                           && !timew.machineApplyBusy
+                                           && !timew.machineNotesDirty
+                                onLeftClicked: timew.machineRequestV2Review()
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineV2ReviewStatus
+                            textFormat: Text.PlainText
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "OBSERVATION IS NOT RESTORE AUTHORIZATION // BRAVE TABS NOT RESTORED"
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+                        Row {
+                            width: parent.width
+                            height: 31
+                            spacing: 6
+                            visible: !!timew.machineV2ReviewResult
+                                     && timew.machineV2ReviewResult.status === "review_only"
+                                     && timew.machineV2ReviewResult.items.length > 0
+                                     && !!timew.machineSavedItem
+                                     && timew.machineV2ReviewKey === timew.machineSavedItem.id
+                            ActionButton {
+                                width: 48
+                                height: parent.height
+                                label: "<"
+                                accentColor: Colors.cyan
+                                available: !timew.machineV2ReviewBusy
+                                onLeftClicked: timew.machineStepV2ReviewItem(-1)
+                            }
+                            GohuText {
+                                width: Math.max(0, parent.width - 108)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: timew.machineV2ReviewResult
+                                      ? "WINDOW " + (timew.machineV2ReviewIndex + 1)
+                                        + " / " + timew.machineV2ReviewResult.items.length
+                                      : ""
+                                color: Colors.cyan
+                                horizontalAlignment: Text.AlignHCenter
+                                font.pixelSize: 11
+                            }
+                            ActionButton {
+                                width: 48
+                                height: parent.height
+                                label: ">"
+                                accentColor: Colors.cyan
+                                available: !timew.machineV2ReviewBusy
+                                onLeftClicked: timew.machineStepV2ReviewItem(1)
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: !!timew.machineV2ReviewItem
+                            text: timew.machineV2ReviewItem
+                                  ? timew.machineV2ReviewItem.app_id + " // "
+                                    + timew.machineV2ReviewItem.classification
+                                    + "\nSAVED " + timew.machineV2ReviewItem.target_output
+                                    + " // " + timew.machineV2ReviewItem.target_workspace
+                                  : ""
+                            textFormat: Text.PlainText
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+                        Row {
+                            width: parent.width
                             height: 42
                             spacing: 8
                             ActionButton {
@@ -6422,6 +6667,7 @@ PanelWindow {
                                 labelPixelSize: 13
                                 accentColor: Colors.orange
                                 available: !!timew.machineSavedItem
+                                           && !timew.machineV2ReviewBusy
                                            && !timew.machineAutoRestoreBusy
                                            && !timew.machineStoreBusy
                                            && !timew.machineApplyBusy

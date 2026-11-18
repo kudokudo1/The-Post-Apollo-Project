@@ -43,6 +43,6 @@ for prohibited in (
     assert prohibited not in resolver, prohibited
 assert 'function applySavedCheckpoint(' not in qml
 assert 'function machineApplyRecovery(' not in qml
-assert qml.count("Process {") == 15  # Explicit v2 SAVE bridge plus existing M1r/restore
+assert qml.count("Process {") == 16  # Includes the explicit deny-only V2 review process
 assert "id: machineSaveBridgeProcess" in qml
 print("TIMEW MACHINE M1J UI CONTRACT: PASS / EPHEMERAL / READ ONLY")

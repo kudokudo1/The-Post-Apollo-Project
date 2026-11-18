@@ -65,7 +65,7 @@ assert 'save_pair' in geometry
 assert 'SCHEMA_VERSION = 1' in legacy
 assert 'function createMarker' in timeline  # old session-only state preserved
 
-assert qml.count('Process {') == 15
+assert qml.count('Process {') == 16
 assert qml.count('onTextEdited:') == 20
 assert 'onTextEdited: timew.machineBraveTabDraft = text' in qml
 roots = re.findall(r'^    (?:readonly )?property\s+\w+\s+(\w+)\s*[:=]',

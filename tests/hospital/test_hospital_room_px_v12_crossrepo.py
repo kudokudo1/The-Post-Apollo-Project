@@ -83,7 +83,8 @@ with tempfile.TemporaryDirectory(prefix="hospital-trashpp-cross-") as tmp:
     result=authorized("TRASH")
     assert result["originalPreserved"] is True
     assert result["burnAllowed"] is False
-    assert result["operatorAuthenticated"] is True
+    assert result["grantSignatureVerified"] is True
+    assert result["operatorAuthenticated"] is False
     assert result["state"]=="TRASHED" and result["revision"]==1
     assert "room-sample" not in [x["id"] for x in run("rooms")]
     rows=run("room-lifecycle-bin")

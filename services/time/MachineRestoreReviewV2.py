@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 import json
+import sqlite3
 from pathlib import Path
 import sys
 import uuid
@@ -173,7 +174,8 @@ def main(argv=None):
         encoded = json.dumps(result, separators=(",", ":"), ensure_ascii=False)
         if len(encoded.encode("utf-8")) > MAX_OUTPUT_BYTES:
             raise ReviewError("REVIEW TOO LARGE")
-    except (ValueError, KeyError, TypeError, OSError, RuntimeError):
+    except (ValueError, KeyError, TypeError, OSError, RuntimeError,
+            sqlite3.Error):
         result = {
             "kind": KIND, "status": "unavailable",
             "read_only": True, "restore_allowed": False,

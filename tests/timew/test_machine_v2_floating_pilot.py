@@ -196,12 +196,17 @@ try:
             dict(request_a, execution_approved=False),
             dict(request_a, approval_kind="production"),
             dict(request_a, live_con_id=0),
-            dict(request_a, live_con_id=111),
-            dict(request_a, checkpoint_window_key=KEY_B),
+            dict(request_a, live_con_id=999),
+            dict(request_a, checkpoint_window_key="99999999-9999-4999-8999-999999999999"),
             dict(request_a, untrusted_url="https://private.example"),
         ):
             rejects(lambda bad=bad: pilot.prepare(bad, read_runner=sway.read))
         assert sway.commands == []
+        # Two legitimate Brave instances cannot be distinguished by
+        # app_id alone. The operator must choose the current con_id; the
+        # fixture cannot prove that the chosen one is historically correct.
+        assert pilot.prepare(dict(request_a, live_con_id=111),
+                             read_runner=sway.read)["persistent_identity_verified"] is False
 
         # Ordinary local/dev invocation does not enable a live dispatcher.
         os.environ.pop("CI", None)

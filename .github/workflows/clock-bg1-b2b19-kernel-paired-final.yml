@@ -1,0 +1,63 @@
+name: Clock BG1-B2B19 kernel-paired native final source (deny-only)
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmKernelPairedFinalWitness.py"
+      - "services/time/BG1-ALARM-KERNEL-PAIRED-FINAL-WITNESS.md"
+      - "tests/time/test_clock_bg1_b2b19_kernel_paired_final.py"
+      - ".github/workflows/clock-bg1-b2b19-kernel-paired-final.yml"
+  push:
+    paths:
+      - "services/time/AlarmKernelPairedFinalWitness.py"
+      - "services/time/BG1-ALARM-KERNEL-PAIRED-FINAL-WITNESS.md"
+      - "tests/time/test_clock_bg1_b2b19_kernel_paired_final.py"
+      - ".github/workflows/clock-bg1-b2b19-kernel-paired-final.yml"
+permissions:
+  contents: read
+jobs:
+  signed-native-peer-qml-standin-one-use-final-fsync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install existing Clock Ed25519 verification dependency
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Compile exact new Clock Python modules
+        run: |
+          python3 -m py_compile services/time/AlarmKernelPairedFinalWitness.py tests/time/test_clock_bg1_b2b19_kernel_paired_final.py
+      - name: Actual signed native plus QML stand-in peer pair and final V2 sync
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b19_kernel_paired_final.py' -v
+      - name: Preserve existing native bridge and final file witnesses
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b17_signed_bridge_channel.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b16_native_final_v2_witness.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b9_installed_role_trust.py' -v
+      - name: Preserve QML live writer and V2 regressions
+        run: |
+          node --test tests/time/test_clock_bg1_b2b15_mounted_save_drain.cjs
+          node --test tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_manager_v2_contract.py' -v
+      - name: Exact four-new-file Clock scope and inactive host
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],text=True
+          ).splitlines())
+          expected={
+              "services/time/AlarmKernelPairedFinalWitness.py",
+              "services/time/BG1-ALARM-KERNEL-PAIRED-FINAL-WITNESS.md",
+              "tests/time/test_clock_bg1_b2b19_kernel_paired_final.py",
+              ".github/workflows/clock-bg1-b2b19-kernel-paired-final.yml"
+          }
+          assert changed==expected, f"Unapproved B2B19 Clock scope: {sorted(changed ^ expected)}"
+          print("PASS: only four new Clock files; no QML, keys, installed services, actual alarm data or BG2")
+          PY

@@ -97,7 +97,7 @@ assert 'write_text' not in generator and 'open(' not in generator
 assert "MachineBraveNativeProbe" not in qml
 assert "MachineBraveNativeProbe" not in legacy
 assert "SCHEMA_VERSION = 1" in legacy
-assert qml.count("Process {") == 15
+assert qml.count("Process {") == 16  # isolated V2 review; no Brave permission bridge
 properties = re.findall(
     r"^    (?:readonly )?property\s+\w+\s+(\w+)\s*[:=]",
     qml, flags=re.MULTILINE)

@@ -1134,13 +1134,20 @@ PanelWindow {
         if (matching.length !== 1)
             return false;
         const item = matching[0];
-        return restoreItem(item) === true;
+        return restoreItem(item, expectedRevision, resourceId) === true;
     }
 
-    function restoreItem(item) {
-        if (busy || !item) return false;
+    function restoreItem(item, expectedRevision, expectedReviewId) {
+        if (busy || !item || !/^[0-9a-f]{64}$/.test(expectedRevision)
+                || !/^[0-9a-f]{64}$/.test(expectedReviewId)
+                || String(item.reviewId) !== expectedReviewId)
+            return false;
         clearConfirmation();
-        return run("restore", ["restore", String(item.uri), String(item.original)]);
+        // U10 // Pass the UI's exact reviewed inventory+row witness into the
+        // backend for fresh double-index revalidation before GIO Restore.
+        return run("restore", ["restore-reviewed",
+                               String(item.uri), String(item.original),
+                               expectedRevision, expectedReviewId]);
     }
 
     function armBurn(item) {

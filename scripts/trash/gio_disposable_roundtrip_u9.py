@@ -150,15 +150,21 @@ def run_roundtrip(root: Path, inherited: dict[str, str]) -> dict:
         raise RoundTripError("GIO_TRASH_FAILED")
     if original.exists() or original.is_symlink():
         raise RoundTripError("GIO_DID_NOT_MOVE_SOURCE")
-    item = reviewed_item(index("AFTER_TRASH"), original)
+    reviewed_index = index("AFTER_TRASH")
+    item = reviewed_item(reviewed_index, original)
     uri = item["uri"]
+    revision = reviewed_index.get("revision")
+    review_id = item["reviewId"]
+    if (not isinstance(revision, str)
+            or re.fullmatch(r"[0-9a-f]{64}", revision) is None):
+        raise RoundTripError("REVIEWED_INVENTORY_REVISION_INVALID")
 
     # Existing-destination refusal must leave both entries unchanged.
     collision = b"U9_DISPOSABLE_COLLISION_SENTINEL"
     original.write_bytes(collision)
     refusal = json_response(command(
-        [sys.executable, "-I", "-B", str(backend), "restore",
-         uri, str(original)], env
+        [sys.executable, "-I", "-B", str(backend), "restore-reviewed",
+         uri, str(original), revision, review_id], env
     ), False, "COLLISION")
     if refusal.get("error") != "RESTORE_TARGET_EXISTS":
         raise RoundTripError("EXISTING_TARGET_NOT_REFUSED")
@@ -168,10 +174,12 @@ def run_roundtrip(root: Path, inherited: dict[str, str]) -> dict:
     original.unlink()  # Only the sentinel created inside private runner sandbox.
 
     receipt = json_response(command(
-        [sys.executable, "-I", "-B", str(backend), "restore",
-         uri, str(original)], env
+        [sys.executable, "-I", "-B", str(backend), "restore-reviewed",
+         uri, str(original), revision, review_id], env
     ), True, "RESTORE")
-    if receipt.get("kind") != "restore" or receipt.get("message") != "RESTORED":
+    if (receipt.get("kind") != "restore"
+            or receipt.get("message") != "RESTORED"
+            or receipt.get("verified") is not True):
         raise RoundTripError("RESTORE_RECEIPT_UNEXPECTED")
     if not original.is_file() or hashlib.sha256(original.read_bytes()).hexdigest() != digest:
         raise RoundTripError("RESTORED_BYTES_CHANGED")
@@ -179,8 +187,8 @@ def run_roundtrip(root: Path, inherited: dict[str, str]) -> dict:
 
     # A prior row must not be restored twice.
     stale = json_response(command(
-        [sys.executable, "-I", "-B", str(backend), "restore",
-         uri, str(original)], env
+        [sys.executable, "-I", "-B", str(backend), "restore-reviewed",
+         uri, str(original), revision, review_id], env
     ), False, "REPLAY")
     if stale.get("error") != "STALE_OR_UNKNOWN_TRASH_ITEM":
         raise RoundTripError("STALE_RESTORE_NOT_DENIED")
@@ -194,6 +202,7 @@ def run_roundtrip(root: Path, inherited: dict[str, str]) -> dict:
         "gioReal": True,
         "trashIngress": "gio trash (one disposable file)",
         "restoreAdapter": "scripts/trash/trash_cli.py",
+        "reviewedRestoreRevisionChecked": True,
         "initialInventoryEmpty": True,
         "exactOneItemIndexed": True,
         "collisionDenied": True,

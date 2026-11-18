@@ -154,7 +154,7 @@ class ClockKernelPairedFinalWitness:
                     (pin.pid, pin.ticks)):
                 raise Refused("KERNEL_PEER_DOES_NOT_MATCH_PIN")
             return witness
-        except (Peer.Refused, OSError, ValueError) as exc:
+        except (Peer.Refused, OSError) as exc:
             raise Refused("KERNEL_PEER_NOT_OBSERVED") from exc
         except BaseException:
             if witness is not None:

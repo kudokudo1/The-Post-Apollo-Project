@@ -23,6 +23,7 @@ from MachineGeometryV2 import project_geometry
 from MachineGeometryStoreV2 import save_pair, load_geometry
 import MachineCheckpointStore as legacy
 import MachineV2FloatingPilot as pilot
+from MachineV2GeometryJournal import GeometryJournal, GeometryJournalError, DB_NAME
 
 KEY_A = "11111111-1111-4111-8111-111111111111"
 KEY_B = "22222222-2222-4222-8222-222222222222"
@@ -156,7 +157,7 @@ class FixtureJournal:
 def rejects(fn):
     try:
         fn()
-    except (pilot.RehearsalRefused, ValueError, KeyError, TypeError):
+    except (pilot.RehearsalRefused, GeometryJournalError, ValueError, KeyError, TypeError):
         return
     raise AssertionError("unsafe V2 floating fixture was accepted")
 
@@ -322,6 +323,54 @@ try:
             request_a, read_runner=denied.read,
             command_runner=denied.command, journal=RejectJournal()))
         assert denied.commands == []
+
+        # The exact same disposable command path now works with a REAL
+        # owner-private SQLite ledger, not only the injected mock journal.
+        persistent_db = Path(home) / "post-apollo" / "machine" / DB_NAME
+        persistent = GeometryJournal(persistent_db)
+        assert persistent.pending() == []
+        safe = FakeSway()
+        durable_success = pilot.execute_disposable(
+            request_a, read_runner=safe.read, command_runner=safe.command,
+            journal=persistent)
+        assert durable_success["status"] == "verified_fixture_placement"
+        assert persistent_db.exists()
+        assert persistent.pending() == []
+        import sqlite3
+        with sqlite3.connect(persistent_db) as connection:
+            saved_operations = connection.execute(
+                "SELECT id, phase FROM operations").fetchall()
+        assert len(saved_operations) == 1
+        assert saved_operations[0][1] == "verified_fixture_placement"
+        assert GeometryJournal(persistent_db).get(
+            saved_operations[0][0])["automatic_retry_allowed"] is False
+        # Even with fresh manual flags and a now-drifted window, replay of
+        # this same checkpoint/window is rejected before command dispatch.
+        repeated = FakeSway()
+        rejects(lambda: pilot.execute_disposable(
+            request_a, read_runner=repeated.read,
+            command_runner=repeated.command, journal=GeometryJournal(persistent_db)))
+        assert repeated.commands == []
+
+        # If the second command fails, the persistent state survives
+        # process teardown as an UNCERTAIN manual-review hold.
+        interrupted_db = Path(home) / "interrupted" / "post-apollo" / "machine" / DB_NAME
+        interrupted_ledger = GeometryJournal(interrupted_db)
+        broken_durable = FakeSway()
+        broken_durable.fail_command = 2
+        res = pilot.execute_disposable(
+            request_b, read_runner=broken_durable.read,
+            command_runner=broken_durable.command,
+            journal=interrupted_ledger)
+        assert res["status"] == "uncertain_requires_review"
+        assert len(GeometryJournal(interrupted_db).pending()) == 1
+        assert GeometryJournal(interrupted_db).pending()[0]["phase"] == "uncertain_requires_review"
+        blocked = FakeSway()
+        rejects(lambda: pilot.execute_disposable(
+            request_a, read_runner=blocked.read,
+            command_runner=blocked.command,
+            journal=GeometryJournal(interrupted_db)))
+        assert blocked.commands == []
 
         # Output is never browser data, a recovery grant or a real identity.
         visible = json.dumps(placed_a) + json.dumps(placed_b)

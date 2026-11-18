@@ -5,9 +5,12 @@ No Sway process, user's desktop, browser or protected archive is accessed.
 """
 from __future__ import annotations
 
+import contextlib
 import copy
+import io
 import json
 import os
+import sqlite3
 from pathlib import Path
 import sys
 import tempfile
@@ -18,6 +21,7 @@ import MachineCheckpointStore as legacy
 from MachineCaptureSaveV2 import _legacy_from_geometry
 from MachineGeometryV2 import project_geometry
 from MachineGeometryStoreV2 import save_pair, load_geometry
+import MachineRestoreReviewV2 as review_module
 from MachineRestoreReviewV2 import plan, inspect, main, ReviewError, OBSERVED
 
 
@@ -231,6 +235,22 @@ try:
 
         # Invalid invocation is denied without consulting any local runtime.
         assert main(["not-review", checkpoint_id]) == 1
+        # The CLI must redact SQLite errors and never leak private paths.
+        previous_inspect = review_module.inspect
+        try:
+            def damaged_db(_):
+                raise sqlite3.OperationalError("/home/operator/private/machine.db")
+            review_module.inspect = damaged_db
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                assert main(["review", checkpoint_id]) == 1
+            refused = json.loads(output.getvalue())
+            assert refused["status"] == "unavailable"
+            assert refused["restore_allowed"] is False
+            assert refused["safe_actions"] == []
+            assert "operator/private" not in output.getvalue()
+        finally:
+            review_module.inspect = previous_inspect
 finally:
     if old_home is None:
         os.environ.pop("XDG_DATA_HOME", None)

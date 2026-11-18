@@ -238,7 +238,7 @@ class ControllerFreshChallengeTests(unittest.TestCase):
         console=b"console fragment\r\n"+self.serial.replace(b"\n", b"\r\n")
         report=self.check(serial=console)
         self.assertIs(report["freshControllerNonceInActualSignedBeginDenialInCI"], True)
-        self.refused(serial=b"\r"+console)
+        self.refused(serial=b"console fragment\r\n\r"+self.serial.replace(b"\n", b"\r\n"))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

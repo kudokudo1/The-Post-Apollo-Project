@@ -6,6 +6,7 @@ import qs.services.sounds
 import "AlarmManagerPolicy.js" as Policy
 import "AlarmWriterQuiescencePolicy.js" as WriterQuiescence
 import "AlarmWriterBarrierPolicy.js" as WriterBarrier
+import "AlarmWriterDrainPolicy.js" as WriterDrain
 
 // V2 is the only mounted Alarm owner; V1 remains read-only migration input.
 // TimeW is just a view. No QtMultimedia dependency in the scheduler itself.
@@ -22,18 +23,73 @@ Scope {
     property var document: Policy.initialDocument()
     property var pendingDocument: null
     property var queuedDocument: null
-    // BG1-B2B6: read-only ACTIVE latch. No UI, IPC, or native process can
-    // currently switch this to QUIESCING/RELEASED. A trusted installed
-    // writer authority and durable save receipt must exist first.
+    // BG1-B2B15: B2B6's installed-authority barrier remains immutable ACTIVE.
+    // The PRIVATE local save-drain phase is separate and starts ACTIVE too.
+    // There is no QML/public bridge for starting the private drain; the
+    // future native Clock authority must first install a trusted channel.
     readonly property string alarmWriterBarrierPhase: "ACTIVE"
+    readonly property bool nativeWriterDrainBridgeInstalled: false
+    readonly property string localWriterDrainPhase: writerDrain.phase
+    readonly property var localWriterDrainStatus:
+        WriterDrain.status(writerDrain.phase, writerDrain.draining,
+                           writerPauseSnapshot(), writerDrain.acceptedGeneration,
+                           writerDrain.observedSaveGeneration)
+    QtObject {
+        id: writerDrain
+        property string phase: WriterDrain.ACTIVE
+        property bool draining: false
+        property bool acceptingNewEdits: true
+        property bool acceptedFlushOnly: false
+        property int acceptedGeneration: 0
+        property int pendingGeneration: 0
+        property int queuedGeneration: 0
+        property int observedSaveGeneration: 0
+
+        // PRIVATE local method, not reachable through manager's public API.
+        // The native installed Clock channel is absent and immutable false.
+        function beginInternalSaveDrain() {
+            if (!manager.nativeWriterDrainBridgeInstalled
+                    || phase !== WriterDrain.ACTIVE || draining
+                    || !WriterDrain.canStart(manager.writerPauseSnapshot()))
+                return false;
+            acceptingNewEdits = false;
+            draining = true;
+            maybeComplete();
+            return true;
+        }
+        function maybeComplete() {
+            if (!draining || phase !== WriterDrain.ACTIVE)
+                return false;
+            if (!WriterDrain.canFinish(manager.writerPauseSnapshot(),
+                                      acceptedGeneration,
+                                      observedSaveGeneration))
+                return false;
+            draining = false;
+            phase = WriterDrain.QUIESCING;
+            manager.syncSound();
+            return true;
+        }
+        function markFailed() {
+            if (!draining) return;
+            acceptedFlushOnly = false;
+            acceptingNewEdits = false;
+            draining = false;
+            phase = WriterDrain.FAILED;
+            manager.syncSound();
+        }
+    }
     readonly property bool alarmWriterMaySave:
         WriterBarrier.allowDiskMutation(alarmWriterBarrierPhase)
+        && writerDrain.phase === WriterDrain.ACTIVE
     readonly property bool alarmWriterMayTick:
         WriterBarrier.allowSchedulerTick(alarmWriterBarrierPhase)
+        && !writerDrain.draining && writerDrain.phase === WriterDrain.ACTIVE
     readonly property bool alarmWriterMayAnnounce:
         WriterBarrier.allowRingAnnouncement(alarmWriterBarrierPhase)
+        && !writerDrain.draining && writerDrain.phase === WriterDrain.ACTIVE
     readonly property bool alarmWriterMayAudioStart:
         WriterBarrier.allowAudioStart(alarmWriterBarrierPhase)
+        && !writerDrain.draining && writerDrain.phase === WriterDrain.ACTIVE
     function writerPauseSnapshot() {
         return {
             storageState: storageState,
@@ -98,7 +154,9 @@ Scope {
     }
 
     readonly property bool canEdit:
-        alarmWriterMaySave && (storageState === "ready"
+        alarmWriterMaySave && !writerDrain.draining
+        && writerDrain.acceptingNewEdits
+        && (storageState === "ready"
         || storageState === "empty" || storageState === "saving")
     readonly property int count: document.alarms.length
     readonly property int ringingCount: document.alarms.filter(function(a) {
@@ -120,18 +178,31 @@ Scope {
             feedback = "ALARM WRITER BARRIER // SAVE REFUSED";
             return false;
         }
+        // During a *future trusted* local drain, only an already accepted
+        // queued document can continue from FileView.onSaved. Direct widget
+        // calls to beginWrite cannot bypass the frozen intake.
+        if (writerDrain.draining && !writerDrain.acceptedFlushOnly) {
+            feedback = "ALARM WRITER DRAIN // NEW WRITE REFUSED";
+            return false;
+        }
         storageState = "saving";
         pendingDocument = next;
+        writerDrain.pendingGeneration = writerDrain.acceptedFlushOnly
+            ? writerDrain.queuedGeneration : writerDrain.acceptedGeneration;
         alarmFile.setText(JSON.stringify(next, null, 2) + "\n");
         return true;
     }
     function saveDocument(next) {
         if (!alarmWriterMaySave || !canEdit || !Policy.validDocument(next))
             return false;
+        // The last accepted document wins if multiple edits coalesce while
+        // one asynchronous FileView write is in flight. Track its revision.
+        writerDrain.acceptedGeneration++;
         document = next;
-        if (pendingDocument !== null)
+        if (pendingDocument !== null) {
             queuedDocument = next;
-        else
+            writerDrain.queuedGeneration = writerDrain.acceptedGeneration;
+        } else
             beginWrite(next);
         syncSound();
         return true;
@@ -559,8 +630,11 @@ Scope {
                 return;
             const saved = manager.pendingDocument;
             const queued = manager.queuedDocument;
+            const acknowledgedGeneration = writerDrain.pendingGeneration;
             manager.pendingDocument = null;
             manager.queuedDocument = null;
+            writerDrain.pendingGeneration = 0;
+            writerDrain.observedSaveGeneration = acknowledgedGeneration;
             if (queued !== null
                     && JSON.stringify(saved) !== JSON.stringify(queued)
                     && !manager.alarmWriterMaySave) {
@@ -574,19 +648,39 @@ Scope {
                 return;
             }
             if (queued !== null
-                    && JSON.stringify(saved) !== JSON.stringify(queued))
-                manager.beginWrite(queued);
-            else {
+                    && JSON.stringify(saved) !== JSON.stringify(queued)) {
+                // Only the saved-callback's previously accepted queue may
+                // flush after the future trusted local drain freezes edits.
+                writerDrain.acceptedFlushOnly = writerDrain.draining;
+                try {
+                    if (!manager.beginWrite(queued)) {
+                        writerDrain.markFailed();
+                        manager.storageState = "error";
+                        manager.storageError = "WRITER_DRAIN_QUEUE_REFUSED";
+                        manager.feedback = "QUEUED SAVE FAILED // NOT DURABLE";
+                        return;
+                    }
+                } finally {
+                    writerDrain.acceptedFlushOnly = false;
+                }
+            } else {
+                // Coalesced identical content needs no redundant write.
+                if (queued !== null)
+                    writerDrain.observedSaveGeneration =
+                        writerDrain.queuedGeneration;
+                writerDrain.queuedGeneration = 0;
                 manager.storageState = "ready";
                 if (manager.migrationRequested) {
                     manager.migrationRequested = false;
                     manager.feedback = "V1 ALARM MIGRATED // V1 FILE PRESERVED";
                     Qt.callLater(manager.announceRestoredRinging);
                 }
+                writerDrain.maybeComplete();
                 Qt.callLater(manager.checkDue);
             }
         }
         onSaveFailed: function(error) {
+            writerDrain.markFailed();
             manager.pendingDocument = null;
             manager.queuedDocument = null;
             manager.storageState = "error";

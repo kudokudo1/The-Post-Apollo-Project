@@ -134,7 +134,10 @@ test("live AlarmManager retains passive B2B4 probe alongside guarded B2B6 write 
     }
     assert.match(qml,/function saveDocument\(next\) \{\s*if \(!alarmWriterMaySave \|\| !canEdit \|\| !Policy\.validDocument\(next\)\)/);
     assert.match(qml,/function beginWrite\(next\) \{[\s\S]*?if \(!alarmWriterMaySave \|\| !Policy\.validDocument\(next\)\)[\s\S]*?storageState = "saving";/);
-    assert.match(qml,/if \(queued !== null\s*&& JSON\.stringify\(saved\) !== JSON\.stringify\(queued\)\)\s*manager\.beginWrite\(queued\);/);
+    assert.match(qml,/if \(queued !== null\s*&& JSON\.stringify\(saved\) !== JSON\.stringify\(queued\)\) \{/);
+    assert.match(qml,/writerDrain\.acceptedFlushOnly = writerDrain\.draining/);
+    assert.match(qml,/if \(!manager\.beginWrite\(queued\)\)/);
+    assert.match(qml,/finally \{\s*writerDrain\.acceptedFlushOnly = false/);
     assert.match(qml,/function checkDue\(\) \{\s*if \(!alarmWriterMayTick \|\| !canEdit\) return;/);
     assert.match(qml,/if \(!canEdit\) \{\s*document = r\.document;\s*syncSound\(\);/);
     assert.match(qml,/atomicWrites: true/);

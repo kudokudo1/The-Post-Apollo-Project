@@ -1,0 +1,69 @@
+name: Clock BG1-B2B15 mounted accepted-save drain (trust hold)
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmManagerService.qml"
+      - "services/time/AlarmWriterDrainPolicy.js"
+      - "services/time/BG1-ALARM-MOUNTED-SAVE-DRAIN.md"
+      - "tests/time/test_clock_bg1_b2b15_mounted_save_drain.cjs"
+      - "tests/time/test_clock_bg1_b2b4_writer_quiescence.cjs"
+      - "tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs"
+      - ".github/workflows/clock-bg1-b2b15-mounted-save-drain.yml"
+  push:
+    paths:
+      - "services/time/AlarmManagerService.qml"
+      - "services/time/AlarmWriterDrainPolicy.js"
+      - "services/time/BG1-ALARM-MOUNTED-SAVE-DRAIN.md"
+      - "tests/time/test_clock_bg1_b2b15_mounted_save_drain.cjs"
+      - "tests/time/test_clock_bg1_b2b4_writer_quiescence.cjs"
+      - "tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs"
+      - ".github/workflows/clock-bg1-b2b15-mounted-save-drain.yml"
+permissions:
+  contents: read
+jobs:
+  real-mounted-save-callbacks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Exercise actual mounted FileView callbacks and private drain policy
+        run: node --test tests/time/test_clock_bg1_b2b15_mounted_save_drain.cjs
+      - name: Preserve both previously mounted Clock writer barrier layers
+        run: |
+          node --test tests/time/test_clock_bg1_b2b4_writer_quiescence.cjs
+          node --test tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs
+      - name: Preserve V2 alarming, notes and recovery contracts
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_manager_v2_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_note_recovery_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_reliability_popup_actions_contract.py' -v
+      - name: Preserve old-writer synthetic ownership and kernel peer
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_owner_fencing_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_broker_protocol.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2_shadow_transactions.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+      - name: Exact Clock-only 9-file review boundary
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          files=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],text=True
+          ).splitlines())
+          expected={
+              "services/time/AlarmManagerService.qml",
+              "services/time/AlarmWriterDrainPolicy.js",
+              "services/time/BG1-ALARM-MOUNTED-SAVE-DRAIN.md",
+              "tests/time/test_clock_bg1_b2b15_mounted_save_drain.cjs",
+              "tests/time/test_clock_bg1_b2b4_writer_quiescence.cjs",
+              "tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs",
+              ".github/workflows/clock-bg1-b2b15-mounted-save-drain.yml",
+              ".github/workflows/clock-bg1-b2b4-writer-quiescence.yml",
+              ".github/workflows/clock-bg1-b2b6-mounted-barrier.yml"}
+          assert files==expected, f"Unauthorized Clock source changes: {sorted(files^expected)}"
+          print("No native authority, systemd, V2 alarm data, Identity, Connections or BG2 changes: PASS")
+          PY

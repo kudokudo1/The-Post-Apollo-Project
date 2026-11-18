@@ -9,6 +9,7 @@ Nothing is saved in the user's SQLite database or restored to their desktop.
 from __future__ import annotations
 
 import json
+import sqlite3
 import os
 from pathlib import Path
 import re
@@ -31,6 +32,7 @@ from MachineCaptureSaveV2 import capture_and_save
 from MachineSaveBridgeV2 import inspect as inspect_for_save, save_request
 from MachineGeometryStoreV2 import load_geometry
 from MachineV2FloatingPilot import (prepare as preview_float, execute_disposable, APPROVAL_KIND)
+from MachineV2GeometryJournal import GeometryJournal, DB_NAME
 import MachineCheckpointStore as legacy
 
 APP = "machine-geometry-test"
@@ -484,21 +486,12 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             assert proposed["production_restore_allowed"] is False
             assert proposed["persistent_identity_verified"] is False
 
-            class NativeFixtureJournal:
-                def __init__(self):
-                    self.phases = []
-                def begin(self, summary):
-                    self.phases.append("begin")
-                    assert summary["live_con_id"] == float_id
-                    return "native-ci-only"
-                def dispatching(self, op):
-                    assert op == "native-ci-only"
-                    self.phases.append("dispatching")
-                def finish(self, op, status):
-                    assert op == "native-ci-only"
-                    self.phases.append(status)
-
-            journal_native = NativeFixtureJournal()
+            # Not a fake receipt: exercise durable SQLite BEFORE real
+            # private-Sway commands. The path is inside this CI temp root.
+            journal_path = root / "data/post-apollo/machine" / DB_NAME
+            assert journal_path.parent.is_relative_to(root)
+            journal_native = GeometryJournal(journal_path)
+            assert journal_native.pending() == []
             placed = execute_disposable(
                 floating_request, read_runner=bound,
                 command_runner=bound, journal=journal_native)
@@ -506,8 +499,20 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             assert placed["dispatched_commands"] == 2
             assert placed["persistent_identity_verified"] is False
             assert placed["production_restore_allowed"] is False
-            assert journal_native.phases == [
-                "begin", "dispatching", "verified_fixture_placement"]
+            assert journal_native.pending() == []
+            with sqlite3.connect(journal_path) as conn:
+                observed = conn.execute("""SELECT id,phase FROM operations
+                    ORDER BY created_utc""").fetchall()
+                transitions = conn.execute("""SELECT phase FROM transitions
+                    ORDER BY seq""").fetchall()
+            assert len(observed) == 1
+            assert observed[0][1] == "verified_fixture_placement"
+            assert [row[0] for row in transitions] == [
+                "prepared", "dispatching", "verified_fixture_placement"]
+            assert GeometryJournal(journal_path).get(observed[0][0])[
+                "production_restore_allowed"] is False
+            assert GeometryJournal(journal_path).get(observed[0][0])[
+                "automatic_retry_allowed"] is False
             def restored_exact():
                 matches = [row for row in tree_windows(get("get_tree"))
                            if row["app_id"] == FLOAT and row["id"] == float_id]

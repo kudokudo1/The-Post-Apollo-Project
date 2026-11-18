@@ -39,7 +39,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: kudokudo1/The-Post-Apollo-Dev-Exp
-          ref: f7700de432c6e1bc9c116742348b76afda1a40db
+          ref: b509d3dfefe616e4d2363d86520d50e781674bb8
           path: px-source
           persist-credentials: false
       - name: Install exact signed-grant verifier dependency

@@ -117,6 +117,65 @@ Item {
     signal closeRequested()
     signal refreshRequested()
     signal attachmentRegistered(string roomId, string sessionId)
+    property string lifecycleArmAction: ""
+    property string lifecycleArmDigest: ""
+    property int lifecycleArmRevision: -1
+    property string lifecycleArmRoomId: ""
+    property string lifecycleOutcome: ""
+
+    readonly property bool lifecycleArmed:
+        lifecycleArmAction !== ""
+        && lifecycleArmRoomId === root.pinnedRoomId
+        && roomLifecycle.reviewReady
+        && lifecycleArmDigest === String(roomLifecycle.review.digest || "")
+        && lifecycleArmRevision === roomLifecycle.review.revision
+
+    function clearLifecycleArm() {
+        lifecycleArmAction = "";
+        lifecycleArmDigest = "";
+        lifecycleArmRevision = -1;
+        lifecycleArmRoomId = "";
+    }
+
+    function armLifecycleAction(action) {
+        clearLifecycleArm();
+        const state = roomLifecycle.review || {};
+        const wanted = action === "TRASH" ? "ACTIVE" : "TRASHED";
+        if (!root.active || root.viewMode !== "lifecycle"
+                || !roomLifecycle.permissionReady || !roomLifecycle.reviewReady
+                || state.roomId !== root.pinnedRoomId
+                || state.state !== wanted
+                || (action === "TRASH" && state.canTrash !== true)
+                || (action === "RESTORE" && state.canRestore !== true)) {
+            lifecycleOutcome = "HOLD // TRUSTED ROOM AUTHORITY NOT VERIFIED";
+            return false;
+        }
+        lifecycleArmAction = action;
+        lifecycleArmDigest = String(state.digest);
+        lifecycleArmRevision = state.revision;
+        lifecycleArmRoomId = root.pinnedRoomId;
+        lifecycleOutcome = "ARMED // CONFIRM " + action + " FOR EXACT ROOM";
+        return true;
+    }
+
+    function confirmLifecycleAction() {
+        if (!lifecycleArmed || !roomLifecycle.permissionReady) {
+            clearLifecycleArm();
+            lifecycleOutcome = "REFUSED // ROOM OR REVISION CHANGED";
+            return false;
+        }
+        const action = lifecycleArmAction;
+        const witness = { digest: lifecycleArmDigest,
+                          revision: lifecycleArmRevision };
+        clearLifecycleArm();
+        return roomLifecycle.execute(action, witness);
+    }
+
+    onViewModeChanged: {
+        clearLifecycleArm();
+        if (viewMode === "lifecycle" && active)
+            Qt.callLater(function() { roomLifecycle.refresh(); });
+    }
 
     function reload() {
         if (!active)
@@ -289,6 +348,7 @@ Item {
     }
     onPinnedRoomIdChanged: {
         attachmentArmKey = "";
+        clearLifecycleArm();
         runtimeStatusVerified = false;
         if (active)
             transcript.refresh();
@@ -297,6 +357,23 @@ Item {
         runtimeStatusVerified = false;
         if (active && sessionMatches)
             runtime.refresh();
+    }
+
+    HospitalRoomLifecycleService {
+        id: roomLifecycle
+        active: root.active && root.viewMode === "lifecycle"
+        roomId: root.pinnedRoomId
+        onCommitted: function(receipt) {
+            root.clearLifecycleArm();
+            root.lifecycleOutcome = "SAVED // " + String(receipt.state || "");
+            root.refreshRequested();
+            roomLifecycle.refresh();
+        }
+        onRefused: function(reason) {
+            root.clearLifecycleArm();
+            root.lifecycleOutcome = String(reason);
+            root.refreshRequested();
+        }
     }
 
     HospitalWorkerAttachmentActionService {
@@ -625,31 +702,84 @@ Item {
                     font.pixelSize: 9
                     wrapMode: Text.Wrap
                 }
-                // Reuses the existing Trash++ U1 review deck, with every
-                // source-owned operation held until a real PX owner adapter
-                // authenticates revision, retention, dependencies and Restore.
-                // Flags here are deliberately NOT permission or authority.
+                // PX v12 exposes exact Room state/revision, but its current
+                // CLI reports operatorAuthenticated:false. Until a separately
+                // trusted broker exists, this source-owned deck stays locked.
+                // BURN remains permanently unavailable in this batch.
                 TrashLifecycleActionDeck {
                     ownerId: "hospital"
                     resourceId: root.pinnedRoomId
-                    resourceRevision: ""
-                    showTrash: true
-                    showRestore: true
+                    resourceRevision: String(roomLifecycle.review.digest || "")
+                    showTrash: roomLifecycle.review.state !== "TRASHED"
+                    showRestore: roomLifecycle.review.state === "TRASHED"
                     showBurn: true
-                    trashCapable: false
-                    restoreCapable: false
+                    trashCapable: roomLifecycle.permissionReady
+                        && roomLifecycle.review.canTrash === true
+                    restoreCapable: roomLifecycle.permissionReady
+                        && roomLifecycle.review.canRestore === true
                     burnCapable: false
-                    ownerApproved: false
-                    policyReviewed: false
-                    protectedResource: true
-                    retentionHold: true
+                    ownerApproved: roomLifecycle.permissionReady
+                    policyReviewed: roomLifecycle.permissionReady
+                    protectedResource: !roomLifecycle.permissionReady
+                    retentionHold: !roomLifecycle.permissionReady
+                    requestInFlight: roomLifecycle.loading || roomLifecycle.operating
                     actionWidth: Math.max(70, (lifecycleRows.width - 12) / 3)
                     actionHeight: 30
+                    onTrashReviewRequested: function(ownerId, resourceId, expectedRevision) {
+                        if (ownerId === "hospital"
+                                && resourceId === root.pinnedRoomId
+                                && expectedRevision === roomLifecycle.review.digest)
+                            root.armLifecycleAction("TRASH");
+                    }
+                    onRestoreReviewRequested: function(ownerId, resourceId, expectedRevision) {
+                        if (ownerId === "hospital"
+                                && resourceId === root.pinnedRoomId
+                                && expectedRevision === roomLifecycle.review.digest)
+                            root.armLifecycleAction("RESTORE");
+                    }
+                }
+                HospitalActionButton {
+                    width: parent.width
+                    height: 27
+                    label: roomLifecycle.loading ? "READING PX ROOM"
+                           : "REFRESH ROOM LIFECYCLE"
+                    compactIcon: "↻"
+                    accent: Colors.cyan
+                    enabledAction: !roomLifecycle.loading && !roomLifecycle.operating
+                    onTriggered: {
+                        root.clearLifecycleArm();
+                        roomLifecycle.refresh();
+                    }
+                }
+                HospitalActionButton {
+                    width: parent.width
+                    height: 29
+                    visible: root.lifecycleArmed
+                    label: "CONFIRM EXACT ROOM // " + root.lifecycleArmAction
+                    compactIcon: "ROOM"
+                    accent: Colors.red
+                    enabledAction: root.lifecycleArmed
+                        && roomLifecycle.permissionReady
+                        && !roomLifecycle.operating
+                    onTriggered: root.confirmLifecycleAction()
                 }
                 GohuText {
                     width: parent.width
-                    text: "TRASH, RESTORE AND BURN ARE LOCKED // No owner-authorized Room lifecycle backend exists yet. These buttons do not enqueue or change records."
-                    color: Colors.orange
+                    text: roomLifecycle.lastError || root.lifecycleOutcome
+                        || (roomLifecycle.reviewReady
+                            ? "PX " + String(roomLifecycle.review.state)
+                              + " // REV " + roomLifecycle.review.revision
+                            : "PX ROOM LIFECYCLE // NOT VERIFIED")
+                    color: roomLifecycle.lastError ? Colors.red : Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.Wrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "HOSPITAL TRASH/RESTORE // SOURCE API PRESENT IN PX V12."
+                        + " OPERATOR AUTHORITY IS NOT SIGNED // ACTIONS HELD."
+                        + " BURN IS NOT SUPPORTED."
+                    color: Colors.blue
                     font.pixelSize: 9
                     wrapMode: Text.Wrap
                 }

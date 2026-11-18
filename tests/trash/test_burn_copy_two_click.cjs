@@ -19,7 +19,7 @@ function method(name) {
 const methods=[
     "armResearchBurn","advanceResearchBurn","confirmResearchBurn",
     "clearResearchBurn","clearConfirmation","showBurnReceipt",
-    "failBurnReceipt","dismissBurnReceipt","armBurn","confirmBurn"
+    "failBurnReceipt","dismissBurnReceipt","armBurn","armBurnAll","confirmBurn"
 ].map(method).join("\n");
 
 const copy={id:"0123456789abcdef0123456789abcdef",kind:"SAVED EVENT",

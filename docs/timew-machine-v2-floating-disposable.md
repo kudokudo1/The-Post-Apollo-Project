@@ -25,13 +25,13 @@ There is **no TimeW button, CLI or production service** for this rehearsal. Do n
 python3 -B -I tests/timew/test_machine_v2_floating_pilot.py
 ```
 
-The test demonstrates two selected Brave-like floating windows on two virtual displays independently returning to their saved rectangles, including a second attempt that reports ALREADY without dispatch. The two window positions and commands are simulated in memory; a stock/native Sway execution is **not yet verified**.
+The test demonstrates two selected Brave-like floating windows on two virtual displays independently returning to their saved rectangles, including a second attempt that reports ALREADY without dispatch. The two-window test exercises simulated geometry. A separate real private headless Sway regression was added to the existing M2 runner; its exact-head result remains to be verified.
 
 ## VERIFY
 
 New tests cover real V1/V2 SQLite save/read from temporary `XDG_DATA_HOME`, two duplicate-app windows on separate outputs, correct per-container targeting, no-op, missing/fake IDs, changed monitor topology, torn two-read capture, fake successful IPC without postflight, second-command failure, missing journal and journal write failure. No source title, PID, browser URL, passphrase or native window ID is included in the public receipt.
 
-The dedicated workflow also runs the existing V2 read-only planner, atomic geometry checkpoint, one-click V1 RESTORE and original single-window journaled-move regression. These are synthetic integration tests, not native desktop visual acceptance.
+The dedicated workflow also runs the existing V2 read-only planner, atomic geometry checkpoint, one-click V1 RESTORE and original single-window journaled-move regression. A second native CI path extends `test_machine_geometry_headless_sway.py`: it captures a real disposable floating window, moves that window away inside its private stock Sway compositor, runs the rehearsal against the explicitly pinned socket, then checks the postflight rectangle. This is not a Fedora/SwayPX operator desktop acceptance test.
 
 ## WATCH OUT FOR
 
@@ -39,7 +39,7 @@ The dedicated workflow also runs the existing V2 read-only planner, atomic geome
 - **Not an authorized production executor.** `CI` / `GITHUB_ACTIONS` flags are safeguards against accidental invocation, not authentication. The fixture journal is an injected test interface, not a validated durable user ledger.
 - Two-step resize+move is **non-atomic**. If resize succeeds and positioning fails, report UNCERTAIN and retain the manual recovery hold. No automatic retry/undo. Actual persistent journaling and fresh signed operator approval must be designed and reviewed before exposing runtime execution.
 - Only **floating windows already on their saved output/workspace** are supported. Tiling-tree reconstruction, changed monitor layouts, cross-monitor migration, missing application launch, Brave tab restoration and normal-browser profiles are explicitly outside this milestone.
-- SwayPX-specific native behavior, output scaling, compositor constraints and permissions remain to be tested on a disposable native compositor.
+- Native stock Sway headless verification has been added but still needs an exact-head run. Fedora/SwayPX-specific behavior, alternate output scaling, compositor constraints and permission/approval design remain outstanding.
 
 ## CHECKLIST
 
@@ -49,7 +49,7 @@ The dedicated workflow also runs the existing V2 read-only planner, atomic geome
 - [x] Disposable two-display synthetic test and regression workflow
 - [ ] Exact-head GitHub workflows and raw logs
 - [ ] Independent Nurse 2 security review
-- [ ] Disposable stock Sway live placement before any workstation execution
+- [ ] Exact-head native stock Sway headless placement result before any workstation execution
 - [ ] Signed operator approval and durable geometry-operation journal
 - [ ] Authorized TimeW integration, multi-window identity and Brave sessions
 - [ ] Operator merge and production acceptance separately

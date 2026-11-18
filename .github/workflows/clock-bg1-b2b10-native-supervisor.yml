@@ -54,7 +54,12 @@ jobs:
               "services/time/BG1-ALARM-INSTALLED-ROLE-TRUST.md",
               "tests/time/test_clock_bg1_b2b9_installed_role_trust.py",
               ".github/workflows/clock-bg1-b2b9-installed-role-trust.yml"}
-          assert paths in (own,own|dependency), (
-              f"Unapproved Clock file scope: {sorted(paths ^ (own|dependency))}")
+          extension={
+              "services/time/AlarmSupervisorSessionLedger.py",
+              "services/time/BG1-ALARM-SUPERVISOR-SESSIONS.md",
+              "tests/time/test_clock_bg1_b2b11_durable_supervisor_sessions.py",
+              ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml"}
+          assert paths in (own, own|dependency, own|extension), (
+              f"Unapproved Clock file scope: {sorted(paths ^ (own|extension|dependency))}")
           print("B2B10 4-file scope, B2B9 unmodified dependency: PASS")
           PY

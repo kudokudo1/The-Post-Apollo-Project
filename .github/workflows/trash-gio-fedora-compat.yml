@@ -39,4 +39,9 @@ jobs:
           test "$GITHUB_ACTIONS" = "true"
           test "$CI" = "true"
           test -d "$RUNNER_TEMP"
-          python3 -I -B scripts/trash/gio_disposable_roundtrip_u9.py
+          # GitHub mounts RUNNER_TEMP from its host UID; Fedora container may
+          # run under another UID. Give the fixture an explicitly new, owned,
+          # mode-0700 child under the same ephemeral GitHub runner scratch.
+          scratch="$(mktemp -d "$RUNNER_TEMP/trashpp-u10c-fedora-XXXXXX")"
+          chmod 0700 "$scratch"
+          RUNNER_TEMP="$scratch" python3 -I -B scripts/trash/gio_disposable_roundtrip_u9.py

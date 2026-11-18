@@ -50,7 +50,7 @@ For developer review, the GitHub workflow `.github/workflows/connections-hospita
 ## VERIFY
 
 - [ ] Native signer source compiles under pinned Python 3.12 and `cryptography==46.0.4`
-- [ ] 38 native signing/source/receipt/fail-closed security cases pass
+- [ ] 41 native signing/source/receipt/fail-closed security cases pass
 - [ ] Same signed grant verifies in exact PX #130 owner implementation
 - [ ] Existing 40 C5-H1 scope denial tests still pass
 - [ ] Independent Nurse 2 review of native interface, identity, logind, Polkit/retention and private key handling

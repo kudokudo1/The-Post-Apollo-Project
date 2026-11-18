@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "../components"
 import "../widgets"
+import "../services/hospital"
 
 // TRASH // Bottom-left utility backed by the user's existing GIO Trash.
 // The 50x50 dock button retains Power's exact edge clearances; the panel is
@@ -945,6 +946,68 @@ PanelWindow {
     // One visual Trash list. Files still use GIO and saved records still
     // use the isolated, revision-controlled managed-copy backend.
     property string trashViewFilter: "all"
+
+    // Hospital is a source-owned record family, NOT a GIO file or copy.
+    property string hospitalSelectedRoomId: ""
+    property string hospitalArmRoomId: ""
+    property string hospitalArmDigest: ""
+    property int hospitalArmRevision: -1
+    property string hospitalOutcome: ""
+
+    function clearHospitalArm() {
+        hospitalArmRoomId = "";
+        hospitalArmDigest = "";
+        hospitalArmRevision = -1;
+    }
+
+    function reviewHospitalRestore(row) {
+        const roomId = String((row || {}).roomId || "");
+        if (!menuOpen || activeMode !== "trash" || !hospitalBin.loaded
+                || hospitalBin.busy || !roomId
+                || !hospitalBin.rows.some(function(x) {
+                    return x.roomId === roomId && x.revision === row.revision;
+                })) {
+            hospitalOutcome = "HOSPITAL RESTORE // STALE BIN";
+            return false;
+        }
+        if (hospitalSelectedRoomId !== roomId) {
+            clearHospitalArm();
+            hospitalSelectedRoomId = roomId;
+            hospitalOutcome = "HOSPITAL // READING EXACT ROOM";
+            Qt.callLater(function() { hospitalRestore.refresh(); });
+            return true;
+        }
+        const snapshot = hospitalRestore.review || {};
+        if (!hospitalRestore.reviewReady || snapshot.roomId !== roomId
+                || snapshot.state !== "TRASHED"
+                || snapshot.revision !== row.revision) {
+            clearHospitalArm();
+            hospitalOutcome = "HOSPITAL RESTORE // REFRESH SOURCE FIRST";
+            hospitalRestore.refresh();
+            return false;
+        }
+        if (!hospitalRestore.permissionReady
+                || snapshot.canRestore !== true) {
+            clearHospitalArm();
+            hospitalOutcome = "HOSPITAL RESTORE // TRUSTED OPERATOR AUTHORITY HOLD";
+            return false;
+        }
+        if (hospitalArmRoomId === roomId
+                && hospitalArmDigest === snapshot.digest
+                && hospitalArmRevision === snapshot.revision) {
+            const witness = {digest:hospitalArmDigest,
+                             revision:hospitalArmRevision};
+            clearHospitalArm();
+            hospitalOutcome = "HOSPITAL // SUBMITTING RESTORE";
+            return hospitalRestore.execute("RESTORE", witness);
+        }
+        hospitalArmRoomId = roomId;
+        hospitalArmDigest = String(snapshot.digest || "");
+        hospitalArmRevision = snapshot.revision;
+        hospitalOutcome = "ARMED // CLICK AGAIN FOR " + roomId;
+        return true;
+    }
+
     readonly property bool trashShowsFiles:
         trashViewFilter === "all" || trashViewFilter === "files"
     readonly property var trashDisplayRows: {
@@ -956,7 +1019,8 @@ PanelWindow {
             }) : [];
         const needle = String(trashSearch.text || "").trim().toLowerCase();
         const copyRows = researchBinRows.filter(function(row) {
-            if (trashViewFilter === "files") return false;
+            if (trashViewFilter === "files"
+                    || trashViewFilter === "hospital") return false;
             if (trashViewFilter === "events" && row.kind !== "SAVED EVENT")
                 return false;
             if (trashViewFilter === "research" && row.kind !== "SAVED RESEARCH")
@@ -969,7 +1033,24 @@ PanelWindow {
                     originLabel:row.source + " // " + row.recordedAt,
                     record:row};
         });
-        return fileRows.concat(copyRows);
+        const hospitalRows = hospitalBin.loaded
+            ? hospitalBin.rows.filter(function(row) {
+                if (trashViewFilter !== "all"
+                        && trashViewFilter !== "records"
+                        && trashViewFilter !== "hospital")
+                    return false;
+                return !needle || (String(row.name || "") + " "
+                    + String(row.roomId || "") + " "
+                    + String(row.repository || "")).toLowerCase()
+                    .indexOf(needle) >= 0;
+            }).map(function(row) {
+                return {entryType:"hospital", name:String(row.name || row.roomId),
+                        originLabel:String(row.repository || "UNKNOWN PATIENT")
+                            + " // PX ROOM " + String(row.roomId),
+                        roomId:String(row.roomId), revision:row.revision,
+                        record:row};
+            }) : [];
+        return fileRows.concat(copyRows).concat(hospitalRows);
     }
 
     readonly property var filteredItems: items.filter(function(item) {
@@ -1011,7 +1092,11 @@ PanelWindow {
                                                    trashLauncher.archiveSearchText.trim());
                 });
             else if (activeMode === "burn" || activeMode === "trash")
-                Qt.callLater(function() { trashLauncher.refreshResearch(); });
+                Qt.callLater(function() {
+                    trashLauncher.refreshResearch();
+                    if (trashLauncher.activeMode === "trash")
+                        hospitalBin.refresh();
+                });
         }
     }
 
@@ -1046,6 +1131,8 @@ PanelWindow {
 
     function refresh(clearReceipt, passive) {
         if (busy) return false;
+        if (activeMode === "trash" && hospitalBin.active && !hospitalBin.busy)
+            hospitalBin.refresh();
         if (clearReceipt === true)
             receipt = "";
         // Passive polling never triggers destructive operations or overwrites
@@ -1202,6 +1289,35 @@ PanelWindow {
         return false;
     }
 
+
+    HospitalRoomBinService {
+        id: hospitalBin
+        active: trashLauncher.menuOpen && trashLauncher.activeMode === "trash"
+    }
+    HospitalRoomLifecycleService {
+        id: hospitalRestore
+        active: trashLauncher.menuOpen && trashLauncher.activeMode === "trash"
+        roomId: trashLauncher.hospitalSelectedRoomId
+        onCommitted: function(receipt) {
+            trashLauncher.clearHospitalArm();
+            trashLauncher.hospitalOutcome = "HOSPITAL ROOM RESTORED // "
+                + String(receipt.roomId || "");
+            hospitalBin.refresh();
+        }
+        onRefused: function(reason) {
+            trashLauncher.clearHospitalArm();
+            trashLauncher.hospitalOutcome = "HOSPITAL RESTORE REFUSED // "
+                + String(reason);
+            hospitalBin.refresh();
+        }
+    }
+
+    onActiveModeChanged: {
+        clearHospitalArm();
+        hospitalSelectedRoomId = "";
+        if (menuOpen && activeMode === "trash")
+            Qt.callLater(function() { hospitalBin.refresh(); });
+    }
 
     IpcHandler {
         target: "trash"
@@ -1680,13 +1796,15 @@ PanelWindow {
                     color: Colors.white
                     verticalAlignment: Text.AlignVCenter
                     text: "FILES " + trashLauncher.total
-                          + " // RECORDS " + trashLauncher.researchBinRows.length
+                          + " // COPIES " + trashLauncher.researchBinRows.length
+                          + " // HOSP " + (hospitalBin.loaded ? hospitalBin.rows.length : "?")
                 }
 
                 ActionButton {
                     width: 92
                     height: 23
-                    label: "RECORD BIN " + trashLauncher.researchBinRows.length
+                    label: "RECORD BIN " + (trashLauncher.researchBinRows.length
+                        + (hospitalBin.loaded ? hospitalBin.rows.length : 0))
                     labelPixelSize: 9
                     accentColor: Colors.orange
                     available: !trashLauncher.researchBusy
@@ -1709,7 +1827,7 @@ PanelWindow {
                 visible: trashLauncher.activeMode === "trash"
                 width: parent.width
                 height: 33
-                placeholderText: "SEARCH TRASH // FILES, EVENTS OR RESEARCH COPIES"
+                placeholderText: "SEARCH TRASH // FILES, COPIES, HOSPITAL ROOMS"
                 color: Colors.white
                 font.pixelSize: 11
                 placeholderTextColor: Colors.cyan
@@ -1735,11 +1853,12 @@ PanelWindow {
                         {id:"files", label:"FILES"},
                         {id:"records", label:"RECORDS"},
                         {id:"events", label:"EVENTS"},
-                        {id:"research", label:"RESEARCH"}
+                        {id:"research", label:"RESEARCH"},
+                        {id:"hospital", label:"HOSP"}
                     ]
                     ActionButton {
                         required property var modelData
-                        width: (trashSourceFilters.width - 16) / 5
+                        width: (trashSourceFilters.width - 20) / 6
                         height: 26
                         label: modelData.label
                         labelPixelSize: 9
@@ -1753,12 +1872,30 @@ PanelWindow {
                 }
             }
 
+            GohuText {
+                width: parent.width
+                height: 20
+                visible: trashLauncher.activeMode === "trash"
+                    && (!!trashLauncher.hospitalSelectedRoomId
+                        || !!hospitalBin.lastError)
+                text: hospitalBin.lastError
+                    || trashLauncher.hospitalOutcome
+                    || (hospitalRestore.lastError
+                        || "HOSPITAL SOURCE // REVIEW HELD")
+                font.pixelSize: 9
+                color: hospitalBin.lastError || hospitalRestore.lastError
+                    ? Colors.red : Colors.orange
+                elide: Text.ElideMiddle
+            }
+
             Item {
                 id: trashListBox
                 visible: trashLauncher.activeMode === "trash"
                 width: parent.width
                 height: Math.max(90, trashMenu.height - 323
-                                 - (trashLauncher.confirmMode === "item" ? 46 : 0))
+                                 - (trashLauncher.confirmMode === "item" ? 46 : 0)
+                                 - (trashLauncher.hospitalSelectedRoomId
+                                    || hospitalBin.lastError ? 20 : 0))
 
                 ListView {
                     id: trashFileList
@@ -1776,7 +1913,9 @@ PanelWindow {
                         height: 55
                         color: Colors.dark
                         border.width: 1
-                        border.color: trashEntry.modelData.entryType === "record"
+                        border.color: trashEntry.modelData.entryType === "hospital"
+                                      ? Colors.magenta
+                                      : trashEntry.modelData.entryType === "record"
                                       ? Colors.orange : Colors.green
                         radius: 0
 
@@ -1789,7 +1928,9 @@ PanelWindow {
                             GohuText {
                                 width: parent.width
                                 height: 19
-                                text: (trashEntry.modelData.entryType === "record"
+                                text: (trashEntry.modelData.entryType === "hospital"
+                                       ? "[HOSPITAL] "
+                                       : trashEntry.modelData.entryType === "record"
                                        ? "[COPY] " : "[FILE] ")
                                       + String(trashEntry.modelData.name || "UNNAMED")
                                 color: Colors.white
@@ -1829,6 +1970,24 @@ PanelWindow {
                                            && trashLauncher.researchBurnId === ""
                                 onLeftClicked: trashLauncher.restoreResearchCopy(
                                     trashEntry.modelData.record)
+                            }
+
+                            // Hospital entries are restored ONLY by the
+                            // PX source owner. Never use GIO or managed copies.
+                            ActionButton {
+                                width: 68
+                                height: 31
+                                visible: trashEntry.modelData.entryType === "hospital"
+                                label: trashLauncher.hospitalArmRoomId
+                                       === trashEntry.modelData.roomId
+                                       ? "CONFIRM" : "REVIEW"
+                                labelPixelSize: 9
+                                accentColor: Colors.magenta
+                                available: hospitalBin.loaded && !hospitalBin.busy
+                                    && !hospitalRestore.operating
+                                    && !hospitalRestore.loading
+                                onLeftClicked: trashLauncher.reviewHospitalRestore(
+                                    trashEntry.modelData)
                             }
 
                             // GIO system-file Restore uses the same U1
@@ -1875,6 +2034,7 @@ PanelWindow {
                             ActionButton {
                                 width: 55
                                 height: 31
+                                visible: trashEntry.modelData.entryType !== "hospital"
                                 label: trashEntry.modelData.entryType === "record"
                                        ? "BURN COPY" : "BURN"
                                 labelPixelSize: 9
@@ -1912,8 +2072,11 @@ PanelWindow {
                     color: Colors.cyan
                     text: trashLauncher.total === 0
                           && trashLauncher.researchBinRows.length === 0
+                          && hospitalBin.loaded && hospitalBin.rows.length === 0
                           ? "TRASH EMPTY // NOTHING TO RESTORE"
-                          : "NO MATCHES // CHOOSE A SOURCE FILTER"
+                          : !hospitalBin.loaded && trashLauncher.trashViewFilter === "hospital"
+                            ? "HOSPITAL BIN // NOT VERIFIED"
+                            : "NO MATCHES // CHOOSE A SOURCE FILTER"
                 }
             }
 

@@ -1,0 +1,49 @@
+name: Hospital / Trash++ Unified Room Lifecycle Batch
+
+on:
+  pull_request:
+    paths:
+      - "services/hospital/HospitalRoomLifecycleService.qml"
+      - "services/hospital/HospitalRoomBinService.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "modules/Trash.qml"
+      - "tests/hospital/test_hospital_room_lifecycle_review_contracts.py"
+      - "tests/hospital/test_hospital_room_trashpp_batch_contracts.py"
+      - "tests/hospital/test_hospital_room_px_v12_crossrepo.py"
+      - ".github/workflows/hospital-room-trashpp-batch.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/hospital/HospitalRoomLifecycleService.qml"
+      - "services/hospital/HospitalRoomBinService.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "modules/Trash.qml"
+      - "tests/hospital/test_hospital_room_lifecycle_review_contracts.py"
+      - "tests/hospital/test_hospital_room_trashpp_batch_contracts.py"
+      - ".github/workflows/hospital-room-trashpp-batch.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ui-and-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify integrated source control and source-owned Trash++ boundary
+        run: |
+          python3 tests/hospital/test_hospital_room_lifecycle_review_contracts.py
+          python3 tests/hospital/test_hospital_room_trashpp_batch_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py
+      - name: Check out exact PX PR #130 head without modifying its branch
+        uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: 8c0f9c4e5788579efd9d34672ff308f4bca2937f
+          path: px-source
+          persist-credentials: false
+      - name: Install exact signed-grant verifier dependency
+        run: python3 -m pip install 'cryptography==46.0.3'
+      - name: Verify PX/Trash++ JSON contract using fresh disposable database
+        run: |
+          python3 tests/hospital/test_hospital_room_px_v12_crossrepo.py

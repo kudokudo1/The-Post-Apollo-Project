@@ -1,0 +1,31 @@
+name: TimeW MACHINE V2 floating placement disposable rehearsal
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineV2FloatingPilot.py"
+      - "tests/timew/test_machine_v2_floating_pilot.py"
+      - ".github/workflows/timew-machine-v2-floating-disposable.yml"
+      - "docs/timew-machine-v2-floating-disposable.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safe-selected-floating-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run two-window floating placement under fake Sway and ephemeral SQLite
+        run: python3 -B -I tests/timew/test_machine_v2_floating_pilot.py
+      - name: Retain deny-only V2 planner and checkpoint protections
+        run: |
+          python3 -B -I tests/timew/test_machine_restore_review_v2.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+      - name: Keep existing guarded one-click V1 desktop restoration unchanged
+        run: |
+          python3 -B -I tests/timew/test_machine_one_click_restore.py
+          python3 -B -I tests/timew/test_machine_one_click_restore_ui.py
+          python3 -B -I tests/timew/test_machine_window_move_pilot.py

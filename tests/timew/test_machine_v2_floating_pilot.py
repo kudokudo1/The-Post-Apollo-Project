@@ -202,11 +202,11 @@ try:
         ):
             rejects(lambda bad=bad: pilot.prepare(bad, read_runner=sway.read))
         assert sway.commands == []
-        # Two legitimate Brave instances cannot be distinguished by
-        # app_id alone. The operator must choose the current con_id; the
-        # fixture cannot prove that the chosen one is historically correct.
-        assert pilot.prepare(dict(request_a, live_con_id=111),
-                             read_runner=sway.read)["persistent_identity_verified"] is False
+        # A different Brave instance on another output remains blocked:
+        # manual selection cannot silently override monitor boundaries.
+        # Neither same-app identity nor historical correctness is verified.
+        rejects(lambda: pilot.prepare(dict(request_a, live_con_id=111),
+                                      read_runner=sway.read))
 
         # Ordinary local/dev invocation does not enable a live dispatcher.
         os.environ.pop("CI", None)

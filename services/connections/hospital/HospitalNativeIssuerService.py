@@ -204,11 +204,28 @@ def _socket_root_path(path, owner_uid, *, socket_mode=True):
         C.deny("UNTRUSTED_IPC_SOCKET_OWNER_OR_MODE")
     return st
 
-def _packet_recv(sock):
-    data, ancillary, flags, addr = sock.recvmsg(MAX_IPC + 1)
-    if (flags & socket.MSG_TRUNC or not data
-            or len(data) > MAX_IPC or ancillary):
+def _packet_recv(sock, *, expected_sender):
+    """Require actual SCM_CREDENTIALS on EVERY message, not only SO_PEERCRED.
+
+    A socket fd may be passed to another process. Peer identity fixed when
+    connected is insufficient to prove which process sent this packet.
+    """
+    if (type(expected_sender) is not tuple or len(expected_sender) != 3
+            or any(type(v) is not int for v in expected_sender)):
+        C.deny("UNPINNED_PACKET_SENDER")
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
+    data, ancillary, flags, addr = sock.recvmsg(
+        MAX_IPC + 1, socket.CMSG_SPACE(struct.calcsize("3i")))
+    if flags & (socket.MSG_TRUNC | socket.MSG_CTRUNC) or not data or len(data) > MAX_IPC:
         C.deny("BOUNDED_NATIVE_PACKET_REFUSED")
+    credentials = [
+        struct.unpack("3i", value[:struct.calcsize("3i")])
+        for level, kind, value in ancillary
+        if level == socket.SOL_SOCKET and kind == socket.SCM_CREDENTIALS
+        and len(value) == struct.calcsize("3i")
+    ]
+    if len(credentials) != 1 or credentials[0] != expected_sender:
+        C.deny("PACKET_SENDER_DIFFERS_FROM_PINNED_SOCKET_PEER")
     return data
 
 def _writer_exchange(policy, body):
@@ -223,8 +240,10 @@ def _writer_exchange(policy, body):
                 C.deny("WRONG_PX_WRITER_UID")
             if _executable_sha(p[0]) != policy["pxWriterExecutableSha256"]:
                 C.deny("UNENROLLED_PX_WRITER_EXECUTABLE")
-            s.sendall(C.canonical(body))
-            raw = _packet_recv(s)
+            payload = C.canonical(body)
+            if s.send(payload) != len(payload):
+                C.deny("PARTIAL_WRITER_PACKET_REFUSED")
+            raw = _packet_recv(s, expected_sender=p[:3])
             if (_peer_writer(s) != p
                     or _executable_sha(p[0]) != policy["pxWriterExecutableSha256"]):
                 C.deny("PX_WRITER_PROCESS_CHANGED")
@@ -279,7 +298,8 @@ def _native_step(client, policy):
     if peer[1] != policy["operatorUid"]:
         C.deny("NONOPERATOR_UID_REFUSED")
     _same_peer(client, peer, policy["clientExecutableSha256"])
-    request = C.validate_request(_packet_recv(client))
+    request = C.validate_request(
+        _packet_recv(client, expected_sender=peer[:3]))
     _same_peer(client, peer, policy["clientExecutableSha256"])
     first_seat = _active_seat(peer[0], peer[1])
     if C.host_fingerprint() != policy["hostId"]:
@@ -345,7 +365,9 @@ def main():
             with listen.accept()[0] as client:
                 client.settimeout(40)
                 response = _native_step(client, policy)
-                client.sendall(C.canonical(response))
+                answer = C.canonical(response)
+                if client.send(answer) != len(answer):
+                    C.deny("PARTIAL_CLIENT_RECEIPT_REFUSED")
         finally:
             listen.close()
         return 0

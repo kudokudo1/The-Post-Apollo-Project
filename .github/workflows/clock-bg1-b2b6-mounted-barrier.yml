@@ -63,6 +63,16 @@ jobs:
               ".github/workflows/clock-bg1-b2b15-mounted-save-drain.yml",
               ".github/workflows/clock-bg1-b2b4-writer-quiescence.yml",
               ".github/workflows/clock-bg1-b2b6-mounted-barrier.yml"}
-          assert changed in (permitted,b2b15), f"Unapproved change: {changed ^ (permitted|b2b15)}"
+          b2b18={
+              "services/time/AlarmManagerService.qml",
+              "services/time/AlarmNativeBridgeInboundPolicy.js",
+              "services/time/BG1-ALARM-MOUNTED-QML-NATIVE-INGRESS.md",
+              "tests/time/test_clock_bg1_b2b18_qml_receiver.cjs",
+              ".github/workflows/clock-bg1-b2b18-mounted-qml-ingress.yml",
+              ".github/workflows/clock-bg1-b2b4-writer-quiescence.yml",
+              ".github/workflows/clock-bg1-b2b6-mounted-barrier.yml",
+              ".github/workflows/clock-bg1-b2b15-mounted-save-drain.yml",
+          }
+          assert changed in (permitted,b2b15,b2b18), f"Unapproved change: {changed ^ (permitted|b2b15)}"
           print("No Clock broker, background observer, sound, notifications, Identity or Connections modified: PASS")
           PY

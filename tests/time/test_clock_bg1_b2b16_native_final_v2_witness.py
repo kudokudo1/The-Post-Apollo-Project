@@ -197,6 +197,26 @@ class ClockB2B16NativeFinalV2Tests(unittest.TestCase):
         self.assertEqual(counter[0],2)
         self.assertEqual(self.source.read_bytes(),self.raw)
 
+    def test_replaced_parent_directory_after_sync_cannot_claim_source_path(self):
+        # An open dirfd survives rename. Reject it when the original
+        # approved absolute path now points to a different directory.
+        old_sync=Final.os.fsync
+        changed=[False]
+        def replace_directory(fd):
+            old_sync(fd)
+            if not changed[0]:
+                changed[0]=True
+                relocated=self.h.root/"previous-clock-source"
+                self.source_dir.rename(relocated)
+                self.source_dir.mkdir(mode=0o700)
+                self.source.write_bytes(self.raw)
+                self.source.chmod(0o600)
+        with patch.object(Final.os,"fsync",side_effect=replace_directory):
+            self.refused(self.fresh().observe,
+                         "FINAL_V2_DIRECTORY_REPLACED")
+        self.assertTrue(changed[0])
+        self.assertEqual(self.source.read_bytes(),self.raw)
+
     def test_mutating_existing_inode_during_fsync_cannot_claim_stable_revision(self):
         saved_sync=Final.os.fsync
         modified=[False]

@@ -494,7 +494,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('stdout: StdioCollector {', TRASH)
         self.assertIn("function consume(raw)", TRASH)
         self.assertIn("function refresh(clearReceipt, passive)", TRASH)
-        self.assertIn("function restoreItem(item)", TRASH)
+        self.assertIn("function restoreItem(item, expectedRevision, expectedReviewId)", TRASH)
         self.assertIn("function armBurn(item)", TRASH)
         self.assertIn("function armBurnAll()", TRASH)
         self.assertIn("function confirmBurn()", TRASH)

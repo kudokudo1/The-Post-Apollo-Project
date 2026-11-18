@@ -1,0 +1,67 @@
+name: Clock BG1-B2B11 native supervisor durable session epoch (deny-only)
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmSupervisorSessionLedger.py"
+      - "services/time/AlarmNativeClockSupervisor.py"
+      - "services/time/BG1-ALARM-SUPERVISOR-SESSIONS.md"
+      - "tests/time/test_clock_bg1_b2b11_durable_supervisor_sessions.py"
+      - ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml"
+      - ".github/workflows/clock-bg1-b2b10-native-supervisor.yml"
+  push:
+    paths:
+      - "services/time/AlarmSupervisorSessionLedger.py"
+      - "services/time/AlarmNativeClockSupervisor.py"
+      - "services/time/BG1-ALARM-SUPERVISOR-SESSIONS.md"
+      - "tests/time/test_clock_bg1_b2b11_durable_supervisor_sessions.py"
+      - ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml"
+      - ".github/workflows/clock-bg1-b2b10-native-supervisor.yml"
+permissions:
+  contents: read
+jobs:
+  supervisor-session-floor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing Clock verifier cryptography dependency
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Real signed native socket session journal and pidfd exit tests
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b11_durable_supervisor_sessions.py' -v
+      - name: Preserve B2B10 native supervisor, B2B9 installed trust
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b10_native_supervisor.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b9_installed_role_trust.py' -v
+      - name: Preserve original kernel pidfd and mounted Clock writer barrier
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+          node --test tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs
+      - name: Exact eight-file integrated Clock-only boundary
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],text=True
+          ).splitlines())
+          b2b10={
+              ".github/workflows/clock-bg1-b2b10-native-supervisor.yml",
+              "services/time/AlarmNativeClockSupervisor.py",
+              "services/time/BG1-ALARM-NATIVE-SUPERVISOR.md",
+              "tests/time/test_clock_bg1_b2b10_native_supervisor.py"}
+          b2b11={
+              ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml",
+              "services/time/AlarmSupervisorSessionLedger.py",
+              "services/time/BG1-ALARM-SUPERVISOR-SESSIONS.md",
+              "tests/time/test_clock_bg1_b2b11_durable_supervisor_sessions.py"}
+          assert changed in (b2b11, b2b10|b2b11), (
+              f"Unexpected clock session changes: {sorted(changed ^ (b2b10|b2b11))}")
+          print("B2B10 main integration and B2B11 scope: PASS")
+          print("No live QML, Identity, Connections, systemd, audio or BG2 edits: PASS")
+          PY

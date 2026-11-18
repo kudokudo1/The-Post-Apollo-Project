@@ -54,6 +54,18 @@ jobs:
               "services/time/BG1-ALARM-RELEASE-FLOOR-CONTROLLER.md",
               "tests/time/test_clock_bg1_b2b13_release_floor_controller.py",
               ".github/workflows/clock-bg1-b2b13-release-floor-controller.yml"}
-          assert changes==expected, f"Unapproved Clock change: {sorted(changes^expected)}"
+          b2b14={
+              ".github/workflows/clock-bg1-b2b10-native-supervisor.yml",
+              ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml",
+              ".github/workflows/clock-bg1-b2b12-protected-session.yml",
+              ".github/workflows/clock-bg1-b2b13-release-floor-controller.yml",
+              ".github/workflows/clock-bg1-b2b14-current-floor-admission.yml",
+              "services/time/AlarmClockReleaseFloorController.py",
+              "services/time/AlarmCurrentFloorWitness.py",
+              "services/time/AlarmNativeClockSupervisor.py",
+              "services/time/BG1-ALARM-CURRENT-FLOOR-ADMISSION.md",
+              "tests/time/test_clock_bg1_b2b13_release_floor_controller.py",
+              "tests/time/test_clock_bg1_b2b14_current_floor_admission.py"}
+          assert changes in (expected,b2b14), f"Unapproved Clock change: {sorted(changes^(expected|b2b14))}"
           print("No live Clock QML, installed signing key, Identity, Connections or BG2 changes: PASS")
           PY

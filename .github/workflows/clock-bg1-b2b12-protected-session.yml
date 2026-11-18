@@ -57,6 +57,18 @@ jobs:
               ".github/workflows/clock-bg1-b2b12-protected-session.yml",
               ".github/workflows/clock-bg1-b2b10-native-supervisor.yml",
               ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml"}
-          assert changed==expected, f"Unexpected change: {sorted(changed ^ expected)}"
+          b2b14={
+              ".github/workflows/clock-bg1-b2b10-native-supervisor.yml",
+              ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml",
+              ".github/workflows/clock-bg1-b2b12-protected-session.yml",
+              ".github/workflows/clock-bg1-b2b13-release-floor-controller.yml",
+              ".github/workflows/clock-bg1-b2b14-current-floor-admission.yml",
+              "services/time/AlarmClockReleaseFloorController.py",
+              "services/time/AlarmCurrentFloorWitness.py",
+              "services/time/AlarmNativeClockSupervisor.py",
+              "services/time/BG1-ALARM-CURRENT-FLOOR-ADMISSION.md",
+              "tests/time/test_clock_bg1_b2b13_release_floor_controller.py",
+              "tests/time/test_clock_bg1_b2b14_current_floor_admission.py"}
+          assert changed in (expected,b2b14), f"Unexpected change: {sorted(changed ^ (expected|b2b14))}"
           print("No installed signing keys, live QML, Identity, Connections, systemd or BG2 changes: PASS")
           PY

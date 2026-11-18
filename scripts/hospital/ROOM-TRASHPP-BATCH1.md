@@ -13,8 +13,13 @@ ASSIGNMENT // Operator-approved consolidated Trash/Restore delivery, Burn separa
 - \`px hospital rooms\` excludes TRASHED Rooms; \`room-lifecycle-bin\` is
   metadata-only and reports no Burn capability; \`room-lifecycle-review\`
   verifies the exact Room digest and revision.
-- TRASH and RESTORE are atomic with expected revision, graph digest and
-  a repeated exact Room ID; source SQL triggers reject writers on TRASHED Rooms.
+- TRASH and RESTORE are atomic with expected revision, graph digest,
+  a repeated exact Room ID, and a **pinned, signed one-use authorization
+  grant**. Source SQL triggers reject writers on TRASHED Rooms.
+- CLI requests without `--signed-authorization-file` refuse. Pinned Ed25519
+  grant checks bind action/Room/Patient/repository/revision/digest/retention
+  and current host, with replay prevention inside the same transaction.
+  Signing and operator consent are *not* supplied by the PX source.
 - Neither a local JSON cache nor GIO is allowed to own Hospital records.
 
 **Application partner:**

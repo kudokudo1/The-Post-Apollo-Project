@@ -57,7 +57,7 @@ assert 'BROWSER LIST ORDER // UNLINKED // NOT SAVED' in qml
 assert 'NO BRAVE COUNTS ENTERED // UNLINKED' in qml
 assert 'INVALID COUNTS // USE 2 // 5 // 6' in qml
 assert 'BROWSER TABS + EXACT RESTORE STILL IN DEVELOPMENT' in qml
-assert qml.count('Process {') == 15  # no new process or bridge
+assert qml.count('Process {') == 16  # added V2 geometry review, no Brave IPC bridge
 assert qml.count("machineBraveTabDraft") == 4  # source + property + display input + edit
 assert "brave-topology" not in qml  # no direct browser module connection
 

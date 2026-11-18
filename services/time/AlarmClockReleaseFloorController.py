@@ -12,6 +12,8 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import os
+import fcntl
+from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
 import stat
@@ -34,11 +36,13 @@ def _neighbor(module, alias):
 
 
 Session = _neighbor("AlarmProtectedSessionEnrollment","clock_b2b13_session")
+Floor = _neighbor("AlarmCurrentFloorWitness","clock_b2b14_floor")
 Origin = Session.Origin
 Peer = Session.Peer
 PROTECTED_STATE = Path("/var/lib/post-apollo/clock/controller-v1")
 DISPOSABLE_STATE = "bg1-clock-controller-fixture"
 LEDGER = "clock-release-floor-v1.sqlite3"
+ISSUE_LOCK = "clock-release-issue-v1.lock"
 MAX_VERSION = 2147483647
 DENIED = {
     "roleAuthenticated": False, "writerStopped": False,
@@ -193,6 +197,32 @@ def _durable_publish(directory, name, raw, *, synthetic):
             pass
 
 
+@contextmanager
+def _issue_lock(directory, *, synthetic):
+    """Serialize floor commit AND all signed-publication files across issuers."""
+    path=directory/ISSUE_LOCK
+    fd=None
+    try:
+        fd=os.open(path,os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW |
+                   os.O_CLOEXEC,0o600)
+        st=os.fstat(fd)
+        if (not stat.S_ISREG(st.st_mode) or st.st_nlink!=1
+                or st.st_uid!=(os.getuid() if synthetic else 0)
+                or stat.S_IMODE(st.st_mode)!=0o600):
+            raise Refused("UNSAFE_CLOCK_ISSUER_LOCK")
+        fcntl.flock(fd,fcntl.LOCK_EX)
+        # A renamed/replaced lock file must not split concurrent writers.
+        now=os.lstat(path)
+        if (now.st_dev,now.st_ino)!=(st.st_dev,st.st_ino):
+            raise Refused("CLOCK_ISSUER_LOCK_REPLACED")
+        yield
+    except OSError as exc:
+        raise Refused("CLOCK_ISSUER_LOCK_UNAVAILABLE") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
 class ClockReleaseFloorController:
     """Trusted direct-invocation controller, NOT a socket-exposed issuer.
 
@@ -242,6 +272,13 @@ class ClockReleaseFloorController:
         self.root_pin = pinned_root_sha256
         self.floor = (minimum_epoch,minimum_sequence)
         self.ledger_path = self.state/LEDGER
+        self.floor_witness=Floor.ClockCurrentFloorWitness(
+            enrollment_directory=self.enrollment,
+            trust_directory=trust_directory,
+            pinned_root_sha256=pinned_root_sha256,
+            minimum_epoch=minimum_epoch,
+            minimum_sequence=minimum_sequence,
+            synthetic_only=synthetic_only)
 
     def _db(self):
         _check_directory(self.state,synthetic=self.synthetic,role="state")
@@ -312,44 +349,106 @@ class ClockReleaseFloorController:
                 Peer.verify(accepted_socket,witness,role["interpreterPath"])
             except Peer.Refused as exc:
                 raise Refused("CONTROLLER_PROCESS_EXITED") from exc
-            db = self._db()
-            try:
-                db.execute("BEGIN IMMEDIATE")
-                old = _read(db)
-                if old is not None and (
-                        (epoch,sequence) <= (old[0],old[1])):
-                    raise Refused("MONOTONIC_CLOCK_RELEASE_REPLAY")
-                if old is not None and old[5]!=self.root_pin:
-                    raise Refused("CLOCK_RELEASE_ROOT_CHANGED_WITHOUT_APPROVAL")
-                if old is not None and (pid,ticks)==(old[3],old[4]):
-                    raise Refused("OLD_CLOCK_PROCESS_ALREADY_ENROLLED")
-                db.execute("""INSERT INTO release_floor
-                    (slot,epoch,sequence,boot_id,old_writer_pid,
-                     old_writer_ticks,signer_digest,session_digest)
-                    VALUES (1,?,?,?,?,?,?,?)
-                    ON CONFLICT(slot) DO UPDATE SET
-                    epoch=excluded.epoch,
-                    sequence=excluded.sequence,
-                    boot_id=excluded.boot_id,
-                    old_writer_pid=excluded.old_writer_pid,
-                    old_writer_ticks=excluded.old_writer_ticks,
-                    signer_digest=excluded.signer_digest,
-                    session_digest=excluded.session_digest""",
-                    (epoch,sequence,data["bootId"],pid,ticks,self.root_pin,
-                     hashlib.sha256(raw).hexdigest()))
-                db.execute("COMMIT")
-            except BaseException:
-                if db.in_transaction:
-                    db.execute("ROLLBACK")
-                raise
-            finally:
-                db.close()
-            # Floor already committed, so partial/crashed publication
-            # is fail-closed and can only recover at a higher version.
-            _durable_publish(self.enrollment,Session.SESSION_FILE,raw,
-                             synthetic=self.synthetic)
-            _durable_publish(self.enrollment,Session.SIGNATURE_FILE,
-                             signature,synthetic=self.synthetic)
+            # One lock spans the whole multi-file publication, not just
+            # the SQLite transaction. Otherwise two cooperating issuers
+            # could commit in order but publish session files out of order.
+            with _issue_lock(self.state,synthetic=self.synthetic):
+                db=self._db()
+                try:
+                    db.execute("BEGIN IMMEDIATE")
+                    old=_read(db)
+                    if old is not None and (
+                            (epoch,sequence)<=(old[0],old[1])):
+                        raise Refused("MONOTONIC_CLOCK_RELEASE_REPLAY")
+                    if old is not None and old[5]!=self.root_pin:
+                        raise Refused("CLOCK_RELEASE_ROOT_CHANGED_WITHOUT_APPROVAL")
+                    if old is not None and (pid,ticks)==(old[3],old[4]):
+                        raise Refused("OLD_CLOCK_PROCESS_ALREADY_ENROLLED")
+                    # On upgrading an old B2B13 installation without its
+                    # floor witness, require supervised migration. No
+                    # guessed floor or silent legacy exception.
+                    first=self.enrollment/Floor.MANIFEST_FILE
+                    second=self.enrollment/Floor.SIGNATURE_FILE
+                    if old is None and not (
+                            os.path.lexists(first) or
+                            os.path.lexists(second)):
+                        previous=None
+                    else:
+                        try:
+                            previous=self.floor_witness.read_signed()
+                        except Floor.Refused as exc:
+                            raise Refused("PRIOR_SIGNED_FLOOR_UNVERIFIED") from exc
+                        prior_version=(previous["releaseEpoch"],
+                                       previous["releaseSequence"])
+                        if prior_version>=(epoch,sequence):
+                            raise Refused("PRIOR_SIGNED_FLOOR_VERSION_REPLAY")
+                        if old is None:
+                            raise Refused("SIGNED_FLOOR_WITHOUT_LEDGER")
+                        if previous["state"]=="CURRENT" and (
+                                prior_version!=(old[0],old[1])
+                                or previous["sessionSha256"]!=old[6]):
+                            raise Refused("CURRENT_FLOOR_AND_LEDGER_DIFFER")
+                        if previous["state"]=="BLOCKED" and (
+                                prior_version<(old[0],old[1])):
+                            raise Refused("BLOCKED_FLOOR_BEHIND_LEDGER")
+                    # Require the exact program and original kernel peer
+                    # still exist after waiting for exclusive issuer lock.
+                    _,latest_role,_=self.origin._load_bundle()
+                    if latest_role!=policy_raw:
+                        raise Refused("CONTROLLER_ROLE_CHANGED_DURING_ISSUE")
+                    try:
+                        Peer.verify(accepted_socket,witness,
+                                    role["interpreterPath"])
+                    except Peer.Refused as exc:
+                        raise Refused("CONTROLLER_PROCESS_EXITED") from exc
+                    blocked=Floor.make_record(
+                        epoch=epoch,sequence=sequence,session_raw=raw,
+                        state="BLOCKED")
+                    blocked_sig=self.signer.sign(Floor.DOMAIN+blocked)
+                    root.verify(blocked_sig,Floor.DOMAIN+blocked)
+                    # Publish BLOCKED durably BEFORE raising SQL floor.
+                    # Any torn JSON+sig pair fails signature verification.
+                    _durable_publish(self.enrollment,Floor.MANIFEST_FILE,
+                                     blocked,synthetic=self.synthetic)
+                    _durable_publish(self.enrollment,Floor.SIGNATURE_FILE,
+                                     blocked_sig,synthetic=self.synthetic)
+                    db.execute("""INSERT INTO release_floor
+                        (slot,epoch,sequence,boot_id,old_writer_pid,
+                         old_writer_ticks,signer_digest,session_digest)
+                        VALUES (1,?,?,?,?,?,?,?)
+                        ON CONFLICT(slot) DO UPDATE SET
+                        epoch=excluded.epoch,
+                        sequence=excluded.sequence,
+                        boot_id=excluded.boot_id,
+                        old_writer_pid=excluded.old_writer_pid,
+                        old_writer_ticks=excluded.old_writer_ticks,
+                        signer_digest=excluded.signer_digest,
+                        session_digest=excluded.session_digest""",
+                        (epoch,sequence,data["bootId"],pid,ticks,
+                         self.root_pin,hashlib.sha256(raw).hexdigest()))
+                    db.execute("COMMIT")
+                except BaseException:
+                    if db.in_transaction:
+                        db.execute("ROLLBACK")
+                    raise
+                finally:
+                    db.close()
+                # After SQL commit, CURRENT is safe to publish; its
+                # digest names only the new session, so the old one
+                # cannot pass even if session publication is interrupted.
+                current=Floor.make_record(
+                    epoch=epoch,sequence=sequence,session_raw=raw,
+                    state="CURRENT")
+                current_sig=self.signer.sign(Floor.DOMAIN+current)
+                root.verify(current_sig,Floor.DOMAIN+current)
+                _durable_publish(self.enrollment,Floor.MANIFEST_FILE,
+                                 current,synthetic=self.synthetic)
+                _durable_publish(self.enrollment,Floor.SIGNATURE_FILE,
+                                 current_sig,synthetic=self.synthetic)
+                _durable_publish(self.enrollment,Session.SESSION_FILE,raw,
+                                 synthetic=self.synthetic)
+                _durable_publish(self.enrollment,Session.SIGNATURE_FILE,
+                                 signature,synthetic=self.synthetic)
             return dict({"signedSessionPublished":True,
                          "latestEpoch":epoch,
                          "latestSequence":sequence,

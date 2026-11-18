@@ -174,6 +174,31 @@ class TestHttpsIsolation(unittest.TestCase):
         with self.assertRaises((ssl.SSLError, URLError, OSError)):
             urlopen(self.https_base + "/v1/iphone/next", timeout=2)
 
+    def test_tls_1_2_client_is_rejected(self):
+        legacy = ssl.create_default_context(cafile=str(self.cert))
+        legacy.maximum_version = ssl.TLSVersion.TLSv1_2
+        opener = build_opener(HTTPSHandler(context=legacy))
+        with self.assertRaises((ssl.SSLError, URLError, OSError)):
+            opener.open(self.https_base + "/v1/iphone/next", timeout=2)
+
+    def test_unapproved_peer_is_rejected_before_phone_claim(self):
+        # Here the server expects a different IPv4 peer (127.0.0.2) from
+        # the actual local test client (127.0.0.1).
+        denied = Gate._PrivateIphoneHTTPSServer(
+            "127.0.0.1", 0, self.relay, self.context, "127.0.0.2",
+            allow_test_loopback=True)
+        thread = threading.Thread(target=denied.serve_forever, daemon=True)
+        thread.start()
+        try:
+            address = "https://127.0.0.1:" + str(denied.server_port)
+            with self.assertRaises((ssl.SSLError, URLError, OSError)):
+                self.opener.open(address + "/v1/iphone/next", timeout=2)
+            self.assertEqual(self.relay.status()["state"], "EMPTY")
+        finally:
+            denied.shutdown()
+            thread.join(timeout=3)
+            denied.server_close()
+
     def test_plain_http_is_not_accepted_on_https_port(self):
         with self.assertRaises((RemoteDisconnected, ConnectionError,
                                 URLError, OSError)):

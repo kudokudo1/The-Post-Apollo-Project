@@ -215,5 +215,11 @@ def inspect_controller_owned_ci_only(
         "enrollmentSha256": hashlib.sha256(raw["enrollment"]).hexdigest(),
         "receiptKeySha256": result["receiptKeySha256"],
         "hostId": result["hostId"],
+        # These values came from the verified C4b controller-signed
+        # enrollment, not unverified guest-provided version fields.
+        "releaseEpoch": result["releaseEpoch"],
+        "releaseSequence": result["releaseSequence"],
+        "releaseSha256": result["releaseSha256"],
+        "controllerRootSha256": hashlib.sha256(raw["root"]).hexdigest(),
         **E.NEGATIVE, **NEGATIVE,
     }

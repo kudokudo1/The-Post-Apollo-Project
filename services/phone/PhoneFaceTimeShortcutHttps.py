@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import ipaddress
+import json
 import os
 from pathlib import Path
 import socket
@@ -45,39 +46,48 @@ def _safe_address(raw: object, *, allow_loopback: bool = False) -> str:
     raise ValueError("invalid private IPv4 address")
 
 
-def _private_tls_key(path: str) -> None:
-    """No deployment with symlink, shared or foreign private key."""
-    try:
-        item = Path(path).lstat()
-    except OSError:
-        raise ValueError("unavailable TLS key") from None
-    if (not stat.S_ISREG(item.st_mode)
-            or item.st_uid != os.getuid()
-            or item.st_mode & 0o077
-            or item.st_size <= 0
-            or item.st_size > 100000):
-        raise ValueError("unsafe TLS key")
-
-
 def _tls_context(certfile: str, keyfile: str) -> ssl.SSLContext:
-    """iPhone must independently trust the hostname/SAN certificate."""
-    _private_tls_key(keyfile)
+    """Load the verified key by a held fd, not a second untrusted path lookup.
+
+    This service is Linux-specific. /proc/self/fd pins the owner-only inode
+    during the OpenSSL key read even if someone swaps the original filename.
+    iPhone SAN, validity and root trust are enforced by the actual iOS client,
+    NOT proved by this local load operation.
+    """
+    if type(certfile) is not str or type(keyfile) is not str:
+        raise ValueError("invalid TLS identity")
     try:
         certificate = Path(certfile).lstat()
-        if not stat.S_ISREG(certificate.st_mode) or certificate.st_size > 100000:
+        if (not stat.S_ISREG(certificate.st_mode)
+                or certificate.st_size <= 0 or certificate.st_size > 100000):
             raise ValueError("invalid TLS certificate")
     except OSError:
         raise ValueError("invalid TLS certificate") from None
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.minimum_version = ssl.TLSVersion.TLSv1_3
-    context.options |= ssl.OP_NO_COMPRESSION
-    # No insecure HTTP fallback and no anonymous/self-signed bypass.
-    # Certificate trust is enforced by iPhone TLS client, not by this server.
+
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     try:
-        context.load_cert_chain(certfile=certfile, keyfile=keyfile)
-    except (OSError, ssl.SSLError, ValueError):
-        raise ValueError("TLS identity unavailable") from None
-    return context
+        keyfd = os.open(keyfile, flags)
+    except OSError:
+        raise ValueError("unsafe TLS key") from None
+    try:
+        item = os.fstat(keyfd)
+        if (not stat.S_ISREG(item.st_mode)
+                or item.st_uid != os.getuid()
+                or item.st_mode & 0o077
+                or item.st_size <= 0 or item.st_size > 100000):
+            raise ValueError("unsafe TLS key")
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_3
+        context.options |= ssl.OP_NO_COMPRESSION
+        try:
+            # Never re-open the original key path after validating the inode.
+            context.load_cert_chain(
+                certfile=certfile, keyfile=f"/proc/self/fd/{keyfd}")
+        except (OSError, ssl.SSLError, ValueError):
+            raise ValueError("TLS identity unavailable") from None
+        return context
+    finally:
+        os.close(keyfd)
 
 
 class _PhoneOnlyHandler(_Handler):
@@ -163,10 +173,48 @@ def serve(
         thread.join(timeout=3)
 
 
+CONFIG_SCHEMA = "post-apollo.phone.facetime-https-local-check.v1"
+
+
+def _local_configuration(
+    bind: object, phone_port: object, admin_port: object,
+    peer: object, certfile: object, keyfile: object,
+    admin_file: object, phone_file: object,
+) -> None:
+    """Read-only acceptance of local *materials*, not reachable iPhone proof."""
+    _safe_address(bind)
+    _safe_address(peer)
+    if (type(phone_port) is not int or type(admin_port) is not int
+            or not 1024 <= phone_port <= 65535
+            or not 1024 <= admin_port <= 65535):
+        raise ValueError("invalid configured ports")
+    _tls_context(certfile, keyfile)
+    Relay(_load_token(admin_file), _load_token(phone_file))
+
+
+def _check_result(accepted: bool) -> dict[str, object]:
+    # No path, IP, token, SAN, phone number or provider evidence emitted.
+    return {
+        "schema": CONFIG_SCHEMA,
+        "execution": "READ_ONLY_LOCAL_FILES_ONLY",
+        "state": "LOCAL_MATERIAL_ACCEPTED" if accepted else "CONFIGURATION_REJECTED",
+        "networkListenerStarted": False,
+        "iphoneReachableVerified": False,
+        "iphoneCertificateTrustVerified": False,
+        "iphoneShortcutConfigured": False,
+        "faceTimeConnected": False,
+        "faceTimeCallControl": False,
+        "videoAvailable": False,
+        "personalDataAuthorized": False,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Explicit iPhone-only FaceTime HTTPS ingress; not FaceTime")
-    parser.add_argument("--serve-iphone-https", action="store_true")
+    option = parser.add_mutually_exclusive_group()
+    option.add_argument("--serve-iphone-https", action="store_true")
+    option.add_argument("--check-configuration", action="store_true")
     parser.add_argument("--acknowledge-private-lan-exposure", action="store_true")
     parser.add_argument("--operator-port", type=int)
     parser.add_argument("--phone-bind")
@@ -177,21 +225,33 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--admin-token-file")
     parser.add_argument("--iphone-token-file")
     args = parser.parse_args(argv)
+    if args.check_configuration:
+        # No serve(), socket bind, DNS, WLAN or phone interaction on this path.
+        try:
+            _local_configuration(
+                args.phone_bind, args.phone_port, args.operator_port,
+                args.iphone_client_ip, args.certificate_file,
+                args.private_key_file, args.admin_token_file,
+                args.iphone_token_file)
+            accepted = True
+        except (OSError, ValueError, TypeError, UnicodeError, ssl.SSLError):
+            accepted = False
+        print(json.dumps(_check_result(accepted), sort_keys=True))
+        return 0 if accepted else 2
     if not (args.serve_iphone_https and args.acknowledge_private_lan_exposure):
         return 2
     try:
-        bind = _safe_address(args.phone_bind)
-        peer = _safe_address(args.iphone_client_ip)
-        if (type(args.phone_port) is not int
-                or not 1024 <= args.phone_port <= 65535
-                or type(args.operator_port) is not int
-                or not 1024 <= args.operator_port <= 65535):
-            return 2
+        _local_configuration(
+            args.phone_bind, args.phone_port, args.operator_port,
+            args.iphone_client_ip, args.certificate_file,
+            args.private_key_file, args.admin_token_file,
+            args.iphone_token_file)
         tls = _tls_context(args.certificate_file, args.private_key_file)
         relay = Relay(_load_token(args.admin_token_file),
                       _load_token(args.iphone_token_file))
-        serve(args.operator_port, bind, args.phone_port, peer, relay, tls)
-    except (OSError, ValueError, TypeError, ssl.SSLError):
+        serve(args.operator_port, args.phone_bind, args.phone_port,
+              args.iphone_client_ip, relay, tls)
+    except (OSError, ValueError, TypeError, UnicodeError, ssl.SSLError):
         # Never echo private paths, peer addresses or credentials.
         return 2
     return 0

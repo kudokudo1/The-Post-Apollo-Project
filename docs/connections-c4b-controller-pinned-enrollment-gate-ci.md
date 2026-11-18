@@ -13,9 +13,9 @@ Earlier [#2025](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/2025) 
 
 This new `controller_pinned_enrollment_gate_ci.py` is a read-only **deny-only contract**, intentionally not wired into production. It accepts:
 
-- A strictly canonical Ed25519 **controller-root-signed** purpose/role-scoped enrollment certificate with an exact package, unit, audience, diagnostic-only scope, 128-bit enrollment ID, signed release SHA-256, release epoch/sequence, and the SHA-256 of the **exact gateway receipt public key**.
+- A strictly canonical Ed25519 **controller-root-signed** purpose/role-scoped enrollment certificate with an exact package, unit, audience, diagnostic-only scope, 128-bit enrollment ID, C3e-compatible signed host ID, signed release SHA-256, release epoch/sequence, and the SHA-256 of the **exact gateway receipt public key**.
 - A separately pinned controller **public root key**, never taken from the guest proof.
-- A separately pinned signed release digest and minimum release epoch/sequence, never from UART.
+- A separately pinned C3e-compatible host identity, signed release digest and minimum release epoch/sequence, never from UART.
 - An exact externally supplied revocation-ID snapshot. Empty snapshots work **only in synthetic CI**; the function cannot prove a live operator-approved revocation ledger is present.
 - One actual signed `BEGIN` **UNAVAILABLE** receipt containing the controller's fresh nonce and a public key supplied by the guest.
 
@@ -27,13 +27,13 @@ The unit tests generate separate, short-lived signing keys in the GitHub runner 
 
 ## HOW TO USE
 
-Dedicated fast CI: `.github/workflows/connections-identity-silverblue-controller-enrollment.yml`. It executes 32 adversarial enrollment/signature/release/revocation/guest-substitution cases, plus the previous C4b challenge, receipt binding and Identity release regressions.
+Dedicated fast CI: `.github/workflows/connections-identity-silverblue-controller-enrollment.yml`. It executes 35 adversarial enrollment/signature/release/revocation/cross-host/guest-substitution cases, plus the previous C4b challenge, receipt binding and Identity release regressions.
 
 The existing real Fedora KVM signed-RPM workflow remains unchanged; it does **not** pretend an operator root exists. No production QML, broker, native service, sign-in or C5 files are modified.
 
 ## VERIFY
 
-- [ ] 32 new synthetic independent-root enrollment tests on exact PR head
+- [ ] 35 new synthetic independent-root enrollment and cross-host refusal tests on exact PR head
 - [ ] 24 existing controller challenge tests, 25 runtime key binding tests, 7 Identity release tests
 - [ ] Applicable C4b real Silverblue regression, signed RPM source and Grammar workflows
 - [ ] Independent NRS-2 review of role/domain/key separation, revocation source and guest substitution
@@ -51,7 +51,7 @@ All `hostAuthenticated`, `canBeginSignIn`, `credentialActionsEnabled`, `producti
 
 - [x] Read Syntagma AGENTS, Hospital continuity and permissions; confirm merged #2025, existing C4b owner and current GitHub main.
 - [x] Add a separate controller-pinned certificate verifier, not trusting guest-supplied keys as enrollment.
-- [x] Reject signed forged guest key, unexpected role, rollback, revoked enrollment, wrong release and replayed nonce.
+- [x] Reject signed forged guest key, unexpected role or host ID, rollback, revoked enrollment, wrong release and replayed nonce.
 - [x] Add exact-head CI and standalone recovery/documentation contract.
 - [ ] CI verification and independent review
 - [ ] Actual operator-enrolled root custody/rotation/revocation, external floor, installed host attestation, C3e/Identity/C5 integration

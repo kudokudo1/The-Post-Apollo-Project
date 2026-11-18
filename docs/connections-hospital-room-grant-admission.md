@@ -30,7 +30,7 @@ It can independently inspect a **previously signed** PX v12 envelope against an 
 
 ### PX contract verification
 
-The dedicated CI checks out the exact immutable PX #130 source head `8c0f9c4e5788579efd9d34672ff308f4bca2937f`, **reads its actual `px_hospital_room_authority.py`**, and runs the same disposable synthetic signed envelope through BOTH the unmodified PX verifier and this bounded Connections reader. The workflow checks that PX still requires signed grants, atomically consumes one-use approvals and refuses unsigned transitions. No PX, C3e, C4b, Identity, C5a–d, Hospital QML or host file is modified.
+The dedicated CI checks out the exact immutable PX #130 source head `5a82559fef377420639a26371ac04a765b534ff6`, **reads its actual `px_hospital_room_authority.py`**, and runs the same disposable synthetic signed envelope through BOTH the unmodified PX verifier and this bounded Connections reader. The workflow checks that PX still requires signed grants, atomically consumes one-use approvals and refuses unsigned transitions. No PX, C3e, C4b, Identity, C5a–d, Hospital QML or host file is modified.
 
 ## HOW TO USE
 

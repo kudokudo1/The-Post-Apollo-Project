@@ -6,6 +6,7 @@ import base64
 import hashlib
 import json
 import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -196,6 +197,39 @@ class ControllerFreshChallengeTests(unittest.TestCase):
                        '"productionAuthority": True', '"hostAuthenticated": True',
                        "systemctl start", "rpm-ostree install"):
             self.assertNotIn(needle, source)
+
+    def test_25_guest_uart_emits_proof_on_new_line_after_unterminated_console(self):
+        # Reproduce the real transport class: a kernel/systemd console
+        # fragment and then a genuine, correctly signed proof. No helper
+        # changes to verifier parsing are permitted; the sender must
+        # create the record boundary on the shared serial byte stream.
+        probe=(Path(__file__).parent/"guest_identity_service_probe.sh").read_text()
+        self.assertIn(
+            r"""C4B_ID_CHALLENGE_PROOF\ //*) printf '\n%s\n' "$line" >/dev/ttyS0 ;;""",
+            probe,
+        )
+        self.assertNotIn(
+            r"""C4B_ID_CHALLENGE_PROOF\ //*) echo "$line" >/dev/ttyS0 ;;""",
+            probe,
+        )
+        proof=self.serial.rstrip(b"\n").decode("ascii")
+        write=subprocess.run(
+            ["bash", "-c", r"""printf '\n%s\n' "$1" """, "_", proof],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            check=True, timeout=5,
+        ).stdout
+        self.assertEqual(write, b"\n"+self.serial)
+        report=self.check(serial=b"unterminated systemd console text"+write)
+        self.assertIs(report["freshControllerNonceInActualSignedBeginDenialInCI"], True)
+
+    def test_26_prefixed_proof_still_strictly_refused(self):
+        # An arbitrary firmware, kernel or attacker prefix remains invalid.
+        # The fix is at the producer, NOT permissive prefix-stripping.
+        self.refused(serial=b"unterminated systemd console text"+self.serial)
+        self.refused(serial=b"\x1b[31m"+self.serial)
+
+    def test_27_duplicate_is_still_refused_after_uart_record_boundary(self):
+        self.refused(serial=b"unfinished prior output\n"+self.serial+self.serial)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

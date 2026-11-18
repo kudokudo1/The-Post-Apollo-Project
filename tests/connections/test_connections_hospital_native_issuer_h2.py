@@ -383,6 +383,28 @@ class NativeIssuerSecurity(unittest.TestCase):
         self.assertNotIn("auth_self_keep",pol)
         self.assertNotIn("auth_admin_keep",pol)
 
+    def test_39_real_kernel_packet_credentials_match_receiving_process(self):
+        import socket
+        with socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET) as (tx,rx):
+            rx.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
+            tx.send(b"native-packet")
+            actual=(os.getpid(),os.getuid(),os.getgid())
+            self.assertEqual(S._packet_recv(rx,expected_sender=actual),b"native-packet")
+
+    def test_40_forwarded_or_different_sender_pid_cannot_pass_packet_gate(self):
+        import socket
+        with socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET) as (tx,rx):
+            rx.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
+            tx.send(b"other-process-packet")
+            forged=(os.getpid()+1,os.getuid(),os.getgid())
+            self.denied(S._packet_recv,rx,expected_sender=forged)
+
+    def test_41_packet_gate_rejects_no_trusted_expected_peer(self):
+        import socket
+        with socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET) as (tx,rx):
+            tx.send(b"native-packet")
+            self.denied(S._packet_recv,rx,expected_sender=None)
+
     def test_38_native_units_have_no_install_or_auto_activation(self):
         sock=(HERE/"native/post-apollo-hospital-issuer.socket").read_text()
         unit=(HERE/"native/post-apollo-hospital-issuer.service").read_text()

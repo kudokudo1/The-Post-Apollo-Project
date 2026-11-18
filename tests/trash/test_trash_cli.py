@@ -71,9 +71,11 @@ class TrashBackendTests(unittest.TestCase):
 
     def test_restore_only_listed_uri_and_never_overwrites_existing_target(self):
         with patch.object(trash, "_run", side_effect=[
-                result(self.rows), result("")]) as run:
+                result(self.rows), result("")]) as run, \
+             patch.object(trash, "_restore_preflight") as preflight:
             data = trash.item_action("restore", "trash:///Camera%201.png",
                                      str(self.first))
+        preflight.assert_called_once()
         self.assertEqual(data["message"], "RESTORED")
         self.assertEqual(run.call_args_list[-1].args[0],
                          ["/usr/bin/gio", "trash", "--restore",
@@ -185,7 +187,8 @@ class TrashBackendTests(unittest.TestCase):
 
     def test_gio_failures_are_reported_without_success_claims(self):
         with patch.object(trash, "_run", side_effect=[
-                result(self.rows), result("", 1, "cannot restore")]):
+                result(self.rows), result("", 1, "cannot restore")]), \
+             patch.object(trash, "_restore_preflight"):
             with self.assertRaisesRegex(trash.TrashError, "GIO_RESTORE_FAILED"):
                 trash.item_action("restore", "trash:///Camera%201.png",
                                   str(self.first))

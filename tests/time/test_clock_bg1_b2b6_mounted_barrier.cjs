@@ -146,6 +146,27 @@ test("no stale queued-write callback can bypass pause barrier",()=>{
     assert.match(onSaved,/manager\.storageState = "ready"/);
 });
 
+test("B2B15 private accepted-save drain cannot bypass mounted authority",()=>{
+    const qml=read("services/time/AlarmManagerService.qml");
+    assert.match(qml,/readonly property string alarmWriterBarrierPhase: "ACTIVE"/);
+    assert.match(qml,/readonly property bool nativeWriterDrainBridgeInstalled: false/);
+    assert.match(qml,/readonly property string localWriterDrainPhase: writerDrain\.phase/);
+    assert.match(functionBody(qml,"beginWrite"),
+        /if \(writerDrain\.draining && !writerDrain\.acceptedFlushOnly\)/);
+    assert.match(functionBody(qml,"saveDocument"),
+        /writerDrain\.acceptedGeneration\+\+/);
+    const save=qml.slice(qml.indexOf("        onSaved: {"),
+        qml.indexOf("        onSaveFailed:",qml.indexOf("        onSaved: {")));
+    assert.match(save,/writerDrain\.observedSaveGeneration = acknowledgedGeneration/);
+    assert.match(save,/writerDrain\.acceptedFlushOnly = writerDrain\.draining/);
+    assert.match(save,/writerDrain\.maybeComplete\(\)/);
+    assert.match(save,/finally \{\s*writerDrain\.acceptedFlushOnly = false/);
+    assert.match(qml,/writerDrain\.markFailed\(\)/);
+    assert.match(qml,/WriterDrain\.QUIESCING/);
+    assert.match(qml,/WriterDrain\.FAILED/);
+    assert.equal(qml.match(/alarmFile\.setText\(/g)?.length,1);
+});
+
 test("timer, migration and restart ring-announcement paths are gated",()=>{
     const qml=read("services/time/AlarmManagerService.qml");
     assert.match(functionBody(qml,"maybeInitialize"),

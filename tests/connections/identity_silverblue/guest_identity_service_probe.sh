@@ -396,7 +396,11 @@ PY
 while IFS= read -r line; do
   case "$line" in
     C4B_ID_PASS\ //*) echo "$line" >/dev/ttyS0 ;;
-    C4B_ID_CHALLENGE_PROOF\ //*) echo "$line" >/dev/ttyS0 ;;
+    # The QEMU UART is a shared byte stream, not a record-oriented pipe.
+    # Kernel/systemd progress may leave an unterminated console line before
+    # the proof. Isolate this public signed frame on its OWN physical line.
+    # Do not relax the controller's strict start-of-line / signature checks.
+    C4B_ID_CHALLENGE_PROOF\ //*) printf '\n%s\n' "$line" >/dev/ttyS0 ;;
     *) printf 'C4B_ID_SERVICE_PROBE_DETAIL // %.500s\n' "$line" >/dev/ttyS0 ;;
   esac
 done < <(sed -n '1,28p' "$probe_log")

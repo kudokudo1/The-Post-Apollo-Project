@@ -236,6 +236,8 @@ def _writer_exchange(policy, body):
             s.settimeout(4)
             s.connect(C.WRITER_SOCKET)
             p = _peer_writer(s)
+            # Enable per-packet Linux credentials BEFORE the writer replies.
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
             if p[1] != policy["pxWriterUid"]:
                 C.deny("WRONG_PX_WRITER_UID")
             if _executable_sha(p[0]) != policy["pxWriterExecutableSha256"]:
@@ -364,6 +366,16 @@ def main():
             listen.settimeout(40)
             with listen.accept()[0] as client:
                 client.settimeout(40)
+                # A socket-activated caller must WAIT for this READY packet.
+                # Credentials on messages queued before SO_PASSCRED was set
+                # are not reliable; early request packets fail closed.
+                client.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
+                ready = C.canonical({
+                    "schema": "postapollo.connections.hospital-native-ready.v1",
+                    "status": "READY",
+                })
+                if client.send(ready) != len(ready):
+                    C.deny("NATIVE_CLIENT_HANDSHAKE_FAILED")
                 response = _native_step(client, policy)
                 answer = C.canonical(response)
                 if client.send(answer) != len(answer):

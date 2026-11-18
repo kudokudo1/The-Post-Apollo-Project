@@ -1,0 +1,74 @@
+import QtQuick
+import Quickshell
+import Quickshell.Io
+
+// Hospital's source-owned Trash inventory: metadata only, never a path or
+// GIO item. Errors are separate from a genuinely empty Room bin.
+Scope {
+    id: root
+    property bool active: false
+    property bool busy: false
+    property bool loaded: false
+    property string lastError: ""
+    property var rows: []
+
+    function refresh() {
+        if (!active || busy || binProcess.running)
+            return false;
+        busy = true;
+        loaded = false;
+        lastError = "";
+        binProcess.exec([
+            "bash", "-lc",
+            'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"; '
+                + '[ -x "$px" ] || px="$HOME/.local/bin/px"; '
+                + 'exec "$px" "$@"',
+            "hospital-room-bin", "hospital",
+            "room-lifecycle-bin", "--json"
+        ]);
+        return true;
+    }
+
+    Process {
+        id: binProcess
+        property string outputText: ""
+        property string errorText: ""
+        stdout: StdioCollector {
+            onStreamFinished: binProcess.outputText = String(this.text || "")
+        }
+        stderr: StdioCollector {
+            onStreamFinished: binProcess.errorText = String(this.text || "")
+        }
+        onExited: function(code, status) {
+            const output = binProcess.outputText;
+            const error = binProcess.errorText;
+            binProcess.outputText = "";
+            binProcess.errorText = "";
+            root.busy = false;
+            try {
+                if (Number(code) !== 0)
+                    throw new Error(String(error || output || "PX NOT AVAILABLE").slice(0,200));
+                const parsed = JSON.parse(output || "[]");
+                if (!Array.isArray(parsed) || parsed.length > 2500)
+                    throw new Error("HOSPITAL BIN FORMAT INVALID");
+                const valid = parsed.every(function(item) {
+                    return item && item.state === "TRASHED"
+                        && item.kind === "HOSPITAL ROOM"
+                        && item.burnAllowed === false
+                        && /^[A-Za-z0-9._:/-]{1,160}$/.test(String(item.roomId || ""))
+                        && Number.isSafeInteger(item.revision)
+                        && item.revision > 0;
+                });
+                if (!valid)
+                    throw new Error("HOSPITAL BIN IDENTITY INVALID");
+                root.rows = parsed;
+                root.loaded = true;
+                root.lastError = "";
+            } catch (e) {
+                root.rows = [];
+                root.loaded = false;
+                root.lastError = "HOSPITAL BIN // " + String(e).slice(0,230);
+            }
+        }
+    }
+}

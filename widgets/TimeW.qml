@@ -6313,7 +6313,8 @@ PanelWindow {
                                 label: "REFRESH STORED"
                                 labelPixelSize: 10
                                 accentColor: timew.semanticColor
-                                available: !timew.machineStoreBusy
+                                available: !timew.machineV2ReviewBusy
+                                           && !timew.machineStoreBusy
                                            && !timew.machineSaveBridgeBusy
                                            && !timew.machineNotesDirty
                                 onLeftClicked: timew.machineListCheckpoints()
@@ -6329,6 +6330,7 @@ PanelWindow {
                                 label: "<"
                                 accentColor: timew.semanticColor
                                 available: timew.machineSavedCheckpoints.length > 1
+                                           && !timew.machineV2ReviewBusy
                                            && !timew.machineNotesDirty
                                            && !timew.machineSaveBridgeBusy
                                            && !timew.machineStoreBusy
@@ -6351,6 +6353,7 @@ PanelWindow {
                                 label: ">"
                                 accentColor: timew.semanticColor
                                 available: timew.machineSavedCheckpoints.length > 1
+                                           && !timew.machineV2ReviewBusy
                                            && !timew.machineNotesDirty
                                            && !timew.machineSaveBridgeBusy
                                            && !timew.machineStoreBusy
@@ -6544,6 +6547,7 @@ PanelWindow {
                                 labelPixelSize: 11
                                 accentColor: Colors.cyan
                                 available: !!timew.machineSavedItem
+                                           && !timew.machineV2ReviewBusy
                                            && !timew.machineSaveBridgeBusy
                                            && !timew.machineStoreBusy
                                            && !timew.machineAutoRestoreBusy
@@ -6644,7 +6648,7 @@ PanelWindow {
                             text: timew.machineV2ReviewItem
                                   ? timew.machineV2ReviewItem.app_id + " // "
                                     + timew.machineV2ReviewItem.classification
-                                    + "\\nSAVED " + timew.machineV2ReviewItem.target_output
+                                    + "\nSAVED " + timew.machineV2ReviewItem.target_output
                                     + " // " + timew.machineV2ReviewItem.target_workspace
                                   : ""
                             textFormat: Text.PlainText

@@ -1,0 +1,62 @@
+name: Clock BG1-B2B20 durable native cutover and real old-writer exit (synthetic only)
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmNativeCutoverController.py"
+      - "services/time/BG1-ALARM-NATIVE-CUTOVER-CONTROLLER.md"
+      - "tests/time/test_clock_bg1_native_cutover_controller.py"
+      - ".github/workflows/clock-bg1-b2b20-native-cutover-controller.yml"
+  push:
+    paths:
+      - "services/time/AlarmNativeCutoverController.py"
+      - "services/time/BG1-ALARM-NATIVE-CUTOVER-CONTROLLER.md"
+      - "tests/time/test_clock_bg1_native_cutover_controller.py"
+      - ".github/workflows/clock-bg1-b2b20-native-cutover-controller.yml"
+permissions:
+  contents: read
+jobs:
+  real-process-and-crash-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install existing Clock Ed25519 library
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Compile native controller and test
+        run: python3 -m py_compile services/time/AlarmNativeCutoverController.py tests/time/test_clock_bg1_native_cutover_controller.py
+      - name: Actual old writer and SQLite/fsync cutover tests
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_native_cutover_controller.py' -v
+      - name: Preserve signed bridge and source witnesses
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b19_kernel_paired_final.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b17_signed_bridge_channel.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b16_native_final_v2_witness.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+      - name: Preserve mounted QML writer, alarm and notes regressions
+        run: |
+          node --test tests/time/test_clock_bg1_b2b15_mounted_save_drain.cjs
+          node --test tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_manager_v2_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_note_recovery_contract.py' -v
+      - name: Strict four new Clock file scope
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          actual=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],text=True
+          ).splitlines())
+          expected={
+              "services/time/AlarmNativeCutoverController.py",
+              "services/time/BG1-ALARM-NATIVE-CUTOVER-CONTROLLER.md",
+              "tests/time/test_clock_bg1_native_cutover_controller.py",
+              ".github/workflows/clock-bg1-b2b20-native-cutover-controller.yml"}
+          assert actual==expected, f"Unauthorized scope: {sorted(actual ^ expected)}"
+          print("PASS: only four Clock files, no live QML or user alarm data")
+          PY

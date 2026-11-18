@@ -201,13 +201,18 @@ class ClockProtectedSessionEnrollment:
             raise Refused("INDEPENDENT_CLOCK_RELEASE_FLOOR_REQUIRED")
         self.synthetic=synthetic_only
         self.path=Path(enrollment_directory)
-        self.origin=Origin.ClockInstalledRoleTrustPreflight(
-            trust_directory=trust_directory,
-            pinned_root_sha256=pinned_root_sha256,
-            expected_role="clock-ui-bridge",
-            minimum_epoch=minimum_epoch,
-            minimum_sequence=minimum_sequence,
-            disposable_test_mode=synthetic_only)
+        try:
+            self.origin=Origin.ClockInstalledRoleTrustPreflight(
+                trust_directory=trust_directory,
+                pinned_root_sha256=pinned_root_sha256,
+                expected_role="clock-ui-bridge",
+                minimum_epoch=minimum_epoch,
+                minimum_sequence=minimum_sequence,
+                disposable_test_mode=synthetic_only)
+        except Origin.Refused as exc:
+            # Preserve B2B9's fixed fail-closed reason, but expose only
+            # this module's own refusal type to session callers.
+            raise Refused(str(exc)) from exc
         self.floor=(minimum_epoch,minimum_sequence)
         _protected_dir(self.path,disposable=synthetic_only)
         if self.synthetic:

@@ -59,7 +59,16 @@ jobs:
               "services/time/BG1-ALARM-SUPERVISOR-SESSIONS.md",
               "tests/time/test_clock_bg1_b2b11_durable_supervisor_sessions.py",
               ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml"}
-          assert paths in (own, own|dependency, own|extension), (
-              f"Unapproved Clock file scope: {sorted(paths ^ (own|extension|dependency))}")
-          print("B2B10 4-file scope, B2B9 unmodified dependency: PASS")
+          protected_session={
+              "services/time/AlarmProtectedSessionEnrollment.py",
+              "services/time/AlarmNativeClockSupervisor.py",
+              "services/time/BG1-ALARM-PROTECTED-SESSION-ENROLLMENT.md",
+              "tests/time/test_clock_bg1_b2b12_protected_enrollment.py",
+              ".github/workflows/clock-bg1-b2b12-protected-session.yml",
+              ".github/workflows/clock-bg1-b2b10-native-supervisor.yml",
+              ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml"}
+          assert paths in (own, own|dependency, own|extension,
+                           protected_session), (
+              f"Unapproved Clock file scope: {sorted(paths ^ (own|extension|dependency|protected_session))}")
+          print("B2B10 original and exact B2B12 inherited scope: PASS")
           PY

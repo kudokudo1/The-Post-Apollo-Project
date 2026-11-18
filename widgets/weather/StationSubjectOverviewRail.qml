@@ -60,6 +60,7 @@ Item {
                        /Math.max(1,overviewRail.routes.length))
                 height: longButtons.height
                 label: modelData.label
+                keyboardActivationSignal: "clicked"
                 selected: overviewRail.selectedPath !== ""
                     && modelData.path === overviewRail.selectedPath
                 labelPixelSize: 10

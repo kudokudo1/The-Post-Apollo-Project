@@ -221,3 +221,84 @@ test("single Burn menu filters both sources and requires scope for bulk",()=>{
     assert.match(qml,/trashLauncher\.burnFilter === "records"/);
     assert.match(qml,/onLeftClicked: \{\s+if \(trashLauncher\.burnFilter === "files"\)/);
 });
+
+
+// Native acceptance found a real regression: file Burn's first click stayed on
+// LOADING SAFETY... forever. The animation used to complete only for managed
+// copies because file Burn deliberately has researchBurnId === "".
+function finishRealQmlArmAnimation(ctx) {
+    const first=qml.indexOf("id: researchBurnArmAnimation");
+    const end=qml.indexOf("// The second click",first);
+    assert.ok(first>=0 && end>first,"missing shared QML Burn animation");
+    const animation=qml.slice(first,end);
+    const callback=animation.match(/onFinished:\s*\{([\s\S]*?)\n\s{8}\}/);
+    assert.ok(callback,"missing QML animation completion callback");
+    ctx.trashLauncher=ctx;
+    Object.defineProperty(ctx,"burnConfirmationOpen",{
+        configurable:true,
+        get(){return ctx.confirmMode!=="" || ctx.researchBurnId!=="" || ctx.burnUiStage!=="";}
+    });
+    vm.runInContext(callback[1],ctx);
+}
+
+test("P1 native regression: single GIO file reaches second Burn click after real QML animation",()=>{
+    const ctx=harness();
+    ctx.file={name:"disposable.txt",uri:"trash:///disposable.txt",
+              original:"/tmp/disposable.txt"};
+    assert.equal(vm.runInContext("armBurn(file)",ctx),true);
+    assert.equal(ctx.researchBurnId,""); // The old animation condition rejected this.
+    ctx.researchBurnPointerRelocated=true;
+    assert.equal(vm.runInContext("advanceResearchBurn()",ctx),true);
+    assert.equal(ctx.researchBurnClickArmed,true);
+    assert.equal(ctx.researchBurnLoadComplete,false);
+    finishRealQmlArmAnimation(ctx);
+    assert.equal(ctx.researchBurnLoadComplete,true,
+                 "GIO file must become CLICK AGAIN // BURN after 850 ms");
+    assert.equal(ctx.calls.length,0,"arming must not delete a file");
+    assert.equal(vm.runInContext("advanceResearchBurn()",ctx),true);
+    assert.equal(ctx.burnUiStage,"clicked");
+    assert.equal(ctx.delays,1);
+    assert.equal(ctx.calls.length,0,"second click still waits for safety feedback");
+});
+
+test("P1 native regression: GIO Burn All animation has the same bounded arming path",()=>{
+    const ctx=harness({burnFilter:"files"});
+    assert.equal(vm.runInContext("armBurnAll()",ctx),true);
+    assert.equal(ctx.confirmMode,"all");
+    assert.equal(ctx.researchBurnId,"");
+    ctx.researchBurnPointerRelocated=true;
+    assert.equal(vm.runInContext("advanceResearchBurn()",ctx),true);
+    finishRealQmlArmAnimation(ctx);
+    assert.equal(ctx.researchBurnLoadComplete,true);
+    assert.equal(vm.runInContext("advanceResearchBurn()",ctx),true);
+    assert.equal(ctx.burnUiStage,"clicked");
+    assert.equal(ctx.calls.length,0,"no Burn All before delayed confirmation");
+});
+
+test("P1 regression: managed-copy Burn still arms and canceled modal never completes",()=>{
+    const ctx=harness();
+    assert.equal(vm.runInContext("armResearchBurn(researchRows[0])",ctx),true);
+    ctx.researchBurnPointerRelocated=true;
+    assert.equal(vm.runInContext("advanceResearchBurn()",ctx),true);
+    finishRealQmlArmAnimation(ctx);
+    assert.equal(ctx.researchBurnLoadComplete,true,"managed copy must not regress");
+    vm.runInContext("clearResearchBurn()",ctx);
+    ctx.researchBurnLoadComplete=false;
+    finishRealQmlArmAnimation(ctx);
+    assert.equal(ctx.researchBurnLoadComplete,false,"canceled modal must remain disarmed");
+    assert.equal(ctx.calls.length,0);
+});
+
+test("P1 regression: paused/offscreen and unarmed animations cannot grant a Burn click",()=>{
+    for(const overrides of [
+        {menuOpen:false,confirmMode:"item",researchBurnClickArmed:true},
+        {menuOpen:true,confirmMode:"",researchBurnClickArmed:true},
+        {menuOpen:true,confirmMode:"item",researchBurnClickArmed:false},
+        {menuOpen:true,confirmMode:"item",researchBurnClickArmed:true,burnUiStage:"working"}
+    ]) {
+        const ctx=harness(overrides);
+        finishRealQmlArmAnimation(ctx);
+        assert.equal(ctx.researchBurnLoadComplete,false,JSON.stringify(overrides));
+        assert.equal(ctx.calls.length,0);
+    }
+});

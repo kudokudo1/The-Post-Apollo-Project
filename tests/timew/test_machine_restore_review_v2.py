@@ -80,8 +80,22 @@ LIVE_KEYS = {
 
 
 def projected(source=None, *, saved=False):
-    return project_geometry(*(frame() if source is None else source),
-                            window_keys=SAVED_KEYS if saved else LIVE_KEYS)
+    source = frame() if source is None else source
+    # Each synthetic variant has its own exact window set. Like the real
+    # capture adapter, reject extraneous/transient keys instead of bypassing
+    # the projector's strict complete-map validation.
+    ids = set()
+    def visit(node):
+        if node.get("app_id") and node.get("id") is not None:
+            ids.add(node["id"])
+        for name in ("nodes", "floating_nodes"):
+            for child in node.get(name, []):
+                visit(child)
+    visit(source[2])
+    available = SAVED_KEYS if saved else LIVE_KEYS
+    assert ids <= set(available)
+    return project_geometry(*source, window_keys={
+        key: available[key] for key in ids})
 
 
 def reasons(value):

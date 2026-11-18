@@ -132,6 +132,63 @@ def _selected(rows, uri, original):
     raise TrashError("STALE_OR_UNKNOWN_TRASH_ITEM")
 
 
+def _sha256_token(value):
+    return (type(value) is str and len(value) == 64
+            and all(char in "0123456789abcdef" for char in value))
+
+
+def restore_reviewed(uri, original, expected_revision, expected_review_id):
+    """U10 UI-reviewed Restore: revalidate twice, refuse stale observations.
+
+    Two inventories narrow stale-selection windows but cannot atomically bind
+    GIO's eventual restore to an exact inode or prevent another process from
+    changing the destination after the last check. Do not claim this is a
+    no-overwrite transaction, a security authorization or Burn permission.
+    """
+    if not (_sha256_token(expected_revision)
+            and _sha256_token(expected_review_id)):
+        raise TrashError("RESTORE_REVIEW_TOKEN_INVALID")
+    gio, initial = inventory()
+    row = _selected(initial, uri, original)
+    if (_revision(initial) != expected_revision
+            or row["reviewId"] != expected_review_id):
+        raise TrashError("TRASH_CHANGED_REFRESH_REQUIRED")
+    if os.path.lexists(row["original"]):
+        raise TrashError("RESTORE_TARGET_EXISTS")
+
+    # Detect a replacement/reordered inventory or a late destination collision
+    # before GIO is launched. A later concurrent change remains possible.
+    next_gio, latest = inventory()
+    if next_gio != gio:
+        raise TrashError("GIO_EXECUTABLE_CHANGED")
+    current = _selected(latest, uri, original)
+    if (_revision(latest) != expected_revision
+            or current["reviewId"] != expected_review_id):
+        raise TrashError("TRASH_CHANGED_REFRESH_REQUIRED")
+    if os.path.lexists(current["original"]):
+        raise TrashError("RESTORE_TARGET_EXISTS")
+
+    result = _run([gio, "trash", "--restore", current["uri"]],
+                  timeout=ACTION_TIMEOUT)
+    if result.returncode != 0:
+        raise TrashError("GIO_RESTORE_FAILED: " + _error_text(result.stderr))
+
+    # A successful exit is not sufficient evidence; the file must exist and
+    # the original item must no longer be listed. An unknown outcome is an
+    # explicit error. Never automatically retry a possibly completed restore.
+    try:
+        _, after = inventory()
+    except TrashError as exc:
+        raise TrashError("RESTORE_RESULT_UNVERIFIED") from exc
+    if (not os.path.lexists(current["original"])
+            or any(item["uri"] == current["uri"]
+                   and item["original"] == current["original"]
+                   for item in after)):
+        raise TrashError("RESTORE_RESULT_UNVERIFIED")
+    return {"ok": True, "kind": "restore", "name": current["name"],
+            "message": "RESTORED", "verified": True}
+
+
 def item_action(action, uri, original, confirmation=""):
     if action not in ("restore", "burn"):
         raise TrashError("UNKNOWN_ACTION")
@@ -218,7 +275,11 @@ def main(argv):
             except ValueError:
                 raise TrashError("INVALID_PAGE")
             result = index(page)
+        elif len(argv) == 6 and argv[1] == "restore-reviewed":
+            result = restore_reviewed(argv[2], argv[3], argv[4], argv[5])
         elif len(argv) == 4 and argv[1] == "restore":
+            # Legacy CLI remains for existing automation and U9 compatibility.
+            # The Quickshell reviewed path uses restore-reviewed instead.
             result = item_action("restore", argv[2], argv[3])
         elif len(argv) == 5 and argv[1] == "burn":
             result = item_action("burn", argv[2], argv[3], argv[4])

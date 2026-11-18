@@ -49,10 +49,10 @@ function review(ctx,owner="filesystem-gio",id=key,revision=rev){
         +JSON.stringify(revision)+")",ctx);
 }
 
-test("GIO restore from exact indexed key delegates once to old backend",()=>{
+test("GIO restore from exact indexed key carries reviewed tokens to backend",()=>{
     const ctx=harness();
     assert.equal(review(ctx),true);
-    assert.deepEqual(ctx.calls,[{action:"restore",args:["restore",uri,original]}]);
+    assert.deepEqual(ctx.calls,[{action:"restore",args:["restore-reviewed",uri,original,rev,key]}]);
     assert.equal(ctx.cleared,1);
     assert.equal(ctx.busy,true);
     assert.equal(review(ctx),false);
@@ -110,6 +110,8 @@ test("UI review deck is file-only, uses SHA token and never requests Burn",()=>{
     assert.match(qml,/showTrash: false/);
     assert.match(qml,/showBurn: false/);
     assert.match(qml,/onRestoreReviewRequested:/);
+    assert.match(qml,/\["restore-reviewed"/);
+    assert.doesNotMatch(qml,/run\("restore", \["restore",/);
     assert.match(deck,/property string resourceRevisionKind: "sha256"/);
     assert.doesNotMatch(qml,/onBurnReviewRequested:/);
 });

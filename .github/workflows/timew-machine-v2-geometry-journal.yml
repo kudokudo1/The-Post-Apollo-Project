@@ -1,0 +1,36 @@
+name: TimeW MACHINE V2 geometry durable operation journal
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineV2GeometryJournal.py"
+      - "services/time/MachineV2FloatingPilot.py"
+      - "tests/timew/test_machine_v2_geometry_journal.py"
+      - "tests/timew/test_machine_v2_floating_pilot.py"
+      - "tests/timew/test_machine_geometry_headless_sway.py"
+      - ".github/workflows/timew-machine-v2-geometry-journal.yml"
+      - "docs/timew-machine-v2-geometry-journal.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite-crash-recovery-and-fixture-sway:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Prove private geometry journal durability and no replay
+        run: python3 -B -I tests/timew/test_machine_v2_geometry_journal.py
+      - name: Execute two-window simulated placement against durable SQLite
+        run: python3 -B -I tests/timew/test_machine_v2_floating_pilot.py
+      - name: Preserve exact saved V2 and original one-click recovery
+        run: |
+          python3 -B -I tests/timew/test_machine_restore_review_v2.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_window_move_pilot.py
+          python3 -B -I tests/timew/test_machine_one_click_restore.py
+          python3 -B -I tests/timew/test_machine_one_click_restore_ui.py

@@ -127,26 +127,41 @@ class ClockCurrentFloorWitness:
         if synthetic_only and self.path.parent != self.origin.trust.parent:
             raise Refused("DISPOSABLE_FLOOR_SCOPE_MISMATCH")
 
-    def inspect_current(self):
+    def read_signed(self):
+        """Verified prior state, including BLOCKED, for trusted controller.
+
+        This does NOT imply CURRENT and cannot be an admission result.
+        Previously signed versions may precede the new installed role.
+        """
         Session._protected_dir(self.path,disposable=self.synthetic)
         try:
-            root,role_raw,_=self.origin._load_bundle()
-            role=Origin.Role._policy(role_raw)
+            root,_,_=self.origin._load_bundle()
         except (Origin.Refused,Origin.Role.Refused,ValueError,OSError) as exc:
             raise Refused("CLOCK_FLOOR_ROLE_NOT_VERIFIED") from exc
-        raw=Session._read_file(self.path/MANIFEST_FILE,
-                               length=MAX_SIZE,disposable=self.synthetic)
-        sig=Session._read_file(self.path/SIGNATURE_FILE,
-                               length=64,disposable=self.synthetic)
+        try:
+            raw=Session._read_file(self.path/MANIFEST_FILE,
+                                   length=MAX_SIZE,disposable=self.synthetic)
+            sig=Session._read_file(self.path/SIGNATURE_FILE,
+                                   length=64,disposable=self.synthetic)
+        except Session.Refused as exc:
+            raise Refused("CURRENT_FLOOR_FILE_UNVERIFIED") from exc
         if len(sig)!=64:
             raise Refused("FLOOR_SIGNATURE_LENGTH_REFUSED")
         try:
             root.verify(sig,DOMAIN+raw)
         except InvalidSignature as exc:
             raise Refused("FLOOR_SIGNATURE_NOT_TRUSTED") from exc
-        obj=validate(raw)
+        return validate(raw)
+
+    def inspect_current(self):
+        obj=self.read_signed()
         if obj["state"]!="CURRENT":
             raise Refused("CONTROLLER_ISSUANCE_BLOCKED")
+        try:
+            _,role_raw,_=self.origin._load_bundle()
+            role=Origin.Role._policy(role_raw)
+        except (Origin.Refused,Origin.Role.Refused,ValueError,OSError) as exc:
+            raise Refused("CLOCK_FLOOR_ROLE_NOT_VERIFIED") from exc
         version=(obj["releaseEpoch"],obj["releaseSequence"])
         if (version<self.minimum or version!=(
                 role["releaseEpoch"],role["releaseSequence"])):

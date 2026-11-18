@@ -385,7 +385,11 @@ class NativeIssuerSecurity(unittest.TestCase):
 
     def test_39_real_kernel_packet_credentials_match_receiving_process(self):
         import socket
-        with socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET) as (tx,rx):
+        import contextlib
+        with contextlib.ExitStack() as stack:
+            tx,rx=socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+            stack.enter_context(tx)
+            stack.enter_context(rx)
             rx.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
             tx.send(b"native-packet")
             actual=(os.getpid(),os.getuid(),os.getgid())
@@ -393,7 +397,11 @@ class NativeIssuerSecurity(unittest.TestCase):
 
     def test_40_forwarded_or_different_sender_pid_cannot_pass_packet_gate(self):
         import socket
-        with socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET) as (tx,rx):
+        import contextlib
+        with contextlib.ExitStack() as stack:
+            tx,rx=socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+            stack.enter_context(tx)
+            stack.enter_context(rx)
             rx.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
             tx.send(b"other-process-packet")
             forged=(os.getpid()+1,os.getuid(),os.getgid())
@@ -401,7 +409,11 @@ class NativeIssuerSecurity(unittest.TestCase):
 
     def test_41_packet_gate_rejects_no_trusted_expected_peer(self):
         import socket
-        with socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET) as (tx,rx):
+        import contextlib
+        with contextlib.ExitStack() as stack:
+            tx,rx=socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+            stack.enter_context(tx)
+            stack.enter_context(rx)
             tx.send(b"native-packet")
             self.denied(S._packet_recv,rx,expected_sender=None)
 

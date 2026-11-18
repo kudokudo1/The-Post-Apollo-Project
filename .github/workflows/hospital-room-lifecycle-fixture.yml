@@ -1,0 +1,40 @@
+name: Hospital Room Lifecycle Synthetic Restore
+
+on:
+  pull_request:
+    paths:
+      - "scripts/hospital/room_lifecycle_fixture_v1.py"
+      - "scripts/hospital/ROOM-LIFECYCLE-FIXTURE-V1.md"
+      - "tests/hospital/test_room_lifecycle_fixture_v1.py"
+      - ".github/workflows/hospital-room-lifecycle-fixture.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/hospital/room_lifecycle_fixture_v1.py"
+      - "scripts/hospital/ROOM-LIFECYCLE-FIXTURE-V1.md"
+      - "tests/hospital/test_room_lifecycle_fixture_v1.py"
+      - ".github/workflows/hospital-room-lifecycle-fixture.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: c856f6edafb27b3f2a233ad3beaf33653c9dbde9
+          path: px-source
+          persist-credentials: false
+      - name: Synthetic PX v10 Room Trash / Restore
+        run: |
+          python3 -B -m unittest discover -s tests/hospital -p 'test_room_lifecycle_fixture_v1.py' -v
+      - name: Refuse direct CLI or live DB paths
+        run: |
+          if python3 scripts/hospital/room_lifecycle_fixture_v1.py; then
+            echo "ERROR: fixture module must have no CLI"
+            exit 1
+          fi

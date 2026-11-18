@@ -80,8 +80,10 @@ test("Escape, INDEX, close and keyboard are Subjects-only with no hidden mode cu
   assert.equal(policy.escapeAction(true),"workspace");
   assert.equal(policy.escapeAction(false),"close");
   assert.match(station,/function cycleMainMode\(direction\)\s*\{\s*subjectNavigator\.cycleSubjects\(direction\);/);
-  assert.match(station,/function moveNavigationCursor\(direction\)\s*\{\s*subjectNavigator\.moveCursor\(direction\);/);
-  assert.match(station,/function activateNavigationCursor\(\)\s*\{\s*subjectNavigator\.activateCursor\(\);/);
+  assert.match(station,/function moveNavigationCursor\(direction\)\s*\{\s*return moveContentKey\(/);
+  assert.match(station,/return weatherContentKeys\.handleDirectionKey\(key,modifiers\);/);
+  assert.match(station,/function activateNavigationCursor\(\)[\s\S]*return weatherContentKeys\.activate\(\);/);
+  assert.match(station,/subjectNavigator\.activateCursor\(\);/);
   assert.match(station,/function open\(\)\s*\{[\s\S]*?terminalView\.terminalState !== "IDLE"[\s\S]*?subjectNavigationOpen = true;[\s\S]*?menuOpen = true;/);
   assert.match(station,/function close\(\)\s*\{[\s\S]*?subjectNavigationOpen = false;[\s\S]*?menuOpen = false;/);
   assert.match(station,/label: "INDEX"/);

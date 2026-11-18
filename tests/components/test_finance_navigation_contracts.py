@@ -248,7 +248,9 @@ assert "root.menuOpen = false" in menu
 assert "!transactionDraftPane.open" in menu
 assert "transactionDraftPane.clear();" in menu
 assert "onLeftClicked: root.menuOpen = false" in menu
-assert "activeMainModes().length" in menu
+assert "function cycleMainMode(direction)" in menu
+assert "const modes = activeMainModes();" in menu
+assert "return financeContentKeys.move(0,Number(direction)<0?-1:1)" in menu
 assert "return mainModes.filter(function(mode) { return !mode.future; });" in menu
 assert "root.moveNavigationZone(-1)" in menu
 assert "root.activateNavigationCursor()" in menu

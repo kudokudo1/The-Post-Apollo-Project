@@ -32,21 +32,25 @@ def check_window_local_modes(relative, frame, mode_count):
     assert 'context: Qt.WindowShortcut' not in source
     assert "Shortcut {" not in source
     assert "root.cycleMainMode(reverse ? -1 : 1)" in source
-    assert "root.moveNavigationCursor(-1)" in source
-    assert "root.moveNavigationCursor(1)" in source
+    assert "root.moveContentKey(event.key,event.modifiers)" in source
     assert "root.activateNavigationCursor()" in source
     for forbidden in ('sequence: "Ctrl+Left"', 'sequence: "Ctrl+Right"',
                       'sequence: "Shift+Left"', 'sequence: "Shift+Right"'):
         assert forbidden not in source, (relative, forbidden)
-    # Tab actually activates main modes; arrows preview only. Enter is the
-    # sole key that commits the preview. Data/save/delete handlers are absent.
+    # Tab owns main modes. Plain arrows/HJKL select a content control,
+    # not a rail button, and Enter never commits an arbitrary destructive act.
+    assert "WidgetContentKeyboardNavigator {" in source
+    assert "function moveContentKey(key,modifiers)" in source
+    assert "contentKeyboardSelectorItem" in source
+    assert all(key in source for key in
+               ("Qt.Key_H", "Qt.Key_J", "Qt.Key_K", "Qt.Key_L"))
     cursor = source.split("function moveNavigationCursor(direction)", 1)[1]
     cursor = cursor.split("function activateNavigationCursor()", 1)[0]
-    assert "keyboardModeCursor" in cursor
-    assert "selectMainMode(" not in cursor
+    assert "ContentKeys.move" in cursor
     activate = source.split("function activateNavigationCursor()", 1)[1]
     activate = activate.split("function ", 1)[0]
-    assert "selectMainMode(keyboardModeCursor)" in activate
+    assert "ContentKeys.activate()" in activate
+    assert "selectMainMode(keyboardModeCursor)" not in source
     assert source.count("onMenuOpenChanged:") == 1
     assert "WlrKeyboardFocus.OnDemand" in source
     assert "WlrKeyboardFocus.Exclusive" not in source

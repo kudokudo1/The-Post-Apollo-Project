@@ -60,7 +60,15 @@ PanelWindow {
     property int keyboardModeCursor: 0
     readonly property bool standardModeKeysAvailable:
         root.menuOpen && root.activeFocusItem === tasksFrame
-    onSelectedMainModeIndexChanged: keyboardModeCursor = selectedMainModeIndex
+    readonly property alias contentKeyboardSelectorItem: tasksContentKeys
+    onSelectedMainModeIndexChanged: {
+        keyboardModeCursor = selectedMainModeIndex;
+        tasksContentKeys.reset();
+        Qt.callLater(function() {
+            if(tasksContentKeys.navigationActive)
+                tasksContentKeys.selectInitial();
+        });
+    }
 
     // Keep task storage shared with ApolloHub. This menu does not create a
     // FileView, storage service, or parallel task document.
@@ -97,18 +105,19 @@ PanelWindow {
         selectMainMode((selectedMainModeIndex + step + count) % count);
     }
 
-    // Vertical arrows preview without opening a task, changing a field,
-    // or saving a draft. Enter alone commits the highlighted main mode.
-    function moveNavigationCursor(direction) {
-        if (!standardModeKeysAvailable || mainModes.length < 1) return;
-        const step = Number(direction) < 0 ? -1 : 1;
-        keyboardModeCursor =
-            (keyboardModeCursor + step + mainModes.length) % mainModes.length;
+    // Arrow/HJKL navigation belongs to the selected TASKS content, not
+    // to the five main-mode buttons. Text editors keep their own keys.
+    function moveContentKey(key,modifiers) {
+        if(!standardModeKeysAvailable) return false;
+        return tasksContentKeys.handleDirectionKey(key,modifiers);
     }
-
+    function moveNavigationCursor(direction) {
+        if(!standardModeKeysAvailable) return false;
+        return tasksContentKeys.move(0,Number(direction)<0?-1:1);
+    }
     function activateNavigationCursor() {
-        if (!standardModeKeysAvailable) return;
-        selectMainMode(keyboardModeCursor);
+        if(!standardModeKeysAvailable) return false;
+        return tasksContentKeys.activate();
     }
 
     function expandChassis() {
@@ -129,8 +138,13 @@ PanelWindow {
         if (menuOpen) {
             keyboardModeCursor = selectedMainModeIndex;
             Qt.callLater(function() {
-                if (root.menuOpen)
+                if (root.menuOpen) {
                     tasksFrame.forceActiveFocus();
+                    Qt.callLater(function() {
+                        if(tasksContentKeys.navigationActive)
+                            tasksContentKeys.selectInitial();
+                    });
+                }
             });
         }
     }
@@ -188,7 +202,16 @@ PanelWindow {
         Keys.priority: Keys.BeforeItem
         Keys.onShortcutOverride: function(event) {
             if (!root.standardModeKeysAvailable) return;
-            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab)
+            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
+                    || (event.modifiers === Qt.NoModifier
+                        && (event.key === Qt.Key_Left
+                            || event.key === Qt.Key_Right
+                            || event.key === Qt.Key_Up
+                            || event.key === Qt.Key_Down
+                            || event.key === Qt.Key_H
+                            || event.key === Qt.Key_J
+                            || event.key === Qt.Key_K
+                            || event.key === Qt.Key_L)))
                 event.accepted = true;
         }
         Keys.onPressed: function(event) {
@@ -199,15 +222,19 @@ PanelWindow {
                     || (event.modifiers & Qt.ShiftModifier) !== 0;
                 root.cycleMainMode(reverse ? -1 : 1);
             } else if (event.modifiers === Qt.NoModifier
-                    && event.key === Qt.Key_Up) {
-                root.moveNavigationCursor(-1);
-            } else if (event.modifiers === Qt.NoModifier
-                    && event.key === Qt.Key_Down) {
-                root.moveNavigationCursor(1);
+                    && (event.key === Qt.Key_Left
+                        || event.key === Qt.Key_Right
+                        || event.key === Qt.Key_Up
+                        || event.key === Qt.Key_Down
+                        || event.key === Qt.Key_H
+                        || event.key === Qt.Key_J
+                        || event.key === Qt.Key_K
+                        || event.key === Qt.Key_L)) {
+                if(!root.moveContentKey(event.key,event.modifiers)) return;
             } else if (event.modifiers === Qt.NoModifier
                     && (event.key === Qt.Key_Enter
                         || event.key === Qt.Key_Return)) {
-                root.activateNavigationCursor();
+                if(!root.activateNavigationCursor()) return;
             } else {
                 return;
             }
@@ -397,6 +424,13 @@ PanelWindow {
             anchors.rightMargin: 12
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 14
+
+            WidgetContentKeyboardNavigator {
+                id: tasksContentKeys
+                anchors.fill: parent
+                contentRoot: mainModeContent
+                navigationActive: root.standardModeKeysAvailable
+            }
 
             Column {
                 visible: root.activeMode.id !== "tasks" && root.activeMode.id !== "today"

@@ -225,6 +225,8 @@ PanelWindow {
             + (Math.abs(cents) / 100).toFixed(2);
     }
 
+    readonly property alias contentKeyboardSelectorItem: financeContentKeys
+
     // Independent navigation state; no financial services are attached.
     readonly property var mainModes: [
         { id: "budget", name: "Budget", icon: "⋆$🗓₊˚" },
@@ -283,39 +285,53 @@ PanelWindow {
         selectedBudgetSubMode = budgetSubModes[navigationIndex].id;
     }
 
+    // Main-mode selection belongs to Tab, top Budget submodes belong to
+    // Shift+arrows and lower Budget sections to Ctrl+arrows. Unmodified
+    // directions/HJKL and Enter operate only in the current CONTENT pane.
+    function moveContentKey(key,modifiers) {
+        if(!standardKeysAvailable || !financeKeyboardAnchor.activeFocus)
+            return false;
+        return financeContentKeys.handleDirectionKey(key,modifiers);
+    }
     function moveNavigationCursor(direction) {
-        const count = navigationZone === "sub" && selectedMainMode === "budget"
-                      ? budgetSubModes.length : activeMainModes().length;
-        const step = Number(direction) < 0 ? -1 : 1;
-        navigationIndex = (navigationIndex + step + count) % count;
+        return financeContentKeys.move(0,Number(direction)<0?-1:1);
     }
-
     function moveNavigationZone(direction) {
-        if (selectedMainMode !== "budget")
-            return;
-        if (Number(direction) > 0) {
-            if (navigationZone === "sub")
-                return;
-            navigationZone = "sub";
-            navigationIndex = Math.max(0, budgetSubModes.findIndex(
-                function(mode) { return mode.id === selectedBudgetSubMode; }
-            ));
-        } else {
-            if (navigationZone === "main")
-                return;
-            navigationZone = "main";
-            navigationIndex = Math.max(0, activeMainModes().findIndex(
-                function(mode) { return mode.id === selectedMainMode; }
-            ));
-        }
+        return financeContentKeys.move(Number(direction)<0?-1:1,0);
     }
-
     function activateNavigationCursor() {
-        if (navigationZone === "sub" && selectedMainMode === "budget")
-            selectedBudgetSubMode = budgetSubModes[navigationIndex].id;
-        else {
-            const modes = activeMainModes();
-            selectMainMode(modes[navigationIndex].id);
+        return financeContentKeys.activate();
+    }
+    function restoreFinanceContentFocus() {
+        if(!standardKeysAvailable) return;
+        financeKeyboardAnchor.forceActiveFocus();
+        Qt.callLater(function() {
+            if(financeContentKeys.navigationActive)
+                financeContentKeys.selectInitial();
+        });
+    }
+    Connections {
+        target: root
+        function onSelectedMainModeChanged() {
+            financeContentKeys.reset();
+            Qt.callLater(function() {
+                if(financeContentKeys.navigationActive)
+                    financeContentKeys.selectInitial();
+            });
+        }
+        function onSelectedBudgetSubModeChanged() {
+            financeContentKeys.reset();
+            Qt.callLater(function() {
+                if(financeContentKeys.navigationActive)
+                    financeContentKeys.selectInitial();
+            });
+        }
+        function onBudgetSectionChanged() {
+            financeContentKeys.reset();
+            Qt.callLater(function() {
+                if(financeContentKeys.navigationActive)
+                    financeContentKeys.selectInitial();
+            });
         }
     }
 
@@ -381,14 +397,14 @@ PanelWindow {
             // Refresh on each real closed → open transition, not shell boot.
             financeBudget.refresh();
             if (keyboardActive)
-                Qt.callLater(function() { financeKeyboardAnchor.forceActiveFocus(); });
+                Qt.callLater(root.restoreFinanceContentFocus);
         } else {
             transactionDraftPane.clear();
         }
     }
     onKeyboardActiveChanged: {
         if (menuOpen && keyboardActive)
-            Qt.callLater(function() { financeKeyboardAnchor.forceActiveFocus(); });
+            Qt.callLater(root.restoreFinanceContentFocus);
     }
 
     implicitWidth: frameWidth + glowGutter * 2
@@ -459,7 +475,17 @@ PanelWindow {
                         && (event.modifiers & Qt.ControlModifier) !== 0
                         && (event.modifiers & (Qt.ShiftModifier | Qt.AltModifier)) === 0
                         && (event.key === Qt.Key_Left
-                            || event.key === Qt.Key_Right)))
+                            || event.key === Qt.Key_Right))
+                    || (financeKeyboardAnchor.activeFocus
+                        && event.modifiers === Qt.NoModifier
+                        && (event.key === Qt.Key_Left
+                            || event.key === Qt.Key_Right
+                            || event.key === Qt.Key_Up
+                            || event.key === Qt.Key_Down
+                            || event.key === Qt.Key_H
+                            || event.key === Qt.Key_J
+                            || event.key === Qt.Key_K
+                            || event.key === Qt.Key_L)))
                 event.accepted = true;
         }
         Keys.onPressed: function(event) {
@@ -481,6 +507,24 @@ PanelWindow {
                            || event.key === Qt.Key_Right)) {
                 root.cycleBudgetSection(event.key === Qt.Key_Right ? 1 : -1);
                 event.accepted = true;
+            } else if (financeKeyboardAnchor.activeFocus
+                       && event.modifiers === Qt.NoModifier
+                       && (event.key === Qt.Key_Left
+                           || event.key === Qt.Key_Right
+                           || event.key === Qt.Key_Up
+                           || event.key === Qt.Key_Down
+                           || event.key === Qt.Key_H
+                           || event.key === Qt.Key_J
+                           || event.key === Qt.Key_K
+                           || event.key === Qt.Key_L)) {
+                if(root.moveContentKey(event.key,event.modifiers))
+                    event.accepted = true;
+            } else if (financeKeyboardAnchor.activeFocus
+                       && event.modifiers === Qt.NoModifier
+                       && (event.key === Qt.Key_Return
+                           || event.key === Qt.Key_Enter)) {
+                if(root.activateNavigationCursor())
+                    event.accepted = true;
             }
         }
     }
@@ -489,24 +533,28 @@ PanelWindow {
         sequence: "Tab"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable
+                 && financeKeyboardAnchor.activeFocus
         onActivated: root.cycleMainMode(1)
     }
     Shortcut {
         sequence: "Shift+Tab"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable
+                 && financeKeyboardAnchor.activeFocus
         onActivated: root.cycleMainMode(-1)
     }
     Shortcut {
         sequence: "Shift+Left"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable
+                 && financeKeyboardAnchor.activeFocus
         onActivated: root.cycleBudgetSubMode(-1)
     }
     Shortcut {
         sequence: "Shift+Right"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable
+                 && financeKeyboardAnchor.activeFocus
         onActivated: root.cycleBudgetSubMode(1)
     }
     Shortcut {
@@ -524,37 +572,37 @@ PanelWindow {
     Shortcut {
         sequence: "Up"
         context: Qt.WindowShortcut
-        enabled: root.standardKeysAvailable
+        enabled: root.standardKeysAvailable && financeKeyboardAnchor.activeFocus
         onActivated: root.moveNavigationCursor(-1)
     }
     Shortcut {
         sequence: "Down"
         context: Qt.WindowShortcut
-        enabled: root.standardKeysAvailable
+        enabled: root.standardKeysAvailable && financeKeyboardAnchor.activeFocus
         onActivated: root.moveNavigationCursor(1)
     }
     Shortcut {
         sequence: "Left"
         context: Qt.WindowShortcut
-        enabled: root.standardKeysAvailable
+        enabled: root.standardKeysAvailable && financeKeyboardAnchor.activeFocus
         onActivated: root.moveNavigationZone(-1)
     }
     Shortcut {
         sequence: "Right"
         context: Qt.WindowShortcut
-        enabled: root.standardKeysAvailable
+        enabled: root.standardKeysAvailable && financeKeyboardAnchor.activeFocus
         onActivated: root.moveNavigationZone(1)
     }
     Shortcut {
         sequence: "Return"
         context: Qt.WindowShortcut
-        enabled: root.standardKeysAvailable
+        enabled: root.standardKeysAvailable && financeKeyboardAnchor.activeFocus
         onActivated: root.activateNavigationCursor()
     }
     Shortcut {
         sequence: "Enter"
         context: Qt.WindowShortcut
-        enabled: root.standardKeysAvailable
+        enabled: root.standardKeysAvailable && financeKeyboardAnchor.activeFocus
         onActivated: root.activateNavigationCursor()
     }
     Shortcut {
@@ -939,6 +987,16 @@ PanelWindow {
             anchors.leftMargin: 8
             anchors.rightMargin: 8
 
+            // The yellow cursor follows real buttons in the work area,
+            // never the left main-mode rail or the global header.
+            WidgetContentKeyboardNavigator {
+                id: financeContentKeys
+                anchors.fill: parent
+                contentRoot: workArea
+                navigationActive: root.standardKeysAvailable
+                    && financeKeyboardAnchor.activeFocus
+            }
+
             GohuText {
                 id: sectionTitle
                 anchors.top: parent.top
@@ -977,6 +1035,7 @@ PanelWindow {
                         width: (budgetSubRail.width - budgetSubRail.spacing * 2) / 3
                         height: 72
                         showLabel: false
+                        keyboardNavTarget: false  // Shift+arrow owns this top subrail
                         selected: root.selectedBudgetSubMode === modelData.id
                         keyboardSelected: root.standardKeysAvailable
                                           && root.navigationZone === "sub"
@@ -1269,6 +1328,7 @@ PanelWindow {
             height: 28
             label: modelData.label
             labelPixelSize: 9
+            keyboardActivationSignal: "leftClicked"
             accentColor: root.budgetSection===modelData.key
                 ? Colors.magenta : Colors.cyan
             trackLabelGlowLocally: true
@@ -1336,6 +1396,7 @@ ActionButton {
     id: advancedToggle
     width: parent.width
     height: 26
+    keyboardActivationSignal: "leftClicked"
     label: root.advancedOpen ? "HIDE ADVANCED" : "ADVANCED"
     labelPixelSize: 9
     accentColor: Colors.cyan

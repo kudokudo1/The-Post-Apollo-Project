@@ -556,6 +556,7 @@ Rectangle {
                     height: 32
                     label: "OPEN SUBJECTS // " + modelData.path.toUpperCase()
                     labelPixelSize: 10
+                    keyboardActivationSignal: "clicked"
                     onClicked: browser.chooseRoute(modelData.path)
                 }
             }

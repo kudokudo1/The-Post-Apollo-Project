@@ -35,7 +35,7 @@ assert family_ids[:7] == ["home","weather","cosmos","earth","media","magick","to
 
 for token in ("function cycleMainMode(direction)","function moveNavigationCursor(direction)",
               "function activateNavigationCursor()","subjectNavigator.cycleSubjects(direction);",
-              "subjectNavigator.moveCursor(direction);","subjectNavigator.activateCursor();"):
+              "subjectNavigator.moveCursor(-1);","subjectNavigator.activateCursor();"):
     assert token in station, token
 
 print("Weather SUBECTS family navigation contracts: PASS")

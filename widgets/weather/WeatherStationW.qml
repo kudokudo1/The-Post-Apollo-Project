@@ -572,6 +572,10 @@ PanelWindow {
         }
     }
 
+    // The main rail is Tab-only. Plain arrows/HJKL target controls in the
+    // CURRENT workspace, never SUBJECTS or the bottom tab rail.
+    readonly property alias contentKeyboardSelectorItem: weatherContentKeys
+
     // Stable keyboard home. Qt can consume Tab as focus-chain navigation
     // before a WindowShortcut, so the anchor handles the shared navigation
     // keys locally while the guarded Shortcut entries remain as fallback.
@@ -595,7 +599,17 @@ PanelWindow {
                     || ((event.modifiers & Qt.ControlModifier) !== 0
                         && (event.modifiers & (Qt.ShiftModifier | Qt.AltModifier)) === 0
                         && (event.key === Qt.Key_Left
-                            || event.key === Qt.Key_Right))) {
+                            || event.key === Qt.Key_Right))
+                    || (weatherKeyboardAnchor.activeFocus
+                        && event.modifiers === Qt.NoModifier
+                        && (event.key === Qt.Key_Left
+                            || event.key === Qt.Key_Right
+                            || event.key === Qt.Key_Up
+                            || event.key === Qt.Key_Down
+                            || event.key === Qt.Key_H
+                            || event.key === Qt.Key_J
+                            || event.key === Qt.Key_K
+                            || event.key === Qt.Key_L))) {
                 event.accepted = true;
             }
         }
@@ -618,13 +632,21 @@ PanelWindow {
                            || event.key === Qt.Key_Right)) {
                 weatherStation.cycleBottomSubMode(
                     event.key === Qt.Key_Right ? 1 : -1);
-            } else if (event.key === Qt.Key_Up) {
-                weatherStation.moveNavigationCursor(-1);
-            } else if (event.key === Qt.Key_Down) {
-                weatherStation.moveNavigationCursor(1);
+            } else if (event.modifiers === Qt.NoModifier
+                    && (event.key === Qt.Key_Left
+                        || event.key === Qt.Key_Right
+                        || event.key === Qt.Key_Up
+                        || event.key === Qt.Key_Down
+                        || event.key === Qt.Key_H
+                        || event.key === Qt.Key_J
+                        || event.key === Qt.Key_K
+                        || event.key === Qt.Key_L)) {
+                if(!weatherStation.moveContentKey(event.key,event.modifiers))
+                    return;
             } else if (event.key === Qt.Key_Return
                        || event.key === Qt.Key_Enter) {
-                weatherStation.activateNavigationCursor();
+                if(!weatherStation.activateNavigationCursor())
+                    return;
             } else {
                 return;
             }
@@ -648,8 +670,13 @@ PanelWindow {
     }
 
     function restoreWeatherKeyboardFocus() {
-        if (weatherStation.standardKeysAvailable)
+        if (weatherStation.standardKeysAvailable) {
             weatherKeyboardAnchor.forceActiveFocus();
+            Qt.callLater(function() {
+                if(weatherContentKeys.navigationActive)
+                    weatherContentKeys.selectInitial();
+            });
+        }
     }
 
     onKeyboardActiveChanged: {
@@ -666,7 +693,7 @@ PanelWindow {
     }
 
 
-    // Keyboard navigation only targets the native SUBJECTS/INDEX rail.
+    // Tab / Shift+Tab alone owns the SUBJECTS main-mode rail.
     function cycleMainMode(direction) {
         subjectNavigator.cycleSubjects(direction);
     }
@@ -678,23 +705,64 @@ PanelWindow {
             return false;
         return subjectNavigator.cycleWorkspaceTab(direction);
     }
+    // In INDEX the existing tree retains its own contextual navigation.
+    // In normal workspaces arrows/HJKL target the actual visible CONTENT.
+    function moveContentKey(key,modifiers) {
+        if(!standardKeysAvailable || !weatherKeyboardAnchor.activeFocus)
+            return false;
+        if(subjectNavigator.indexOpen) {
+            if(key===Qt.Key_Up || key===Qt.Key_K)
+                {subjectNavigator.moveCursor(-1);return true;}
+            if(key===Qt.Key_Down || key===Qt.Key_J)
+                {subjectNavigator.moveCursor(1);return true;}
+            return false;
+        }
+        return weatherContentKeys.handleDirectionKey(key,modifiers);
+    }
     function moveNavigationCursor(direction) {
-        subjectNavigator.moveCursor(direction);
+        return moveContentKey(direction < 0 ? Qt.Key_Up : Qt.Key_Down,
+                              Qt.NoModifier);
     }
     function activateNavigationCursor() {
-        subjectNavigator.activateCursor();
+        if(!standardKeysAvailable || !weatherKeyboardAnchor.activeFocus)
+            return false;
+        if(subjectNavigator.indexOpen) {
+            subjectNavigator.activateCursor();
+            return true;
+        }
+        return weatherContentKeys.activate();
+    }
+
+    Connections {
+        target: subjectNavigator
+        function onCurrentPathChanged() {
+            weatherContentKeys.reset();
+            Qt.callLater(function() {
+                if(weatherContentKeys.navigationActive)
+                    weatherContentKeys.selectInitial();
+            });
+        }
+        function onIndexOpenChanged() {
+            weatherContentKeys.reset();
+            Qt.callLater(function() {
+                if(weatherContentKeys.navigationActive)
+                    weatherContentKeys.selectInitial();
+            });
+        }
     }
 
     Shortcut {
         sequence: "Tab"
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
+                 && weatherKeyboardAnchor.activeFocus
         onActivated: weatherStation.cycleMainMode(1)
     }
     Shortcut {
         sequence: "Shift+Tab"
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
+                 && weatherKeyboardAnchor.activeFocus
         onActivated: weatherStation.cycleMainMode(-1)
     }
     Shortcut {
@@ -715,24 +783,28 @@ PanelWindow {
         sequence: "Up"
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
+                 && weatherKeyboardAnchor.activeFocus
         onActivated: weatherStation.moveNavigationCursor(-1)
     }
     Shortcut {
         sequence: "Down"
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
+                 && weatherKeyboardAnchor.activeFocus
         onActivated: weatherStation.moveNavigationCursor(1)
     }
     Shortcut {
         sequence: "Return"
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
+                 && weatherKeyboardAnchor.activeFocus
         onActivated: weatherStation.activateNavigationCursor()
     }
     Shortcut {
         sequence: "Enter"
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
+                 && weatherKeyboardAnchor.activeFocus
         onActivated: weatherStation.activateNavigationCursor()
     }
 
@@ -1229,6 +1301,20 @@ PanelWindow {
                 onTerminalLaunchRequested: function(mode) {
                     weatherStation.launchSubjectTerminal(mode);
                 }
+            }
+
+            // Visible focus marker belongs strictly to the workspace area.
+            // No selection overlay is ever placed on the main mode rail.
+            WidgetContentKeyboardNavigator {
+                id: weatherContentKeys
+                anchors.fill: subjectNavigator
+                contentRoot: subjectNavigator
+                navigationActive: weatherStation.standardKeysAvailable
+                    && weatherKeyboardAnchor.activeFocus
+                    && subjectNavigator.visible
+                    && !subjectNavigator.indexOpen
+                    && !weatherStation.providerDiagnosticsOpen
+                    && !weatherStation.contextTerminalRequested
             }
 
             StationTerminal {

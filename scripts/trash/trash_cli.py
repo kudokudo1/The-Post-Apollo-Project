@@ -19,6 +19,13 @@ MAX_ITEMS = 2500
 MAX_LIST_BYTES = 1048576
 MAX_ARG = 8192
 ACTION_TIMEOUT = 75
+# Queried only for an explicitly selected Restore item. Never scan external
+# trash directories or accept unbounded metadata into a Restore decision.
+RESTORE_INFO_LIMIT = 32768
+RESTORE_ATTRIBUTES = (
+    "trash::orig-path", "trash::deletion-date", "id::file",
+    "standard::type", "standard::size",
+)
 
 
 class TrashError(Exception):
@@ -132,6 +139,62 @@ def _selected(rows, uri, original):
     raise TrashError("STALE_OR_UNKNOWN_TRASH_ITEM")
 
 
+def _restore_identity(gio, row):
+    """Read the GIO item's own identity evidence, never a filesystem path.
+
+    GIO itself uses trash::orig-path for the destination. Require that it
+    agrees with the listed tuple and that a stable secondary field exists.
+    This is a preflight witness, NOT an atomic identity or permission token.
+    """
+    process = _run([gio, "info", "--attributes=" + ",".join(RESTORE_ATTRIBUTES),
+                    row["uri"]])
+    if process.returncode != 0:
+        raise TrashError("RESTORE_SOURCE_INFO_UNAVAILABLE")
+    raw = process.stdout
+    if (not isinstance(raw, str)
+            or len(raw.encode("utf-8")) > RESTORE_INFO_LIMIT):
+        raise TrashError("RESTORE_SOURCE_INFO_INVALID")
+    fields = {}
+    inside_attributes = False
+    for line in raw.splitlines():
+        if line.strip() == "attributes:":
+            if inside_attributes:
+                raise TrashError("RESTORE_SOURCE_INFO_INVALID")
+            inside_attributes = True
+            continue
+        if not inside_attributes or not line.startswith(("  ", "\t")):
+            continue
+        key, separator, value = line.strip().partition(": ")
+        if separator and key in RESTORE_ATTRIBUTES:
+            if key in fields or not value or "\r" in value or "\x00" in value:
+                raise TrashError("RESTORE_SOURCE_INFO_INVALID")
+            fields[key] = value
+    if not inside_attributes or fields.get("trash::orig-path") != row["original"]:
+        raise TrashError("RESTORE_SOURCE_ORIGINAL_CHANGED")
+    if not (fields.get("trash::deletion-date") or fields.get("id::file")):
+        # A URI and path can be re-used; require at least a secondary witness.
+        raise TrashError("RESTORE_SOURCE_IDENTITY_UNAVAILABLE")
+    return tuple(fields.get(key, "") for key in RESTORE_ATTRIBUTES)
+
+
+def _restore_preflight(gio, row):
+    """Deny a swapped GIO item or newly occupied destination before Restore.
+
+    Last-moment races after this check still belong to GIO's no-overwrite
+    g_file_move(..., G_FILE_COPY_NONE); never use --force.
+    """
+    if os.path.lexists(row["original"]):
+        raise TrashError("RESTORE_TARGET_EXISTS")
+    first = _restore_identity(gio, row)
+    _, fresh_rows = inventory()
+    _selected(fresh_rows, row["uri"], row["original"])
+    second = _restore_identity(gio, row)
+    if first != second:
+        raise TrashError("RESTORE_SOURCE_IDENTITY_CHANGED")
+    if os.path.lexists(row["original"]):
+        raise TrashError("RESTORE_TARGET_EXISTS")
+
+
 def item_action(action, uri, original, confirmation=""):
     if action not in ("restore", "burn"):
         raise TrashError("UNKNOWN_ACTION")
@@ -139,8 +202,8 @@ def item_action(action, uri, original, confirmation=""):
         raise TrashError("BURN_CONFIRMATION_REQUIRED")
     gio, rows = inventory()
     row = _selected(rows, uri, original)
-    if action == "restore" and os.path.lexists(row["original"]):
-        raise TrashError("RESTORE_TARGET_EXISTS")
+    if action == "restore":
+        _restore_preflight(gio, row)
     # A URI is used only after positive inventory matching. No raw filesystem
     # deletion, shell=True, flag interpolation or path-based traversal.
     command = [gio, "trash", "--restore", row["uri"]] if action == "restore" \

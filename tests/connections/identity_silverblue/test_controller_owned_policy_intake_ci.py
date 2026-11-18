@@ -124,7 +124,7 @@ class ControllerOwnedPolicyIntakeTests(unittest.TestCase):
 
     def test_06_symlink_controller_directory_fails_closed(self):
         alias=self.directory.parent/(self.directory.name+"-alias")
-        alias.symlink_to(self.directory,is_directory=True)
+        alias.symlink_to(self.directory, target_is_directory=True)
         self.addCleanup(alias.unlink)
         self.refuse(controller_dir=alias)
 

@@ -70,12 +70,12 @@ jobs:
           assert "readonly property bool credentialActionsEnabled: false" in broker
           print("C4B_HOLD // FRESH_CHALLENGE_IS_NOT_INDEPENDENTLY_ENROLLED_KEY")
           PY
-      - name: 24 adversarial real Ed25519 signed nonce parsing and replay refusals
+      - name: 28 adversarial nonce, UART framing and replay refusal cases
         shell: bash
         run: |
           set -euo pipefail
           python3 -B tests/connections/identity_silverblue/test_controller_challenge_ci.py
-          echo "C4B_ID_PASS // 24_EXTERNAL_CONTROLLER_NONCE_NEGATIVE_CASES"
+          echo "C4B_ID_PASS // 28_EXTERNAL_CONTROLLER_NONCE_NEGATIVE_CASES"
       - name: Preserve earlier signed RPM, guest key-binding and marker sanitizer tests
         shell: bash
         run: |

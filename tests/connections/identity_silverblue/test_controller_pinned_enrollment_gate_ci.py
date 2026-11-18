@@ -36,11 +36,13 @@ class ControllerPinnedEnrollmentTests(unittest.TestCase):
         )
         self.serial = self.proof(self.guest_public, self.frame)
         self.release = hashlib.sha256(b"independently-pinned-ci-release").hexdigest()
+        self.host_id = "postapollo-identity-ci@silverblue-fixture-a"
         self.record = {
             "schema": E.SCHEMA, "role": E.ROLE,
             "package": E.PACKAGE, "unit": E.UNIT,
             "audience": E.AUDIENCE, "scope": E.SCOPE,
             "enrollmentId": "a"*32,
+            "hostId": self.host_id,
             "releaseSha256": self.release,
             "receiptKeySha256": hashlib.sha256(self.guest_public).hexdigest(),
             "releaseEpoch": 3, "releaseSequence": 5,
@@ -63,6 +65,7 @@ class ControllerPinnedEnrollmentTests(unittest.TestCase):
             "enrollment_signature": self.sig,
             "independently_pinned_controller_root": self.root.public_key(),
             "independently_pinned_release_sha256": self.release,
+            "independently_pinned_host_id": self.host_id,
             "minimum_release_epoch": 3,
             "minimum_release_sequence": 5,
             "revoked_enrollment_ids": (),
@@ -246,6 +249,22 @@ class ControllerPinnedEnrollmentTests(unittest.TestCase):
                           "rpm-ostree install","credentialActionsEnabled\": True",
                           "productionAuthority\": True"):
             self.assertNotIn(forbidden,src)
+
+    def test_33_signed_host_scope_cannot_be_reused_on_different_host(self):
+        self.refuse(independently_pinned_host_id="postapollo-identity-ci@silverblue-fixture-b")
+
+    def test_34_controller_signs_wrong_host_still_refused(self):
+        self.record["hostId"]="postapollo-identity-ci@silverblue-fixture-b"
+        self.sign()
+        self.refuse()
+
+    def test_35_malformed_or_guest_chosen_host_scope_refused(self):
+        self.refuse(independently_pinned_host_id="")
+        self.refuse(independently_pinned_host_id="postapollo-identity-ci@HOST#A")
+        self.refuse(independently_pinned_host_id=None)
+        self.record["hostId"]=True
+        self.sign()
+        self.refuse()
 
 if __name__=="__main__":
     unittest.main(verbosity=2)

@@ -32,8 +32,7 @@ def check_window_local_modes(relative, frame, mode_count):
     assert 'context: Qt.WindowShortcut' not in source
     assert "Shortcut {" not in source
     assert "root.cycleMainMode(reverse ? -1 : 1)" in source
-    assert "root.moveNavigationCursor(-1)" in source
-    assert "root.moveNavigationCursor(1)" in source
+    assert "root.moveContentKey(event.key,event.modifiers)" in source
     assert "root.activateNavigationCursor()" in source
     for forbidden in ('sequence: "Ctrl+Left"', 'sequence: "Ctrl+Right"',
                       'sequence: "Shift+Left"', 'sequence: "Shift+Right"'):

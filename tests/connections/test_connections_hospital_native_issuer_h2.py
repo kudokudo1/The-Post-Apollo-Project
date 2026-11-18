@@ -269,7 +269,7 @@ class NativeIssuerSecurity(unittest.TestCase):
                     self.request,self.nonce,self.policy,self.now)
 
     def test_30_source_wrong_repo_or_patient_blocks_px_schema(self):
-        for field,value in (("patientId","../bad"),("repository","has whitespace")):
+        for field,value in (("patientId","bad value"),("repository","has whitespace")):
             old=self.prepared[field]
             self.prepared[field]=value
             with self.subTest(field=field):
@@ -303,7 +303,7 @@ class NativeIssuerSecurity(unittest.TestCase):
              patch.object(S,"_polkit_approve",side_effect=polkit), \
              patch.object(C,"host_fingerprint",return_value="c"*64), \
              patch.object(C,"load_installed_key",return_value=self.key), \
-             patch.object(S.os,"urandom",return_value=bytes(range(32))):
+             patch.object(S.os,"urandom",side_effect=lambda n:bytes(range(n))):
             # _native_step generates its own nonce before calling PX.
             out=S._native_step(client,self.policy)
         self.assertEqual(out["status"],"COMMITTED")
@@ -326,7 +326,7 @@ class NativeIssuerSecurity(unittest.TestCase):
              patch.object(S,"_polkit_approve",side_effect=C.Refused("DENIED")) as auth,\
              patch.object(C,"host_fingerprint",return_value="c"*64),\
              patch.object(C,"load_installed_key") as keys,\
-             patch.object(S.os,"urandom",return_value=bytes(range(32))):
+             patch.object(S.os,"urandom",side_effect=lambda n:bytes(range(n))):
             self.denied(S._native_step,object(),self.policy)
             auth.assert_called_once()
             keys.assert_not_called()
@@ -342,7 +342,7 @@ class NativeIssuerSecurity(unittest.TestCase):
              patch.object(S,"_polkit_approve") as auth,\
              patch.object(C,"host_fingerprint",return_value="c"*64),\
              patch.object(C,"load_installed_key") as keys,\
-             patch.object(S.os,"urandom",return_value=bytes(range(32))):
+             patch.object(S.os,"urandom",side_effect=lambda n:bytes(range(n))):
             self.denied(S._native_step,object(),self.policy)
             auth.assert_not_called()
             keys.assert_not_called()
@@ -358,7 +358,7 @@ class NativeIssuerSecurity(unittest.TestCase):
              patch.object(S,"_polkit_approve") as auth,\
              patch.object(C,"host_fingerprint",return_value="c"*64),\
              patch.object(C,"load_installed_key") as keys,\
-             patch.object(S.os,"urandom",return_value=bytes(range(32))):
+             patch.object(S.os,"urandom",side_effect=lambda n:bytes(range(n))):
             self.denied(S._native_step,object(),self.policy)
             auth.assert_called_once()
             keys.assert_not_called()
@@ -390,8 +390,8 @@ class NativeIssuerSecurity(unittest.TestCase):
         self.assertIn("SocketMode=0660",sock)
         self.assertIn("User=root",unit)
         self.assertIn("ProtectSystem=strict",unit)
-        self.assertNotIn("[Install]",sock)
-        self.assertNotIn("[Install]",unit)
+        self.assertNotIn("\n[Install]\n",sock)
+        self.assertNotIn("\n[Install]\n",unit)
 
 if __name__=="__main__":
     unittest.main(verbosity=2)

@@ -39,9 +39,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: kudokudo1/The-Post-Apollo-Dev-Exp
-          ref: 3ab56fb88a7290ec0651446cdd685e842f5c6120
+          ref: f7700de432c6e1bc9c116742348b76afda1a40db
           path: px-source
           persist-credentials: false
+      - name: Install exact signed-grant verifier dependency
+        run: python3 -m pip install 'cryptography==46.0.3'
       - name: Verify PX/Trash++ JSON contract using fresh disposable database
         run: |
           python3 tests/hospital/test_hospital_room_px_v12_crossrepo.py

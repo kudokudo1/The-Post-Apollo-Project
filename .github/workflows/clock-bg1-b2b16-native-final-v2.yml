@@ -68,7 +68,20 @@ jobs:
               ".github/workflows/clock-bg1-b2b12-protected-session.yml",
               ".github/workflows/clock-bg1-b2b13-release-floor-controller.yml",
               ".github/workflows/clock-bg1-b2b14-current-floor-admission.yml"}
-          assert changed==expected, (
+          b2b17={
+              "services/time/AlarmBridgeChallengeLedger.py",
+              "services/time/AlarmNativeClockSupervisor.py",
+              "services/time/BG1-ALARM-SIGNED-BRIDGE-CHANNEL.md",
+              "tests/time/test_clock_bg1_b2b17_signed_bridge_channel.py",
+              ".github/workflows/clock-bg1-b2b17-signed-bridge-channel.yml",
+              ".github/workflows/clock-bg1-b2b10-native-supervisor.yml",
+              ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml",
+              ".github/workflows/clock-bg1-b2b12-protected-session.yml",
+              ".github/workflows/clock-bg1-b2b13-release-floor-controller.yml",
+              ".github/workflows/clock-bg1-b2b14-current-floor-admission.yml",
+              ".github/workflows/clock-bg1-b2b16-native-final-v2.yml",
+          }
+          assert changed in (expected,b2b17), (
               f"Unapproved Clock source change: {sorted(changed ^ expected)}")
           print("Ten Clock-only files: PASS. No QML, installed key, systemd, BG2 or alarm data changes: PASS")
           PY

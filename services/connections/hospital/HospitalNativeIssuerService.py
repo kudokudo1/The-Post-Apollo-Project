@@ -323,6 +323,12 @@ def _native_step(client, policy):
         C.deny("OPERATOR_SESSION_CHANGED_AFTER_CONSENT")
     if prepared["expiresAt"] <= int(time.time()):
         C.deny("PX_PREPARE_EXPIRED_AFTER_APPROVAL")
+    # A long interactive Polkit prompt must not authorize a previous or
+    # expired root-owned issuer policy after policy rotation/revocation.
+    if C.read_policy() != policy:
+        C.deny("ISSUER_POLICY_CHANGED_DURING_OPERATOR_APPROVAL")
+    if C.host_fingerprint() != policy["hostId"]:
+        C.deny("HOST_CHANGED_DURING_OPERATOR_APPROVAL")
     # Root signing key is loaded only AFTER Linux + real Polkit + trusted PX
     # source checks. Only protected writer receives this signed envelope.
     key = C.load_installed_key()

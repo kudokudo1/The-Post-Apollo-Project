@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: kudokudo1/The-Post-Apollo-Dev-Exp
-          ref: 8c0f9c4e5788579efd9d34672ff308f4bca2937f
+          ref: 5a82559fef377420639a26371ac04a765b534ff6
           path: px-source
           persist-credentials: false
       - uses: actions/setup-python@v5

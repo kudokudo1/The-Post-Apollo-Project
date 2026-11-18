@@ -1,0 +1,74 @@
+name: Clock BG1-B2B16 native final V2 synced source witness (deny-only)
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmFinalV2SourceWitness.py"
+      - "services/time/AlarmNativeClockSupervisor.py"
+      - "services/time/BG1-ALARM-NATIVE-FINAL-V2-WITNESS.md"
+      - "tests/time/test_clock_bg1_b2b16_native_final_v2_witness.py"
+      - ".github/workflows/clock-bg1-b2b16-native-final-v2.yml"
+  push:
+    paths:
+      - "services/time/AlarmFinalV2SourceWitness.py"
+      - "services/time/AlarmNativeClockSupervisor.py"
+      - "services/time/BG1-ALARM-NATIVE-FINAL-V2-WITNESS.md"
+      - "tests/time/test_clock_bg1_b2b16_native_final_v2_witness.py"
+      - ".github/workflows/clock-bg1-b2b16-native-final-v2.yml"
+permissions:
+  contents: read
+jobs:
+  native-synced-file-observation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install existing native Clock Ed25519 verification dependency
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Real AF_UNIX signed old-writer and exact Linux final V2 file sync
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b16_native_final_v2_witness.py' -v
+      - name: Preserve previous native supervisor and session trust suites
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b10_native_supervisor.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b11_durable_supervisor_sessions.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b12_protected_enrollment.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b13_release_floor_controller.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b14_current_floor_admission.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b9_installed_role_trust.py' -v
+      - name: Preserve original kernel pidfd and mounted source drain
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+          node --test tests/time/test_clock_bg1_b2b15_mounted_save_drain.cjs
+          node --test tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs
+      - name: Preserve V2 alarm and recovery contracts
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_manager_v2_contract.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_alarm_note_recovery_contract.py' -v
+      - name: Exact ten-file Clock-only source boundary
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],text=True
+          ).splitlines())
+          expected={
+              "services/time/AlarmFinalV2SourceWitness.py",
+              "services/time/AlarmNativeClockSupervisor.py",
+              "services/time/BG1-ALARM-NATIVE-FINAL-V2-WITNESS.md",
+              "tests/time/test_clock_bg1_b2b16_native_final_v2_witness.py",
+              ".github/workflows/clock-bg1-b2b16-native-final-v2.yml",
+              ".github/workflows/clock-bg1-b2b10-native-supervisor.yml",
+              ".github/workflows/clock-bg1-b2b11-supervisor-sessions.yml",
+              ".github/workflows/clock-bg1-b2b12-protected-session.yml",
+              ".github/workflows/clock-bg1-b2b13-release-floor-controller.yml",
+              ".github/workflows/clock-bg1-b2b14-current-floor-admission.yml"}
+          assert changed==expected, (
+              f"Unapproved Clock source change: {sorted(changed ^ expected)}")
+          print("Ten Clock-only files: PASS. No QML, installed key, systemd, BG2 or alarm data changes: PASS")
+          PY

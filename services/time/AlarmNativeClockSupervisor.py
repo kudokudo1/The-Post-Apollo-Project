@@ -72,19 +72,38 @@ def _current_floor_component():
 
 CurrentFloor=_current_floor_component()
 
+def _final_source_component():
+    path=Path(__file__).resolve().with_name("AlarmFinalV2SourceWitness.py")
+    spec=importlib.util.spec_from_file_location("clock_b2b16_final_v2",path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Clock native V2 source verifier unavailable")
+    module=importlib.util.module_from_spec(spec)
+    sys.modules[spec.name]=module
+    spec.loader.exec_module(module)
+    return module
+
+FinalV2=_final_source_component()
+
 # Intentionally unprovisioned. Only a separately approved protected
 # Clock installation may pin these values in reviewed source/package
 # provenance. NO socket request, environment setting, or CLI flag can
 # provide them. A signed session without independent trust is DENIED.
 APPROVED_CLOCK_RELEASE_ROOT_SHA256 = None
 APPROVED_CLOCK_RELEASE_FLOOR = None
+# A *separately* trusted installed supervisor must bind these from its own
+# protected package and last accepted final source witness. No request,
+# environment or QML flag may choose them.
+APPROVED_CLOCK_FINAL_V2_SOURCE_PATH = None
+APPROVED_CLOCK_FINAL_V2_SOURCE_DIGEST = None
+APPROVED_CLOCK_FINAL_V2_SOURCE_UID = None
 
 SOCKET_FILE = "clock-supervisor-v1.sock"
 RUNTIME_SUBDIR = "post-apollo-clock"
 TEST_RUNTIME = "bg1-clock-supervisor-fixture"
 MAX_FRAME = 1024
 PROTOCOL = 1
-ACTIONS = frozenset(("INSPECT_ORIGIN", "REQUEST_PAUSE",
+ACTIONS = frozenset(("INSPECT_ORIGIN", "INSPECT_FINAL_V2",
+                     "REQUEST_PAUSE",
                      "RELEASE_WRITER", "TAKE_OWNERSHIP", "RING_ALARM"))
 
 
@@ -176,6 +195,19 @@ def _response(reason, observed=False):
             "canRing": False, "canNotify": False}
 
 
+def _final_response(reason, *, observed=False, final=False):
+    result=_response(reason, observed=observed)
+    result.update({
+        "finalV2RevisionObserved": bool(final),
+        "fileSyncObserved": bool(final),
+        "parentDirectorySyncObserved": bool(final),
+        "sourceExclusive": False,
+        "finalRevisionDurablyLocked": False,
+        "oldWriterRestartPrevented": False,
+    })
+    return result
+
+
 class ClockNativeSupervisor:
     """One foreground AF_UNIX supervisor; never owns or writes alarm data."""
 
@@ -194,6 +226,9 @@ class ClockNativeSupervisor:
         # Real foreground mode still has NO trusted session enroller.
         self._session_ledger = None
         self._test_pidfds = {}
+        # Only test code may set a disposable source. The installed
+        # source and pinned digest are intentionally unprovisioned.
+        self._test_final_source = None
 
     def add_synthetic_session(self, pin):
         """Only isolated tests can enroll a test subprocess. No CLI for this."""
@@ -217,6 +252,62 @@ class ClockNativeSupervisor:
         if pin.pid in self._test_pins:
             raise Refused("SUPERVISOR_PIN_ALREADY_PRESENT")
         self._test_pins[pin.pid] = pin
+
+    def pin_synthetic_final_v2(self, *, source_path, expected_digest,
+                               expected_uid):
+        """Pin disposable V2 file outside the socket request protocol."""
+        if not self.synthetic or self._listener is None:
+            raise Refused("TRUSTED_FINAL_V2_CONTROLLER_UNAVAILABLE")
+        if self._test_final_source is not None:
+            raise Refused("SYNTHETIC_FINAL_V2_ALREADY_PINNED")
+        try:
+            witness=FinalV2.ClockFinalV2SourceWitness(
+                source_path=source_path, pinned_sha256=expected_digest,
+                expected_uid=expected_uid, synthetic_only=True)
+        except FinalV2.Refused as exc:
+            raise Refused(str(exc)) from exc
+        self._test_final_source=witness
+
+    def _observe_final_v2(self, conn):
+        """Only a live previously signed session may observe pinned bytes.
+
+        Neither this inspection nor fsync can prohibit a subsequent write,
+        so absolutely no writer or ring rights are conferred.
+        """
+        try:
+            if self.synthetic:
+                raw=conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,
+                                    struct.calcsize("3i"))
+                pid,uid,_=struct.unpack("3i",raw)
+                pin=self._test_pins.get(pid)
+                held=self._test_pidfds.get(pid)
+                if (pin is None or held is None
+                        or uid!=os.getuid()
+                        or self._test_final_source is None
+                        or Peer._exited(held)):
+                    return False
+                result=self._test_final_source.observe()
+                if Peer._exited(held):
+                    return False
+            else:
+                path=APPROVED_CLOCK_FINAL_V2_SOURCE_PATH
+                digest=APPROVED_CLOCK_FINAL_V2_SOURCE_DIGEST
+                uid=APPROVED_CLOCK_FINAL_V2_SOURCE_UID
+                if (type(path) is not str or type(digest) is not str
+                        or type(uid) is not int):
+                    return False
+                witness=FinalV2.ClockFinalV2SourceWitness(
+                    source_path=path,pinned_sha256=digest,
+                    expected_uid=uid,synthetic_only=False)
+                result=witness.observe()
+            return (result["finalV2RevisionObserved"] is True
+                    and result["fileSyncObserved"] is True
+                    and result["parentDirectorySyncObserved"] is True
+                    and result["writerStopped"] is False
+                    and result["canTransferOwnership"] is False
+                    and result["canRing"] is False)
+        except (FinalV2.Refused, Peer.Refused, ValueError, OSError):
+            return False
 
     def bind(self):
         if self._listener is not None:
@@ -387,14 +478,21 @@ class ClockNativeSupervisor:
             with conn.makefile("rb") as reader:
                 frame = reader.readline(MAX_FRAME + 1)
             action = _decode_request(frame)
-            if action != "INSPECT_ORIGIN":
-                result = _response("NATIVE_WRITER_HANDOFF_NOT_AUTHORIZED")
-            else:
+            if action == "INSPECT_ORIGIN":
                 observed = self._observe(conn)
                 result = _response(
                     "OBSERVED_ONLY_NOT_AUTHORIZED" if observed
                     else "NO_INSTALLED_CLOCK_SESSION_AUTHORITY",
                     observed=observed)
+            elif action == "INSPECT_FINAL_V2":
+                observed=self._observe(conn)
+                final=observed and self._observe_final_v2(conn)
+                result=_final_response(
+                    "FINAL_V2_SYNC_OBSERVED_ONLY_NOT_AUTHORIZED" if final
+                    else "NO_TRUSTED_FINAL_V2_SOURCE_WITNESS",
+                    observed=observed, final=final)
+            else:
+                result = _response("NATIVE_WRITER_HANDOFF_NOT_AUTHORIZED")
         except (Refused, OSError, socket.timeout, ValueError) as exc:
             reason = str(exc) if isinstance(exc, Refused) else \
                      "CLOCK_REQUEST_READ_REFUSED"

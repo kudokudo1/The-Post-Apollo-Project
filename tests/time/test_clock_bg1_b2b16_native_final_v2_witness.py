@@ -228,9 +228,7 @@ class ClockB2B16NativeFinalV2Tests(unittest.TestCase):
         self.assertIsNone(Server.APPROVED_CLOCK_FINAL_V2_SOURCE_UID)
         self.assertIsNone(Server.APPROVED_CLOCK_RELEASE_ROOT_SHA256)
         self.assertIsNone(Server.APPROVED_CLOCK_RELEASE_FLOOR)
-        self.assertFalse(self.h.server._observe_final_v2(None)
-                         if False else Server.ClockNativeSupervisor
-                         ._observe_installed(self.h.server,None))
+        self.assertFalse(self.h.server._observe_installed(None))
         native=SUPERVISOR.read_text()
         qml=(ROOT/"services/time/AlarmManagerService.qml").read_text()
         self.assertIn('alarmWriterBarrierPhase: "ACTIVE"',qml)
@@ -240,8 +238,8 @@ class ClockB2B16NativeFinalV2Tests(unittest.TestCase):
         for forbidden in ("notify-send","alarmFile.setText","systemctl",
                           "os.replace(", "canRing=True"):
             self.assertNotIn(forbidden,WITNESS.read_text())
-        self.assertFalse(self.h.server._final_response if hasattr(
-            self.h.server,"_final_response") else False)
+        self.assertFalse(Server._final_response("DENY")["canTransferOwnership"])
+        self.assertFalse(Server._final_response("DENY")["releaseAcknowledged"])
 
     def test_synthetic_path_and_pin_cannot_be_used_as_production_source(self):
         self.refused(lambda:self.fresh(synthetic=False).observe(),

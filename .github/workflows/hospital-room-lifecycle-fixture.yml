@@ -23,6 +23,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: c856f6edafb27b3f2a233ad3beaf33653c9dbde9
+          path: px-source
+          persist-credentials: false
       - name: Synthetic PX v10 Room Trash / Restore
         run: |
           python3 -B -m unittest discover -s tests/hospital -p 'test_room_lifecycle_fixture_v1.py' -v

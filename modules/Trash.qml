@@ -1795,13 +1795,15 @@ PanelWindow {
                     color: Colors.white
                     verticalAlignment: Text.AlignVCenter
                     text: "FILES " + trashLauncher.total
-                          + " // RECORDS " + trashLauncher.researchBinRows.length
+                          + " // COPIES " + trashLauncher.researchBinRows.length
+                          + " // HOSP " + (hospitalBin.loaded ? hospitalBin.rows.length : "?")
                 }
 
                 ActionButton {
                     width: 92
                     height: 23
-                    label: "RECORD BIN " + trashLauncher.researchBinRows.length
+                    label: "RECORD BIN " + (trashLauncher.researchBinRows.length
+                        + (hospitalBin.loaded ? hospitalBin.rows.length : 0))
                     labelPixelSize: 9
                     accentColor: Colors.orange
                     available: !trashLauncher.researchBusy
@@ -1824,7 +1826,7 @@ PanelWindow {
                 visible: trashLauncher.activeMode === "trash"
                 width: parent.width
                 height: 33
-                placeholderText: "SEARCH TRASH // FILES, EVENTS OR RESEARCH COPIES"
+                placeholderText: "SEARCH TRASH // FILES, COPIES, HOSPITAL ROOMS"
                 color: Colors.white
                 font.pixelSize: 11
                 placeholderTextColor: Colors.cyan
@@ -1850,11 +1852,12 @@ PanelWindow {
                         {id:"files", label:"FILES"},
                         {id:"records", label:"RECORDS"},
                         {id:"events", label:"EVENTS"},
-                        {id:"research", label:"RESEARCH"}
+                        {id:"research", label:"RESEARCH"},
+                        {id:"hospital", label:"HOSP"}
                     ]
                     ActionButton {
                         required property var modelData
-                        width: (trashSourceFilters.width - 16) / 5
+                        width: (trashSourceFilters.width - 20) / 6
                         height: 26
                         label: modelData.label
                         labelPixelSize: 9
@@ -1891,7 +1894,9 @@ PanelWindow {
                         height: 55
                         color: Colors.dark
                         border.width: 1
-                        border.color: trashEntry.modelData.entryType === "record"
+                        border.color: trashEntry.modelData.entryType === "hospital"
+                                      ? Colors.magenta
+                                      : trashEntry.modelData.entryType === "record"
                                       ? Colors.orange : Colors.green
                         radius: 0
 
@@ -1904,7 +1909,9 @@ PanelWindow {
                             GohuText {
                                 width: parent.width
                                 height: 19
-                                text: (trashEntry.modelData.entryType === "record"
+                                text: (trashEntry.modelData.entryType === "hospital"
+                                       ? "[HOSPITAL] "
+                                       : trashEntry.modelData.entryType === "record"
                                        ? "[COPY] " : "[FILE] ")
                                       + String(trashEntry.modelData.name || "UNNAMED")
                                 color: Colors.white
@@ -1944,6 +1951,24 @@ PanelWindow {
                                            && trashLauncher.researchBurnId === ""
                                 onLeftClicked: trashLauncher.restoreResearchCopy(
                                     trashEntry.modelData.record)
+                            }
+
+                            // Hospital entries are restored ONLY by the
+                            // PX source owner. Never use GIO or managed copies.
+                            ActionButton {
+                                width: 68
+                                height: 31
+                                visible: trashEntry.modelData.entryType === "hospital"
+                                label: trashLauncher.hospitalArmRoomId
+                                       === trashEntry.modelData.roomId
+                                       ? "CONFIRM" : "REVIEW"
+                                labelPixelSize: 9
+                                accentColor: Colors.magenta
+                                available: hospitalBin.loaded && !hospitalBin.busy
+                                    && !hospitalRestore.operating
+                                    && !hospitalRestore.loading
+                                onLeftClicked: trashLauncher.reviewHospitalRestore(
+                                    trashEntry.modelData)
                             }
 
                             // GIO system-file Restore uses the same U1
@@ -1990,6 +2015,7 @@ PanelWindow {
                             ActionButton {
                                 width: 55
                                 height: 31
+                                visible: trashEntry.modelData.entryType !== "hospital"
                                 label: trashEntry.modelData.entryType === "record"
                                        ? "BURN COPY" : "BURN"
                                 labelPixelSize: 9
@@ -2027,6 +2053,7 @@ PanelWindow {
                     color: Colors.cyan
                     text: trashLauncher.total === 0
                           && trashLauncher.researchBinRows.length === 0
+                          && hospitalBin.loaded && hospitalBin.rows.length === 0
                           ? "TRASH EMPTY // NOTHING TO RESTORE"
                           : "NO MATCHES // CHOOSE A SOURCE FILTER"
                 }

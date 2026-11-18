@@ -61,10 +61,14 @@ class GIOReviewIdU4Tests(unittest.TestCase):
         self.assertEqual(run.call_args.args[0],
                          ["/usr/bin/gio","trash","--list"])
 
-    def test_no_new_restore_verb_or_backend_authority(self):
+    def test_reviewed_restore_is_separate_from_legacy_and_burn_authority(self):
         source=PATH.read_text(encoding="utf-8")
         self.assertIn('elif len(argv) == 4 and argv[1] == "restore":',source)
-        self.assertNotIn('"restore-reviewed"',source)
+        self.assertIn('elif len(argv) == 6 and argv[1] == "restore-reviewed":',source)
+        self.assertIn('def restore_reviewed(uri, original, expected_revision, expected_review_id):',source)
+        self.assertIn('_selected(initial, uri, original)',source)
+        self.assertIn('_selected(latest, uri, original)',source)
+        self.assertIn('os.path.lexists(current["original"])',source)
         self.assertNotIn('reviewId", confirmation',source)
         self.assertNotIn("os.remove(",source)
         self.assertIn('_selected(rows, uri, original)',source)

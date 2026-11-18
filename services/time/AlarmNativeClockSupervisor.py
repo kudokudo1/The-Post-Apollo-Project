@@ -45,6 +45,27 @@ def _session_component():
     return component
 
 Session = _session_component()
+
+def _protected_enrollment_component():
+    path = Path(__file__).resolve().with_name(
+        "AlarmProtectedSessionEnrollment.py")
+    spec = importlib.util.spec_from_file_location(
+        "clock_b2b12_enrollment", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Clock protected session verifier unavailable")
+    component = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = component
+    spec.loader.exec_module(component)
+    return component
+
+ProtectedEnrollment = _protected_enrollment_component()
+# Intentionally unprovisioned. Only a separately approved protected
+# Clock installation may pin these values in reviewed source/package
+# provenance. NO socket request, environment setting, or CLI flag can
+# provide them. A signed session without independent trust is DENIED.
+APPROVED_CLOCK_RELEASE_ROOT_SHA256 = None
+APPROVED_CLOCK_RELEASE_FLOOR = None
+
 SOCKET_FILE = "clock-supervisor-v1.sock"
 RUNTIME_SUBDIR = "post-apollo-clock"
 TEST_RUNTIME = "bg1-clock-supervisor-fixture"
@@ -219,6 +240,38 @@ class ClockNativeSupervisor:
         finally:
             os.umask(old_umask)
 
+    def _observe_installed(self, conn):
+        """Observe approved installed process enrollment. NEVER authorize.
+
+        The approved signer/root pin and monotonic floor are intentionally
+        unprovisioned. Installing a root file alone does not turn this on.
+        """
+        if self.synthetic:
+            return False
+        pin = APPROVED_CLOCK_RELEASE_ROOT_SHA256
+        floor = APPROVED_CLOCK_RELEASE_FLOOR
+        if (type(pin) is not str or not Origin.HEX.fullmatch(pin)
+                or type(floor) is not tuple or len(floor) != 2
+                or any(type(x) is not int or x < 1 for x in floor)):
+            return False
+        try:
+            verifier = ProtectedEnrollment.ClockProtectedSessionEnrollment(
+                enrollment_directory=ProtectedEnrollment.INSTALL_ENROLLMENT_DIR,
+                trust_directory=Origin.TRUST_DIR,
+                pinned_root_sha256=pin,
+                minimum_epoch=floor[0],
+                minimum_sequence=floor[1],
+                synthetic_only=False)
+            observed = verifier.inspect(conn)
+        except (ProtectedEnrollment.Refused, Origin.Refused,
+                Peer.Refused, ValueError, OSError):
+            return False
+        return (observed["originObserved"] is True
+                and observed["signedSessionObserved"] is True
+                and observed["roleAuthenticated"] is False
+                and observed["canTransferOwnership"] is False
+                and observed["canRing"] is False)
+
     def _observe(self, conn):
         try:
             raw = conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,
@@ -226,8 +279,9 @@ class ClockNativeSupervisor:
             pid, uid, gid = struct.unpack("3i", raw)
         except (OSError, struct.error, AttributeError):
             return False
-        if (not self.synthetic or uid != os.getuid()
-                or pid <= 1 or gid < 0):
+        if not self.synthetic:
+            return self._observe_installed(conn)
+        if uid != os.getuid() or pid <= 1 or gid < 0:
             return False
         pin = self._test_pins.get(pid)
         if pin is None:

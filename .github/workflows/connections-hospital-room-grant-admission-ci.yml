@@ -1,0 +1,100 @@
+name: Connections Hospital Room signed grant boundary (PX v12 CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/hospital/HospitalRoomGrantAdmissionCI.py'
+      - 'tests/connections/test_connections_hospital_room_grant_admission_ci.py'
+      - '.github/workflows/connections-hospital-room-grant-admission-ci.yml'
+      - 'docs/connections-hospital-room-grant-admission.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-px-signed-grant-denials:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check out PX owner v12 signed grant verifier at exact reviewed head
+        uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: 5a82559fef377420639a26371ac04a765b534ff6
+          path: px-source
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test-only public Ed25519 verification dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Compile and verify no private signer or native permission grant installed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/hospital/HospitalRoomGrantAdmissionCI.py \
+            tests/connections/test_connections_hospital_room_grant_admission_ci.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("services/connections/hospital/HospitalRoomGrantAdmissionCI.py").read_text()
+          status=Path("services/hospital/HospitalRoomLifecycleService.qml").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          px=Path("px-source/bin/px_hospital_room_authority.py").read_text()
+          for key in (
+              "installedNativeIssuerAuthenticated",
+              "independentlyProtectedIssuerRootVerified",
+              "independentKernelCallerIdentityVerified",
+              "independentActiveSeatVerified",
+              "realHumanConsentAuthenticated",
+              "independentRetentionLegalHoldEvaluationVerified",
+              "protectedPxWriterAndDatabaseVerified",
+              "operatorC5HospitalPermissionGranted",
+              "roomTrashAuthorized", "roomRestoreAuthorized",
+              "hostAuthenticated", "credentialActionsEnabled",
+              "productionAuthority",
+          ):
+              assert '"' + key + '": False' in source, key
+          assert "Ed25519PrivateKey" not in source
+          assert "def issue_" not in source
+          assert "def sign_" not in source
+          assert "room-lifecycle-issuer.pub" in px
+          assert "review.operatorAuthenticated === true" in status
+          assert "review.requiresOwnerReview === false" in status
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          print("C5H_HOLD // NO_NATIVE_ISSUER_NO_SIGNATURE_MINTING_OR_PRODUCTION_GRANTS")
+          PY
+      - name: 40 exact PX verifier, permission scope and signed grant adversarial cases
+        env:
+          C5H_PX_AUTH_SOURCE: ${{ github.workspace }}/px-source/bin/px_hospital_room_authority.py
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_hospital_room_grant_admission_ci.py
+          echo "C5H_PASS // 40_PX_V12_SIGNED_GRANT_AND_SCOPE_REFUSAL_TESTS"
+      - name: Preserve signed PX source owner tests and no unsigned direct Room transition
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          auth=Path("px-source/bin/px_hospital_room_authority.py").read_text()
+          life=Path("px-source/bin/px_hospital_room_lifecycle.py").read_text()
+          for phrase in ("SIGNED_ROOM_AUTHORIZATION_REQUIRED",
+                         "room_lifecycle_authorizations",
+                         "BEGIN IMMEDIATE",
+                         "authorization.consume("):
+              assert phrase in life, phrase
+          for phrase in ("trusted_public_key", "installed_host_binding",
+                         "REPLAYED_APPROVAL", "RETENTION_NOT_APPROVED_BY_ISSUER"):
+              assert phrase in auth, phrase
+          print("C5H_HOLD // PX_OWNER_SIGNED_SOURCE_REQUIRED_WRITER_NOT_PROTECTED")
+          PY

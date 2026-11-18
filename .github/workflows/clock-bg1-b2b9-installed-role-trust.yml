@@ -1,0 +1,57 @@
+name: Clock BG1-B2B9 protected installed role trust preflight (deny-only)
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmInstalledRoleTrustPreflight.py"
+      - "services/time/BG1-ALARM-INSTALLED-ROLE-TRUST.md"
+      - "tests/time/test_clock_bg1_b2b9_installed_role_trust.py"
+      - ".github/workflows/clock-bg1-b2b9-installed-role-trust.yml"
+  push:
+    paths:
+      - "services/time/AlarmInstalledRoleTrustPreflight.py"
+      - "services/time/BG1-ALARM-INSTALLED-ROLE-TRUST.md"
+      - "tests/time/test_clock_bg1_b2b9_installed_role_trust.py"
+      - ".github/workflows/clock-bg1-b2b9-installed-role-trust.yml"
+permissions:
+  contents: read
+jobs:
+  installed-clock-role-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned existing Ed25519 test dependency
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Actual Unix-socket signed role observation and trust bundle refusals
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b9_installed_role_trust.py' -v
+      - name: Preserve signed origin and same-peer challenge/exit regressions
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b2_signed_role_origin.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b7_role_bound_release.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b8_writer_exit_fence.py' -v
+      - name: Preserve mounted Clock barrier and kernel identity checks
+        run: |
+          node --test tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+      - name: Four-file new Clock scope guard
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],
+              text=True).splitlines())
+          expected={
+              "services/time/AlarmInstalledRoleTrustPreflight.py",
+              "services/time/BG1-ALARM-INSTALLED-ROLE-TRUST.md",
+              "tests/time/test_clock_bg1_b2b9_installed_role_trust.py",
+              ".github/workflows/clock-bg1-b2b9-installed-role-trust.yml"}
+          assert changed==expected, f"Unapproved file scope: {sorted(changed ^ expected)}"
+          print("No installed keys, Clock QML, broker, Identity, Connections, systemd or BG2 edits: PASS")
+          PY

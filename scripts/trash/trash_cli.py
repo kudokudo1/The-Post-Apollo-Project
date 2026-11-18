@@ -167,7 +167,9 @@ def _restore_identity(gio, row):
             continue
         if not in_attributes or not line.startswith(("  ", "\t")):
             continue
-        key, separator, value = line.strip().partition(": ")
+        # Strip indentation ONLY: a valid original filename can end in a space.
+        # str.strip() silently changes the GIO-provided path bytes.
+        key, separator, value = line.lstrip(" \t").partition(": ")
         if separator and key in RESTORE_ATTRIBUTES:
             if key in fields or not value or "\r" in value or "\x00" in value:
                 raise TrashError("RESTORE_SOURCE_INFO_INVALID")

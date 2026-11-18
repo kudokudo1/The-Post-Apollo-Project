@@ -21,7 +21,7 @@ This phase adds a real **CI controller → read-only installer ISO → OSTree si
 5. **After** the existing required signed RPM / dedicated SELinux / four UNAVAILABLE actions / cleanup / two-boot rollback success markers, the controller verifies exactly one proof, canonical base64url, Ed25519 signature, exact BEGIN action, `UNAVAILABLE` state, no request ID, and exact fresh nonce from its own pre-ISO 0600 reference. It refuses replayed older receipts, substituted signers and duplicate proofs.
 6. The host controller emits a distinct final fixed marker only after that verification. No production flags change and no authority is conveyed to QML.
 
-The 24 new adversarial tests check genuine Ed25519 signed-denial handling, wrong host nonce, signed replay, wrong public signer, mutated signature/body/action, a signed non-denial, duplicate/missing proofs, controls, malformed base64, oversize data, wrong permissions/symlinked nonce path, and hard-false grants. Existing 25 runtime binding + 31 signed RPM + 7 Identity release regression cases remain in CI.
+The 28 adversarial tests check genuine Ed25519 signed-denial handling, wrong host nonce, signed replay, wrong public signer, mutated signature/body/action, a signed non-denial, duplicate/missing proofs, controls, malformed base64, oversize data, wrong permissions/symlinked nonce path, and hard-false grants. Existing 25 runtime binding + 31 signed RPM + 7 Identity release regression cases remain in CI.
 
 ## HOW TO USE
 
@@ -33,11 +33,17 @@ The challenge file and full serial data are deleted with disposable runner/conta
 
 ## VERIFY
 
-- [ ] Exact-head **24** new controller challenge/proof adversarial tests pass.
+- [ ] Exact-head **28** controller challenge/proof and UART transport adversarial tests pass.
 - [ ] Existing C4b **25** runtime signer-binding and **31** signed RPM contract tests, plus Identity **7** release candidate tests, pass.
 - [ ] Real signed RPM official Fedora 44 Silverblue VM reaches original two reboots and rollback, emits exactly one bounded proof, and host controller verifies the original nonce against the real BEGIN denial.
 - [ ] Grammar and relevant GitHub checks pass.
 - [ ] Independent Nurse 2 source and security review with operator-controlled merge acceptance.
+
+## UART proof-framing regression repair (November 18, 2026)
+
+Nurse 2 correctly held C4b regression acceptance after real Silverblue run `44242697783` reached rollback but rejected the UART proof with `C4B_CONTROLLER_PROOF_PREFIX_OR_CONTROL_REFUSED`. The uploaded bounded artifact excludes the rejected raw proof, so the *exact* preceding console bytes cannot be independently recovered. The UART is a shared byte stream; a preceding kernel/systemd message can leave an unterminated line ahead of the proof. The C4b-owned producer now writes an explicit newline **before** its one bounded public proof record, keeping the same full exact signed frame and public key. The controller **does not strip, normalize, or accept** any unexpected prefix or control byte; it still requires exactly one complete base64url proof, the Ed25519 signature, correct action/denial and the controller's fresh original nonce. New tests cover unterminated console fragments, Linux tty CRLF and deliberate prefixed/duplicate proof refusal.
+
+This repair is only a proposed transport fix until a new exact-head official Fedora Silverblue KVM run passes. A green fast suite alone is insufficient.
 
 ## WATCH OUT FOR
 

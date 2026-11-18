@@ -179,9 +179,16 @@ class ClockB2B13ControllerTests(unittest.TestCase):
         self.assertFalse(self.controller.inspect_floor()["floorRecorded"])
 
     def test_crash_after_floor_commit_cannot_reissue_same_version(self):
+        # B2B14 publishes BLOCKED and CURRENT first. Inject failure only
+        # when the new session itself is about to be published, AFTER
+        # the SQLite floor and CURRENT witness are durable.
+        original=Controller._durable_publish
+        def fail_session(directory,name,raw,*,synthetic):
+            if name==Session.SESSION_FILE:
+                raise Controller.Refused("CLOCK_SESSION_WRITE_FAILED")
+            return original(directory,name,raw,synthetic=synthetic)
         with patch.object(Controller,"_durable_publish",
-                          side_effect=Controller.Refused(
-                              "CLOCK_SESSION_WRITE_FAILED")):
+                          side_effect=fail_session):
             self.refused(self.issue,"CLOCK_SESSION_WRITE_FAILED")
         self.assertEqual(self.controller.inspect_floor()["latestEpoch"],5)
         self.assertFalse(

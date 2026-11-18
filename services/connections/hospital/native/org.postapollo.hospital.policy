@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+  <!-- Source-only. Installation requires operator review of ALL effective rules. -->
+  <action id="org.postapollo.hospital.room-trash">
+    <description>Approve preserving and moving a Hospital Room to Trash</description>
+    <message>Authenticate to move the reviewed Hospital Room to Trash</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_self</allow_active>
+    </defaults>
+  </action>
+  <action id="org.postapollo.hospital.room-restore">
+    <description>Approve restoration of a preserved Hospital Room</description>
+    <message>Authenticate to restore the reviewed Hospital Room</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_self</allow_active>
+    </defaults>
+  </action>
+</policyconfig>

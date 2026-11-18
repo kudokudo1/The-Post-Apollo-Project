@@ -9,6 +9,7 @@ The CI-only guard prevents accidental use, not a hostile actor forging CI vars.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -19,6 +20,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+from unittest.mock import patch
 
 SCHEMA = "post-apollo.trash-gio-roundtrip.u9"
 TIMEOUT = 25
@@ -173,13 +175,47 @@ def run_roundtrip(root: Path, inherited: dict[str, str]) -> dict:
     reviewed_item(index("AFTER_COLLISION"), original)
     original.unlink()  # Only the sentinel created inside private runner sandbox.
 
+    # U10b // Inject an occupied destination only AFTER the actual reviewed
+    # backend's last Python lexists() call, immediately before its REAL GIO
+    # restore command. This proves no-force GIO preserves the collision.
+    spec = importlib.util.spec_from_file_location("u10b_real_trash_cli", backend)
+    target = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(target)
+    raw_run = target._run
+    late_sentinel = b"U10B_LATE_COLLISION_MUST_NOT_BE_OVERWRITTEN"
+    reached_move = False
+
+    def inject_late_collision(argv, timeout=20):
+        nonlocal reached_move
+        if len(argv) == 4 and argv[1:3] == ["trash", "--restore"] and argv[3] == uri:
+            if reached_move or original.exists() or original.is_symlink():
+                raise RoundTripError("LATE_COLLISION_FIXTURE_ALREADY_OCCUPIED")
+            original.write_bytes(late_sentinel)
+            reached_move = True
+        return raw_run(argv, timeout=timeout)
+
+    with patch.object(target, "_run", side_effect=inject_late_collision):
+        try:
+            target.restore_reviewed(uri, str(original), revision, review_id)
+        except target.TrashError as exc:
+            if not str(exc).startswith("GIO_RESTORE_FAILED"):
+                raise RoundTripError("LATE_COLLISION_WRONG_BACKEND_REFUSAL") from exc
+        else:
+            raise RoundTripError("LATE_COLLISION_RESTORE_UNEXPECTEDLY_SUCCEEDED")
+    if not reached_move or not original.is_file() or original.read_bytes() != late_sentinel:
+        raise RoundTripError("LATE_COLLISION_SENTINEL_LOST")
+    reviewed_item(index("AFTER_LATE_COLLISION"), original)
+    original.unlink()  # Only the injected disposable runner sentinel.
+
     receipt = json_response(command(
         [sys.executable, "-I", "-B", str(backend), "restore-reviewed",
          uri, str(original), revision, review_id], env
     ), True, "RESTORE")
     if (receipt.get("kind") != "restore"
             or receipt.get("message") != "RESTORED"
-            or receipt.get("verified") is not True):
+            or receipt.get("verified") is not True
+            or receipt.get("metadataWitness") not in ("observed", "unavailable")
+            or type(receipt.get("secondaryIdentityObserved")) is not bool):
         raise RoundTripError("RESTORE_RECEIPT_UNEXPECTED")
     if not original.is_file() or hashlib.sha256(original.read_bytes()).hexdigest() != digest:
         raise RoundTripError("RESTORED_BYTES_CHANGED")
@@ -206,6 +242,9 @@ def run_roundtrip(root: Path, inherited: dict[str, str]) -> dict:
         "initialInventoryEmpty": True,
         "exactOneItemIndexed": True,
         "collisionDenied": True,
+        "lateCollisionPreserved": True,
+        "metadataCompatibilityMode": receipt["metadataWitness"],
+        "secondaryIdentityObserved": receipt["secondaryIdentityObserved"],
         "restoredBytesVerified": True,
         "staleReplayDenied": True,
         "postRestoreInventoryEmpty": True,

@@ -249,6 +249,8 @@ class ClockNativeSupervisor:
                                    expected_start_ticks=pin.ticks)
             # Observed origin cannot become a production Clock grant.
             verified = (result["originObserved"] is True
+                        and result["releaseEpoch"] == pin.epoch
+                        and result["releaseSequence"] >= pin.minimum_sequence
                         and result["roleAuthenticated"] is False
                         and result["canTransferOwnership"] is False
                         and result["canRing"] is False)

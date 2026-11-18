@@ -7,6 +7,7 @@ import "AlarmManagerPolicy.js" as Policy
 import "AlarmWriterQuiescencePolicy.js" as WriterQuiescence
 import "AlarmWriterBarrierPolicy.js" as WriterBarrier
 import "AlarmWriterDrainPolicy.js" as WriterDrain
+import "AlarmNativeBridgeInboundPolicy.js" as NativeBridge
 
 // V2 is the only mounted Alarm owner; V1 remains read-only migration input.
 // TimeW is just a view. No QtMultimedia dependency in the scheduler itself.
@@ -76,6 +77,35 @@ Scope {
             draining = false;
             phase = WriterDrain.FAILED;
             manager.syncSound();
+        }
+    }
+    // B2B18: actual mounted QML receive component. Hard-off until a
+    // separate independently authenticated native sender/QML trust root
+    // exists. QML SocketServer does not give this code Linux peer credentials.
+    // Empty path + immutable active:false prevent an accidental listener.
+    readonly property var nativeBridgeIngressStatus: NativeBridge.inactiveStatus()
+    QtObject {
+        id: nativeBridgeIngress
+        // A private observer only; even valid synthetic frames cannot
+        // invoke the writerDrain, FileView, or an alarm state transition.
+        function inspectFrame(raw) {
+            if (!manager.nativeWriterDrainBridgeInstalled
+                    || nativeBridgeReceiver.active !== true)
+                return NativeBridge.inactiveStatus();
+            return NativeBridge.inspectCandidate(
+                raw, manager.localWriterDrainStatus);
+        }
+    }
+    SocketServer {
+        id: nativeBridgeReceiver
+        active: false
+        path: ""
+        handler: Socket {
+            parser: SplitParser {
+                onRead: message => {
+                    nativeBridgeIngress.inspectFrame(message);
+                }
+            }
         }
     }
     readonly property bool alarmWriterMaySave:

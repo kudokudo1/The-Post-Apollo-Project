@@ -68,6 +68,16 @@ jobs:
               ".github/workflows/clock-bg1-b2b15-mounted-save-drain.yml",
               ".github/workflows/clock-bg1-b2b4-writer-quiescence.yml",
               ".github/workflows/clock-bg1-b2b6-mounted-barrier.yml"}
-          assert paths in (historical, mounted, b2b15), f"Unapproved B2B4/B2B6/B2B15 diff: {sorted(paths)}"
+          b2b18={
+              "services/time/AlarmManagerService.qml",
+              "services/time/AlarmNativeBridgeInboundPolicy.js",
+              "services/time/BG1-ALARM-MOUNTED-QML-NATIVE-INGRESS.md",
+              "tests/time/test_clock_bg1_b2b18_qml_receiver.cjs",
+              ".github/workflows/clock-bg1-b2b18-mounted-qml-ingress.yml",
+              ".github/workflows/clock-bg1-b2b4-writer-quiescence.yml",
+              ".github/workflows/clock-bg1-b2b6-mounted-barrier.yml",
+              ".github/workflows/clock-bg1-b2b15-mounted-save-drain.yml",
+          }
+          assert paths in (historical, mounted, b2b15,b2b18), f"Unapproved B2B4/B2B6/B2B15 diff: {sorted(paths)}"
           print("No broker/Identity/Connections/active background mode changes: PASS")
           PY

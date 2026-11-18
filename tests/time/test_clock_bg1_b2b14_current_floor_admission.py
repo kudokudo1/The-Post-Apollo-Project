@@ -123,8 +123,10 @@ class ClockB2B14SignedFloorTests(unittest.TestCase):
             b"postapollo.identity.current-floor\x00"+signed))
         self.refused(lambda:self.witness().inspect_current(),
                      "FLOOR_SIGNATURE_NOT_TRUSTED")
+        # The pin is syntactically valid, but B2B9 refuses its mismatch
+        # when reading the independently installed Clock public key.
         self.refused(lambda:self.witness(pin="e"*64).inspect_current(),
-                     "CLOCK_FLOOR_ROOT_NOT_APPROVED")
+                     "CLOCK_FLOOR_ROLE_NOT_VERIFIED")
 
     def test_floor_malformed_duplicate_bool_and_noncanonical_refuse(self):
         self.h.issue()

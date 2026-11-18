@@ -6,6 +6,7 @@ on:
       - 'services/phone/PhoneFaceTimeShortcutHttps.py'
       - 'tests/phone/test_phone_facetime_shortcuts_https_v1.py'
       - 'MODEL/contracts/social-phone-facetime-iphone-https-gateway-v1.md'
+      - 'MODEL/contracts/social-phone-facetime-iphone-https-readiness-v2.md'
       - '.github/workflows/social-phone-facetime-shortcuts-https-v1.yml'
   push:
     branches: [main]
@@ -13,6 +14,7 @@ on:
       - 'services/phone/PhoneFaceTimeShortcutHttps.py'
       - 'tests/phone/test_phone_facetime_shortcuts_https_v1.py'
       - 'MODEL/contracts/social-phone-facetime-iphone-https-gateway-v1.md'
+      - 'MODEL/contracts/social-phone-facetime-iphone-https-readiness-v2.md'
       - '.github/workflows/social-phone-facetime-shortcuts-https-v1.yml'
   workflow_dispatch:
 
@@ -35,7 +37,7 @@ jobs:
         run: |
           python -m py_compile services/phone/PhoneFaceTimeShortcutHttps.py
           python -m py_compile services/phone/PhoneFaceTimeShortcutRelay.py services/phone/PhoneFaceTimeShortcutOperator.py
-      - name: Real dual-listener TLS 1.3 and local operator HTTP, wrong cert, no admin HTTPS, peer restrictions
+      - name: Real dual-listener TLS 1.3, no-socket configuration check, pinned key and private route refusal
         run: python -m unittest discover -s tests/phone -p 'test_phone_facetime_shortcuts_https_v1.py' -v
       - name: Inherited one-time request relay, privacy and typed confirmation
         run: python -m unittest discover -s tests/phone -p 'test_phone_facetime_shortcuts_relay_v1.py' -v

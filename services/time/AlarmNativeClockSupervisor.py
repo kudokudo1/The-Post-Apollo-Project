@@ -59,6 +59,19 @@ def _protected_enrollment_component():
     return component
 
 ProtectedEnrollment = _protected_enrollment_component()
+
+def _current_floor_component():
+    path=Path(__file__).resolve().with_name("AlarmCurrentFloorWitness.py")
+    spec=importlib.util.spec_from_file_location("clock_b2b14_floor",path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Clock current-floor verifier unavailable")
+    module=importlib.util.module_from_spec(spec)
+    sys.modules[spec.name]=module
+    spec.loader.exec_module(module)
+    return module
+
+CurrentFloor=_current_floor_component()
+
 # Intentionally unprovisioned. Only a separately approved protected
 # Clock installation may pin these values in reviewed source/package
 # provenance. NO socket request, environment setting, or CLI flag can
@@ -262,9 +275,26 @@ class ClockNativeSupervisor:
                 minimum_epoch=floor[0],
                 minimum_sequence=floor[1],
                 synthetic_only=False)
+            witness=CurrentFloor.ClockCurrentFloorWitness(
+                enrollment_directory=ProtectedEnrollment.INSTALL_ENROLLMENT_DIR,
+                trust_directory=Origin.TRUST_DIR,
+                pinned_root_sha256=pin,
+                minimum_epoch=floor[0],minimum_sequence=floor[1],
+                synthetic_only=False)
+            # Signed root snapshot is independently checked both BEFORE
+            # and AFTER kernel-peer observation. No cached floor state
+            # may authenticate a session after a newer issuance begins.
+            _,bundle=verifier._load()
+            previous=witness.compare_session(bundle[0])
+            expected=(previous["releaseEpoch"],previous["releaseSequence"],
+                      previous["sessionSha256"])
             observed = verifier.inspect(conn)
-        except (ProtectedEnrollment.Refused, Origin.Refused,
-                Peer.Refused, ValueError, OSError):
+            _,after=verifier._load()
+            if bundle!=after:
+                return False
+            witness.compare_session(after[0],expected=expected)
+        except (ProtectedEnrollment.Refused, CurrentFloor.Refused,
+                Origin.Refused, Peer.Refused, ValueError, OSError):
             return False
         return (observed["originObserved"] is True
                 and observed["signedSessionObserved"] is True

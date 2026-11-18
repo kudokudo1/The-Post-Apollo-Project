@@ -251,7 +251,7 @@ probe_log=/var/tmp/c4b-id-service-probe.log
 probe_rc=0
 POST_APOLLO_C4B_TEST_GUEST=1 GITHUB_ACTIONS=true \
 python3 -I -B - "$socket" "$signer" "$pid" "$uid" "$gid" "$cgroup" "$selinux" >"$probe_log" 2>&1 <<'PY' || probe_rc="$?"
-import secrets,socket,struct,subprocess,sys
+import base64,os,re,secrets,socket,stat,struct,subprocess,sys
 from pathlib import Path
 sys.path.insert(0,"/usr/libexec/post-apollo/identity")
 sys.path.insert(0,"/usr/local/libexec")
@@ -263,6 +263,23 @@ sockpath,signerpath=sys.argv[1:3]
 pid,uid,gid=map(int,sys.argv[3:6])
 expected_cgroup,expected_lsm=sys.argv[6:8]
 key=Ed25519PrivateKey.from_private_bytes(Path(signerpath).read_bytes()).public_key()
+# The controller challenge was issued BEFORE the installer ISO and survives
+# only on disposable test media/staged volatile post-rollback storage. It
+# is a public NONCE, never a release root, private key or login token.
+challenge_file="/var/lib/postapollo-id-ci-assets/controller-challenge.txt"
+fd=os.open(challenge_file,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC)
+try:
+    st=os.fstat(fd)
+    if (not stat.S_ISREG(st.st_mode) or st.st_uid!=0 or st.st_gid!=0 or
+            stat.S_IMODE(st.st_mode)!=0o600 or st.st_size!=44):
+        raise RuntimeError("external CI challenge path not root-owned 0600")
+    challenge_bytes=os.read(fd,45)
+finally:
+    os.close(fd)
+if (len(challenge_bytes)!=44 or challenge_bytes[-1:]!=b"\n" or
+        re.fullmatch(rb"[A-Za-z0-9_-]{43}",challenge_bytes[:-1]) is None):
+    raise RuntimeError("external CI challenge malformed")
+controller_begin_nonce=challenge_bytes[:-1].decode("ascii")
 
 def start_ticks():
     # /proc/<pid>/stat field 22, with a parenthesized process name
@@ -312,7 +329,11 @@ def check_origin(stage):
 
 for action in ("BEGIN","STATUS","CANCEL","RECOVER"):
     check_origin(f"before {action}")
-    nonce=secrets.token_urlsafe(32)
+    # The BEGIN denial must prove possession of the guest signing key over
+    # fresh controller entropy; the remaining denials keep independent
+    # per-request nonces and unchanged signed-native command contracts.
+    nonce=(controller_begin_nonce if action=="BEGIN"
+           else secrets.token_urlsafe(32))
     rid=None if action=="BEGIN" else "CI_NO_LOGIN_REQUEST_01234567"
     request=build_request(action,rid,nonce)
     with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as conn:
@@ -335,6 +356,13 @@ for action in ("BEGIN","STATUS","CANCEL","RECOVER"):
     if receipt["state"]!="UNAVAILABLE" or receipt["requestId"] is not None:
         raise RuntimeError("identity command was not denied")
     check_origin(f"after {action}")
+    if action=="BEGIN":
+        # Both fields are PUBLIC. The controller cryptographically checks the
+        # signed receipt and exact nonce against its own pre-boot reference.
+        # Its pubkey is NOT yet externally enrolled host trust.
+        public=key.public_bytes(Encoding.Raw,PublicFormat.Raw)
+        b64=lambda value:base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+        print("C4B_ID_CHALLENGE_PROOF // pub="+b64(public)+" frame="+b64(out))
     print(f"C4B_ID_PASS // INSTALLED_SIGNED_UNAVAILABLE_{action}")
 print("C4B_ID_PASS // KERNEL_PEER_PID_START_AND_SUPERVISOR_RECHECKED_FOR_FOUR_SIGNED_DENIALS")
 # The signed release and actual runtime receipt signer were previously
@@ -368,6 +396,7 @@ PY
 while IFS= read -r line; do
   case "$line" in
     C4B_ID_PASS\ //*) echo "$line" >/dev/ttyS0 ;;
+    C4B_ID_CHALLENGE_PROOF\ //*) echo "$line" >/dev/ttyS0 ;;
     *) printf 'C4B_ID_SERVICE_PROBE_DETAIL // %.500s\n' "$line" >/dev/ttyS0 ;;
   esac
 done < <(sed -n '1,28p' "$probe_log")

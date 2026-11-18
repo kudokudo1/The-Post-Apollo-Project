@@ -1,0 +1,86 @@
+name: C4b Identity controller-issued fresh nonce signed-denial verification (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/verify_controller_challenge_ci.py'
+      - 'tests/connections/identity_silverblue/test_controller_challenge_ci.py'
+      - 'tests/connections/identity_silverblue/guest_identity_service_probe.sh'
+      - 'tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh'
+      - 'tests/connections/identity_silverblue/run_official_silverblue_identity.sh'
+      - 'tests/connections/identity_silverblue/sanitize_guest_marker_artifact.py'
+      - '.github/workflows/connections-identity-silverblue-controller-challenge.yml'
+      - 'docs/connections-c4b-controller-fresh-challenge-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  controller-issued-fresh-nonce-ci-only:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin Ed25519 verification dependency for disposable runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Confirm no runtime credential, host grant or direct host actuation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/identity_silverblue/verify_controller_challenge_ci.py \
+            tests/connections/identity_silverblue/test_controller_challenge_ci.py
+          bash -n tests/connections/identity_silverblue/run_official_silverblue_identity.sh
+          bash -n tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh
+          bash -n tests/connections/identity_silverblue/guest_identity_service_probe.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          v=Path("tests/connections/identity_silverblue/verify_controller_challenge_ci.py").read_text()
+          probe=Path("tests/connections/identity_silverblue/guest_identity_service_probe.sh").read_text()
+          host=Path("tests/connections/identity_silverblue/run_official_silverblue_identity.sh").read_text()
+          guest=Path("tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh").read_text()
+          marks=Path("tests/connections/identity_silverblue/sanitize_guest_marker_artifact.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          for term in ("C4B_ID_CHALLENGE_PROOF", "HOST_CONTROLLER_FRESH_CHALLENGE_SIGNED_DENIAL_VERIFIED"):
+              assert term in v, term
+          assert 'verify_receipt(' in v
+          assert 'os.O_NOFOLLOW' in v
+          assert 'verify "$tmp/controller-challenge.txt" "$tmp/identity-guest-serial.log"' in host
+          assert 'install -m 0644 "$tmp/controller-challenge.txt" "$tmp/seed/controller-challenge.txt"' in host
+          assert 'controller_begin_nonce' in probe and 'socket.SO_PEERCRED' in probe
+          assert 'C4B_ID_CHALLENGE_PROOF' in probe and marks
+          assert 'FRESH_CONTROLLER_NONCE_STAGED_BEFORE_SERVICE_BOOT' in guest
+          for field in ("operatorReleaseRootEnrolled", "remoteSignedLinuxOriginAuthenticated",
+                        "independentlyEnrolledReceiptSignerVerified",
+                        "externallyProtectedChallengeLedgerVerified",
+                        "externalRollbackResistanceVerified", "c5HumanConsentVerified",
+                        "hostAuthenticated", "canBeginSignIn",
+                        "credentialActionsEnabled", "productionAuthority"):
+              assert '"' + field + '": False' in v
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          print("C4B_HOLD // FRESH_CHALLENGE_IS_NOT_INDEPENDENTLY_ENROLLED_KEY")
+          PY
+      - name: 24 adversarial real Ed25519 signed nonce parsing and replay refusals
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_controller_challenge_ci.py
+          echo "C4B_ID_PASS // 24_EXTERNAL_CONTROLLER_NONCE_NEGATIVE_CASES"
+      - name: Preserve earlier signed RPM, guest key-binding and marker sanitizer tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_runtime_receipt_binding_ci.py
+          python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
+          python3 -B tests/identity/test_silverblue_release_candidate_v1.py
+          echo "C4B_HOLD // OFFLINE_GUEST_EVIDENCE_ONLY_NO_SIGNIN"

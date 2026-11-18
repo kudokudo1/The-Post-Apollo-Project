@@ -44,6 +44,7 @@ jobs:
           bash -n tests/connections/identity_silverblue/selinux/build_policy_ci.sh
           bash -n tests/connections/identity_silverblue/run_official_silverblue_identity.sh
           bash -n tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh
+          python3 -B -m py_compile tests/connections/identity_silverblue/verify_controller_challenge_ci.py
           python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
           python3 -B tests/connections/identity_silverblue/test_identity_booted_rpm_mtime_only.py
       - name: Build the exact existing Identity gateway RPM on disposable Fedora 44
@@ -142,12 +143,14 @@ jobs:
                 test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm ||
                   { echo "C4B_ID_BLOCKED // FEDORA_CONTAINER_KVM_NOT_ACCESSIBLE"; exit 2; }
                 dnf -y --setopt=install_weak_deps=False --setopt=gpgcheck=1 install \
-                  curl qemu-system-x86 qemu-img xorriso genisoimage ||
+                  curl qemu-system-x86 qemu-img xorriso genisoimage python3-cryptography ||
                   { echo "C4B_ID_BLOCKED // FEDORA_SIGNED_QEMU_TOOLING_UNAVAILABLE"; exit 2; }
                 for required in curl qemu-system-x86_64 qemu-img xorriso genisoimage; do
                   command -v "$required" >/dev/null ||
                     { echo "C4B_ID_BLOCKED // FEDORA_QEMU_TOOLING_INCOMPLETE"; exit 2; }
                 done
+                /usr/bin/python3 -I -B -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey" ||
+                  { echo "C4B_ID_BLOCKED // HOST_CONTROLLER_ED25519_VERIFIER_UNAVAILABLE"; exit 2; }
                 echo "C4B_ID_PASS // FEDORA44_SIGNED_QEMU_TOOLING_READY"
                 /usr/bin/bash /src/tests/connections/identity_silverblue/run_official_silverblue_identity.sh \
                   /evidence/rpm /evidence/crypto /evidence/selinux

@@ -118,6 +118,23 @@ case "$phase" in
     [[ -s "$store/postapollo_identity_ci.pp" ]] ||
       fail "SELINUX_OFFLINE_COMPILED_POLICY_EMPTY"
     echo "C4B_ID_PASS // OFFLINE_TEST_SELINUX_MODULE_HASH_BOUND_BEFORE_LAYER"
+    # The controller issued this public challenge before building the ISO;
+    # retain its exact bytes across the temporary OSTree deployment boot.
+    # Its source is the offline seed, not the service, and its reference
+    # copy remains outside the VM for the final controller-side verifier.
+    challenge_source="$data/controller-challenge.txt"
+    [[ -f "$challenge_source" && ! -L "$challenge_source" &&
+       "$(stat -c '%u:%g:%a:%s' "$challenge_source")" == '0:0:644:44' ]] ||
+      fail "CONTROLLER_FRESH_NONCE_SEED_MISSING_OR_WRONG_MODE"
+    controller_nonce="$(cat "$challenge_source")" ||
+      fail "CONTROLLER_FRESH_NONCE_SEED_READ_FAILED"
+    [[ "$controller_nonce" =~ ^[A-Za-z0-9_-]{43}$ ]] ||
+      fail "CONTROLLER_FRESH_NONCE_SEED_INVALID"
+    install -m 0600 "$challenge_source" "$store/controller-challenge.txt" ||
+      fail "CONTROLLER_FRESH_NONCE_PERSISTENT_TEST_STAGING_REFUSED"
+    [[ "$(stat -c '%u:%g:%a:%s' "$store/controller-challenge.txt")" == '0:0:600:44' ]] ||
+      fail "CONTROLLER_FRESH_NONCE_STAGED_INCORRECTLY"
+    echo "C4B_ID_PASS // FRESH_CONTROLLER_NONCE_STAGED_BEFORE_SERVICE_BOOT"
     install -m 0600 "$rpmfile" "$store/identity-silverblue-ci.rpm"
     install -m 0600 "$data/identity-artifact-manifest.sha256" "$store/seed-manifest"
     echo "C4B_ID_PASS // SIGNED_IDENTITY_RPM_VERIFIED_OFFLINE_BEFORE_LAYER"

@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-PX = ROOT / "bin/px-hospital-store"
+PX = ROOT / "px-source/bin/px-hospital-store"
 MODULE = ROOT / "scripts/hospital/room_lifecycle_fixture_v1.py"
 
 def load(path, name):

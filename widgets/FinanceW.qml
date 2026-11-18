@@ -533,24 +533,28 @@ PanelWindow {
         sequence: "Tab"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable
+                 && financeKeyboardAnchor.activeFocus
         onActivated: root.cycleMainMode(1)
     }
     Shortcut {
         sequence: "Shift+Tab"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable
+                 && financeKeyboardAnchor.activeFocus
         onActivated: root.cycleMainMode(-1)
     }
     Shortcut {
         sequence: "Shift+Left"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable
+                 && financeKeyboardAnchor.activeFocus
         onActivated: root.cycleBudgetSubMode(-1)
     }
     Shortcut {
         sequence: "Shift+Right"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable
+                 && financeKeyboardAnchor.activeFocus
         onActivated: root.cycleBudgetSubMode(1)
     }
     Shortcut {

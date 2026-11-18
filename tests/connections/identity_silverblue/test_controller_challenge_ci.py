@@ -231,5 +231,14 @@ class ControllerFreshChallengeTests(unittest.TestCase):
     def test_27_duplicate_is_still_refused_after_uart_record_boundary(self):
         self.refused(serial=b"unfinished prior output\n"+self.serial+self.serial)
 
+    def test_28_crlf_from_real_guest_console_preserves_exact_signed_frame(self):
+        # Linux tty ONLCR inserts carriage returns before the record
+        # separator. A CR at the END of an otherwise exact proof is
+        # transport framing, not permission to accept control prefixes.
+        console=b"console fragment\r\n"+self.serial.replace(b"\n", b"\r\n")
+        report=self.check(serial=console)
+        self.assertIs(report["freshControllerNonceInActualSignedBeginDenialInCI"], True)
+        self.refused(serial=b"\r"+console)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1,0 +1,47 @@
+name: Trash GIO Fedora Compatibility
+
+on:
+  pull_request:
+    paths:
+      - "scripts/trash/trash_cli.py"
+      - "scripts/trash/gio_disposable_roundtrip_u9.py"
+      - "tests/trash/test_gio_metadata_whitespace_u10c.py"
+      - ".github/workflows/trash-gio-fedora-compat.yml"
+  push:
+    paths:
+      - "scripts/trash/trash_cli.py"
+      - "scripts/trash/gio_disposable_roundtrip_u9.py"
+      - "tests/trash/test_gio_metadata_whitespace_u10c.py"
+      - ".github/workflows/trash-gio-fedora-compat.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fedora-gio-recovery:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:43
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@v4
+      - name: Install isolated Fedora GIO / GVfs prerequisites
+        run: |
+          dnf -y -q install python3 glib2 gvfs gvfs-client dbus-daemon
+          command -v gio
+          command -v dbus-run-session
+      - name: Check source metadata parser preserves original path whitespace
+        run: python3 -B -m unittest discover -s tests/trash -p 'test_gio_metadata_whitespace_u10c.py' -v
+      - name: Verify real Fedora GVfs reviewed Restore in disposable CI-only HOME
+        run: |
+          test "$GITHUB_ACTIONS" = "true"
+          test "$CI" = "true"
+          test -d "$RUNNER_TEMP"
+          # GitHub mounts RUNNER_TEMP from its host UID; Fedora container may
+          # run under another UID. Give the fixture an explicitly new, owned,
+          # mode-0700 child under the same ephemeral GitHub runner scratch.
+          scratch="$(mktemp -d "$RUNNER_TEMP/trashpp-u10c-fedora-XXXXXX")"
+          chmod 0700 "$scratch"
+          RUNNER_TEMP="$scratch" python3 -I -B scripts/trash/gio_disposable_roundtrip_u9.py

@@ -22,7 +22,7 @@ for fragment in (
 
 assert qml.count('onLeftClicked: timew.machineRestoreSelectedCheckpoint()') == 1
 assert qml.count('id: machineAutoRestoreProcess') == 1
-assert qml.count('Process {') == 15
+assert qml.count('Process {') == 16
 assert 'id: machineSaveBridgeProcess' in qml
 assert 'onMenuOpenChanged: timew.machineRestoreSelectedCheckpoint()' not in qml
 assert 'Component.onCompleted: timew.machineRestoreSelectedCheckpoint()' not in qml

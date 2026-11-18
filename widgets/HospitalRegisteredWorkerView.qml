@@ -5,6 +5,7 @@ import "../services/hospital/HospitalWorkerSessionPolicy.js" as SessionPolicy
 import "../services/hospital/HospitalWorkerAttentionPolicy.js" as WorkerAttentionPolicy
 import "../services/hospital/HospitalWorkerConnectionPolicy.js" as ConnectionPolicy
 import "../services/hospital/HospitalWorkerAttachmentPreviewPolicy.js" as AttachPreviewPolicy
+import "../services/hospital/HospitalRoomTrashReviewPolicy.js" as TrashReviewPolicy
 
 // Exact durable Room / pinned PX Session inspection. No room-bind,
 // no session-create, no browser-chat access and no automatic agent turns.
@@ -79,6 +80,16 @@ Item {
         WorkerAttentionPolicy.describe(root.roomData)
     readonly property var connectionPlan:
         ConnectionPolicy.inspect(root.roomData)
+    // Source-owned Hospital record. Trash++ U1 shows controls but U2
+    // does not authorize deletion or original-source archive/restore.
+    readonly property var lifecycleReview: TrashReviewPolicy.inspect({
+        pinnedRoomId: root.pinnedRoomId,
+        room: root.roomData,
+        allRooms: root.allRooms,
+        allSessions: root.allSessions,
+        roomsLoaded: root.roomsSnapshotLoaded,
+        sessionsLoaded: root.sessionsSnapshotLoaded
+    })
     readonly property color connectionColor:
         connectionPlan.canRequestTurn ? Colors.cyan
         : connectionPlan.code === "DOCTOR_MISMATCH"
@@ -467,6 +478,17 @@ Item {
             font.pixelSize: 9
             elide: Text.ElideRight
         }
+
+        HospitalActionButton {
+            width: parent.width
+            height: 27
+            label: "TRASH++ // ROOM TRASH / BURN REVIEW"
+            compactIcon: "TRASH"
+            accent: Colors.red
+            selectedAction: root.viewMode === "lifecycle"
+            actionDescription: "Review protected PX Room lifecycle. No Trash, Restore, Burn or file operation is authorized."
+            onTriggered: root.viewMode = "lifecycle"
+        }
     }
 
     Row {
@@ -549,6 +571,121 @@ Item {
             providersLoaded: root.providerDirectoryLoaded
             sourceError: root.attachmentSourceError
             onRegistryRefreshRequested: root.refreshRequested()
+        }
+
+        Flickable {
+            id: lifecycleScroll
+            visible: root.viewMode === "lifecycle"
+            anchors.fill: parent
+            clip: true
+            contentWidth: width
+            contentHeight: lifecycleRows.implicitHeight + 12
+            boundsBehavior: Flickable.StopAtBounds
+
+            Column {
+                id: lifecycleRows
+                width: lifecycleScroll.width
+                spacing: 9
+
+                GohuText {
+                    width: parent.width
+                    text: "TRASH++ // HOSPITAL ROOM LIFECYCLE"
+                    font.pixelSize: 12
+                    color: Colors.orange
+                    elide: Text.ElideRight
+                }
+                GohuText {
+                    width: parent.width
+                    text: "ROOM ID // " + root.pinnedRoomId
+                    color: Colors.cyan
+                    font.pixelSize: 10
+                    elide: Text.ElideMiddle
+                }
+                GohuText {
+                    width: parent.width
+                    text: "REVIEW STATE // " + root.lifecycleReview.state
+                    color: Colors.red
+                    font.pixelSize: 10
+                    wrapMode: Text.Wrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "PROTECTED ORIGINAL // This Room is a PX SQLite record, not a GIO file or Trash++ managed copy."
+                    color: Colors.white
+                    font.pixelSize: 10
+                    wrapMode: Text.Wrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "SESSION REFERENCES // "
+                        + root.lifecycleReview.sessionSummary
+                        + "  // ASSIGNMENT // "
+                        + root.lifecycleReview.assignmentSummary
+                    color: Colors.blue
+                    font.pixelSize: 9
+                    wrapMode: Text.Wrap
+                }
+                // Reuses the existing Trash++ U1 review deck, with every
+                // source-owned operation held until a real PX owner adapter
+                // authenticates revision, retention, dependencies and Restore.
+                // Flags here are deliberately NOT permission or authority.
+                TrashLifecycleActionDeck {
+                    ownerId: "hospital"
+                    resourceId: root.pinnedRoomId
+                    resourceRevision: ""
+                    showTrash: true
+                    showRestore: true
+                    showBurn: true
+                    trashCapable: false
+                    restoreCapable: false
+                    burnCapable: false
+                    ownerApproved: false
+                    policyReviewed: false
+                    protectedResource: true
+                    retentionHold: true
+                    actionWidth: Math.max(70, (lifecycleRows.width - 12) / 3)
+                    actionHeight: 30
+                }
+                GohuText {
+                    width: parent.width
+                    text: "TRASH, RESTORE AND BURN ARE LOCKED // No owner-authorized Room lifecycle backend exists yet. These buttons do not enqueue or change records."
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.Wrap
+                }
+                Repeater {
+                    model: root.lifecycleReview.blockers
+                    GohuText {
+                        required property string modelData
+                        width: lifecycleRows.width
+                        text: "! " + modelData.replace(/_/g, " ")
+                        color: Colors.red
+                        font.pixelSize: 9
+                        wrapMode: Text.Wrap
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "NEXT // Hospital owns a versioned, transaction-safe TRASH -> RESTORE implementation. Trash++ checks signed owner authority, retention and explicit Burn review. Never trash hospital.db or auto-remove linked sessions."
+                    color: Colors.blue
+                    font.pixelSize: 9
+                    wrapMode: Text.Wrap
+                }
+                HospitalActionButton {
+                    width: parent.width
+                    height: 28
+                    label: "BACK TO ROOM STATUS"
+                    compactIcon: "ROOM"
+                    accent: Colors.cyan
+                    onTriggered: root.viewMode = "continuity"
+                }
+            }
+        }
+
+        NeonScrollBar {
+            flickable: lifecycleScroll
+            handleStyle: "star"
+            visible: root.viewMode === "lifecycle" && scrollable
         }
 
         Flickable {

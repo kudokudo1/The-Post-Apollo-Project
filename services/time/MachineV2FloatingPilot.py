@@ -37,22 +37,23 @@ def refuse(reason="V2 FLOATING REHEARSAL REFUSED"):
     raise RehearsalRefused(reason)
 
 
-def _uuid(value):
+def _uuid(value, *, version=None):
     if not isinstance(value, str):
-        refuse("INVALID CHECKPOINT ID")
+        refuse("INVALID CHECKPOINT OR WINDOW KEY")
     try:
         parsed = uuid.UUID(value)
     except (TypeError, ValueError, AttributeError):
-        refuse("INVALID CHECKPOINT ID")
-    if parsed.version != 4 or str(parsed) != value:
-        refuse("INVALID CHECKPOINT ID")
+        refuse("INVALID CHECKPOINT OR WINDOW KEY")
+    if str(parsed) != value or (version is not None and parsed.version != version):
+        refuse("INVALID CHECKPOINT OR WINDOW KEY")
     return value
 
 
 def _request(request):
     if not isinstance(request, dict) or set(request) != FIELDS:
         refuse("INVALID REQUEST SHAPE")
-    _uuid(request["checkpoint_id"])
+    _uuid(request["checkpoint_id"], version=4)
+    # CUSTOMIZE derives UUIDv5 keys; full SAVE commonly uses UUIDv4.
     _uuid(request["checkpoint_window_key"])
     if not valid_con_id(request["live_con_id"]):
         refuse("INVALID LIVE WINDOW")

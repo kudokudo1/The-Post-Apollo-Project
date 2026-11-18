@@ -30,6 +30,7 @@ from MachineWindowResolver import _walk_live
 from MachineCaptureSaveV2 import capture_and_save
 from MachineSaveBridgeV2 import inspect as inspect_for_save, save_request
 from MachineGeometryStoreV2 import load_geometry
+from MachineV2FloatingPilot import (prepare as preview_float, execute_disposable, APPROVAL_KIND)
 import MachineCheckpointStore as legacy
 
 APP = "machine-geometry-test"
@@ -440,6 +441,80 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             assert json.loads(again_mark.stdout)["status"] == "geometry_verified"
             assert any(entry["id"] == marker_id for entry in
                        legacy.listing()["checkpoints"])
+
+            # V2 floating exact placement: execute on the existing PRIVATE
+            # headless Sway socket only. Do NOT inherit operator SWAYSOCK.
+            # Distinct from the regular TimeW RESTORE action.
+            float_saved = next(row for row in geometry_saved["geometry"]["windows"]
+                               if row["app_id"] == FLOAT)
+            float_id = next(row["id"] for row in test_windows
+                            if row["app_id"] == FLOAT)
+            screen = next(row["rect"] for row in geometry_saved["geometry"]["outputs"]
+                          if row["connector"] == float_saved["output"])
+            saved_rect = float_saved["rect"]
+            assert saved_rect["width"] >= 100 and saved_rect["height"] >= 80
+            assert saved_rect["x"] >= screen["x"] and saved_rect["y"] >= screen["y"]
+            assert saved_rect["x"] + saved_rect["width"] <= screen["x"] + screen["width"]
+            assert saved_rect["y"] + saved_rect["height"] <= screen["y"] + screen["height"]
+            if saved_rect["x"] + saved_rect["width"] + 35 <= screen["x"] + screen["width"]:
+                shifted_x = saved_rect["x"] + 35
+            else:
+                shifted_x = saved_rect["x"] - 35
+            assert screen["x"] <= shifted_x
+            assert shifted_x + saved_rect["width"] <= screen["x"] + screen["width"]
+            command("[con_id=" + str(float_id) + "] move absolute position "
+                    + str(shifted_x) + " px " + str(saved_rect["y"]) + " px")
+            def floating_shifted():
+                candidates = [row for row in tree_windows(get("get_tree"))
+                              if row["app_id"] == FLOAT and row["id"] == float_id]
+                return len(candidates) == 1 and candidates[0]["rect"]["x"] != saved_rect["x"]
+            wait_for(floating_shifted, label="disposable floating window moved off checkpoint")
+
+            floating_request = {
+                "checkpoint_id": cid,
+                "checkpoint_window_key": float_saved["window_key"],
+                "live_con_id": float_id,
+                "operator_selected": True,
+                "execution_approved": True,
+                "approval_kind": APPROVAL_KIND,
+            }
+            bound = lambda argv, **options: run_ipc(argv)
+            proposed = preview_float(floating_request, read_runner=bound)
+            assert proposed["status"] == "manual_fixture_candidate"
+            assert proposed["production_restore_allowed"] is False
+            assert proposed["persistent_identity_verified"] is False
+
+            class NativeFixtureJournal:
+                def __init__(self):
+                    self.phases = []
+                def begin(self, summary):
+                    self.phases.append("begin")
+                    assert summary["live_con_id"] == float_id
+                    return "native-ci-only"
+                def dispatching(self, op):
+                    assert op == "native-ci-only"
+                    self.phases.append("dispatching")
+                def finish(self, op, status):
+                    assert op == "native-ci-only"
+                    self.phases.append(status)
+
+            journal_native = NativeFixtureJournal()
+            placed = execute_disposable(
+                floating_request, read_runner=bound,
+                command_runner=bound, journal=journal_native)
+            assert placed["status"] == "verified_fixture_placement", placed
+            assert placed["dispatched_commands"] == 2
+            assert placed["persistent_identity_verified"] is False
+            assert placed["production_restore_allowed"] is False
+            assert journal_native.phases == [
+                "begin", "dispatching", "verified_fixture_placement"]
+            def restored_exact():
+                matches = [row for row in tree_windows(get("get_tree"))
+                           if row["app_id"] == FLOAT and row["id"] == float_id]
+                return len(matches) == 1 and matches[0]["rect"] == saved_rect
+            wait_for(restored_exact, label="real private Sway exact floating postflight")
+            print("MACHINE V2 FLOATING // REAL DISPOSABLE SWAY PLACEMENT PASS")
+
             print("MACHINE PERSISTENT MARK // NEW PROCESS V2 GEOMETRY AND STORED PASS")
             print("MACHINE STORED // REAL HEADLESS SWAY V2 READBACK PASS")
             print("MACHINE PYTHON -I CLI // INSPECT AND SAVE TO PRIVATE SQLITE PASS")

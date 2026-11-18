@@ -42,7 +42,8 @@ jobs:
           broker=Path("services/connections/ConnectionsBroker.qml").read_text()
           status=Path("services/connections/ConnectionsRequestStatus.qml").read_text()
           for token in ("independently_pinned_controller_root", "revoked_enrollment_ids",
-                        "independently_pinned_release_sha256", "V._proof_bytes(serial)",
+                        "independently_pinned_release_sha256", "independently_pinned_host_id",
+                        "C4B_ENROLLMENT_WRONG_CONTROLLER_PINNED_HOST", "V._proof_bytes(serial)",
                         "C4B_ENROLLMENT_GUEST_KEY_NOT_CONTROLLER_PINNED",
                         "C4B_ENROLLMENT_SIGNATURE_UNTRUSTED"):
               assert token in source, token
@@ -59,12 +60,12 @@ jobs:
           assert "readonly property bool hostAuthenticated: false" in status
           print("C4B_ENROLLMENT_HOLD // TEST_CONTROLLER_ROOT_NOT_OPERATOR_ENROLLED")
           PY
-      - name: 32 cryptographic enrollment and guest-substitution adversarial cases
+      - name: 35 cryptographic enrollment, cross-host and guest-substitution adversarial cases
         shell: bash
         run: |
           set -euo pipefail
           python3 -B tests/connections/identity_silverblue/test_controller_pinned_enrollment_gate_ci.py
-          echo "C4B_ENROLLMENT_PASS // 32_CONTROLLER_SIGNED_ENROLLMENT_REFUSAL_CASES"
+          echo "C4B_ENROLLMENT_PASS // 35_CONTROLLER_SIGNED_ENROLLMENT_REFUSAL_CASES"
       - name: Preserve existing controller challenge and runtime signer tests
         shell: bash
         run: |

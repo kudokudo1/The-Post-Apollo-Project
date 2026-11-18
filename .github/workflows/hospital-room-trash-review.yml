@@ -1,0 +1,35 @@
+name: Hospital Room Trash++ Review
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalRoomTrashReviewPolicy.js"
+      - "tests/hospital/test_hospital_room_lifecycle_review_contracts.py"
+      - "tests/hospital/test_room_lifecycle_review_policy.js"
+      - ".github/workflows/hospital-room-trash-review.yml"
+  push:
+    branches: [main]
+    paths:
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalRoomTrashReviewPolicy.js"
+      - "tests/hospital/test_hospital_room_lifecycle_review_contracts.py"
+      - "tests/hospital/test_room_lifecycle_review_policy.js"
+      - ".github/workflows/hospital-room-trash-review.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check pure policy and synthetic Room fixtures
+        run: |
+          node --check services/hospital/HospitalRoomTrashReviewPolicy.js
+          node tests/hospital/test_room_lifecycle_review_policy.js
+      - name: Check shared Trash++ deck and deny-only Hospital UI contracts
+        run: |
+          python3 tests/hospital/test_hospital_room_lifecycle_review_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py

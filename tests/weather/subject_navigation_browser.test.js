@@ -74,7 +74,10 @@ test("SUBJECTS is the only runtime browser and preserves historical source metad
   assert.match(stationSource,/visible: weatherStation\.subjectNavigationOpen/);
   assert.match(stationSource,/function openNotificationView\(view\)/);
   assert.match(stationSource,/subjectNavigator\.cycleSubjects\(direction\)/);
-  assert.match(stationSource,/subjectNavigator\.moveCursor\(direction\)/);
+  // INDEX retains its contextual Up/Down tree; normal workspaces use the
+  // visible content selector instead of moving the SUBJECTS rail.
+  assert.match(stationSource,/subjectNavigator\.moveCursor\(-1\)/);
+  assert.match(stationSource,/return weatherContentKeys\.handleDirectionKey\(key,modifiers\)/);
   assert.match(stationSource,/subjectNavigator\.activateCursor\(\)/);
   assert.match(stationSource,/SubjectSourceBadge\.badgeFor\(/);
   assert.ok(stationSource.includes("StationSubjectRail {"));

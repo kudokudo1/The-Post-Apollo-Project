@@ -60,7 +60,9 @@ jobs:
                         'kind": "commit"', "C.WRITER_SOCKET"):
               assert token in service, token
           assert "Ed25519PrivateKey.generate" not in core+service
-          assert "grant" not in service.split("client.sendall(C.canonical(response))")[1]
+          assert "client.sendall(C.canonical(response))" in service
+          assert "client.sendall(signed)" not in service
+          assert "client.sendall(grant)" not in service
           assert "review.operatorAuthenticated === true" in ui
           assert "review.requiresOwnerReview === false" in ui
           assert "readonly property bool credentialActionsEnabled: false" in broker

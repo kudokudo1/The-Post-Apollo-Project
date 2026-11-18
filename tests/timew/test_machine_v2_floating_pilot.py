@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
+import uuid
 from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -190,6 +191,23 @@ try:
         assert first["target"]["rect"] == rect(100, 100, 800, 500)
         assert first["current"]["rect"] == rect(30, 80, 510, 360)
         assert sway.commands == []
+
+        # CUSTOMIZE SAVE uses per-capture UUIDv5 window keys, unlike
+        # ordinary UUIDv4 SAVE. They are still only checkpoint-local keys.
+        namespace = uuid.UUID("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
+        v5_a = str(uuid.uuid5(namespace, "11"))
+        v5_b = str(uuid.uuid5(namespace, "12"))
+        custom_geo = project_geometry(*saved, window_keys={
+            11: v5_a, 12: v5_b})
+        custom_old = _legacy_from_geometry(
+            custom_geo, label="Two selected Brave windows",
+            captured_at="2026-11-18T00:01:00+00:00")
+        custom_id = save_pair(custom_old, custom_geo)["checkpoint"]["id"]
+        custom_request = dict(
+            request_a, checkpoint_id=custom_id, checkpoint_window_key=v5_a)
+        custom_review = pilot.prepare(custom_request, read_runner=sway.read)
+        assert custom_review["status"] == "manual_fixture_candidate"
+        assert custom_review["persistent_identity_verified"] is False
 
         for bad in (
             dict(request_a, operator_selected=False),

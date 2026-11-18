@@ -1,0 +1,60 @@
+name: Clock BG1-B2B12 protected signed session enrollment (deny-only)
+on:
+  pull_request:
+    paths:
+      - "services/time/AlarmProtectedSessionEnrollment.py"
+      - "services/time/AlarmNativeClockSupervisor.py"
+      - "services/time/BG1-ALARM-PROTECTED-SESSION-ENROLLMENT.md"
+      - "tests/time/test_clock_bg1_b2b12_protected_enrollment.py"
+      - ".github/workflows/clock-bg1-b2b12-protected-session.yml"
+  push:
+    paths:
+      - "services/time/AlarmProtectedSessionEnrollment.py"
+      - "services/time/AlarmNativeClockSupervisor.py"
+      - "services/time/BG1-ALARM-PROTECTED-SESSION-ENROLLMENT.md"
+      - "tests/time/test_clock_bg1_b2b12_protected_enrollment.py"
+      - ".github/workflows/clock-bg1-b2b12-protected-session.yml"
+permissions:
+  contents: read
+jobs:
+  protected-session-read-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install existing Clock Ed25519 trust dependency
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Verify independent signed enrollment against real kernel peer
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b12_protected_enrollment.py' -v
+      - name: Preserve installed Clock role trust and native socket supervisor
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b9_installed_role_trust.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b10_native_supervisor.py' -v
+      - name: Preserve durable session ledger, kernel PID and live QML guards
+        run: |
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b11_durable_supervisor_sessions.py' -v
+          python3 -m unittest discover -s tests/time -p 'test_clock_bg1_b2b_peer_identity.py' -v
+          node --test tests/time/test_clock_bg1_b2b6_mounted_barrier.cjs
+      - name: Exact five-file Clock-only guard
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only","origin/main...HEAD"],text=True
+          ).splitlines())
+          expected={
+              "services/time/AlarmProtectedSessionEnrollment.py",
+              "services/time/AlarmNativeClockSupervisor.py",
+              "services/time/BG1-ALARM-PROTECTED-SESSION-ENROLLMENT.md",
+              "tests/time/test_clock_bg1_b2b12_protected_enrollment.py",
+              ".github/workflows/clock-bg1-b2b12-protected-session.yml"}
+          assert changed==expected, f"Unexpected change: {sorted(changed ^ expected)}"
+          print("No installed signing keys, live QML, Identity, Connections, systemd or BG2 changes: PASS")
+          PY

@@ -105,6 +105,16 @@ Item {
         } catch(error) { reset(); }
     }
 
+    function selectInitial() {
+        if(!navigationActive) return false;
+        const controls=candidates();
+        const next=Spatial.initialIndex(controls);
+        if(next<0) {reset();return false;}
+        selectedItem=controls[next].item;
+        refreshBounds();
+        return hasContentSelection;
+    }
+
     function move(dx,dy) {
         if(!navigationActive) return false;
         const current=candidates();

@@ -407,6 +407,18 @@ class NativeIssuerSecurity(unittest.TestCase):
             forged=(os.getpid()+1,os.getuid(),os.getgid())
             self.denied(S._packet_recv,rx,expected_sender=forged)
 
+    def test_42_native_ready_handshake_precedes_client_packet(self):
+        """SO_PASSCRED must be installed before a peer sends any request."""
+        service=(HERE/"HospitalNativeIssuerService.py").read_text()
+        prepare=service.index("client.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)")
+        ready=service.index("if client.send(ready) != len(ready):")
+        invoke=service.index("response = _native_step(client, policy)")
+        self.assertLess(prepare,ready)
+        self.assertLess(ready,invoke)
+        writer=service.index("s.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)")
+        send=service.index("if s.send(payload) != len(payload):")
+        self.assertLess(writer,send)
+
     def test_41_packet_gate_rejects_no_trusted_expected_peer(self):
         import socket
         import contextlib

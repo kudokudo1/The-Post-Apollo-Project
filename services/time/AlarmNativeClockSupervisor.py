@@ -177,7 +177,7 @@ def _unique(pairs):
 
 def _decode_request(line):
     if (type(line) is not bytes or not 1 < len(line) <= MAX_FRAME
-            or not line.endswith(b"\\n") or b"\\n" in line[:-1]):
+            or not line.endswith(b"\n") or b"\n" in line[:-1]):
         raise Refused("CLOCK_REQUEST_FRAME_INVALID")
     raw = line[:-1]
     try:

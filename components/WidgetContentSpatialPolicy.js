@@ -48,6 +48,10 @@ function nextIndex(rects,current,dx,dy) {
         var size=dx!==0
             ? (r.height+rects[current].height)/2
             : (r.width+rects[current].width)/2;
+        // A far-offscreen diagonal must not steal an edge arrow. Nearby
+        // on-screen diagonal controls remain valid when a row is sparse,
+        // and offscreen controls in the SAME column/row remain scrollable.
+        if(r.visible === false && cross>Math.max(60,size)) continue;
         // Preserve the current row/column first; pick nearby controls
         // only when a straight directional neighbor does not exist.
         var perpendicular=Math.max(0,cross-size/2);

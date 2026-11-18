@@ -146,10 +146,12 @@ Item {
             // An arbitrary action is NOT safe merely because it has a
             // clickable surface. Navigation-only owners opt in explicitly.
             const kind=button.keyboardActivationSignal;
-            if(kind!=="leftClicked" && kind!=="triggered")
+            if(kind!=="leftClicked" && kind!=="triggered"
+                    && kind!=="clicked")
                 return false;
             reset();  // route changes may destroy this delegate synchronously
             if(kind==="leftClicked") button.leftClicked(null);
+            else if(kind==="clicked") button.clicked(null);
             else button.triggered(null);
             return true;
         } catch(error) { reset();return false; }

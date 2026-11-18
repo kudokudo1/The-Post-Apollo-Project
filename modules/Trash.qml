@@ -1457,7 +1457,12 @@ PanelWindow {
         duration: 850
         easing.type: Easing.Linear
         onFinished: {
-            if (trashLauncher.researchBurnId !== ""
+            // Both a reviewed GIO file and a managed copy share this timer.
+            // A GIO file has no researchBurnId; require the live confirmation
+            // modal instead of gating completion on a managed-copy identity.
+            if (trashLauncher.menuOpen
+                    && trashLauncher.burnConfirmationOpen
+                    && trashLauncher.burnUiStage === ""
                     && trashLauncher.researchBurnClickArmed)
                 trashLauncher.researchBurnLoadComplete = true;
         }

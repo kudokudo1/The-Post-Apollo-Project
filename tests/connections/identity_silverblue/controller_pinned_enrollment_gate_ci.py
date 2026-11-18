@@ -33,9 +33,12 @@ AUDIENCE = "protected-connections-c3e-ci-only"
 SCOPE = "signed-denial-diagnostic-only"
 HEX = re.compile(r"[0-9a-f]{64}\Z")
 IDENT = re.compile(r"[0-9a-f]{32}\Z")
+# Match protected C3e-AF's established host identity shape. This is a
+# controller-pinned NAME, not evidence of the real computer's identity.
+HOST = re.compile(r"postapollo-identity-ci@[a-z0-9][a-z0-9-]{2,63}\Z")
 FIELDS = frozenset((
     "schema", "role", "package", "unit", "audience", "scope",
-    "enrollmentId", "releaseSha256", "receiptKeySha256",
+    "enrollmentId", "hostId", "releaseSha256", "receiptKeySha256",
     "releaseEpoch", "releaseSequence",
 ))
 MAX_ENROLLMENT = 1536
@@ -95,6 +98,8 @@ def _read_signed_record(raw: bytes) -> dict:
             record["audience"] != AUDIENCE or record["scope"] != SCOPE or
             type(record["enrollmentId"]) is not str or
             IDENT.fullmatch(record["enrollmentId"]) is None or
+            type(record["hostId"]) is not str or
+            HOST.fullmatch(record["hostId"]) is None or
             any(type(record[k]) is not str or HEX.fullmatch(record[k]) is None
                 for k in ("releaseSha256", "receiptKeySha256")) or
             any(type(record[k]) is not int or not 0 < record[k] < 2**53
@@ -107,6 +112,7 @@ def inspect_enrolled_controller_challenge_ci_only(
     signed_enrollment: bytes, enrollment_signature: bytes,
     independently_pinned_controller_root: Ed25519PublicKey,
     independently_pinned_release_sha256: str,
+    independently_pinned_host_id: str,
     minimum_release_epoch: int, minimum_release_sequence: int,
     revoked_enrollment_ids: tuple,
 ):
@@ -121,6 +127,8 @@ def inspect_enrolled_controller_challenge_ci_only(
     if (type(enrollment_signature) is not bytes or len(enrollment_signature) != 64 or
             type(independently_pinned_release_sha256) is not str or
             HEX.fullmatch(independently_pinned_release_sha256) is None or
+            type(independently_pinned_host_id) is not str or
+            HOST.fullmatch(independently_pinned_host_id) is None or
             type(minimum_release_epoch) is not int or
             type(minimum_release_sequence) is not int or
             not 0 < minimum_release_epoch < 2**53 or
@@ -137,6 +145,8 @@ def inspect_enrolled_controller_challenge_ci_only(
         )
     except InvalidSignature as exc:
         raise Refused("C4B_ENROLLMENT_SIGNATURE_UNTRUSTED") from exc
+    if not hmac.compare_digest(record["hostId"], independently_pinned_host_id):
+        _deny("C4B_ENROLLMENT_WRONG_CONTROLLER_PINNED_HOST")
     if (not hmac.compare_digest(
             record["releaseSha256"], independently_pinned_release_sha256,
         ) or (record["releaseEpoch"], record["releaseSequence"]) <
@@ -182,6 +192,7 @@ def inspect_enrolled_controller_challenge_ci_only(
         "receiptSignerMatchesControllerSignedEnrollmentInCI": True,
         "signedDenialMatchesFreshControllerNonceInCI": True,
         "enrollmentId": record["enrollmentId"],
+        "hostId": record["hostId"],
         "releaseEpoch": record["releaseEpoch"],
         "releaseSequence": record["releaseSequence"],
         "releaseSha256": record["releaseSha256"],

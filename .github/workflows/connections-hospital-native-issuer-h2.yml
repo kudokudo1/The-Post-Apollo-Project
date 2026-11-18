@@ -60,7 +60,9 @@ jobs:
                         'kind": "commit"', "C.WRITER_SOCKET"):
               assert token in service, token
           assert "Ed25519PrivateKey.generate" not in core+service
-          assert "client.sendall(C.canonical(response))" in service
+          assert "if client.send(answer) != len(answer):" in service
+          assert "socket.SO_PASSCRED" in service
+          assert "socket.SCM_CREDENTIALS" in service
           assert "client.sendall(signed)" not in service
           assert "client.sendall(grant)" not in service
           assert "review.operatorAuthenticated === true" in ui
@@ -72,14 +74,14 @@ jobs:
           assert "HOSPITAL_NATIVE_HOLD" in core and "HOSPITAL_NATIVE_HOLD" in service
           print("C5H2_HOLD // SOURCE_ONLY_NO_INSTALLED_KEY_NO_PROTECTED_PX_WRITER")
           PY
-      - name: 38 native signer exact PX v12 frame and staged hostile-origin cases
+      - name: 41 native signer exact PX v12 frame and staged hostile-origin cases
         shell: bash
         env:
           C5H_PX_AUTH_SOURCE: ${{ github.workspace }}/px-source/bin/px_hospital_room_authority.py
         run: |
           set -euo pipefail
           python3 -B tests/connections/test_connections_hospital_native_issuer_h2.py
-          echo "C5H2_PASS // 38_NATIVE_ISSUER_SOURCE_AND_PX_SIGNATURE_TESTS"
+          echo "C5H2_PASS // 41_NATIVE_ISSUER_SOURCE_AND_PX_SIGNATURE_TESTS"
       - name: Preserve previously merged C5-H1 signed grant and scope checks
         shell: bash
         env:

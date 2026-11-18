@@ -1,0 +1,75 @@
+name: C4b controller-pinned receipt enrollment gate (deny-only CI)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/controller_pinned_enrollment_gate_ci.py'
+      - 'tests/connections/identity_silverblue/test_controller_pinned_enrollment_gate_ci.py'
+      - '.github/workflows/connections-identity-silverblue-controller-enrollment.yml'
+      - 'docs/connections-c4b-controller-pinned-enrollment-gate-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  controller-signed-enrollment-negative-only:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin Ed25519 dependency for disposable CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Verify exact source and hard deny-only trust boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/identity_silverblue/controller_pinned_enrollment_gate_ci.py \
+            tests/connections/identity_silverblue/test_controller_pinned_enrollment_gate_ci.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/identity_silverblue/controller_pinned_enrollment_gate_ci.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          status=Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          for token in ("independently_pinned_controller_root", "revoked_enrollment_ids",
+                        "independently_pinned_release_sha256", "V._proof_bytes(serial)",
+                        "C4B_ENROLLMENT_GUEST_KEY_NOT_CONTROLLER_PINNED",
+                        "C4B_ENROLLMENT_SIGNATURE_UNTRUSTED"):
+              assert token in source, token
+          for denied in ("operatorEnrollmentRootCustodyVerified",
+                         "externalEnrollmentAuthorizedForProduction",
+                         "independentHostKernelAttestationVerified",
+                         "independentSeatAndPeerVerified",
+                         "externallyProtectedRevocationLedgerVerified",
+                         "externalRollbackResistanceVerified", "c5HumanConsentVerified",
+                         "hostAuthenticated", "canBeginSignIn",
+                         "credentialActionsEnabled", "productionAuthority"):
+              assert '"' + denied + '": False' in source, denied
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "readonly property bool hostAuthenticated: false" in status
+          print("C4B_ENROLLMENT_HOLD // TEST_CONTROLLER_ROOT_NOT_OPERATOR_ENROLLED")
+          PY
+      - name: 32 cryptographic enrollment and guest-substitution adversarial cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_controller_pinned_enrollment_gate_ci.py
+          echo "C4B_ENROLLMENT_PASS // 32_CONTROLLER_SIGNED_ENROLLMENT_REFUSAL_CASES"
+      - name: Preserve existing controller challenge and runtime signer tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_controller_challenge_ci.py
+          python3 -B tests/connections/identity_silverblue/test_runtime_receipt_binding_ci.py
+          python3 -B tests/identity/test_silverblue_release_candidate_v1.py
+          echo "C4B_ENROLLMENT_HOLD // NO_REAL_HOST_TRUST_OR_SIGNIN"

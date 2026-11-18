@@ -10,7 +10,8 @@ DEPENDENCY // PX Hospital store writer owner (The-Post-Apollo-Dev-Exp); Trash++ 
 
 This stage demonstrates a **reversible Room Trash -> Restore record lifecycle**
 using SQLite **only in RAM**, on the actual PX v10 schema instantiated by
-\`bin/px-hospital-store\` for test fixtures. It does not migrate or write
+\`px-source/bin/px-hospital-store\` from a pinned, separate CI checkout of
+\`kudokudo1/The-Post-Apollo-Dev-Exp@c856f6ed\`. It does not migrate or write
 the operator's persistent \`hospital.db\`, and cannot open an on-disk database.
 
 - \`install_fixture\` refuses all file-backed or attached databases and requires

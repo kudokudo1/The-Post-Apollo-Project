@@ -56,9 +56,13 @@ The verifier:
 - Executes real Linux `fsync()` on the opened **read-only file
   descriptor** and containing directory descriptor. It then
   rereads the exact bytes and compares file descriptor metadata
-  against the path's current inode. Errors, a changed digest,
-  inode replacement, content modification, symlinks, bad
-  permissions or unsafe directories refuse.
+  against the path's current inode. It also reopens the complete
+  independently approved absolute parent path and compares its
+  filesystem identity with the pinned directory descriptor, so a
+  directory rename/swap cannot leave a stale observed source.
+  Errors, a changed digest, inode/directory replacement,
+  content modification, symlinks, bad permissions or unsafe
+  directories refuse.
 - In synthetic mode, the supervisor checks the original held
   kernel pidfd **before and after** the sync observation.
 - Replies with no V2 alarm data, path, notes, source digest or

@@ -33,6 +33,18 @@ def _origin_component():
 
 Origin = _origin_component()
 Peer = Origin.Role._Peer
+
+def _session_component():
+    path = Path(__file__).resolve().with_name("AlarmSupervisorSessionLedger.py")
+    spec = importlib.util.spec_from_file_location("clock_b2b11_session", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Clock session floor component unavailable")
+    component = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = component
+    spec.loader.exec_module(component)
+    return component
+
+Session = _session_component()
 SOCKET_FILE = "clock-supervisor-v1.sock"
 RUNTIME_SUBDIR = "post-apollo-clock"
 TEST_RUNTIME = "bg1-clock-supervisor-fixture"
@@ -57,6 +69,7 @@ class SyntheticSessionPin:
     pinned_root_sha256: str
     minimum_epoch: int
     minimum_sequence: int
+    epoch: int = 5  # Synthetic ledger epoch, never live ownership.
 
 
 def _owned_directory(path, *, exact_mode=0o700):
@@ -142,6 +155,11 @@ class ClockNativeSupervisor:
         self._listener = None
         self._socket_identity = None
         self._test_pins = {}
+        # B2B11: only the explicitly disposable supervisor gets a ledger
+        # and holds duplicate kernel pidfds to witness actual process exit.
+        # Real foreground mode still has NO trusted session enroller.
+        self._session_ledger = None
+        self._test_pidfds = {}
 
     def add_synthetic_session(self, pin):
         """Only isolated tests can enroll a test subprocess. No CLI for this."""
@@ -155,7 +173,10 @@ class ClockNativeSupervisor:
                 or type(pin.pinned_root_sha256) is not str
                 or type(pin.minimum_epoch) is not int
                 or type(pin.minimum_sequence) is not int
-                or pin.minimum_epoch <= 0 or pin.minimum_sequence <= 0):
+                or pin.minimum_epoch <= 0 or pin.minimum_sequence <= 0
+                or type(pin.epoch) is not int
+                or not 1 <= pin.epoch <= Session.MAX_EPOCH
+                or pin.epoch < pin.minimum_epoch):
             raise Refused("SYNTHETIC_SESSION_ONLY")
         if self._listener is None:
             raise Refused("SUPERVISOR_NOT_LISTENING")
@@ -174,6 +195,9 @@ class ClockNativeSupervisor:
         except OSError as exc:
             raise Refused("CLOCK_SOCKET_DIRECTORY_UNAVAILABLE") from exc
         _owned_directory(self.directory)
+        if self.synthetic:
+            self._session_ledger = Session.ClockSessionLedger(
+                self.directory, synthetic_only=True)
         if os.path.lexists(self.socket_path):
             # Never unlink a path occupied by another active supervisor.
             raise Refused("CLOCK_SOCKET_ALREADY_EXISTS")
@@ -224,15 +248,52 @@ class ClockNativeSupervisor:
                                    expected_pid=pin.pid,
                                    expected_start_ticks=pin.ticks)
             # Observed origin cannot become a production Clock grant.
-            return (result["originObserved"] is True
-                    and result["roleAuthenticated"] is False
-                    and result["canTransferOwnership"] is False
-                    and result["canRing"] is False)
-        except (Peer.Refused, Origin.Refused, OSError, ValueError):
+            verified = (result["originObserved"] is True
+                        and result["roleAuthenticated"] is False
+                        and result["canTransferOwnership"] is False
+                        and result["canRing"] is False)
+            if not verified or self._session_ledger is None:
+                return False
+            self._session_ledger.observe_signed_process(
+                pid=pin.pid, ticks=pin.ticks, epoch=pin.epoch,
+                release_root_sha256=pin.pinned_root_sha256)
+            # The original pinned SO_PEERPIDFD survives this request so
+            # the supervisor can later witness actual exit, not infer it
+            # from PID reuse or from a signed response.
+            retained = os.dup(witness["pidfd"])
+            previous = self._test_pidfds.pop(pin.pid, None)
+            if previous is not None:
+                os.close(previous)
+            self._test_pidfds[pin.pid] = retained
+            return True
+        except (Peer.Refused, Origin.Refused, Session.Refused,
+                OSError, ValueError):
             return False
         finally:
             if witness is not None:
                 Peer.close(witness)
+
+    def observe_synthetic_session_exit(self, pid):
+        """Test-only; the original pidfd MUST have signaled process exit.
+
+        A successful observation does not authorize RELEASED or owner
+        takeover, nor does it protect against a real Quickshell restart.
+        """
+        if not self.synthetic or self._session_ledger is None:
+            raise Refused("INSTALLED_SESSION_REVOCATION_UNAVAILABLE")
+        pin = self._test_pins.get(pid)
+        fd = self._test_pidfds.get(pid)
+        if pin is None or fd is None:
+            raise Refused("NO_SUPERVISED_TEST_PROCESS_WITNESS")
+        try:
+            result = self._session_ledger.observe_exited_pidfd(
+                pid=pin.pid, ticks=pin.ticks, epoch=pin.epoch,
+                pidfd=fd)
+        except Session.Refused as exc:
+            raise Refused(str(exc)) from exc
+        os.close(self._test_pidfds.pop(pid))
+        self._test_pins.pop(pid)
+        return result
 
     def _handle(self, conn):
         conn.settimeout(2.0)
@@ -285,6 +346,13 @@ class ClockNativeSupervisor:
             finally:
                 self._socket_identity = None
         self._test_pins.clear()
+        for fd in self._test_pidfds.values():
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+        self._test_pidfds.clear()
+        self._session_ledger = None
 
     def serve_forever(self):
         self.bind()

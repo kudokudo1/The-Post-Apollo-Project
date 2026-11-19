@@ -218,6 +218,11 @@ def inspect_rotation_ci_only(
             controller_challenge=controller_challenge)
     except P.Refused as exc:
         raise Refused("C4B_ROTATION_NEXT_SIGNED_BUNDLE_REFUSED") from exc
+    # A retired controller signing root must not be repurposed as the
+    # successor gateway's signed-denial receipt key. Checking only the new
+    # controller root leaves a cross-release key-role confusion path open.
+    if hmac.compare_digest(candidate["receiptKeySha256"], old_digest):
+        _deny("C4B_ROTATION_RETIRED_ROOT_AS_GATEWAY_RECEIPT_REFUSED")
     if (candidate.get("policySha256") != next_digest
             or candidate.get("controllerRootSha256") != new_digest
             or candidate.get("hostId") != following["hostId"]

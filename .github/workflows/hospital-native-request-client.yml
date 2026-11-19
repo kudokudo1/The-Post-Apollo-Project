@@ -35,6 +35,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Read-only checkout of PX protected writer at exact reviewed #130 commit
+        uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: aea04d01242c9d13f2dd4f34d699cab7bd11abf3
+          path: px-source
+          persist-credentials: false
+      - name: Install pinned PX Ed25519 verifier import for parser contract
+        run: python3 -m pip install 'cryptography==46.0.3'
       - name: Compile production native client and exercise disposable packet fixture
         run: |
           python3 tests/hospital/test_hospital_native_request_client.py

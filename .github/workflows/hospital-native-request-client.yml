@@ -39,7 +39,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: kudokudo1/The-Post-Apollo-Dev-Exp
-          ref: 7b071b7e0566a9f24334835bd285f547ead1d4e7
+          ref: f4c30d25c755d7a155ac33e53e22d51f3ad240c7
           path: px-source
           persist-credentials: false
       - name: Install pinned PX Ed25519 verifier import for parser contract

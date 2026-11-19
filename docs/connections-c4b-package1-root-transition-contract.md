@@ -116,3 +116,20 @@ Actual kernel Unix-UID boundary exercised in GitHub Actions:
 **Verification gate:** 28 new disposable Linux root-owned-ledger tests in the existing Package 1 CI, in addition to 28 signed root-rollover and 20 rotated C3e-AF alignment tests. Exact-head workflow results and independent security review still required.
 
 **Recovery:** #2068 remains the single C4b Package 1 draft. To reproduce CI, inspect the dedicated connections-c4b-package1-signed-root-transition workflow. No commands are provided for running this fixture as a production service.
+
+
+## PACKAGE 1 FRESH INDEPENDENT CHECKPOINT CONTRACT // 2026-11-19
+
+**Scope:** C4b-only additive source verifier and Linux CI tests, on the existing #2068 draft. This **does not** enroll an actual remote witness or choose the operator's production signing-key custodian.
+
+### Mechanism
+
+- A separately pinned Ed25519 **witness** public key verifies a domain-separated, canonical, exact-fields signed statement containing an independently issued fresh challenge digest and the controller's currently committed root, policy hash, chain digest, sequence, host ID and minimum release floor.
+- A stale signed witness response for a different nonce, a different host, a different local root/policy, a different release floor or a rolled-back SQLite transition sequence **refuses**. C4b controller root and witness signer must be separate.
+- The C4b root-owned ledger now exposes a distinct **witness-required diagnostic rotation entrypoint**. It verifies the signed witness statement against the ledger's **current state inside the same BEGIN IMMEDIATE SQLite transaction** before checking old/new root signatures and spending the one-use staged intent. The legacy unwitnessed CI entrypoint remains test-only; neither entrypoint can grant credentials or production login.
+- A disposable Linux test copies a root-owned SQLite file before a legitimate rotation, lets the witness sign the newer state, restores the older file, and verifies that the newer signed witness **refuses** the restored controller state. It explicitly demonstrates that a forged/stale witness signing home can make old state appear consistent again: the true independent custodian is the missing trusted component.
+- Tests also check missing signer, wrong pinned witness key, signature forgery, duplicate/noncanonical fields, wrong host, wrong chain, wrong release floor, wrong controller root, nonce replay and production-scope injection. No real external witness private key is stored or installed by this package.
+
+**Trust boundary:** This is stronger than inspecting a Unix UID permission flag, because it shows how a separately signed checkpoint can detect a privileged filesystem rollback *when the external witness preserves and signs the genuinely current history*. It is **NOT** protection against a compromised shared-root signer, external witness rollback, compromised operator key, copied signing seed, reuse of a signed challenge, or forgery when the attacker controls all test pins. A production service needs an independently isolated custodian, protected one-use challenge ledger, audited key enrollment/recovery, rollback-resistant hardware or external anchor and signed host/seat/runtime attestations. C3e and Identity retain ownership of those decisions.
+
+**Verification criterion:** New 21-case checkpoint/recovery suite under real disposable Linux root CI in the **same** Package 1 GitHub Actions workflow; prior 28+20+28 source/UID tests plus inherited C4b/C3e tests must also stay green. Exact-head independent Nurse 2 review remains required. No merge, local installation, trusted roots or sign-in activation are authorized by CI.

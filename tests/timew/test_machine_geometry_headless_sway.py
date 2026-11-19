@@ -8,6 +8,7 @@ Nothing is saved in the user's SQLite database or restored to their desktop.
 """
 from __future__ import annotations
 
+import base64
 import json
 import sqlite3
 import os
@@ -33,6 +34,9 @@ from MachineSaveBridgeV2 import inspect as inspect_for_save, save_request
 from MachineGeometryStoreV2 import load_geometry
 from MachineV2FloatingPilot import (prepare as preview_float, execute_disposable, APPROVAL_KIND)
 from MachineV2GeometryJournal import GeometryJournal, DB_NAME
+from MachineV2PairedRehearsal import execute_fixture as execute_signed_fixture
+import MachineV2PairConsent as pc
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 import MachineCheckpointStore as legacy
 
 APP = "machine-geometry-test"
@@ -492,13 +496,75 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
             assert journal_path.parent.is_relative_to(root)
             journal_native = GeometryJournal(journal_path)
             assert journal_native.pending() == []
-            placed = execute_disposable(
-                floating_request, read_runner=bound,
-                command_runner=bound, journal=journal_native)
+            # Full signed admit/spend/dispatch path against this ONE private
+            # real-Sway test window. Ed25519 keys are generated in memory
+            # and never installed or confused with C3e/C5 authority.
+            pair_secret = Ed25519PrivateKey.generate()
+            consent_secret = Ed25519PrivateKey.generate()
+            native_session = str(uuid.uuid4())
+            current_ms = int(time.time() * 1000)
+            intent = pc._intent({
+                "checkpoint_id": cid,
+                "window_key": float_saved["window_key"],
+                "live_con_id": float_id,
+                "app_id": FLOAT, "workspace": float_saved["workspace"],
+                "output": float_saved["output"],
+                "before_rect": proposed["current"]["rect"],
+                "target_rect": saved_rect,
+                "session_id": native_session,
+            })
+            pair_claim = {
+                "schema": pc.PAIR_SCHEMA, "audience": pc.AUDIENCE,
+                "pair_id": str(uuid.uuid4()), "checkpoint_id": cid,
+                "window_key": float_saved["window_key"],
+                "live_con_id": float_id,
+                "app_id": FLOAT,
+                "workspace": float_saved["workspace"],
+                "output": float_saved["output"],
+                "session_id": native_session,
+                "browser_window_ref": str(uuid.uuid4()),
+                "issued_ms": current_ms, "expires_ms": current_ms + 10000,
+            }
+            consent_claim = {
+                "schema": pc.CONSENT_SCHEMA, "audience": pc.AUDIENCE,
+                "grant_id": str(uuid.uuid4()),
+                "pair_sha256": pc._digest(pair_claim),
+                "intent_sha256": pc._digest(intent),
+                "seat_id": "CI-seat-virtual", "session_id": native_session,
+                "issued_ms": current_ms, "expires_ms": current_ms + 9500,
+                "single_use": True, "approved_action": pc.ACTION,
+            }
+            def ci_sign(claim, key, domain):
+                sig = base64.urlsafe_b64encode(
+                    key.sign(domain + pc._json(claim))).decode().rstrip("=")
+                return {"payload": claim, "signature": sig}
+            claim_pair = ci_sign(pair_claim, pair_secret, pc.PAIR_DOMAIN)
+            claim_consent = ci_sign(consent_claim, consent_secret, pc.CONSENT_DOMAIN)
+            spend_path = root / "data/post-apollo/machine" / pc.SPEND_NAME
+            assert spend_path.parent == journal_path.parent
+            spent = pc.OneUseSpendLedger(spend_path)
+            assert spent.lookup(consent_claim["grant_id"]) is None
+            placed = execute_signed_fixture(
+                checkpoint_id=cid, window_key=float_saved["window_key"],
+                live_con_id=float_id,
+                pairing=claim_pair, consent=claim_consent,
+                pair_key=pair_secret.public_key(),
+                consent_key=consent_secret.public_key(),
+                expected_session_id=native_session,
+                expected_seat_id="CI-seat-virtual",
+                active_seat_guard=lambda: True,
+                clock_ms=lambda: int(time.time() * 1000),
+                spend_ledger=spent, geometry_journal=journal_native,
+                read_runner=bound, command_runner=bound,
+                legacy_reader=legacy.load, geometry_reader=load_geometry,
+            )
             assert placed["status"] == "verified_fixture_placement", placed
             assert placed["dispatched_commands"] == 2
-            assert placed["persistent_identity_verified"] is False
-            assert placed["production_restore_allowed"] is False
+            assert placed["persistent_brave_identity_verified"] is False
+            assert placed["production_authorized"] is False
+            assert placed["consent_spent"] is True
+            assert spent.lookup(consent_claim["grant_id"])["spent"] is True
+            assert spent.lookup(consent_claim["grant_id"])["replay_allowed"] is False
             assert journal_native.pending() == []
             with sqlite3.connect(journal_path) as conn:
                 observed = conn.execute("""SELECT id,phase FROM operations
@@ -519,6 +585,7 @@ with tempfile.TemporaryDirectory(prefix="machine-m2-headless-") as temp:
                 return len(matches) == 1 and matches[0]["rect"] == saved_rect
             wait_for(restored_exact, label="real private Sway exact floating postflight")
             print("MACHINE V2 FLOATING // REAL DISPOSABLE SWAY PLACEMENT PASS")
+            print("MACHINE V2 PAIR+CONSENT // REAL DISPOSABLE SWAY WITH SPENT GRANT PASS")
 
             print("MACHINE PERSISTENT MARK // NEW PROCESS V2 GEOMETRY AND STORED PASS")
             print("MACHINE STORED // REAL HEADLESS SWAY V2 READBACK PASS")

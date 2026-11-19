@@ -179,6 +179,9 @@ def verify_pair_and_consent(*, pairing, consent, intent, pair_key,
     _uuid(pair["checkpoint_id"], version=4)
     _uuid(pair["window_key"])
     _uuid(pair["session_id"], version=4)
+    if (type(pair["live_con_id"]) is not int
+            or not 0 < pair["live_con_id"] <= 9007199254740991):
+        refuse()
     _field(pair["app_id"])
     _field(pair["workspace"])
     _field(pair["output"])

@@ -209,7 +209,8 @@ for owner, source, widget, control_type in (
 ):
     marker = "id: " + widget
     assert source.count(marker) == 1, f"{owner} close widget identity changed"
-    header = source[max(0, source.index(marker) - 90):source.index(marker) + 1350]
+    close_action_end = source.index("onLeftClicked: root.close()", source.index(marker))
+    header = source[max(0, source.index(marker) - 100):close_action_end + len("onLeftClicked: root.close()")]
     assert control_type + " {" in header.split(marker)[0], (
         f"{owner} close must use shared ActionButton, not its old rectangle")
     for token in (

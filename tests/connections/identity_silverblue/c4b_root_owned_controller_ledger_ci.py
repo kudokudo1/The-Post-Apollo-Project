@@ -27,6 +27,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 import c4b_signed_trust_transition_ci as T
 import controller_owned_policy_intake_ci as P
 import controller_pinned_enrollment_gate_ci as E
+import c4b_signed_external_checkpoint_ci as W
 
 SCHEMA = "postapollo.identity.c4b-root-owned-controller-ledger.ci-v1"
 DIR_PREFIX = "c4b-p1-controller-ci-"
@@ -248,13 +249,27 @@ def initialize_for_disposable_ci(root, *, initial_controller_policy: bytes,
     _check_db(root)
 
 
+def _external_state(values, policy):
+    """Exact read-only state pinned by a separately signed witness."""
+    return {
+        "hostId": values["host_id"],
+        "controllerRootSha256": _hash(values["controller_root_public"]),
+        "controllerPolicySha256": values["controller_policy_sha256"],
+        "transitionSha256": values["transition_sha256"],
+        "transitionSequence": values["transition_sequence"],
+        "minimumReleaseEpoch": policy["minimumReleaseEpoch"],
+        "minimumReleaseSequence": policy["minimumReleaseSequence"],
+    }
+
+
 def inspect_current_ci_only(root):
     db = _connect(root)
     try:
-        values, _, _ = _read(db)
+        values, policy, _ = _read(db)
         return {
             "schema": SCHEMA,
             "rootOwnedControllerLedgerReadInDisposableCi": True,
+            **_external_state(values, policy),
             "hostId": values["host_id"],
             "controllerRootSha256": _hash(values["controller_root_public"]),
             "policySha256": values["controller_policy_sha256"],
@@ -301,11 +316,12 @@ def stage_rotation_intent_for_disposable_ci(
         db.close()
 
 
-def verify_and_commit_rotation_ci_only(
+def _verify_and_commit_rotation_core_ci_only(
     root, *, next_policy: bytes, next_root_public: bytes,
     transition: bytes, previous_signature: bytes,
     proposed_signature: bytes, next_controller_dir: Path,
     serial: bytes, controller_challenge: str,
+    signed_external_checkpoint=None,
 ):
     """One-use root-owned transaction across signature check and commit.
 
@@ -324,7 +340,25 @@ def verify_and_commit_rotation_ci_only(
     db = _connect(root)
     try:
         db.execute("BEGIN IMMEDIATE")
-        values, _, old_root = _read(db)
+        values, old_policy, old_root = _read(db)
+        if signed_external_checkpoint is not None:
+            if type(signed_external_checkpoint) is not dict or set(
+                    signed_external_checkpoint) != {
+                    "signed_checkpoint", "checkpoint_signature",
+                    "independently_pinned_witness_root",
+                    "independently_pinned_witness_sha256",
+                    "independently_issued_challenge"}:
+                _deny("C4B_P1_EXACT_EXTERNAL_WITNESS_PARAMS_REQUIRED")
+            try:
+                witness = W.inspect_current_checkpoint_ci_only(
+                    controller_state=_external_state(values, old_policy),
+                    **signed_external_checkpoint)
+            except W.Refused as exc:
+                raise Refused("C4B_P1_FRESH_EXTERNAL_WITNESS_STATE_REFUSED") from exc
+            if (witness.get(
+                    "externalPinnedSignedCheckpointMatchesRootOwnedLedgerInCi") is not True
+                    or any(witness.get(key) is not False for key in W.NEGATIVE)):
+                _deny("C4B_P1_WITNESS_ATTEMPTED_AUTHORITY_PROMOTION")
         if values["pending_id"] is None:
             _deny("C4B_P1_NO_STAGED_PRIVILEGED_INTENT")
         if (signed["transitionId"] != values["pending_id"]
@@ -390,3 +424,48 @@ def verify_and_commit_rotation_ci_only(
         raise Refused("C4B_P1_COMMIT_LEDGER_TRANSACTION_REFUSED") from exc
     finally:
         db.close()
+
+
+def verify_and_commit_rotation_ci_only(
+    root, *, next_policy: bytes, next_root_public: bytes,
+    transition: bytes, previous_signature: bytes,
+    proposed_signature: bytes, next_controller_dir: Path,
+    serial: bytes, controller_challenge: str,
+):
+    """Legacy diagnostic fixture with no signed outside witness.
+
+    Production must never call this entrypoint; all returned authorization
+    fields remain FALSE, including if the root-owned local DB was replayed.
+    """
+    return _verify_and_commit_rotation_core_ci_only(
+        root, next_policy=next_policy, next_root_public=next_root_public,
+        transition=transition, previous_signature=previous_signature,
+        proposed_signature=proposed_signature,
+        next_controller_dir=next_controller_dir,
+        serial=serial, controller_challenge=controller_challenge,
+    )
+
+
+def verify_and_commit_rotation_with_checkpoint_ci_only(
+    root, *, signed_external_checkpoint: dict,
+    next_policy: bytes, next_root_public: bytes,
+    transition: bytes, previous_signature: bytes,
+    proposed_signature: bytes, next_controller_dir: Path,
+    serial: bytes, controller_challenge: str,
+):
+    """Fail closed unless a fresh external checkpoint agrees UNDER DB lock.
+
+    Separate independently protected witness custody and real nonce
+    consumption are still missing. This is a CI source boundary, not a live
+    production rotation or an enrollment endpoint.
+    """
+    if type(signed_external_checkpoint) is not dict:
+        _deny("C4B_P1_WITNESSED_COMMIT_REQUIRED")
+    return _verify_and_commit_rotation_core_ci_only(
+        root, next_policy=next_policy, next_root_public=next_root_public,
+        transition=transition, previous_signature=previous_signature,
+        proposed_signature=proposed_signature,
+        next_controller_dir=next_controller_dir,
+        serial=serial, controller_challenge=controller_challenge,
+        signed_external_checkpoint=signed_external_checkpoint,
+    )

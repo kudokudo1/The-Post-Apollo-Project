@@ -148,6 +148,8 @@ def inspect_ci_only(
         "controllerTransitionSequence": signed["transitionSequence"],
         "signedCheckpointSha256": hashlib.sha256(
             witness_args["signed_checkpoint"]).hexdigest(),
+        "signedCheckpointSignatureSha256": hashlib.sha256(
+            witness_args["checkpoint_signature"]).hexdigest(),
         "matchingFloorEpoch": floor_epoch,
         "matchingFloorSequence": floor_sequence,
         **NEGATIVE,

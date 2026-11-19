@@ -27,7 +27,7 @@ A candidate that merely controls the new root cannot sign for the old root. A ca
   - Preserves exact host, role/audience and source scope; rejects release downgrade, changed release without version advance, and revoked-ID removal
   - Reads the replacement bundle with unchanged controller policy intake, verifies successor signed enrollment against the same actual denial key and controller challenge
   - **Read only**: returns CI observations with all host, enrollment, consent, credential and production authorization flags false
-- New C4b 27-case test suite: old/new root substitution, signature tampering, replayed/gapped cursor, forged chain head/event ID, noncanonical/duplicate event, host and release substitution, revoked ID removal, missing/swapped bundle, false denial signer, nonce replay and no-grant assertions
+- New C4b 28-case test suite: old/new root substitution, signature tampering, replayed/gapped cursor, forged chain head/event ID, noncanonical/duplicate event, host and release substitution, revoked ID removal, missing/swapped bundle, false denial signer, nonce replay and no-grant assertions
 - Dedicated GitHub Actions workflow checks new tests plus existing controller policy, key enrollment, C3e-AF alignment, signed controller challenge and runtime receipt regressions
 
 Source paths are tests/connections/identity_silverblue/c4b_signed_trust_transition_ci.py, test_c4b_signed_trust_transition_ci.py, and .github/workflows/connections-c4b-package1-signed-root-transition-ci.yml.
@@ -38,7 +38,7 @@ Developers can read the draft and GitHub Actions results. This is **not** a CLI 
 
 ## VERIFY // Criteria
 
-- [ ] New 27-case source-level test suite succeeds on exact PR head
+- [x] New 28-case source-level test suite succeeds on exact PR head
 - [ ] All inherited C4b controller-enrollment / C3e-AF contract regressions succeed on exact head
 - [ ] No C3e, C5, Identity, Hospital, PX, installed gateway, key or local workstation code mutated
 - [ ] Independent Nurse 2 source/security review

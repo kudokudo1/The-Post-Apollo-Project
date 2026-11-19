@@ -30,10 +30,12 @@ for marker in (
 # No click can invent source identity, and no persistent command is sent
 # just from showing a review panel or opening a Room.
 for marker in (
-    'active && reviewReady && nativeClientInstalled',
+    'active && nativeClientInstalled',
     'executeProcess.exec([nativeClientPath, action, room]);',
-    'current.roomId !== room',
-    'current.digest !== digest', 'current.revision !== revision',
+    'pendingRevision = -1;',
+    'pendingDigest = "";',
+    'payload.roomId !== root.pendingRoomId',
+    '!Number.isSafeInteger(payload.revision)',
     'payload.status !== "COMMITTED"',
     'payload.action !== root.pendingAction',
     'payload.originalPreserved !== true',

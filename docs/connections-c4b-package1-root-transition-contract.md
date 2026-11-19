@@ -5,7 +5,7 @@
 **STAFF ROLE:** External Hospital-compatible successor DOC (live Hospital attachment not verified)
 **ASSIGNMENT:** Package 1 trusted-host foundation, C4b-owned producer/gateway enrollment seam
 **STATE:** draft source-only CI, **NO production authority**, no real trust-root enrollment or workstation changes
-**UPSTREAM:** C4b signed enrollment #2033, controller policy #2044, C3e role alignment #2046, real Silverblue observer #2066 (independent draft review)
+**UPSTREAM:** C4b signed enrollment #2033, controller policy #2044, C3e role alignment #2046, real Silverblue observer #2066 (merged; this is not production acceptance)
 **DOWNSTREAM:** protected C3e issuer/Identity native consumer, C5 one-use consent, approved operator root-custody decision
 **OWNERSHIP:** only newly added C4b Python test-source, workflow and this document. The protected C3e/C5/Identity source and installed C4b service remain unchanged.
 
@@ -73,7 +73,7 @@ C3e and Identity own their source/issuer interfaces. C5 owns per-action human co
 
 ## NEXT
 
-Check the exact-head workflow. Repair **only** evidenced test or wiring failures on this Package 1 branch; do not relax protected C3e process constraints. Seek independent review and an operator root-custody decision before proceeding to actual trusted enrollment. The companion #2066 real-guest observer stays a separate draft with its review SHA preserved.
+Check the exact-head workflow. Repair **only** evidenced test or wiring failures on this Package 1 branch; do not relax protected C3e process constraints. Seek independent review and an operator root-custody decision before proceeding to actual trusted enrollment. The companion #2066 real-guest observer was merged on 2026-11-19. The C4b controller-root Package 1 draft remains separate and requires its own independent review.
 
 ## DECISIONS
 

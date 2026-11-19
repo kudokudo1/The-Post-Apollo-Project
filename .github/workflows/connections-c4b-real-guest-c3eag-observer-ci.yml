@@ -1,0 +1,60 @@
+name: C4b ↔ C3e-AG real Silverblue guest origin wiring (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/guest_identity_service_probe.sh'
+      - 'tests/connections/identity_silverblue/run_official_silverblue_identity.sh'
+      - 'tests/connections/identity_silverblue/test_c4b_real_c3eag_guest_integration_ci.py'
+      - '.github/workflows/connections-identity-silverblue-real-boot.yml'
+      - '.github/workflows/connections-c4b-real-guest-c3eag-observer-ci.yml'
+      - 'docs/connections-c4b-real-guest-c3eag-observer-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-c4b-c3e-observer-contract:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Reject mutated protected C3e source, syntax errors and grant elevation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          bash -n tests/connections/identity_silverblue/run_official_silverblue_identity.sh
+          bash -n tests/connections/identity_silverblue/guest_identity_service_probe.sh
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eAGIdentityKernelObserver.py \
+            tests/connections/identity_silverblue/test_c4b_real_c3eag_guest_integration_ci.py
+          python3 -B tests/connections/identity_silverblue/test_c4b_real_c3eag_guest_integration_ci.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/c3e_release_trust/C3eAGIdentityKernelObserver.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          vm=Path("tests/connections/identity_silverblue/run_official_silverblue_identity.sh").read_text()
+          for k in ("independentInstalledHostAttested",
+                    "signedHostOriginAuthenticated","operatorReleaseRootEnrolled",
+                    "externallyProtectedChallengeIssuerVerified",
+                    "externalRollbackResistanceVerified","c5HumanConsentVerified",
+                    "hostAuthenticated","canBeginSignIn","credentialActionsEnabled",
+                    "productionAuthority"):
+              assert '"' + k + '": False' in source,k
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "C4B_ID_PASS // REAL_OFFICIAL_SILVERBLUE_SIGNED_IDENTITY_RPM_TWO_REBOOTS_AND_ROLLBACK" in vm
+          print("C4B_C3EAG_HOLD // REAL_GUEST_CANDIDATE_NOT_EXTERNAL_ATTESTATION")
+          PY
+      - name: Preserve existing protected C3e-AG 25 genuine Linux process refusal tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            /usr/bin/python3 -B tests/connections/test_connections_c3eag_identity_kernel_observer.py
+          echo "C4B_C3EAG_PASS // 25_EXISTING_REAL_KERNEL_PROCESS_REFUSAL_TESTS"

@@ -58,6 +58,24 @@ Hospital's `px_hospital_staffing_transport.py` specifies `postapollo.hospital.na
 
 **Frame mismatch requiring explicit agreement:** merged C5-H2's `MAX_IPC=8192`; Hospital staffing requests allow `MAX_FRAME=16384`, canonical signed grants up to `8192` bytes. A new staffing service must agree on bounded request/response framing, strict truncation refusal, READY handshake and total decode limits. **Proposed:** separate staffing socket/service identity, rooted in `/run/post-apollo/hospital/`, and no extra actions on Room Trash/Restore's current `issuer.sock`. The exact socket basename, installed UID/GID, systemd service, SELinux and maximum packet/response bytes are **UNAPPROVED** until owners agree. Preserve the existing protected writer's exclusive database and its legacy Room Trash/Restore socket.
 
+### Agreed source semantics // Complete COMMIT frame budget (design-only)
+
+Hospital owner reviewed the semantic interface at [#2077 comment #7020995201](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/2077#issuecomment-7020995201) and acknowledged the mirror checkpoint at [Hospital #133 comment #7021004871](https://github.com/kudokudo1/The-Post-Apollo-Dev-Exp/pull/133#issuecomment-7021004871). This is a **conditional source-interface ACK**, not approval of the installed service, real key authority, actual operator consent, final receipt/peer protocol or 16 KiB service configuration.
+
+Hospital's **existing** `px_hospital_staffing_transport.py` fixes `MAX_FRAME=16384` for the **entire canonical request**, and `MAX_GRANT_BYTES=8192` for the **decoded signed envelope**. `MAX_FRAME=8192` in the lower-level staffing grant verifier is likewise a signed-envelope bound, **not** the request/frame transport bound. An unpadded base64url encoding of exactly 8,192 raw bytes occupies **10,923 ASCII characters**, leaving at most **5,461 bytes before** any COMMIT JSON field names, quotes, punctuation, Room, complete staffing intent, writer instance, nonce or other data. Therefore the issuer **cannot** infer a valid COMMIT frame merely from `len(envelope) <= 8192`.
+
+**Proposed source-side composition rule for an eventual separately reviewed staffing issuer:**
+
+1. Preserve the exact original PREPARE `action`, `roomId`, canonical `intent` and `requestNonce` and the protected writer's independently checked `writerInstance`. Never let a caller supply the COMMIT scope or substitute an already signed envelope.
+2. Require `type(signed_envelope) is bytes`, `1 <= len(signed_envelope) <= 8192` and valid canonical staffing envelope syntax/signature domain. Base64url encode **those exact signed bytes without padding**; never truncate, compress, drop scope fields or split signed data to make it fit.
+3. Construct the **exact** seven-field Hospital `COMMIT_FIELDS` request, replacing `kind=prepare` with `kind=commit` and adding `writerInstance` and `signedEnvelope`. Serialize using Hospital's canonical JSON rules (`sort_keys=True`, `separators=(",", ":")`, `ensure_ascii=True`, `allow_nan=False`) and count **the serialized bytes**, not character count or the raw envelope alone. Refuse if `len(commit_bytes) > 16384`.
+4. Do this full-frame budget check **before sending** to the protected writer. For `AF_UNIX/SOCK_SEQPACKET`, the future receiver must separately enforce a bounded read with explicit `MSG_TRUNC`/oversized-packet refusal; receiving a 16 KiB prefix is **not** a valid 16 KiB request if the packet was longer. Reparse the whole canonical message, verify the independently trusted issuer peer, exact PREPARE and one-use authorization, then leave any database mutation to Hospital.
+5. If full-frame composition fails or a packet is malformed/truncated, refuse **without** retrying an alternate action, exposing the signed envelope to UI, reusing the previous approval, downgrading to the Room 8 KiB parser or mutating the source. A future issuer can require a new PREPARE and fresh human approval; only the protected writer can decide whether an interrupted attempt committed.
+
+**Proposed test matrix before native implementation:** complete canonical frame exactly `16384` bytes (admissible to the *size parser*, not an authorization); `16385` (must refuse); decoded envelope exactly `8192` (may still refuse on whole-frame size); decoded envelope `8193` (must refuse); large Bed/branch text that makes the complete frame overflow despite a valid smaller envelope; invalid/noncanonical base64url; altered PREPARE intent or nonce; duplicate/unknown COMMIT fields; `MSG_TRUNC` packet; an 8 KiB Room-parser downgrade attempt. Retain the current separate staffing and Room authority domains.
+
+**Unapproved installation parameters:** dedicated staffing issuer socket basename, peer UID/GID, SELinux, approved release/key custody and native response/receipt format remain owner/operator decisions. These composition rules are a proposed fail-closed implementation boundary, **not** a release-ready service or passing test suite.
+
 ## VERIFY
 
 **Source facts, not production evidence:**
@@ -81,7 +99,8 @@ No staffing issuer implementation may rely on the proposed fields and untrusted 
 - [x] Review both Polkit actions, signed grant and root-owned verifier policy.
 - [x] Compare actual C5-H2 native process/seat checks, grant domain and IPC bounds with Hospital staffing draft.
 - [x] Publish proposed Connections-side interface for cross-owner review without editing either established implementation.
-- [ ] Hospital owner acknowledgement and any required interface corrections
+- [x] Hospital source-interface compatibility acknowledged, conditionally, in GitHub #2077 and Hospital #133
+- [ ] Native issuer owner / Hospital approval of remaining five release boundaries, including exact frame and receipt peer parameters
 - [ ] Connections C5-H2/staffing owner acceptance or explicit new bounded staffing implementation assignment
 - [ ] Separate approved signer/host provenance/consent and protected writer/migration decisions
 - [ ] Only then implement and independently test an isolated staffing native issuer
@@ -89,7 +108,7 @@ No staffing issuer implementation may rely on the proposed fields and untrusted 
 
 ## NEXT
 
-Receive and reconcile the two owners' decisions on the five unapproved boundaries. Any final API change should first update this source contract and Hospital #133's companion proposal, and only then proceed to an isolated source-only staffing issuer draft. C3e #2075/#2076 are separate protected signer/witness preflight assignments, not an implicit authorization to modify installed C5/H2 service or Hospital writer.
+Preserve the Hospital source-interface ACK and reconcile the five **still-unapproved native implementation** decisions with the responsible owners. Any final API change should first update this source contract and Hospital #133's companion proposal, and only then proceed to an isolated source-only staffing issuer draft. C3e #2075/#2076 are separate protected signer/witness preflight assignments, not an implicit authorization to modify installed C5/H2 service or Hospital writer.
 
 ## DECISIONS
 

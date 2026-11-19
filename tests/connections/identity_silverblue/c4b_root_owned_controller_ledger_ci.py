@@ -62,6 +62,11 @@ CREATE TABLE controller_state (
       AND pending_next_policy_sha256 IS NOT NULL)
   )
 );
+CREATE TABLE consumed_external_witness_challenges (
+  challenge_sha256 TEXT PRIMARY KEY CHECK(length(challenge_sha256) = 64),
+  witness_public_sha256 TEXT NOT NULL CHECK(length(witness_public_sha256) = 64),
+  committed_transition_sha256 TEXT NOT NULL CHECK(length(committed_transition_sha256) = 64)
+);
 INSERT INTO schema_meta (id,schema)
 VALUES(1,'postapollo.identity.c4b-root-owned-controller-ledger.ci-v1');
 """
@@ -395,6 +400,28 @@ def _verify_and_commit_rotation_core_ci_only(
                 or any(verified.get(name) is not False for name in
                        (*T.NEGATIVE, *P.NEGATIVE, *E.NEGATIVE))):
             _deny("C4B_P1_ROTATION_AUTHORITY_OR_CURSOR_MISMATCH")
+        if signed_external_checkpoint is not None:
+            # Consume the exact verifier challenge only when all signed
+            # transition evidence has passed. A failed transaction rolls
+            # consumption back alongside the proposed new root and policy.
+            # This is ONLY root-owned local SQLite replay defense, not the
+            # separately custodied witness's own durable challenge ledger.
+            nonce_digest = _hash(
+                signed_external_checkpoint["independently_issued_challenge"])
+            if db.execute(
+                """SELECT 1 FROM consumed_external_witness_challenges
+                   WHERE challenge_sha256=?""",
+                (nonce_digest,),
+            ).fetchone() is not None:
+                _deny("C4B_P1_SIGNED_WITNESS_CHALLENGE_ALREADY_CONSUMED")
+            db.execute(
+                """INSERT INTO consumed_external_witness_challenges
+                   (challenge_sha256,witness_public_sha256,
+                    committed_transition_sha256) VALUES(?,?,?)""",
+                (nonce_digest,
+                 signed_external_checkpoint["independently_pinned_witness_sha256"],
+                 _hash(transition)),
+            )
         db.execute(
             """UPDATE controller_state
                SET controller_root_public=?,controller_policy=?,

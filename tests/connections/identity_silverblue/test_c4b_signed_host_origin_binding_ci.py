@@ -59,6 +59,7 @@ class C4bThirdKeyHostOriginBindingTests(unittest.TestCase):
     def args(self, **overrides):
         params = {
             "join_inputs": self.inputs,
+            "controller_ledger_root": self.inner.c4b.fixture.base.root,
             "signed_host_binding": self.raw,
             "host_binding_signature": self.signature,
             "independently_pinned_host_signer": self.host_signer.public_key(),
@@ -179,12 +180,14 @@ class C4bThirdKeyHostOriginBindingTests(unittest.TestCase):
         self.refuse(signed_host_binding=b"x" * (B.MAX_RECORD_BYTES + 1))
 
     def test_24_wrong_source_c3e_origin_refuses_even_when_signature_valid(self):
-        changed = deepcopy(self.inputs)
+        changed = {**self.inputs,
+                   "installed_os_evidence": deepcopy(self.inputs["installed_os_evidence"])}
         changed["installed_os_evidence"]["kernel_enforcing"] = "0"
         self.refuse(join_inputs=changed)
 
     def test_25_changed_protected_c3e_floor_refuses_even_when_signed_old(self):
-        changed = deepcopy(self.inputs)
+        changed = {**self.inputs,
+                   "read_only_witness_status": dict(self.inputs["read_only_witness_status"])}
         changed["read_only_witness_status"]["observed_release_sequence"] += 1
         self.refuse(join_inputs=changed)
 

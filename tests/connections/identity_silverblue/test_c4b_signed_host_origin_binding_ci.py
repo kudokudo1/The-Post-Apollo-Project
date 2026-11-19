@@ -260,6 +260,29 @@ class C4bThirdKeyHostOriginBindingTests(unittest.TestCase):
                     "C4B_C3EN_HOST_BINDING_LEDGER_LOST_DURING_VERIFICATION"):
                 self.inspect()
 
+    def test_33_same_host_and_checkpoint_nonce_refuses_signed_result(self):
+        # The two request domains are separate. A caller must not recycle
+        # the same challenge across the signed host evidence and C4b proof.
+        self.refuse(independently_issued_host_challenge=
+                    self.inputs["fresh_challenge"])
+
+    def test_34_builder_refuses_host_nonce_reuse_before_signing(self):
+        with self.assertRaisesRegex(
+                B.Refused,
+                "C4B_C3EN_HOST_BINDING_DISTINCT_HOST_AND_CHECKPOINT_NONCES_REQUIRED"):
+            B.make_expected_statement_ci_only(
+                join_inputs=self.inputs, join_result=self.expected_join,
+                host_attestation_challenge=self.inputs["fresh_challenge"])
+
+    def test_35_invalid_controller_root_path_type_refuses(self):
+        self.refuse(controller_ledger_root=str(
+            self.inner.c4b.fixture.base.root))
+
+    def test_36_incomplete_controller_state_refuses(self):
+        malformed = dict(self.inputs["controller_state"])
+        malformed.pop("minimumReleaseSequence")
+        self.refuse(join_inputs={**self.inputs, "controller_state": malformed})
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

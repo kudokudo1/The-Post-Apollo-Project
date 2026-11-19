@@ -283,6 +283,34 @@ class C4bThirdKeyHostOriginBindingTests(unittest.TestCase):
         malformed.pop("minimumReleaseSequence")
         self.refuse(join_inputs={**self.inputs, "controller_state": malformed})
 
+    def test_37_existing_staged_rotation_makes_host_binding_refuse(self):
+        self.inner.c4b.fixture.base.stage()
+        self.assertIs(self.inner.c4b.fixture.base.current()[
+            "pendingIntentExists"], True)
+        with self.assertRaisesRegex(
+                B.Refused,
+                "C4B_C3EN_HOST_BINDING_PENDING_ROTATION_NOT_QUIESCENT"):
+            self.inspect()
+
+    def test_38_rotation_staged_during_host_witness_exchange_refuses(self):
+        original = B.J.inspect_ci_only
+
+        def stage_during_exchange(**kwargs):
+            result = original(**kwargs)
+            self.inner.c4b.fixture.base.stage()
+            return result
+
+        with mock.patch.object(B.J, "inspect_ci_only",
+                               side_effect=stage_during_exchange):
+            with self.assertRaisesRegex(
+                    B.Refused,
+                    "C4B_C3EN_HOST_BINDING_ROTATION_STAGED_DURING_VERIFICATION"):
+                self.inspect()
+        self.assertIs(self.inner.c4b.fixture.base.current()[
+            "pendingIntentExists"], True)
+        self.assertEqual(self.inner.c4b.fixture.base.current()[
+            "transitionSequence"], 4)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

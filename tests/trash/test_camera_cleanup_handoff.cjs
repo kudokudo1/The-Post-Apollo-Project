@@ -9,6 +9,7 @@ const test = require("node:test");
 const root = path.resolve(__dirname, "../..");
 const cameraSource = fs.readFileSync(path.join(root, "widgets/CameraW.qml"), "utf8");
 const cleanupSource = fs.readFileSync(path.join(root, "widgets/CameraCleanupView.qml"), "utf8");
+const scrollbarSource = fs.readFileSync(path.join(root, "components/NeonScrollBar.qml"), "utf8");
 const trashSource = fs.readFileSync(path.join(root, "modules/Trash.qml"), "utf8");
 const shellSource = fs.readFileSync(path.join(root, "shell.qml"), "utf8");
 
@@ -305,4 +306,26 @@ test("Busy or unowned actions fail closed and preserve current menu",()=>{
     assert.match(trashSource,/burnConfirmationOpen/);
     assert.doesNotMatch(trashSource,/id: burnAllConfirmMenu/);
     assert.doesNotMatch(trashMethods,/gio|trashQueuedNow|trash-batch-now/);
+});
+
+test("Cleanup inner scrollbar handle drags stay owned by their list, not outer viewport",()=>{
+    // Qt Quick's MouseArea.preventStealing stops a parent Flickable from
+    // grabbing a drag after its initial press. Wheel routing is independent.
+    assert.match(scrollbarSource,/property bool protectHandleDragFromAncestor: false/);
+    assert.match(scrollbarSource,/preventStealing: root\.protectHandleDragFromAncestor/);
+    assert.match(scrollbarSource,/property bool captureNestedPaneWheel: true/);
+    assert.match(scrollbarSource,/property string nestedScrollMode: "contain"/);
+    assert.match(scrollbarSource,/WheelHandler \{/);
+
+    for(const id of ["cleanupQueuedList","cleanupBatchList","cleanupGridList"]){
+        assert.match(cleanupSource,new RegExp(
+            "flickable: "+id+"\\s+protectHandleDragFromAncestor: true"),
+            id+" must grab its own scrollbar handle");
+    }
+    assert.equal((cleanupSource.match(/protectHandleDragFromAncestor: true/g)||[]).length,3,
+        "protect exactly the three nested Camera list scrollbar handles");
+    assert.doesNotMatch(trashSource,/protectHandleDragFromAncestor: true/,
+        "leave the outer scrollbar draggable independently");
+    assert.match(trashSource,/id: cleanupPageViewport/);
+    assert.match(trashSource,/flickable: cleanupPageViewport/);
 });

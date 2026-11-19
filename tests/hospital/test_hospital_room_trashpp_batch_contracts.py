@@ -30,12 +30,13 @@ for marker in (
 # No click can invent source identity, and no persistent command is sent
 # just from showing a review panel or opening a Room.
 for marker in (
-    'review.operatorAuthenticated === true',
-    'review.requiresOwnerReview === false',
+    'active && reviewReady && nativeClientInstalled',
+    'executeProcess.exec([nativeClientPath, action, room]);',
     'current.roomId !== room',
     'current.digest !== digest', 'current.revision !== revision',
-    '"--expected-revision"', '"--expected-digest"',
-    '"--confirm-room-id"', 'payload.originalPreserved !== true',
+    'payload.status !== "COMMITTED"',
+    'payload.action !== root.pendingAction',
+    'payload.originalPreserved !== true',
     'payload.burnAllowed !== false',
     'root.committed(payload)', 'root.refused(problem)'
 ):
@@ -62,12 +63,15 @@ for marker in (
 for marker in ('restoreResearchCopy(', 'reviewGioFileRestore(',
                'reviewManagedCopyAction(', 'armBurn(', 'armResearchBurn('):
     check(marker,trash,"preserve older owners")
-for marker in ('ownerApproved: roomLifecycle.permissionReady',
-               'retentionHold: !roomLifecycle.permissionReady'):
+for marker in ('ownerApproved: false',
+               'policyReviewed: false',
+               'retentionHold: true'):
     check(marker,worker,"deny-by-default source trust")
 check('property bool protectedResource: true',deck,"shared primitive")
 assert "onBurnReviewRequested:" not in worker
 assert "room-lifecycle-burn" not in trash
 assert "gio trash" not in action.lower()
 assert "gio trash" not in bin_service.lower()
-print("HOSPITAL TRASH++ BATCH // PASS // Room review, exact authority hold, source bin, no Burn")
+assert 'room-lifecycle-trash' not in action
+assert 'room-lifecycle-restore' not in action
+print("HOSPITAL TRASH++ BATCH // PASS // native approval request, source bin, no Burn")

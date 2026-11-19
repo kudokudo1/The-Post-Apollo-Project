@@ -239,6 +239,7 @@ def inspect_rotation_ci_only(
         "previousControllerRootSha256": old_digest,
         "nextControllerRootSha256": new_digest,
         "nextPolicySha256": next_digest,
+        "releaseSha256": candidate["releaseSha256"],
         "receiptKeySha256": candidate["receiptKeySha256"],
         "enrollmentSha256": candidate["enrollmentSha256"],
         "hostId": following["hostId"],

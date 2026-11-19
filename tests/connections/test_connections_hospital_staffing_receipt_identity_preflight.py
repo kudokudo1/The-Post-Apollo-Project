@@ -278,6 +278,10 @@ class StaffingReceiptIdentityTests(unittest.TestCase):
         dup=raw.replace(b'"status":',b'"status":"fake","status":',1)
         self.refused("NONCANONICAL_RECORD",proposal=True,
                      proposed_receipt_raw=dup)
+        bad_commit=json.loads(self.commit_raw)
+        bad_commit["signedEnvelope"]="a"
+        self.refused("COMMIT_RECOMPOSITION_REFUSED",proposal=True,
+                     commit_raw=T.canonical(bad_commit))
 
     def test_28_version_bool_masquerading_as_one_refused(self):
         self.refused("PROPOSED_RECEIPT_VERSION_OR_IDENTITY_MISMATCH",proposal=True,

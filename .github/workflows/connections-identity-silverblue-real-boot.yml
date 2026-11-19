@@ -44,6 +44,8 @@ jobs:
           bash -n tests/connections/identity_silverblue/selinux/build_policy_ci.sh
           bash -n tests/connections/identity_silverblue/run_official_silverblue_identity.sh
           bash -n tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh
+          python3 -B -m py_compile tests/connections/c3e_release_trust/C3eAGIdentityKernelObserver.py
+          python3 -B tests/connections/identity_silverblue/test_c4b_real_c3eag_guest_integration_ci.py
           python3 -B -m py_compile tests/connections/identity_silverblue/verify_controller_challenge_ci.py
           python3 -B tests/connections/identity_silverblue/test_identity_signed_rpm_contract.py
           python3 -B tests/connections/identity_silverblue/test_identity_booted_rpm_mtime_only.py

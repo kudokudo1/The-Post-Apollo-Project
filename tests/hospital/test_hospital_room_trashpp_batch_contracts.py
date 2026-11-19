@@ -45,7 +45,7 @@ for marker in (
 ):
     check(marker,action,"PX exact owner transport")
 # The source-owned bin is a separate read-only Process, not GIO index.
-for marker in ('"hospital-room-read"', 'Array.isArray(parsed)',
+for marker in ('hospital-room-read', 'Array.isArray(parsed)',
                'item.burnAllowed === false',
                'item.state === "TRASHED"', 'root.loaded = true',
                'root.loaded = false'):

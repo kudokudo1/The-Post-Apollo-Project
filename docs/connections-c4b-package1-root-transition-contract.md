@@ -81,3 +81,15 @@ Check the exact-head workflow. Repair **only** evidenced test or wiring failures
 - No real root signing key was minted, copied or installed. Test roots exist only as disposable unit-test data.
 - No local host writes, system service mutation, remote login, token handling, provider grant, PX Room mutation, automatic merge or deployment.
 - Exact production key-custody and trust-store ownership decisions remain **unapproved** and cannot be supplied by a synthetic CI fixture.
+
+## PACKAGE 1 INTEGRATION UPDATE // C4b ↔ C3e-AF continuity
+
+C4b now composes its own dual-signed successor-root transition with **unchanged protected C3e-AF signed role enrollment verification** in `tests/connections/identity_silverblue/c4b_rotated_c3eaf_role_gate_ci.py`. This does **not** take ownership of C3e source.
+
+- Requires the former C4b controller root, successor C4b root and C3e enrollment signer to remain separate.
+- Requires new C4b policy hash, signed host, release epoch/sequence and receipt signer to match the independent C3e role verification after the proposed root transition. A stale signed C3e role for an advanced release refuses.
+- Requires the C3e release and witness public keys never reuse the **retired** C4b controller root, in addition to unchanged C3e-AF restrictions against aliasing the successor root.
+- Validates a new controller enrollment signed by the new root over the same real fresh signed-denial receipt already used by C4b's prior verifier.
+- Adds **20 positive/negative test cases**, making **47 new Package 1 cases**, plus inherited C4b/C3e regressions in the existing dedicated workflow.
+
+**Trust limitation:** Caller-selected CI roots, policy bytes, cursor and runtime pins are still not independent native custody. No release artifact-to-running-process external witness, protected monotonic ledger, root rollover recovery approval or native sign-in authority results from this. The real protected key-store/host-witness integration still requires operator and C3e/Identity ownership decisions.

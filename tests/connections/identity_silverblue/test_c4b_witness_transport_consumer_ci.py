@@ -118,6 +118,15 @@ class WitnessUnixPeerTests(unittest.TestCase):
                         elif mode == "oversized":
                             conn.sendall(struct.pack("!I", T.MAX_FRAME + 1))
                             os._exit(0)
+                        elif mode == "slow_drip":
+                            conn.sendall(struct.pack("!I", len(payload)))
+                            # Sending one byte regularly avoids the socket's
+                            # idle timeout, but must NOT defeat the client's
+                            # single monotonic overall deadline.
+                            for item in payload[:90]:
+                                conn.sendall(bytes((item,)))
+                                time.sleep(0.04)
+                            os._exit(0)
                         conn.sendall(struct.pack("!I", len(payload)) + payload)
             except (BaseException):
                 os._exit(3)
@@ -282,6 +291,14 @@ class WitnessUnixPeerTests(unittest.TestCase):
     def test_22_unresponsive_nonroot_witness_hits_bounded_timeout(self):
         self.server("timeout")
         self.refused()
+        self.assertEqual(self.fixture.base.current()["transitionSequence"], 4)
+
+    def test_23_slow_drip_peer_cannot_extend_absolute_deadline(self):
+        self.server("slow_drip")
+        began = time.monotonic()
+        self.refused()
+        elapsed = time.monotonic() - began
+        self.assertLess(elapsed, 2.8, "slow drip exceeded the 2s total budget")
         self.assertEqual(self.fixture.base.current()["transitionSequence"], 4)
 
 

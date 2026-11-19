@@ -47,7 +47,7 @@ Scope {
             root.busy = false;
             try {
                 if (Number(code) !== 0)
-                    throw new Error(String(error || output || "PX NOT AVAILABLE").slice(0,200));
+                    throw new Error("HOSPITAL BACKEND NOT READY");
                 const parsed = JSON.parse(output || "[]");
                 if (!Array.isArray(parsed) || parsed.length > 2500)
                     throw new Error("HOSPITAL BIN FORMAT INVALID");
@@ -67,7 +67,11 @@ Scope {
             } catch (e) {
                 root.rows = [];
                 root.loaded = false;
-                root.lastError = "HOSPITAL BIN // " + String(e).slice(0,230);
+                // Do not display raw px argparse usage or mistaken "0 Rooms".
+                // An unavailable PX command is NOT an empty Trash++ bin.
+                root.lastError = String(e).includes("HOSPITAL BACKEND NOT READY")
+                    ? "HOSPITAL BACKEND NOT READY // PX ROOM BIN UNAVAILABLE"
+                    : "HOSPITAL BIN // SOURCE RESPONSE INVALID";
             }
         }
     }

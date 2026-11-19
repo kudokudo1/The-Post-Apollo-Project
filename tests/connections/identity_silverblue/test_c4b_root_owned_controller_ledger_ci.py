@@ -301,6 +301,17 @@ class C4bRootOwnedControllerLedgerTests(unittest.TestCase):
             self.assertNotIn(forbidden, source)
         self.assertFalse(any(L.NEGATIVE.values()))
 
+    def test_28_revoking_the_current_successor_enrollment_is_refused(self):
+        # Preserve the refusal discovered by the real CI positive fixture:
+        # the active successor enrollment ID is 'a' * 32. The controller
+        # must not certify it after placing that ID on the revocation list.
+        self.rot.next_policy["revokedEnrollmentIds"] = ["a" * 32, "b" * 32]
+        self.rot.render()
+        self.stage()
+        self.refuse()
+        self.assertEqual(self.current()["transitionSequence"], 4)
+        self.assertTrue(self.current()["pendingIntentExists"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -150,7 +150,8 @@ PanelWindow {
         // Accept only an explicit backend outcome, never a guessed success.
         const list = payload && Array.isArray(payload.burnedItems)
             ? payload.burnedItems : [];
-        burnReceiptItems = list.slice(0, 2500).map(function(row) {
+        // Up to 2,500 GIO files plus 64 bounded managed copies.
+        burnReceiptItems = list.slice(0, 2564).map(function(row) {
             return {name:String(row.name || "UNNAMED"),
                     kind:String(row.kind || "UNKNOWN"),
                     source:String(row.source || row.original || "")};

@@ -89,7 +89,7 @@ jobs:
             GITHUB_ACTOR="$GITHUB_ACTOR" POST_APOLLO_C4B_P1_ROOT_LEDGER_TEST_ONLY=1 \
             "$(command -v python3)" -B \
             tests/connections/identity_silverblue/test_c4b_root_owned_controller_ledger_ci.py
-          echo "C4B_PACKAGE1_PASS // 27_REAL_LINUX_ROOT_OWNED_CONTROLLER_LEDGER_CASES"
+          echo "C4B_PACKAGE1_PASS // 28_REAL_LINUX_ROOT_OWNED_CONTROLLER_LEDGER_CASES"
           echo "C4B_PACKAGE1_HOLD // CI_ROOT_NOT_OPERATOR_OR_HARDWARE_ROLLBACK_AUTHORITY"
       - name: Preserve full merged C4b signed enrollment and cross-role regressions
         shell: bash

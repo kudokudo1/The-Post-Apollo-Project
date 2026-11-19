@@ -20,7 +20,7 @@ import c4b_witness_transport_consumer_ci as T
 
 SCHEMA = "postapollo.identity.c4b-c3en-signed-origin-join.ci-v1"
 STATUS = "C4B_C3EN_SIGNED_AND_ORIGIN_FLOORS_COMPATIBLE_NOT_BOUND"
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 C3EN_PATH = ROOT / "tests/connections/c3e_release_trust/C3eNOriginWitnessHandoff.py"
 NEGATIVE = {
     "cryptographicallyJoinedInstalledHostAndExternalSigner": False,

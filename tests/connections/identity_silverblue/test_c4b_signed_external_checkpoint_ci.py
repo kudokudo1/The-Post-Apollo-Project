@@ -228,6 +228,71 @@ class ExternalControllerCheckpointTests(unittest.TestCase):
         self.assertIn("verify_and_commit_rotation_with_checkpoint_ci_only", ledger)
         self.assertTrue(all(v is False for v in W.NEGATIVE.values()))
 
+    def test_22_witness_nonce_consumed_in_same_rotation_commit(self):
+        self.base.stage()
+        result = self.commit()
+        self.assertTrue(result["singlePrivilegedTestIntentConsumedInCi"])
+        db = L._connect(self.base.root)
+        try:
+            rows = db.execute(
+                "SELECT challenge_sha256,witness_public_sha256,"
+                "committed_transition_sha256 "
+                "FROM consumed_external_witness_challenges").fetchall()
+        finally:
+            db.close()
+        self.assertEqual(rows, [(
+            sha(self.challenge),
+            sha(self.witness.public_key().public_bytes_raw()),
+            sha(self.base.rot.encoded))])
+
+    def test_23_rejected_bad_rotation_does_not_spend_witness_nonce(self):
+        self.base.stage()
+        with self.assertRaises(L.Refused):
+            L.verify_and_commit_rotation_with_checkpoint_ci_only(
+                self.base.root, signed_external_checkpoint=self.external(),
+                **self.base.args(proposed_signature=b"\\0" * 64))
+        db = L._connect(self.base.root)
+        try:
+            total = db.execute(
+                "SELECT count(*) FROM consumed_external_witness_challenges"
+            ).fetchone()[0]
+        finally:
+            db.close()
+        self.assertEqual(total, 0)
+        self.assertEqual(self.base.current()["transitionSequence"], 4)
+        self.commit()
+        self.assertEqual(self.base.current()["transitionSequence"], 5)
+
+    def test_24_preconsumed_witness_nonce_blocks_valid_double_use(self):
+        self.base.stage()
+        db = L._connect(self.base.root)
+        try:
+            db.execute(
+                "INSERT INTO consumed_external_witness_challenges "
+                "(challenge_sha256,witness_public_sha256,"
+                "committed_transition_sha256) VALUES(?,?,?)",
+                (sha(self.challenge),
+                 sha(self.witness.public_key().public_bytes_raw()),
+                 "e" * 64))
+        finally:
+            db.close()
+        with self.assertRaisesRegex(
+                L.Refused, "C4B_P1_SIGNED_WITNESS_CHALLENGE_ALREADY_CONSUMED"):
+            self.commit()
+        self.assertEqual(self.base.current()["transitionSequence"], 4)
+        self.assertTrue(self.base.current()["pendingIntentExists"])
+
+    def test_25_missing_consumption_table_refuses_not_resets(self):
+        self.base.stage()
+        db = L._connect(self.base.root)
+        try:
+            db.execute("DROP TABLE consumed_external_witness_challenges")
+        finally:
+            db.close()
+        self.reject_commit()
+        self.assertEqual(self.base.current()["transitionSequence"], 4)
+        self.assertTrue(self.base.current()["pendingIntentExists"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

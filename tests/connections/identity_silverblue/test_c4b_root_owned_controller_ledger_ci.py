@@ -67,8 +67,10 @@ class C4bRootOwnedControllerLedgerTests(unittest.TestCase):
         return opts
 
     def commit(self, **changes):
-        return L.verify_and_commit_rotation_ci_only(
-            self.root, **self.args(**changes))
+        return L.verify_and_commit_unwitnessed_disposable_fixture_ci_only(
+            self.root, explicit_fixture_scope=
+                "c4b-p1-negative-prewitness-regression-ci-only",
+            **self.args(**changes))
 
     def refuse(self, **changes):
         with self.assertRaises(L.Refused):
@@ -240,7 +242,10 @@ class C4bRootOwnedControllerLedgerTests(unittest.TestCase):
             next_policy_sha256=self.rot.event["nextPolicySha256"],
         )
         with self.assertRaises(L.Refused):
-            L.verify_and_commit_rotation_ci_only(revoked_root, **self.args())
+            L.verify_and_commit_unwitnessed_disposable_fixture_ci_only(
+                revoked_root, explicit_fixture_scope=
+                    "c4b-p1-negative-prewitness-regression-ci-only",
+                **self.args())
         state = L.inspect_current_ci_only(revoked_root)
         self.assertEqual(state["transitionSequence"], 4)
         self.assertTrue(state["pendingIntentExists"])
@@ -300,6 +305,24 @@ class C4bRootOwnedControllerLedgerTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, source)
         self.assertFalse(any(L.NEGATIVE.values()))
+
+    def test_29_default_unwitnessed_rotation_api_is_permanently_refused(self):
+        self.stage()
+        before = self.current()
+        with self.assertRaisesRegex(
+                L.Refused, "C4B_P1_EXTERNAL_SIGNED_CHECKPOINT_REQUIRED"):
+            L.verify_and_commit_rotation_ci_only(
+                self.root, **self.args())
+        self.assertEqual(self.current(), before)
+
+    def test_30_legacy_test_fixture_requires_explicit_scope(self):
+        self.stage()
+        with self.assertRaisesRegex(
+                L.Refused, "C4B_P1_UNWITNESSED_DISPOSABLE_SCOPE_REQUIRED"):
+            L.verify_and_commit_unwitnessed_disposable_fixture_ci_only(
+                self.root, explicit_fixture_scope="production",
+                **self.args())
+        self.assertEqual(self.current()["transitionSequence"], 4)
 
     def test_28_revoking_the_current_successor_enrollment_is_refused(self):
         # Preserve the refusal discovered by the real CI positive fixture:

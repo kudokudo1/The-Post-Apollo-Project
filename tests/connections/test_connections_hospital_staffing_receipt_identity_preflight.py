@@ -242,7 +242,9 @@ class StaffingReceiptIdentityTests(unittest.TestCase):
 
     def test_22_replayed_receipt_against_fresh_prepare_refused(self):
         other=dict(self.original,requestNonce=b64(b"Q"*32))
-        self.refused("PREPARE_COMMIT_IDENTITY_CHANGED",proposal=True,
+        # PREPARED's original nonce is checked before COMMIT: earlier
+        # denial is stronger and preserves the exact Hospital source.
+        self.refused("UNTRUSTED_OR_CHANGED_PREPARED_SOURCE",proposal=True,
                      original_prepare_raw=T.canonical(other))
 
     def test_23_changed_prepared_source_refused(self):

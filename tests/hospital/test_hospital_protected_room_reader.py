@@ -126,12 +126,20 @@ assert json.loads(request)=={
     "operation":"bin",
 }
 
-# Verify the exact bytes against the current PX owner parser, checked out
-# read-only at the explicitly pinned PX #130 commit by the CI workflow.
+# Verify the exact bytes against the coordinated Hospital writer, checked
+# out read-only from the stacked Hospital/Connections integration PR #133.
 PX_SOURCE=ROOT / "px-source/bin/px_hospital_room_writer.py"
 assert PX_SOURCE.is_file(), "EXACT_PX_WRITER_SOURCE_NOT_CHECKED_OUT"
 sys.path.insert(0,str(PX_SOURCE.parent))
 from px_hospital_room_writer import parse_request
+from px_hospital_connections_consent import (
+    REQUEST_SCHEMA as CONSENT_REQUEST,
+    PREPARED_SCHEMA as CONSENT_PREPARED,
+    RECEIPT_SCHEMA as CONSENT_RECEIPT,
+)
+assert CONSENT_REQUEST == "postapollo.hospital.protected-writer-request.v1"
+assert CONSENT_PREPARED == "postapollo.hospital.protected-writer-prepared.v1"
+assert CONSENT_RECEIPT == "postapollo.hospital.protected-writer-receipt.v1"
 assert parse_request(request) == {
     "schema":"post-apollo.hospital.protected-room-writer.v1",
     "operation":"bin",

@@ -321,6 +321,21 @@ assert row and row['spent'] is True and row['replay_allowed'] is False
         assert len(stopped_journal.pending()) == 1
         assert stopped_spend.lookup(verified["grant_id"])["spent"] is True
 
+        # A wall-clock rollback midway through the two-step move also
+        # invalidates the admission, not just a jump past expiration.
+        rollback_sway = FakeSway()
+        rollback_clock = [NOW]
+        rollback_sway.on_first_command = lambda: rollback_clock.__setitem__(0, NOW-1)
+        rollback_spend, rollback_journal = private_journals(Path(tmp)/"rollback")
+        rolled = invoke(sway=rollback_sway, spend=rollback_spend,
+                        journal=rollback_journal,
+                        clock_source=lambda: rollback_clock[0])
+        assert rolled["status"] == "uncertain_requires_review"
+        assert rolled["dispatched_commands"] == 1
+        assert len(rollback_sway.commands) == 1
+        assert len(rollback_journal.pending()) == 1
+        assert rollback_spend.lookup(verified["grant_id"])["spent"]
+
         # If the geometry journal is already held, a new consent can be
         # burned but still cannot override the protected pending operation.
         held_spend, held_journal = private_journals(Path(tmp)/"held")
@@ -358,6 +373,32 @@ assert row and row['spent'] is True and row['replay_allowed'] is False
             assert not t.is_alive()
         assert len(won) == 1 and len(lost) == 4
         assert race_ledger.lookup(verified["grant_id"])["spent"]
+
+        # Private spend ledger rejects unsafe links and permissions. Ordinary
+        # owner-only SQLite does not defend against a malicious same-UID actor.
+        import stat
+        assert stat.S_IMODE(race_ledger.path.stat().st_mode) == 0o600
+        assert stat.S_IMODE(race_ledger.path.parent.stat().st_mode) == 0o700
+        os.chmod(race_ledger.path, 0o644)
+        expect_denied(lambda: race_ledger.lookup(verified["grant_id"]))
+        os.chmod(race_ledger.path, 0o600)
+        os.chmod(race_ledger.path.parent, 0o755)
+        expect_denied(lambda: race_ledger.lookup(verified["grant_id"]))
+        os.chmod(race_ledger.path.parent, 0o700)
+        linked_root = Path(tmp) / "unsafe-link" / "post-apollo" / "machine"
+        linked_root.mkdir(parents=True, mode=0o700)
+        link = linked_root / pc.SPEND_NAME
+        link.symlink_to(race_ledger.path)
+        expect_denied(lambda: pc.OneUseSpendLedger(link).lookup(
+            verified["grant_id"]))
+        link.unlink()
+        os.link(race_ledger.path, link)
+        expect_denied(lambda: pc.OneUseSpendLedger(link).lookup(
+            verified["grant_id"]))
+        link.unlink()
+        with sqlite3.connect(race_ledger.path) as corrupt:
+            corrupt.execute("PRAGMA user_version=99")
+        expect_denied(lambda: race_ledger.lookup(verified["grant_id"]))
 
         # A same-UID forged document cannot grant permission without Ed25519.
         # Even valid signatures are fixture-only until independent installed

@@ -293,6 +293,20 @@ class ExternalControllerCheckpointTests(unittest.TestCase):
         self.assertEqual(self.base.current()["transitionSequence"], 4)
         self.assertTrue(self.base.current()["pendingIntentExists"])
 
+    def test_26_successor_controller_root_cannot_sign_its_own_witness(self):
+        self.witness = self.base.rot.proposed_root
+        self.make_statement()
+        # The checkpoint is otherwise valid for the currently enrolled OLD
+        # root, so the rollover gate must separately reject NEW-key aliasing.
+        self.assertTrue(self.inspect()[
+            "externalPinnedSignedCheckpointMatchesRootOwnedLedgerInCi"])
+        self.base.stage()
+        with self.assertRaisesRegex(
+                L.Refused, "C4B_P1_NEW_CONTROLLER_ROOT_CANNOT_BE_WITNESS"):
+            self.commit()
+        self.assertTrue(self.base.current()["pendingIntentExists"])
+        self.assertEqual(self.base.current()["transitionSequence"], 4)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

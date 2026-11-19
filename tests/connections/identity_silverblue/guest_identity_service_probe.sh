@@ -249,9 +249,9 @@ echo "C4B_ID_PASS // REAL_SYSTEMD_IDENTITY_GATEWAY_SOCKET_AND_PROCESS_OBSERVED" 
 # probe failure, forcing a costly full reinstall to identify its cause.
 probe_log=/var/tmp/c4b-id-service-probe.log
 probe_rc=0
-POST_APOLLO_C4B_TEST_GUEST=1 GITHUB_ACTIONS=true \
+POST_APOLLO_C4B_TEST_GUEST=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
 python3 -I -B - "$socket" "$signer" "$pid" "$uid" "$gid" "$cgroup" "$selinux" >"$probe_log" 2>&1 <<'PY' || probe_rc="$?"
-import base64,os,re,secrets,socket,stat,struct,subprocess,sys
+import base64,hashlib,os,re,secrets,socket,stat,struct,subprocess,sys
 from pathlib import Path
 sys.path.insert(0,"/usr/libexec/post-apollo/identity")
 sys.path.insert(0,"/usr/local/libexec")
@@ -259,6 +259,9 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from signed_command_receipt_v0 import build_request,verify_receipt
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from postapollo_id_ci_runtime_receipt import rehearse_guest_local_ci_only
+# The actual unchanged C3e-AG observer, packaged ONLY in this disposable C4b
+# guest. Not a signed host enrollment, trusted remote witness, or admission.
+import postapollo_id_ci_c3eag_observer as C3EAG
 sockpath,signerpath=sys.argv[1:3]
 pid,uid,gid=map(int,sys.argv[3:6])
 expected_cgroup,expected_lsm=sys.argv[6:8]
@@ -388,6 +391,51 @@ for name in ("operatorEnrollmentRootCustodyVerified",
     if bound.get(name) is not False:
         raise RuntimeError("guest binding tried to grant authority: "+name)
 check_origin("after signed-runtime-key binding")
+# Existing C3e-AG has never run against the actual official Silverblue guest.
+# This is the real systemd MainPID while it is still active, not a fake
+# Ubuntu process or post-rollback guest-authored provenance record.
+# The SHA pins are measured from already RPM-verified installed guest bytes:
+# these are local diagnostic consistency pins, NOT an independently pinned
+# operator manifest or authenticated cross-machine release policy.
+real_guest_expected={
+    "pid":pid,
+    "startTicks":pinned_start,
+    "uid":uid,
+    "gid":gid,
+    "unit":"post-apollo-identity-silverblue-ci.service",
+    "exePath":C3EAG.C4B_EXE,
+    "exeSha256":hashlib.sha256(Path(C3EAG.C4B_EXE).read_bytes()).hexdigest(),
+    "scriptPath":C3EAG.C4B_SCRIPT,
+    "entrypointSha256":hashlib.sha256(Path(C3EAG.C4B_SCRIPT).read_bytes()).hexdigest(),
+    "cgroup":expected_cgroup,
+    "selinux":expected_lsm,
+}
+observed=C3EAG.observe_ci_only(
+    expected=real_guest_expected,mode="c4b-guest-candidate")
+if (observed.get("observedC4bGuestCandidateNotAttested") is not True
+        or observed.get("realLinuxPidAndExecutableObservedInDisposableCI") is not True
+        or observed.get("sourceScriptFileMatchesCallerPinInCI") is not True
+        or any(observed.get(k) is not False for k in C3EAG.NEGATIVE)):
+    raise RuntimeError("C3eAG tried to promote CI observation into authority")
+print("C4B_ID_PASS // REAL_C3EAG_RUNNING_GATEWAY_KERNEL_SNAPSHOT")
+# A genuine kernel observer must reject both bad caller pins and the
+# difference between a measured original process and a substituted source.
+for field,bad in (
+    ("pid",pid+999999),
+    ("startTicks",pinned_start+1),
+    ("uid",uid+1),
+    ("exeSha256","0"*64),
+    ("entrypointSha256","0"*64),
+):
+    invalid=dict(real_guest_expected,**{field:bad})
+    try:
+        C3EAG.observe_ci_only(expected=invalid,mode="c4b-guest-candidate")
+    except C3EAG.Refused:
+        pass
+    else:
+        raise RuntimeError("C3eAG accepted substituted kernel or script pin: "+field)
+check_origin("after C3eAG real guest observation and refusals")
+print("C4B_ID_PASS // REAL_C3EAG_MUTATED_KERNEL_AND_SCRIPT_PINS_REFUSED")
 print("C4B_ID_PASS // GUEST_LOCAL_RELEASE_BOUND_TO_ACTUAL_GATEWAY_RECEIPT_KEY")
 print("C4B_ID_PASS // SUBSTITUTE_RECEIPT_PUBLIC_KEY_EXPLICITLY_REFUSED")
 PY

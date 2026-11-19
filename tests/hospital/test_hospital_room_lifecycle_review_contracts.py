@@ -35,8 +35,8 @@ for guard in (
 ):
     requires(guard, view, "review-only until authenticated source grant: " + guard)
 for guard in (
-    'active && reviewReady && nativeClientInstalled',
-    'if (!active || !permissionReady || !reviewReady',
+    'active && nativeClientInstalled',
+    'if (!active || !nativeClientInstalled || operating',
     'executeProcess.exec([nativeClientPath, action, room]);',
     'payload.status !== "COMMITTED"',
     'payload.originalPreserved !== true',

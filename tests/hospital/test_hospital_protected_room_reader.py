@@ -36,7 +36,7 @@ for marker in (
     'SOCKET_NAME = "hospital-room-writer-v1.sock"',
     'socket.SO_PEERCRED',
     'socket.SOCK_STREAM',
-    'os.O_NOFOLLOW',
+    'getattr(os, "O_NOFOLLOW"',
     'os.getuid() != os.geteuid()',
     'info.st_uid != writer_uid',
     'current_peer = _peer(s, writer_uid)',

@@ -22,12 +22,13 @@ Scope {
     property int pendingRevision: -1
     property string pendingDigest: ""
 
-    // Compatibility with existing Trash++ / Hospital caller names. This
-    // means a pinned native *request path* is installed, NOT that the
-    // operator has approved the Room. C5-H2 alone checks live seat, Polkit,
-    // retention, consent and PX source state after the deliberate click.
+    // Historical shared UI binding name. This is ONLY native transport
+    // readiness, NEVER human approval or verified ownership. The C5-H2
+    // issuer obtains independent protected Room state and interactive
+    // approval, and PX alone commits a one-use signed grant.
+    // Do not rely on the legacy user-UID PX preview to request consent.
     readonly property bool permissionReady:
-        active && reviewReady && nativeClientInstalled
+        active && nativeClientInstalled
 
     signal committed(var receipt)
     signal refused(string reason)
@@ -91,36 +92,25 @@ Scope {
         return true;
     }
 
-    // Called only after explicit two-step UI confirmation. The installed
-    // client sends ONLY action + Room ID to C5-H2. The native issuer obtains
-    // fresh protected PX state and genuine approval independently; the QML
-    // witness is only a stale-preview guard, never the signing authority.
+    // Called only after two exact-Room UI gestures. The request contains
+    // action + Room ID, never a desktop graph digest, grant or permission.
+    // The installed issuer independently performs a protected source
+    // PREPARE, rechecks operator + seat + Polkit + retention, then commits.
+    // A missing/stale legacy PX review must not spoof or veto that authority.
     function execute(action, witness) {
-        const evidence = witness || {};
-        const current = review || {};
         const room = String(roomId || "").trim();
-        const digest = String(evidence.digest || "");
-        const revision = evidence.revision;
-        const expectedState = action === "TRASH" ? "ACTIVE" : "TRASHED";
-        const permitted = action === "TRASH"
-            ? current.canTrash === true : current.canRestore === true;
-        if (!active || !permissionReady || !reviewReady || loading
-                || operating || executeProcess.running
+        if (!active || !nativeClientInstalled || operating
+                || executeProcess.running
                 || (action !== "TRASH" && action !== "RESTORE")
-                || !permitted || current.state !== expectedState
-                || current.roomId !== room
-                || current.digest !== digest
-                || current.revision !== revision
-                || !/^[0-9a-f]{64}$/.test(digest)
-                || !Number.isSafeInteger(revision) || revision < 0) {
-            lastError = "LIFECYCLE REFUSED // AUTHORITY OR REVIEW NOT VERIFIED";
+                || !/^[A-Za-z0-9._:/-]{1,160}$/.test(room)) {
+            lastError = "HOSPITAL NATIVE HOLD // REQUEST PATH NOT VERIFIED";
             refused(lastError);
             return false;
         }
         pendingAction = action;
         pendingRoomId = room;
-        pendingDigest = digest;
-        pendingRevision = revision;
+        pendingDigest = "";
+        pendingRevision = -1;
         operating = true;
         outcome = "NATIVE APPROVAL REQUESTED // " + action;
         lastError = "";
@@ -227,7 +217,8 @@ Scope {
                         || payload.status !== "COMMITTED"
                         || payload.action !== root.pendingAction
                         || payload.roomId !== root.pendingRoomId
-                        || payload.revision !== root.pendingRevision + 1
+                        || !Number.isSafeInteger(payload.revision)
+                        || payload.revision <= 0
                         || payload.originalPreserved !== true
                         || payload.burnAllowed !== false)
                     throw new Error("PROTECTED COMMIT RECEIPT IDENTITY MISMATCH");

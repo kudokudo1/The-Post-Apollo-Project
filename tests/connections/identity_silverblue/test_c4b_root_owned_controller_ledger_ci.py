@@ -218,13 +218,46 @@ class C4bRootOwnedControllerLedgerTests(unittest.TestCase):
         self.assertEqual(self.current()["transitionSequence"], 4)
 
     def test_21_revocation_erasure_refuses_even_with_both_root_signatures(self):
+        # Re-bootstrap a SECOND isolated ledger *after* selecting the prior
+        # revoked policy. This tests actual monotonic revocation continuity,
+        # not just a mismatch with a previously bootstrapped controller.
         self.rot.previous_policy["revokedEnrollmentIds"] = ["a" * 32]
-        # The root fixture was bootstrapped before this mutation. It cannot
-        # be retroactively accepted as new policy by a caller.
+        self.rot.next_policy["revokedEnrollmentIds"] = []
+        self.rot.render()
+        revoked_root = Path(tempfile.mkdtemp(prefix=L.DIR_PREFIX, dir="/run"))
+        revoked_root.chmod(0o700)
+        self.addCleanup(lambda: shutil.rmtree(revoked_root))
+        L.initialize_for_disposable_ci(
+            revoked_root, initial_controller_policy=self.rot.previous_raw,
+            initial_controller_root_public=
+                self.rot.previous_root.public_key().public_bytes_raw(),
+            initial_transition_sha256=self.rot.chain_head,
+            initial_transition_sequence=self.rot.sequence,
+        )
+        L.stage_rotation_intent_for_disposable_ci(
+            revoked_root, transition_id=self.rot.identifier,
+            next_root_sha256=self.rot.event["nextRootSha256"],
+            next_policy_sha256=self.rot.event["nextPolicySha256"],
+        )
+        with self.assertRaises(L.Refused):
+            L.verify_and_commit_rotation_ci_only(revoked_root, **self.args())
+        state = L.inspect_current_ci_only(revoked_root)
+        self.assertEqual(state["transitionSequence"], 4)
+        self.assertTrue(state["pendingIntentExists"])
+
+    def test_27_monotonic_revocation_addition_commits_once(self):
+        self.rot.next_policy["revokedEnrollmentIds"] = ["a" * 32, "b" * 32]
         self.rot.render()
         self.stage()
+        self.commit()
+        connection = L._connect(self.root)
+        try:
+            _, stored_policy, _ = L._read(connection)
+        finally:
+            connection.close()
+        self.assertEqual(stored_policy["revokedEnrollmentIds"],
+                         ["a" * 32, "b" * 32])
         self.refuse()
-        self.assertEqual(self.current()["transitionSequence"], 4)
 
     def test_22_policy_bundle_changed_after_staging_refuses(self):
         self.stage()

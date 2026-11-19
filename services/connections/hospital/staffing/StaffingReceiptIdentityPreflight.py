@@ -12,6 +12,7 @@ The root-controlled writer, nonce consumption and actual result are Hospital's.
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import json
 import re
@@ -131,7 +132,7 @@ def _source_context(original_prepare_raw, prepared_raw, commit_raw):
             _hold("NONCANONICAL_SIGNED_ENVELOPE")
         recomposed = Transport.compose_commit(
             original_prepare_raw, writer_instance, envelope)
-    except (Transport.PreflightHold, ValueError, TypeError) as exc:
+    except (Transport.PreflightHold, ValueError, TypeError, binascii.Error) as exc:
         raise ReceiptHold("CONNECTIONS_STAFFING_RECEIPT_HOLD // COMMIT_RECOMPOSITION_REFUSED") from exc
     if recomposed != commit_raw:
         _hold("COMMIT_NOT_ORIGINAL_PREPARE")

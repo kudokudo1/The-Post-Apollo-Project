@@ -264,9 +264,12 @@ class WitnessUnixPeerTests(unittest.TestCase):
         self.refused(controller_state=bad)
 
     def test_20_wrong_caller_input_types_fail_without_network(self):
-        self.refused(fresh_challenge=b"x", separately_pinned_peer_pid=2048)
+        # Bind the real expected server first so rejection cannot be
+        # accidentally satisfied by a missing socket/path.
+        self.server()
+        self.refused(fresh_challenge=b"x")
         self.refused(separately_pinned_peer_pid=True)
-        self.refused(socket_path="/run/test", separately_pinned_peer_pid=2048)
+        self.refused(socket_path="/run/test")
 
     def test_21_transport_has_no_native_permission_or_signing_key(self):
         src = Path(T.__file__).read_text()
@@ -275,6 +278,11 @@ class WitnessUnixPeerTests(unittest.TestCase):
                           '"productionAuthority": True'):
             self.assertNotIn(forbidden, src)
         self.assertTrue(all(v is False for v in T.NEGATIVE.values()))
+
+    def test_22_unresponsive_nonroot_witness_hits_bounded_timeout(self):
+        self.server("timeout")
+        self.refused()
+        self.assertEqual(self.fixture.base.current()["transitionSequence"], 4)
 
 
 if __name__ == "__main__":

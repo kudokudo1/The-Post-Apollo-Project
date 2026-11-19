@@ -26,6 +26,7 @@ PREFIX = "trashpp-product-p1-"
 ROOT = Path(__file__).resolve().parents[2]
 GIO_BACKEND = ROOT / "scripts/trash/trash_cli.py"
 MANAGED_BACKEND = ROOT / "scripts/trash/research_records.py"
+COMBINED_BACKEND = ROOT / "scripts/trash/trash_all_cli.py"
 V2_CAPTURE = ROOT / "scripts/trash/archive_v2_capture_cli.py"
 V2_INDEX = ROOT / "scripts/trash/archive_v2_index.py"
 
@@ -206,6 +207,81 @@ def run_managed_archive(root: Path, env: dict) -> None:
          "SOURCE_MODIFIED_BY_LIFECYCLE")
 
 
+
+def run_combined_all(root: Path, env: dict) -> None:
+    """Use both real independently guarded stores inside private GVfs CI."""
+    home = root / "home"
+    data = home / ".local" / "share" / "quickshell"
+    data_arg = str(data)
+    source = home / ".local/share/post-apollo/finance-crawler/crawl-records.json"
+    source_digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    snapshots = backend(V2_INDEX, ["index", data_arg], env, "ALL_V2_BEFORE")
+    need(snapshots.get("total") == 1, "ALL_V2_MISSING")
+    gio = shutil.which("gio", path=env.get("PATH"))
+    need(gio is not None, "ALL_GIO_UNAVAILABLE")
+
+    before_copies = backend(MANAGED_BACKEND, ["list", data_arg], env,
+                            "ALL_MANAGED_BEFORE")
+    need(before_copies.get("binCount") == 0, "ALL_MANAGED_NOT_EMPTY")
+    pages = json.loads(source.read_text(encoding="utf-8"))
+    selected = pages[0]
+    archived = backend(MANAGED_BACKEND,
+                       ["archive", data_arg, selected["url"],
+                        selected["observedAt"], str(before_copies["revision"])],
+                       env, "ALL_CREATE_MANAGED_COPY")
+    record = next(x for x in archived["items"] if x["state"] == "archived")
+    trashed = backend(MANAGED_BACKEND,
+                      ["trash", data_arg, record["id"], str(archived["revision"])],
+                      env, "ALL_TRASH_MANAGED_COPY")
+    need(trashed.get("binCount") == 1, "ALL_BIN_NOT_ONE")
+
+    file = home / "P1-COMBINED-disposable.txt"
+    file.write_bytes(b"PRIVATE_COMBINED_TEST:" + secrets.token_bytes(16))
+    need(u9.command([gio, "trash", str(file)], env).returncode == 0,
+         "ALL_FILE_TRASH_FAILED")
+    gio_before = checked_index(env, "ALL_GIO_BEFORE", 1)
+    args = [data_arg, gio_before["revision"], "1",
+            str(trashed["revision"]), "1", trashed["binDigest"]]
+    refusal(COMBINED_BACKEND, ["burn-all", *args, "NO"], env,
+            "COMBINED_BURN_CONFIRMATION_REQUIRED", "ALL_UNCONFIRMED")
+    refusal(COMBINED_BACKEND,
+            ["burn-all", data_arg, "0" * 64, "1", *args[3:],
+             "BURN_ALL_FILES_AND_COPIES_CONFIRMED"], env,
+            "STALE_SYSTEM_TRASH_REFRESH_REQUIRED", "ALL_STALE_GIO")
+    refusal(COMBINED_BACKEND,
+            ["burn-all", data_arg, gio_before["revision"], "1",
+             str(trashed["revision"] + 1), "1", trashed["binDigest"],
+             "BURN_ALL_FILES_AND_COPIES_CONFIRMED"], env,
+            "STALE_MANAGED_COPIES_REFRESH_REQUIRED", "ALL_STALE_MANAGED")
+
+    need(checked_index(env, "ALL_NO_EARLY_FILE_DELETE", 1)["revision"]
+         == gio_before["revision"], "ALL_REFUSAL_DELETED_FILE")
+    need(backend(MANAGED_BACKEND, ["list", data_arg], env,
+                 "ALL_NO_EARLY_COPY_DELETE")["binCount"] == 1,
+         "ALL_REFUSAL_DELETED_COPY")
+
+    combined = backend(COMBINED_BACKEND,
+                       ["burn-all", *args,
+                        "BURN_ALL_FILES_AND_COPIES_CONFIRMED"], env,
+                       "ALL_BOTH_CONFIRMED")
+    need(combined.get("kind") == "combined-burn-all"
+         and combined.get("verified") is True
+         and combined.get("partial") is False
+         and combined.get("count") == 2
+         and combined.get("burnedCount") == 2
+         and {x.get("kind") for x in combined.get("burnedItems", [])}
+         == {"SYSTEM FILE", "SAVED RESEARCH"},
+         "ALL_BOTH_RECEIPT_UNVERIFIED")
+    u9.assert_empty_index(checked_index(env, "ALL_AFTER", 0))
+    need(backend(MANAGED_BACKEND, ["list", data_arg], env,
+                 "ALL_MANAGED_AFTER")["binCount"] == 0,
+         "ALL_MANAGED_BIN_NOT_EMPTY")
+    need(backend(V2_INDEX, ["index", data_arg], env, "ALL_V2_AFTER") == snapshots,
+         "ALL_CHANGED_READ_ONLY_ARCHIVE")
+    need(hashlib.sha256(source.read_bytes()).hexdigest() == source_digest,
+         "ALL_CHANGED_ORIGINAL_SOURCE")
+
+
 def validated_child(raw: str, runner: Path, env: dict) -> Path:
     need(bool(env.get("DBUS_SESSION_BUS_ADDRESS")), "PRIVATE_DBUS_REQUIRED")
     need(bool(raw) and os.path.isabs(raw), "CHILD_PATH_INVALID")
@@ -229,11 +305,14 @@ def main(argv: list[str]) -> int:
             env = u9.isolated_environment(root, inherited)
             run_gio(root, env)
             run_managed_archive(root, env)
+            run_combined_all(root, env)
             result = {
                 "schema": SCHEMA, "ok": True,
                 "scope": "github-actions-private-gvfs-only",
                 "gioSingleBurnVerified": True, "gioBurnAllVerified": True,
                 "gioUnconfirmedAndStaleDenied": True,
+                "combinedAllBurnVerified": True,
+                "combinedStaleAndUnconfirmedDenied": True,
                 "managedRestoreVerified": True,
                 "managedSingleAndBulkBurnVerified": True,
                 "archiveV2ReadOnlyPreserved": True,

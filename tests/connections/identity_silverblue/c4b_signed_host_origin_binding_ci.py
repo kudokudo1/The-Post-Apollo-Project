@@ -16,12 +16,15 @@ import hashlib
 import hmac
 import json
 import re
+from pathlib import Path
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 import c4b_c3en_signed_origin_join_ci as J
+import c4b_root_owned_controller_ledger_ci as L
+import c4b_signed_external_checkpoint_ci as W
 
 SCHEMA = "postapollo.identity.c4b-c3en-host-binding.ci-v1"
 DOMAIN = b"postapollo.identity.c4b-c3en-host-binding.ci-v1\x00"
@@ -186,8 +189,8 @@ def make_expected_statement_ci_only(
 
 
 def inspect_signed_host_binding_ci_only(
-    *, join_inputs: dict, signed_host_binding: bytes,
-    host_binding_signature: bytes,
+    *, join_inputs: dict, controller_ledger_root: Path,
+    signed_host_binding: bytes, host_binding_signature: bytes,
     independently_pinned_host_signer: Ed25519PublicKey,
     independently_pinned_host_signer_sha256: str,
     independently_issued_host_challenge: bytes,
@@ -206,7 +209,20 @@ def inspect_signed_host_binding_ci_only(
         Encoding.Raw, PublicFormat.Raw)
     if not hmac.compare_digest(_sha(pub), independently_pinned_host_signer_sha256):
         _deny("C4B_C3EN_HOST_BINDING_SIGNER_PIN_REFUSED")
-    root_hash = join_inputs["controller_state"].get("controllerRootSha256")
+    if type(join_inputs["controller_state"]) is not dict:
+        _deny("C4B_C3EN_HOST_BINDING_EXACT_CONTROLLER_STATE_REQUIRED")
+    # Re-read actual root-owned disposable ledger instead of trusting two
+    # mutually consistent stale caller snapshots. This is still local
+    # root-only CI custody, NOT rollback resistance against privileged root.
+    try:
+        persisted = L.inspect_current_ci_only(controller_ledger_root)
+    except L.Refused as exc:
+        raise Refused("C4B_C3EN_HOST_BINDING_ROOT_LEDGER_REFUSED") from exc
+    current = {key: persisted[key] for key in W.STATE_FIELDS}
+    if not hmac.compare_digest(
+            _canonical(join_inputs["controller_state"]), _canonical(current)):
+        _deny("C4B_C3EN_HOST_BINDING_PROTECTED_LEDGER_STATE_CHANGED")
+    root_hash = current.get("controllerRootSha256")
     witness_hash = join_inputs["separately_pinned_witness_sha256"]
     if (type(root_hash) is not str or type(witness_hash) is not str
             or SHA256.fullmatch(root_hash) is None

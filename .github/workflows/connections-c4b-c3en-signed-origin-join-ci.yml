@@ -5,6 +5,8 @@ on:
     paths:
       - 'tests/connections/identity_silverblue/c4b_c3en_signed_origin_join_ci.py'
       - 'tests/connections/identity_silverblue/test_c4b_c3en_signed_origin_join_ci.py'
+      - 'tests/connections/identity_silverblue/c4b_signed_host_origin_binding_ci.py'
+      - 'tests/connections/identity_silverblue/test_c4b_signed_host_origin_binding_ci.py'
       - '.github/workflows/connections-c4b-c3en-signed-origin-join-ci.yml'
       - 'docs/connections-c4b-c3en-signed-origin-join.md'
   workflow_dispatch:
@@ -35,7 +37,9 @@ jobs:
           set -euo pipefail
           python3 -B -m py_compile \
             tests/connections/identity_silverblue/c4b_c3en_signed_origin_join_ci.py \
-            tests/connections/identity_silverblue/test_c4b_c3en_signed_origin_join_ci.py
+            tests/connections/identity_silverblue/test_c4b_c3en_signed_origin_join_ci.py \
+            tests/connections/identity_silverblue/c4b_signed_host_origin_binding_ci.py \
+            tests/connections/identity_silverblue/test_c4b_signed_host_origin_binding_ci.py
           python3 - <<'PY'
           from pathlib import Path
           src=Path('tests/connections/identity_silverblue/c4b_c3en_signed_origin_join_ci.py').read_text()
@@ -53,6 +57,13 @@ jobs:
               assert '"'+flag+'": False' in src, flag
           assert 'readonly property bool credentialActionsEnabled: false' in qml
           assert 'Ed25519PrivateKey.generate(' not in src
+          binding=Path('tests/connections/identity_silverblue/c4b_signed_host_origin_binding_ci.py').read_text()
+          assert 'L.inspect_current_ci_only(controller_ledger_root)' in binding
+          assert 'J.inspect_ci_only(**join_inputs)' in binding
+          assert 'Ed25519PrivateKey' not in binding
+          for key in ('realInstalledHostAttestationVerified', 'hostAuthenticated',
+                      'canBeginSignIn', 'productionAuthority', 'credentialActionsEnabled'):
+              assert '"'+key+'": False' in binding, key
           print('C4B_C3EN_JOIN_HOLD // NO_HOST_AUTH_OR_SIGNIN')
           PY
       - name: Actual nonroot socket signer versus original C3e-N source and hostile floors
@@ -70,6 +81,17 @@ jobs:
             tests/connections/identity_silverblue/test_c4b_c3en_signed_origin_join_ci.py
           echo "C4B_C3EN_JOIN_PASS // 19_REAL_SIGNED_SOCKET_AND_ORIGINAL_C3EN_SOURCE_CASES"
           echo "C4B_C3EN_JOIN_HOLD // UNBOUND_TEST_ORIGINS_NOT_NATIVE_AUTHORITY"
+      - name: Third-root signed snapshot binding and stale-controller rollback refusals
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            GITHUB_ACTOR="$GITHUB_ACTOR" POST_APOLLO_C4B_P1_ROOT_LEDGER_TEST_ONLY=1 \
+            POST_APOLLO_C4B_P1_TRANSPORT_TEST_ONLY=1 \
+            "$(command -v python3)" -B \
+            tests/connections/identity_silverblue/test_c4b_signed_host_origin_binding_ci.py
+          echo "C4B_C3EN_JOIN_PASS // 30_THIRD_SIGNER_CROSS_EVIDENCE_REFUSAL_CASES"
+          echo "C4B_C3EN_JOIN_HOLD // NO_REAL_HOST_SIGNER_CUSTODY_OR_ACTUAL_INSTALLED_SEAT_ATTESTATION"
       - name: Preserve original protected C3e-N verifier and existing C4b consumer
         shell: bash
         run: |

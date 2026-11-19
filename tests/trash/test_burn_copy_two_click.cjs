@@ -382,7 +382,7 @@ test("ALL Burn button uses both scopes and advertises non-atomic partial outcome
     assert.match(qml,/trashLauncher\.armCombinedBurnAll\(\)/);
     assert.match(qml,/BURN ALL \/\/ SYSTEM FILES \+ TRASHED COPIES/);
     assert.match(qml,/Two separate backends; a failure can leave a PARTIAL deletion/);
-    assert.match(qml,/action === "burn-combined"\s*\?\s*"scripts\/trash\/trash_all_cli.py"/);
+    assert.match(qml,/action === "burn-combined"\s*\?\s*Quickshell\.shellPath\("scripts\/trash\/trash_all_cli.py"\)/);
     assert.match(qml,/confirmMode === "combined"/);
     assert.match(qml,/BURN_ALL_FILES_AND_COPIES_CONFIRMED/);
     assert.doesNotMatch(qml,/burnFilter === "all"\s*\?\s*trashLauncher\.armBurnAll\(\)/);

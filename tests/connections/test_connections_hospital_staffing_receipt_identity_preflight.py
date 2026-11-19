@@ -249,8 +249,19 @@ class StaffingReceiptIdentityTests(unittest.TestCase):
 
     def test_23_changed_prepared_source_refused(self):
         changed=dict(self.prepared,expectedDigest="f"*64)
-        self.refused("PROPOSED_RECEIPT_VERSION_OR_IDENTITY_MISMATCH",proposal=True,
+        self.refused("GRANT_PREPARED_REVISION_OR_GRAPH_CHANGED",proposal=True,
                      prepared_raw=T.canonical(changed))
+        for name,value in (("roomRevision",6),("graphDigest","f"*64)):
+            with self.subTest(field=name):
+                body=dict(self.body, **{name:value})
+                forged=T.canonical({"body":body,
+                                    "signature":b64(b"\x91"*64)})
+                commit=T.compose_commit(
+                    self.original_raw,self.prepared["writerInstance"],forged)
+                # Matching forged grant syntax/digest does NOT excuse a
+                # release/graph changed after the original PREPARE.
+                self.refused("GRANT_PREPARED_REVISION_OR_GRAPH_CHANGED",
+                             proposal=True,commit_raw=commit)
 
     def test_24_changed_prepared_writer_refused(self):
         changed=dict(self.prepared,writerInstance="other-writer-001")

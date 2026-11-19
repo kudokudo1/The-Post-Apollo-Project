@@ -18,14 +18,20 @@ Scope {
         busy = true;
         loaded = false;
         lastError = "";
-        binProcess.exec([
-            "bash", "-lc",
-            'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"; '
-                + '[ -x "$px" ] || px="$HOME/.local/bin/px"; '
-                + 'exec "$px" "$@"',
-            "hospital-room-bin", "hospital",
-            "room-lifecycle-bin", "--json"
-        ]);
+        // PX protected source only. Missing/uninstalled readers are NOT
+        // replaced with desktop-owned hospital.db or the old px CLI.
+        try {
+            binProcess.exec([
+                "/usr/libexec/post-apollo/hospital/hospital-room-read",
+                "bin"
+            ]);
+        } catch (error) {
+            busy = false;
+            rows = [];
+            loaded = false;
+            lastError = "HOSPITAL BACKEND NOT READY // PROTECTED BIN READER UNAVAILABLE";
+            return false;
+        }
         return true;
     }
 

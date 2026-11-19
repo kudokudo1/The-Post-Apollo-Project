@@ -247,6 +247,18 @@ def inspect_signed_host_binding_ci_only(
     if (set(signed) != set(json.loads(expected))
             or not hmac.compare_digest(signed_host_binding, expected)):
         _deny("C4B_C3EN_HOST_BINDING_SIGNED_VS_VERIFIED_EVIDENCE_MISMATCH")
+    # The socket exchange and C3e-N checks happen outside the SQLite
+    # inspection transaction. Refuse if the protected controller advanced
+    # or its database disappeared before returning a diagnostic result.
+    # Root may still roll back BOTH observations; no production authority.
+    try:
+        after = L.inspect_current_ci_only(controller_ledger_root)
+    except L.Refused as exc:
+        raise Refused(
+            "C4B_C3EN_HOST_BINDING_LEDGER_LOST_DURING_VERIFICATION") from exc
+    after_state = {key: after[key] for key in W.STATE_FIELDS}
+    if not hmac.compare_digest(_canonical(current), _canonical(after_state)):
+        _deny("C4B_C3EN_HOST_BINDING_LEDGER_CHANGED_DURING_VERIFICATION")
     return {
         "schema": SCHEMA,
         "status": STATUS,

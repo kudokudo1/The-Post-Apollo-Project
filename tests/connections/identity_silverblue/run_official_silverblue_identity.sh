@@ -87,6 +87,10 @@ install -m 0644 "$tmp/controller-challenge.txt" "$tmp/seed/controller-challenge.
 payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/guest_identity_ostree_cycle.sh")"
 helper_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/verify_booted_rpm_mtime_only.py")"
 service_probe_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/guest_identity_service_probe.sh")"
+# Preserve the exact existing C3e-AG kernel observer source. The disposable
+# C4b guest runs this read-only observer against its actual installed service
+# before rollback; this NEVER enrolls/attests an external trust root.
+c3eag_kernel_observer_payload="$(base64 -w0 "$repo/tests/connections/c3e_release_trust/C3eAGIdentityKernelObserver.py")"
 # Static verifier code only. No private key or runtime release-signing seed
 # is transferred to the offline ISO, RPM or GitHub artifact.
 receipt_binding_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/runtime_receipt_binding_ci.py")"
@@ -126,6 +130,12 @@ base64 -d >/usr/local/libexec/postapollo-id-ci-service-probe.sh <<'C4B_ID_SERVIC
 $service_probe_payload
 C4B_ID_SERVICE_PROBE
 chmod 0700 /usr/local/libexec/postapollo-id-ci-service-probe.sh
+# A copy of the C3e-owned observer only: C4b does NOT edit or relax its checks.
+# This is a test fixture staged solely inside the disposable offline guest.
+base64 -d >/usr/local/libexec/postapollo_id_ci_c3eag_observer.py <<'C4B_C3EAG_OBSERVER'
+$c3eag_kernel_observer_payload
+C4B_C3EAG_OBSERVER
+chmod 0444 /usr/local/libexec/postapollo_id_ci_c3eag_observer.py
 # Read-only code ships in a disposable seed image, never the signer private
 # key. The receipt-binding helper mints a separate in-memory guest-local CI
 # root and refuses a swapped controller/guest receipt key.
@@ -402,6 +412,8 @@ for evidence in \
   'C4B_ID_PASS // KERNEL_PEER_PID_START_AND_SUPERVISOR_RECHECKED_FOR_FOUR_SIGNED_DENIALS' \
   'C4B_ID_PASS // GUEST_LOCAL_RELEASE_BOUND_TO_ACTUAL_GATEWAY_RECEIPT_KEY' \
   'C4B_ID_PASS // SUBSTITUTE_RECEIPT_PUBLIC_KEY_EXPLICITLY_REFUSED' \
+  'C4B_ID_PASS // REAL_C3EAG_RUNNING_GATEWAY_KERNEL_SNAPSHOT' \
+  'C4B_ID_PASS // REAL_C3EAG_MUTATED_KERNEL_AND_SCRIPT_PINS_REFUSED' \
   'C4B_ID_PASS // DEDICATED_SELINUX_MODULE_REMOVED_AFTER_SERVICE_STOP' \
   'C4B_ID_PASS // REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP' \
   'C4B_ID_PASS // REAL_IDENTITY_SERVICE_PROBE_FINISHED_BEFORE_ROLLBACK' \

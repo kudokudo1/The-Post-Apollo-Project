@@ -255,5 +255,19 @@ class SignedControllerTransitionTests(unittest.TestCase):
         # A read-only CI verifier has no authoritative consume operation.
         self.assertFalse(hasattr(T, "commit_transition"))
 
+    def test_28_retired_controller_root_cannot_sign_successor_gateway_receipts(self):
+        retired_public = self.previous_root.public_key().public_bytes_raw()
+        self.next_enrollment["receiptKeySha256"] = sha(retired_public)
+        self.render()
+        denial = F._canonical({
+            "schema": F.LEGACY_RECEIPT_SCHEMA,
+            "state": "UNAVAILABLE", "requestId": None,
+        }) + b"\\n"
+        frame = F.ReceiptIssuer(self.previous_root).seal(
+            "BEGIN", None, self.fixture.nonce, denial)
+        serial = self.fixture.proof(retired_public, frame)
+        self.refuse(serial=serial)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

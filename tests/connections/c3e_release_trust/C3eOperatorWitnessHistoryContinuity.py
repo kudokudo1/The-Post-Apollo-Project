@@ -198,6 +198,14 @@ def inspect_next_history_proposal_ci_only(
             raise
         raise Refused("C3E_HISTORY_SIGNED_JSON_REFUSED") from exc
 
+    # Python treats True == 1, so equality alone must never authorize
+    # a correctly signed boolean masquerading as a release/chain counter.
+    integer_fields = ("releaseEpoch", "releaseSequence", "historySequence")
+    if (any(type(doc[field]) is not int for field in integer_fields)
+            or any(type(doc[field]) is not str
+                   for field in FIELDS.difference(integer_fields))):
+        _deny("C3E_HISTORY_SIGNED_RECORD_MISMATCH_OR_REPLAY")
+
     expected = {
         "schema": SCHEMA,
         "purpose": PURPOSE,

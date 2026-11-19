@@ -184,7 +184,8 @@ def _response(status, *, dispatched=0):
 
 
 def execute_disposable(request, *, read_runner, command_runner, journal,
-                       legacy_reader=load_legacy, geometry_reader=load_geometry):
+                       legacy_reader=load_legacy, geometry_reader=load_geometry,
+                       authority_guard=None):
     """Test-only two-command resize+position. No production entrypoint.
 
     The injected journal must record BEGIN and DISPATCHING before any command.
@@ -193,6 +194,11 @@ def execute_disposable(request, *, read_runner, command_runner, journal,
     """
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("CI") != "true":
         refuse("DISPOSABLE CI ONLY")
+    if authority_guard is not None:
+        # Optional only for the separately verified disposable signed
+        # admission coordinator. Not proof of a production trusted issuer.
+        if not callable(authority_guard) or authority_guard() is not True:
+            refuse("EXTERNAL ADMISSION REVOKED")
     if journal is None or not all(callable(getattr(journal, name, None))
                                   for name in ("begin", "dispatching", "finish")):
         refuse("EXPLICIT FIXTURE JOURNAL REQUIRED")
@@ -201,6 +207,8 @@ def execute_disposable(request, *, read_runner, command_runner, journal,
                        read_runner=read_runner)
     if prepared["status"] == "already":
         return _response("already_observed")
+    if authority_guard is not None and authority_guard() is not True:
+        refuse("EXTERNAL ADMISSION REVOKED")
     target, signature = prepared["target"], prepared["signature"]
     con_id = request["live_con_id"]
     current_rect = prepared["current"]["rect"]
@@ -221,6 +229,13 @@ def execute_disposable(request, *, read_runner, command_runner, journal,
     count = 0
     status = "uncertain_requires_review"
     for index, command in enumerate(commands):
+        # A short-lived external permission must stay live before EACH
+        # non-atomic command; expiry/revocation after resize leaves UNCERTAIN.
+        try:
+            if authority_guard is not None and authority_guard() is not True:
+                break
+        except Exception:
+            break
         # Reobserve without retry or widening the operator-selected binding.
         try:
             live, mapping = _sample(read_runner)

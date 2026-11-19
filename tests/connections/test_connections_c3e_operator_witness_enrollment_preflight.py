@@ -171,11 +171,11 @@ class C3eOperatorWitnessPreflightTests(unittest.TestCase):
                      independently_measured_snapshot=modified)
 
     def test_19_partial_or_extra_signed_fields_refused(self):
-        doc = dict(self.fixture.doc)
-        doc["productionAuthority"] = True
+        # Even if the attacker controls the disposable root and correctly
+        # signs a modified enrollment, extra authority fields must refuse.
+        self.fixture.doc["productionAuthority"] = True
         self.resign()
-        self.refused("EXISTING_SIGNED_ROLE_ENROLLMENT_REFUSED",
-                     signed_enrollment=C.AF._canonical(doc))
+        self.refused("EXISTING_SIGNED_ROLE_ENROLLMENT_REFUSED")
 
     def test_20_missing_or_invalid_out_of_band_root_fingerprint(self):
         for bad in (None, True, "", "a"*63, "F"*64):

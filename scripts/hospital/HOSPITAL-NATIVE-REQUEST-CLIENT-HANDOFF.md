@@ -77,7 +77,7 @@ CI workflow: \`Hospital Native Request Client / Backend Readiness\`.
    PX owns reconciliation, trusted retention source, issuer UID routing and
    native writer executable proof. Do **not** add a fake client adapter
    pretending the two sockets are interchangeable.
-2. The new native client is **source only**. It is not installed, compiled
+2. Both native clients are **source only**. Neither is installed, compiled
    on the user's machine, enrolled in the issuer's root-owned ELF digest
    policy, signed as a release, or authorized for production. The unit test
    fixture accepts no real grant or Room operation.
@@ -85,12 +85,14 @@ CI workflow: \`Hospital Native Request Client / Backend Readiness\`.
    runtime is not installed. \`--check\` tests installed client/socket
    appearance, not full upstream readiness; the issuer must still refuse if
    Polkit, retention, legal hold, current Room, or writer provenance fail.
-4. Until PX native read paths are deployed, the QML \`review\` and
-   \`room-lifecycle-bin\` read-only routes still use the older PX CLI
-   and may return NOT READY. No insecure DB fallback is added.
+4. QML Room and Bin reads now use a separate, source-only **protected read
+   client** over PX #130's SOCK_STREAM review/bin interface. It has no
+   desktop-owned SQLite or old CLI fallback. Its root-owned routing policy,
+   user/socket access, and native installation remain unapproved.
 5. The QML compatibility property \`permissionReady\` means only
-   **request transport installed + Room preview loaded**. It is *not*
-   permission granted, signed consent or authority to change source.
+   **mutation request transport installed**. It is *not* permission
+   granted, source eligibility, signed consent or authority to change
+   source; C5-H2 independently rechecks Room and retention on every request.
 6. Production additionally requires mutually verified signer/writer
    endpoint, secure systemd/SELinux and owner root key custody, approved
    v10→v11→v12 migration, WAL-aware backup/restoration and old-writer fencing,
@@ -120,12 +122,49 @@ Hospital UI lane.
 **Connections owner:** review pinned ELF client identity and release
 enrollment, Polkit/active-seat human approval and no cached grants.
 
-**Hospital/Trash++ owner:** after protected PX read route is available,
-switch Room/Bin reads to its reviewed native client, verify exact source
-state across both screens, and run real install acceptance.
+**Hospital/Trash++ owner:** verify the new source-only protected Room/Bin
+read client against PX's installed writer. Coordinate its pinned routing
+policy and socket ACL with PX before native acceptance.
 
 ## DECISIONS
 
 One coordinated Hospital source PR instead of tiny incremental prototypes.
 No merge, local installation, production activation or Burn is authorized.
 Operator final acceptance remains separate from CI success.
+
+
+## 2026-11-19 // Protected read source completion
+
+- \`services/hospital/native/hospital_room_read_client.py\` is a separate
+  root-installed **read-only** executable source. Fixed production path:
+  \`/usr/libexec/post-apollo/hospital/hospital-room-read\`. It has no
+  Trash, Restore, Burn, SQL, CLI-fallback, or signing-key capability.
+- Its interpreter is isolated (\`python3 -I\`). It refuses untrusted file
+  ancestry, symlink replacements, unexpected current UID and missing
+  root-controlled client policy. The independently reviewed installation
+  must provide
+  \`/etc/post-apollo/hospital/room-read-client.json\` with exact fields:
+  \`schema = postapollo.hospital.protected-read-client.v1\`,
+  \`clientUid\`, \`writerUid\`, \`socketPath\` ending in
+  \`hospital-room-writer-v1.sock\`. This is public routing metadata,
+  **not a grant or authority**. Installer/root source owner must
+  approve owner UID, exact endpoint and restricted client socket ACL.
+- The client checks protected socket owner/ancestry and Linux SO_PEERCRED,
+  sends only the reviewed PX v1 \`review\` or \`bin\` frame, checks the
+  exact bounded source JSON response, and emits only Room/Bin metadata.
+  It cannot specify an arbitrary path in its CLI or environment.
+- \`HospitalRoomLifecycleService.qml\` and \`HospitalRoomBinService.qml\`
+  now use this protected read client and never access user-owned PX
+  lifecycle state. Missing native reader always yields
+  **HOSPITAL BACKEND NOT READY**.
+- **Native-first consent:** explicit two-step Room request does not
+  depend on an obsolete desktop PX preview. The C5-H2 protected issuer
+  independently checks current Room, patient, assignment, revision,
+  retention/legal hold, actual operator seat and Polkit. The UI checks
+  only exact Room/action and the issuer's COMMITTED result, without
+  manufacturing operator consent or relying on a desktop digest.
+- These are source changes in application PR #2069, **not** an
+  installed protected service, PX protocol convergence or operator approval.
+  The C5-H2 → PX signer/writer prepare/commit mismatch remains blocked.
+- Unit tests use only disposable Unix socketpairs; no live key, database
+  or user host file is read or changed.

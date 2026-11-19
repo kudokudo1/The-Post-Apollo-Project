@@ -161,7 +161,10 @@ test("compact Cleanup fits via scroll instead of clipping or changing Camera dat
     assert.match(trashSource,/readonly property bool cleanupScrollRailVisible:/);
     assert.match(trashSource,/anchors\.bottomMargin: trashLauncher\.cleanupScrollRailVisible \? 29 : 0/);
     assert.match(trashSource,/id: cleanupPageViewport/);
-    assert.match(trashSource,/contentHeight: Math\.max\(height,/);
+    // Batch/Swipe/Hunt retain the old scroll canvas when queue is closed.
+    // Narrow VIEW QUEUE deliberately fits its page to the viewport instead.
+    assert.match(trashSource,/contentHeight: trashLauncher\.cleanupQueueFocused/);
+    assert.match(trashSource,/\? height : Math\.max\(height,/);
     assert.match(trashSource,/\? 650 : 525\)/);
     assert.match(trashSource,/id: cleanupCompactScrollRail/);
     assert.match(trashSource,/visible: trashLauncher\.cleanupScrollRailVisible/);

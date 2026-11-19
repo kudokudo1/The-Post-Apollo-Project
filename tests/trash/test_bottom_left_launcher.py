@@ -144,7 +144,11 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn('chassisSize === "medium" ? 570', TRASH)
         self.assertIn('chassisSize === "large" ? 730', TRASH)
         self.assertIn("usableWidth - 55", TRASH)
-        self.assertIn("usableHeight - 120", TRASH)
+        # Full/opening-height window must clear the 70px top widget bar,
+        # 10px visual gap and bottom-anchored frame offset (85px).
+        self.assertIn("fullHeightReserve: 70 + 10 + 85", TRASH)
+        self.assertIn("usableHeight - fullHeightReserve", TRASH)
+        self.assertNotIn("usableHeight - 120", TRASH)
         self.assertIn('label: "↓"', TRASH)
         self.assertIn('label: "↑"', TRASH)
         self.assertIn("onLeftClicked: trashLauncher.stepChassis(-1)", TRASH)

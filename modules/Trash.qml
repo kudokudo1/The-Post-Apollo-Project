@@ -22,6 +22,9 @@ PanelWindow {
     // page cannot fit on screen, provide buttons outside that gesture area.
     readonly property bool cleanupScrollRailVisible:
         activeMode === "cleanup"
+        // In narrow queue review the queue list owns scrolling. Do not
+        // waste its action space on a second, competing page scroll rail.
+        && !cleanupQueueFocused
         && (chassisSize === "compact"
             || (cameraCleanupController
                 && (cameraCleanupController.cleanupTechnique === "swipe"
@@ -899,6 +902,17 @@ PanelWindow {
     readonly property var chassisSizes: ["compact", "medium", "large", "full"]
     readonly property int usableWidth: screen ? screen.width : 2560
     readonly property int usableHeight: screen ? screen.height : 1440
+    // Top bar is 70px; keep a 10px gap below it. The bottom-anchored
+    // PanelWindow places this frame 85px above its top when height is
+    // converted to the visible menu coordinate (90px shell + 10px margin
+    // - 15px frame offset). Reserving 165px gives an 80px menu top.
+    readonly property int fullHeightReserve: 70 + 10 + 85
+    // QUEUE is a focused review screen in the two narrow chassis sizes:
+    // one internal list scroll and its pinned TRASH action, no outer scroll.
+    readonly property bool cleanupQueueFocused:
+        activeMode === "cleanup" && !!cameraCleanupController
+        && cameraCleanupController.cleanupQueueOpen
+        && (chassisSize === "compact" || chassisSize === "medium")
     readonly property int frameWidth: Math.max(320, Math.min(
         chassisSize === "compact" ? 420
         : chassisSize === "medium" ? 620
@@ -907,8 +921,9 @@ PanelWindow {
     readonly property int frameHeight: Math.max(330, Math.min(
         chassisSize === "compact" ? 450
         : chassisSize === "medium" ? 570
-        : chassisSize === "large" ? 730 : usableHeight - 120,
-        usableHeight - 120))
+        : chassisSize === "large" ? 730
+        : usableHeight - fullHeightReserve,
+        usableHeight - fullHeightReserve))
     readonly property bool burnWarning:
         confirmMode !== "" || pendingAction === "burn"
         || pendingAction === "burn-all" || pendingAction === "burn-combined"
@@ -2253,11 +2268,16 @@ PanelWindow {
                     // original 525px side-by-side Camera design. The parent
                     // viewport is bounded; the contents are explicitly
                     // scrollable instead of falling below the panel frame.
-                    contentHeight: Math.max(height,
-                        trashLauncher.chassisSize === "compact"
-                        && trashLauncher.cameraCleanupController
-                        && trashLauncher.cameraCleanupController.cleanupTechnique === "batch"
-                        ? 650 : 525)
+                    contentHeight: trashLauncher.cleanupQueueFocused
+                        ? height : Math.max(height,
+                            trashLauncher.chassisSize === "compact"
+                            && trashLauncher.cameraCleanupController
+                            && trashLauncher.cameraCleanupController.cleanupTechnique === "batch"
+                            ? 650 : 525)
+                    onContentHeightChanged: {
+                        if (trashLauncher.cleanupQueueFocused)
+                            contentY = 0;
+                    }
                     interactive: trashLauncher.cameraCleanupController
                                  && trashLauncher.cameraCleanupController.cleanupTechnique
                                     !== "swipe"
@@ -2265,7 +2285,12 @@ PanelWindow {
                                     !== "hunt"
 
                     Item {
-                        width: cleanupPageViewport.width
+                        // A star-shaped outer scrollbar occupies 16px plus
+                        // its edge clearance. Keep inner list rails and page
+                        // controls out of that lane when the page scrolls.
+                        width: Math.max(0, cleanupPageViewport.width
+                            - (cleanupPageViewport.contentHeight
+                               > cleanupPageViewport.height + 1 ? 21 : 0))
                         height: cleanupPageViewport.contentHeight
 
                         Loader {

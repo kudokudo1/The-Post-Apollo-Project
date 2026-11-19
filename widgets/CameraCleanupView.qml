@@ -16,6 +16,10 @@ Column {
     // Camera-owned actions, but do not force the wide two-column preview
     // or lengthy filter labels into it.
     readonly property bool compactHosted: width <= 450
+    // In the two narrow Trash chassis, VIEW QUEUE becomes a focused
+    // review page. The mode/search/filter controls are still available
+    // after BACK TO MODE, but cannot push the final TRASH action offscreen.
+    readonly property bool queueFocused: camera.cleanupQueueOpen && width < 640
     // Camera owns every queue item and file action. This component only
     // renders and selects, and now lives INSIDE the Trash++ PanelWindow.
     function focusSwipe() {
@@ -46,6 +50,7 @@ Column {
         id: cleanupModeRow
         width: parent.width
         height: 33
+        visible: !cleanupPage.queueFocused
         spacing: 6
         Repeater {
             model: [
@@ -112,6 +117,7 @@ Column {
         width: parent.width
         height: 19
         visible: camera.cleanupTechnique !== "desktop"
+                 && !cleanupPage.queueFocused
         font.pixelSize: 9
         color: camera.batchReceipt ? Colors.yellow : Colors.cyan
         elide: Text.ElideRight
@@ -126,6 +132,7 @@ Column {
         height: 32
         spacing: 6
         visible: camera.cleanupTechnique !== "desktop"
+                 && !cleanupPage.queueFocused
         TextField {
             id: cleanupSearch
             width: parent.width * 0.52
@@ -188,6 +195,7 @@ Column {
         height: 28
         spacing: 5
         visible: camera.cleanupTechnique !== "desktop"
+                 && !cleanupPage.queueFocused
         Repeater {
             model: [
                 {id: "all", label: "ALL"},
@@ -219,7 +227,12 @@ Column {
         width: parent.width
         height: camera.cleanupTechnique === "desktop"
                 ? Math.max(170, cleanupPage.height - 135)
-                : Math.max(145, cleanupPage.height - 216)
+                : cleanupPage.queueFocused
+                  // Title 24 + VIEW QUEUE 38 + two Column gaps.
+                  // The queue deck fits at the foot of this work area.
+                  ? Math.max(0, cleanupPage.height - 24 - 38
+                                - 2 * cleanupPage.spacing)
+                  : Math.max(145, cleanupPage.height - 216)
 
         Rectangle {
             id: cleanupQueueView
@@ -271,7 +284,7 @@ Column {
                     ListView {
                         id: cleanupQueuedList
                         anchors.fill: parent
-                        anchors.rightMargin: 11
+                        anchors.rightMargin: 21
                         clip: true
                         boundsBehavior: Flickable.StopAtBounds
                         spacing: 3
@@ -436,7 +449,7 @@ Column {
                     ListView {
                         id: cleanupBatchList
                         anchors.fill: parent
-                        anchors.rightMargin: 12
+                        anchors.rightMargin: 21
                         model: camera.galleryFiles
                         spacing: 4
                         clip: true

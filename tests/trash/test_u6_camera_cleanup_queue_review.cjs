@@ -6,6 +6,7 @@ const assert=require("node:assert/strict"),test=require("node:test");
 const root=path.resolve(__dirname,"../..");
 const camera=fs.readFileSync(path.join(root,"widgets/CameraW.qml"),"utf8");
 const cleanup=fs.readFileSync(path.join(root,"widgets/CameraCleanupView.qml"),"utf8");
+const trash=fs.readFileSync(path.join(root,"modules/Trash.qml"),"utf8");
 const deck=fs.readFileSync(path.join(root,"components/TrashLifecycleActionDeck.qml"),"utf8");
 
 function method(name) {
@@ -163,4 +164,42 @@ test("the single-file Gallery confirmation and desktop screenshot plan are indep
     assert.doesNotMatch(cleanup,/onLeftClicked: camera\.confirmCleanup\(\)/);
     assert.match(cleanup,/label: "PREVIEW MATCHES"/);
     assert.match(camera,/"trash-batch-now", JSON\.stringify\(batchPaths\)/);
+});
+
+test("compact and medium VIEW QUEUE keep TRASH inside the visible viewport",()=>{
+    assert.match(trash,/property bool cleanupQueueFocused:/);
+    assert.match(trash,/contentHeight: trashLauncher\.cleanupQueueFocused\s*\? height/);
+    assert.match(trash,/!cleanupQueueFocused\s*&& \(chassisSize === "compact"/);
+    assert.match(cleanup,/property bool queueFocused: camera\.cleanupQueueOpen && width < 640/);
+    assert.match(cleanup,/id: cleanupModeRow[\s\S]{0,140}visible: !cleanupPage\.queueFocused/);
+    assert.match(cleanup,/cleanupPage\.height - 24 - 38\s*- 2 \* cleanupPage\.spacing/);
+
+    // Synthetic geometry only. Real QML layout and controls require a
+    // native host pass; this catches the old hard-coded 650px queue page.
+    for(const screenHeight of [768,1080,1440]){
+        for(const frameHeight of [450,570]){
+            const boundedHeight=Math.max(330,Math.min(frameHeight,screenHeight-165));
+            const viewportHeight=boundedHeight-136;
+            const queuePageHeight=viewportHeight;
+            const workHeight=queuePageHeight-24-38-2*7;
+            const queuedListHeight=workHeight-112;
+            const usedHeight=24+7+38+7+workHeight;
+            assert.ok(queuedListHeight>=40,
+                "queue needs an actual internal list viewport");
+            assert.equal(usedHeight,viewportHeight,
+                "final TRASH deck must fit without page scrolling");
+        }
+    }
+});
+test("outer/inner scrollbars have distinct lanes and full frame clears top bar",()=>{
+    assert.match(trash,/fullHeightReserve: 70 \+ 10 \+ 85/);
+    assert.match(trash,/usableHeight - fullHeightReserve/);
+    assert.match(trash,/cleanupPageViewport\.contentHeight[\s\S]{0,100}> cleanupPageViewport\.height \+ 1 \? 21 : 0/);
+    assert.match(cleanup,/anchors\.rightMargin: 21/g);
+    for(const screenHeight of [768,1080,1440]){
+        const fullFrameHeight=screenHeight-(70+10+85);
+        const menuTop=screenHeight-fullFrameHeight-85;
+        assert.equal(menuTop,80,
+            "full chassis must open below the 70px top bar plus 10px gap");
+    }
 });

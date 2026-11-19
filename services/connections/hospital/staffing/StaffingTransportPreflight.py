@@ -12,6 +12,7 @@ PREPARE state, durable nonce consumption and Session/Doctor atomic writes.
 from __future__ import annotations
 
 import base64
+import binascii
 import json
 import re
 import socket
@@ -96,7 +97,7 @@ def _decode_b64(value, size):
         hold("INVALID_UNPADDED_BASE64URL")
     try:
         data = base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
-    except (ValueError, TypeError) as exc:
+    except (ValueError, TypeError, binascii.Error) as exc:
         raise PreflightHold(
             "HOSPITAL_STAFFING_PREFLIGHT_HOLD // INVALID_UNPADDED_BASE64URL"
         ) from exc
@@ -127,7 +128,8 @@ def parse_original_prepare(raw):
     if set(request) != PREPARE_FIELDS or request.get("kind") != PREPARE:
         hold("ORIGINAL_PREPARE_REQUIRED")
     if (request.get("schema") != REQUEST_SCHEMA
-            or request.get("action") not in ALLOWED_ACTIONS
+            or type(request.get("action")) is not str
+            or request["action"] not in ALLOWED_ACTIONS
             or type(request.get("roomId")) is not str
             or type(request.get("intent")) is not dict
             or request["intent"].get("roomId") != request["roomId"]):

@@ -246,7 +246,7 @@ class C4bRootOwnedControllerLedgerTests(unittest.TestCase):
         self.assertTrue(state["pendingIntentExists"])
 
     def test_27_monotonic_revocation_addition_commits_once(self):
-        self.rot.next_policy["revokedEnrollmentIds"] = ["a" * 32, "b" * 32]
+        self.rot.next_policy["revokedEnrollmentIds"] = ["b" * 32, "c" * 32]
         self.rot.render()
         self.stage()
         self.commit()
@@ -256,7 +256,7 @@ class C4bRootOwnedControllerLedgerTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual(stored_policy["revokedEnrollmentIds"],
-                         ["a" * 32, "b" * 32])
+                         ["b" * 32, "c" * 32])
         self.refuse()
 
     def test_22_policy_bundle_changed_after_staging_refuses(self):

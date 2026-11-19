@@ -229,6 +229,8 @@ def inspect_signed_host_binding_ci_only(
         persisted = L.inspect_current_ci_only(controller_ledger_root)
     except L.Refused as exc:
         raise Refused("C4B_C3EN_HOST_BINDING_ROOT_LEDGER_REFUSED") from exc
+    if persisted.get("pendingIntentExists") is not False:
+        _deny("C4B_C3EN_HOST_BINDING_PENDING_ROTATION_NOT_QUIESCENT")
     current = {key: persisted[key] for key in W.STATE_FIELDS}
     if not hmac.compare_digest(
             _canonical(join_inputs["controller_state"]), _canonical(current)):
@@ -267,6 +269,8 @@ def inspect_signed_host_binding_ci_only(
     except L.Refused as exc:
         raise Refused(
             "C4B_C3EN_HOST_BINDING_LEDGER_LOST_DURING_VERIFICATION") from exc
+    if after.get("pendingIntentExists") is not False:
+        _deny("C4B_C3EN_HOST_BINDING_ROTATION_STAGED_DURING_VERIFICATION")
     after_state = {key: after[key] for key in W.STATE_FIELDS}
     if not hmac.compare_digest(_canonical(current), _canonical(after_state)):
         _deny("C4B_C3EN_HOST_BINDING_LEDGER_CHANGED_DURING_VERIFICATION")

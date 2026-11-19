@@ -316,6 +316,7 @@ Column {
                     }
                     NeonScrollBar {
                         flickable: cleanupQueuedList
+                        protectHandleDragFromAncestor: true
                         x: parent.width - width - 1
                         height: parent.height
                         geometryMode: "viewport"
@@ -496,6 +497,7 @@ Column {
                     }
                     NeonScrollBar {
                         flickable: cleanupBatchList
+                        protectHandleDragFromAncestor: true
                         x: parent.width - width - 1
                         height: parent.height
                         geometryMode: "viewport"
@@ -697,6 +699,7 @@ Column {
                 }
                 NeonScrollBar {
                     flickable: cleanupGridList
+                    protectHandleDragFromAncestor: true
                     x: parent.width - width - 1
                     height: parent.height
                     geometryMode: "viewport"

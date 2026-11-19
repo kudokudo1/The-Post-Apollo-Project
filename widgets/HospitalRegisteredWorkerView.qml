@@ -124,11 +124,11 @@ Item {
     property string lifecycleOutcome: ""
 
     readonly property bool lifecycleArmed:
-        lifecycleArmAction !== ""
+        (lifecycleArmAction === "TRASH" || lifecycleArmAction === "RESTORE")
         && lifecycleArmRoomId === root.pinnedRoomId
-        && roomLifecycle.reviewReady
-        && lifecycleArmDigest === String(roomLifecycle.review.digest || "")
-        && lifecycleArmRevision === roomLifecycle.review.revision
+        && root.roomMatches && root.active
+        && root.viewMode === "lifecycle"
+        && roomLifecycle.permissionReady
 
     function clearLifecycleArm() {
         lifecycleArmAction = "";
@@ -139,36 +139,32 @@ Item {
 
     function armLifecycleAction(action) {
         clearLifecycleArm();
-        const state = roomLifecycle.review || {};
-        const wanted = action === "TRASH" ? "ACTIVE" : "TRASHED";
+        // The old desktop PX lifecycle review is display-only. It is not
+        // the source of retention authority. The native C5-H2 issuer checks
+        // source-owned Room state, operator presence and legal holds afresh.
         if (!root.active || root.viewMode !== "lifecycle"
-                || !roomLifecycle.permissionReady || !roomLifecycle.reviewReady
-                || state.roomId !== root.pinnedRoomId
-                || state.state !== wanted
-                || (action === "TRASH" && state.canTrash !== true)
-                || (action === "RESTORE" && state.canRestore !== true)) {
-            lifecycleOutcome = "HOLD // TRUSTED ROOM AUTHORITY NOT VERIFIED";
+                || !root.roomMatches || !roomLifecycle.permissionReady
+                || (action !== "TRASH" && action !== "RESTORE")
+                || !/^[A-Za-z0-9._:/-]{1,160}$/.test(root.pinnedRoomId)) {
+            lifecycleOutcome = "HOLD // NATIVE ROOM REQUEST UNAVAILABLE";
             return false;
         }
         lifecycleArmAction = action;
-        lifecycleArmDigest = String(state.digest);
-        lifecycleArmRevision = state.revision;
         lifecycleArmRoomId = root.pinnedRoomId;
-        lifecycleOutcome = "ARMED // CONFIRM " + action + " FOR EXACT ROOM";
+        lifecycleOutcome = "ARMED // CONFIRM " + action
+            + " FOR EXACT ROOM // NATIVE CONSENT REQUIRED";
         return true;
     }
 
     function confirmLifecycleAction() {
         if (!lifecycleArmed || !roomLifecycle.permissionReady) {
             clearLifecycleArm();
-            lifecycleOutcome = "REFUSED // ROOM OR REVISION CHANGED";
+            lifecycleOutcome = "REFUSED // ROOM OR NATIVE REQUEST CHANGED";
             return false;
         }
         const action = lifecycleArmAction;
-        const witness = { digest: lifecycleArmDigest,
-                          revision: lifecycleArmRevision };
         clearLifecycleArm();
-        return roomLifecycle.execute(action, witness);
+        return roomLifecycle.execute(action);
     }
 
     onViewModeChanged: {
@@ -739,9 +735,8 @@ Item {
                 HospitalActionButton {
                     width: parent.width
                     height: 30
-                    visible: roomLifecycle.reviewReady
-                        && roomLifecycle.review.state === "ACTIVE"
-                        && roomLifecycle.review.canTrash === true
+                    visible: !roomLifecycle.reviewReady
+                        || roomLifecycle.review.state === "ACTIVE"
                     label: "REQUEST NATIVE APPROVAL // TRASH ROOM"
                     compactIcon: "TRASH"
                     accent: Colors.orange
@@ -752,9 +747,8 @@ Item {
                 HospitalActionButton {
                     width: parent.width
                     height: 30
-                    visible: roomLifecycle.reviewReady
-                        && roomLifecycle.review.state === "TRASHED"
-                        && roomLifecycle.review.canRestore === true
+                    visible: !roomLifecycle.reviewReady
+                        || roomLifecycle.review.state === "TRASHED"
                     label: "REQUEST NATIVE APPROVAL // RESTORE ROOM"
                     compactIcon: "RESTORE"
                     accent: Colors.cyan
@@ -789,11 +783,13 @@ Item {
                 }
                 GohuText {
                     width: parent.width
-                    text: roomLifecycle.lastError || root.lifecycleOutcome
+                    text: root.lifecycleOutcome || roomLifecycle.lastError
                         || (roomLifecycle.reviewReady
-                            ? "PX " + String(roomLifecycle.review.state)
-                              + " // REV " + roomLifecycle.review.revision
-                            : "PX ROOM LIFECYCLE // NOT VERIFIED")
+                            ? "PX LEGACY PREVIEW // "
+                                + String(roomLifecycle.review.state)
+                                + " // REV " + roomLifecycle.review.revision
+                            : "PX LEGACY PREVIEW UNAVAILABLE"
+                                + " // NATIVE SOURCE REVIEW IS INDEPENDENT")
                     color: roomLifecycle.lastError ? Colors.red : Colors.orange
                     font.pixelSize: 9
                     wrapMode: Text.Wrap
@@ -801,12 +797,11 @@ Item {
                 GohuText {
                     width: parent.width
                     text: roomLifecycle.permissionReady
-                        ? "NATIVE REQUEST CLIENT VERIFIED // HUMAN CONSENT STILL REQUIRED."
-                          + " PX RECHECKS ROOM, RETENTION AND OPERATOR BEFORE COMMIT."
-                          + " BURN NOT SUPPORTED."
-                        : "HOSPITAL BACKEND NOT READY // INSTALL AND VERIFY"
-                          + " PROTECTED PX + C5 ISSUER. NO ROOM ACTION ENABLED."
-                          + " BURN NOT SUPPORTED."
+                        ? "NATIVE REQUEST TRANSPORT INSTALLED // NOT AN APPROVAL."
+                          + " ISSUER/PX RECHECK ROOM, RETENTION, OPERATOR AND SEAT."
+                          + " NO GRANT IS STORED IN QML. BURN NOT SUPPORTED."
+                        : "HOSPITAL BACKEND NOT READY // NATIVE CLIENT MISSING."
+                          + " NO ROOM ACTION ENABLED. BURN NOT SUPPORTED."
                     color: Colors.blue
                     font.pixelSize: 9
                     wrapMode: Text.Wrap

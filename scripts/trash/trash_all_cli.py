@@ -108,7 +108,7 @@ def combined(data_dir: str, file_revision: str, file_count: int,
             or type(copy_revision) is not int
             or not 0 <= file_count <= 2500
             or not 0 <= copy_count <= 2500
-            or not 0 <= copy_revision <= 999_999_999
+            or not 0 <= copy_revision <= 2_147_483_647
             or file_count + copy_count < 1):
         raise Refused("INVALID_COMBINED_BURN_SCOPE")
     _preflight(data_dir, file_revision, file_count,

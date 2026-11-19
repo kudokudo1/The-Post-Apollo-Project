@@ -113,7 +113,7 @@ jobs:
             GITHUB_ACTOR="$GITHUB_ACTOR" POST_APOLLO_C4B_P1_ROOT_LEDGER_TEST_ONLY=1 \
             "$(command -v python3)" -B \
             tests/connections/identity_silverblue/test_c4b_signed_external_checkpoint_ci.py
-          echo "C4B_PACKAGE1_PASS // 25_FRESH_EXTERNAL_CHECKPOINT_AND_PRIVILEGED_ROLLBACK_REFUSALS"
+          echo "C4B_PACKAGE1_PASS // 26_FRESH_EXTERNAL_CHECKPOINT_AND_PRIVILEGED_ROLLBACK_REFUSALS"
           echo "C4B_PACKAGE1_HOLD // NO_OPERATOR_CUSTODIED_WITNESS_OR_HARDWARE_FLOOR"
       - name: Preserve full merged C4b signed enrollment and cross-role regressions
         shell: bash

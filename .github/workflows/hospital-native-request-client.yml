@@ -35,11 +35,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Read-only checkout of PX protected writer at exact reviewed #130 commit
+      - name: Read-only checkout of PX protected writer at exact coordinated Hospital/Connections integration commit
         uses: actions/checkout@v4
         with:
           repository: kudokudo1/The-Post-Apollo-Dev-Exp
-          ref: aea04d01242c9d13f2dd4f34d699cab7bd11abf3
+          ref: 7b071b7e0566a9f24334835bd285f547ead1d4e7
           path: px-source
           persist-credentials: false
       - name: Install pinned PX Ed25519 verifier import for parser contract

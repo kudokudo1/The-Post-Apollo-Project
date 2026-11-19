@@ -90,7 +90,7 @@ jobs:
             POST_APOLLO_C4B_P1_TRANSPORT_TEST_ONLY=1 \
             "$(command -v python3)" -B \
             tests/connections/identity_silverblue/test_c4b_signed_host_origin_binding_ci.py
-          echo "C4B_C3EN_JOIN_PASS // 32_THIRD_SIGNER_CROSS_EVIDENCE_REFUSAL_CASES"
+          echo "C4B_C3EN_JOIN_PASS // 36_THIRD_SIGNER_CROSS_EVIDENCE_REFUSAL_CASES"
           echo "C4B_C3EN_JOIN_HOLD // NO_REAL_HOST_SIGNER_CUSTODY_OR_ACTUAL_INSTALLED_SEAT_ATTESTATION"
       - name: Preserve original protected C3e-N verifier and existing C4b consumer
         shell: bash

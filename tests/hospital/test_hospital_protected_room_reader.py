@@ -126,6 +126,22 @@ assert json.loads(request)=={
     "operation":"bin",
 }
 
+# Verify the exact bytes against the current PX owner parser, checked out
+# read-only at the explicitly pinned PX #130 commit by the CI workflow.
+PX_SOURCE=ROOT / "px-source/bin/px_hospital_room_writer.py"
+assert PX_SOURCE.is_file(), "EXACT_PX_WRITER_SOURCE_NOT_CHECKED_OUT"
+sys.path.insert(0,str(PX_SOURCE.parent))
+from px_hospital_room_writer import parse_request
+assert parse_request(request) == {
+    "schema":"post-apollo.hospital.protected-room-writer.v1",
+    "operation":"bin",
+}
+req2,_=fixture("review","room-fixture",response=wire(rev))
+assert parse_request(req2) == {
+    "schema":"post-apollo.hospital.protected-room-writer.v1",
+    "operation":"review","roomId":"room-fixture",
+}
+
 for bad in (
     wire({**rev,"roomId":"different"}),
     wire({**rev,"digest":"z"*64}),

@@ -150,7 +150,8 @@ PanelWindow {
         // Accept only an explicit backend outcome, never a guessed success.
         const list = payload && Array.isArray(payload.burnedItems)
             ? payload.burnedItems : [];
-        burnReceiptItems = list.slice(0, 2500).map(function(row) {
+        // Up to 2,500 GIO files plus 64 bounded managed copies.
+        burnReceiptItems = list.slice(0, 2564).map(function(row) {
             return {name:String(row.name || "UNNAMED"),
                     kind:String(row.kind || "UNKNOWN"),
                     source:String(row.source || row.original || "")};
@@ -480,7 +481,8 @@ PanelWindow {
         try { payload = JSON.parse(String(raw || "").trim()); }
         catch (error) {
             researchState = "STALE // INVALID MANAGED RESPONSE";
-            if (action === "burn" || action === "burn-all")
+            if (action === "burn" || action === "burn-all"
+                    || action === "burn-combined")
                 failBurnReceipt(researchState);
             return;
         }
@@ -492,7 +494,8 @@ PanelWindow {
                 || typeof payload.binDigest !== "string") {
             researchState = "STALE // " + String(payload && payload.error
                                                 || "RESEARCH STORE UNAVAILABLE");
-            if (action === "burn" || action === "burn-all")
+            if (action === "burn" || action === "burn-all"
+                    || action === "burn-combined")
                 failBurnReceipt(researchState);
             return;
         }
@@ -502,7 +505,8 @@ PanelWindow {
         researchBinDigest = payload.binDigest;
         researchState = action === "list" ? "READY // SAVED RESEARCH"
                                          : action.toUpperCase() + " // COMPLETE";
-        if (action === "burn" || action === "burn-all") {
+        if (action === "burn" || action === "burn-all"
+                    || action === "burn-combined") {
             const expected = researchBurnScope === "all"
                              ? researchBurnCount : 1;
             showBurnReceipt(payload, researchBurnScope === "all"
@@ -771,12 +775,19 @@ PanelWindow {
     }
 
     function advanceResearchBurn() {
-        const isFile = confirmMode === "item" || confirmMode === "all";
+        const isCombined = confirmMode === "combined";
+        const isFile = confirmMode === "item" || confirmMode === "all"
+                       || isCombined;
         const isCopy = researchBurnId !== "";
         if (burnUiStage !== "" || (!isFile && !isCopy)
                 || !researchBurnPointerRelocated || researchBusy || busy
                 || (isCopy && researchBurnRevision !== researchRevision)
-                || (isFile && confirmMode === "all"
+                || (isCombined && (!indexReady || lastError
+                    || researchBurnRevision !== researchRevision
+                    || researchBurnCount !== researchBinCount
+                    || researchBurnCount !== researchBinRows.length
+                    || researchBurnDigest !== researchBinDigest))
+                || (isFile && (confirmMode === "all" || isCombined)
                     && (confirmRevision !== revision
                         || confirmCount !== total)))
             return false;
@@ -900,7 +911,8 @@ PanelWindow {
         usableHeight - 120))
     readonly property bool burnWarning:
         confirmMode !== "" || pendingAction === "burn"
-        || pendingAction === "burn-all" || researchBurnId !== ""
+        || pendingAction === "burn-all" || pendingAction === "burn-combined"
+        || researchBurnId !== ""
         || researchPending === "burn" || researchPending === "burn-all"
         || burnUiStage !== ""
 
@@ -1124,7 +1136,9 @@ PanelWindow {
             status = "TRASH // " + action.toUpperCase() + " REQUESTED";
         }
         trashProcess.exec(["python3", "-I", "-B",
-                           Quickshell.shellPath("scripts/trash/trash_cli.py")]
+                           (action === "burn-combined"
+                               ? Quickshell.shellPath("scripts/trash/trash_all_cli.py")
+                               : Quickshell.shellPath("scripts/trash/trash_cli.py"))]
                           .concat(args));
         return true;
     }
@@ -1151,7 +1165,8 @@ PanelWindow {
         catch (error) {
             lastError = true;
             status = "TRASH // INVALID BACKEND RESPONSE";
-            if (action === "burn" || action === "burn-all")
+            if (action === "burn" || action === "burn-all"
+                    || action === "burn-combined")
                 failBurnReceipt(status);
             return;
         }
@@ -1160,7 +1175,8 @@ PanelWindow {
             status = "TRASH // " + String(payload && payload.error
                                               || "BACKEND_UNAVAILABLE");
             // A failed operation never implies items were deleted.
-            if (action === "burn" || action === "burn-all")
+            if (action === "burn" || action === "burn-all"
+                    || action === "burn-combined")
                 failBurnReceipt(status);
             return;
         }
@@ -1180,11 +1196,17 @@ PanelWindow {
             if (action === "index" || changed)
                 status = receipt || ("TRASH // " + total + " ITEMS");
         } else {
-            if (action === "burn" || action === "burn-all") {
-                const expected = action === "burn" ? 1 : confirmCount;
+            if (action === "burn" || action === "burn-all"
+                    || action === "burn-combined") {
+                const expected = action === "burn" ? 1
+                                 : action === "burn-combined"
+                                 ? confirmCount + researchBurnCount
+                                 : confirmCount;
                 showBurnReceipt(payload, action === "burn"
-                                ? "SYSTEM TRASH // FILE" : "SYSTEM TRASH // ALL",
-                                expected);
+                                ? "SYSTEM TRASH // FILE"
+                                : action === "burn-combined"
+                                ? "FILES + MANAGED COPIES // ALL"
+                                : "SYSTEM TRASH // ALL", expected);
                 receipt = burnReceiptMessage;
             } else {
                 receipt = "RESTORED // " + String(payload.name || "");
@@ -1192,8 +1214,11 @@ PanelWindow {
             status = receipt;
             // Refresh inventory WITHOUT dismissing the confirmed result.
             Qt.callLater(function() {
-                if (trashLauncher.menuOpen && !trashLauncher.busy)
+                if (trashLauncher.menuOpen && !trashLauncher.busy) {
                     trashLauncher.refresh(false, true);
+                    if (action === "burn-combined")
+                        trashLauncher.refreshResearch();
+                }
             });
         }
     }
@@ -1267,11 +1292,52 @@ PanelWindow {
         return true;
     }
 
+    function armCombinedBurnAll() {
+        if (!menuOpen || activeMode !== "burn" || burnFilter !== "all"
+                || busy || researchBusy || !indexReady || lastError
+                || confirmMode !== "" || researchBurnId !== ""
+                || burnUiStage !== "" || revision.length !== 64
+                || researchBinDigest.length !== 64
+                || researchBinCount !== researchBinRows.length
+                || (total < 1 && researchBinCount < 1))
+            return false;
+        clearConfirmation();
+        clearResearchBurn();
+        confirmMode = "combined";
+        confirmRevision = revision;
+        confirmCount = total;
+        researchBurnScope = "combined";
+        researchBurnTitle = total + " SYSTEM FILES + "
+                            + researchBinCount + " MANAGED COPIES";
+        researchBurnRevision = researchRevision;
+        researchBurnCount = researchBinCount;
+        researchBurnDigest = researchBinDigest;
+        researchBurnPointerRelocated = false;
+        return true;
+    }
+
     function confirmBurn() {
         if (busy || researchBusy || burnUiStage !== "working"
                 || !researchBurnPointerRelocated
                 || !researchBurnClickArmed || !researchBurnLoadComplete)
             return false;
+        if (confirmMode === "combined" && activeMode === "burn"
+                && indexReady && !lastError
+                && confirmRevision === revision && confirmCount === total
+                && researchBurnRevision === researchRevision
+                && researchBurnCount === researchBinCount
+                && researchBurnCount === researchBinRows.length
+                && researchBurnDigest === researchBinDigest
+                && (confirmCount > 0 || researchBurnCount > 0)) {
+            // One coordinated operation, two independently guarded backends.
+            // The result explicitly reports partial/uncertain outcomes.
+            return run("burn-combined", [
+                "burn-all", Quickshell.dataDir,
+                confirmRevision, String(confirmCount),
+                String(researchBurnRevision), String(researchBurnCount),
+                researchBurnDigest, "BURN_ALL_FILES_AND_COPIES_CONFIRMED"
+            ]);
+        }
         if (confirmMode === "item" && confirmUri) {
             return run("burn", ["burn", confirmUri, confirmOriginal,
                                 "BURN_CONFIRMED"]);
@@ -1502,7 +1568,8 @@ PanelWindow {
                     trashLauncher.researchBusy = false;
                     trashLauncher.researchPending = "";
                     trashLauncher.researchState = "STALE // RESEARCH PROCESS FAILED";
-                    if (action === "burn" || action === "burn-all")
+                    if (action === "burn" || action === "burn-all"
+                    || action === "burn-combined")
                         trashLauncher.failBurnReceipt(trashLauncher.researchState);
                 }
             });
@@ -1525,7 +1592,8 @@ PanelWindow {
                     trashLauncher.busy = false;
                     trashLauncher.lastError = true;
                     trashLauncher.status = "TRASH // BACKEND PROCESS UNAVAILABLE";
-                    if (action === "burn" || action === "burn-all")
+                    if (action === "burn" || action === "burn-all"
+                    || action === "burn-combined")
                         trashLauncher.failBurnReceipt(trashLauncher.status);
                 }
             });
@@ -3016,7 +3084,16 @@ PanelWindow {
                                 available: !trashLauncher.busy
                                            && !trashLauncher.researchBusy
                                            && !trashLauncher.burnConfirmationOpen
-                                           && (trashLauncher.burnFilter === "files"
+                                           && (trashLauncher.burnFilter === "all"
+                                               ? trashLauncher.indexReady
+                                                 && !trashLauncher.lastError
+                                                 && trashLauncher.revision.length === 64
+                                                 && trashLauncher.researchBinDigest.length === 64
+                                                 && trashLauncher.researchBinCount
+                                                    === trashLauncher.researchBinRows.length
+                                                 && (trashLauncher.total > 0
+                                                     || trashLauncher.researchBinCount > 0)
+                                               : trashLauncher.burnFilter === "files"
                                                ? trashLauncher.total > 0
                                                  && trashLauncher.revision.length === 64
                                                : trashLauncher.burnFilter === "records"
@@ -3024,7 +3101,9 @@ PanelWindow {
                                                  && trashLauncher.researchBinCount
                                                     === trashLauncher.researchBinRows.length)
                                 onLeftClicked: {
-                                    if (trashLauncher.burnFilter === "files")
+                                    if (trashLauncher.burnFilter === "all")
+                                        trashLauncher.armCombinedBurnAll();
+                                    else if (trashLauncher.burnFilter === "files")
                                         trashLauncher.armBurnAll();
                                     else if (trashLauncher.burnFilter === "records")
                                         trashLauncher.armResearchBurnAll();
@@ -3038,7 +3117,9 @@ PanelWindow {
                             font.pixelSize: 9
                             color: Colors.yellow
                             wrapMode: Text.WordWrap
-                            text: trashLauncher.burnFilter === "files"
+                            text: trashLauncher.burnFilter === "all"
+                                  ? "BURN ALL // SYSTEM FILES + TRASHED COPIES"
+                                  : trashLauncher.burnFilter === "files"
                                   ? "BURN ALL // SYSTEM TRASH ONLY"
                                   : trashLauncher.burnFilter === "records"
                                   ? "BURN ALL // MANAGED COPIES ONLY"
@@ -3092,7 +3173,8 @@ PanelWindow {
                     width: parent.width
                     font.pixelSize: 17
                     text: (trashLauncher.researchBurnScope === "all"
-                           || trashLauncher.confirmMode === "all")
+                           || trashLauncher.confirmMode === "all"
+                           || trashLauncher.confirmMode === "combined")
                           ? "BURN ALL // FINAL REVIEW"
                           : "BURN ITEM // FINAL REVIEW"
                     color: Colors.red
@@ -3110,7 +3192,11 @@ PanelWindow {
                     width: parent.width
                     font.pixelSize: 11
                     color: Colors.yellow
-                    text: trashLauncher.confirmMode === "all"
+                    text: trashLauncher.confirmMode === "combined"
+                          ? "SCOPE // " + trashLauncher.confirmCount
+                            + " SYSTEM FILES + " + trashLauncher.researchBurnCount
+                            + " TRASHED COPIES"
+                          : trashLauncher.confirmMode === "all"
                           ? "SCOPE // SYSTEM TRASH // " + trashLauncher.confirmCount + " FILES"
                           : trashLauncher.confirmMode === "item"
                           ? "SCOPE // ONE SYSTEM TRASH FILE"
@@ -3125,7 +3211,9 @@ PanelWindow {
                     font.pixelSize: 13
                     color: Colors.white
                     elide: Text.ElideRight
-                    text: trashLauncher.confirmMode === "all"
+                    text: trashLauncher.confirmMode === "combined"
+                          ? trashLauncher.researchBurnTitle
+                          : trashLauncher.confirmMode === "all"
                           ? trashLauncher.confirmCount + " SYSTEM TRASH FILES"
                           : trashLauncher.confirmMode === "item"
                           ? trashLauncher.confirmName
@@ -3137,7 +3225,9 @@ PanelWindow {
                     font.pixelSize: 11
                     color: Colors.cyan
                     wrapMode: Text.WordWrap
-                    text: trashLauncher.confirmMode === "all"
+                    text: trashLauncher.confirmMode === "combined"
+                          ? "This permanently deletes BOTH reviewed Linux Trash files and trashed managed copies. Two separate backends; a failure can leave a PARTIAL deletion, not an atomic rollback. Active copies, V2 snapshots and all source-owned originals remain untouched."
+                          : trashLauncher.confirmMode === "all"
                           ? "This empties Linux Trash across mounts, but never managed copies or source-owned Weather, Hospital or Finance records. GIO rechecks the full index revision."
                           : trashLauncher.confirmMode === "item"
                           ? "This permanently removes ONE verified Linux Trash file. Managed copies and source records remain untouched."

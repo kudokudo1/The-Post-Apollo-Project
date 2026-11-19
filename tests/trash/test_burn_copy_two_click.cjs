@@ -19,7 +19,8 @@ function method(name) {
 const methods=[
     "armResearchBurn","advanceResearchBurn","confirmResearchBurn",
     "clearResearchBurn","clearConfirmation","showBurnReceipt",
-    "failBurnReceipt","dismissBurnReceipt","armBurn","armBurnAll","confirmBurn"
+    "failBurnReceipt","dismissBurnReceipt","armBurn","armBurnAll",
+    "armCombinedBurnAll","confirmBurn"
 ].map(method).join("\n");
 
 const copy={id:"0123456789abcdef0123456789abcdef",kind:"SAVED EVENT",
@@ -219,7 +220,7 @@ test("single Burn menu filters both sources and requires scope for bulk",()=>{
     assert.match(qml,/onLeftClicked: trashLauncher\.setMode\("burn"\)/);
     assert.match(qml,/trashLauncher\.burnFilter === "files"/);
     assert.match(qml,/trashLauncher\.burnFilter === "records"/);
-    assert.match(qml,/onLeftClicked: \{\s+if \(trashLauncher\.burnFilter === "files"\)/);
+    assert.match(qml,/onLeftClicked: \{\s+if \(trashLauncher\.burnFilter === "all"\)\s+trashLauncher\.armCombinedBurnAll\(\);\s+else if \(trashLauncher\.burnFilter === "files"\)/);
 });
 
 
@@ -301,4 +302,88 @@ test("P1 regression: paused/offscreen and unarmed animations cannot grant a Burn
         assert.equal(ctx.researchBurnLoadComplete,false,JSON.stringify(overrides));
         assert.equal(ctx.calls.length,0);
     }
+});
+
+
+test("ALL Burn arms both reviewed stores and delays both mutations until second click",()=>{
+    const ctx=harness({
+        burnFilter:"all", indexReady:true, lastError:false,
+        total:2, revision:"b".repeat(64),
+        researchBinCount:1,researchBinRows:[copy],
+        researchBinDigest:"d".repeat(64)
+    });
+    ctx.Quickshell={dataDir:"/tmp/disposable-test-data"};
+    assert.equal(vm.runInContext("armCombinedBurnAll()",ctx),true);
+    assert.equal(ctx.confirmMode,"combined");
+    assert.equal(ctx.confirmCount,2);
+    assert.equal(ctx.researchBurnCount,1);
+    assert.equal(ctx.researchBurnScope,"combined");
+    assert.equal(ctx.calls.length,0);
+    assert.equal(vm.runInContext("advanceResearchBurn()",ctx),false);
+    ctx.researchBurnPointerRelocated=true;
+    assert.equal(vm.runInContext("advanceResearchBurn()",ctx),true);
+    finishRealQmlArmAnimation(ctx);
+    assert.equal(ctx.researchBurnLoadComplete,true);
+    assert.equal(ctx.calls.length,0);
+    assert.equal(vm.runInContext("advanceResearchBurn()",ctx),true);
+    assert.equal(ctx.burnUiStage,"clicked");
+    assert.equal(ctx.calls.length,0,"even second click must wait 420ms");
+    ctx.burnUiStage="working"; // simulated genuine timer callback
+    assert.equal(vm.runInContext("confirmBurn()",ctx),true);
+    assert.deepEqual(Array.from(ctx.calls[0].args),[
+        "burn-all","/tmp/disposable-test-data","b".repeat(64),"2",
+        "8","1","d".repeat(64),
+        "BURN_ALL_FILES_AND_COPIES_CONFIRMED"
+    ]);
+    assert.equal(ctx.calls[0].action,"burn-combined");
+});
+
+test("ALL Burn refuses missing inventory or wrong revision and never schedules deletion",()=>{
+    for(const changes of [
+        {indexReady:false}, {lastError:true},
+        {researchBinDigest:""},
+        {total:0,researchBinCount:0,researchBinRows:[]},
+        {researchBinCount:2,researchBinRows:[copy]}
+    ]){
+        const ctx=harness({
+            burnFilter:"all",indexReady:true,lastError:false,total:1,
+            researchBinCount:1,researchBinRows:[copy],
+            researchBinDigest:"d".repeat(64),...changes
+        });
+        assert.equal(vm.runInContext("armCombinedBurnAll()",ctx),false,
+                     JSON.stringify(changes));
+        assert.equal(ctx.calls.length,0);
+    }
+    for(const changes of [
+        {revision:"a".repeat(64)},
+        {total:4},
+        {researchRevision:9},
+        {researchBinDigest:"e".repeat(64)},
+        {researchBinCount:2}
+    ]){
+        const ctx=harness({burnFilter:"all",indexReady:true,lastError:false,
+                           researchBinDigest:"d".repeat(64)});
+        ctx.Quickshell={dataDir:"/tmp/disposable-test-data"};
+        assert.equal(vm.runInContext("armCombinedBurnAll()",ctx),true);
+        ctx.researchBurnPointerRelocated=true;
+        assert.equal(vm.runInContext("advanceResearchBurn()",ctx),true);
+        Object.assign(ctx,changes);
+        assert.equal(vm.runInContext("advanceResearchBurn()",ctx),false,
+                     JSON.stringify(changes));
+        ctx.burnUiStage="working";
+        assert.equal(vm.runInContext("confirmBurn()",ctx),false,
+                     JSON.stringify(changes));
+        assert.equal(ctx.calls.length,0);
+    }
+});
+
+test("ALL Burn button uses both scopes and advertises non-atomic partial outcome",()=>{
+    assert.match(qml,/burnFilter === "all"\s*\?\s*trashLauncher\.indexReady/);
+    assert.match(qml,/trashLauncher\.armCombinedBurnAll\(\)/);
+    assert.match(qml,/BURN ALL \/\/ SYSTEM FILES \+ TRASHED COPIES/);
+    assert.match(qml,/Two separate backends; a failure can leave a PARTIAL deletion/);
+    assert.match(qml,/action === "burn-combined"\s*\?\s*Quickshell\.shellPath\("scripts\/trash\/trash_all_cli.py"\)/);
+    assert.match(qml,/confirmMode === "combined"/);
+    assert.match(qml,/BURN_ALL_FILES_AND_COPIES_CONFIRMED/);
+    assert.doesNotMatch(qml,/burnFilter === "all"\s*\?\s*trashLauncher\.armBurnAll\(\)/);
 });

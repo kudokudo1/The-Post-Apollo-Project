@@ -132,7 +132,7 @@ Actual kernel Unix-UID boundary exercised in GitHub Actions:
 
 **Trust boundary:** This is stronger than inspecting a Unix UID permission flag, because it shows how a separately signed checkpoint can detect a privileged filesystem rollback *when the external witness preserves and signs the genuinely current history*. It is **NOT** protection against a compromised shared-root signer, external witness rollback, compromised operator key, copied signing seed, reuse of a signed challenge, or forgery when the attacker controls all test pins. A production service needs an independently isolated custodian, protected one-use challenge ledger, audited key enrollment/recovery, rollback-resistant hardware or external anchor and signed host/seat/runtime attestations. C3e and Identity retain ownership of those decisions.
 
-**Verification criterion:** Expanded 25-case checkpoint/recovery suite under real disposable Linux root CI in the **same** Package 1 GitHub Actions workflow; prior 28+20+30 source/UID tests plus inherited C4b/C3e tests must also stay green. Exact-head independent Nurse 2 review remains required. No merge, local installation, trusted roots or sign-in activation are authorized by CI.
+**Verification criterion:** Expanded 26-case checkpoint/recovery suite under real disposable Linux root CI in the **same** Package 1 GitHub Actions workflow; prior 28+20+30 source/UID tests plus inherited C4b/C3e tests must also stay green. Exact-head independent Nurse 2 review remains required. No merge, local installation, trusted roots or sign-in activation are authorized by CI.
 
 
 ## PACKAGE 1 HARDENING // Default Witness Requirement & Single-Spend Challenges
@@ -143,4 +143,4 @@ In the witnessed root-only diagnostic path, the SQLite schema now includes consu
 
 **Caution:** The consumed-nonce table is held by the local controller root and therefore can be rolled back with the same SQLite file. It does **not** replace an independently operated, durable witness challenge-issuance/spend ledger. This is a caller-facing safety contract and disposable Linux test evidence, not actual operator root custody, C5 consent, authentication of a real seat or a deployed native trust service.
 
-**Latest new regression count after this increment:** 28 controller root + 20 C3e role + 30 Linux root-owned ledger + 25 signed witness/recovery = **103 new Package 1 tests**, in addition to pre-existing C4b/C3e regressions. Final exact-head GitHub CI and Nurse 2 review must be confirmed before acceptance.
+**Latest new regression count after this increment:** 28 controller root + 20 C3e role + 30 Linux root-owned ledger + 26 signed witness/recovery = **104 new Package 1 tests**, in addition to pre-existing C4b/C3e regressions. Final exact-head GitHub CI and Nurse 2 review must be confirmed before acceptance.

@@ -40,6 +40,7 @@ class C4bC3eNSignedOriginJoinTests(unittest.TestCase):
             "test_01_coherent_two_process_fixture_is_not_authentication")
         self.c3e.setUp()
         self.addCleanup(self.c3e.doCleanups)
+        self.assertTrue(J.C3EN_PATH.is_file(), "Original protected C3e-N checker is required")
         self.state = self.c4b.fixture._state()
         self.c3e.status["observed_policy_epoch"] = self.state["minimumReleaseEpoch"]
         self.c3e.status["observed_release_sequence"] = self.state[

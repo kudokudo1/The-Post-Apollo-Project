@@ -140,6 +140,14 @@ def _source_context(original_prepare_raw, prepared_raw, commit_raw):
     body = signed["body"]
     if type(body) is not dict:
         _hold("INVALID_SIGNED_BODY")
+    # A matching receipt hash alone could describe a syntactically valid
+    # grant that names the wrong Room revision or protected graph.
+    # This is only a claimed-data comparison, never signature trust.
+    if (type(body.get("roomRevision")) is not int
+            or body["roomRevision"] != prepared["expectedRevision"]
+            or type(body.get("graphDigest")) is not str
+            or body["graphDigest"] != prepared["expectedDigest"]):
+        _hold("GRANT_PREPARED_REVISION_OR_GRAPH_CHANGED")
     grant_digest = _digest(GRANT_DOMAIN + Transport.canonical(body))
     session_id = (original["intent"]["sessionId"]
                   if original["action"] == "SESSION_ATTACH"

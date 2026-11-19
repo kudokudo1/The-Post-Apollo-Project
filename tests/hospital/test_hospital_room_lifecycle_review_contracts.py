@@ -39,11 +39,12 @@ for guard in (
     'if (!active || !nativeClientInstalled || operating',
     'executeProcess.exec([nativeClientPath, action, room]);',
     'payload.status !== "COMMITTED"',
+    'nativeReadPath, "review", id',
     'payload.originalPreserved !== true',
     'payload.burnAllowed !== false',
 ):
     requires(guard, action, "transport never invents trusted authority: " + guard)
-for guard in ('"room-lifecycle-bin"', 'item.burnAllowed === false',
+for guard in ('"hospital-room-read"', 'item.burnAllowed === false',
               'root.loaded = false', 'root.lastError',
               'HOSPITAL BACKEND NOT READY'):
     requires(guard, bin_service, "bin metadata authority and stale errors")

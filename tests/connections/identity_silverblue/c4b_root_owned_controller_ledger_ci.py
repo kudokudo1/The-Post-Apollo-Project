@@ -432,11 +432,31 @@ def verify_and_commit_rotation_ci_only(
     proposed_signature: bytes, next_controller_dir: Path,
     serial: bytes, controller_challenge: str,
 ):
-    """Legacy diagnostic fixture with no signed outside witness.
+    """Default legacy entrypoint is hard-blocked, never a witness bypass.
 
-    Production must never call this entrypoint; all returned authorization
-    fields remain FALSE, including if the root-owned local DB was replayed.
+    Historical source callers must migrate to the explicitly guarded
+    disposable fixture helper or the witnessed transaction. No unverified
+    controller can select an easier path by omitting the checkpoint.
     """
+    _deny("C4B_P1_EXTERNAL_SIGNED_CHECKPOINT_REQUIRED")
+
+
+def verify_and_commit_unwitnessed_disposable_fixture_ci_only(
+    root, *, next_policy: bytes, next_root_public: bytes,
+    transition: bytes, previous_signature: bytes,
+    proposed_signature: bytes, next_controller_dir: Path,
+    serial: bytes, controller_challenge: str,
+    explicit_fixture_scope: str,
+):
+    """Unsafe *test-only* transition for negative pre-witness regressions.
+
+    The extra deliberate scope, GitHub-only environment and root UID guard
+    prevent accidental use via the normal rotation API. This is NOT native
+    enrollment, sign-in or production authority.
+    """
+    if explicit_fixture_scope != "c4b-p1-negative-prewitness-regression-ci-only":
+        _deny("C4B_P1_UNWITNESSED_DISPOSABLE_SCOPE_REQUIRED")
+    _root_dir(root)
     return _verify_and_commit_rotation_core_ci_only(
         root, next_policy=next_policy, next_root_public=next_root_public,
         transition=transition, previous_signature=previous_signature,

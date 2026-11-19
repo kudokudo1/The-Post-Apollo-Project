@@ -1,0 +1,78 @@
+name: Connections / Hospital staffing request-receipt identity (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "services/connections/hospital/staffing/StaffingReceiptIdentityPreflight.py"
+      - "tests/connections/test_connections_hospital_staffing_receipt_identity_preflight.py"
+      - ".github/workflows/connections-hospital-staffing-receipt-identity-preflight.yml"
+      - "docs/connections-hospital-staffing-receipt-identity-preflight.md"
+      - "services/connections/hospital/staffing/StaffingTransportPreflight.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unapproved-receipt-binding:
+    name: Exact source-only receipt binding and Linux peer refusal
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact Connections review candidate
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout pinned Hospital staffing source (NOT installed)
+        uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: ee1dc74056fbd2c849d3391e3148b003514b2932
+          path: hospital-source
+          persist-credentials: false
+      - name: Bytecode syntax and no native authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/hospital/staffing/StaffingReceiptIdentityPreflight.py \
+            tests/connections/test_connections_hospital_staffing_receipt_identity_preflight.py
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path("services/connections/hospital/staffing/StaffingReceiptIdentityPreflight.py").read_text()
+          assert 'run_native_staffing_receipt_verifier' in src
+          assert 'NATIVE_WRITER_RECEIPT_AUTHORITY_NOT_INSTALLED' in src
+          for bad in ('sqlite3.connect(', 'Ed25519PrivateKey', 'subprocess.run(', 'socket.bind(', 'os.open('):
+              assert bad not in src, bad
+          for key in (
+              'hospitalNativeReceiptSchemaApproved',
+              'independentlyAuthenticatedHospitalWriter',
+              'installedWriterReleaseVerified',
+              'writerReceiptCryptographicallyVerified',
+              'writerTransactionCommittedVerified',
+              'hospitalPersistentReplayProtectionVerified',
+              'nativeOperatorAuthorized',
+              'c5HumanConsentVerified',
+              'canApprove',
+              'canAttachSession',
+              'canSucceedDoctor',
+              'productionAuthority',
+              'credentialActionsEnabled',
+          ):
+              assert '"'+key+'": False' in src, key
+          print("STAFFING_RECEIPT_HOLD // AUTHORITY_OFF")
+          PY
+      - name: Pin actual Hospital parser / coordinator and execute 32 hostile cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = "true"
+          test "$CI" = "true"
+          python3 -B tests/connections/test_connections_hospital_staffing_receipt_identity_preflight.py
+          echo "STAFFING_RECEIPT_PASS // 32_DENY_ONLY_CASES"
+      - name: Inherited isolated staffing transport CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_hospital_staffing_transport_preflight.py
+          echo "STAFFING_RECEIPT_HOLD // NO_NATIVE_AUTHORITATIVE_WRITER"

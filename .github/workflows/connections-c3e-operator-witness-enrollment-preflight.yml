@@ -45,7 +45,7 @@ jobs:
           assert "AF.verify_signed_enrollment_ci_only(" in source
           assert "Ed25519PrivateKey" not in source
           for forbidden in ("sqlite3.connect(", "socket.socket(", "subprocess.run(",
-                            "credentialActionsEnabled\\\": True", "productionAuthority\\\": True"):
+                            '"credentialActionsEnabled": True', '"productionAuthority": True'):
               assert forbidden not in source, forbidden
           for field in ("operatorEnrollmentRootCustodyVerified",
                         "independentWitnessSigningKeyCustodyVerified",

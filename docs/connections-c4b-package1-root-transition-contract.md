@@ -113,6 +113,6 @@ Actual kernel Unix-UID boundary exercised in GitHub Actions:
 
 **Security limitations:** This proves a Linux permission separation test against an unprivileged desktop UID, not physical machine identity, SELinux/TPM root-of-trust, independent C3e protected trust custody, hardware antirollback or authentic human consent. A compromised root supervisor or snapshot of the whole root-owned SQLite file defeats the source's external rollback claim. CI-owned disposable Ed25519 fixtures can never authorize production sign-in. Key custody and native controller installation remain held for the operator and protected owner coordination.
 
-**Verification gate:** 27 new disposable Linux root-owned-ledger tests in the existing Package 1 CI, in addition to 28 signed root-rollover and 20 rotated C3e-AF alignment tests. Exact-head workflow results and independent security review still required.
+**Verification gate:** 28 new disposable Linux root-owned-ledger tests in the existing Package 1 CI, in addition to 28 signed root-rollover and 20 rotated C3e-AF alignment tests. Exact-head workflow results and independent security review still required.
 
 **Recovery:** #2068 remains the single C4b Package 1 draft. To reproduce CI, inspect the dedicated connections-c4b-package1-signed-root-transition workflow. No commands are provided for running this fixture as a production service.

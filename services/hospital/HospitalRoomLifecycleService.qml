@@ -65,15 +65,11 @@ Scope {
         }
     }
 
-    function commandArgs(args) {
-        return [
-            "bash", "-lc",
-            'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"; '
-                + '[ -x "$px" ] || px="$HOME/.local/bin/px"; '
-                + 'exec "$px" "$@"',
-            "hospital-room-lifecycle", "hospital"
-        ].concat(args);
-    }
+    // Fixed read-only native executable. It opens only PX's approved
+    // protected writer socket with owner/peer UID and config checks.
+    // No fallback to desktop-owned hospital.db or old px hospital CLI.
+    readonly property string nativeReadPath:
+        "/usr/libexec/post-apollo/hospital/hospital-room-read"
 
     function refresh() {
         const id = String(roomId || "").trim();
@@ -86,9 +82,14 @@ Scope {
         loading = true;
         if (!nativeClientInstalled && !nativeProbe.running)
             probeNativeClient();
-        queryProcess.exec(commandArgs([
-            "room-lifecycle-review", id, "--json"
-        ]));
+        try {
+            queryProcess.exec([nativeReadPath, "review", id]);
+        } catch (error) {
+            loading = false;
+            reviewReady = false;
+            lastError = "HOSPITAL BACKEND NOT READY // PROTECTED ROOM READER UNAVAILABLE";
+            return false;
+        }
         return true;
     }
 
@@ -169,7 +170,7 @@ Scope {
             root.loading = false;
             try {
                 if (Number(code) !== 0)
-                    throw new Error("HOSPITAL BACKEND NOT READY // PX ROOM REVIEW UNAVAILABLE");
+                    throw new Error("HOSPITAL BACKEND NOT READY // PROTECTED ROOM REVIEW UNAVAILABLE");
                 const payload = JSON.parse(output || "{}");
                 if (String(payload.roomId || "") !== String(root.roomId || "")
                         || !/^[0-9a-f]{64}$/.test(String(payload.digest || ""))
@@ -184,9 +185,9 @@ Scope {
                 root.review = ({});
                 root.reviewReady = false;
                 root.lastError = "HOSPITAL BACKEND NOT READY // "
-                    + (String(e).includes("PX ROOM REVIEW")
-                       ? "PX ROOM REVIEW UNAVAILABLE"
-                       : "ROOM REVIEW FORMAT REFUSED");
+                    + (String(e).includes("PROTECTED ROOM REVIEW")
+                       ? "PROTECTED ROOM REVIEW UNAVAILABLE"
+                       : "PROTECTED REVIEW FORMAT REFUSED");
             }
         }
     }

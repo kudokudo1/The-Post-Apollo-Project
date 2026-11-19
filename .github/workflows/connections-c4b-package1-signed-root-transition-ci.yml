@@ -5,6 +5,8 @@ on:
     paths:
       - 'tests/connections/identity_silverblue/c4b_signed_trust_transition_ci.py'
       - 'tests/connections/identity_silverblue/test_c4b_signed_trust_transition_ci.py'
+      - 'tests/connections/identity_silverblue/c4b_rotated_c3eaf_role_gate_ci.py'
+      - 'tests/connections/identity_silverblue/test_c4b_rotated_c3eaf_role_gate_ci.py'
       - 'tests/connections/identity_silverblue/controller_owned_policy_intake_ci.py'
       - 'tests/connections/identity_silverblue/controller_pinned_enrollment_gate_ci.py'
       - 'tests/connections/identity_silverblue/c4b_c3eaf_enrollment_alignment_ci.py'
@@ -38,7 +40,9 @@ jobs:
           set -euo pipefail
           python3 -B -m py_compile \
             tests/connections/identity_silverblue/c4b_signed_trust_transition_ci.py \
-            tests/connections/identity_silverblue/test_c4b_signed_trust_transition_ci.py
+            tests/connections/identity_silverblue/test_c4b_signed_trust_transition_ci.py \
+            tests/connections/identity_silverblue/c4b_rotated_c3eaf_role_gate_ci.py \
+            tests/connections/identity_silverblue/test_c4b_rotated_c3eaf_role_gate_ci.py
           python3 - <<'PY'
           from pathlib import Path
           src=Path("tests/connections/identity_silverblue/c4b_signed_trust_transition_ci.py").read_text()
@@ -67,7 +71,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 -B tests/connections/identity_silverblue/test_c4b_signed_trust_transition_ci.py
-          echo "C4B_PACKAGE1_PASS // 27_SIGNED_ROTATION_AND_REVOCATION_CASES"
+          python3 -B tests/connections/identity_silverblue/test_c4b_rotated_c3eaf_role_gate_ci.py
+          echo "C4B_PACKAGE1_PASS // 47_SIGNED_ROTATION_C3E_ROLE_AND_REVOCATION_CASES"
       - name: Preserve full merged C4b signed enrollment and cross-role regressions
         shell: bash
         run: |

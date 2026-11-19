@@ -83,13 +83,22 @@ def execute_fixture(*, checkpoint_id, window_key, live_con_id,
     # This is a separately injected fixture guard, NOT production C5 consent.
     if active_seat_guard() is not True or clock_ms() >= grant["expires_ms"]:
         refuse()
-    spend_ledger.spend(grant, now_ms=_ms(clock_ms()))
+    spend_at = _ms(clock_ms())
+    if spend_at < now or spend_at >= grant["expires_ms"]:
+        refuse()
+    spend_ledger.spend(grant, now_ms=spend_at)
     # Consuming is irreversible even if the subsequent operation refuses.
     # This prevents a crash/restart from replaying a previously spent permit.
+    last_time = spend_at
     def still_valid():
+        nonlocal last_time
         try:
-            return (active_seat_guard() is True
-                    and _ms(clock_ms()) < grant["expires_ms"])
+            current = _ms(clock_ms())
+            if (current < last_time or current >= grant["expires_ms"]
+                    or active_seat_guard() is not True):
+                return False
+            last_time = current
+            return True
         except Exception:
             return False
     try:

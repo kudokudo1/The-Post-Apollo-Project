@@ -262,7 +262,7 @@ class SignedControllerTransitionTests(unittest.TestCase):
         denial = F._canonical({
             "schema": F.LEGACY_RECEIPT_SCHEMA,
             "state": "UNAVAILABLE", "requestId": None,
-        }) + b"\\n"
+        }) + b"\n"
         frame = F.ReceiptIssuer(self.previous_root).seal(
             "BEGIN", None, self.fixture.nonce, denial)
         serial = self.fixture.proof(retired_public, frame)

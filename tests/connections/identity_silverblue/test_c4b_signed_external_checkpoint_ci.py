@@ -250,7 +250,7 @@ class ExternalControllerCheckpointTests(unittest.TestCase):
         with self.assertRaises(L.Refused):
             L.verify_and_commit_rotation_with_checkpoint_ci_only(
                 self.base.root, signed_external_checkpoint=self.external(),
-                **self.base.args(proposed_signature=b"\\0" * 64))
+                **self.base.args(proposed_signature=b"\0" * 64))
         db = L._connect(self.base.root)
         try:
             total = db.execute(

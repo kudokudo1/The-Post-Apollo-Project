@@ -212,7 +212,7 @@ def inspect_signed_host_binding_ci_only(
         Encoding.Raw, PublicFormat.Raw)
     if not hmac.compare_digest(_sha(pub), independently_pinned_host_signer_sha256):
         _deny("C4B_C3EN_HOST_BINDING_SIGNER_PIN_REFUSED")
-    if (type(controller_ledger_root) is not Path
+    if (not isinstance(controller_ledger_root, Path)
             or type(join_inputs["controller_state"]) is not dict
             or set(join_inputs["controller_state"]) != W.STATE_FIELDS):
         _deny("C4B_C3EN_HOST_BINDING_EXACT_CONTROLLER_STATE_REQUIRED")

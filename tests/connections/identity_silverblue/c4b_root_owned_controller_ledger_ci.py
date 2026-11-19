@@ -364,6 +364,13 @@ def _verify_and_commit_rotation_core_ci_only(
                     "externalPinnedSignedCheckpointMatchesRootOwnedLedgerInCi") is not True
                     or any(witness.get(key) is not False for key in W.NEGATIVE)):
                 _deny("C4B_P1_WITNESS_ATTEMPTED_AUTHORITY_PROMOTION")
+            # The existing external checkpoint gate already refuses the
+            # CURRENT controller signing root as its own witness. Also refuse
+            # the PROPOSED successor key: one actor must not mint the next
+            # controller root and present it as an independent witness.
+            if hmac.compare_digest(
+                    witness["witnessPublicSha256"], _hash(next_root_public)):
+                _deny("C4B_P1_NEW_CONTROLLER_ROOT_CANNOT_BE_WITNESS")
         if values["pending_id"] is None:
             _deny("C4B_P1_NO_STAGED_PRIVILEGED_INTENT")
         if (signed["transitionId"] != values["pending_id"]

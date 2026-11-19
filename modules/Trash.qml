@@ -1135,9 +1135,9 @@ PanelWindow {
             status = "TRASH // " + action.toUpperCase() + " REQUESTED";
         }
         trashProcess.exec(["python3", "-I", "-B",
-                           Quickshell.shellPath(action === "burn-combined"
-                               ? "scripts/trash/trash_all_cli.py"
-                               : "scripts/trash/trash_cli.py")]
+                           (action === "burn-combined"
+                               ? Quickshell.shellPath("scripts/trash/trash_all_cli.py")
+                               : Quickshell.shellPath("scripts/trash/trash_cli.py"))]
                           .concat(args));
         return true;
     }

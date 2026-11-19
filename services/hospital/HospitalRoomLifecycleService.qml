@@ -12,6 +12,7 @@ Scope {
     property bool active: false
     property bool loading: false
     property bool operating: false
+    property bool nativeClientInstalled: false
     property string lastError: ""
     property string outcome: ""
     property var review: ({})
@@ -21,9 +22,13 @@ Scope {
     property int pendingRevision: -1
     property string pendingDigest: ""
 
+    // Historical shared UI binding name. This is ONLY native transport
+    // readiness, NEVER human approval or verified ownership. The C5-H2
+    // issuer obtains independent protected Room state and interactive
+    // approval, and PX alone commits a one-use signed grant.
+    // Do not rely on the legacy user-UID PX preview to request consent.
     readonly property bool permissionReady:
-        reviewReady && review.operatorAuthenticated === true
-        && review.requiresOwnerReview === false
+        active && nativeClientInstalled
 
     signal committed(var receipt)
     signal refused(string reason)
@@ -35,19 +40,36 @@ Scope {
         lastError = "";
     }
     onActiveChanged: {
-        if (!active)
+        if (!active) {
             reviewReady = false;
+            nativeClientInstalled = false;
+        } else {
+            Qt.callLater(function() { root.probeNativeClient(); });
+        }
     }
 
-    function commandArgs(args) {
-        return [
-            "bash", "-lc",
-            'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"; '
-                + '[ -x "$px" ] || px="$HOME/.local/bin/px"; '
-                + 'exec "$px" "$@"',
-            "hospital-room-lifecycle", "hospital"
-        ].concat(args);
+    readonly property string nativeClientPath:
+        "/usr/libexec/post-apollo/hospital/hospital-room-request"
+
+    function probeNativeClient() {
+        if (!active || nativeProbe.running || operating)
+            return false;
+        nativeClientInstalled = false;
+        try {
+            nativeProbe.exec([nativeClientPath, "--check"]);
+            return true;
+        } catch (error) {
+            nativeClientInstalled = false;
+            lastError = "HOSPITAL BACKEND NOT READY // NATIVE CLIENT NOT INSTALLED";
+            return false;
+        }
     }
+
+    // Fixed read-only native executable. It opens only PX's approved
+    // protected writer socket with owner/peer UID and config checks.
+    // No fallback to desktop-owned hospital.db or old px hospital CLI.
+    readonly property string nativeReadPath:
+        "/usr/libexec/post-apollo/hospital/hospital-room-read"
 
     function refresh() {
         const id = String(roomId || "").trim();
@@ -58,54 +80,76 @@ Scope {
         review = ({});
         lastError = "";
         loading = true;
-        queryProcess.exec(commandArgs([
-            "room-lifecycle-review", id, "--json"
-        ]));
+        if (!nativeClientInstalled && !nativeProbe.running)
+            probeNativeClient();
+        try {
+            queryProcess.exec([nativeReadPath, "review", id]);
+        } catch (error) {
+            loading = false;
+            reviewReady = false;
+            lastError = "HOSPITAL BACKEND NOT READY // PROTECTED ROOM READER UNAVAILABLE";
+            return false;
+        }
         return true;
     }
 
-    // Called only after a deliberate operator UI confirmation. The backend
-    // rechecks exact Room ID, digest and revision under BEGIN IMMEDIATE.
-    // No unsigned UI state can substitute for independent authority.
+    // Called only after two exact-Room UI gestures. The request contains
+    // action + Room ID, never a desktop graph digest, grant or permission.
+    // The installed issuer independently performs a protected source
+    // PREPARE, rechecks operator + seat + Polkit + retention, then commits.
+    // A missing/stale legacy PX review must not spoof or veto that authority.
     function execute(action, witness) {
-        const evidence = witness || {};
-        const current = review || {};
         const room = String(roomId || "").trim();
-        const digest = String(evidence.digest || "");
-        const revision = evidence.revision;
-        const expectedState = action === "TRASH" ? "ACTIVE" : "TRASHED";
-        const permitted = action === "TRASH"
-            ? current.canTrash === true : current.canRestore === true;
-        if (!active || !permissionReady || !reviewReady || loading
-                || operating || executeProcess.running
+        if (!active || !nativeClientInstalled || operating
+                || executeProcess.running
                 || (action !== "TRASH" && action !== "RESTORE")
-                || !permitted || current.state !== expectedState
-                || current.roomId !== room
-                || current.digest !== digest
-                || current.revision !== revision
-                || !/^[0-9a-f]{64}$/.test(digest)
-                || !Number.isSafeInteger(revision) || revision < 0) {
-            lastError = "LIFECYCLE REFUSED // AUTHORITY OR REVIEW NOT VERIFIED";
+                || !/^[A-Za-z0-9._:/-]{1,160}$/.test(room)) {
+            lastError = "HOSPITAL NATIVE HOLD // REQUEST PATH NOT VERIFIED";
             refused(lastError);
             return false;
         }
         pendingAction = action;
         pendingRoomId = room;
-        pendingDigest = digest;
-        pendingRevision = revision;
+        pendingDigest = "";
+        pendingRevision = -1;
         operating = true;
-        outcome = "PX // " + action + " SUBMITTED";
+        outcome = "NATIVE APPROVAL REQUESTED // " + action;
         lastError = "";
-        executeProcess.exec(commandArgs([
-            action === "TRASH"
-                ? "room-lifecycle-trash" : "room-lifecycle-restore",
-            room,
-            "--expected-revision", String(revision),
-            "--expected-digest", digest,
-            "--confirm-room-id", room,
-            "--json"
-        ]));
-        return true;
+        try {
+            executeProcess.exec([nativeClientPath, action, room]);
+            return true;
+        } catch (error) {
+            operating = false;
+            lastError = "HOSPITAL BACKEND NOT READY // NATIVE REQUEST UNAVAILABLE";
+            refused(lastError);
+            return false;
+        }
+    }
+
+    // This status check cannot authorize a Room. The native executable
+    // itself verifies its ROOT-owned inode and the ROOT-owned issuer socket;
+    // production still requires the separate issuer/PX service installation.
+    Process {
+        id: nativeProbe
+        property string outputText: ""
+        stdout: StdioCollector {
+            onStreamFinished: nativeProbe.outputText = String(this.text || "")
+        }
+        onExited: function(code, status) {
+            const output = nativeProbe.outputText;
+            nativeProbe.outputText = "";
+            let installed = false;
+            try {
+                if (Number(code) === 0) {
+                    const payload = JSON.parse(output || "{}");
+                    installed = payload.schema === "postapollo.hospital.native-client.v1"
+                        && payload.status === "INSTALLED";
+                }
+            } catch (error) {
+                installed = false;
+            }
+            root.nativeClientInstalled = installed;
+        }
     }
 
     Process {
@@ -126,7 +170,7 @@ Scope {
             root.loading = false;
             try {
                 if (Number(code) !== 0)
-                    throw new Error(String(error || output || "PX NOT AVAILABLE").slice(0,240));
+                    throw new Error("HOSPITAL BACKEND NOT READY // PROTECTED ROOM REVIEW UNAVAILABLE");
                 const payload = JSON.parse(output || "{}");
                 if (String(payload.roomId || "") !== String(root.roomId || "")
                         || !/^[0-9a-f]{64}$/.test(String(payload.digest || ""))
@@ -140,7 +184,10 @@ Scope {
             } catch (e) {
                 root.review = ({});
                 root.reviewReady = false;
-                root.lastError = "PX REVIEW // " + String(e).slice(0,230);
+                root.lastError = "HOSPITAL BACKEND NOT READY // "
+                    + (String(e).includes("PROTECTED ROOM REVIEW")
+                       ? "PROTECTED ROOM REVIEW UNAVAILABLE"
+                       : "PROTECTED REVIEW FORMAT REFUSED");
             }
         }
     }
@@ -165,17 +212,19 @@ Scope {
             let problem = "";
             try {
                 if (Number(code) !== 0)
-                    throw new Error(String(err || result || "PX REFUSED").slice(0,230));
+                    throw new Error("PROTECTED ISSUER REFUSED OR NOT INSTALLED");
                 payload = JSON.parse(result || "{}");
-                if (payload.roomId !== root.pendingRoomId
-                        || payload.state !== (root.pendingAction === "TRASH"
-                            ? "TRASHED" : "ACTIVE")
-                        || payload.revision !== root.pendingRevision + 1
+                if (payload.schema !== "postapollo.connections.hospital-native-issuer-response.v1"
+                        || payload.status !== "COMMITTED"
+                        || payload.action !== root.pendingAction
+                        || payload.roomId !== root.pendingRoomId
+                        || !Number.isSafeInteger(payload.revision)
+                        || payload.revision <= 0
                         || payload.originalPreserved !== true
                         || payload.burnAllowed !== false)
-                    throw new Error("PX RECEIPT IDENTITY OR STATE MISMATCH");
+                    throw new Error("PROTECTED COMMIT RECEIPT IDENTITY MISMATCH");
             } catch (e) {
-                problem = "PX LIFECYCLE // " + String(e).slice(0,240);
+                problem = "HOSPITAL NATIVE HOLD // " + String(e).slice(0,180);
             }
             root.pendingAction = "";
             root.pendingRoomId = "";
@@ -189,7 +238,9 @@ Scope {
                 root.refused(problem);
             } else {
                 root.lastError = "";
-                root.outcome = "PX " + payload.state + " // RECEIPT RECORDED";
+                root.outcome = "PROTECTED PX // "
+                    + (payload.action === "TRASH" ? "TRASHED" : "RESTORED")
+                    + " // RECEIPT CONFIRMED";
                 root.committed(payload);
             }
         }

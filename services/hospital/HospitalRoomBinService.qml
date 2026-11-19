@@ -18,14 +18,20 @@ Scope {
         busy = true;
         loaded = false;
         lastError = "";
-        binProcess.exec([
-            "bash", "-lc",
-            'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"; '
-                + '[ -x "$px" ] || px="$HOME/.local/bin/px"; '
-                + 'exec "$px" "$@"',
-            "hospital-room-bin", "hospital",
-            "room-lifecycle-bin", "--json"
-        ]);
+        // PX protected source only. Missing/uninstalled readers are NOT
+        // replaced with desktop-owned hospital.db or the old px CLI.
+        try {
+            binProcess.exec([
+                "/usr/libexec/post-apollo/hospital/hospital-room-read",
+                "bin"
+            ]);
+        } catch (error) {
+            busy = false;
+            rows = [];
+            loaded = false;
+            lastError = "HOSPITAL BACKEND NOT READY // PROTECTED BIN READER UNAVAILABLE";
+            return false;
+        }
         return true;
     }
 
@@ -47,7 +53,7 @@ Scope {
             root.busy = false;
             try {
                 if (Number(code) !== 0)
-                    throw new Error(String(error || output || "PX NOT AVAILABLE").slice(0,200));
+                    throw new Error("HOSPITAL BACKEND NOT READY");
                 const parsed = JSON.parse(output || "[]");
                 if (!Array.isArray(parsed) || parsed.length > 2500)
                     throw new Error("HOSPITAL BIN FORMAT INVALID");
@@ -67,7 +73,11 @@ Scope {
             } catch (e) {
                 root.rows = [];
                 root.loaded = false;
-                root.lastError = "HOSPITAL BIN // " + String(e).slice(0,230);
+                // Do not display raw px argparse usage or mistaken "0 Rooms".
+                // An unavailable PX command is NOT an empty Trash++ bin.
+                root.lastError = String(e).includes("HOSPITAL BACKEND NOT READY")
+                    ? "HOSPITAL BACKEND NOT READY // PX ROOM BIN UNAVAILABLE"
+                    : "HOSPITAL BIN // SOURCE RESPONSE INVALID";
             }
         }
     }

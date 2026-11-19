@@ -1,0 +1,55 @@
+name: Hospital Native Request Client / Backend Readiness
+
+on:
+  pull_request:
+    paths:
+      - "services/hospital/native/hospital_room_request_client.c"
+      - "services/hospital/native/hospital_room_read_client.py"
+      - "services/hospital/HospitalRoomLifecycleService.qml"
+      - "services/hospital/HospitalRoomBinService.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "tests/hospital/hospital_native_request_client_test.c"
+      - "tests/hospital/test_hospital_native_request_client.py"
+      - "tests/hospital/test_hospital_protected_room_reader.py"
+      - "tests/hospital/test_hospital_room_lifecycle_review_contracts.py"
+      - "tests/hospital/test_hospital_room_trashpp_batch_contracts.py"
+      - ".github/workflows/hospital-native-request-client.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/hospital/native/hospital_room_request_client.c"
+      - "services/hospital/HospitalRoomLifecycleService.qml"
+      - "services/hospital/HospitalRoomBinService.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "tests/hospital/hospital_native_request_client_test.c"
+      - "tests/hospital/test_hospital_native_request_client.py"
+      - "tests/hospital/test_hospital_room_lifecycle_review_contracts.py"
+      - "tests/hospital/test_hospital_room_trashpp_batch_contracts.py"
+      - ".github/workflows/hospital-native-request-client.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  native-client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read-only checkout of PX protected writer at exact coordinated Hospital/Connections integration commit
+        uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: f4c30d25c755d7a155ac33e53e22d51f3ad240c7
+          path: px-source
+          persist-credentials: false
+      - name: Install pinned PX Ed25519 verifier import for parser contract
+        run: python3 -m pip install 'cryptography==46.0.3'
+      - name: Compile production native client and exercise disposable packet fixture
+        run: |
+          python3 tests/hospital/test_hospital_native_request_client.py
+          python3 tests/hospital/test_hospital_protected_room_reader.py
+      - name: Keep Hospital/Trash++ source contracts and workforce UI intact
+        run: |
+          python3 tests/hospital/test_hospital_room_lifecycle_review_contracts.py
+          python3 tests/hospital/test_hospital_room_trashpp_batch_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py

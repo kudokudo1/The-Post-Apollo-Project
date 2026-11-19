@@ -24,25 +24,29 @@ for guard in (
     'ownerId: "hospital"', 'resourceId: root.pinnedRoomId',
     'resourceRevision: String(roomLifecycle.review.digest || "")',
     'showBurn: true', 'burnCapable: false',
-    'ownerApproved: roomLifecycle.permissionReady',
-    'policyReviewed: roomLifecycle.permissionReady',
-    'protectedResource: !roomLifecycle.permissionReady',
-    'retentionHold: !roomLifecycle.permissionReady',
+    'ownerApproved: false',
+    'policyReviewed: false',
+    'protectedResource: true',
+    'retentionHold: true',
+    'REQUEST NATIVE APPROVAL // TRASH ROOM',
+    'REQUEST NATIVE APPROVAL // RESTORE ROOM',
     'onTrashReviewRequested:', 'onRestoreReviewRequested:',
     'enabledAction: root.lifecycleArmed',
 ):
     requires(guard, view, "review-only until authenticated source grant: " + guard)
 for guard in (
-    'review.operatorAuthenticated === true',
-    'review.requiresOwnerReview === false',
-    'if (!active || !permissionReady || !reviewReady',
-    '"--expected-revision"', '"--expected-digest"',
-    '"--confirm-room-id"', 'payload.originalPreserved !== true',
+    'active && nativeClientInstalled',
+    'if (!active || !nativeClientInstalled || operating',
+    'executeProcess.exec([nativeClientPath, action, room]);',
+    'payload.status !== "COMMITTED"',
+    'nativeReadPath, "review", id',
+    'payload.originalPreserved !== true',
     'payload.burnAllowed !== false',
 ):
     requires(guard, action, "transport never invents trusted authority: " + guard)
-for guard in ('"room-lifecycle-bin"', 'item.burnAllowed === false',
-              'root.loaded = false', 'root.lastError'):
+for guard in ('hospital-room-read', 'item.burnAllowed === false',
+              'root.loaded = false', 'root.lastError',
+              'HOSPITAL BACKEND NOT READY'):
     requires(guard, bin_service, "bin metadata authority and stale errors")
 for guard in (
     'entryType:"hospital"', 'visible: trashEntry.modelData.entryType !== "hospital"',
@@ -63,4 +67,6 @@ assert "gio trash" not in bin_service.lower()
 requires("signal trashReviewRequested", deck, "canonical shared deck")
 for marker in ("id: transcriptScroll","id: continuityView","id: attachScroll"):
     requires(marker, view, "existing Room actions must remain intact")
-print("HOSPITAL ROOM TRASH++ CONTRACT // PASS // source PX, guarded bin, Burn omitted")
+assert 'room-lifecycle-trash' not in action
+assert 'room-lifecycle-restore' not in action
+print("HOSPITAL ROOM TRASH++ CONTRACT // PASS // native-only mutation, guarded bin, Burn omitted")

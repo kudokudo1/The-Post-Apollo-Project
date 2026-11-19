@@ -220,7 +220,7 @@ test("single Burn menu filters both sources and requires scope for bulk",()=>{
     assert.match(qml,/onLeftClicked: trashLauncher\.setMode\("burn"\)/);
     assert.match(qml,/trashLauncher\.burnFilter === "files"/);
     assert.match(qml,/trashLauncher\.burnFilter === "records"/);
-    assert.match(qml,/onLeftClicked: \{\s+if \(trashLauncher\.burnFilter === "files"\)/);
+    assert.match(qml,/onLeftClicked: \{\s+if \(trashLauncher\.burnFilter === "all"\)\s+trashLauncher\.armCombinedBurnAll\(\);\s+else if \(trashLauncher\.burnFilter === "files"\)/);
 });
 
 

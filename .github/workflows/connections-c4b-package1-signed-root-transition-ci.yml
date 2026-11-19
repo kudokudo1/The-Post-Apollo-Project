@@ -7,6 +7,8 @@ on:
       - 'tests/connections/identity_silverblue/test_c4b_signed_trust_transition_ci.py'
       - 'tests/connections/identity_silverblue/c4b_rotated_c3eaf_role_gate_ci.py'
       - 'tests/connections/identity_silverblue/test_c4b_rotated_c3eaf_role_gate_ci.py'
+      - 'tests/connections/identity_silverblue/c4b_root_owned_controller_ledger_ci.py'
+      - 'tests/connections/identity_silverblue/test_c4b_root_owned_controller_ledger_ci.py'
       - 'tests/connections/identity_silverblue/controller_owned_policy_intake_ci.py'
       - 'tests/connections/identity_silverblue/controller_pinned_enrollment_gate_ci.py'
       - 'tests/connections/identity_silverblue/c4b_c3eaf_enrollment_alignment_ci.py'
@@ -42,7 +44,9 @@ jobs:
             tests/connections/identity_silverblue/c4b_signed_trust_transition_ci.py \
             tests/connections/identity_silverblue/test_c4b_signed_trust_transition_ci.py \
             tests/connections/identity_silverblue/c4b_rotated_c3eaf_role_gate_ci.py \
-            tests/connections/identity_silverblue/test_c4b_rotated_c3eaf_role_gate_ci.py
+            tests/connections/identity_silverblue/test_c4b_rotated_c3eaf_role_gate_ci.py \
+            tests/connections/identity_silverblue/c4b_root_owned_controller_ledger_ci.py \
+            tests/connections/identity_silverblue/test_c4b_root_owned_controller_ledger_ci.py
           python3 - <<'PY'
           from pathlib import Path
           src=Path("tests/connections/identity_silverblue/c4b_signed_trust_transition_ci.py").read_text()
@@ -73,6 +77,20 @@ jobs:
           python3 -B tests/connections/identity_silverblue/test_c4b_signed_trust_transition_ci.py
           python3 -B tests/connections/identity_silverblue/test_c4b_rotated_c3eaf_role_gate_ci.py
           echo "C4B_PACKAGE1_PASS // 48_SIGNED_ROTATION_C3E_ROLE_AND_REVOCATION_CASES"
+      - name: Disposable Linux root UID isolation, protected cursor and one-use rotation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_ACTOR" = kudokudo1
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            GITHUB_ACTOR="$GITHUB_ACTOR" POST_APOLLO_C4B_P1_ROOT_LEDGER_TEST_ONLY=1 \
+            "$(command -v python3)" -B \
+            tests/connections/identity_silverblue/test_c4b_root_owned_controller_ledger_ci.py
+          echo "C4B_PACKAGE1_PASS // 26_REAL_LINUX_ROOT_OWNED_CONTROLLER_LEDGER_CASES"
+          echo "C4B_PACKAGE1_HOLD // CI_ROOT_NOT_OPERATOR_OR_HARDWARE_ROLLBACK_AUTHORITY"
       - name: Preserve full merged C4b signed enrollment and cross-role regressions
         shell: bash
         run: |

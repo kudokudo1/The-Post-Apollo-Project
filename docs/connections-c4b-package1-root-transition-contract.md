@@ -93,3 +93,26 @@ C4b now composes its own dual-signed successor-root transition with **unchanged 
 - Adds **20 positive/negative test cases**, making **48 new Package 1 cases** after the additional retired-root receipt-role refusal, plus inherited C4b/C3e regressions in the existing dedicated workflow.
 
 **Trust limitation:** Caller-selected CI roots, policy bytes, cursor and runtime pins are still not independent native custody. No release artifact-to-running-process external witness, protected monotonic ledger, root rollover recovery approval or native sign-in authority results from this. The real protected key-store/host-witness integration still requires operator and C3e/Identity ownership decisions.
+
+## PACKAGE 1 LINUX CONTROLLER-LEDGER REHEARSAL // 2026-11-19
+
+**Next substantive Package 1 increment:** root-owned *controller* policy and monotonic rotation cursor implemented solely for disposable GitHub-hosted Linux CI. This is additive C4b code, not a protected C3e issuer or a native workstation install.
+
+New source files:
+
+- tests/connections/identity_silverblue/c4b_root_owned_controller_ledger_ci.py
+- tests/connections/identity_silverblue/test_c4b_root_owned_controller_ledger_ci.py
+
+Actual kernel Unix-UID boundary exercised in GitHub Actions:
+
+1. Explicit GitHub-hosted CI guard requires Linux root and a protected /run/c4b-p1-controller-ci-* directory owned by root, with mode 0700.
+2. The root supervisor explicitly initializes a 0600 SQLite ledger with the previously pinned synthetic controller public key, signed-policy bytes and current chain cursor. A missing database is NEVER auto-created during consume.
+3. A separate staged-intent transaction pins the exact next root SHA256, next policy SHA256 and one-use transition ID before candidate verification. Staging does NOT equate to operator consent.
+4. Under BEGIN IMMEDIATE, the root process re-reads that private current state, reuses the existing C4b dual-signature verifier and fresh signed guest denial, and atomically advances both the policy/root and chain cursor while clearing the exact pending intent.
+5. Replay, tampering, invalid signatures, missing state and a second intent refuse without silently advancing the cursor; a separate real nobody UID process is required to fail a read on the protected DB.
+
+**Security limitations:** This proves a Linux permission separation test against an unprivileged desktop UID, not physical machine identity, SELinux/TPM root-of-trust, independent C3e protected trust custody, hardware antirollback or authentic human consent. A compromised root supervisor or snapshot of the whole root-owned SQLite file defeats the source's external rollback claim. CI-owned disposable Ed25519 fixtures can never authorize production sign-in. Key custody and native controller installation remain held for the operator and protected owner coordination.
+
+**Verification gate:** 26 new disposable Linux root-owned-ledger tests in the existing Package 1 CI, in addition to 28 signed root-rollover and 20 rotated C3e-AF alignment tests. Exact-head workflow results and independent security review still required.
+
+**Recovery:** #2068 remains the single C4b Package 1 draft. To reproduce CI, inspect the dedicated connections-c4b-package1-signed-root-transition workflow. No commands are provided for running this fixture as a production service.

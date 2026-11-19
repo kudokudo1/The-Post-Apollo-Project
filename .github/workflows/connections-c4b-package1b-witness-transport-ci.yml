@@ -73,7 +73,7 @@ jobs:
             POST_APOLLO_C4B_P1_TRANSPORT_TEST_ONLY=1 \
             "$(command -v python3)" -B \
             tests/connections/identity_silverblue/test_c4b_witness_transport_consumer_ci.py
-          echo "C4B_PACKAGE1B_PASS // 21_REAL_NONROOT_UNIX_WITNESS_CONSUMER_CASES"
+          echo "C4B_PACKAGE1B_PASS // 22_REAL_NONROOT_UNIX_WITNESS_CONSUMER_CASES"
           echo "C4B_PACKAGE1B_HOLD // TEST_PROCESS_CREDENTIALS_NOT_INDEPENDENT_OPERATOR_CUSTODY"
       - name: Preserve merged Package 1 signed rotation, ledger and C3e contracts
         shell: bash

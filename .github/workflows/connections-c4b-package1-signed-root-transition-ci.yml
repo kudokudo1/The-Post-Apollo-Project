@@ -72,7 +72,7 @@ jobs:
           set -euo pipefail
           python3 -B tests/connections/identity_silverblue/test_c4b_signed_trust_transition_ci.py
           python3 -B tests/connections/identity_silverblue/test_c4b_rotated_c3eaf_role_gate_ci.py
-          echo "C4B_PACKAGE1_PASS // 47_SIGNED_ROTATION_C3E_ROLE_AND_REVOCATION_CASES"
+          echo "C4B_PACKAGE1_PASS // 48_SIGNED_ROTATION_C3E_ROLE_AND_REVOCATION_CASES"
       - name: Preserve full merged C4b signed enrollment and cross-role regressions
         shell: bash
         run: |

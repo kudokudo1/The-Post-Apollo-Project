@@ -702,10 +702,10 @@ Item {
                     font.pixelSize: 9
                     wrapMode: Text.Wrap
                 }
-                // PX v12 exposes exact Room state/revision, but its current
-                // CLI reports operatorAuthenticated:false. Until a separately
-                // trusted broker exists, this source-owned deck stays locked.
-                // BURN remains permanently unavailable in this batch.
+                // This canonical deletion deck stays DENY-ONLY. The button
+                // below initiates a REQUEST for independent native approval,
+                // never claims that a QML flag represents owner consent.
+                // BURN remains unavailable for Hospital originals.
                 TrashLifecycleActionDeck {
                     ownerId: "hospital"
                     resourceId: root.pinnedRoomId
@@ -713,15 +713,13 @@ Item {
                     showTrash: roomLifecycle.review.state !== "TRASHED"
                     showRestore: roomLifecycle.review.state === "TRASHED"
                     showBurn: true
-                    trashCapable: roomLifecycle.permissionReady
-                        && roomLifecycle.review.canTrash === true
-                    restoreCapable: roomLifecycle.permissionReady
-                        && roomLifecycle.review.canRestore === true
+                    trashCapable: false
+                    restoreCapable: false
                     burnCapable: false
-                    ownerApproved: roomLifecycle.permissionReady
-                    policyReviewed: roomLifecycle.permissionReady
-                    protectedResource: !roomLifecycle.permissionReady
-                    retentionHold: !roomLifecycle.permissionReady
+                    ownerApproved: false
+                    policyReviewed: false
+                    protectedResource: true
+                    retentionHold: true
                     requestInFlight: roomLifecycle.loading || roomLifecycle.operating
                     actionWidth: Math.max(70, (lifecycleRows.width - 12) / 3)
                     actionHeight: 30
@@ -737,6 +735,32 @@ Item {
                                 && expectedRevision === roomLifecycle.review.digest)
                             root.armLifecycleAction("RESTORE");
                     }
+                }
+                HospitalActionButton {
+                    width: parent.width
+                    height: 30
+                    visible: roomLifecycle.reviewReady
+                        && roomLifecycle.review.state === "ACTIVE"
+                        && roomLifecycle.review.canTrash === true
+                    label: "REQUEST NATIVE APPROVAL // TRASH ROOM"
+                    compactIcon: "TRASH"
+                    accent: Colors.orange
+                    enabledAction: roomLifecycle.permissionReady
+                        && !roomLifecycle.loading && !roomLifecycle.operating
+                    onTriggered: root.armLifecycleAction("TRASH")
+                }
+                HospitalActionButton {
+                    width: parent.width
+                    height: 30
+                    visible: roomLifecycle.reviewReady
+                        && roomLifecycle.review.state === "TRASHED"
+                        && roomLifecycle.review.canRestore === true
+                    label: "REQUEST NATIVE APPROVAL // RESTORE ROOM"
+                    compactIcon: "RESTORE"
+                    accent: Colors.cyan
+                    enabledAction: roomLifecycle.permissionReady
+                        && !roomLifecycle.loading && !roomLifecycle.operating
+                    onTriggered: root.armLifecycleAction("RESTORE")
                 }
                 HospitalActionButton {
                     width: parent.width
@@ -776,9 +800,13 @@ Item {
                 }
                 GohuText {
                     width: parent.width
-                    text: "HOSPITAL TRASH/RESTORE // SOURCE API PRESENT IN PX V12."
-                        + " OPERATOR AUTHORITY IS NOT SIGNED // ACTIONS HELD."
-                        + " BURN IS NOT SUPPORTED."
+                    text: roomLifecycle.permissionReady
+                        ? "NATIVE REQUEST CLIENT VERIFIED // HUMAN CONSENT STILL REQUIRED."
+                          + " PX RECHECKS ROOM, RETENTION AND OPERATOR BEFORE COMMIT."
+                          + " BURN NOT SUPPORTED."
+                        : "HOSPITAL BACKEND NOT READY // INSTALL AND VERIFY"
+                          + " PROTECTED PX + C5 ISSUER. NO ROOM ACTION ENABLED."
+                          + " BURN NOT SUPPORTED."
                     color: Colors.blue
                     font.pixelSize: 9
                     wrapMode: Text.Wrap

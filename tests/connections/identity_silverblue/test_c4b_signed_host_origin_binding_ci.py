@@ -9,6 +9,7 @@ from pathlib import Path
 import secrets
 import sys
 import unittest
+from unittest import mock
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -225,6 +226,39 @@ class C4bThirdKeyHostOriginBindingTests(unittest.TestCase):
                           '"productionAuthority": True'):
             self.assertNotIn(forbidden, src)
         self.assertTrue(all(v is False for v in B.NEGATIVE.values()))
+
+    def test_31_controller_rotation_during_external_verification_refuses(self):
+        original = B.J.inspect_ci_only
+
+        def advance_after_signed_socket(**kwargs):
+            result = original(**kwargs)
+            self.inner.c4b.fixture.base.stage()
+            self.inner.c4b.fixture.base.commit()
+            return result
+
+        with mock.patch.object(B.J, "inspect_ci_only",
+                               side_effect=advance_after_signed_socket):
+            with self.assertRaisesRegex(
+                    B.Refused,
+                    "C4B_C3EN_HOST_BINDING_LEDGER_CHANGED_DURING_VERIFICATION"):
+                self.inspect()
+        self.assertEqual(self.inner.c4b.fixture.base.current()[
+            "transitionSequence"], 5)
+
+    def test_32_controller_ledger_disappears_during_verification_refuses(self):
+        original = B.J.inspect_ci_only
+
+        def drop_after_signed_socket(**kwargs):
+            result = original(**kwargs)
+            (self.inner.c4b.fixture.base.root / B.L.DB_FILE).unlink()
+            return result
+
+        with mock.patch.object(B.J, "inspect_ci_only",
+                               side_effect=drop_after_signed_socket):
+            with self.assertRaisesRegex(
+                    B.Refused,
+                    "C4B_C3EN_HOST_BINDING_LEDGER_LOST_DURING_VERIFICATION"):
+                self.inspect()
 
 
 if __name__ == "__main__":

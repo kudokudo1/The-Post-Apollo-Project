@@ -1,0 +1,94 @@
+name: Connections C4b Package 1B Unix witness consumer (deny-only CI)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/c4b_witness_transport_consumer_ci.py'
+      - 'tests/connections/identity_silverblue/test_c4b_witness_transport_consumer_ci.py'
+      - 'tests/connections/identity_silverblue/c4b_signed_external_checkpoint_ci.py'
+      - 'tests/connections/identity_silverblue/c4b_root_owned_controller_ledger_ci.py'
+      - '.github/workflows/connections-c4b-package1b-witness-transport-ci.yml'
+      - 'docs/connections-c4b-package1b-witness-transport-contract.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c4b-witness-transport-no-grant:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin disposable signature verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Verify test-only source and hard-disabled permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/identity_silverblue/c4b_witness_transport_consumer_ci.py \
+            tests/connections/identity_silverblue/test_c4b_witness_transport_consumer_ci.py \
+            tests/connections/identity_silverblue/c4b_signed_external_checkpoint_ci.py \
+            tests/connections/identity_silverblue/c4b_root_owned_controller_ledger_ci.py
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('tests/connections/identity_silverblue/c4b_witness_transport_consumer_ci.py').read_text()
+          ledger=Path('tests/connections/identity_silverblue/c4b_root_owned_controller_ledger_ci.py').read_text()
+          broker=Path('services/connections/ConnectionsBroker.qml').read_text()
+          for token in ('socket.SO_PEERCRED', 'SO_PEERCRED', 'C4B_P1_TRANSPORT_KERNEL_PEER_IDENTITY_MISMATCH',
+                        'W.inspect_current_checkpoint_ci_only(', 'MAX_FRAME', 'RUNNER_ENVIRONMENT'):
+              assert token in src, token
+          for flag in ('realIndependentWitnessCustodyVerified',
+                       'protectedWitnessChallengeHistoryVerified',
+                       'operatorControlledNativeTransportEnrolled',
+                       'rootRollbackResistanceVerified', 'hostAuthenticated',
+                       'canBeginSignIn', 'credentialActionsEnabled', 'productionAuthority'):
+              assert '"'+flag+'": False' in src, flag
+          assert 'verify_and_commit_rotation_with_checkpoint_ci_only' in ledger
+          assert 'C4B_P1_EXTERNAL_SIGNED_CHECKPOINT_REQUIRED' in ledger
+          assert 'readonly property bool credentialActionsEnabled: false' in broker
+          assert 'Ed25519PrivateKey.generate(' not in src
+          print('C4B_PACKAGE1B_HOLD // NO_REAL_WITNESS_OR_CREDENTIAL_AUTHORITY')
+          PY
+      - name: Real forked nonroot Unix witness transport hostile cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_ACTOR" = kudokudo1
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            GITHUB_ACTOR="$GITHUB_ACTOR" POST_APOLLO_C4B_P1_ROOT_LEDGER_TEST_ONLY=1 \
+            POST_APOLLO_C4B_P1_TRANSPORT_TEST_ONLY=1 \
+            "$(command -v python3)" -B \
+            tests/connections/identity_silverblue/test_c4b_witness_transport_consumer_ci.py
+          echo "C4B_PACKAGE1B_PASS // 23_REAL_NONROOT_UNIX_WITNESS_CONSUMER_CASES"
+          echo "C4B_PACKAGE1B_HOLD // TEST_PROCESS_CREDENTIALS_NOT_INDEPENDENT_OPERATOR_CUSTODY"
+      - name: Preserve merged Package 1 signed rotation, ledger and C3e contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_c4b_signed_trust_transition_ci.py
+          python3 -B tests/connections/identity_silverblue/test_c4b_rotated_c3eaf_role_gate_ci.py
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            GITHUB_ACTOR="$GITHUB_ACTOR" POST_APOLLO_C4B_P1_ROOT_LEDGER_TEST_ONLY=1 \
+            "$(command -v python3)" -B \
+            tests/connections/identity_silverblue/test_c4b_root_owned_controller_ledger_ci.py
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            GITHUB_ACTOR="$GITHUB_ACTOR" POST_APOLLO_C4B_P1_ROOT_LEDGER_TEST_ONLY=1 \
+            "$(command -v python3)" -B \
+            tests/connections/identity_silverblue/test_c4b_signed_external_checkpoint_ci.py
+          python3 -B tests/connections/identity_silverblue/test_c4b_c3eaf_enrollment_alignment_ci.py
+          echo "C4B_PACKAGE1B_PASS // INHERITED_104_CASES_AND_C3E_ROLE_REGRESSIONS"
+          echo "C4B_PACKAGE1B_HOLD // OFF_HOST_WITNESS_CUSTODY_AND_PRODUCTION_ADMISSION_MISSING"

@@ -74,7 +74,7 @@ for marker in (
 ):
     require(marker, ROOM, "Room deck remains explicitly deny-only")
 require('HOSPITAL BACKEND NOT READY // PX ROOM BIN UNAVAILABLE', BIN, "bin not-ready")
-require('"hospital-room-read"', BIN, "protected bin source reader")
+require('hospital-room-read', BIN, "protected bin source reader")
 require('visible: trashEntry.modelData.entryType !== "hospital"', TRASH, "Hospital never GIO Burn")
 require('hospitalRestore.execute("RESTORE", witness)', TRASH, "existing bin Restore request")
 assert "room-lifecycle-burn" not in SERVICE + BIN + source

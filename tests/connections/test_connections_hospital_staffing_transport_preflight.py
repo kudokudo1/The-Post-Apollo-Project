@@ -186,6 +186,16 @@ bad_prepare = dict(json.loads(original),action="TRASH")
 denied(lambda:pre.compose_commit(
     pre.canonical(bad_prepare),writer,envelope),
     "UNKNOWN_ACTION_OR_SCOPE")
+
+for foreign_action in ([], {}, True, 0, None):
+    bad_prepare = dict(json.loads(original), action=foreign_action)
+    denied(lambda b=bad_prepare:pre.compose_commit(
+        pre.canonical(b),writer,envelope),
+        "UNKNOWN_ACTION_OR_SCOPE")
+bad_prepare = dict(json.loads(original),requestNonce="Z"*43)
+denied(lambda:pre.compose_commit(
+    pre.canonical(bad_prepare),writer,envelope),
+    "NONCANONICAL_BASE64URL")
 bad_prepare = dict(json.loads(original),extra=True)
 denied(lambda:pre.compose_commit(
     pre.canonical(bad_prepare),writer,envelope),

@@ -223,7 +223,9 @@ try:
         spend, journal = private_journals(tmp)
         assert spend.lookup(verified["grant_id"]) is None
         assert not spend.path.exists() and not journal.path.exists()
-        assert not spend.path.parent.exists()
+        # The earlier saved V1/V2 checkpoint owns the shared parent
+        # directory; read-only spend lookup creates no ledger files.
+        assert spend.path.parent.is_dir()
 
         # Cryptographic, role, audience, binding and freshness refusals MUST
         # occur before a grant is spent or Sway is commanded.

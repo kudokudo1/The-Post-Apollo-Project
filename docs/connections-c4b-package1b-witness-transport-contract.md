@@ -27,7 +27,7 @@ Additive C4b-only source:
 
 ## VERIFY
 
-The isolated 22-test transport suite covers valid signed remote-process response, end-to-end root-owned rotation, forged socket owner vs real kernel credentials, wrong pinned PID or GID, fake Ed25519 signature, grant-field injection, schema forgery, duplicate/noncanonical JSON, malformed/partial/oversized frames, challenge replay, stale controller history after rotation, unsafe paths and directory permissions, bad public root, host mismatch and hard-disabled authority.
+The isolated 23-test transport suite covers valid signed remote-process response, end-to-end root-owned rotation, forged socket owner vs real kernel credentials, wrong pinned PID or GID, fake Ed25519 signature, grant-field injection, schema forgery, duplicate/noncanonical JSON, malformed/partial/oversized frames, challenge replay, stale controller history after rotation, unsafe paths and directory permissions, bad public root, host mismatch and hard-disabled authority.
 
 The new workflow must pass at the exact PR head along with the inherited 104 Package 1 cases and C3e-AF alignment. The official Silverblue KVM regression also runs on changes to the repository; check its independent result. Obtain independent Nurse 2 review before considering merge.
 

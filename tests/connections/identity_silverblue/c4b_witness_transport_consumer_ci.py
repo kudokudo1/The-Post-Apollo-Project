@@ -21,6 +21,7 @@ import socket
 import stat
 import struct
 import sys
+import time
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
@@ -130,9 +131,14 @@ def _scope(sock_path, peer_uid, peer_gid, peer_pid):
         _deny("C4B_P1_TRANSPORT_SOCKET_OWNER_OR_TYPE_REFUSED")
 
 
-def _receive_exact(channel, size):
+def _receive_exact(channel, size, deadline):
+    """A shared absolute deadline, not a fresh timeout for every byte."""
     out = bytearray()
     while len(out) < size:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            _deny("C4B_P1_TRANSPORT_OVERALL_DEADLINE_EXCEEDED")
+        channel.settimeout(remaining)
         chunk = channel.recv(size - len(out))
         if not chunk:
             _deny("C4B_P1_TRANSPORT_TRUNCATED_FRAME")
@@ -140,11 +146,11 @@ def _receive_exact(channel, size):
     return bytes(out)
 
 
-def _read_frame(channel):
-    length = struct.unpack("!I", _receive_exact(channel, 4))[0]
+def _read_frame(channel, deadline):
+    length = struct.unpack("!I", _receive_exact(channel, 4, deadline))[0]
     if not 0 < length <= MAX_FRAME:
         _deny("C4B_P1_TRANSPORT_OVERSIZE_OR_EMPTY_FRAME")
-    return _receive_exact(channel, length)
+    return _receive_exact(channel, length, deadline)
 
 
 def fetch_current_witness_ci_only(
@@ -180,6 +186,7 @@ def fetch_current_witness_ci_only(
     if not hasattr(socket, "SO_PEERCRED"):
         _deny("C4B_P1_TRANSPORT_KERNEL_PEER_CREDENTIALS_UNAVAILABLE")
     try:
+        deadline = time.monotonic() + 2.0
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
             channel.settimeout(2.0)
             channel.connect(str(socket_path))
@@ -191,8 +198,12 @@ def fetch_current_witness_ci_only(
                     or uid != separately_pinned_peer_uid
                     or gid != separately_pinned_peer_gid):
                 _deny("C4B_P1_TRANSPORT_KERNEL_PEER_IDENTITY_MISMATCH")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                _deny("C4B_P1_TRANSPORT_OVERALL_DEADLINE_EXCEEDED")
+            channel.settimeout(remaining)
             channel.sendall(struct.pack("!I", len(request)) + request)
-            raw = _read_frame(channel)
+            raw = _read_frame(channel, deadline)
     except (OSError, TimeoutError) as exc:
         raise Refused("C4B_P1_TRANSPORT_UNIX_IO_OR_DEADLINE_REFUSED") from exc
 

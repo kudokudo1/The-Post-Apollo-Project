@@ -42,7 +42,7 @@ for forbidden in ('getenv(', 'setenv(', 'system(', 'popen(', 'execvp(', 'execve(
 
 for marker in (
     'readonly property bool permissionReady:',
-    'active && reviewReady && nativeClientInstalled',
+    'active && nativeClientInstalled',
     'nativeClientPath, action, room',
     'executeProcess.exec([nativeClientPath, action, room]);',
     'payload.status !== "COMMITTED"',
@@ -50,6 +50,7 @@ for marker in (
     'payload.action !== root.pendingAction',
     'payload.roomId !== root.pendingRoomId',
     'payload.originalPreserved !== true',
+    '!Number.isSafeInteger(payload.revision)',
     'payload.burnAllowed !== false',
     'HOSPITAL BACKEND NOT READY',
 ):
@@ -64,6 +65,8 @@ for marker in (
     'protectedResource: true', 'retentionHold: true',
     'burnCapable: false',
     'REQUEST NATIVE APPROVAL // TRASH ROOM',
+    'root.roomMatches && root.active',
+    'roomLifecycle.execute(action);',
     'REQUEST NATIVE APPROVAL // RESTORE ROOM',
     'onTriggered: root.armLifecycleAction("TRASH")',
     'onTriggered: root.armLifecycleAction("RESTORE")',

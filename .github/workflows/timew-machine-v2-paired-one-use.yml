@@ -1,0 +1,56 @@
+name: TimeW MACHINE V2 paired window and one-use consent admission
+
+on:
+  pull_request:
+    paths:
+      - 'services/time/MachineV2PairConsent.py'
+      - 'services/time/MachineV2PairedRehearsal.py'
+      - 'services/time/MachineV2FloatingPilot.py'
+      - 'tests/timew/test_machine_v2_pair_consent.py'
+      - '.github/workflows/timew-machine-v2-paired-one-use.yml'
+      - 'docs/timew-machine-v2-paired-one-use.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  two-independent-signed-roles:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install same reviewed Ed25519 primitive used by Connections and Identity
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Verify signed pairing, separate consent, one-use burn and mid-command revocation
+        run: python3 -B -I tests/timew/test_machine_v2_pair_consent.py
+      - name: Preserve durable V2 geometry journal and already tested floating executor
+        run: |
+          python3 -B -I tests/timew/test_machine_v2_geometry_journal.py
+          python3 -B -I tests/timew/test_machine_v2_floating_pilot.py
+      - name: Preserve V2 read-only planner and original one-click Restore
+        run: |
+          python3 -B -I tests/timew/test_machine_restore_review_v2.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_one_click_restore.py
+          python3 -B -I tests/timew/test_machine_one_click_restore_ui.py
+      - name: Ensure no installed trust issuer or desktop activation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          policy = Path("services/time/MachineV2PairConsent.py").read_text()
+          harness = Path("services/time/MachineV2PairedRehearsal.py").read_text()
+          ui = Path("widgets/TimeW.qml").read_text()
+          for bad in ("Ed25519PrivateKey", "def main(", "if __name__"):
+              assert bad not in policy, bad
+          assert 'GITHUB_ACTIONS") != "true"' in harness
+          assert 'CI") != "true"' in harness
+          assert "MachineV2PairedRehearsal" not in ui
+          assert "MachineV2PairConsent" not in ui
+          print("TIMEW V2 PAIR CONSENT // FIXTURE-ONLY, NO UI EXECUTION PATH")
+          PY

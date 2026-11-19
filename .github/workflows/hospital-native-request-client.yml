@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - "services/hospital/native/hospital_room_request_client.c"
+      - "services/hospital/native/hospital_room_read_client.py"
       - "services/hospital/HospitalRoomLifecycleService.qml"
       - "services/hospital/HospitalRoomBinService.qml"
       - "widgets/HospitalRegisteredWorkerView.qml"
       - "tests/hospital/hospital_native_request_client_test.c"
       - "tests/hospital/test_hospital_native_request_client.py"
+      - "tests/hospital/test_hospital_protected_room_reader.py"
       - "tests/hospital/test_hospital_room_lifecycle_review_contracts.py"
       - "tests/hospital/test_hospital_room_trashpp_batch_contracts.py"
       - ".github/workflows/hospital-native-request-client.yml"
@@ -34,7 +36,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile production native client and exercise disposable packet fixture
-        run: python3 tests/hospital/test_hospital_native_request_client.py
+        run: |
+          python3 tests/hospital/test_hospital_native_request_client.py
+          python3 tests/hospital/test_hospital_protected_room_reader.py
       - name: Keep Hospital/Trash++ source contracts and workforce UI intact
         run: |
           python3 tests/hospital/test_hospital_room_lifecycle_review_contracts.py

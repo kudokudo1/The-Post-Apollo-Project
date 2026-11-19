@@ -166,6 +166,10 @@ Item {
     readonly property bool scrollChaining: nestedScrollMode === "chain"
     property var chainFlickable: null // Explicit host-owned outer pane.
     property bool captureNestedPaneWheel: true // Scoped to real nested Flickables.
+    // Explicit host opt-in: a Flickable ancestor must not steal an inner
+    // scrollbar's mouse-handle drag. Other scrollbar consumers retain their
+    // original pointer behavior; wheel containment remains independent.
+    property bool protectHandleDragFromAncestor: false
     readonly property bool nestedPaneDetected: isNestedWithinFlickable()
     property bool keyboardEnabled: true
     property string interactionStyle: "progressive" // "distinct" variant.
@@ -873,6 +877,9 @@ Item {
         anchors.fill: parent
 
         enabled: root.interactive && root.scrollable
+        // This must already be true when the press begins. Otherwise Qt may
+        // let an ancestor Flickable steal the drag after pointer movement.
+        preventStealing: root.protectHandleDragFromAncestor
         hoverEnabled: true
         cursorShape:
             root.interactive

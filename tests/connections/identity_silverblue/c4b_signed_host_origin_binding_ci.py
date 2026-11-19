@@ -125,6 +125,9 @@ def make_expected_statement_ci_only(
         _deny("C4B_C3EN_HOST_BINDING_ORIGINAL_JOIN_REQUIRED")
     raw_state = join_inputs["controller_state"]
     fresh = join_inputs["fresh_challenge"]
+    if (type(fresh) is bytes and len(fresh) == 32
+            and hmac.compare_digest(fresh, host_attestation_challenge)):
+        _deny("C4B_C3EN_HOST_BINDING_DISTINCT_HOST_AND_CHECKPOINT_NONCES_REQUIRED")
     if (type(raw_state) is not dict
             or type(raw_state.get("controllerRootSha256")) is not str
             or SHA256.fullmatch(raw_state["controllerRootSha256"]) is None
@@ -209,8 +212,16 @@ def inspect_signed_host_binding_ci_only(
         Encoding.Raw, PublicFormat.Raw)
     if not hmac.compare_digest(_sha(pub), independently_pinned_host_signer_sha256):
         _deny("C4B_C3EN_HOST_BINDING_SIGNER_PIN_REFUSED")
-    if type(join_inputs["controller_state"]) is not dict:
+    if (type(controller_ledger_root) is not Path
+            or type(join_inputs["controller_state"]) is not dict
+            or set(join_inputs["controller_state"]) != W.STATE_FIELDS):
         _deny("C4B_C3EN_HOST_BINDING_EXACT_CONTROLLER_STATE_REQUIRED")
+    checkpoint_challenge = join_inputs["fresh_challenge"]
+    if (type(checkpoint_challenge) is not bytes
+            or len(checkpoint_challenge) != 32
+            or hmac.compare_digest(checkpoint_challenge,
+                                   independently_issued_host_challenge)):
+        _deny("C4B_C3EN_HOST_BINDING_DISTINCT_HOST_AND_CHECKPOINT_NONCES_REQUIRED")
     # Re-read actual root-owned disposable ledger instead of trusting two
     # mutually consistent stale caller snapshots. This is still local
     # root-only CI custody, NOT rollback resistance against privileged root.

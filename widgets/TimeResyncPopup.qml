@@ -46,15 +46,12 @@ WindowPanelFrame {
                 color: Colors.yellow
                 font.pixelSize: 12
             }
-            TimeActionButton {
+            CloseButton {
                 id: closePopup
+                // Compact popup header retains its 25px-wide control.
                 width: 25
-                height: 24
-                actionRole: "cancel"
-                label: "×"
-                labelPixelSize: 14
-                contentPadding: 1
-                onLeftClicked: popup.closeRequested()
+                Accessible.name: "Close Time resync popup"
+                onCloseRequested: popup.closeRequested()
             }
         }
 

@@ -46,10 +46,31 @@ function validSchedule(row) {
     var keys=["amountCents","date","dueDay","expenseId","fundingGoalId",
         "id","kind","title"];
     var actual=Object.keys(row).sort();
+    var hasSource=actual.indexOf("sourceMonth")!==-1;
+    if(hasSource)keys.push("sourceMonth");
+    if(row.kind==="bill_cadence")keys.push("anchorMonth","intervalMonths");
+    keys.sort();
     if(actual.length!==keys.length ||
             keys.some(function(k,i){return actual[i]!==k;}))return false;
     if(typeof row.id!=="string"||!/^p-[0-9a-f]{32}$/.test(row.id)
        ||typeof row.kind!=="string")return false;
+    if(hasSource && (typeof row.sourceMonth!=="string" ||
+        (row.kind!=="bill_defer" && row.sourceMonth!=="")))return false;
+    if(row.kind==="bill_cadence")
+        return hasSource && row.sourceMonth==="" && row.title===""
+            && row.date==="" && row.amountCents===0 && row.dueDay===0
+            && row.fundingGoalId==="" && typeof row.expenseId==="string"
+            && /^p-[0-9a-f]{32}$/.test(row.expenseId)
+            && Number.isInteger(row.intervalMonths)
+            && [3,12].indexOf(row.intervalMonths)!==-1
+            && indexFor(row.anchorMonth)!==null;
+    if(row.kind==="bill_defer")
+        return hasSource && row.title==="" && row.fundingGoalId===""
+            && row.amountCents===0 && row.dueDay===0
+            && typeof row.expenseId==="string"
+            && /^p-[0-9a-f]{32}$/.test(row.expenseId)
+            && indexFor(row.sourceMonth)!==null
+            && validDate(row.date) && row.date.slice(0,7)>row.sourceMonth;
     if(row.kind==="bill_due")
         return row.title===""&&row.date===""&&row.fundingGoalId===""
             &&row.amountCents===0&&typeof row.expenseId==="string"
@@ -68,6 +89,14 @@ function validSchedule(row) {
             &&typeof row.fundingGoalId==="string"
             &&(row.fundingGoalId===""||/^p-[0-9a-f]{32}$/.test(row.fundingGoalId));
     return false;
+}
+// A cadence is a metadata annotation on an existing bill. Without one,
+// the entered expense continues to repeat every month.
+function chargeOccurs(month,cadence) {
+    if(indexFor(month)===null)return false;
+    if(!cadence)return true;
+    var offset=indexFor(month)-indexFor(cadence.anchorMonth);
+    return offset>=0 && offset%cadence.intervalMonths===0;
 }
 // Explicit coverage indicator for entered records only, NEVER an assurance
 // all household obligations are known. Works even with no income entered.
@@ -88,6 +117,8 @@ function coverage(rows,schedules) {
     var income=rows.filter(function(row){return row.kind==="income";});
     var bills=schedules.filter(function(row){return row.kind==="bill_due";});
     var skips=schedules.filter(function(row){return row.kind==="bill_skip";});
+    var deferrals=schedules.filter(function(row){return row.kind==="bill_defer";});
+    var cadences=schedules.filter(function(row){return row.kind==="bill_cadence";});
     var purchases=schedules.filter(function(row){return row.kind==="purchase";});
     var ids=bills.map(function(row){return row.expenseId;});
     if(new Set(ids).size!==ids.length)
@@ -102,6 +133,28 @@ function coverage(rows,schedules) {
     var skipKeys=skips.map(function(row){return row.expenseId+"|"+row.date;});
     if(new Set(skipKeys).size!==skipKeys.length)
         return refuse("DUPLICATE_BILL_EXCEPTION");
+    var deferKeys=deferrals.map(function(row){
+        return row.expenseId+"|"+row.sourceMonth;
+    });
+    if(new Set(deferKeys).size!==deferKeys.length)
+        return refuse("DUPLICATE_BILL_DEFERRAL");
+    if(deferKeys.some(function(key){return skipKeys.indexOf(key)!==-1;}))
+        return refuse("CONFLICTING_BILL_EXCEPTION");
+    if(deferrals.some(function(row){return ids.indexOf(row.expenseId)===-1;}))
+        return refuse("SCHEDULE_REFERENCE_MISSING");
+    var cadenceIds=cadences.map(function(row){return row.expenseId;});
+    if(new Set(cadenceIds).size!==cadenceIds.length)
+        return refuse("DUPLICATE_BILL_CADENCE");
+    if(cadences.some(function(row){return ids.indexOf(row.expenseId)===-1;}))
+        return refuse("SCHEDULE_REFERENCE_MISSING");
+    var cadenceById=new Map(cadences.map(function(row){
+        return [row.expenseId,row];
+    }));
+    if(skips.some(function(row){
+        return !chargeOccurs(row.date,cadenceById.get(row.expenseId));
+    }) || deferrals.some(function(row){
+        return !chargeOccurs(row.sourceMonth,cadenceById.get(row.expenseId));
+    }))return refuse("INVALID_RECURRENCE_EXCEPTION");
     var undated=expenses.filter(function(row) {
         return ids.indexOf(row.id)===-1;
     });
@@ -113,6 +166,17 @@ function coverage(rows,schedules) {
         undatedExpenseTitles:undated.map(function(row){return row.title;}),
         manualIncomeCount:income.length,
         monthlyExceptionCount:skips.length,
+        deferredPaymentCount:deferrals.length,
+        quarterlyBillCount:cadences.filter(function(row){return row.intervalMonths===3;}).length,
+        annualBillCount:cadences.filter(function(row){return row.intervalMonths===12;}).length,
+        cadenceCount:cadences.length,
+        cadenceEntries:cadences.map(function(row){
+            var e=expenses.find(function(expense){return expense.id===row.expenseId;});
+            return {id:row.id,expenseId:row.expenseId,title:e.title,
+                intervalMonths:row.intervalMonths,anchorMonth:row.anchorMonth,
+                amountPerOccurrenceCents:e.monthlyCents};
+        }),
+        amountInterpretation:"PER_CHARGE_WHEN_CADENCE_SET",
         plannedPurchaseCount:purchases.length};
 }
 
@@ -138,8 +202,10 @@ function project(rows,schedules,startMonth,horizonMonths,contextId) {
     var incomeRows=rows.filter(function(row){return row.kind==="income";});
     if(incomeRows.length===0)return refuse("ADD_MANUAL_MONTHLY_INCOME");
     var income=incomeRows.reduce(function(total,row){return total+row.monthlyCents;},0);
-    var costs=rows.filter(function(row){return row.kind==="expense";})
-        .reduce(function(total,row){return total+row.monthlyCents;},0);
+    var expenseRows=rows.filter(function(row){return row.kind==="expense";});
+    var cadenceById=new Map(schedules.filter(function(row){
+        return row.kind==="bill_cadence";
+    }).map(function(row){return [row.expenseId,row];}));
     var goals=rows.filter(function(row){return row.kind==="goal";})
         .map(function(row) {
             return {id:row.id,title:row.title,deadlineMonth:row.deadlineMonth,
@@ -152,6 +218,7 @@ function project(rows,schedules,startMonth,horizonMonths,contextId) {
     var billRows=schedules.filter(function(row){return row.kind==="bill_due";});
     var purchases=schedules.filter(function(row){return row.kind==="purchase";});
     var skipRows=schedules.filter(function(row){return row.kind==="bill_skip";});
+    var deferRows=schedules.filter(function(row){return row.kind==="bill_defer";});
     purchases.sort(function(a,b) {
         return a.date.localeCompare(b.date)||a.id.localeCompare(b.id);
     });
@@ -188,25 +255,55 @@ function project(rows,schedules,startMonth,horizonMonths,contextId) {
                     projectedSavedCents:goal.allocatedCents});
             }
         }
+        var scheduledCosts=expenseRows.reduce(function(total,row){
+            return total+(chargeOccurs(month,cadenceById.get(row.id))
+                ?row.monthlyCents:0);
+        },0);
         var excluded=skipRows.filter(function(row){return row.date===month;});
-        var skippedIds=new Set(excluded.map(function(row){return row.expenseId;}));
+        var moved=deferRows.filter(function(row){return row.sourceMonth===month;});
+        var omittedIds=new Set(excluded.concat(moved).map(function(row){
+            return row.expenseId;
+        }));
         var exceptionEvents=excluded.map(function(row) {
             var expense=expensesById.get(row.expenseId);
             return {id:row.id,expenseId:row.expenseId,title:expense.title,
                 month:month,excludedCents:expense.monthlyCents};
         });
-        var currentCosts=costs-exceptionEvents.reduce(function(total,row) {
-            return total+row.excludedCents;
+        var movedFromEvents=moved.map(function(row){
+            var expense=expensesById.get(row.expenseId);
+            return {id:row.id,expenseId:row.expenseId,title:expense.title,
+                sourceMonth:row.sourceMonth,targetDate:row.date,
+                movedCents:expense.monthlyCents};
+        });
+        var currentCosts=scheduledCosts-excluded.reduce(function(total,row){
+            return total+expensesById.get(row.expenseId).monthlyCents;
+        },0)-moved.reduce(function(total,row){
+            return total+expensesById.get(row.expenseId).monthlyCents;
+        },0);
+        var movedToEvents=deferRows.filter(function(row){
+            return row.date.slice(0,7)===month;
+        }).map(function(row){
+            var expense=expensesById.get(row.expenseId);
+            return {id:row.id,expenseId:row.expenseId,title:expense.title,
+                sourceMonth:row.sourceMonth,targetDate:row.date,
+                movedCents:expense.monthlyCents};
+        }).sort(function(a,b){return a.targetDate.localeCompare(b.targetDate)
+            ||a.id.localeCompare(b.id);});
+        var movedPaymentCents=movedToEvents.reduce(function(total,row){
+            return total+row.movedCents;
         },0);
         var billEvents=billRows.filter(function(row){
-            return !skippedIds.has(row.expenseId);
+            return chargeOccurs(month,cadenceById.get(row.expenseId))
+                && !omittedIds.has(row.expenseId);
         }).map(function(row) {
             var expense=expensesById.get(row.expenseId);
             var day=Math.min(row.dueDay,daysIn(month));
             return {id:row.id,expenseId:row.expenseId,title:expense.title,
                 dueDate:month+"-"+String(day).padStart(2,"0"),
                 adjustedToMonthEnd:day!==row.dueDay,
-                amountCents:expense.monthlyCents};
+                amountCents:expense.monthlyCents,
+                intervalMonths:cadenceById.has(row.expenseId)
+                    ?cadenceById.get(row.expenseId).intervalMonths:1};
         }).sort(function(a,b){return a.dueDate.localeCompare(b.dueDate)
             ||a.id.localeCompare(b.id);});
         var purchaseNewCash=0,goalFunded=0,purchaseEvents=[];
@@ -226,13 +323,17 @@ function project(rows,schedules,startMonth,horizonMonths,contextId) {
                 amountCents:row.amountCents,goalFundedCents:reserved,
                 newCashCents:newCash,fundingGoalId:row.fundingGoalId});
         });
-        var change=income-currentCosts-contributions-purchaseNewCash;
+        var change=income-currentCosts-contributions-purchaseNewCash-movedPaymentCents;
         cumulative+=change;
-        if(![contributions,purchaseNewCash,goalFunded,change,cumulative].every(
+        if(![contributions,purchaseNewCash,goalFunded,movedPaymentCents,
+               currentCosts,change,cumulative].every(
             Number.isSafeInteger))return refuse("UNSAFE_TOTAL");
         months.push({month:month,incomeCents:income,
-            expenseCents:currentCosts,baseExpenseCents:costs,
+            expenseCents:currentCosts,baseExpenseCents:scheduledCosts,
             exceptionEvents:exceptionEvents,
+            movedFromEvents:movedFromEvents,
+            movedToEvents:movedToEvents,
+            movedPaymentCents:movedPaymentCents,
             contributionCents:contributions,
             purchaseNewCashCents:purchaseNewCash,
             purchaseGoalFundedCents:goalFunded,

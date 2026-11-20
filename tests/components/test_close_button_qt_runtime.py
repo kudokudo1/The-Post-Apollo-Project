@@ -7,7 +7,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_QUICK_BACKEND", "software")
 
-from PySide6.QtCore import QObject, QPoint, Qt
+from PySide6.QtCore import QObject, QPoint, Qt, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtTest import QTest
@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix="close-button-qt-") as temp:
     engine = QQmlEngine()
     engine.addImportPath(temp)
     harness = Path(__file__).resolve().with_name("close_button_runtime_harness.qml")
-    component = QQmlComponent(engine, harness.as_uri())
+    component = QQmlComponent(engine, QUrl.fromLocalFile(str(harness)))
     if component.isError():
         raise RuntimeError("QML load: " + "; ".join(map(str, component.errors())))
     window = component.create()

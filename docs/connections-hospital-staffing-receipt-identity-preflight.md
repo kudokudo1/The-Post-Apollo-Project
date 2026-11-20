@@ -29,7 +29,7 @@ The first helper compares the fixture to the original PREPARE, matching PREPARED
 
 The second helper accepts a separate, exact canonical candidate schema called postapollo.connections.hospital.staffing-receipt-proposal.ci-v1 with protocolVersion=1, kind=source-only-commit-receipt, and status=UNVERIFIED_PROPOSAL_ONLY.
 
-Its exactly 16 fields are: schema, protocolVersion, kind, requestSchema, requestNonce, roomId, action, sessionId, writerInstance, expectedRevision, revisionAfter, graphDigest, grantDigest, originalPrepareSha256, commitSha256, status.
+Its exactly 15 fields are: schema, protocolVersion, kind, requestSchema, requestNonce, roomId, action, sessionId, writerInstance, expectedRevision, graphDigest, grantDigest, originalPrepareSha256, commitSha256, status. A proposed `revisionAfter = expectedRevision + 1` was **removed**: Hospital #133's Session Attach and Doctor Succession source does not guarantee that increment. The writer owner must establish any authoritative post-commit revision separately.
 
 The parser compares them to the supplied original PREPARE, independently supplied PREPARED snapshot and canonical eight-field COMMIT. It rejects changed Session/Doctor identity, action, Room, request nonce, writer instance, source revision, graph or grant digest, altered PREPARE/COMMIT SHA-256, missing or added fields, duplicate JSON fields, unsupported version, boolean-as-version and incorrect status.
 
@@ -39,7 +39,7 @@ Even when all candidate fields match, the helper returns only a format diagnosti
 
 ### Hospital owner decisions needed for a real native receipt
 
-1. **Writer-produced schema/version:** Which fields Hospital will actually send, including originalPrepareSha256, commitSha256, writerInstance, Room graph, revisionAfter, sessionId, grantDigest and any policy generation. The new candidate is NOT an accepted production wire protocol.
+1. **Writer-produced schema/version:** Which fields Hospital will actually send, including originalPrepareSha256, commitSha256, writerInstance, Room graph, verified post-commit revision (if available), sessionId, grantDigest and any policy generation. The new candidate is NOT an accepted production wire protocol.
 2. **Authenticated origin:** Whether the reply is signed by a separately enrolled Hospital writer key, or identified through approved root-controlled installed executable/unit provenance plus kernel packet credentials and fixed Unix socket identity. A claimed writerInstance is not writer authentication.
 3. **Result states:** Distinct authenticated COMMITTED, REFUSED, UNKNOWN/INTERRUPTED and ALREADY_APPLIED semantics. An unanswered COMMIT must never be silently treated as committed, nor automatically replayed with the same consent.
 4. **Version/transport bounds:** Exact response maximum, canonical bytes, READY/SCM_CREDENTIALS handshake, MSG_TRUNC denial, known-version-only dispatch and separate full 16384-byte COMMIT vs decoded 8192-byte envelope limits. Never fall back to the Room issuer's separate 8192-byte permission system.
@@ -59,7 +59,7 @@ The 32 test cases cover matching fixture, false native flag enforcement, changed
 - [ ] Exact-head inherited #2078 real Linux peer/transport workflow PASS
 - [ ] Grammar and any other relevant workflows PASS
 - [ ] Independent Nurse 2 review of exact head
-- [ ] Hospital protected writer owner review of proposed 16-field receipt and native error/recovery semantics
+- [ ] Hospital protected writer owner review of proposed 15-field receipt and native error/recovery semantics
 - [ ] Separate issuer/operator acceptance and merge, no automatic merge
 
 ## WATCH OUT FOR
@@ -80,7 +80,7 @@ Hospital's current coordinator fixture may claim a successful disposable transac
 
 ## NEXT
 
-Request Hospital owner feedback on this proposed 16-field CI schema and its recovery/identity questions before creating a native writer-response implementation. Reconcile any field or version changes on both sides first, then design the independent writer-identity/root provenance adapter under an explicitly approved assignment.
+Request Hospital owner feedback on this proposed 15-field CI schema and its recovery/identity questions before creating a native writer-response implementation. Reconcile any field or version changes on both sides first, then design the independent writer-identity/root provenance adapter under an explicitly approved assignment.
 
 ## DECISIONS
 

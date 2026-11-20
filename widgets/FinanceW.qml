@@ -2148,6 +2148,7 @@ Row {
                 FinanceHouseholdPlanningPane {
                     anchors.fill: parent
                     visible: root.selectedMainMode === "strategies"
+                    active: root.menuOpen && root.selectedMainMode==="strategies"
                 }
 
                 // Research tools share an in-place surface; the crawl and SEC

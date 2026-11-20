@@ -173,8 +173,9 @@ test("Header has Finance-style independent down/up size controls and close", () 
     assert.match(camera, /label: "↑"/);
     assert.match(camera, /available: camera\.chassisLevel !== "fullscreen"/);
     assert.match(camera, /onLeftClicked: camera\.expandChassis\(\)/);
-    assert.match(camera, /label: "X"/);
-    assert.match(camera, /onLeftClicked: camera\.menuOpen = false/);
+    assert.match(camera, /CloseButton \{\s+id: cameraCloseButton/);
+    assert.match(camera, /onCloseRequested: camera\.menuOpen = false/);
+    assert.match(camera, /cameraCloseButton\.width/);
     assert.match(camera, /visible: camera\.menuOpen/);
     assert.match(camera, /width: camera\.menuOpen \? camera\.frameWidth : 0/);
     assert.match(camera, /height: camera\.menuOpen \? camera\.frameHeight : 0/);

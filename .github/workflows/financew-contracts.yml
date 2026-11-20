@@ -54,6 +54,11 @@ on:
       - "widgets/FinanceHouseholdCashFlowPolicy.js"
       - "tests/finance/test_household_plan_store_fp1c.py"
       - "tests/finance/test_household_cashflow_fp1c.mjs"
+      - "widgets/FinanceHouseholdTimelinePane.qml"
+      - "widgets/FinanceHouseholdTimelinePolicy.js"
+      - "tests/finance/test_household_timeline_fp1d.mjs"
+      - "tests/finance/test_household_timeline_fp1d_contracts.py"
+      - "scripts/finance/HOUSEHOLD_TIMELINE_FP1D_README.md"
       - "tests/finance/test_household_plans_fp1c_contracts.py"
       - "scripts/finance/HOUSEHOLD_PLANS_FP1C_README.md"
       - "tests/finance/test_finance_household_plans_contracts.py"
@@ -178,6 +183,11 @@ on:
       - "widgets/FinanceHouseholdCashFlowPolicy.js"
       - "tests/finance/test_household_plan_store_fp1c.py"
       - "tests/finance/test_household_cashflow_fp1c.mjs"
+      - "widgets/FinanceHouseholdTimelinePane.qml"
+      - "widgets/FinanceHouseholdTimelinePolicy.js"
+      - "tests/finance/test_household_timeline_fp1d.mjs"
+      - "tests/finance/test_household_timeline_fp1d_contracts.py"
+      - "scripts/finance/HOUSEHOLD_TIMELINE_FP1D_README.md"
       - "tests/finance/test_household_plans_fp1c_contracts.py"
       - "scripts/finance/HOUSEHOLD_PLANS_FP1C_README.md"
       - "tests/finance/test_finance_household_plans_contracts.py"
@@ -301,6 +311,10 @@ jobs:
         run: node tests/finance/test_finance_household_planning.mjs
       - name: Test FP1c v1 file read compatibility and guarded edits
         run: python3 tests/finance/test_household_plan_store_fp1c.py
+      - name: Test FP1d manual monthly timeline projection and target deadlines
+        run: node tests/finance/test_household_timeline_fp1d.mjs
+      - name: Verify FP1d read-only timeline UI and source isolation
+        run: python3 tests/finance/test_household_timeline_fp1d_contracts.py
       - name: Test FP1c manual cash-flow and deadline arithmetic
         run: node tests/finance/test_household_cashflow_fp1c.mjs
       - name: Verify FP1c local income/editor boundaries

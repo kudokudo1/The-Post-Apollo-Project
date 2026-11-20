@@ -178,5 +178,45 @@ class PeerTests(unittest.TestCase):
         self.assertFalse(errors)
 
 
+    def test_13_inherited_stream_reply_does_not_prove_sender(self):
+        """Kernel socket origin stays the parent even when child writes data."""
+        client, server = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(client.close)
+        client.settimeout(0.8)
+        args = self.original(client)
+        original_pid = os.getpid()
+        child_pid = os.fork()
+        if child_pid == 0:
+            try:
+                client.close()
+                server.settimeout(0.8)
+                request = b""
+                while len(request) < T.HEADER.size:
+                    part = server.recv(T.HEADER.size - len(request))
+                    if not part:
+                        break
+                    request += part
+                if request != T.HEADER.pack(T.MAGIC, 0, T.GET_TREE):
+                    os._exit(2)
+                data = json.dumps(dummy_tree(), separators=(",", ":")).encode()
+                server.sendall(T.HEADER.pack(T.MAGIC, len(data), T.GET_TREE) + data)
+                server.close()
+                os._exit(0)
+            except (OSError, TimeoutError, ValueError):
+                os._exit(3)
+        server.close()
+        try:
+            observed = S.inspect_original_sway_socket_peer_ci_only(**args)
+            self.assertEqual(observed["sourceOnlyOriginalPeerPid"], original_pid)
+            self.assertNotEqual(child_pid, original_pid)
+            self.assertFalse(observed["actualSwayIpcReplySenderProven"])
+            self.assertFalse(observed["canRestoreBrave"])
+        finally:
+            waited, status = os.waitpid(child_pid, 0)
+            self.assertEqual(waited, child_pid)
+            self.assertEqual(status, 0)
+
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)

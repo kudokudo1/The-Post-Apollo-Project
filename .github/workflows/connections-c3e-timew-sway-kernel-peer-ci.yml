@@ -42,7 +42,7 @@ jobs:
                             'subprocess', 'swaymsg', '"canMoveWindow": True'):
               assert forbidden not in p, forbidden
           PY
-      - name: 12 actual Linux peer + fake Sway reply denial tests
+      - name: 13 actual Linux peer + fake Sway reply denial tests
         shell: bash
         run: |
           set -euo pipefail

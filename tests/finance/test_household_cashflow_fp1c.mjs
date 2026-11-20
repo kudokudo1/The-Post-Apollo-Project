@@ -18,6 +18,7 @@ assert.equal(s.readOnly,true);
 assert.equal(s.verifiedBankBalance,false);
 assert.equal(s.monthlyChangeCents,100000);
 assert.equal(s.horizonChangeCents,1200000);
+assert.equal(p.summarize([income,expense,goal],360).horizonChangeCents,36000000);
 assert.equal(s.expenseCents,125000);
 assert.equal(s.incomeCents,250000);
 assert.equal(s.contributionCents,25000);

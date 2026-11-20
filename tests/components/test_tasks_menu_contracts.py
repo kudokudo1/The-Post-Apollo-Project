@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MENU = (ROOT / "widgets/TasksW.qml").read_text(encoding="utf-8")
+CLOSE = (ROOT / "components/CloseButton.qml").read_text(encoding="utf-8")
 SHELL = (ROOT / "shell.qml").read_text(encoding="utf-8")
 
 # Reuse actual FinanceW/TimeW chassis geometry; dock width remains independent.
@@ -81,8 +82,18 @@ assert "glowColor: Colors.cyan" in MENU
 assert 'text: "TASKS // " + root.activeMode.label' in MENU
 assert "color: Colors.magenta" in MENU
 assert "height: 2" in MENU
-assert 'label: "×"' in MENU
-assert "destructive: true" in MENU
+# The header now inherits its canonical × and non-destructive red state
+# from the universal CloseButton, not from duplicated TasksW properties.
+assert "CloseButton {" in MENU
+assert "onCloseRequested: root.menuOpen = false" in MENU
+assert 'label: "×"' in CLOSE
+assert "destructive: false" in CLOSE
+assert "accentColor: Colors.red" in CLOSE
+assert "hoverForegroundColor: Colors.red" in CLOSE
+assert "pressedForegroundColor: Colors.black" in CLOSE
+assert "contentGlowPressedOpacity: 1.0" in CLOSE
+assert "softGlowPressedOpacity: 1.0" in CLOSE
+assert "wideGlowPressedOpacity: 1.0" in CLOSE
 assert "text: root.feedStatus" in MENU
 assert 'emptyTitle: "NO TASKS LOADED"' in MENU
 assert 'emptyDetail: "LOCAL CHECKLIST"' in MENU

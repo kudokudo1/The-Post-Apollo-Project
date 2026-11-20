@@ -1,0 +1,69 @@
+name: Connections C3e / TimeW Brave Sway window identity (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_timew/TimeWBraveSwayIdentityPreflight.py'
+      - 'tests/connections/test_connections_c3e_timew_window_identity_preflight.py'
+      - '.github/workflows/connections-c3e-timew-brave-sway-identity-preflight.yml'
+      - 'docs/connections-c3e-timew-brave-sway-identity-preflight.md'
+      - 'services/time/MachineV2PairConsent.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-grant-single-window-pairing-correlation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install fixed disposable TimeW Ed25519 test dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Source-only TimeW schema reuse and no-authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_timew/TimeWBraveSwayIdentityPreflight.py \
+            tests/connections/test_connections_c3e_timew_window_identity_preflight.py
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("tests/connections/c3e_timew/TimeWBraveSwayIdentityPreflight.py").read_text()
+          timew=Path("services/time/MachineV2PairConsent.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          assert "TimeW._verify(signed_pairing, pairing_public_key, TimeW.PAIR_DOMAIN)" in s
+          for bad in ("sqlite3.connect(", "subprocess.run(", "socket.socket(",
+                      "Ed25519PrivateKey", "os.open(", "swaymsg",
+                      '"canRestoreBrave": True', '"productionAuthority": True'):
+              assert bad not in s, bad
+          for key in (
+              "installedPairingIssuerVerified", "operatorEnrollmentRootCustodyVerified",
+              "kernelPeerOrPidfdLeaseVerified","rootSignedExecutableReleaseVerified",
+              "independentSwaySessionVerified","swayWindowIdentityVerified",
+              "braveWindowInstanceAuthenticated","persistentBraveIdentityVerified",
+              "browserWindowReferenceAuthenticated","activeUnlockedOperatorSeatVerified",
+              "independentC5ConsentVerified","canSignNativePairing","canMoveWindow",
+              "canRestoreBrave","productionAuthority","credentialActionsEnabled"):
+              assert '"'+key+'": False' in s, key
+          assert 'production_authorized": False' in timew
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          print("C3E_TIMEW_HOLD // NO_NATIVE_PAIRING_ISSUER_OR_CONSENT")
+          PY
+      - name: Execute 34 adversarial signed pairing and Sway/process correlation cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$CI" = true
+          python3 -B tests/connections/test_connections_c3e_timew_window_identity_preflight.py
+          echo "C3E_TIMEW_PASS // 34_CI_ONLY_CORRELATION_CASES"

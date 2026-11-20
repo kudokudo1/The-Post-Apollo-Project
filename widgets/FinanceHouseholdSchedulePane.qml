@@ -480,7 +480,7 @@ Item {
                     anchors.topMargin: 7
                     anchors.left: parent.left
                     anchors.leftMargin: 7
-                    anchors.right: removeButton.left
+                    anchors.right: editButton.left
                     anchors.rightMargin: 5
                     text: scheduleRow.modelData.kind==="bill_due"
                         ? "BILL // "+schedules.billLabel(scheduleRow.modelData.expenseId)
@@ -497,7 +497,7 @@ Item {
                     anchors.bottomMargin: 8
                     anchors.left: parent.left
                     anchors.leftMargin: 7
-                    anchors.right: removeButton.left
+                    anchors.right: editButton.left
                     anchors.rightMargin: 5
                     text: scheduleRow.modelData.kind==="bill_due"
                         ? "DAY "+scheduleRow.modelData.dueDay
@@ -513,6 +513,7 @@ Item {
                     textFormat: Text.PlainText
                 }
                 ActionButton {
+                    id: editButton
                     anchors.right: removeButton.left
                     anchors.rightMargin: 4
                     anchors.verticalCenter: parent.verticalCenter

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FinanceW FP1f: versioned operator-entered schedules, no bank/Actual/identity access.
+"""FinanceW FP1g: versioned schedules with optional explicit deferred bill payment, no bank/Actual/identity access.
 
 A bill record references a monthly plan expense without duplicating its cost.
 A purchase is a separate dated planning payment, optionally funded from one
@@ -69,8 +69,20 @@ def valid_month(value):
 def valid_record(row, version):
     keys = ("id", "kind", "title", "expenseId", "dueDay", "date",
             "amountCents", "fundingGoalId")
+    if version == 3:
+        keys += ("sourceMonth",)
     if not exact(row, keys) or not valid_id(row["id"]):
         return False
+    if version == 3 and (type(row["sourceMonth"]) is not str or
+            (row["kind"] != "bill_defer" and row["sourceMonth"] != "")):
+        return False
+    if version == 3 and row["kind"] == "bill_defer":
+        return (row["title"] == "" and valid_id(row["expenseId"])
+                and type(row["dueDay"]) is int and row["dueDay"] == 0
+                and valid_month(row["sourceMonth"]) and valid_date(row["date"])
+                and row["date"][:7] > row["sourceMonth"]
+                and type(row["amountCents"]) is int and row["amountCents"] == 0
+                and row["fundingGoalId"] == "")
     if row["kind"] == "bill_due":
         return (row["title"] == "" and valid_id(row["expenseId"])
                 and type(row["dueDay"]) is int and 1 <= row["dueDay"] <= 31
@@ -83,7 +95,7 @@ def valid_record(row, version):
                 and type(row["amountCents"]) is int
                 and 1 <= row["amountCents"] <= MAX_CENTS
                 and (row["fundingGoalId"] == "" or valid_id(row["fundingGoalId"])))
-    if version == 2 and row["kind"] == "bill_skip":
+    if version in (2, 3) and row["kind"] == "bill_skip":
         return (row["title"] == "" and valid_id(row["expenseId"])
                 and type(row["dueDay"]) is int and row["dueDay"] == 0
                 and valid_month(row["date"]) and type(row["amountCents"]) is int
@@ -98,7 +110,7 @@ def empty(context):
 def validate(doc, context):
     if not exact(doc, ("version", "contextId", "revision", "rows")):
         fail("INVALID_STORE")
-    if (type(doc["version"]) is not int or doc["version"] not in (1, 2)
+    if (type(doc["version"]) is not int or doc["version"] not in (1, 2, 3)
             or doc["contextId"] != context):
         fail("INVALID_STORE")
     if type(doc["revision"]) is not int or not 0 <= doc["revision"] < 2**53:
@@ -115,6 +127,12 @@ def validate(doc, context):
     skips = [(r["expenseId"], r["date"])
              for r in rows if r["kind"] == "bill_skip"]
     if len(set(skips)) != len(skips) or any(expense not in bills for expense, _ in skips):
+        fail("INVALID_STORE")
+    defers = [(r["expenseId"], r["sourceMonth"])
+              for r in rows if r["kind"] == "bill_defer"]
+    if (len(set(defers)) != len(defers)
+            or any(expense not in bills for expense, _ in defers)
+            or any(pair in skips for pair in defers)):
         fail("INVALID_STORE")
     return doc
 
@@ -228,24 +246,38 @@ def make_skip(expense, month):
     return {"kind": "bill_skip", "title": "", "expenseId": expense,
             "dueDay": 0, "date": month, "amountCents": 0, "fundingGoalId": ""}
 
+def make_defer(expense, source_month, target_date):
+    if (not valid_id(expense) or not valid_month(source_month)
+            or not valid_date(target_date) or target_date[:7] <= source_month):
+        fail("INVALID_DEFERRAL")
+    return {"kind": "bill_defer", "title": "", "expenseId": expense,
+            "dueDay": 0, "date": target_date, "amountCents": 0,
+            "fundingGoalId": "", "sourceMonth": source_month}
+
 def apply(doc, command):
     context = command.get("contextId") if type(command) is dict else None
     validate(doc, context)
     action = command.get("action")
     if action == "list" and exact(command, ("action", "contextId")):
         return upgrade_in_memory(doc), False
-    choices = ("add_bill", "add_purchase", "add_skip", "update_bill",
-               "update_purchase", "update_skip", "delete")
+    choices = ("add_bill", "add_purchase", "add_skip", "add_defer",
+               "update_bill", "update_purchase", "update_skip",
+               "update_defer", "delete")
     if action not in choices:
         fail("INVALID_ACTION")
     if (type(command.get("expectedRevision")) is not int
             or command["expectedRevision"] != doc["revision"]):
         fail("STALE_REVISION")
     doc = upgrade_in_memory(doc)
+    if action in ("add_defer", "update_defer") and doc["version"] != 3:
+        doc = {"version": 3, "contextId": doc["contextId"],
+               "revision": doc["revision"],
+               "rows": [{**row, "sourceMonth": ""} for row in doc["rows"]]}
     base = ("action", "contextId", "expectedRevision")
     rows = list(doc["rows"])
-    kind = "bill_due" if action.endswith("bill") else (
-        "bill_skip" if action.endswith("skip") else "purchase")
+    kind = ("bill_due" if action.endswith("bill") else
+            "bill_skip" if action.endswith("skip") else
+            "bill_defer" if action.endswith("defer") else "purchase")
     if action in ("add_bill", "update_bill"):
         expected = base + (("id",) if action.startswith("update") else ()) + ("expenseId", "dueDay")
         if not exact(command, expected):
@@ -263,6 +295,13 @@ def apply(doc, command):
         if not exact(command, expected):
             fail("INVALID_COMMAND")
         record = make_skip(command["expenseId"], command["month"])
+    elif action in ("add_defer", "update_defer"):
+        expected = base + (("id",) if action.startswith("update") else ()) + (
+            "expenseId", "sourceMonth", "targetDate")
+        if not exact(command, expected):
+            fail("INVALID_COMMAND")
+        record = make_defer(command["expenseId"], command["sourceMonth"],
+                            command["targetDate"])
     else:
         if not exact(command, base + ("id",)) or not valid_id(command["id"]):
             fail("INVALID_COMMAND")
@@ -270,14 +309,16 @@ def apply(doc, command):
         if len(found) != 1:
             fail("NOT_FOUND")
         if (found[0]["kind"] == "bill_due" and any(
-                r["kind"] == "bill_skip" and
+                r["kind"] in ("bill_skip", "bill_defer") and
                 r["expenseId"] == found[0]["expenseId"] for r in rows)):
             fail("BILL_HAS_EXCEPTIONS")
         rows = [r for r in rows if r["id"] != command["id"]]
-        next_doc = {"version": 2, "contextId": context,
+        next_doc = {"version": doc["version"], "contextId": context,
                     "revision": doc["revision"]+1, "rows": rows}
         validate(next_doc, context)
         return next_doc, True
+    if doc["version"] == 3 and kind != "bill_defer":
+        record["sourceMonth"] = ""
     if action.startswith("update"):
         if not valid_id(command["id"]):
             fail("INVALID_ID")
@@ -287,7 +328,7 @@ def apply(doc, command):
         if found[0]["kind"] != kind:
             fail("KIND_CHANGE_REFUSED")
         if (kind == "bill_due" and record["expenseId"] != found[0]["expenseId"]
-                and any(r["kind"] == "bill_skip"
+                and any(r["kind"] in ("bill_skip", "bill_defer")
                         and r["expenseId"] == found[0]["expenseId"] for r in rows)):
             fail("BILL_HAS_EXCEPTIONS")
         record["id"] = command["id"]
@@ -297,7 +338,7 @@ def apply(doc, command):
             fail("ROW_LIMIT")
         record["id"] = "p-" + uuid.uuid4().hex
         rows.append(record)
-    next_doc = {"version": 2, "contextId": context,
+    next_doc = {"version": doc["version"], "contextId": context,
                 "revision": doc["revision"]+1, "rows": rows}
     # This validation rejects duplicate bill schedules, duplicate skip months,
     # and skipping a bill absent from this same local context.
@@ -311,7 +352,8 @@ def run(directory, command):
     if command.get("action") == "list":
         return apply(read_doc(directory, context), command)[0]
     if command.get("action") not in ("add_bill", "add_purchase", "add_skip",
-                                   "update_bill", "update_purchase", "update_skip", "delete"):
+                                   "add_defer", "update_bill", "update_purchase",
+                                   "update_skip", "update_defer", "delete"):
         fail("INVALID_ACTION")
     private_dir(directory, True)
     lock_file = directory / (context + ".lock")

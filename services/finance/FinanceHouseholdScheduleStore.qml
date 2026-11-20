@@ -17,6 +17,7 @@ Scope {
     property string submittedContext: ""
     property bool pendingReload: false
     signal scheduleSaved()
+    signal scheduleUpdated()
     signal scheduleDeleted()
 
     function clearView() {
@@ -80,6 +81,27 @@ Scope {
             expectedRevision:revision,title:title,date:date,
             amountText:amountText,fundingGoalId:fundingGoalId || ""});
     }
+    function updateBill(id,expenseId,dueDay) {
+        if (state!=="ready" || !monitoring) return false;
+        return invoke({action:"update_bill",contextId:contextId,
+            expectedRevision:revision,id:id,expenseId:expenseId,dueDay:dueDay});
+    }
+    function updatePurchase(id,title,date,amountText,fundingGoalId) {
+        if (state!=="ready" || !monitoring) return false;
+        return invoke({action:"update_purchase",contextId:contextId,
+            expectedRevision:revision,id:id,title:title,date:date,
+            amountText:amountText,fundingGoalId:fundingGoalId || ""});
+    }
+    function addSkip(expenseId,month) {
+        if (state!=="ready" || !monitoring) return false;
+        return invoke({action:"add_skip",contextId:contextId,
+            expectedRevision:revision,expenseId:expenseId,month:month});
+    }
+    function updateSkip(id,expenseId,month) {
+        if (state!=="ready" || !monitoring) return false;
+        return invoke({action:"update_skip",contextId:contextId,
+            expectedRevision:revision,id:id,expenseId:expenseId,month:month});
+    }
     function remove(id) {
         if (state!=="ready" || !monitoring) return false;
         return invoke({action:"delete",contextId:contextId,
@@ -116,7 +138,7 @@ Scope {
                         if (doc && doc.source==="LOCAL_OPERATOR_SCHEDULES"
                                 && doc.bankVerified===false
                                 && doc.identityVerified===false
-                                && doc.version===1
+                                && doc.version===2
                                 && doc.contextId===store.contextId
                                 && Number.isSafeInteger(doc.revision)
                                 && doc.revision>=0
@@ -124,7 +146,7 @@ Scope {
                                 && doc.rows.length<=60
                                 && doc.rows.every(function(row) {
                                     return row && typeof row.id==="string"
-                                        && (row.kind==="bill_due" || row.kind==="purchase")
+                                        && (row.kind==="bill_due" || row.kind==="purchase" || row.kind==="bill_skip")
                                         && typeof row.title==="string"
                                         && typeof row.expenseId==="string"
                                         && typeof row.date==="string"
@@ -142,6 +164,8 @@ Scope {
                                 store.scheduleSaved();
                             if (store.activeAction==="delete")
                                 store.scheduleDeleted();
+                            if (store.activeAction.indexOf("update_")===0)
+                                store.scheduleUpdated();
                         }
                     } catch(error) { /* No private payload in logs. */ }
                 }

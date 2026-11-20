@@ -13,7 +13,9 @@ assert 'sourceRows: savedPlans.rows' in pane
 assert 'contextId: plansPane.contextId' in pane
 assert 'startMonth: plansPane.currentMonth' in pane
 assert 'onHorizonRequested: function(months)' in pane
-assert '"timeline"].indexOf(next)' in pane
+# FP1e adds SCHEDULE without displacing the original TIMELINE page.
+assert ('"timeline"].indexOf(next)' in pane or
+        '"timeline","schedule"].indexOf(next)' in pane)
 assert 'forecastMonths=12;' in pane
 assert 'timelineMonths=6;' in pane
 assert 'NeonScrollPaneV2 {' in pane

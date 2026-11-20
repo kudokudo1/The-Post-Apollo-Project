@@ -50,7 +50,7 @@ Item {
         deadlineMonth="";
     }
     function setSection(next) {
-        if(["goals","expenses","income","forecast","timeline"].indexOf(next)<0)return;
+        if(["goals","expenses","income","forecast","timeline","schedule"].indexOf(next)<0)return;
         section=next;
         clearEditor();
         plansScroll.flickable.contentY=0;
@@ -71,7 +71,7 @@ Item {
         return true;
     }
     function submit() {
-        if(savedPlans.state!=="ready" || !entryTitle.trim() || section==="forecast" || section==="timeline"
+        if(savedPlans.state!=="ready" || !entryTitle.trim() || section==="forecast" || section==="timeline" || section==="schedule"
                 || editingStale)
             return false;
         armedDeleteId="";
@@ -129,7 +129,7 @@ Item {
             spacing: 9
             GohuText {
                 width: parent.width
-                text: "LOCAL PLANS // GOALS + RECURRING COSTS"
+                text: "LOCAL PLANS // GOALS + RECURRING COSTS + SCHEDULES"
                 color: Colors.magenta
                 font.pixelSize: 12
                 font.bold: true
@@ -216,6 +216,15 @@ Item {
                 selected: plansPane.section==="timeline"
                 onLeftClicked: plansPane.setSection("timeline")
             }
+            ActionButton {
+                width: body.width
+                height: 29
+                label: "SCHEDULE // BILL DUE DAYS + ONE-TIME PURCHASES"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                selected: plansPane.section==="schedule"
+                onLeftClicked: plansPane.setSection("schedule")
+            }
             GohuText {
                 width: parent.width
                 text: savedPlans.message
@@ -235,7 +244,7 @@ Item {
                 onLeftClicked: savedPlans.refresh()
             }
             GohuText {
-                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline"
+                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline" && plansPane.section!=="schedule"
                 width: parent.width
                 text: plansPane.editingId?"EDIT EXISTING LOCAL RECORD"
                     :plansPane.section==="goals"?"ADD A MANUAL SAVINGS TARGET"
@@ -245,7 +254,7 @@ Item {
                 color: Colors.white
             }
             Rectangle {
-                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline"
+                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline" && plansPane.section!=="schedule"
                 width: body.width
                 height: visible?31:0
                 color: Colors.dark
@@ -267,7 +276,7 @@ Item {
             }
             GohuText {
                 width: parent.width
-                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline"
+                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline" && plansPane.section!=="schedule"
                 text: "TITLE (E.G. CAR, RENT, EMERGENCY FUND)"
                 font.pixelSize: 9
                 color: Colors.cyan
@@ -315,7 +324,7 @@ Item {
             }
             Row {
                 width: body.width
-                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline"
+                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline" && plansPane.section!=="schedule"
                 height: visible?30:0
                 spacing: 5
                 GohuText {
@@ -378,7 +387,7 @@ Item {
                 onLeftClicked: plansPane.clearEditor()
             }
             ActionButton {
-                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline"
+                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline" && plansPane.section!=="schedule"
                 width: body.width
                 height: visible?31:0
                 label: plansPane.editingId?"UPDATE LOCAL PLAN":
@@ -400,7 +409,7 @@ Item {
             }
             GohuText {
                 width: parent.width
-                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline"
+                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline" && plansPane.section!=="schedule"
                 text: plansPane.section==="goals"
                     ? "MANUAL GOALS // NOT ACTUAL SAVINGS OR BALANCES"
                     : plansPane.section==="income"
@@ -499,7 +508,7 @@ Item {
             }
             GohuText {
                 width: parent.width
-                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline" &&
+                visible: plansPane.section!=="forecast" && plansPane.section!=="timeline" && plansPane.section!=="schedule" &&
                     (plansPane.section==="goals"?plansPane.goals.length:
                      plansPane.section==="income"?plansPane.incomeRows.length:
                      plansPane.expenses.length)===0
@@ -590,12 +599,23 @@ Item {
                     wrapMode: Text.WordWrap
                 }
             }
+            FinanceHouseholdSchedulePane {
+                id: localSchedule
+                width: body.width
+                visible: plansPane.section==="schedule"
+                active: plansPane.active
+                contextId: plansPane.contextId
+                expenses: plansPane.expenses
+                goals: plansPane.goals
+            }
             FinanceHouseholdTimelinePane {
                 width: body.width
                 visible: plansPane.section==="timeline"
                 active: savedPlans.state==="ready"
                     && plansPane.active && plansPane.section==="timeline"
                 sourceRows: savedPlans.rows
+                scheduleRows: localSchedule.scheduleRows
+                schedulesReady: localSchedule.ready
                 contextId: plansPane.contextId
                 startMonth: plansPane.currentMonth
                 horizonMonths: plansPane.timelineMonths

@@ -1,0 +1,63 @@
+name: Universal CloseButton menu migration contracts
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/FinanceW.qml"
+      - "widgets/CameraW.qml"
+      - "widgets/CompanyNetworkW.qml"
+      - "widgets/TasksW.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/ApolloHubW.qml"
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "modules/Trash.qml"
+      - "widgets/CompanyHubEditor.qml"
+      - "widgets/TimeResyncPopup.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "widgets/GitHubProjectsFieldEditor.qml"
+      - "components/CloseButton.qml"
+      - "components/qmldir"
+      - "tests/components/test_close_button_migration_contracts.py"
+      - ".github/workflows/close-button-migration-contracts.yml"
+  pull_request:
+    paths:
+      - "widgets/FinanceW.qml"
+      - "widgets/CameraW.qml"
+      - "widgets/CompanyNetworkW.qml"
+      - "widgets/TasksW.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/ApolloHubW.qml"
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "modules/Trash.qml"
+      - "widgets/CompanyHubEditor.qml"
+      - "widgets/TimeResyncPopup.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "widgets/GitHubProjectsFieldEditor.qml"
+      - "components/CloseButton.qml"
+      - "components/qmldir"
+      - "tests/components/test_close_button_migration_contracts.py"
+      - ".github/workflows/close-button-migration-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Shared Close × migration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Verify universal CloseButton and consumer callbacks
+        run: |
+          python3 tests/components/test_close_button_contracts.py
+          python3 tests/components/test_close_button_migration_contracts.py

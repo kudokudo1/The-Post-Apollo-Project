@@ -148,8 +148,12 @@ class TimeWWindowIdentityTests(unittest.TestCase):
         self.refuse("SIGNED_PAIR_SELECTION_DRIFT")
 
     def test_13_expired_or_future_pair_refused(self):
-        self.refuse("EXPIRED_OR_FUTURE_PAIRING",observed_at_ms=1_010_000)
-        self.refuse("EXPIRED_OR_FUTURE_PAIRING",observed_at_ms=999_999)
+        late=dict(self.selected,selected_at_ms=1_009_950)
+        early=dict(self.selected,selected_at_ms=999_900)
+        self.refuse("EXPIRED_OR_FUTURE_PAIRING",
+                    selected_window=late,observed_at_ms=1_010_000)
+        self.refuse("EXPIRED_OR_FUTURE_PAIRING",
+                    selected_window=early,observed_at_ms=999_999)
 
     def test_14_stale_selection_refused(self):
         self.refuse("STALE_SELECTION",observed_at_ms=1_002_001)

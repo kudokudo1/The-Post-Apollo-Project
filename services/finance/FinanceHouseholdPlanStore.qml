@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// FP1b: local operator-entered plans only. No verified household membership,
+// FP1c: local operator-entered plans only. No verified household membership,
 // bank sync, Actual Budget account connection, credentials or background work.
 Scope {
     id: store
@@ -18,6 +18,7 @@ Scope {
     property string submittedContext: ""
     property bool pendingReload: false
     signal entrySaved()
+    signal entryUpdated()
     signal entryDeleted()
 
     function clearView() {
@@ -67,11 +68,19 @@ Scope {
         });
         return true;
     }
-    function add(kind,title,targetText,savedText,monthlyText) {
+    function add(kind,title,targetText,savedText,monthlyText,deadlineMonth) {
         if (state!=="ready" || !monitoring) return false;
         return invoke({action:"add",contextId:contextId,expectedRevision:revision,
             kind:kind,title:title,targetText:targetText,
-            savedText:savedText,monthlyText:monthlyText});
+            savedText:savedText,monthlyText:monthlyText,
+            deadlineMonth:deadlineMonth || ""});
+    }
+    function update(id,kind,title,targetText,savedText,monthlyText,deadlineMonth) {
+        if (state!=="ready" || !monitoring) return false;
+        return invoke({action:"update",contextId:contextId,expectedRevision:revision,
+            id:id,kind:kind,title:title,targetText:targetText,
+            savedText:savedText,monthlyText:monthlyText,
+            deadlineMonth:deadlineMonth || ""});
     }
     function remove(id) {
         if (state!=="ready" || !monitoring) return false;
@@ -107,7 +116,7 @@ Scope {
                         if (doc && doc.source==="LOCAL_OPERATOR_PLANS"
                                 && doc.identityVerified===false
                                 && doc.bankVerified===false
-                                && doc.version===1
+                                && doc.version===2
                                 && doc.contextId===store.contextId
                                 && Number.isSafeInteger(doc.revision)
                                 && doc.revision>=0
@@ -115,7 +124,8 @@ Scope {
                                 && doc.rows.length<=60
                                 && doc.rows.every(function(row) {
                                     return row && typeof row.id==="string"
-                                        && (row.kind==="goal" || row.kind==="expense")
+                                        && (row.kind==="goal" || row.kind==="expense" || row.kind==="income")
+                                        && typeof row.deadlineMonth==="string"
                                         && typeof row.title==="string"
                                         && Number.isSafeInteger(row.monthlyCents)
                                         && Number.isSafeInteger(row.targetCents)
@@ -127,6 +137,7 @@ Scope {
                             store.message="LOCAL OPERATOR PLANS // NOT BANK VERIFIED";
                             accepted=true;
                             if (store.activeAction==="add")store.entrySaved();
+                            if (store.activeAction==="update")store.entryUpdated();
                             if (store.activeAction==="delete")store.entryDeleted();
                         }
                     } catch(error) { /* Refuse malformed private payload. */ }

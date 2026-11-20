@@ -112,7 +112,7 @@ assert "CloseButton {" in close_button
 assert 'Accessible.name: "Close Apollo Hub"' in close_button
 assert "onCloseRequested: hub.menuOpen = false" in close_button
 assert "onLeftClicked:" not in close_button
-shared_close = (root / "components/CloseButton.qml").read_text(encoding="utf-8")
+shared_close = (ROOT / "components/CloseButton.qml").read_text(encoding="utf-8")
 for token in (
     'label: "×"',
     "implicitWidth: 34",

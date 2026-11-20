@@ -24,6 +24,7 @@ assert "GOAL-LINKED PURCHASES FIRST USE" in editor
 assert 'Timeline.project(sourceRows,scheduleRows,startMonth,horizonMonths,contextId)' in timeline
 assert "billEvents" in timeline and "purchaseEvents" in timeline
 assert "NOT ACTUALLY PAID" in timeline
+assert "GOAL_SPENT_EARLIER" in timeline
 assert "INCLUDED IN COSTS ONCE" in timeline
 assert "SCHEDULE_REFERENCE_MISSING" in policy
 assert "futurePurchasesCharged:false" in policy

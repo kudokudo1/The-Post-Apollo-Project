@@ -7,6 +7,10 @@ bridge=(root/"services/finance/FinanceHouseholdPlanStore.qml").read_text()
 store=(root/"scripts/finance/household_plan_store.py").read_text()
 policy=(root/"widgets/FinanceHouseholdCashFlowPolicy.js").read_text()
 assert 'property string editingId: ""' in pane
+assert 'property int editingRevision: -1' in pane
+assert '|| editingStale)' in pane
+assert 'EDIT STALE // CANCEL EDIT' in pane
+assert 'months:360,label:"30 YEARS"' in pane
 assert 'savedPlans.update(' in pane
 assert 'onEntryUpdated: plansPane.clearEditor()' in pane
 assert 'onLeftClicked: plansPane.beginEdit(entryRow.modelData)' in pane

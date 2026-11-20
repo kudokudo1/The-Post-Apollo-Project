@@ -1,0 +1,51 @@
+name: Connections / Hospital staffing transport preflight (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "services/connections/hospital/staffing/StaffingTransportPreflight.py"
+      - "tests/connections/test_connections_hospital_staffing_transport_preflight.py"
+      - ".github/workflows/connections-hospital-staffing-transport-preflight.yml"
+      - "docs/connections-hospital-staffing-transport-preflight.md"
+  push:
+    branches: [main]
+    paths:
+      - "services/connections/hospital/staffing/StaffingTransportPreflight.py"
+      - "tests/connections/test_connections_hospital_staffing_transport_preflight.py"
+      - ".github/workflows/connections-hospital-staffing-transport-preflight.yml"
+      - "docs/connections-hospital-staffing-transport-preflight.md"
+
+permissions:
+  contents: read
+
+jobs:
+  transport:
+    name: Isolated staffing COMMIT and kernel-peer transport witness
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Read exact Connections proposed transport
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read exact protected Hospital #133 framing source (not deployed)
+        uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: ee1dc74056fbd2c849d3391e3148b003514b2932
+          path: hospital-source
+          persist-credentials: false
+
+      - name: Syntax and closed native entrypoint
+        run: |
+          python3 -m py_compile services/connections/hospital/staffing/StaffingTransportPreflight.py \
+            tests/connections/test_connections_hospital_staffing_transport_preflight.py
+          if python3 -c "import sys; sys.path.insert(0,'services/connections/hospital/staffing'); import StaffingTransportPreflight as p; p.run_native_issuer()"; then
+            echo "STAFFING NATIVE SERVICE IMPROPERLY ENABLED" >&2
+            exit 1
+          fi
+
+      - name: Exact full frame budget, Hospital parser parity, and real Linux peer packet refusal
+        run: |
+          python3 tests/connections/test_connections_hospital_staffing_transport_preflight.py

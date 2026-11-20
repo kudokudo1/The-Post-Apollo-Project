@@ -178,17 +178,17 @@ def inspect_candidate_query_ci_only(
         ) from exc
     if set(candidate) != FIELDS:
         _hold("QUERY_FIELDS_CHANGED")
-    _uuid(expected_query_id)
-    expected_challenge_b64 = _challenge(expected_challenge)
-    if (candidate["queryId"] != expected_query_id
-            or candidate["challengeB64"] != expected_challenge_b64):
-        _hold("QUERY_NOT_BOUND_TO_EXPECTED_CHALLENGE")
     try:
         challenge = Transport._decode_b64(candidate["challengeB64"], 32)
     except Transport.PreflightHold as exc:
         raise RecoveryQueryHold(
             "CONNECTIONS_HOSPITAL_RECOVER_QUERY_HOLD // INVALID_QUERY_CHALLENGE"
         ) from exc
+    _uuid(expected_query_id)
+    expected_challenge_b64 = _challenge(expected_challenge)
+    if (candidate["queryId"] != expected_query_id
+            or candidate["challengeB64"] != expected_challenge_b64):
+        _hold("QUERY_NOT_BOUND_TO_EXPECTED_CHALLENGE")
     expected = candidate_query_ci_only(
         original_prepare_raw=original_prepare_raw,
         prepared_raw=prepared_raw, commit_raw=commit_raw,

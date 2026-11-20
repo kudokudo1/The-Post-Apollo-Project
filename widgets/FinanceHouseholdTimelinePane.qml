@@ -92,7 +92,7 @@ Item {
             text: timeline.coverage && timeline.coverage.ok
                 ? "DUE-DAY COVERAGE // "+timeline.coverage.datedExpenseCount
                     +" / "+timeline.coverage.monthlyExpenseCount
-                    +" ENTERED MONTHLY COSTS HAVE DATES. "
+                    +" ENTERED EXPENSES HAVE DUE-DAY SCHEDULES. "
                     +"UNLISTED HOUSEHOLD BILLS ARE UNKNOWN."
                 : "COVERAGE UNAVAILABLE // "
                     +(timeline.coverage?timeline.coverage.reason:"LOCAL RECORDS NOT READY")
@@ -100,6 +100,22 @@ Item {
             color: timeline.coverage && timeline.coverage.ok
                 && timeline.coverage.undatedExpenseCount===0
                 ? Colors.cyan : Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
+            visible: timeline.coverage && timeline.coverage.ok
+                && timeline.coverage.cadenceCount>0
+            text: timeline.coverage && timeline.coverage.ok
+                ? "NONMONTHLY BILLING // "
+                    +timeline.coverage.quarterlyBillCount+" QUARTERLY, "
+                    +timeline.coverage.annualBillCount+" ANNUAL. "
+                    +"THE ENTERED EXPENSE AMOUNT IS CHARGED PER OCCURRENCE, "
+                    +"NOT AS A MONTHLY AVERAGE."
+                : ""
+            font.pixelSize: 9
+            color: Colors.orange
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
         }
@@ -257,6 +273,8 @@ Item {
                             width: monthContent.width
                             text: "BILL DUE "+modelData.dueDate+" // "+modelData.title
                                 +" // "+timeline.money(modelData.amountCents)
+                                +(modelData.intervalMonths===3?" (QUARTERLY)"
+                                    :modelData.intervalMonths===12?" (ANNUAL)":" (MONTHLY)")
                                 +(modelData.adjustedToMonthEnd?" (MONTH-END ADJUSTED)":"")
                                 +" // INCLUDED IN COSTS ONCE"
                             font.pixelSize: 9
@@ -331,7 +349,7 @@ Item {
         }
         GohuText {
             width: parent.width
-            text: "ESTIMATES ONLY: AN EXPLICIT DEFERRED BILL IS MODELED IN ITS NEW MONTH, ON TOP OF THAT MONTH\u0027S ORDINARY BILL. DEFERRED AMOUNTS TRACK THE CURRENT MANUAL MONTHLY COST, NOT A CONTRACTUAL PAYMENT. A BILL EXCLUDED FOR ONE MONTH IS NOT ASSUMED FORGIVEN, PAID OR DEFERRED. DUE DAYS LABEL MONTHLY COSTS COUNTED ONCE. ONE-TIME PURCHASES ARE SEPARATE; GOAL RESERVES ARE USED FIRST. UNKNOWN BILLS, TAX, DEBT, INFLATION AND STARTING CASH ARE OMITTED. NOTHING IS TRANSFERRED."
+            text: "NONMONTHLY BILLS USE PER-CHARGE AMOUNTS ONLY IN OCCURRENCE MONTHS; THIS IS NOT MONTHLY ACCRUAL. ESTIMATES ONLY: AN EXPLICIT DEFERRED BILL IS MODELED IN ITS NEW MONTH, ON TOP OF THAT MONTH\u0027S ORDINARY BILL. DEFERRED AMOUNTS TRACK THE CURRENT MANUAL MONTHLY COST, NOT A CONTRACTUAL PAYMENT. A BILL EXCLUDED FOR ONE MONTH IS NOT ASSUMED FORGIVEN, PAID OR DEFERRED. DUE DAYS LABEL MONTHLY COSTS COUNTED ONCE. ONE-TIME PURCHASES ARE SEPARATE; GOAL RESERVES ARE USED FIRST. UNKNOWN BILLS, TAX, DEBT, INFLATION AND STARTING CASH ARE OMITTED. NOTHING IS TRANSFERRED."
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText

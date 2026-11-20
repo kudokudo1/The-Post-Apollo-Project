@@ -21,14 +21,12 @@ sys.path.insert(0, str(ROOT / "tests/connections"))
 sys.path.insert(0, str(ROOT / "hospital-source/bin"))
 import StaffingUnknownCommitPreflight as U
 import StaffingTransportPreflight as T
-from test_connections_hospital_staffing_receipt_identity_preflight import (
-    StaffingReceiptIdentityTests,
-)
+import test_connections_hospital_staffing_receipt_identity_preflight as ReceiptFixtureModule
 
 
 class UnknownCommitPreflightTests(unittest.TestCase):
     def setUp(self):
-        fixture = StaffingReceiptIdentityTests("test_02_valid_fixture_is_never_native")
+        fixture = ReceiptFixtureModule.StaffingReceiptIdentityTests("test_02_valid_fixture_is_never_native")
         fixture.setUp()
         self.fixture = fixture
         self.base = dict(

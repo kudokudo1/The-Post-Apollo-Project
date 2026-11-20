@@ -51,6 +51,11 @@ on:
       - "scripts/finance/household_plan_store.py"
       - "scripts/finance/HOUSEHOLD_PLANS_FP1B_README.md"
       - "tests/finance/test_household_plan_store.py"
+      - "widgets/FinanceHouseholdCashFlowPolicy.js"
+      - "tests/finance/test_household_plan_store_fp1c.py"
+      - "tests/finance/test_household_cashflow_fp1c.mjs"
+      - "tests/finance/test_household_plans_fp1c_contracts.py"
+      - "scripts/finance/HOUSEHOLD_PLANS_FP1C_README.md"
       - "tests/finance/test_finance_household_plans_contracts.py"
       - "scripts/finance/HOUSEHOLD_SCENARIO_LAB_README.md"
       - "tests/finance/test_finance_household_planning.mjs"
@@ -170,6 +175,11 @@ on:
       - "scripts/finance/household_plan_store.py"
       - "scripts/finance/HOUSEHOLD_PLANS_FP1B_README.md"
       - "tests/finance/test_household_plan_store.py"
+      - "widgets/FinanceHouseholdCashFlowPolicy.js"
+      - "tests/finance/test_household_plan_store_fp1c.py"
+      - "tests/finance/test_household_cashflow_fp1c.mjs"
+      - "tests/finance/test_household_plans_fp1c_contracts.py"
+      - "scripts/finance/HOUSEHOLD_PLANS_FP1C_README.md"
       - "tests/finance/test_finance_household_plans_contracts.py"
       - "scripts/finance/HOUSEHOLD_SCENARIO_LAB_README.md"
       - "tests/finance/test_finance_household_planning.mjs"
@@ -289,6 +299,12 @@ jobs:
         run: node tests/finance/test_stock_back_to_range.mjs
       - name: Verify FinanceW FP1a hypothetical household calculations
         run: node tests/finance/test_finance_household_planning.mjs
+      - name: Test FP1c v1 file read compatibility and guarded edits
+        run: python3 tests/finance/test_household_plan_store_fp1c.py
+      - name: Test FP1c manual cash-flow and deadline arithmetic
+        run: node tests/finance/test_household_cashflow_fp1c.mjs
+      - name: Verify FP1c local income/editor boundaries
+        run: python3 tests/finance/test_household_plans_fp1c_contracts.py
       - name: Test FinanceW FP1b private local plan storage (fictional records)
         run: python3 tests/finance/test_household_plan_store.py
       - name: Verify FinanceW FP1b local planning/UI isolation

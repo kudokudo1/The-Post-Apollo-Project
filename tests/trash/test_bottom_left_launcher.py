@@ -13,6 +13,7 @@ POWER = (ROOT / "modules" / "Power.qml").read_text(encoding="utf-8")
 TRASH = (ROOT / "modules" / "Trash.qml").read_text(encoding="utf-8")
 SHELL = (ROOT / "shell.qml").read_text(encoding="utf-8")
 DOCK = (ROOT / "components" / "DockButton.qml").read_text(encoding="utf-8")
+CLOSE = (ROOT / "components" / "CloseButton.qml").read_text(encoding="utf-8")
 
 
 def number(source, name):
@@ -461,15 +462,22 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertNotIn('onLeftClicked: trashLauncher.confirmResearchBurn()', TRASH)
 
     def test_finance_red_close_button_family_and_no_destructive_shortcut(self):
+        self.assertIn('CloseButton {', TRASH)
         self.assertIn('id: closeTrashButton', TRASH)
-        self.assertIn('label: "×"', TRASH)
-        self.assertIn("accentColor: Colors.red", TRASH)
-        self.assertIn("destructive: true", TRASH)
-        self.assertIn("idleSoftGlowColor: Colors.red", TRASH)
-        self.assertIn("hoverSoftGlowColor: Colors.red", TRASH)
-        self.assertIn("idleWideGlowColor: Colors.red", TRASH)
-        self.assertIn("hoverWideGlowColor: Colors.red", TRASH)
-        self.assertIn("onLeftClicked: trashLauncher.toggle()", TRASH)
+        self.assertIn('width: 30', TRASH)
+        self.assertIn('onCloseRequested: trashLauncher.toggle()', TRASH)
+        for value in (
+            'label: "×"', 'destructive: false',
+            'idleFillColor: Colors.black', 'hoverFillColor: Colors.yellow',
+            'hoverForegroundColor: Colors.red',
+            'pressedFillColor: Colors.red', 'pressedForegroundColor: Colors.black',
+            'idleSoftGlowColor: Colors.red', 'hoverSoftGlowColor: Colors.red',
+            'idleWideGlowColor: Colors.red', 'hoverWideGlowColor: Colors.red',
+            'contentGlowPressedOpacity: 1.0',
+            'softGlowPressedOpacity: 1.0',
+            'wideGlowPressedOpacity: 1.0',
+        ):
+            self.assertIn(value, CLOSE)
         self.assertNotIn('onLeftClicked: trashLauncher.run("burn"', TRASH)
 
     def test_ipc_handler_type_is_imported_before_use(self):
@@ -494,7 +502,7 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn("height: trashMenu.visible ? trashMenu.height : 0", TRASH)
         self.assertIn("event.key === Qt.Key_Escape", TRASH)
         self.assertIn("trashLauncher.menuOpen = false", TRASH)
-        self.assertIn('label: "×"', TRASH)
+        self.assertIn('label: "×"', CLOSE)
         self.assertIn('text: "TRASH++ // " + trashLauncher.activeMode.toUpperCase()', TRASH)
         self.assertIn('Quickshell.shellPath("scripts/trash/trash_cli.py")', TRASH)
         self.assertIn('stdout: StdioCollector {', TRASH)

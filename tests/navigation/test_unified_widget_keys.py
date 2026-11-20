@@ -181,9 +181,13 @@ def test_weather_keyboard_live_indicator_and_close_follow_shared_contract():
     assert 'label: "FOCUS"' not in src
 
     assert "id: closeButton" in src
-    assert 'label: "×"' in src
-    assert "accentColor: Colors.red" in src
-    assert "destructive: true" in src
+    assert "CloseButton {" in src
+    assert "onCloseRequested: weatherStation.close()" in src
+    close_source = read("components/CloseButton.qml")
+    assert 'label: "×"' in close_source
+    assert "accentColor: Colors.red" in close_source
+    assert "destructive: false" in close_source
+    assert "wideGlowPressedOpacity: 1.0" in close_source
 
 
 def test_notifications_tab_cycles_every_real_mode_in_visual_order():

@@ -62,7 +62,8 @@ assert "width: root.menuOpen ? root.frameWidth : 0" in MENU
 assert "height: root.menuOpen ? root.frameHeight : 0" in MENU
 assert "visible: root.menuOpen" in MENU
 assert "menuOpen = !menuOpen;" in MENU
-assert "onLeftClicked: root.menuOpen = false" in MENU
+assert "CloseButton {" in MENU
+assert "onCloseRequested: root.menuOpen = false" in MENU
 assert "onMenuOpenChanged: {" in MENU
 assert "tasksFrame.forceActiveFocus();" in MENU
 assert "focus: root.menuOpen" in MENU

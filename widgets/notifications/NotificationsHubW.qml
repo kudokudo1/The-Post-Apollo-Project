@@ -3620,20 +3620,12 @@ PanelWindow {
                                     }
                                 }
 
-                                MiniButton {
-                                    width: 28
-                                    height: 28
-
-                                    label: "×"
-
-                                    labelPixelSize: 17
-
-                                    active: false
-                                    danger: true
-
-                                    onTriggered: {
-                                        root.dismissNotification(notificationEntry.notificationId);
-                                    }
+                                CloseButton {
+                                    // Card-level dismiss, not app-wide CLEAR ALL.
+                                    width: 29
+                                    Accessible.name: "Dismiss notification"
+                                    onCloseRequested:
+                                        root.dismissNotification(notificationEntry.notificationId)
                                 }
                             }
 

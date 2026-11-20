@@ -329,19 +329,13 @@ PanelWindow {
                 }
             }
 
-            ActionButton {
+            CloseButton {
                 id: closeButton
                 anchors.right: parent.right
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
-                width: 34
-                height: 32
-                label: "×"
-                labelPixelSize: 22
-                contentPadding: 4
-                accentColor: Colors.red
-                destructive: true
-                onLeftClicked: root.menuOpen = false
+                Accessible.name: "Close Tasks menu"
+                onCloseRequested: root.menuOpen = false
             }
         }
 

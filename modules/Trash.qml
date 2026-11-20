@@ -1761,7 +1761,7 @@ PanelWindow {
                 spacing: 6
 
                 GohuText {
-                    width: parent.width - 184
+                    width: parent.width - 180
                     height: parent.height
                     text: "TRASH++ // " + trashLauncher.activeMode.toUpperCase()
                           + " // " + trashLauncher.chassisSize.toUpperCase()
@@ -1813,30 +1813,13 @@ PanelWindow {
                     }
                 }
 
-                // Finance red-close treatment, using the shared ActionButton
-                // rather than duplicating free-standing shadows/MouseArea.
-                ActionButton {
+                // Shared CloseButton handles all three persistent red glows.
+                CloseButton {
                     id: closeTrashButton
-                    width: 34
-                    height: 28
-                    label: "×"
-                    labelPixelSize: 20
-                    contentPadding: 4
-                    accentColor: Colors.red
-                    destructive: true
-                    softGlowEnabled: true
-                    idleSoftGlowColor: Colors.red
-                    hoverSoftGlowColor: Colors.red
-                    pressedSoftGlowColor: Colors.red
-                    softGlowIdleOpacity: 0.48
-                    softGlowHoverOpacity: 0.70
-                    wideGlowEnabled: true
-                    idleWideGlowColor: Colors.red
-                    hoverWideGlowColor: Colors.red
-                    pressedWideGlowColor: Colors.red
-                    wideGlowIdleOpacity: 0.22
-                    wideGlowHoverOpacity: 0.32
-                    onLeftClicked: trashLauncher.toggle()
+                    // Compact 29px row: preserve 17:16 inside existing header.
+                    width: 30
+                    Accessible.name: "Close Trash menu"
+                    onCloseRequested: trashLauncher.toggle()
                 }
             }
 

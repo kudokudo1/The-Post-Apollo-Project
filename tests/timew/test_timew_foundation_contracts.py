@@ -103,7 +103,8 @@ assert "Keys.onShortcutOverride:" in window
 assert "Keys.onPressed:" in window
 for key in ("Tab", "Shift+Tab", "Esc"):
     assert 'sequence: "' + key + '"' in window
-assert "onLeftClicked: timew.menuOpen = false" in window
+assert "CloseButton {" in window
+assert "onCloseRequested: timew.menuOpen = false" in window
 
 # TimeW-specific white identity and shared 9px visible top alignment.
 # Preserve the clock dock position; moving the *TimeW window frame* is separate

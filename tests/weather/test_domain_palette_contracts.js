@@ -228,7 +228,8 @@ assert.match(
 assert.doesNotMatch(header, /text:\s*weatherStation\.currentContext/);
 assert.match(header, /height: 2\s+color: Colors\.cyan/);
 assert.match(header, /border\.color: weatherStation\.sourceStatusColor/);
-assert.match(header, /accentColor: Colors\.red/);
+assert.match(header, /CloseButton \{\s+id: closeButton/);
+assert.match(header, /onCloseRequested: weatherStation\.close\(\)/);
 
 // HOME is now a mixed-source dashboard instead of a placeholder or a
 // duplicated copy of the three full domain pages.

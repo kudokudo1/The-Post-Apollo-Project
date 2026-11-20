@@ -2566,7 +2566,7 @@ PanelWindow {
                 spacing: 8
 
                 GohuText {
-                    width: parent.width - (30 * 2 + 38 + cameraHeader.spacing * 3)
+                    width: parent.width - (30 * 2 + cameraCloseButton.width + cameraHeader.spacing * 3)
                            - (camera.activeView === "zoom" ? 110 : 0)
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
@@ -2618,13 +2618,10 @@ PanelWindow {
                     available: camera.chassisLevel !== "fullscreen"
                     onLeftClicked: camera.expandChassis()
                 }
-                ActionButton {
-                    width: 38
-                    height: 31
-                    label: "X"
-                    accentColor: Colors.red
-                    destructive: true
-                    onLeftClicked: camera.menuOpen = false
+                CloseButton {
+                    id: cameraCloseButton
+                    Accessible.name: "Close Camera menu"
+                    onCloseRequested: camera.menuOpen = false
                 }
             }
 

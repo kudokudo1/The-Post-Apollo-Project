@@ -18,9 +18,11 @@ This is **not** a verified SwayPX process or installed release. The expected ide
 
 GitHub Actions only. The suite exercises genuine Linux kernel process credentials and pidfd custody while a Python test-owned server writes synthetic Sway frames. Unlike \`SOCK_SEQPACKET\` per-message SCM_CREDENTIALS used for #2089's *native bridge*, this STREAM preflight makes **no response-sender attribution claim**.
 
+An additional real Linux fork test lets a child inherit the open STREAM endpoint and transmit the fake response while `SO_PEERCRED` remains pinned to its original parent. The observation is retained solely as diagnostic; `actualSwayIpcReplySenderProven` remains false. This explicitly demonstrates why checking only the original endpoint is insufficient for native authorization.
+
 ## VERIFY
 
-- [ ] Exact-head 12/12 CI Linux tests
+- [ ] Exact-head 13/13 CI Linux tests
 - [ ] Source static no-authority check and Grammar
 - [ ] Four additive C3e-only files
 - [ ] Nurse 2 review of kernel peer scope and inheritable-stream limits

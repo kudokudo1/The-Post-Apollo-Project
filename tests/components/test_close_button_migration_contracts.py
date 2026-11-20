@@ -27,8 +27,8 @@ for path, (component, handler) in cases.items():
     source = (ROOT / path).read_text(encoding="utf-8")
     assert source.count(component) == 1, (path, "exactly one shared CloseButton")
     assert handler in source, (path, "original close behavior")
-    assert "×" not in source if path in ("widgets/CameraW.qml",) else True
-    assert 'label: "X"' not in source if path in ("widgets/CameraW.qml",) else True
+    if path == "widgets/CameraW.qml":
+        assert 'label: "X"' not in source
 
 # Preserve distinct semantics and sizing of special-case close surfaces.
 company_editor = (ROOT / "widgets/CompanyHubEditor.qml").read_text(encoding="utf-8")

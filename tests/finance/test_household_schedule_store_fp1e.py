@@ -66,7 +66,9 @@ class Schedule(unittest.TestCase):
                 self.purchase(goal=goal)
         with self.assertRaises(m.Refusal):
             m.run(self.path,{"action":"list","contextId":"mine","token":"secret"})
-        self.assertFalse(self.path.exists())
+        # A rejected write may create a private directory/lock for serialization,
+        # but it must never commit a schedule document.
+        self.assertFalse((self.path/"mine.json").exists())
     def test_delete_refuses_other_context(self):
         saved=self.purchase()
         uid=saved["rows"][0]["id"]

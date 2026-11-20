@@ -1,0 +1,52 @@
+name: Connections C3e TimeW Sway IPC kernel peer (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_timew/TimeWSwayIpcKernelPeerPreflight.py'
+      - 'tests/connections/test_connections_c3e_timew_sway_ipc_kernel_peer.py'
+      - '.github/workflows/connections-c3e-timew-sway-kernel-peer-ci.yml'
+      - 'docs/connections-c3e-timew-sway-ipc-peer-boundary.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-linux-peer-not-real-sway-authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Static native-authority denial
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_timew/TimeWSwayIpcKernelPeerPreflight.py \
+            tests/connections/test_connections_c3e_timew_sway_ipc_kernel_peer.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("tests/connections/c3e_timew/TimeWSwayIpcKernelPeerPreflight.py").read_text()
+          for required in ('socket.SO_PEERCRED', 'Lease.capture_socket_peer',
+                           'Tree.inspect_fake_sway_ipc_ci_only',
+                           'REAL_COMPOSITOR_OR_BRAVE_WINDOW_TRUST_NOT_IMPLEMENTED',
+                           '"canRestoreBrave": False', '"productionAuthority": False'):
+              assert required in p, required
+          for forbidden in ('socket.bind(', 'socket.connect(', 'Ed25519PrivateKey',
+                            'subprocess', 'swaymsg', '"canMoveWindow": True'):
+              assert forbidden not in p, forbidden
+          PY
+      - name: 12 actual Linux peer + fake Sway reply denial tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CI" = true
+          test "$GITHUB_ACTIONS" = true
+          python3 -B tests/connections/test_connections_c3e_timew_sway_ipc_kernel_peer.py
+          echo "C3E_TIMEW_SWAY_KERNEL_HOLD // NO_COMPOSITOR_OR_BRAVE_AUTHORITY"

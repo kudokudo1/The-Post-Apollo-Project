@@ -1,0 +1,47 @@
+name: Connections C3e / TimeW Sway IPC tree wire preflight (CI only)
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_timew/TimeWSwayIpcTreeReadPreflight.py'
+      - 'tests/connections/test_connections_c3e_timew_sway_ipc_tree.py'
+      - '.github/workflows/connections-c3e-timew-sway-ipc-tree-ci.yml'
+      - 'docs/connections-c3e-timew-sway-ipc-observation.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-fake-sway-ipc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read-only source static HOLD
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_timew/TimeWSwayIpcTreeReadPreflight.py \
+            tests/connections/test_connections_c3e_timew_sway_ipc_tree.py
+          python3 - <<'PY'
+          from pathlib import Path
+          x = Path("tests/connections/c3e_timew/TimeWSwayIpcTreeReadPreflight.py").read_text()
+          for marker in ('GET_TREE = 4', 'NATIVE_BRAVE_WAYLAND_TRUST_NOT_IMPLEMENTED',
+                         '"canRestoreBrave": False', '"productionAuthority": False'):
+              assert marker in x, marker
+          for forbidden in ('subprocess', 'swaymsg', 'Ed25519PrivateKey',
+                            'socket.connect(', 'socket.bind(', '"canMoveWindow": True'):
+              assert forbidden not in x, forbidden
+          PY
+      - name: Disposable Sway wire and ambiguity denials
+        run: |
+          set -euo pipefail
+          test "$CI" = true
+          test "$GITHUB_ACTIONS" = true
+          python3 -B tests/connections/test_connections_c3e_timew_sway_ipc_tree.py
+          echo "C3E_TIMEW_SWAY_IPC_DIAGNOSTIC_ONLY // NO_BROWSER_SURFACE_AUTHORITY"

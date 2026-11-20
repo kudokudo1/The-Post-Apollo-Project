@@ -62,6 +62,10 @@ on:
       - "widgets/FinanceHouseholdSchedulePane.qml"
       - "tests/finance/test_household_schedule_store_fp1e.py"
       - "tests/finance/test_household_schedule_timeline_fp1e.mjs"
+      - "tests/finance/test_household_schedule_fp1f.py"
+      - "tests/finance/test_household_schedule_timeline_fp1f.mjs"
+      - "tests/finance/test_household_schedule_fp1f_contracts.py"
+      - "scripts/finance/HOUSEHOLD_SCHEDULE_FP1F_README.md"
       - "tests/finance/test_household_schedule_fp1e_contracts.py"
       - "scripts/finance/HOUSEHOLD_SCHEDULE_FP1E_README.md"
       - "tests/finance/test_household_timeline_fp1d_contracts.py"
@@ -198,6 +202,10 @@ on:
       - "widgets/FinanceHouseholdSchedulePane.qml"
       - "tests/finance/test_household_schedule_store_fp1e.py"
       - "tests/finance/test_household_schedule_timeline_fp1e.mjs"
+      - "tests/finance/test_household_schedule_fp1f.py"
+      - "tests/finance/test_household_schedule_timeline_fp1f.mjs"
+      - "tests/finance/test_household_schedule_fp1f_contracts.py"
+      - "scripts/finance/HOUSEHOLD_SCHEDULE_FP1F_README.md"
       - "tests/finance/test_household_schedule_fp1e_contracts.py"
       - "scripts/finance/HOUSEHOLD_SCHEDULE_FP1E_README.md"
       - "tests/finance/test_household_timeline_fp1d_contracts.py"
@@ -325,6 +333,12 @@ jobs:
         run: node tests/finance/test_finance_household_planning.mjs
       - name: Test FP1c v1 file read compatibility and guarded edits
         run: python3 tests/finance/test_household_plan_store_fp1c.py
+      - name: Test FP1f versioned schedule edits and exception refusals
+        run: python3 tests/finance/test_household_schedule_fp1f.py
+      - name: Test FP1f monthly exclusions and due-day coverage
+        run: node tests/finance/test_household_schedule_timeline_fp1f.mjs
+      - name: Verify FP1f schedule UI and source isolation
+        run: python3 tests/finance/test_household_schedule_fp1f_contracts.py
       - name: Test FP1e local schedule files and refusal safety
         run: python3 tests/finance/test_household_schedule_store_fp1e.py
       - name: Test FP1e scheduled bills and one-time purchase math

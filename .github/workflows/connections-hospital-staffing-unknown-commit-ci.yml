@@ -1,0 +1,77 @@
+name: Connections / Hospital staffing uncertain COMMIT refusal (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/hospital/staffing/StaffingUnknownCommitPreflight.py'
+      - 'tests/connections/test_connections_hospital_staffing_unknown_commit_preflight.py'
+      - 'docs/connections-hospital-staffing-unknown-commit-preflight.md'
+      - '.github/workflows/connections-hospital-staffing-unknown-commit-ci.yml'
+      - 'services/connections/hospital/staffing/StaffingReceiptIdentityPreflight.py'
+      - 'services/connections/hospital/staffing/StaffingTransportPreflight.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-native-retry-with-untrusted-response:
+    name: Unknown outcome cannot become COMMITTED or replayed
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact Connections source candidate
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout pinned Hospital coordinator source (NO deployment)
+        uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: ee1dc74056fbd2c849d3391e3148b003514b2932
+          path: hospital-source
+          persist-credentials: false
+      - name: Verify static deny-only boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/hospital/staffing/StaffingUnknownCommitPreflight.py \
+            tests/connections/test_connections_hospital_staffing_unknown_commit_preflight.py
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("services/connections/hospital/staffing/StaffingUnknownCommitPreflight.py").read_text()
+          assert "Receipt._source_context(" in s
+          assert "NATIVE_HOSPITAL_WRITER_RECOVERY_NOT_INSTALLED" in s
+          for name in ("sqlite3.connect(", "socket.socket(", "subprocess.run(",
+                       "Ed25519PrivateKey", "os.open(", "sendall("):
+              assert name not in s, name
+          for name in (
+              "writerIdentityAuthenticated", "installedWriterReleaseVerified",
+              "writerReceiptAuthenticated", "writerTransactionCommittedVerified",
+              "writerTransactionRefusedVerified", "writerAlreadyAppliedVerified",
+              "hospitalReplayLedgerVerified", "hospitalNativeReceiptSchemaApproved",
+              "nativeOperatorAuthorized", "c5HumanConsentVerified",
+              "canRetryWithSameGrant", "canReplayCommit", "canAttachSession",
+              "canSucceedDoctor", "credentialActionsEnabled", "productionAuthority",
+          ):
+              assert '"'+name+'": False' in s, name
+          assert "readonly property bool credentialActionsEnabled: false" in Path(
+              "services/connections/ConnectionsBroker.qml").read_text()
+          print("STAFFING_UNKNOWN_COMMIT_HOLD // NO_VERIFIED_TRANSACTION_NO_REPLAY")
+          PY
+      - name: Run 24 hostile uncertain-commit classification checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$CI" = true
+          python3 -B tests/connections/test_connections_hospital_staffing_unknown_commit_preflight.py
+          echo "STAFFING_UNKNOWN_COMMIT_PASS // 24_DENY_ONLY_CASES"
+      - name: Preserve parent receipt and kernel transport source regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_hospital_staffing_receipt_identity_preflight.py
+          python3 -B tests/connections/test_connections_hospital_staffing_transport_preflight.py
+          echo "STAFFING_UNKNOWN_COMMIT_HOLD // NO_INSTALLED_HOSPITAL_WRITER"

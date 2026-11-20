@@ -16,6 +16,10 @@ Item {
     property string monthlyText: "100.00"
     property string armedDeleteId: ""
     property string editingId: ""
+    property int editingRevision: -1
+    readonly property bool editingStale: editingId!=="" &&
+        (editingRevision!==savedPlans.revision ||
+         !savedPlans.rows.some(function(row){return row.id===editingId;}))
     property string deadlineMonth: ""
     property int forecastMonths: 12
     readonly property string currentMonth: Qt.formatDate(new Date(),"yyyy-MM")
@@ -41,6 +45,7 @@ Item {
         monthlyText="100.00";
         armedDeleteId="";
         editingId="";
+        editingRevision=-1;
         deadlineMonth="";
     }
     function setSection(next) {
@@ -56,6 +61,7 @@ Item {
         section=next;
         clearEditor();
         editingId=row.id;
+        editingRevision=savedPlans.revision;
         entryTitle=row.title;
         targetText=(row.targetCents/100).toFixed(2);
         savedText=(row.savedCents/100).toFixed(2);
@@ -64,7 +70,8 @@ Item {
         return true;
     }
     function submit() {
-        if(savedPlans.state!=="ready" || !entryTitle.trim() || section==="forecast")
+        if(savedPlans.state!=="ready" || !entryTitle.trim() || section==="forecast"
+                || editingStale)
             return false;
         armedDeleteId="";
         const kind=section==="goals"?"goal":section==="expenses"?"expense":"income";
@@ -368,8 +375,17 @@ Item {
                     plansPane.section==="income"?"SAVE MANUAL INCOME":"SAVE LOCAL COST"
                 labelPixelSize: 10
                 accentColor: Colors.omnitrix
-                available: savedPlans.state==="ready"
+                available: savedPlans.state==="ready" && !plansPane.editingStale
                 onLeftClicked: plansPane.submit()
+            }
+            GohuText {
+                width: parent.width
+                visible: plansPane.editingStale
+                text: "EDIT STALE // CANCEL EDIT AND RELOAD CURRENT RECORD"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
             }
             GohuText {
                 width: parent.width
@@ -501,7 +517,9 @@ Item {
                     Repeater {
                         model: [{months:12,label:"12 MONTHS"},
                                 {months:36,label:"36 MONTHS"},
-                                {months:60,label:"60 MONTHS"}]
+                                {months:60,label:"60 MONTHS"},
+                                {months:120,label:"10 YEARS"},
+                                {months:360,label:"30 YEARS"}]
                         delegate: ActionButton {
                             required property var modelData
                             width: Math.max(80,(forecastPeriod.width-10)/3)

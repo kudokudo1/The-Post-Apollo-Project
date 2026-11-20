@@ -194,11 +194,14 @@ Item {
                         delegate: GohuText {
                             required property var modelData
                             width: monthContent.width
-                            text: "TARGET // "+modelData.title
-                                +" // "+(modelData.gapCents>0
-                                    ? "GAP "+timeline.money(modelData.gapCents)
-                                    : "FUNDED IN MODEL")
-                                +" // NOT A PURCHASE PAYMENT"
+                            text: modelData.status==="GOAL_SPENT_EARLIER"
+                                ? "GOAL // "+modelData.title
+                                  +" // RESERVED MONEY MODELED AS SPENT EARLIER"
+                                : "TARGET // "+modelData.title
+                                  +" // "+(modelData.gapCents>0
+                                      ? "GAP "+timeline.money(modelData.gapCents)
+                                      : "FUNDED IN MODEL")
+                                  +" // NOT A PURCHASE PAYMENT"
                             font.pixelSize: 9
                             color: modelData.gapCents>0?Colors.orange:Colors.magenta
                             textFormat: Text.PlainText

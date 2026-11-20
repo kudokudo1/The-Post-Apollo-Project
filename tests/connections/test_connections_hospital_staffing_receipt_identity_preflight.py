@@ -101,7 +101,7 @@ class StaffingReceiptIdentityTests(unittest.TestCase):
             "sessionId": self.original["intent"]["sessionId"],
             "writerInstance": self.prepared["writerInstance"],
             "expectedRevision": self.prepared["expectedRevision"],
-            "revisionAfter": self.prepared["expectedRevision"] + 1,
+
             "graphDigest": self.prepared["expectedDigest"],
             "grantDigest": self.grant_digest,
             "originalPrepareSha256": hashlib.sha256(self.original_raw).hexdigest(),
@@ -214,11 +214,14 @@ class StaffingReceiptIdentityTests(unittest.TestCase):
         self.refused("PROPOSED_RECEIPT_VERSION_OR_IDENTITY_MISMATCH",proposal=True,
                      proposed_receipt_raw=self.proposed_changed(writerInstance="other-writer-001"))
 
-    def test_17_stale_revision_and_revision_after(self):
-        for field in ("expectedRevision", "revisionAfter"):
-            with self.subTest(field=field):
-                self.refused("PROPOSED_RECEIPT_VERSION_OR_IDENTITY_MISMATCH",proposal=True,
-                             proposed_receipt_raw=self.proposed_changed(**{field:99}))
+    def test_17_stale_or_unapproved_revision_field(self):
+        self.refused("PROPOSED_RECEIPT_VERSION_OR_IDENTITY_MISMATCH",proposal=True,
+                     proposed_receipt_raw=self.proposed_changed(expectedRevision=99))
+        # Hospital #133 does not guarantee the Room revision increments
+        # exactly by one after a successful Session/Doctor transaction.
+        # Any fabricated post-commit revision is an unknown extra field.
+        self.refused("UNEXPECTED_OR_MISSING_RECORD_FIELDS",proposal=True,
+                     proposed_receipt_raw=self.proposed_changed(revisionAfter=6))
 
     def test_18_wrong_graph_digest(self):
         self.refused("PROPOSED_RECEIPT_VERSION_OR_IDENTITY_MISMATCH",proposal=True,

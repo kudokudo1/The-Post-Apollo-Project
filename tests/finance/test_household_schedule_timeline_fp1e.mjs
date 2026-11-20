@@ -57,6 +57,10 @@ assert.equal(shortage.ok,true);
 assert.equal(shortage.months[2].purchaseGoalFundedCents,40000);
 assert.equal(shortage.months[2].purchaseNewCashCents,15000);
 assert.equal(shortage.months[2].changeCents,155000);
+const lateGoal={...goal,deadlineMonth:"2027-03"};
+const spent=p.project([income,rent,lateGoal],[linked],"2026-11",6,"mine");
+assert.equal(spent.months[4].events[0].status,"GOAL_SPENT_EARLIER");
+assert.equal(spent.months[3].contributionCents,0);
 const leap=p.project([income,rent],[bill],"2028-02",6,"family");
 assert.equal(leap.months[0].billEvents[0].dueDate,"2028-02-29");
 assert.equal(p.project(records,[bill,{...linked,fundingGoalId:id("9")}],

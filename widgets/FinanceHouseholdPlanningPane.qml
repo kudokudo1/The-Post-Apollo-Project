@@ -5,6 +5,8 @@ import "FinanceHouseholdPlanningPolicy.js" as Planning
 // FP1a: in-memory scenario lab. Not an Actual, Connections or account reader.
 Item {
     id: planner
+    property bool active: false
+    property string planningView: "compare"
     property string activeContextId: "mine"
     property string upfrontText: "1800.00"
     property string operatingText: "85.00"
@@ -59,9 +61,51 @@ Item {
     onExtraHoursChanged: preview=null
     onHorizonMonthsChanged: preview=null
 
+    Row {
+        id: planningViews
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 35
+        spacing: 5
+        ActionButton {
+            width: (parent.width-5)/2
+            height: 30
+            label: "COMPARE"
+            labelPixelSize: 10
+            accentColor: Colors.cyan
+            selected: planner.planningView==="compare"
+            onLeftClicked: planner.planningView="compare"
+        }
+        ActionButton {
+            width: (parent.width-5)/2
+            height: 30
+            label: "PLANS"
+            labelPixelSize: 10
+            accentColor: Colors.omnitrix
+            selected: planner.planningView==="plans"
+            onLeftClicked: planner.planningView="plans"
+        }
+    }
+    FinanceHouseholdPlansPane {
+        id: householdPlans
+        anchors.top: planningViews.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        visible: planner.planningView==="plans"
+        active: planner.active && planner.planningView==="plans"
+        contextId: planner.activeContextId
+        onContextRequested: function(id) { planner.chooseContext(id); }
+    }
+
     NeonScrollPaneV2 {
         id: plannerScroll
-        anchors.fill: parent
+        anchors.top: planningViews.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        visible: planner.planningView==="compare"
         availableExtent: height
         viewportPolicy: "fill"
         contentExtent: body.implicitHeight+20

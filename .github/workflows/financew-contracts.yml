@@ -46,6 +46,12 @@ on:
       - "widgets/FinanceStockModePolicy.js"
       - "widgets/FinanceHouseholdPlanningPane.qml"
       - "widgets/FinanceHouseholdPlanningPolicy.js"
+      - "widgets/FinanceHouseholdPlansPane.qml"
+      - "services/finance/FinanceHouseholdPlanStore.qml"
+      - "scripts/finance/household_plan_store.py"
+      - "scripts/finance/HOUSEHOLD_PLANS_FP1B_README.md"
+      - "tests/finance/test_household_plan_store.py"
+      - "tests/finance/test_finance_household_plans_contracts.py"
       - "scripts/finance/HOUSEHOLD_SCENARIO_LAB_README.md"
       - "tests/finance/test_finance_household_planning.mjs"
       - "tests/finance/test_finance_household_planning_contracts.py"
@@ -159,6 +165,12 @@ on:
       - "widgets/FinanceStockModePolicy.js"
       - "widgets/FinanceHouseholdPlanningPane.qml"
       - "widgets/FinanceHouseholdPlanningPolicy.js"
+      - "widgets/FinanceHouseholdPlansPane.qml"
+      - "services/finance/FinanceHouseholdPlanStore.qml"
+      - "scripts/finance/household_plan_store.py"
+      - "scripts/finance/HOUSEHOLD_PLANS_FP1B_README.md"
+      - "tests/finance/test_household_plan_store.py"
+      - "tests/finance/test_finance_household_plans_contracts.py"
       - "scripts/finance/HOUSEHOLD_SCENARIO_LAB_README.md"
       - "tests/finance/test_finance_household_planning.mjs"
       - "tests/finance/test_finance_household_planning_contracts.py"
@@ -277,6 +289,10 @@ jobs:
         run: node tests/finance/test_stock_back_to_range.mjs
       - name: Verify FinanceW FP1a hypothetical household calculations
         run: node tests/finance/test_finance_household_planning.mjs
+      - name: Test FinanceW FP1b private local plan storage (fictional records)
+        run: python3 tests/finance/test_household_plan_store.py
+      - name: Verify FinanceW FP1b local planning/UI isolation
+        run: python3 tests/finance/test_finance_household_plans_contracts.py
       - name: Verify FinanceW FP1a Strategies UI/source isolation
         run: python3 tests/finance/test_finance_household_planning_contracts.py
       - name: Verify opt-in OSIRIS globe does not affect FinanceW startup

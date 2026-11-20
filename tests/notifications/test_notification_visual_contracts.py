@@ -226,6 +226,9 @@ assert footer_buttons.index('notificationEntry.targetWholeApp ? "APP"') < footer
 assert 'spacing: 5' in footer_buttons
 assert 'right: cardFooterActions.left' in HUB, "reserve actual footer row width beside message"
 assert 'label: "ZZ"' in top_buttons and 'label: "DND"' in top_buttons
-assert 'label: "CLEAR ALL"' in top_buttons and 'label: "×"' in top_buttons
+assert 'label: "CLEAR ALL"' in top_buttons
+assert 'CloseButton {' in top_buttons
+assert 'root.dismissNotification(notificationEntry.notificationId)' in top_buttons
+assert 'onCloseRequested:' in top_buttons
 
 print("Notification visual contracts: PASS")

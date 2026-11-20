@@ -102,6 +102,18 @@ Scope {
         return invoke({action:"update_skip",contextId:contextId,
             expectedRevision:revision,id:id,expenseId:expenseId,month:month});
     }
+    function addDeferral(expenseId,sourceMonth,targetDate) {
+        if (state!=="ready" || !monitoring) return false;
+        return invoke({action:"add_defer",contextId:contextId,
+            expectedRevision:revision,expenseId:expenseId,
+            sourceMonth:sourceMonth,targetDate:targetDate});
+    }
+    function updateDeferral(id,expenseId,sourceMonth,targetDate) {
+        if (state!=="ready" || !monitoring) return false;
+        return invoke({action:"update_defer",contextId:contextId,
+            expectedRevision:revision,id:id,expenseId:expenseId,
+            sourceMonth:sourceMonth,targetDate:targetDate});
+    }
     function remove(id) {
         if (state!=="ready" || !monitoring) return false;
         return invoke({action:"delete",contextId:contextId,
@@ -138,7 +150,7 @@ Scope {
                         if (doc && doc.source==="LOCAL_OPERATOR_SCHEDULES"
                                 && doc.bankVerified===false
                                 && doc.identityVerified===false
-                                && doc.version===2
+                                && (doc.version===2 || doc.version===3)
                                 && doc.contextId===store.contextId
                                 && Number.isSafeInteger(doc.revision)
                                 && doc.revision>=0
@@ -146,8 +158,9 @@ Scope {
                                 && doc.rows.length<=60
                                 && doc.rows.every(function(row) {
                                     return row && typeof row.id==="string"
-                                        && (row.kind==="bill_due" || row.kind==="purchase" || row.kind==="bill_skip")
+                                        && (row.kind==="bill_due" || row.kind==="purchase" || row.kind==="bill_skip" || row.kind==="bill_defer")
                                         && typeof row.title==="string"
+                                        && (doc.version!==3 || typeof row.sourceMonth==="string")
                                         && typeof row.expenseId==="string"
                                         && typeof row.date==="string"
                                         && typeof row.fundingGoalId==="string"
@@ -160,7 +173,8 @@ Scope {
                             store.message="LOCAL SCHEDULE // NOT BANK VERIFIED";
                             accepted=true;
                             if (store.activeAction==="add_bill"
-                                    || store.activeAction==="add_purchase")
+                                    || store.activeAction==="add_purchase"
+                                    || store.activeAction==="add_defer")
                                 store.scheduleSaved();
                             if (store.activeAction==="delete")
                                 store.scheduleDeleted();

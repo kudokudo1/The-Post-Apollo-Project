@@ -21,6 +21,8 @@ Item {
     property string editingId: ""
     property int editingRevision: -1
     property string skipMonth: Qt.formatDate(new Date(),"yyyy-MM")
+    property string deferSourceMonth: Qt.formatDate(new Date(),"yyyy-MM")
+    property string deferTargetDate: Qt.formatDate(new Date(),"yyyy-MM-dd")
     readonly property bool editingStale: editingId!=="" &&
         (editingRevision!==scheduleStore.revision ||
          !scheduleStore.rows.some(function(row){return row.id===editingId;}))
@@ -57,10 +59,12 @@ Item {
         editingId="";
         editingRevision=-1;
         skipMonth=Qt.formatDate(new Date(),"yyyy-MM");
+        deferSourceMonth=Qt.formatDate(new Date(),"yyyy-MM");
+        deferTargetDate=Qt.formatDate(new Date(),"yyyy-MM-dd");
     }
     onContextIdChanged: clearEditor()
     function setKind(kind) {
-        if(kind!=="bill"&&kind!=="purchase"&&kind!=="skip")return;
+        if(kind!=="bill"&&kind!=="purchase"&&kind!=="skip"&&kind!=="defer")return;
         editorKind=kind;
         clearEditor();
     }
@@ -75,6 +79,11 @@ Item {
             editorKind="skip";
             selectedExpenseId=row.expenseId;
             skipMonth=row.date;
+        } else if(row.kind==="bill_defer") {
+            editorKind="defer";
+            selectedExpenseId=row.expenseId;
+            deferSourceMonth=row.sourceMonth;
+            deferTargetDate=row.date;
         } else if(row.kind==="purchase") {
             editorKind="purchase";
             purchaseTitle=row.title;
@@ -117,6 +126,16 @@ Item {
             if(editingId)
                 return scheduleStore.updateSkip(editingId,selectedExpenseId,skipMonth);
             return scheduleStore.addSkip(selectedExpenseId,skipMonth);
+        }
+        if(editorKind==="defer") {
+            if(!scheduledBills.some(function(row){
+                    return row.expenseId===selectedExpenseId;
+                }))return false;
+            if(editingId)
+                return scheduleStore.updateDeferral(editingId,selectedExpenseId,
+                    deferSourceMonth,deferTargetDate);
+            return scheduleStore.addDeferral(selectedExpenseId,
+                deferSourceMonth,deferTargetDate);
         }
         if(!purchaseTitle.trim() || (fundingGoalId
                 && !goals.some(function(g){return g.id===fundingGoalId;})))
@@ -188,6 +207,15 @@ Item {
             selected: schedules.editorKind==="skip"
             onLeftClicked: schedules.setKind("skip")
         }
+        ActionButton {
+            width: parent.width
+            height: 29
+            label: "DEFER ONE BILL TO A LATER DATE"
+            labelPixelSize: 9
+            accentColor: Colors.magenta
+            selected: schedules.editorKind==="defer"
+            onLeftClicked: schedules.setKind("defer")
+        }
         GohuText {
             width: parent.width
             text: schedules.statusMessage
@@ -226,8 +254,8 @@ Item {
         }
         GohuText {
             width: parent.width
-            visible: schedules.editorKind==="bill" || schedules.editorKind==="skip"
-            text: schedules.editorKind==="skip"
+            visible: schedules.editorKind==="bill" || schedules.editorKind==="skip" || schedules.editorKind==="defer"
+            text: schedules.editorKind==="skip" || schedules.editorKind==="defer"
                 ? "SELECT A BILL WITH AN EXISTING DUE-DAY SCHEDULE"
                 : "SELECT EXISTING MONTHLY COST (AMOUNT NOT DUPLICATED)"
             font.pixelSize: 9
@@ -237,11 +265,11 @@ Item {
         }
         Flow {
             id: expenseRail
-            visible: schedules.editorKind==="bill" || schedules.editorKind==="skip"
+            visible: schedules.editorKind==="bill" || schedules.editorKind==="skip" || schedules.editorKind==="defer"
             width: parent.width
             spacing: 5
             Repeater {
-                model: schedules.editorKind==="skip"
+                model: schedules.editorKind==="skip" || schedules.editorKind==="defer"
                     ? schedules.scheduledExpenses : schedules.expenses
                 delegate: ActionButton {
                     required property var modelData
@@ -332,6 +360,71 @@ Item {
                 verticalAlignment: TextInput.AlignVCenter
                 onTextEdited: schedules.skipMonth=text
             }
+        }
+        GohuText {
+            width: parent.width
+            visible: schedules.editorKind==="defer"
+            text: "ORIGINAL BILL MONTH YYYY-MM // MONTH MOVED OUT OF MODEL"
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        Rectangle {
+            visible: schedules.editorKind==="defer"
+            width: parent.width
+            height: visible?30:0
+            color: Colors.dark
+            border.color: deferralMonthInput.activeFocus?Colors.magenta:Colors.cyan
+            TextInput {
+                id: deferralMonthInput
+                anchors.fill: parent
+                anchors.margins: 6
+                text: schedules.deferSourceMonth
+                font.pixelSize: 11
+                color: Colors.white
+                maximumLength: 7
+                selectByMouse: true
+                verticalAlignment: TextInput.AlignVCenter
+                onTextEdited: schedules.deferSourceMonth=text
+            }
+        }
+        GohuText {
+            width: parent.width
+            visible: schedules.editorKind==="defer"
+            text: "NEW MODELED PAYMENT DATE YYYY-MM-DD // MUST BE A LATER MONTH"
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        Rectangle {
+            visible: schedules.editorKind==="defer"
+            width: parent.width
+            height: visible?30:0
+            color: Colors.dark
+            border.color: deferralDateInput.activeFocus?Colors.magenta:Colors.cyan
+            TextInput {
+                id: deferralDateInput
+                anchors.fill: parent
+                anchors.margins: 6
+                text: schedules.deferTargetDate
+                font.pixelSize: 11
+                color: Colors.white
+                maximumLength: 10
+                selectByMouse: true
+                verticalAlignment: TextInput.AlignVCenter
+                onTextEdited: schedules.deferTargetDate=text
+            }
+        }
+        GohuText {
+            width: parent.width
+            visible: schedules.editorKind==="defer"
+            text: "ONLY THE SELECTED MONTH'S MODELED PAYMENT MOVES. THE NEXT ORDINARY BILL REMAINS DUE. NO CREDITOR AGREEMENT IS CLAIMED."
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
         }
         GohuText {
             width: parent.width
@@ -452,6 +545,7 @@ Item {
             label: schedules.editingId?"UPDATE SCHEDULE":
                 schedules.editorKind==="bill"?"SAVE BILL DUE DAY":
                 schedules.editorKind==="skip"?"SAVE ONE-MONTH EXCLUSION":
+                schedules.editorKind==="defer"?"SAVE BILL DEFERRAL":
                 "SAVE PLANNED PURCHASE"
             labelPixelSize: 10
             accentColor: Colors.omnitrix
@@ -486,7 +580,9 @@ Item {
                         ? "BILL // "+schedules.billLabel(scheduleRow.modelData.expenseId)
                         : scheduleRow.modelData.kind==="bill_skip"
                             ? "EXCLUDED BILL // "+schedules.billLabel(scheduleRow.modelData.expenseId)
-                            : "PURCHASE // "+scheduleRow.modelData.title
+                            : scheduleRow.modelData.kind==="bill_defer"
+                                ? "DEFERRED BILL // "+schedules.billLabel(scheduleRow.modelData.expenseId)
+                                : "PURCHASE // "+scheduleRow.modelData.title
                     font.pixelSize: 9
                     color: Colors.white
                     elide: Text.ElideRight
@@ -504,7 +600,11 @@ Item {
                           +" // "+schedules.money(schedules.billAmount(scheduleRow.modelData.expenseId))
                         : scheduleRow.modelData.kind==="bill_skip"
                             ? "MONTH "+scheduleRow.modelData.date+" // NOT A WAIVER OR PAYMENT"
-                            : scheduleRow.modelData.date
+                            : scheduleRow.modelData.kind==="bill_defer"
+                                ? "FROM "+scheduleRow.modelData.sourceMonth
+                                    +" // TO "+scheduleRow.modelData.date
+                                    +" // MODELED ONLY"
+                                : scheduleRow.modelData.date
                           +" // "+schedules.money(scheduleRow.modelData.amountCents)
                           +" // "+schedules.goalLabel(scheduleRow.modelData.fundingGoalId)
                     font.pixelSize: 9
@@ -553,7 +653,7 @@ Item {
         }
         GohuText {
             width: parent.width
-            text: "BILL EXCLUSIONS REMOVE ONE MONTH FROM THIS MODEL ONLY; THEY DO NOT PROVE A BILL WAS FORGIVEN OR PAID. EDITS PRESERVE SCHEDULE IDS AND REFUSE STALE REVISIONS. GOAL-LINKED PURCHASES FIRST USE MODELED GOAL RESERVES, NOT VERIFIED FUNDS. ALL RECORDS REMAIN LOCAL MANUAL ASSUMPTIONS, NOT BANK PAYMENTS."
+            text: "BILL DEFERRALS MODEL PAYMENT IN A LATER MONTH WITHOUT BANK ACTION OR CREDITOR APPROVAL. BILL EXCLUSIONS REMOVE ONE MONTH FROM THIS MODEL ONLY; THEY DO NOT PROVE A BILL WAS FORGIVEN OR PAID. EDITS PRESERVE SCHEDULE IDS AND REFUSE STALE REVISIONS. GOAL-LINKED PURCHASES FIRST USE MODELED GOAL RESERVES, NOT VERIFIED FUNDS. ALL RECORDS REMAIN LOCAL MANUAL ASSUMPTIONS, NOT BANK PAYMENTS."
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText

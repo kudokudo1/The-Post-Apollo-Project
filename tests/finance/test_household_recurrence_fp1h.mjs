@@ -77,7 +77,7 @@ assert.equal(delayed.months[1].changeCents,-35000);
 assert.equal(delayed.months[3].expenseCents,215000);
 assert.equal(p.coverage(rows,[...schedule,{...skip,date:"2026-12"}]).reason,
     "INVALID_RECURRENCE_EXCEPTION");
-assert.equal(p.coverage(rows,[...schedule,{...defer,sourceMonth:"2026-12"}]).reason,
+assert.equal(p.coverage(rows,[...schedule,{...defer,sourceMonth:"2026-12",date:"2027-01-20"}]).reason,
     "INVALID_RECURRENCE_EXCEPTION");
 assert.equal(p.coverage(rows,[...schedule,skip,defer]).reason,
     "CONFLICTING_BILL_EXCEPTION");

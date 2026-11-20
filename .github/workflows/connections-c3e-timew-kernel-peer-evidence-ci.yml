@@ -1,0 +1,75 @@
+name: Connections C3e / TimeW Linux native peer evidence (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_timew/TimeWKernelPeerEvidencePreflight.py'
+      - 'tests/connections/test_connections_c3e_timew_linux_peer_preflight.py'
+      - '.github/workflows/connections-c3e-timew-kernel-peer-evidence-ci.yml'
+      - 'docs/connections-c3e-timew-linux-peer-evidence-preflight.md'
+      - 'tests/connections/c3e_timew/TimeWBraveSwayIdentityPreflight.py'
+      - 'services/time/MachineBraveProcessLease.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-kernel-sender-does-not-prove-browser-window:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned TimeW CI signature verifier dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Assert source and native authority always deny
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_timew/TimeWKernelPeerEvidencePreflight.py \
+            tests/connections/test_connections_c3e_timew_linux_peer_preflight.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/c3e_timew/TimeWKernelPeerEvidencePreflight.py").read_text()
+          parent=Path("tests/connections/c3e_timew/TimeWBraveSwayIdentityPreflight.py").read_text()
+          for needle in ("Lease.capture_socket_peer", "socket.SO_PEERCRED",
+                         "socket.SCM_CREDENTIALS", "Window.inspect_live_pairing_ci_only",
+                         "NATIVE_WAYLAND_BRAVE_PAIRING_NOT_IMPLEMENTED"):
+              assert needle in source, needle
+          for banned in ("sqlite3.connect(", "Ed25519PrivateKey", "subprocess.run(",
+                         "socket.bind(", "os.open(", "swaymsg",
+                         '"productionAuthority": True', '"canRestoreBrave": True'):
+              assert banned not in source, banned
+          for denied in ("rootEnrolledNativePeerVerified","installedNativeBridgeReleaseVerified",
+                         "braveBrowserProcessProven","nativePeerIsBraveWindowProven",
+                         "browserWindowReferenceAuthenticated","independentlyAuthenticatedSwaySocket",
+                         "braveWaylandSurfaceBindingVerified","activeSeatOrConsentVerified",
+                         "timewOneUseGrantIssued","canSignNativePairing","canMoveWindow",
+                         "canRestoreBrave","productionAuthority"):
+              assert '"'+denied+'": False' in source, denied
+          assert '"canRestoreBrave": False' in parent
+          print("C3E_TIMEW_KERNEL_HOLD // NO_TRUSTED_BRAVE_TO_WAYLAND_BINDING")
+          PY
+      - name: 24 actual Linux kernel sender custody and adversarial denials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$CI" = true
+          python3 -B tests/connections/test_connections_c3e_timew_linux_peer_preflight.py
+          echo "C3E_TIMEW_KERNEL_PASS // 24_PEER_CHALLENGE_CASES"
+      - name: Preserve 34 signed TimeW window pairing correlation refusals
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3e_timew_window_identity_preflight.py
+          echo "C3E_TIMEW_KERNEL_HOLD // NONE_OF_THESE_TESTS_AUTHORIZE_RESTORE"

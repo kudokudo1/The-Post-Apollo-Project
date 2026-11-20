@@ -103,37 +103,35 @@ assert window.count("ActionButton {") >= 5
 assert "SectionFrame {" in tile
 assert "MouseArea {" not in window + tile + dock
 
-# The header Close action uses the canonical U+00D7 multiplication sign.
-# Red stays its identity for normal/hover/keyboard states, without changing
-# ActionButton's destructive black-on-red pressed state. Size follows the
-# accepted FinanceW Close precedent, not a generic 10px label.
+# Header Close delegates to the shared Finance-size component; the Hub
+# still only hides its menu. Visual details belong to CloseButton.qml.
 close_start = window.index("id: closeButton")
-close_end = window.index("onLeftClicked: hub.menuOpen = false", close_start)
-close_button = window[close_start:close_end]
-for needle in (
+close_end = window.index("onCloseRequested: hub.menuOpen = false", close_start)
+close_button = window[window.rfind("CloseButton {", 0, close_start):close_end + 52]
+assert "CloseButton {" in close_button
+assert 'Accessible.name: "Close Apollo Hub"' in close_button
+assert "onCloseRequested: hub.menuOpen = false" in close_button
+assert "onLeftClicked:" not in close_button
+shared_close = (root / "components/CloseButton.qml").read_text(encoding="utf-8")
+for token in (
     'label: "×"',
-    "labelPixelSize: 22",
-    "contentPadding: 4",
-    "accentColor: Colors.red",
-    "destructive: true",
-    "trackLabelGlowLocally: true",
+    "implicitWidth: 34",
+    "implicitHeight: 32",
     "hoverForegroundColor: Colors.red",
     "hoverBorderColor: Colors.red",
-    "hoverContentGlowColor: Colors.red",
+    "trackLabelGlowLocally: true",
     "softGlowEnabled: true",
     "wideGlowEnabled: true",
     "softGlowIdleOpacity: 0.48",
     "wideGlowIdleOpacity: 0.22",
+    "contentGlowPressedOpacity: 1.0",
+    "softGlowPressedOpacity: 1.0",
+    "wideGlowPressedOpacity: 1.0",
 ):
-    # trackLabelGlowLocally appears before the id, unlike state/size options.
-    if needle == "trackLabelGlowLocally: true":
-        assert needle in window[window.rindex("ActionButton {", 0, close_start):close_start]
-    else:
-        assert needle in close_button, f"Hub Close missing {needle}"
+    assert token in shared_close, f"Hub inherited Close missing {token}"
 assert 'label: "X"' not in close_button
 assert 'label: "✕"' not in close_button
 assert 'label: "✖"' not in close_button
-assert "onLeftClicked: hub.menuOpen = false" in window[close_start:close_end + 42]
 
 # Hub editor/selector buttons use ActionButton's existing reactive label
 # tracking (proven on Projects ARCHIVE). Keep the icon and caption alignment
@@ -141,7 +139,7 @@ assert "onLeftClicked: hub.menuOpen = false" in window[close_start:close_end + 4
 import re
 
 for path, source, count in (
-    ("widgets/ApolloHubW.qml", window, 15),
+    ("widgets/ApolloHubW.qml", window, 14),
     ("widgets/hub/ApolloHubTile.qml", tile, 7),
 ):
     actions = len(re.findall(r"\bActionButton\s*\{", source))

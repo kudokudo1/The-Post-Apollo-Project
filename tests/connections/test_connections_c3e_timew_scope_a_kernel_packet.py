@@ -181,7 +181,7 @@ class PacketTests(unittest.TestCase):
                     data=raw[:-1]+b',"selectionId":"forged"}')
 
     def test_14_noncanonical_packet_rejected(self):
-        self.denial("INVALID_PACKET_JSON",
+        self.denial("NONCANONICAL_PACKET_JSON",
                     data=json.dumps(json.loads(self.packet())).encode())
 
     def test_15_packet_claimed_authority_or_version_rejected(self):

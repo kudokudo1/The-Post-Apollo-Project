@@ -185,7 +185,7 @@ class TimeWKernelPeerEvidenceTests(unittest.TestCase):
     def test_22_a_fake_root_key_pin_still_never_grants(self):
         a,b=self.setup_sockets(packet=self.packet)
         out=self.check(a)
-        self.assertTrue(out["testOnlyTimeWPairSignatureMatchesCallerPin"])
+        self.assertTrue(out["testOnlyPairHashMatchesChallengePacket"])
         self.assertFalse(out["rootEnrolledNativePeerVerified"])
         self.assertFalse(out["canSignNativePairing"])
 

@@ -3110,32 +3110,10 @@ PanelWindow {
                     onLeftClicked: timew.toggleResyncPopup()
                 }
 
-                ActionButton {
+                CloseButton {
                     id: closeButton
-                    width: 35
-                    height: 32
-                    label: "×"
-                    labelPixelSize: 22
-                    contentPadding: 4
-                    trackLabelGlowLocally: true
-                    accentColor: Colors.red
-                    destructive: true
-                    idleForegroundColor: Colors.red
-                    hoverForegroundColor: Colors.red
-                    selectedForegroundColor: Colors.red
-                    keyboardSelectedForegroundColor: Colors.red
-                    hoverBorderColor: Colors.red
-                    selectedBorderColor: Colors.red
-                    keyboardSelectedBorderColor: Colors.red
-                    idleContentGlowColor: Colors.red
-                    hoverContentGlowColor: Colors.red
-                    selectedContentGlowColor: Colors.red
-                    keyboardSelectedContentGlowColor: Colors.red
-                    softGlowEnabled: true
-                    idleSoftGlowColor: Colors.red
-                    hoverSoftGlowColor: Colors.red
-                    pressedSoftGlowColor: Colors.red
-                    onLeftClicked: timew.menuOpen = false
+                    Accessible.name: "Close Clock menu"
+                    onCloseRequested: timew.menuOpen = false
                 }
             }
 

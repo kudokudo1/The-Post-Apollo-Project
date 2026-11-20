@@ -267,7 +267,7 @@ assert "enabled: root.menuOpen && root.keyboardActive" in esc
 assert "root.menuOpen = false" in menu
 assert "!transactionDraftPane.open" in menu
 assert "transactionDraftPane.clear();" in menu
-assert "onLeftClicked: root.menuOpen = false" in menu
+assert "onCloseRequested: root.menuOpen = false" in close_block
 assert "function cycleMainMode(direction)" in menu
 assert "const modes = activeMainModes();" in menu
 assert "return financeContentKeys.move(0,Number(direction)<0?-1:1)" in menu

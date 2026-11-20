@@ -1,0 +1,54 @@
+name: TimeW MACHINE V2 Scope A selected live surface deny-only review
+
+on:
+  pull_request:
+    paths:
+      - 'services/time/MachineV2SelectedSurfaceReview.py'
+      - 'tests/timew/test_machine_v2_selected_surface_review.py'
+      - 'docs/timew-machine-v2-scope-a-selected-surface.md'
+      - '.github/workflows/timew-machine-v2-scope-a-review.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  selected-surface-review-no-authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned dependency for existing Brave signed verifier regression
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Prove selected-surface-only Scope A is deny-only under hostile fixtures
+        run: python3 -B -I tests/timew/test_machine_v2_selected_surface_review.py
+      - name: Preserve existing separate signed Brave pairing and durable V2 journal
+        run: |
+          python3 -B -I tests/timew/test_machine_v2_pair_consent.py
+          python3 -B -I tests/timew/test_machine_v2_geometry_journal.py
+      - name: Preserve V2 review, floating pilot and original one-click Restore
+        run: |
+          python3 -B -I tests/timew/test_machine_restore_review_v2.py
+          python3 -B -I tests/timew/test_machine_v2_floating_pilot.py
+          python3 -B -I tests/timew/test_machine_one_click_restore.py
+          python3 -B -I tests/timew/test_machine_one_click_restore_ui.py
+      - name: Confirm no Scope A signing, UI, mutation or native service entrypoint
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("services/time/MachineV2SelectedSurfaceReview.py").read_text()
+          ui = Path("widgets/TimeW.qml").read_text()
+          for forbidden in ("Ed25519PrivateKey", "swaymsg", "subprocess", "socket.socket", "def main(",
+                            "write_response", "command_runner", "execute_disposable(", "def authorize("):
+              assert forbidden not in p, forbidden
+          assert '"restore_allowed": False' in p
+          assert '"production_authorized": False' in p
+          assert '"source_origin_verified": False' in p
+          assert "MachineV2SelectedSurfaceReview" not in ui
+          print("TIMEW SCOPE A // READ-ONLY / NOT TRUSTED / NO PRODUCTION UI PATH")
+          PY

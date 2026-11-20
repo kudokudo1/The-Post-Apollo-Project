@@ -166,8 +166,9 @@ def candidate_query_ci_only(
 
 def inspect_candidate_query_ci_only(
         *, candidate_query_raw: bytes, original_prepare_raw: bytes,
-        prepared_raw: bytes, commit_raw: bytes, now_ms: int):
-    """Compare immutable original operation to exact proposed query fields."""
+        prepared_raw: bytes, commit_raw: bytes, now_ms: int,
+        expected_query_id: str, expected_challenge: bytes):
+    """Compare candidate against separately supplied CI expectations."""
     try:
         candidate = Transport._exact_json(candidate_query_raw,
                                            Transport.MAX_FRAME)
@@ -177,6 +178,11 @@ def inspect_candidate_query_ci_only(
         ) from exc
     if set(candidate) != FIELDS:
         _hold("QUERY_FIELDS_CHANGED")
+    _uuid(expected_query_id)
+    expected_challenge_b64 = _challenge(expected_challenge)
+    if (candidate["queryId"] != expected_query_id
+            or candidate["challengeB64"] != expected_challenge_b64):
+        _hold("QUERY_NOT_BOUND_TO_EXPECTED_CHALLENGE")
     try:
         challenge = Transport._decode_b64(candidate["challengeB64"], 32)
     except Transport.PreflightHold as exc:

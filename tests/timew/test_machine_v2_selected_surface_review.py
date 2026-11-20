@@ -31,6 +31,8 @@ SEAT = "seat0"
 EPOCH = str(uuid.uuid4())
 LIFE_A = str(uuid.uuid4())
 LIFE_B = str(uuid.uuid4())
+LIFE_C = str(uuid.uuid4())
+LIFE_D = str(uuid.uuid4())
 CHALLENGE = "d" * 64
 NOW = 1763625600000
 
@@ -58,11 +60,18 @@ def frame(saved=False):
                 "rect": rect(0, 0, 1920, 1080),
                 "scale": 1.0, "transform": "normal"}]
     workspaces = [{"name": "1", "output": "DP-3"}]
+    tiled = leaf(112, rect(20, 30, 400, 330))
+    tiled.update(type="con", app_id="kitty", floating="auto_off",
+                 name="A TILED PRIVATE TERMINAL")
+    fullscreen = leaf(113, rect(0, 0, 1920, 1080))
+    fullscreen.update(type="con", app_id="obsidian", floating="auto_off",
+                      fullscreen_mode=1, name="A FULLSCREEN PRIVATE NOTE")
+    unrelated = [] if saved else [tiled, fullscreen]
     tree = {"type": "root", "nodes": [{
         "type": "output", "name": "DP-3", "nodes": [{
             "type": "workspace", "name": "1", "layout": "splith",
             "rect": rect(0, 0, 1920, 1080),
-            "nodes": [], "floating_nodes": [
+            "nodes": unrelated, "floating_nodes": [
                 leaf(one, a), leaf(two, b),
             ],
         }],
@@ -148,6 +157,10 @@ try:
         observed = [
             observation(110, life=LIFE_A, box=current_a),
             observation(111, life=LIFE_B, box=current_b),
+            {**observation(112, life=LIFE_C, box=rect(20, 30, 400, 330)),
+             "app_id": "kitty", "floating": False},
+            {**observation(113, life=LIFE_D, box=rect(0, 0, 1920, 1080)),
+             "app_id": "obsidian", "floating": False, "fullscreen_mode": 1},
         ]
 
         def call(*, req=None, token=None, obs=None, time=NOW,
@@ -164,6 +177,9 @@ try:
             )
 
         result = call()
+        # A normal desktop also has unrelated tiled and fullscreen surfaces.
+        # Their existence must not veto one explicitly selected floating one.
+        assert len(observed) == 4
         assert result["status"] == "fixture_consistent_only"
         assert result["scope"] == "selected_live_surface_geometry_only"
         assert result["read_only"] is True
@@ -274,6 +290,17 @@ try:
         not_floating = copy.deepcopy(observed)
         not_floating[0]["floating"] = False
         denies(lambda: call(obs=not_floating))
+        selected_fullscreen = copy.deepcopy(observed)
+        selected_fullscreen[0]["fullscreen_mode"] = 1
+        denies(lambda: call(obs=selected_fullscreen))
+        invalid_unrelated_float = copy.deepcopy(observed)
+        invalid_unrelated_float[2]["floating"] = "auto_off"
+        denies(lambda: call(obs=invalid_unrelated_float))
+        invalid_unrelated_fullscreen = copy.deepcopy(observed)
+        invalid_unrelated_fullscreen[3]["fullscreen_mode"] = True
+        denies(lambda: call(obs=invalid_unrelated_fullscreen))
+        invalid_unrelated_fullscreen[3]["fullscreen_mode"] = -1
+        denies(lambda: call(obs=invalid_unrelated_fullscreen))
 
         # Any change in fresh double Sway sampling must refuse: old approved
         # geometry and compositor state are never sufficient for dispatch.

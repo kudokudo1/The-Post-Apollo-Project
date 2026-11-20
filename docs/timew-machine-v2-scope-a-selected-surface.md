@@ -13,33 +13,33 @@
 
 Scope A addresses one selected live *compositor surface* already present in the current seat/session: its current rectangle is compared against a saved checkpoint's rectangle. This operation does not claim to know *which Brave browser window* the surface corresponds to. Two same-app or same-PID Brave windows remain distinct **only if a future protected SwayPX service genuinely witnesses an operator selecting one exact live surface and revokes on its destruction/reuse**. A caller-provided ID, focus history or title cannot achieve this. Scope A is not tab recovery, restoring a closed window, cross-session Brave identity or automatic monitor remapping.
 
-\`services/time/MachineV2SelectedSurfaceReview.py\` introduces **only** a new *provisional* structural review format and a pure review operation:
-- Proposed \`schema=post-apollo.timew.selected-live-surface.review.v1\` and \`audience=timew-selected-live-surface-geometry-only\`, **separate from** \`MachineV2PairConsent.py\` Brave PAIR v1 and its required \`browser_window_ref\`.
+`services/time/MachineV2SelectedSurfaceReview.py` introduces **only** a new *provisional* structural review format and a pure review operation:
+- Proposed `schema=post-apollo.timew.selected-live-surface.review.v1` and `audience=timew-selected-live-surface-geometry-only`, **separate from** `MachineV2PairConsent.py` Brave PAIR v1 and its required `browser_window_ref`.
 - Candidate fields: challenge SHA-256, selected checkpoint/window key, live Sway con_id, app/output/workspace, current and saved rectangles, seat/session UUID, selection UUID, putative compositor epoch, putative per-surface lifetime UUID/generation and bounded time. This prototype does **not** authenticate, sign, mint or grant any of them.
-- Cross-checks a caller-provided list of observed surfaces with unique con IDs and lifetime tuples, exact selected surface, unchanged epoch/generation and rectangle, and saved/live geometry supplied by the existing \`MachineV2FloatingPilot.prepare\` read-only double-Sway preflight. Refuses mismatched app, floating/fullscreen state, output/workspace, monitor configuration, stale candidate and changed saved target.
-- **All** results, including fixture-consistent cases, return \`read_only=true\`, \`restore_allowed=false\`, \`production_authorized=false\`, \`source_origin_verified=false\`, \`compositor_surface_lifetime_verified=false\`, \`active_seat_verified=false\`, \`c5_operator_consent_verified=false\`, \`one_use_grant_spent=false\`, and \`safe_actions=[]\`.
+- Cross-checks a caller-provided list of observed surfaces with unique con IDs and lifetime tuples, exact selected surface, unchanged epoch/generation and rectangle, and saved/live geometry supplied by the existing `MachineV2FloatingPilot.prepare` read-only double-Sway preflight. The **selected surface** must be floating and non-fullscreen; **unrelated** correctly typed tiled/fullscreen surfaces are permitted so ordinary mixed desktops are not needlessly refused. It still rejects malformed observation state, changed selected app, state, output/workspace, monitor configuration, stale candidate and changed saved target.
+- **All** results, including fixture-consistent cases, return `read_only=true`, `restore_allowed=false`, `production_authorized=false`, `source_origin_verified=false`, `compositor_surface_lifetime_verified=false`, `active_seat_verified=false`, `c5_operator_consent_verified=false`, `one_use_grant_spent=false`, and `safe_actions=[]`.
 - No compositor IPC implementation, signed grant, trusted callback, signer key, C5 approval, local daemon, command runner, installed process or UI route is added. Existing TimeW geometry and Brave PAIR v1 source remain unchanged.
 
 The 5-second **fixture-only** timing cap is not a proposed production consent lease. SwayPX/C3e/C5 owners must agree on the actual expiration and revocation contracts.
 
 ### Scope B remains distinct
 
-Scope B later requires independently authenticated Brave-window instance ↔ Wayland surface binding under protected source provenance. It may then unlock actual window matching, browser restarts and extra tab/session restoration work. No Scope A field may be silently interpreted as browser identity or mapped into Brave PAIR v1 by manufacturing a \`browser_window_ref\`.
+Scope B later requires independently authenticated Brave-window instance ↔ Wayland surface binding under protected source provenance. It may then unlock actual window matching, browser restarts and extra tab/session restoration work. No Scope A field may be silently interpreted as browser identity or mapped into Brave PAIR v1 by manufacturing a `browser_window_ref`.
 
 ## HOW TO USE
 
 For disposable GitHub Actions fixture review only:
 
-\`\`\`bash
+```bash
 python3 -m pip install cryptography==46.0.4
 python3 -B -I tests/timew/test_machine_v2_selected_surface_review.py
-\`\`\`
+```
 
 The dedicated workflow reruns existing Brave signed-verifier, geometry journal, V2 read-only review, pilot and one-click Restore tests. This PR does not offer a UI control or permit local Sway changes.
 
 ## VERIFY
 
-Tests use a saved two-window geometry checkpoint, temporary SQLite storage, a double-read fake Sway, two same-app/same-PID Brave-like floating windows, and a synthetic selected-current-surface record. It refuses duplicate or swapped con_ids, wrong generation/epoch/lifetime, stale time, wrong session/seat/challenge, changed rectangles, fullscreen/nonfloating state, changed output/workspace, different checkpoint/window selection, unknown fields, inappropriate Brave schema/audience or \`browser_window_ref\`. Successful *consistency* is still **not independent provenance**.
+Tests use a saved two-window geometry checkpoint, temporary SQLite storage, a double-read fake Sway, two same-app/same-PID Brave-like floating windows **plus unrelated tiled and fullscreen windows**, and a synthetic selected-current-surface record. It refuses duplicate or swapped con_ids, wrong generation/epoch/lifetime, stale time, wrong session/seat/challenge, changed rectangles, fullscreen/nonfloating state, changed output/workspace, different checkpoint/window selection, unknown fields, inappropriate Brave schema/audience or `browser_window_ref`. Successful *consistency* is still **not independent provenance**.
 
 ## WATCH OUT FOR
 

@@ -1005,54 +1005,18 @@ PanelWindow {
 
         // U8d // The badge and X share one top header band. Neither overlaps
         // the cyan divider, and the close control uses normal red rules.
-        // U9a // Same canonical × glyph, red framing and text glow as
-        // Hospital/Git header closes. The field is BLACK at all times.
+        // Standard CloseButton owns the 17:16 geometry and three persistent
+        // red halo planes; CPU++ keeps its existing close() authority.
         // Top row height is coordinated with the divider beneath it.
-        Rectangle {
+        CloseButton {
             id: cpuPlusCloseButton
             anchors.top: parent.top
             anchors.right: parent.right
             anchors.topMargin: 4
             anchors.rightMargin: 10
             z: 8
-            width: 36
-            height: 30
-            color: Colors.black
-            border.width: 1
-            border.color: cpuPlusCloseMouse.pressed
-                          ? Colors.black : Colors.red
-
-            RectangularShadow {
-                anchors.fill: parent
-                spread: 4
-                z: -1
-                opacity: cpuPlusCloseMouse.containsMouse ? 0.58 : 0.38
-                color: cpuPlusCloseMouse.pressed
-                       ? Colors.black : Colors.red
-            }
-
-            NotoText {
-                anchors.centerIn: parent
-                anchors.verticalCenterOffset: 1
-                text: "×"
-                font.pixelSize: 27
-                color: Colors.red
-                layer.enabled: true
-                layer.effect: DropShadow {
-                    radius: 7
-                    samples: 9
-                    opacity: 0.58
-                    color: Colors.red
-                    transparentBorder: true
-                }
-            }
-            MouseArea {
-                id: cpuPlusCloseMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: cpuPlusWindow.close()
-            }
+            Accessible.name: "Close CPU++ window"
+            onCloseRequested: cpuPlusWindow.close()
         }
 
         Rectangle {

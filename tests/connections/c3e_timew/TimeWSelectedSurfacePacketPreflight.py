@@ -208,6 +208,8 @@ def inspect_kernel_sender_and_selection_ci_only(
                 ) from exc
             if type(claim) is not dict or set(claim) != FIELDS:
                 _hold("UNRECOGNIZED_PACKET_FIELDS")
+            if packet != _canonical(claim):
+                _hold("NONCANONICAL_PACKET_JSON")
             if packet != expected_raw:
                 _hold("PACKET_DIFFERS_FROM_EXPECTED_SCOPE_A")
             if not custody.valid():

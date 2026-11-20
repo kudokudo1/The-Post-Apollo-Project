@@ -25,7 +25,12 @@ Item {
     property int timelineMonths: 6
     readonly property string currentMonth: Qt.formatDate(new Date(),"yyyy-MM")
     readonly property var incomeRows: savedPlans.rows.filter(function(x){return x.kind==="income";})
-    readonly property var projection: CashFlow.summarize(savedPlans.rows,forecastMonths)
+    readonly property var projection: !localSchedule.ready
+        ? ({ok:false,reason:"SCHEDULES_NOT_LOADED"})
+        : localSchedule.scheduleRows.some(function(row) {
+            return row.kind==="bill_cadence";
+        }) ? ({ok:false,reason:"QUARTERLY_OR_ANNUAL_BILLS_USE_TIMELINE"})
+          : CashFlow.summarize(savedPlans.rows,forecastMonths)
     readonly property var contexts: Planning.contexts()
     readonly property var goals: savedPlans.rows.filter(function(x){return x.kind==="goal";})
     readonly property var expenses: savedPlans.rows.filter(function(x){return x.kind==="expense";})

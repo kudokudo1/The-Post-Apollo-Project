@@ -136,6 +136,8 @@ def inspect_fake_sway_ipc_ci_only(*, connection: socket.socket) -> dict:
         raise Refused("C3E_TIMEW_SWAY_IPC_HOLD // IPC_UNAVAILABLE") from exc
     try:
         tree = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_pairs)
+    except Refused:
+        raise  # Preserve the exact duplicate-field security refusal.
     except (UnicodeError, ValueError, TypeError) as exc:
         raise Refused("C3E_TIMEW_SWAY_IPC_HOLD // INVALID_TREE_JSON") from exc
     leaves, ambiguous = _find_brave_leaves(tree)

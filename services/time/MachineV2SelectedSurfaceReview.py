@@ -90,14 +90,19 @@ def _state(record):
     app = _text(record["app_id"])
     output = _text(record["output"])
     workspace = _text(record["workspace"])
-    if record["floating"] is not True or type(record["fullscreen_mode"]) is not int or record["fullscreen_mode"] != 0:
+    # The *selected* surface must be floating/non-fullscreen. Unrelated
+    # current surfaces may be tiled or fullscreen without blocking selection.
+    # Still validate all records strictly to catch ambiguous/lost lifetimes.
+    if (type(record["floating"]) is not bool
+            or type(record["fullscreen_mode"]) is not int
+            or not 0 <= record["fullscreen_mode"] <= 2):
         refuse()
     return {
         "live_con_id": con_id, "compositor_epoch": epoch,
         "surface_lifetime_id": lifetime, "surface_generation": generation,
         "app_id": app, "output": output, "workspace": workspace,
-        "rect": _rect(record["rect"]), "floating": True,
-        "fullscreen_mode": 0,
+        "rect": _rect(record["rect"]), "floating": record["floating"],
+        "fullscreen_mode": record["fullscreen_mode"],
     }
 
 
@@ -175,6 +180,8 @@ def review_selected_fixture(*, request, selection, observed_surfaces, now_ms,
     if len(selected) != 1:
         refuse()
     actual = selected[0]
+    if actual["floating"] is not True or actual["fullscreen_mode"] != 0:
+        refuse()
     for field in ("compositor_epoch", "surface_lifetime_id", "surface_generation",
                   "live_con_id", "app_id", "output", "workspace"):
         if actual[field] != selection[field]:

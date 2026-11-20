@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FinanceW FP1b: local operator planning drafts, never bank or identity access."""
+"""FinanceW FP1c: versioned operator planning drafts, never bank or identity access."""
 from __future__ import annotations
 import fcntl
 import json
@@ -37,40 +37,63 @@ def parse_money(value):
         fail("MONEY_LIMIT")
     return cents
 
-def valid_row(row):
-    return (exact(row, ("id", "kind", "title", "targetCents", "savedCents", "monthlyCents"))
-            and type(row["id"]) is str and re.fullmatch(r"p-[0-9a-f]{32}", row["id"]) is not None
-            and row["kind"] in ("goal", "expense")
-            and type(row["title"]) is str and 1 <= len(row["title"]) <= 80
-            and row["title"] == row["title"].strip()
-            and re.search(r"[\x00-\x1f\x7f]", row["title"]) is None
-            and all(type(row[key]) is int and 0 <= row[key] <= MAX_CENTS
-                    for key in ("targetCents", "savedCents", "monthlyCents"))
-            and ((row["kind"] == "expense"
-                  and row["targetCents"] == 0 and row["savedCents"] == 0
-                  and row["monthlyCents"] > 0)
-                 or (row["kind"] == "goal"
-                     and row["targetCents"] > 0
-                     and row["savedCents"] <= row["targetCents"])) )
+def valid_deadline(value):
+    return (type(value) is str and (value == "" or
+            re.fullmatch(r"(?:19|20)[0-9]{2}-(?:0[1-9]|1[0-2])", value) is not None))
+
+def valid_row(row, version):
+    fields = ("id", "kind", "title", "targetCents", "savedCents", "monthlyCents")
+    if version == 2:
+        fields += ("deadlineMonth",)
+    if not exact(row, fields):
+        return False
+    if (type(row["id"]) is not str or
+            re.fullmatch(r"p-[0-9a-f]{32}", row["id"]) is None or
+            type(row["kind"]) is not str or
+            row["kind"] not in (("goal", "expense") if version == 1
+                                else ("goal", "expense", "income")) or
+            type(row["title"]) is not str or
+            not 1 <= len(row["title"]) <= 80 or
+            row["title"] != row["title"].strip() or
+            re.search(r"[\x00-\x1f\x7f]", row["title"]) is not None or
+            not all(type(row[key]) is int and 0 <= row[key] <= MAX_CENTS
+                    for key in ("targetCents", "savedCents", "monthlyCents"))):
+        return False
+    if version == 2 and (not valid_deadline(row["deadlineMonth"]) or
+                         (row["kind"] != "goal" and row["deadlineMonth"] != "")):
+        return False
+    if row["kind"] == "goal":
+        return row["targetCents"] > 0 and row["savedCents"] <= row["targetCents"]
+    return row["targetCents"] == 0 and row["savedCents"] == 0 and row["monthlyCents"] > 0
 
 def empty(context):
     if not valid_context(context):
         fail("UNKNOWN_CONTEXT")
-    return {"version": 1, "contextId": context, "revision": 0, "rows": []}
+    return {"version": 2, "contextId": context, "revision": 0, "rows": []}
 
 def validate(doc, context):
     if not exact(doc, ("version", "contextId", "revision", "rows")):
         fail("INVALID_STORE")
-    if type(doc["version"]) is not int or doc["version"] != 1 or doc["contextId"] != context:
+    if (type(doc["version"]) is not int or doc["version"] not in (1, 2)
+            or doc["contextId"] != context):
         fail("INVALID_STORE")
     if type(doc["revision"]) is not int or not 0 <= doc["revision"] < 2**53:
         fail("INVALID_STORE")
     rows = doc["rows"]
-    if type(rows) is not list or len(rows) > MAX_ROWS or not all(valid_row(x) for x in rows):
+    if (type(rows) is not list or len(rows) > MAX_ROWS or
+            not all(valid_row(x, doc["version"]) for x in rows)):
         fail("INVALID_STORE")
     if len({x["id"] for x in rows}) != len(rows):
         fail("INVALID_STORE")
     return doc
+
+def upgrade_in_memory(doc):
+    # v1 files stay unchanged on list; first deliberate write converts to v2.
+    if doc["version"] == 2:
+        return doc
+    return {"version": 2, "contextId": doc["contextId"],
+            "revision": doc["revision"],
+            "rows": [{**row, "deadlineMonth": ""} for row in doc["rows"]]}
 
 def directory_path():
     base = os.environ.get("XDG_DATA_HOME")
@@ -155,6 +178,28 @@ def write_doc(directory, doc):
         except OSError:
             pass
 
+def normalized_row(kind, title, target_text, saved_text, monthly_text,
+                   deadline_month):
+    if type(kind) is not str or kind not in ("goal", "expense", "income"):
+        fail("INVALID_KIND")
+    if (type(title) is not str or not 1 <= len(title) <= 80 or
+            title != title.strip() or
+            re.search(r"[\x00-\x1f\x7f]", title) is not None):
+        fail("INVALID_TITLE")
+    target = parse_money(target_text)
+    saved = parse_money(saved_text)
+    monthly = parse_money(monthly_text)
+    if not valid_deadline(deadline_month):
+        fail("INVALID_DEADLINE")
+    if kind == "goal":
+        if target <= 0 or saved > target:
+            fail("INVALID_GOAL")
+    elif target or saved or not monthly or deadline_month:
+        fail("INVALID_MONTHLY_ITEM")
+    return {"kind": kind, "title": title, "targetCents": target,
+            "savedCents": saved, "monthlyCents": monthly,
+            "deadlineMonth": deadline_month}
+
 def apply(doc, command):
     context = command.get("contextId") if type(command) is dict else None
     validate(doc, context)
@@ -162,45 +207,53 @@ def apply(doc, command):
         fail("UNKNOWN_CONTEXT")
     action = command.get("action")
     if action == "list" and exact(command, ("action", "contextId")):
-        return doc, False
-    if action not in ("add", "delete"):
+        return upgrade_in_memory(doc), False
+    if action not in ("add", "update", "delete"):
         fail("INVALID_ACTION")
-    required = ("action", "contextId", "expectedRevision")
     if (type(command.get("expectedRevision")) is not int or
             command["expectedRevision"] != doc["revision"]):
         fail("STALE_REVISION")
-    if action == "add":
-        if not exact(command, required + ("kind", "title", "targetText", "savedText", "monthlyText")):
+    doc = upgrade_in_memory(doc)
+    base = ("action", "contextId", "expectedRevision")
+    if action in ("add", "update"):
+        fields = ("kind", "title", "targetText", "savedText", "monthlyText")
+        mandatory = base + fields + (("id",) if action == "update" else ())
+        has_deadline = exact(command, mandatory + ("deadlineMonth",))
+        if not has_deadline and not (action == "add" and exact(command, mandatory)):
             fail("INVALID_COMMAND")
-        kind = command["kind"]
-        if kind not in ("goal", "expense"):
-            fail("INVALID_KIND")
-        title = command["title"]
-        if type(title) is not str or not 1 <= len(title) <= 80 or title != title.strip() or re.search(r"[\x00-\x1f\x7f]", title):
-            fail("INVALID_TITLE")
-        target = parse_money(command["targetText"])
-        saved = parse_money(command["savedText"])
-        monthly = parse_money(command["monthlyText"])
-        if kind == "goal" and (target <= 0 or saved > target):
-            fail("INVALID_GOAL")
-        if kind == "expense" and (target or saved or not monthly):
-            fail("INVALID_EXPENSE")
-        if len(doc["rows"]) >= MAX_ROWS:
-            fail("ROW_LIMIT")
-        row = {"id": "p-" + uuid.uuid4().hex, "kind": kind, "title": title,
-               "targetCents": target, "savedCents": saved, "monthlyCents": monthly}
-        next_rows = doc["rows"] + [row]
+        value = normalized_row(command["kind"], command["title"],
+                               command["targetText"], command["savedText"],
+                               command["monthlyText"],
+                               command["deadlineMonth"] if has_deadline else "")
+        if action == "add":
+            if len(doc["rows"]) >= MAX_ROWS:
+                fail("ROW_LIMIT")
+            value["id"] = "p-" + uuid.uuid4().hex
+            rows = doc["rows"] + [value]
+        else:
+            identifier = command["id"]
+            if (type(identifier) is not str or
+                    re.fullmatch(r"p-[0-9a-f]{32}", identifier) is None):
+                fail("INVALID_ID")
+            found = [row for row in doc["rows"] if row["id"] == identifier]
+            if len(found) != 1:
+                fail("NOT_FOUND")
+            if value["kind"] != found[0]["kind"]:
+                fail("KIND_CHANGE_REFUSED")
+            value["id"] = identifier
+            rows = [value if row["id"] == identifier else row for row in doc["rows"]]
     else:
-        if not exact(command, required + ("id",)):
+        if not exact(command, base + ("id",)):
             fail("INVALID_COMMAND")
         identifier = command["id"]
-        if type(identifier) is not str or not re.fullmatch(r"p-[0-9a-f]{32}", identifier):
+        if (type(identifier) is not str or
+                re.fullmatch(r"p-[0-9a-f]{32}", identifier) is None):
             fail("INVALID_ID")
-        next_rows = [r for r in doc["rows"] if r["id"] != identifier]
-        if len(next_rows) == len(doc["rows"]):
+        rows = [row for row in doc["rows"] if row["id"] != identifier]
+        if len(rows) == len(doc["rows"]):
             fail("NOT_FOUND")
-    return {"version": 1, "contextId": context,
-            "revision": doc["revision"] + 1, "rows": next_rows}, True
+    return {"version": 2, "contextId": context,
+            "revision": doc["revision"] + 1, "rows": rows}, True
 
 def run(directory, command):
     if type(command) is not dict or not valid_context(command.get("contextId")):
@@ -210,7 +263,7 @@ def run(directory, command):
     if action == "list":
         doc = read_doc(directory, context)
         return apply(doc, command)[0]
-    if action not in ("add", "delete"):
+    if action not in ("add", "update", "delete"):
         fail("INVALID_ACTION")
     private_dir(directory, True)
     lock_path = directory / (context + ".lock")

@@ -2,6 +2,7 @@ import QtQuick
 import "../components"
 import "../services/finance" as FinanceServices
 import "FinanceHouseholdPlanningPolicy.js" as Planning
+import "FinanceHouseholdCashFlowPolicy.js" as CashFlow
 
 // FP1b: explicit local-only household planning, not verified financial access.
 Item {
@@ -14,6 +15,16 @@ Item {
     property string savedText: "0.00"
     property string monthlyText: "100.00"
     property string armedDeleteId: ""
+    property string editingId: ""
+    property int editingRevision: -1
+    readonly property bool editingStale: editingId!=="" &&
+        (editingRevision!==savedPlans.revision ||
+         !savedPlans.rows.some(function(row){return row.id===editingId;}))
+    property string deadlineMonth: ""
+    property int forecastMonths: 12
+    readonly property string currentMonth: Qt.formatDate(new Date(),"yyyy-MM")
+    readonly property var incomeRows: savedPlans.rows.filter(function(x){return x.kind==="income";})
+    readonly property var projection: CashFlow.summarize(savedPlans.rows,forecastMonths)
     readonly property var contexts: Planning.contexts()
     readonly property var goals: savedPlans.rows.filter(function(x){return x.kind==="goal";})
     readonly property var expenses: savedPlans.rows.filter(function(x){return x.kind==="expense";})
@@ -24,7 +35,8 @@ Item {
         contextId: plansPane.contextId
         monitoring: plansPane.active
         onEntrySaved: plansPane.clearEditor()
-        onEntryDeleted: plansPane.armedDeleteId=""
+        onEntryUpdated: plansPane.clearEditor()
+        onEntryDeleted: plansPane.clearEditor()
     }
     function clearEditor() {
         entryTitle="";
@@ -32,19 +44,44 @@ Item {
         savedText="0.00";
         monthlyText="100.00";
         armedDeleteId="";
+        editingId="";
+        editingRevision=-1;
+        deadlineMonth="";
     }
     function setSection(next) {
-        if(next!=="goals" && next!=="expenses")return;
+        if(["goals","expenses","income","forecast"].indexOf(next)<0)return;
         section=next;
         clearEditor();
         plansScroll.flickable.contentY=0;
     }
+    function beginEdit(row) {
+        if(savedPlans.state!=="ready" || !row || !row.id)return false;
+        const next=row.kind==="goal"?"goals":row.kind==="expense"?"expenses":"income";
+        if(["goals","expenses","income"].indexOf(next)<0)return false;
+        section=next;
+        clearEditor();
+        editingId=row.id;
+        editingRevision=savedPlans.revision;
+        entryTitle=row.title;
+        targetText=(row.targetCents/100).toFixed(2);
+        savedText=(row.savedCents/100).toFixed(2);
+        monthlyText=(row.monthlyCents/100).toFixed(2);
+        deadlineMonth=row.deadlineMonth || "";
+        return true;
+    }
     function submit() {
-        if(savedPlans.state!=="ready" || !entryTitle.trim())return false;
+        if(savedPlans.state!=="ready" || !entryTitle.trim() || section==="forecast"
+                || editingStale)
+            return false;
         armedDeleteId="";
-        return savedPlans.add(section==="goals"?"goal":"expense",
-            entryTitle,section==="goals"?targetText:"0",
-            section==="goals"?savedText:"0",monthlyText);
+        const kind=section==="goals"?"goal":section==="expenses"?"expense":"income";
+        const target=kind==="goal"?targetText:"0";
+        const saved=kind==="goal"?savedText:"0";
+        const deadline=kind==="goal"?deadlineMonth:"";
+        if(editingId)
+            return savedPlans.update(editingId,kind,entryTitle,target,saved,
+                monthlyText,deadline);
+        return savedPlans.add(kind,entryTitle,target,saved,monthlyText,deadline);
     }
     function requestDelete(id) {
         if(savedPlans.state!=="ready")return false;
@@ -54,6 +91,9 @@ Item {
         }
         armedDeleteId="";
         return savedPlans.remove(id);
+    }
+    function signedDollars(cents) {
+        return (cents<0?"-":"+")+dollars(Math.abs(cents));
     }
     function dollars(cents) {
         return Number.isSafeInteger(cents)
@@ -67,6 +107,7 @@ Item {
         return Math.ceil(remaining/row.monthlyCents)+" MONTHS AT PLANNED RATE";
     }
     onContextIdChanged: {
+        forecastMonths=12;
         clearEditor();
         plansScroll.flickable.contentY=0;
     }
@@ -142,6 +183,28 @@ Item {
                     onLeftClicked: plansPane.setSection("expenses")
                 }
             }
+            Row {
+                width: parent.width
+                spacing: 5
+                ActionButton {
+                    width: (parent.width-5)/2
+                    height: 30
+                    label: "MONTHLY INCOME"
+                    labelPixelSize: 9
+                    selected: plansPane.section==="income"
+                    accentColor: Colors.omnitrix
+                    onLeftClicked: plansPane.setSection("income")
+                }
+                ActionButton {
+                    width: (parent.width-5)/2
+                    height: 30
+                    label: "FORECAST"
+                    labelPixelSize: 9
+                    selected: plansPane.section==="forecast"
+                    accentColor: Colors.magenta
+                    onLeftClicked: plansPane.setSection("forecast")
+                }
+            }
             GohuText {
                 width: parent.width
                 text: savedPlans.message
@@ -161,16 +224,19 @@ Item {
                 onLeftClicked: savedPlans.refresh()
             }
             GohuText {
+                visible: plansPane.section!=="forecast"
                 width: parent.width
-                text: plansPane.section==="goals"
-                    ? "ADD A MANUAL SAVINGS TARGET"
-                    : "ADD A MANUAL MONTHLY COMMITMENT"
+                text: plansPane.editingId?"EDIT EXISTING LOCAL RECORD"
+                    :plansPane.section==="goals"?"ADD A MANUAL SAVINGS TARGET"
+                    :plansPane.section==="income"?"ADD A MANUAL MONTHLY INCOME ASSUMPTION"
+                    :"ADD A MANUAL MONTHLY COMMITMENT"
                 font.pixelSize: 10
                 color: Colors.white
             }
             Rectangle {
+                visible: plansPane.section!=="forecast"
                 width: body.width
-                height: 31
+                height: visible?31:0
                 color: Colors.dark
                 border.color: titleInput.activeFocus?Colors.magenta:Colors.cyan
                 border.width: 1
@@ -190,6 +256,7 @@ Item {
             }
             GohuText {
                 width: parent.width
+                visible: plansPane.section!=="forecast"
                 text: "TITLE (E.G. CAR, RENT, EMERGENCY FUND)"
                 font.pixelSize: 9
                 color: Colors.cyan
@@ -237,13 +304,15 @@ Item {
             }
             Row {
                 width: body.width
-                height: 30
+                visible: plansPane.section!=="forecast"
+                height: visible?30:0
                 spacing: 5
                 GohuText {
                     width: Math.max(70,parent.width-145)
                     height: parent.height
                     text: plansPane.section==="goals"
-                        ? "SAVE PER MONTH (PLAN)" : "MONTHLY COST (PLAN)"
+                        ? "SAVE PER MONTH (PLAN)" : plansPane.section==="income"
+                            ? "INCOME / MONTH (ASSUMED)" : "MONTHLY COST (PLAN)"
                     font.pixelSize: 9
                     color: Colors.cyan
                     elide: Text.ElideRight
@@ -255,32 +324,91 @@ Item {
                     onValueEdited: function(v){plansPane.monthlyText=v;}
                 }
             }
-            ActionButton {
+            Row {
+                visible: plansPane.section==="goals"
                 width: body.width
-                height: 31
-                label: plansPane.section==="goals"?"SAVE LOCAL GOAL":"SAVE LOCAL COST"
+                height: visible?30:0
+                spacing: 5
+                GohuText {
+                    width: Math.max(70,parent.width-145)
+                    height: parent.height
+                    text: "GOAL DATE YYYY-MM (OPTIONAL)"
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+                Rectangle {
+                    width: 140
+                    height: 28
+                    color: Colors.dark
+                    border.color: deadlineInput.activeFocus?Colors.magenta:Colors.cyan
+                    TextInput {
+                        id: deadlineInput
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        text: plansPane.deadlineMonth
+                        color: Colors.white
+                        font.pixelSize: 10
+                        maximumLength: 7
+                        selectByMouse: true
+                        verticalAlignment: TextInput.AlignVCenter
+                        onTextEdited: plansPane.deadlineMonth=text
+                    }
+                }
+            }
+            ActionButton {
+                visible: plansPane.editingId!==""
+                width: body.width
+                height: visible?27:0
+                label: "CANCEL EDIT // RETURN TO ADD"
+                labelPixelSize: 9
+                accentColor: Colors.orange
+                onLeftClicked: plansPane.clearEditor()
+            }
+            ActionButton {
+                visible: plansPane.section!=="forecast"
+                width: body.width
+                height: visible?31:0
+                label: plansPane.editingId?"UPDATE LOCAL PLAN":
+                    plansPane.section==="goals"?"SAVE LOCAL GOAL":
+                    plansPane.section==="income"?"SAVE MANUAL INCOME":"SAVE LOCAL COST"
                 labelPixelSize: 10
                 accentColor: Colors.omnitrix
-                available: savedPlans.state==="ready"
+                available: savedPlans.state==="ready" && !plansPane.editingStale
                 onLeftClicked: plansPane.submit()
             }
             GohuText {
                 width: parent.width
+                visible: plansPane.editingStale
+                text: "EDIT STALE // CANCEL EDIT AND RELOAD CURRENT RECORD"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: plansPane.section!=="forecast"
                 text: plansPane.section==="goals"
                     ? "MANUAL GOALS // NOT ACTUAL SAVINGS OR BALANCES"
-                    : "MONTHLY ITEMS // NOT SYNCHRONIZED BANK PAYMENTS"
+                    : plansPane.section==="income"
+                        ? "ASSUMPTION // NOT VERIFIED PAYCHECK"
+                        : "MONTHLY ITEMS // NOT SYNCHRONIZED BANK PAYMENTS"
                 font.pixelSize: 9
                 color: Colors.orange
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
             }
             Repeater {
-                model: plansPane.section==="goals"?plansPane.goals:plansPane.expenses
+                model: plansPane.section==="goals"?plansPane.goals:
+                    plansPane.section==="expenses"?plansPane.expenses:
+                    plansPane.section==="income"?plansPane.incomeRows:[]
                 delegate: Rectangle {
                     id: entryRow
                     required property var modelData
                     width: body.width
-                    height: 92
+                    height: 98
                     color: Colors.black
                     border.color: Colors.cyan
                     border.width: 1
@@ -307,7 +435,8 @@ Item {
                         text: entryRow.modelData.kind==="goal"
                             ? ("TARGET "+plansPane.dollars(entryRow.modelData.targetCents)
                                +" // SET ASIDE "+plansPane.dollars(entryRow.modelData.savedCents))
-                            : "MONTHLY "+plansPane.dollars(entryRow.modelData.monthlyCents)
+                            : (entryRow.modelData.kind==="income"?"INCOME ":"MONTHLY ")
+                                +plansPane.dollars(entryRow.modelData.monthlyCents)
                         font.pixelSize: 9
                         color: Colors.cyan
                         elide: Text.ElideRight
@@ -321,10 +450,24 @@ Item {
                         anchors.bottomMargin: 8
                         text: entryRow.modelData.kind==="goal"
                             ? plansPane.forecast(entryRow.modelData)
+                                +(entryRow.modelData.deadlineMonth
+                                  ?" // TARGET "+entryRow.modelData.deadlineMonth:"")
                             : "MANUAL RECURRING PLAN ONLY"
                         font.pixelSize: 9
                         color: Colors.orange
                         elide: Text.ElideRight
+                    }
+                    ActionButton {
+                        anchors.right: deleteAction.left
+                        anchors.rightMargin: 4
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 42
+                        height: 30
+                        label: "EDIT"
+                        labelPixelSize: 9
+                        accentColor: Colors.cyan
+                        available: savedPlans.state==="ready"
+                        onLeftClicked: plansPane.beginEdit(entryRow.modelData)
                     }
                     ActionButton {
                         id: deleteAction
@@ -345,13 +488,96 @@ Item {
             }
             GohuText {
                 width: parent.width
-                visible: (plansPane.section==="goals"
-                          ?plansPane.goals.length:plansPane.expenses.length)===0
+                visible: plansPane.section!=="forecast" &&
+                    (plansPane.section==="goals"?plansPane.goals.length:
+                     plansPane.section==="income"?plansPane.incomeRows.length:
+                     plansPane.expenses.length)===0
                 text: "NO SAVED LOCAL ITEMS IN THIS PLANNING CONTEXT"
                 font.pixelSize: 9
                 color: Colors.orange
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
+            }
+            Column {
+                visible: plansPane.section==="forecast"
+                width: body.width
+                spacing: 9
+                GohuText {
+                    width: parent.width
+                    text: "ASSUMPTION-ONLY CASH-FLOW CHANGE // NOT A BANK BALANCE"
+                    color: Colors.orange
+                    font.pixelSize: 10
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                }
+                Flow {
+                    id: forecastPeriod
+                    width: parent.width
+                    spacing: 5
+                    Repeater {
+                        model: [{months:12,label:"12 MONTHS"},
+                                {months:36,label:"36 MONTHS"},
+                                {months:60,label:"60 MONTHS"},
+                                {months:120,label:"10 YEARS"},
+                                {months:360,label:"30 YEARS"}]
+                        delegate: ActionButton {
+                            required property var modelData
+                            width: Math.max(80,(forecastPeriod.width-10)/3)
+                            height: 29
+                            label: modelData.label
+                            labelPixelSize: 9
+                            selected: plansPane.forecastMonths===modelData.months
+                            accentColor: Colors.magenta
+                            onLeftClicked: plansPane.forecastMonths=modelData.months
+                        }
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: savedPlans.state!=="ready"?"LOCAL PLANS NOT READY":
+                        plansPane.projection.ok
+                        ? "INCOME / MONTH // "+plansPane.dollars(plansPane.projection.incomeCents)
+                        : "NO FORECAST // "+plansPane.projection.reason
+                    color: Colors.cyan
+                    font.pixelSize: 10
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    visible: savedPlans.state==="ready" && plansPane.projection.ok
+                    text: plansPane.projection.ok
+                        ? "EXPENSES / MONTH // "+plansPane.dollars(plansPane.projection.expenseCents)
+                          +" // GOALS / MONTH // "+plansPane.dollars(plansPane.projection.contributionCents)
+                        : ""
+                    color: Colors.white
+                    font.pixelSize: 10
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    visible: savedPlans.state==="ready" && plansPane.projection.ok
+                    text: plansPane.projection.ok
+                        ? "MONTHLY CHANGE // "+plansPane.signedDollars(plansPane.projection.monthlyChangeCents)
+                          +" // "+plansPane.forecastMonths+"-MONTH CHANGE // "
+                          +plansPane.signedDollars(plansPane.projection.horizonChangeCents)
+                        : ""
+                    color: plansPane.projection.ok &&
+                        plansPane.projection.monthlyChangeCents<0
+                        ?Colors.orange:Colors.omnitrix
+                    font.pixelSize: 11
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "FIXED ASSUMPTIONS ONLY. MISSING COSTS ARE NOT ZERO. NO STARTING CASH, INTEREST, INFLATION, TAX, DEBT OR GOAL-COMPLETION ADJUSTMENTS."
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                }
             }
             GohuText {
                 width: parent.width

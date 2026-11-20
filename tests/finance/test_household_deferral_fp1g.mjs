@@ -41,7 +41,7 @@ assert.equal(model.months[2].movedPaymentCents,0);
 assert.equal(model.months[2].changeCents,170000);
 assert.equal(JSON.stringify({rows,plans}),unchanged);
 assert.equal(p.coverage(rows,[deferred]).reason,"SCHEDULE_REFERENCE_MISSING");
-assert.equal(p.coverage(rows,[bill,{...deferred,id:id("f")}]).reason,"DUPLICATE_BILL_DEFERRAL");
+assert.equal(p.coverage(rows,[bill,deferred,{...deferred,id:id("f")}]).reason,"DUPLICATE_BILL_DEFERRAL");
 assert.equal(p.coverage(rows,[bill,deferred,{id:id("1"),kind:"bill_skip",title:"",expenseId:rent.id,dueDay:0,date:"2026-11",amountCents:0,fundingGoalId:"",sourceMonth:""}]).reason,"CONFLICTING_BILL_EXCEPTION");
 assert.equal(p.coverage(rows,[bill,{...deferred,date:"2026-11-29"}]).reason,"INVALID_LOCAL_SCHEDULES");
 // Source month before the visible period: only the later target outflow is shown.

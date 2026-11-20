@@ -40,7 +40,7 @@ FIXTURE_FIELDS = frozenset((
 PROPOSED_FIELDS = frozenset((
     "schema", "protocolVersion", "kind", "requestSchema",
     "requestNonce", "roomId", "action", "sessionId",
-    "writerInstance", "expectedRevision", "revisionAfter",
+    "writerInstance", "expectedRevision",
     "graphDigest", "grantDigest", "originalPrepareSha256",
     "commitSha256", "status",
 ))
@@ -210,7 +210,7 @@ def inspect_proposed_receipt_ci_only(
         "sessionId": session_id,
         "writerInstance": prepared["writerInstance"],
         "expectedRevision": prepared["expectedRevision"],
-        "revisionAfter": prepared["expectedRevision"] + 1,
+
         "graphDigest": prepared["expectedDigest"],
         "grantDigest": grant_digest,
         "originalPrepareSha256": _digest(original_prepare_raw),

@@ -68,4 +68,17 @@ for key in (
 ):
     assert key in CLOSE, key
 
+# A repository-wide inventory catches other literal X/× glyph users without
+# reclassifying destructive Remove actions as ordinary Close automatically.
+# A nonempty inventory is a review queue, not permission for mass conversion.
+remaining = []
+for scope in ("widgets", "modules"):
+    for path in sorted((ROOT / scope).rglob("*.qml")):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if re.search(r'\b(?:label|text):\s*["\'](?:X|×)["\']', line):
+                remaining.append(f"{path.relative_to(ROOT)}:{lineno}: {line.strip()}")
+print("Residual literal X/× control inventory:")
+for record in remaining:
+    print("  " + record)
+
 print("CloseButton cross-widget migration contracts: PASS")

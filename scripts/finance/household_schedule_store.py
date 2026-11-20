@@ -138,7 +138,7 @@ def validate(doc, context):
 
 def upgrade_in_memory(doc):
     # Reading an FP1e v1 schedule never rewrites it.
-    return doc if doc["version"] == 2 else {
+    return doc if doc["version"] in (2, 3) else {
         "version": 2, "contextId": doc["contextId"],
         "revision": doc["revision"], "rows": list(doc["rows"])
     }

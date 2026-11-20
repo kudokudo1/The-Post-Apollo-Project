@@ -131,15 +131,10 @@ Rectangle {
                     elide: Text.ElideRight
                 }
 
-                ActionButton {
-                    width: 34
-                    height: 30
-                    label: "×"
-                    labelPixelSize: 20
-                    accentColor: Colors.red
-                    destructive: true
+                CloseButton {
                     available: !editor.saving
-                    onLeftClicked: editor.cancelRequested()
+                    Accessible.name: "Cancel new Company hub"
+                    onCloseRequested: editor.cancelRequested()
                 }
             }
 

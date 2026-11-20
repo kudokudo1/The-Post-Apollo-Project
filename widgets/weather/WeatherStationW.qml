@@ -1146,49 +1146,10 @@ PanelWindow {
                 }
 
                 // Standard Post-Apollo Close / Dismiss glyph: × (U+00D7).
-                ActionButton {
+                CloseButton {
                     id: closeButton
-
-                    width: 34
-                    height: 32
-
-                    label: "×"
-                    labelPixelSize: 22
-                    contentPadding: 4
-                    trackLabelGlowLocally: true
-
-                    accentColor: Colors.red
-                    destructive: true
-
-                    idleForegroundColor: Colors.red
-                    hoverForegroundColor: Colors.red
-                    selectedForegroundColor: Colors.red
-                    keyboardSelectedForegroundColor: Colors.red
-
-                    hoverBorderColor: Colors.red
-                    selectedBorderColor: Colors.red
-                    keyboardSelectedBorderColor: Colors.red
-
-                    idleContentGlowColor: Colors.red
-                    hoverContentGlowColor: Colors.red
-                    selectedContentGlowColor: Colors.red
-                    keyboardSelectedContentGlowColor: Colors.red
-
-                    softGlowEnabled: true
-                    idleSoftGlowColor: Colors.red
-                    hoverSoftGlowColor: Colors.red
-                    pressedSoftGlowColor: Colors.red
-                    softGlowIdleOpacity: 0.48
-                    softGlowHoverOpacity: 0.70
-
-                    wideGlowEnabled: true
-                    idleWideGlowColor: Colors.red
-                    hoverWideGlowColor: Colors.red
-                    pressedWideGlowColor: Colors.red
-                    wideGlowIdleOpacity: 0.22
-                    wideGlowHoverOpacity: 0.32
-
-                    onLeftClicked: weatherStation.close()
+                    Accessible.name: "Close Weather Station"
+                    onCloseRequested: weatherStation.close()
                 }
             }
 

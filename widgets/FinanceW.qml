@@ -2135,12 +2135,19 @@ Row {
                     anchors.fill: parent
                     visible: !actualBudgetPage.visible
                              && root.selectedMainMode !== "research"
+                             && root.selectedMainMode !== "strategies"
                     // Component persists while navigating/resizing, not just while Market is selected.
                     embeddedComponent: marketPaneComponent
                     showEmbedded: root.selectedMainMode === "market"
                     domainTitle: root.selectedMainMode === "budget"
                                  ? root.selectedBudgetSubMode.toUpperCase()
                                  : root.mainModeName().toUpperCase()
+                }
+
+                // Independent simulation-only Strategies pane.
+                FinanceHouseholdPlanningPane {
+                    anchors.fill: parent
+                    visible: root.selectedMainMode === "strategies"
                 }
 
                 // Research tools share an in-place surface; the crawl and SEC

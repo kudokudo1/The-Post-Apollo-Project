@@ -197,3 +197,35 @@ assert "id: localTargetSwitchButton" in GIT
 assert "id: saveWorkflowButton" in GIT
 
 print("Git main-panel ActionButtons: PASS // seven actions, selectors preserved")
+
+
+# Git and Hospital header CLOSE controls share the ordinary X/button state
+# machine. Red is an EXIT identity, not destructive permission.
+# This is a source contract; native hover visual acceptance remains separate.
+HOSPITAL = (ROOT / "widgets/HospitalW.qml").read_text(encoding="utf-8")
+for owner, source, widget, control_type in (
+    ("Git", GIT, "gitCloseButton", "SharedComponents.ActionButton"),
+    ("Hospital", HOSPITAL, "hospitalCloseButton", "ActionButton"),
+):
+    marker = "id: " + widget
+    assert source.count(marker) == 1, f"{owner} close widget identity changed"
+    close_action_end = source.index("onLeftClicked: root.close()", source.index(marker))
+    header = source[max(0, source.index(marker) - 100):close_action_end + len("onLeftClicked: root.close()")]
+    assert control_type + " {" in header.split(marker)[0], (
+        f"{owner} close must use shared ActionButton, not its old rectangle")
+    for token in (
+        'label: "×"', "width: 40", "height: 34",
+        "accentColor: Colors.red", "destructive: false",
+        "acceptedButtons: Qt.LeftButton", "onLeftClicked: root.close()",
+    ):
+        assert token in header, f"{owner} close lost {token}"
+    assert "MouseArea {" not in header, f"{owner} close regained custom mouse handling"
+    assert "hoverFillColor:" not in header, (
+        f"{owner} close must inherit shared yellow hover, not override it")
+    assert "hoverForegroundColor:" not in header, (
+        f"{owner} close must inherit shared orange hover foreground")
+
+assert "property color hoverFillColor: Colors.yellow" in SHARED
+assert "property color hoverForegroundColor: Colors.orange" in SHARED
+assert "property color hoverBorderColor: Colors.orange" in SHARED
+print("Git/Hospital header red X: PASS // shared hover, non-destructive close")

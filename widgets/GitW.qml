@@ -4214,61 +4214,36 @@ PanelWindow {
                         }
                     }
 
-                    Rectangle {
+                    // Red CLOSE identity, normal shared hover/press behavior.
+                    // Presentation only: existing root.close() authority is unchanged.
+                    SharedComponents.ActionButton {
                         id: gitCloseButton
-
                         width: 40
                         height: 34
                         anchors.verticalCenter: parent.verticalCenter
+                        label: "×"
+                        labelPixelSize: 24
+                        contentPadding: 4
+                        accentColor: Colors.red
+                        destructive: false
+                        acceptedButtons: Qt.LeftButton
+                        Accessible.name: "Close Git/GitHub window"
 
-                        color:
-                            gitCloseMouse.pressed
-                            ? Colors.black
-                            : Colors.dark
-                        border.width: 1
-                        border.color:
-                            gitCloseMouse.pressed
-                            ? Colors.black
-                            : Colors.red
-
-                        RectangularShadow {
-                            anchors.fill: parent
-                            spread: 4
-                            z: -1
-                            opacity:
-                                gitCloseMouse.containsMouse
-                                ? 0.58
-                                : 0.38
-                            color:
-                                gitCloseMouse.pressed
-                                ? Colors.black
-                                : Colors.red
-                        }
-
-                        NotoText {
-                            anchors.centerIn: parent
-                            anchors.verticalCenterOffset: 2
-                            text: "×"
-                            font.pixelSize: 31
-                            color: Colors.red
-
-                            layer.enabled: Window.window !== null
-                            layer.effect: DropShadow {
-                                radius: 7
-                                samples: 9
-                                opacity: 0.58
-                                color: Colors.red
-                                transparentBorder: true
-                            }
-                        }
-
-                        MouseArea {
-                            id: gitCloseMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.close()
-                        }
+                        // Preserve the familiar red X glow, but let ActionButton own
+                        // yellow hover fill, orange hover foreground/border and click state.
+                        softGlowEnabled: true
+                        idleSoftGlowColor: Colors.red
+                        hoverSoftGlowColor: Colors.red
+                        pressedSoftGlowColor: Colors.red
+                        softGlowIdleOpacity: 0.48
+                        softGlowHoverOpacity: 0.70
+                        wideGlowEnabled: true
+                        idleWideGlowColor: Colors.red
+                        hoverWideGlowColor: Colors.red
+                        pressedWideGlowColor: Colors.red
+                        wideGlowIdleOpacity: 0.22
+                        wideGlowHoverOpacity: 0.32
+                        onLeftClicked: root.close()
                     }
                 }
             }

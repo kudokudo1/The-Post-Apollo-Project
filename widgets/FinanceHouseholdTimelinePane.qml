@@ -14,6 +14,8 @@ Item {
     property var scheduleRows: []
     property bool schedulesReady: false
     signal horizonRequested(int months)
+    readonly property var coverage: active && schedulesReady
+        ? Timeline.coverage(sourceRows,scheduleRows) : null
     readonly property var projection: active && schedulesReady
         ? Timeline.project(sourceRows,scheduleRows,startMonth,horizonMonths,contextId)
         : null
@@ -82,6 +84,45 @@ Item {
             color: timeline.projection && timeline.projection.ok
                 ? Colors.cyan : Colors.orange
             font.pixelSize: 9
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
+            text: timeline.coverage && timeline.coverage.ok
+                ? "DUE-DAY COVERAGE // "+timeline.coverage.datedExpenseCount
+                    +" / "+timeline.coverage.monthlyExpenseCount
+                    +" ENTERED MONTHLY COSTS HAVE DATES. "
+                    +"UNLISTED HOUSEHOLD BILLS ARE UNKNOWN."
+                : "COVERAGE UNAVAILABLE // "
+                    +(timeline.coverage?timeline.coverage.reason:"LOCAL RECORDS NOT READY")
+            font.pixelSize: 9
+            color: timeline.coverage && timeline.coverage.ok
+                && timeline.coverage.undatedExpenseCount===0
+                ? Colors.cyan : Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
+            visible: timeline.coverage && timeline.coverage.ok
+                && timeline.coverage.undatedExpenseCount>0
+            text: timeline.coverage && timeline.coverage.ok
+                ? "MISSING DUE DAYS // "
+                    +timeline.coverage.undatedExpenseTitles.join(", ")
+                    +" // AMOUNTS REMAIN COUNTED IN MONTHLY COSTS" : ""
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
+            visible: timeline.coverage && timeline.coverage.ok
+                && timeline.coverage.manualIncomeCount===0
+            text: "NO MANUAL INCOME ENTRY // FORECAST REFUSES TO GUESS"
+            font.pixelSize: 9
+            color: Colors.orange
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
         }
@@ -224,6 +265,21 @@ Item {
                         }
                     }
                     Repeater {
+                        model: monthCard.modelData.exceptionEvents
+                        delegate: GohuText {
+                            required property var modelData
+                            width: monthContent.width
+                            text: "EXCLUDED FROM "+modelData.month+" MODEL // "
+                                +modelData.title+" // "
+                                +timeline.money(modelData.excludedCents)
+                                +" // NOT CONFIRMED WAIVED OR PAID; NOT DEFERRED"
+                            font.pixelSize: 9
+                            color: Colors.orange
+                            textFormat: Text.PlainText
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                    Repeater {
                         model: monthCard.modelData.purchaseEvents
                         delegate: GohuText {
                             required property var modelData
@@ -244,7 +300,7 @@ Item {
         }
         GohuText {
             width: parent.width
-            text: "ESTIMATES ONLY: SCHEDULED BILL DAYS REFER TO COSTS ALREADY COUNTED ONCE. ONE-TIME PAYMENTS ARE MODELED ON THEIR DATES; GOAL-LINKED PURCHASES USE MODELED RESERVES FIRST, THEN NEW CASH. NOTHING IS PAID OR TRANSFERRED. TAX, DEBT, INFLATION, UNKNOWN BILLS AND INITIAL CASH ARE NOT INCLUDED."
+            text: "ESTIMATES ONLY: A BILL EXCLUDED FOR ONE MONTH IS NOT ASSUMED FORGIVEN, PAID OR DEFERRED. DUE DAYS LABEL MONTHLY COSTS COUNTED ONCE. ONE-TIME PURCHASES ARE SEPARATE; GOAL RESERVES ARE USED FIRST. UNKNOWN BILLS, TAX, DEBT, INFLATION AND STARTING CASH ARE OMITTED. NOTHING IS TRANSFERRED."
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText

@@ -55,6 +55,10 @@ function validSchedule(row) {
             &&row.amountCents===0&&typeof row.expenseId==="string"
             &&/^p-[0-9a-f]{32}$/.test(row.expenseId)
             &&Number.isInteger(row.dueDay)&&row.dueDay>=1&&row.dueDay<=31;
+    if(row.kind==="bill_skip")
+        return row.title===""&&row.fundingGoalId===""&&row.amountCents===0
+            &&row.dueDay===0&&row.expenseId!==""&&/^p-[0-9a-f]{32}$/.test(row.expenseId)
+            &&indexFor(row.date)!==null;
     if(row.kind==="purchase")
         return typeof row.title==="string"&&row.title.length>=1
             &&row.title.length<=80&&validDate(row.date)
@@ -65,6 +69,53 @@ function validSchedule(row) {
             &&(row.fundingGoalId===""||/^p-[0-9a-f]{32}$/.test(row.fundingGoalId));
     return false;
 }
+// Explicit coverage indicator for entered records only, NEVER an assurance
+// all household obligations are known. Works even with no income entered.
+function coverage(rows,schedules) {
+    if(!Array.isArray(rows)||rows.length>60||!rows.every(valid))
+        return refuse("INVALID_LOCAL_RECORDS");
+    if(!Array.isArray(schedules)||schedules.length>60
+       ||!schedules.every(validSchedule))
+        return refuse("INVALID_LOCAL_SCHEDULES");
+    var rowIds=rows.map(function(row){return row.id;});
+    var scheduleIds=schedules.map(function(row){return row.id;});
+    if(new Set(rowIds).size!==rowIds.length)
+        return refuse("DUPLICATE_RECORDS");
+    if(new Set(scheduleIds).size!==scheduleIds.length)
+        return refuse("DUPLICATE_SCHEDULES");
+    var expenses=rows.filter(function(row){return row.kind==="expense";});
+    var goals=rows.filter(function(row){return row.kind==="goal";});
+    var income=rows.filter(function(row){return row.kind==="income";});
+    var bills=schedules.filter(function(row){return row.kind==="bill_due";});
+    var skips=schedules.filter(function(row){return row.kind==="bill_skip";});
+    var purchases=schedules.filter(function(row){return row.kind==="purchase";});
+    var ids=bills.map(function(row){return row.expenseId;});
+    if(new Set(ids).size!==ids.length)
+        return refuse("DUPLICATE_BILL_SCHEDULE");
+    var expenseIds=new Set(expenses.map(function(row){return row.id;}));
+    var goalIds=new Set(goals.map(function(row){return row.id;}));
+    if(bills.some(function(row){return !expenseIds.has(row.expenseId);})
+       ||purchases.some(function(row){return row.fundingGoalId!=="" &&
+                !goalIds.has(row.fundingGoalId);})
+       ||skips.some(function(row){return ids.indexOf(row.expenseId)===-1;}))
+        return refuse("SCHEDULE_REFERENCE_MISSING");
+    var skipKeys=skips.map(function(row){return row.expenseId+"|"+row.date;});
+    if(new Set(skipKeys).size!==skipKeys.length)
+        return refuse("DUPLICATE_BILL_EXCEPTION");
+    var undated=expenses.filter(function(row) {
+        return ids.indexOf(row.id)===-1;
+    });
+    return {ok:true,source:"LOCAL_MANUAL_COVERAGE_ONLY",readOnly:true,
+        bankVerified:false,identityVerified:false,
+        dueDateCoverageOnly:true,allObligationsKnown:false,
+        monthlyExpenseCount:expenses.length,datedExpenseCount:bills.length,
+        undatedExpenseCount:undated.length,
+        undatedExpenseTitles:undated.map(function(row){return row.title;}),
+        manualIncomeCount:income.length,
+        monthlyExceptionCount:skips.length,
+        plannedPurchaseCount:purchases.length};
+}
+
 // Supports the FP1d 4-argument call for inherited read-only tests.
 // New FP1e callers must always provide an explicit schedules array.
 function project(rows,schedules,startMonth,horizonMonths,contextId) {
@@ -82,15 +133,8 @@ function project(rows,schedules,startMonth,horizonMonths,contextId) {
     if(start===null)return refuse("INVALID_START_MONTH");
     if([6,12,24].indexOf(horizonMonths)<0)
         return refuse("INVALID_HORIZON");
-    if(!Array.isArray(rows)||rows.length>60||!rows.every(valid))
-        return refuse("INVALID_LOCAL_RECORDS");
-    var ids=rows.map(function(row){return row.id;});
-    if(new Set(ids).size!==ids.length)return refuse("DUPLICATE_RECORDS");
-    if(!Array.isArray(schedules)||schedules.length>60
-       ||!schedules.every(validSchedule))return refuse("INVALID_LOCAL_SCHEDULES");
-    var scheduleIds=schedules.map(function(row){return row.id;});
-    if(new Set(scheduleIds).size!==scheduleIds.length)
-        return refuse("DUPLICATE_SCHEDULES");
+    var audit=coverage(rows,schedules);
+    if(!audit.ok)return refuse(audit.reason);
     var incomeRows=rows.filter(function(row){return row.kind==="income";});
     if(incomeRows.length===0)return refuse("ADD_MANUAL_MONTHLY_INCOME");
     var income=incomeRows.reduce(function(total,row){return total+row.monthlyCents;},0);
@@ -107,13 +151,7 @@ function project(rows,schedules,startMonth,horizonMonths,contextId) {
         .map(function(row){return [row.id,row];}));
     var billRows=schedules.filter(function(row){return row.kind==="bill_due";});
     var purchases=schedules.filter(function(row){return row.kind==="purchase";});
-    var billIds=billRows.map(function(row){return row.expenseId;});
-    if(new Set(billIds).size!==billIds.length)
-        return refuse("DUPLICATE_BILL_SCHEDULE");
-    if(billRows.some(function(row){return !expensesById.has(row.expenseId);})
-       ||purchases.some(function(row){
-            return row.fundingGoalId!==""&&!goalsById.has(row.fundingGoalId);
-        }))return refuse("SCHEDULE_REFERENCE_MISSING");
+    var skipRows=schedules.filter(function(row){return row.kind==="bill_skip";});
     purchases.sort(function(a,b) {
         return a.date.localeCompare(b.date)||a.id.localeCompare(b.id);
     });
@@ -150,7 +188,19 @@ function project(rows,schedules,startMonth,horizonMonths,contextId) {
                     projectedSavedCents:goal.allocatedCents});
             }
         }
-        var billEvents=billRows.map(function(row) {
+        var excluded=skipRows.filter(function(row){return row.date===month;});
+        var skippedIds=new Set(excluded.map(function(row){return row.expenseId;}));
+        var exceptionEvents=excluded.map(function(row) {
+            var expense=expensesById.get(row.expenseId);
+            return {id:row.id,expenseId:row.expenseId,title:expense.title,
+                month:month,excludedCents:expense.monthlyCents};
+        });
+        var currentCosts=costs-exceptionEvents.reduce(function(total,row) {
+            return total+row.excludedCents;
+        },0);
+        var billEvents=billRows.filter(function(row){
+            return !skippedIds.has(row.expenseId);
+        }).map(function(row) {
             var expense=expensesById.get(row.expenseId);
             var day=Math.min(row.dueDay,daysIn(month));
             return {id:row.id,expenseId:row.expenseId,title:expense.title,
@@ -176,12 +226,14 @@ function project(rows,schedules,startMonth,horizonMonths,contextId) {
                 amountCents:row.amountCents,goalFundedCents:reserved,
                 newCashCents:newCash,fundingGoalId:row.fundingGoalId});
         });
-        var change=income-costs-contributions-purchaseNewCash;
+        var change=income-currentCosts-contributions-purchaseNewCash;
         cumulative+=change;
         if(![contributions,purchaseNewCash,goalFunded,change,cumulative].every(
             Number.isSafeInteger))return refuse("UNSAFE_TOTAL");
         months.push({month:month,incomeCents:income,
-            expenseCents:costs,contributionCents:contributions,
+            expenseCents:currentCosts,baseExpenseCents:costs,
+            exceptionEvents:exceptionEvents,
+            contributionCents:contributions,
             purchaseNewCashCents:purchaseNewCash,
             purchaseGoalFundedCents:goalFunded,
             changeCents:change,cumulativeChangeCents:cumulative,
@@ -193,5 +245,6 @@ function project(rows,schedules,startMonth,horizonMonths,contextId) {
         startingCashKnown:false,missingCostsPossible:true,
         futurePurchasesCharged:false,actualTransfersMade:false,
         plannedPurchaseOutflowModeled:true,
+        coverage:audit,
         priorDeadlines:priorDeadlines,priorSchedules:priorSchedules,months:months};
 }

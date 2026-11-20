@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FinanceW FP1e: operator-entered schedules, no bank/Actual/identity access.
+"""FinanceW FP1f: versioned operator-entered schedules, no bank/Actual/identity access.
 
 A bill record references a monthly plan expense without duplicating its cost.
 A purchase is a separate dated planning payment, optionally funded from one
@@ -62,7 +62,11 @@ def cents_of(value):
         fail("AMOUNT_LIMIT")
     return amount
 
-def valid_record(row):
+def valid_month(value):
+    return (type(value) is str and
+            re.fullmatch(r"(?:19|20)\d{2}-(?:0[1-9]|1[0-2])", value) is not None)
+
+def valid_record(row, version):
     keys = ("id", "kind", "title", "expenseId", "dueDay", "date",
             "amountCents", "fundingGoalId")
     if not exact(row, keys) or not valid_id(row["id"]):
@@ -70,8 +74,8 @@ def valid_record(row):
     if row["kind"] == "bill_due":
         return (row["title"] == "" and valid_id(row["expenseId"])
                 and type(row["dueDay"]) is int and 1 <= row["dueDay"] <= 31
-                and row["date"] == "" and row["amountCents"] == 0
-                and row["fundingGoalId"] == "")
+                and row["date"] == "" and type(row["amountCents"]) is int
+                and row["amountCents"] == 0 and row["fundingGoalId"] == "")
     if row["kind"] == "purchase":
         return (valid_title(row["title"]) and row["expenseId"] == ""
                 and type(row["dueDay"]) is int and row["dueDay"] == 0
@@ -79,29 +83,47 @@ def valid_record(row):
                 and type(row["amountCents"]) is int
                 and 1 <= row["amountCents"] <= MAX_CENTS
                 and (row["fundingGoalId"] == "" or valid_id(row["fundingGoalId"])))
+    if version == 2 and row["kind"] == "bill_skip":
+        return (row["title"] == "" and valid_id(row["expenseId"])
+                and type(row["dueDay"]) is int and row["dueDay"] == 0
+                and valid_month(row["date"]) and type(row["amountCents"]) is int
+                and row["amountCents"] == 0 and row["fundingGoalId"] == "")
     return False
 
 def empty(context):
     if not valid_context(context):
         fail("INVALID_CONTEXT")
-    return {"version": 1, "contextId": context, "revision": 0, "rows": []}
+    return {"version": 2, "contextId": context, "revision": 0, "rows": []}
 
 def validate(doc, context):
     if not exact(doc, ("version", "contextId", "revision", "rows")):
         fail("INVALID_STORE")
-    if type(doc["version"]) is not int or doc["version"] != 1 or doc["contextId"] != context:
+    if (type(doc["version"]) is not int or doc["version"] not in (1, 2)
+            or doc["contextId"] != context):
         fail("INVALID_STORE")
     if type(doc["revision"]) is not int or not 0 <= doc["revision"] < 2**53:
         fail("INVALID_STORE")
     rows = doc["rows"]
-    if type(rows) is not list or len(rows) > MAX_ROWS or not all(valid_record(r) for r in rows):
+    if (type(rows) is not list or len(rows) > MAX_ROWS
+            or not all(valid_record(row, doc["version"]) for row in rows)):
         fail("INVALID_STORE")
     if len({r["id"] for r in rows}) != len(rows):
         fail("INVALID_STORE")
     bills = [r["expenseId"] for r in rows if r["kind"] == "bill_due"]
     if len(set(bills)) != len(bills):
         fail("INVALID_STORE")
+    skips = [(r["expenseId"], r["date"])
+             for r in rows if r["kind"] == "bill_skip"]
+    if len(set(skips)) != len(skips) or any(expense not in bills for expense, _ in skips):
+        fail("INVALID_STORE")
     return doc
+
+def upgrade_in_memory(doc):
+    # Reading an FP1e v1 schedule never rewrites it.
+    return doc if doc["version"] == 2 else {
+        "version": 2, "contextId": doc["contextId"],
+        "revision": doc["revision"], "rows": list(doc["rows"])
+    }
 
 def directory_path():
     base = os.environ.get("XDG_DATA_HOME")
@@ -185,55 +207,102 @@ def write_doc(directory, doc):
             os.close(fd)
         temp.unlink(missing_ok=True)
 
+def make_bill(expense, due):
+    if not valid_id(expense) or type(due) is not int or not 1 <= due <= 31:
+        fail("INVALID_BILL")
+    return {"kind": "bill_due", "title": "", "expenseId": expense,
+            "dueDay": due, "date": "", "amountCents": 0, "fundingGoalId": ""}
+
+def make_purchase(title, date, amount_text, goal):
+    amount = cents_of(amount_text)
+    if (not valid_title(title) or not valid_date(date) or not amount
+            or type(goal) is not str or (goal != "" and not valid_id(goal))):
+        fail("INVALID_PURCHASE")
+    return {"kind": "purchase", "title": title, "expenseId": "",
+            "dueDay": 0, "date": date, "amountCents": amount,
+            "fundingGoalId": goal}
+
+def make_skip(expense, month):
+    if not valid_id(expense) or not valid_month(month):
+        fail("INVALID_EXCEPTION")
+    return {"kind": "bill_skip", "title": "", "expenseId": expense,
+            "dueDay": 0, "date": month, "amountCents": 0, "fundingGoalId": ""}
+
 def apply(doc, command):
     context = command.get("contextId") if type(command) is dict else None
     validate(doc, context)
     action = command.get("action")
     if action == "list" and exact(command, ("action", "contextId")):
-        return doc, False
-    if action not in ("add_bill", "add_purchase", "delete"):
+        return upgrade_in_memory(doc), False
+    choices = ("add_bill", "add_purchase", "add_skip", "update_bill",
+               "update_purchase", "update_skip", "delete")
+    if action not in choices:
         fail("INVALID_ACTION")
     if (type(command.get("expectedRevision")) is not int
             or command["expectedRevision"] != doc["revision"]):
         fail("STALE_REVISION")
+    doc = upgrade_in_memory(doc)
     base = ("action", "contextId", "expectedRevision")
     rows = list(doc["rows"])
-    if action == "add_bill":
-        if not exact(command, base + ("expenseId", "dueDay")):
+    kind = "bill_due" if action.endswith("bill") else (
+        "bill_skip" if action.endswith("skip") else "purchase")
+    if action in ("add_bill", "update_bill"):
+        expected = base + (("id",) if action.startswith("update") else ()) + ("expenseId", "dueDay")
+        if not exact(command, expected):
             fail("INVALID_COMMAND")
-        expense_id, due = command["expenseId"], command["dueDay"]
-        if not valid_id(expense_id) or type(due) is not int or not 1 <= due <= 31:
-            fail("INVALID_BILL")
-        if any(r["kind"] == "bill_due" and r["expenseId"] == expense_id for r in rows):
-            fail("BILL_ALREADY_SCHEDULED")
-        row = {"id": "p-" + uuid.uuid4().hex, "kind": "bill_due",
-               "title": "", "expenseId": expense_id, "dueDay": due,
-               "date": "", "amountCents": 0, "fundingGoalId": ""}
-    elif action == "add_purchase":
-        if not exact(command, base + ("title", "date", "amountText", "fundingGoalId")):
+        record = make_bill(command["expenseId"], command["dueDay"])
+    elif action in ("add_purchase", "update_purchase"):
+        expected = base + (("id",) if action.startswith("update") else ()) + (
+            "title", "date", "amountText", "fundingGoalId")
+        if not exact(command, expected):
             fail("INVALID_COMMAND")
-        amount = cents_of(command["amountText"])
-        if (not valid_title(command["title"]) or not valid_date(command["date"])
-                or amount == 0 or (command["fundingGoalId"] != "" and
-                                    not valid_id(command["fundingGoalId"]))):
-            fail("INVALID_PURCHASE")
-        row = {"id": "p-" + uuid.uuid4().hex, "kind": "purchase",
-               "title": command["title"], "expenseId": "", "dueDay": 0,
-               "date": command["date"], "amountCents": amount,
-               "fundingGoalId": command["fundingGoalId"]}
+        record = make_purchase(command["title"], command["date"],
+                               command["amountText"], command["fundingGoalId"])
+    elif action in ("add_skip", "update_skip"):
+        expected = base + (("id",) if action.startswith("update") else ()) + ("expenseId", "month")
+        if not exact(command, expected):
+            fail("INVALID_COMMAND")
+        record = make_skip(command["expenseId"], command["month"])
     else:
         if not exact(command, base + ("id",)) or not valid_id(command["id"]):
             fail("INVALID_COMMAND")
-        rows = [r for r in rows if r["id"] != command["id"]]
-        if len(rows) == len(doc["rows"]):
+        found = [r for r in rows if r["id"] == command["id"]]
+        if len(found) != 1:
             fail("NOT_FOUND")
-        return {"version": 1, "contextId": context,
-                "revision": doc["revision"]+1, "rows": rows}, True
-    if len(rows) >= MAX_ROWS:
-        fail("ROW_LIMIT")
-    rows.append(row)
-    return {"version": 1, "contextId": context,
-            "revision": doc["revision"]+1, "rows": rows}, True
+        if (found[0]["kind"] == "bill_due" and any(
+                r["kind"] == "bill_skip" and
+                r["expenseId"] == found[0]["expenseId"] for r in rows)):
+            fail("BILL_HAS_EXCEPTIONS")
+        rows = [r for r in rows if r["id"] != command["id"]]
+        next_doc = {"version": 2, "contextId": context,
+                    "revision": doc["revision"]+1, "rows": rows}
+        validate(next_doc, context)
+        return next_doc, True
+    if action.startswith("update"):
+        if not valid_id(command["id"]):
+            fail("INVALID_ID")
+        found = [r for r in rows if r["id"] == command["id"]]
+        if len(found) != 1:
+            fail("NOT_FOUND")
+        if found[0]["kind"] != kind:
+            fail("KIND_CHANGE_REFUSED")
+        if (kind == "bill_due" and record["expenseId"] != found[0]["expenseId"]
+                and any(r["kind"] == "bill_skip"
+                        and r["expenseId"] == found[0]["expenseId"] for r in rows)):
+            fail("BILL_HAS_EXCEPTIONS")
+        record["id"] = command["id"]
+        rows = [record if r["id"] == command["id"] else r for r in rows]
+    else:
+        if len(rows) >= MAX_ROWS:
+            fail("ROW_LIMIT")
+        record["id"] = "p-" + uuid.uuid4().hex
+        rows.append(record)
+    next_doc = {"version": 2, "contextId": context,
+                "revision": doc["revision"]+1, "rows": rows}
+    # This validation rejects duplicate bill schedules, duplicate skip months,
+    # and skipping a bill absent from this same local context.
+    validate(next_doc, context)
+    return next_doc, True
 
 def run(directory, command):
     if type(command) is not dict or not valid_context(command.get("contextId")):
@@ -241,7 +310,8 @@ def run(directory, command):
     context = command["contextId"]
     if command.get("action") == "list":
         return apply(read_doc(directory, context), command)[0]
-    if command.get("action") not in ("add_bill", "add_purchase", "delete"):
+    if command.get("action") not in ("add_bill", "add_purchase", "add_skip",
+                                   "update_bill", "update_purchase", "update_skip", "delete"):
         fail("INVALID_ACTION")
     private_dir(directory, True)
     lock_file = directory / (context + ".lock")

@@ -1,0 +1,61 @@
+name: Connections / Hospital proposed read-only RECOVER query (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/hospital/staffing/StaffingRecoveryQueryPreflight.py'
+      - 'tests/connections/test_connections_hospital_staffing_recovery_query_preflight.py'
+      - 'docs/connections-hospital-staffing-recovery-query-proposal.md'
+      - '.github/workflows/connections-hospital-staffing-recovery-query-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-native-recover-or-commit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout pinned Hospital source for parser/fixture only
+        uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: ef5ce8ab496418b20baadc63887bbb74a58711ec
+          path: hospital-source
+          persist-credentials: false
+      - name: Static no-native-authority review
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/hospital/staffing/StaffingRecoveryQueryPreflight.py \
+            tests/connections/test_connections_hospital_staffing_recovery_query_preflight.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("services/connections/hospital/staffing/StaffingRecoveryQueryPreflight.py").read_text()
+          for marker in ('Receipt._source_context(', 'NATIVE_RECOVERY_REQUEST_NOT_APPROVED_OR_INSTALLED',
+                         '"canReplayCommit": False', '"writerReceiptAuthenticated": False',
+                         '"canSendRecoveryQuery": False', '"productionAuthority": False'):
+              assert marker in p, marker
+          for bad in ('sqlite3', 'subprocess', 'socket.', 'sendall(',
+                      'Ed25519PrivateKey', 'os.open(', 'requests.', 'connect('):
+              assert bad not in p, bad
+          PY
+      - name: Run 17 adversarial recovery-query tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$CI" = true
+          python3 -B tests/connections/test_connections_hospital_staffing_recovery_query_preflight.py
+          echo "RECOVER_QUERY_CI_HOLD // NO_NATIVE_WRITER_AND_NO_GRANT_RETRY"
+      - name: Preserve prior receipt and UNKNOWN COMMIT behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_hospital_staffing_receipt_identity_preflight.py
+          python3 -B tests/connections/test_connections_hospital_staffing_unknown_commit_preflight.py

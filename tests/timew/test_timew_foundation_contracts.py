@@ -290,7 +290,11 @@ assert "label: timew.use24Hour ? \"24H\" : \"12H\"" in window
 assert "onLeftClicked: timew.use24Hour = !timew.use24Hour" in window
 assert "fillColor: Colors.black" in window
 assert "border.color: Colors.cyan" in window
-assert "accentColor: Colors.red" in window
+# Close red identity is inherited from the shared visual component, not inline.
+close_component = (ROOT / "components/CloseButton.qml").read_text(encoding="utf-8")
+assert "CloseButton {" in window
+assert "onCloseRequested: timew.menuOpen = false" in window
+assert "accentColor: Colors.red" in close_component
 
 # CALC now runs a bounded, manual zoneinfo conversion on user request.
 # Its fixed script resolves from the Quickshell config root, and is never
@@ -779,14 +783,23 @@ assert "height: 2\n                color: Colors.cyan" in window
 assert "bordered: false" in window
 assert "trackDefaultGlowsLocally: true" in window
 
-# The shared destructive Close is the real U+00D7 X, red in idle and hover.
-start = window.index("id: closeButton")
-end = window.index("onLeftClicked: timew.menuOpen = false", start)
-close = window[start:end]
-for prop in ('label: "×"', "labelPixelSize: 22", "destructive: true",
-             "accentColor: Colors.red", "hoverForegroundColor: Colors.red",
-             "hoverBorderColor: Colors.red"):
-    assert prop in close, prop
+# The shared Close renders the canonical U+00D7, preserving red identity
+# without treating ordinary window close as destructive permission.
+start = window.index("CloseButton {")
+end = window.index("onCloseRequested: timew.menuOpen = false", start)
+close = window[start:end + len("onCloseRequested: timew.menuOpen = false")]
+assert 'id: closeButton' in close
+assert 'Accessible.name: "Close Clock menu"' in close
+assert "onCloseRequested: timew.menuOpen = false" in close
+assert "onLeftClicked:" not in close
+for prop in (
+    'label: "×"', "labelPixelSize: Math.round(width * 22 / 34)",
+    "destructive: false", "accentColor: Colors.red",
+    "hoverForegroundColor: Colors.red", "hoverBorderColor: Colors.red",
+    "contentGlowPressedOpacity: 1.0",
+    "softGlowPressedOpacity: 1.0", "wideGlowPressedOpacity: 1.0",
+):
+    assert prop in close_component, prop
 
 # Both TOOLS clocks are session-local elapsed counters. Desktop alarms,
 # system notifications and *automatic* Sway restoration remain unimplemented.

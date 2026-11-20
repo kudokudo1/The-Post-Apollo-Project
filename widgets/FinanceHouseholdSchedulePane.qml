@@ -23,6 +23,8 @@ Item {
     property string skipMonth: Qt.formatDate(new Date(),"yyyy-MM")
     property string deferSourceMonth: Qt.formatDate(new Date(),"yyyy-MM")
     property string deferTargetDate: Qt.formatDate(new Date(),"yyyy-MM-dd")
+    property int cadenceIntervalMonths: 3
+    property string cadenceAnchorMonth: Qt.formatDate(new Date(),"yyyy-MM")
     readonly property bool editingStale: editingId!=="" &&
         (editingRevision!==scheduleStore.revision ||
          !scheduleStore.rows.some(function(row){return row.id===editingId;}))
@@ -61,10 +63,12 @@ Item {
         skipMonth=Qt.formatDate(new Date(),"yyyy-MM");
         deferSourceMonth=Qt.formatDate(new Date(),"yyyy-MM");
         deferTargetDate=Qt.formatDate(new Date(),"yyyy-MM-dd");
+        cadenceIntervalMonths=3;
+        cadenceAnchorMonth=Qt.formatDate(new Date(),"yyyy-MM");
     }
     onContextIdChanged: clearEditor()
     function setKind(kind) {
-        if(kind!=="bill"&&kind!=="purchase"&&kind!=="skip"&&kind!=="defer")return;
+        if(kind!=="bill"&&kind!=="purchase"&&kind!=="skip"&&kind!=="defer"&&kind!=="cadence")return;
         editorKind=kind;
         clearEditor();
     }
@@ -79,6 +83,11 @@ Item {
             editorKind="skip";
             selectedExpenseId=row.expenseId;
             skipMonth=row.date;
+        } else if(row.kind==="bill_cadence") {
+            editorKind="cadence";
+            selectedExpenseId=row.expenseId;
+            cadenceIntervalMonths=row.intervalMonths;
+            cadenceAnchorMonth=row.anchorMonth;
         } else if(row.kind==="bill_defer") {
             editorKind="defer";
             selectedExpenseId=row.expenseId;
@@ -126,6 +135,16 @@ Item {
             if(editingId)
                 return scheduleStore.updateSkip(editingId,selectedExpenseId,skipMonth);
             return scheduleStore.addSkip(selectedExpenseId,skipMonth);
+        }
+        if(editorKind==="cadence") {
+            if(!scheduledBills.some(function(row) {
+                    return row.expenseId===selectedExpenseId;
+                }))return false;
+            if(editingId)
+                return scheduleStore.updateCadence(editingId,selectedExpenseId,
+                    cadenceIntervalMonths,cadenceAnchorMonth);
+            return scheduleStore.addCadence(selectedExpenseId,cadenceIntervalMonths,
+                cadenceAnchorMonth);
         }
         if(editorKind==="defer") {
             if(!scheduledBills.some(function(row){
@@ -216,6 +235,15 @@ Item {
             selected: schedules.editorKind==="defer"
             onLeftClicked: schedules.setKind("defer")
         }
+        ActionButton {
+            width: parent.width
+            height: 29
+            label: "QUARTERLY / ANNUAL BILL FREQUENCY"
+            labelPixelSize: 9
+            accentColor: Colors.magenta
+            selected: schedules.editorKind==="cadence"
+            onLeftClicked: schedules.setKind("cadence")
+        }
         GohuText {
             width: parent.width
             text: schedules.statusMessage
@@ -254,8 +282,8 @@ Item {
         }
         GohuText {
             width: parent.width
-            visible: schedules.editorKind==="bill" || schedules.editorKind==="skip" || schedules.editorKind==="defer"
-            text: schedules.editorKind==="skip" || schedules.editorKind==="defer"
+            visible: schedules.editorKind==="bill" || schedules.editorKind==="skip" || schedules.editorKind==="defer" || schedules.editorKind==="cadence"
+            text: schedules.editorKind==="skip" || schedules.editorKind==="defer" || schedules.editorKind==="cadence"
                 ? "SELECT A BILL WITH AN EXISTING DUE-DAY SCHEDULE"
                 : "SELECT EXISTING MONTHLY COST (AMOUNT NOT DUPLICATED)"
             font.pixelSize: 9
@@ -265,11 +293,11 @@ Item {
         }
         Flow {
             id: expenseRail
-            visible: schedules.editorKind==="bill" || schedules.editorKind==="skip" || schedules.editorKind==="defer"
+            visible: schedules.editorKind==="bill" || schedules.editorKind==="skip" || schedules.editorKind==="defer" || schedules.editorKind==="cadence"
             width: parent.width
             spacing: 5
             Repeater {
-                model: schedules.editorKind==="skip" || schedules.editorKind==="defer"
+                model: schedules.editorKind==="skip" || schedules.editorKind==="defer" || schedules.editorKind==="cadence"
                     ? schedules.scheduledExpenses : schedules.expenses
                 delegate: ActionButton {
                     required property var modelData
@@ -428,6 +456,79 @@ Item {
         }
         GohuText {
             width: parent.width
+            visible: schedules.editorKind==="cadence"
+            text: "EXPLICIT BILL FREQUENCY // REPLACES MONTHLY COST WITH A CHARGE EVERY 3 OR 12 MONTHS"
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        Row {
+            visible: schedules.editorKind==="cadence"
+            width: parent.width
+            height: visible?29:0
+            spacing: 5
+            ActionButton {
+                width: (parent.width-5)/2
+                height: 29
+                label: "QUARTERLY // 3 MONTHS"
+                labelPixelSize: 9
+                selected: schedules.cadenceIntervalMonths===3
+                accentColor: Colors.cyan
+                onLeftClicked: schedules.cadenceIntervalMonths=3
+            }
+            ActionButton {
+                width: (parent.width-5)/2
+                height: 29
+                label: "ANNUAL // 12 MONTHS"
+                labelPixelSize: 9
+                selected: schedules.cadenceIntervalMonths===12
+                accentColor: Colors.magenta
+                onLeftClicked: schedules.cadenceIntervalMonths=12
+            }
+        }
+        GohuText {
+            width: parent.width
+            visible: schedules.editorKind==="cadence"
+            text: "FIRST PLANNED CHARGE MONTH YYYY-MM"
+            color: Colors.cyan
+            font.pixelSize: 9
+        }
+        Rectangle {
+            visible: schedules.editorKind==="cadence"
+            width: parent.width
+            height: visible?30:0
+            color: Colors.dark
+            border.color: cadenceAnchorInput.activeFocus?Colors.magenta:Colors.cyan
+            TextInput {
+                id: cadenceAnchorInput
+                anchors.fill: parent
+                anchors.margins: 6
+                text: schedules.cadenceAnchorMonth
+                font.pixelSize: 11
+                color: Colors.white
+                maximumLength: 7
+                selectByMouse: true
+                verticalAlignment: TextInput.AlignVCenter
+                onTextEdited: schedules.cadenceAnchorMonth=text
+            }
+        }
+        GohuText {
+            width: parent.width
+            visible: schedules.editorKind==="cadence"
+            text: schedules.selectedExpenseId===""
+                ? "SELECT AN ENTERED BILL ABOVE. THE EXISTING EXPENSE AMOUNT WILL BE TREATED AS ONE CHARGE, NOT A MONTHLY AVERAGE."
+                : "PER-CHARGE AMOUNT // "
+                    +schedules.money(schedules.billAmount(schedules.selectedExpenseId))
+                    +" // FIRST CHARGE "+schedules.cadenceAnchorMonth
+                    +" // EVERY "+schedules.cadenceIntervalMonths+" MONTHS. REMOVE FREQUENCY ENTRY TO RESTORE MONTHLY CHARGES."
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
             visible: schedules.editorKind==="purchase"
             text: "PURCHASE DESCRIPTION"
             font.pixelSize: 9
@@ -546,6 +647,7 @@ Item {
                 schedules.editorKind==="bill"?"SAVE BILL DUE DAY":
                 schedules.editorKind==="skip"?"SAVE ONE-MONTH EXCLUSION":
                 schedules.editorKind==="defer"?"SAVE BILL DEFERRAL":
+                schedules.editorKind==="cadence"?"SAVE BILL FREQUENCY":
                 "SAVE PLANNED PURCHASE"
             labelPixelSize: 10
             accentColor: Colors.omnitrix
@@ -578,8 +680,10 @@ Item {
                     anchors.rightMargin: 5
                     text: scheduleRow.modelData.kind==="bill_due"
                         ? "BILL // "+schedules.billLabel(scheduleRow.modelData.expenseId)
-                        : scheduleRow.modelData.kind==="bill_skip"
-                            ? "EXCLUDED BILL // "+schedules.billLabel(scheduleRow.modelData.expenseId)
+                        : scheduleRow.modelData.kind==="bill_cadence"
+                            ? "FREQUENCY // "+schedules.billLabel(scheduleRow.modelData.expenseId)
+                            : scheduleRow.modelData.kind==="bill_skip"
+                                ? "EXCLUDED BILL // "+schedules.billLabel(scheduleRow.modelData.expenseId)
                             : scheduleRow.modelData.kind==="bill_defer"
                                 ? "DEFERRED BILL // "+schedules.billLabel(scheduleRow.modelData.expenseId)
                                 : "PURCHASE // "+scheduleRow.modelData.title
@@ -598,8 +702,13 @@ Item {
                     text: scheduleRow.modelData.kind==="bill_due"
                         ? "DAY "+scheduleRow.modelData.dueDay
                           +" // "+schedules.money(schedules.billAmount(scheduleRow.modelData.expenseId))
-                        : scheduleRow.modelData.kind==="bill_skip"
-                            ? "MONTH "+scheduleRow.modelData.date+" // NOT A WAIVER OR PAYMENT"
+                        : scheduleRow.modelData.kind==="bill_cadence"
+                            ? "EVERY "+scheduleRow.modelData.intervalMonths
+                                +" MONTHS FROM "+scheduleRow.modelData.anchorMonth
+                                +" // "+schedules.money(schedules.billAmount(scheduleRow.modelData.expenseId))
+                                +" PER CHARGE"
+                            : scheduleRow.modelData.kind==="bill_skip"
+                                ? "MONTH "+scheduleRow.modelData.date+" // NOT A WAIVER OR PAYMENT"
                             : scheduleRow.modelData.kind==="bill_defer"
                                 ? "FROM "+scheduleRow.modelData.sourceMonth
                                     +" // TO "+scheduleRow.modelData.date
@@ -653,7 +762,7 @@ Item {
         }
         GohuText {
             width: parent.width
-            text: "BILL DEFERRALS MODEL PAYMENT IN A LATER MONTH WITHOUT BANK ACTION OR CREDITOR APPROVAL. BILL EXCLUSIONS REMOVE ONE MONTH FROM THIS MODEL ONLY; THEY DO NOT PROVE A BILL WAS FORGIVEN OR PAID. EDITS PRESERVE SCHEDULE IDS AND REFUSE STALE REVISIONS. GOAL-LINKED PURCHASES FIRST USE MODELED GOAL RESERVES, NOT VERIFIED FUNDS. ALL RECORDS REMAIN LOCAL MANUAL ASSUMPTIONS, NOT BANK PAYMENTS."
+            text: "QUARTERLY/ANNUAL CHARGES USE THE ENTERED EXPENSE AMOUNT PER OCCURRENCE, NOT PER MONTH; OTHER MONTHS OMIT IT. BILL DEFERRALS MODEL PAYMENT IN A LATER MONTH WITHOUT BANK ACTION OR CREDITOR APPROVAL. BILL EXCLUSIONS REMOVE ONE MONTH FROM THIS MODEL ONLY; THEY DO NOT PROVE A BILL WAS FORGIVEN OR PAID. EDITS PRESERVE SCHEDULE IDS AND REFUSE STALE REVISIONS. GOAL-LINKED PURCHASES FIRST USE MODELED GOAL RESERVES, NOT VERIFIED FUNDS. ALL RECORDS REMAIN LOCAL MANUAL ASSUMPTIONS, NOT BANK PAYMENTS."
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText

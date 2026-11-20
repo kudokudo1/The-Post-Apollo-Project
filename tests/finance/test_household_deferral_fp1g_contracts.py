@@ -8,11 +8,11 @@ ui=(root/"widgets/FinanceHouseholdSchedulePane.qml").read_text()
 policy=(root/"widgets/FinanceHouseholdTimelinePolicy.js").read_text()
 timeline=(root/"widgets/FinanceHouseholdTimelinePane.qml").read_text()
 assert "make_defer" in store
-assert "doc[\"version\"] not in (1, 2, 3)" in store
+assert "doc[\"version\"] not in (1, 2, 3, 4)" in store
 assert "add_defer" in store and "update_defer" in store
 assert "BILL_HAS_EXCEPTIONS" in store
 assert "STALE_REVISION" in store
-assert "doc[\"version\"] in (2, 3)" in store
+assert "doc[\"version\"] in (2, 3, 4)" in store
 assert "sourceMonth" in store
 assert 'doc.version===2 || doc.version===3' in bridge
 assert 'function addDeferral(expenseId,sourceMonth,targetDate)' in bridge

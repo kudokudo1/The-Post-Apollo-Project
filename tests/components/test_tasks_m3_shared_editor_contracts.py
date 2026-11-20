@@ -97,7 +97,11 @@ assert "root.menuOpen = false" not in handoff
 
 assert "width: root.menuOpen ? root.frameWidth : 0" in MENU
 assert "height: root.menuOpen ? root.frameHeight : 0" in MENU
-assert "onLeftClicked: root.menuOpen = false" in MENU
+# Header X closes through the shared CloseButton without coupling task drafts
+# or the editor's separate two-step Escape focus handoff to this click.
+assert "CloseButton {" in MENU
+assert "onCloseRequested: root.menuOpen = false" in MENU
+assert "onLeftClicked: root.menuOpen = false" not in MENU
 assert "onVisibleChanged:" in EDITOR
 assert "entryInput.focus = false;" in EDITOR
 

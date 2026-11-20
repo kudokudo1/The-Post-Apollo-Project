@@ -13,7 +13,7 @@ import struct
 
 MAGIC = b"i3-ipc"
 GET_TREE = 4
-HEADER = struct.Struct("<6sII")
+HEADER = struct.Struct("=6sII")
 MAX_REPLY = 262144
 MAX_NODES = 2048
 MAX_CHILDREN = 256

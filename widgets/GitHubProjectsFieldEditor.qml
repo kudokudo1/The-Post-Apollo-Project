@@ -127,15 +127,11 @@ Item {
                 elide: Text.ElideRight
             }
 
-            Components.ActionButton {
+            Components.CloseButton {
+                // Compact edit-overlay header, close only (never save).
                 width: 27
-                height: 25
-                label: "×"
-                labelPixelSize: 12
-                accentColor: Colors.orange
-                idleForegroundColor: Colors.orange
-                idleBorderColor: Colors.orange
-                onTriggered: root.closeEditor()
+                Accessible.name: "Close GitHub project field editor"
+                onCloseRequested: root.closeEditor()
             }
         }
 

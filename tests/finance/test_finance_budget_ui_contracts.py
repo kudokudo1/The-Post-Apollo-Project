@@ -3,6 +3,7 @@
 from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 ui = (root / "widgets/FinanceW.qml").read_text()
+close_component = (root / "components/CloseButton.qml").read_text()
 bridge = (root / "services/finance/FinanceBudgetReadService.qml").read_text()
 cli = (root / "scripts/finance/read_budget.mjs").read_text()
 assert 'FinanceServices.FinanceBudgetReadService {' in ui
@@ -16,9 +17,12 @@ assert 'feedStatus === "LIVE" ? Colors.green' in ui
 assert 'feedStatus === "OFFLINE" || feedStatus === "ERROR"' in ui
 assert '|| feedStatus === "NO FEED" ? feedStatusColor : Colors.omnitrix' in ui
 assert 'id: closeButton' in ui
-assert 'softGlowIdleOpacity: 0.48' in ui
-assert 'wideGlowEnabled: true' in ui
-assert 'idleWideGlowColor: Colors.red' in ui
+# The header now inherits Finance's red multi-layer glow from CloseButton.
+assert 'CloseButton {' in ui
+assert 'onCloseRequested: root.menuOpen = false' in ui
+assert 'softGlowIdleOpacity: 0.48' in close_component
+assert 'wideGlowEnabled: true' in close_component
+assert 'idleWideGlowColor: Colors.red' in close_component
 assert 'root.moneyText(modelData.amountCents)' in ui
 assert 'modelData.date + "  " + modelData.description' in ui
 assert 'modelData.account' in ui

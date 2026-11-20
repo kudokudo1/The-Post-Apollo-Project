@@ -741,33 +741,16 @@ PanelWindow {
                 }
             }
 
-            ActionButton {
+            // Finance is the first visual pilot of the shared 17:16 ×.
+            // Preserve the existing status gap and header placement; only
+            // presentation/input comes from the reusable CloseButton.
+            CloseButton {
                 id: closeButton
                 anchors.right: parent.right
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
-                width: 34
-                height: 32
-                label: "×"
-                labelPixelSize: 22
-                contentPadding: 4
-                accentColor: Colors.red
-                destructive: true
-                // The shared ActionButton provides a glow without cloning
-                // the × glyph through an extra DropShadow source.
-                softGlowEnabled: true
-                idleSoftGlowColor: Colors.red
-                hoverSoftGlowColor: Colors.red
-                pressedSoftGlowColor: Colors.red
-                softGlowIdleOpacity: 0.48
-                softGlowHoverOpacity: 0.70
-                wideGlowEnabled: true
-                idleWideGlowColor: Colors.red
-                hoverWideGlowColor: Colors.red
-                pressedWideGlowColor: Colors.red
-                wideGlowIdleOpacity: 0.22
-                wideGlowHoverOpacity: 0.32
-                onLeftClicked: root.menuOpen = false
+                Accessible.name: "Close Finance window"
+                onCloseRequested: root.menuOpen = false
             }
         }
 

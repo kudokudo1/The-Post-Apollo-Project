@@ -6,8 +6,9 @@ Finance → STRATEGIES → PLANS. Choose the local planning context.
 Existing savings goals and monthly costs offer EDIT, keeping the same record
 ID. Edits require a current revision and an explicit UPDATE.
 An optional goal deadline is entered as YYYY-MM.
-Add planned income from MONTHLY INCOME. Open FORECAST and select 12/36/60
-months to inspect the hypothetical change at fixed monthly rates.
+Add planned income from MONTHLY INCOME. Open FORECAST and select 12/36/60,
+120 or 360 months to inspect the hypothetical change at fixed monthly rates.
+An open edit refuses saving if the selected record/revision changes.
 
 Projection = listed monthly income - listed monthly expenses -
 monthly contributions for incomplete goals, multiplied by the horizon.

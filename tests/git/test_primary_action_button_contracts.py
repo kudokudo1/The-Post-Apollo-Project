@@ -199,33 +199,47 @@ assert "id: saveWorkflowButton" in GIT
 print("Git main-panel ActionButtons: PASS // seven actions, selectors preserved")
 
 
-# Git and Hospital header CLOSE controls share the ordinary X/button state
-# machine. Red is an EXIT identity, not destructive permission.
-# This is a source contract; native hover visual acceptance remains separate.
+# Git and Hospital header CLOSE controls now inherit the distinct shared
+# Finance-style X component. Red is identity, not destructive permission.
 HOSPITAL = (ROOT / "widgets/HospitalW.qml").read_text(encoding="utf-8")
-for owner, source, widget, control_type in (
-    ("Git", GIT, "gitCloseButton", "SharedComponents.ActionButton"),
-    ("Hospital", HOSPITAL, "hospitalCloseButton", "ActionButton"),
+CLOSE = (ROOT / "components/CloseButton.qml").read_text(encoding="utf-8")
+for owner, source, widget, control_type, accessible in (
+    ("Git", GIT, "gitCloseButton", "SharedComponents.CloseButton",
+     'Accessible.name: "Close Git/GitHub window"'),
+    ("Hospital", HOSPITAL, "hospitalCloseButton", "CloseButton",
+     'Accessible.name: "Close Hospital window"'),
 ):
     marker = "id: " + widget
     assert source.count(marker) == 1, f"{owner} close widget identity changed"
-    close_action_end = source.index("onLeftClicked: root.close()", source.index(marker))
-    header = source[max(0, source.index(marker) - 100):close_action_end + len("onLeftClicked: root.close()")]
-    assert control_type + " {" in header.split(marker)[0], (
-        f"{owner} close must use shared ActionButton, not its old rectangle")
-    for token in (
-        'label: "×"', "width: 40", "height: 34",
-        "accentColor: Colors.red", "destructive: false",
-        "acceptedButtons: Qt.LeftButton", "onLeftClicked: root.close()",
-    ):
+    offset = source.index(marker)
+    beginning = source.rfind(control_type + " {", 0, offset)
+    assert beginning >= 0, f"{owner} close must inherit universal CloseButton"
+    end = source.index("onCloseRequested: root.close()", offset)
+    header = source[beginning:end + len("onCloseRequested: root.close()")]
+    for token in (accessible, "anchors.verticalCenter: parent.verticalCenter",
+                  "onCloseRequested: root.close()"):
         assert token in header, f"{owner} close lost {token}"
     assert "MouseArea {" not in header, f"{owner} close regained custom mouse handling"
-    assert "hoverFillColor:" not in header, (
-        f"{owner} close must inherit shared yellow hover, not override it")
-    assert "hoverForegroundColor:" not in header, (
-        f"{owner} close must inherit shared orange hover foreground")
+    assert "onLeftClicked:" not in header, f"{owner} close bypasses close request"
 
-assert "property color hoverFillColor: Colors.yellow" in SHARED
-assert "property color hoverForegroundColor: Colors.orange" in SHARED
-assert "property color hoverBorderColor: Colors.orange" in SHARED
-print("Git/Hospital header red X: PASS // shared hover, non-destructive close")
+# One shared visual specification: 17:16, red-on-yellow hover, black-on-red
+# pressed, source-aligned glyph glow and persistent triple halo at full press.
+for token in (
+    'label: "×"', "implicitWidth: 34", "implicitHeight: 32",
+    "height: width * 16 / 17",
+    "destructive: false",
+    "idleFillColor: Colors.black",
+    "hoverFillColor: Colors.yellow",
+    "hoverForegroundColor: Colors.red",
+    "hoverBorderColor: Colors.red",
+    "pressedFillColor: Colors.red",
+    "pressedForegroundColor: Colors.black",
+    "pressedBorderColor: Colors.black",
+    "trackLabelGlowLocally: true",
+    "contentGlowPressedOpacity: 1.0",
+    "softGlowPressedOpacity: 1.0",
+    "wideGlowPressedOpacity: 1.0",
+):
+    assert token in CLOSE, token
+
+print("Git/Hospital header red X: PASS // universal persistent-glow CloseButton")

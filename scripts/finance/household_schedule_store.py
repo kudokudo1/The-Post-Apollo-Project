@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FinanceW FP1g: versioned schedules with optional explicit deferred bill payment, no bank/Actual/identity access.
+"""FinanceW FP1h: explicit quarterly/annual bill recurrence, with safe v4 schema, no bank/Actual/identity access.
 
 A bill record references a monthly plan expense without duplicating its cost.
 A purchase is a separate dated planning payment, optionally funded from one
@@ -66,17 +66,41 @@ def valid_month(value):
     return (type(value) is str and
             re.fullmatch(r"(?:19|20)\d{2}-(?:0[1-9]|1[0-2])", value) is not None)
 
+def month_index(month):
+    if not valid_month(month):
+        return None
+    year, number = map(int, month.split("-"))
+    return year * 12 + number - 1
+
+def is_occurrence(month, cadence):
+    if cadence is None:
+        return valid_month(month)
+    offset = month_index(month) - month_index(cadence["anchorMonth"])
+    return offset >= 0 and offset % cadence["intervalMonths"] == 0
+
 def valid_record(row, version):
+    kind = row.get("kind") if type(row) is dict else None
+    cadence = version == 4 and kind == "bill_cadence"
     keys = ("id", "kind", "title", "expenseId", "dueDay", "date",
             "amountCents", "fundingGoalId")
-    if version == 3:
+    if version >= 3:
         keys += ("sourceMonth",)
+    if cadence:
+        keys += ("intervalMonths", "anchorMonth")
     if not exact(row, keys) or not valid_id(row["id"]):
         return False
-    if version == 3 and (type(row["sourceMonth"]) is not str or
-            (row["kind"] != "bill_defer" and row["sourceMonth"] != "")):
+    if version >= 3 and (type(row["sourceMonth"]) is not str or
+            (kind != "bill_defer" and row["sourceMonth"] != "")):
         return False
-    if version == 3 and row["kind"] == "bill_defer":
+    if cadence:
+        return (row["title"] == "" and valid_id(row["expenseId"])
+                and type(row["dueDay"]) is int and row["dueDay"] == 0
+                and row["date"] == "" and type(row["amountCents"]) is int
+                and row["amountCents"] == 0 and row["fundingGoalId"] == ""
+                and type(row["intervalMonths"]) is int
+                and row["intervalMonths"] in (3, 12)
+                and valid_month(row["anchorMonth"]))
+    if version >= 3 and row["kind"] == "bill_defer":
         return (row["title"] == "" and valid_id(row["expenseId"])
                 and type(row["dueDay"]) is int and row["dueDay"] == 0
                 and valid_month(row["sourceMonth"]) and valid_date(row["date"])
@@ -95,7 +119,7 @@ def valid_record(row, version):
                 and type(row["amountCents"]) is int
                 and 1 <= row["amountCents"] <= MAX_CENTS
                 and (row["fundingGoalId"] == "" or valid_id(row["fundingGoalId"])))
-    if version in (2, 3) and row["kind"] == "bill_skip":
+    if version in (2, 3, 4) and row["kind"] == "bill_skip":
         return (row["title"] == "" and valid_id(row["expenseId"])
                 and type(row["dueDay"]) is int and row["dueDay"] == 0
                 and valid_month(row["date"]) and type(row["amountCents"]) is int
@@ -110,7 +134,7 @@ def empty(context):
 def validate(doc, context):
     if not exact(doc, ("version", "contextId", "revision", "rows")):
         fail("INVALID_STORE")
-    if (type(doc["version"]) is not int or doc["version"] not in (1, 2, 3)
+    if (type(doc["version"]) is not int or doc["version"] not in (1, 2, 3, 4)
             or doc["contextId"] != context):
         fail("INVALID_STORE")
     if type(doc["revision"]) is not int or not 0 <= doc["revision"] < 2**53:
@@ -134,11 +158,20 @@ def validate(doc, context):
             or any(expense not in bills for expense, _ in defers)
             or any(pair in skips for pair in defers)):
         fail("INVALID_STORE")
+    cadences = [r for r in rows if r["kind"] == "bill_cadence"]
+    cadence_ids = [r["expenseId"] for r in cadences]
+    if len(set(cadence_ids)) != len(cadence_ids) or any(
+            expense not in bills for expense in cadence_ids):
+        fail("INVALID_STORE")
+    cadence_by_expense = {r["expenseId"]: r for r in cadences}
+    if any(not is_occurrence(month, cadence_by_expense.get(expense))
+           for expense, month in skips + defers):
+        fail("INVALID_RECURRENCE_EXCEPTION")
     return doc
 
 def upgrade_in_memory(doc):
     # Reading an FP1e v1 schedule never rewrites it.
-    return doc if doc["version"] in (2, 3) else {
+    return doc if doc["version"] in (2, 3, 4) else {
         "version": 2, "contextId": doc["contextId"],
         "revision": doc["revision"], "rows": list(doc["rows"])
     }
@@ -254,30 +287,45 @@ def make_defer(expense, source_month, target_date):
             "dueDay": 0, "date": target_date, "amountCents": 0,
             "fundingGoalId": "", "sourceMonth": source_month}
 
+def make_cadence(expense, interval, anchor):
+    if (not valid_id(expense) or type(interval) is not int
+            or interval not in (3, 12) or not valid_month(anchor)):
+        fail("INVALID_CADENCE")
+    return {"kind": "bill_cadence", "title": "", "expenseId": expense,
+            "dueDay": 0, "date": "", "amountCents": 0,
+            "fundingGoalId": "", "sourceMonth": "",
+            "intervalMonths": interval, "anchorMonth": anchor}
+
 def apply(doc, command):
     context = command.get("contextId") if type(command) is dict else None
     validate(doc, context)
     action = command.get("action")
     if action == "list" and exact(command, ("action", "contextId")):
         return upgrade_in_memory(doc), False
-    choices = ("add_bill", "add_purchase", "add_skip", "add_defer",
+    choices = ("add_bill", "add_purchase", "add_skip", "add_defer", "add_cadence",
                "update_bill", "update_purchase", "update_skip",
-               "update_defer", "delete")
+               "update_defer", "update_cadence", "delete")
     if action not in choices:
         fail("INVALID_ACTION")
     if (type(command.get("expectedRevision")) is not int
             or command["expectedRevision"] != doc["revision"]):
         fail("STALE_REVISION")
     doc = upgrade_in_memory(doc)
-    if action in ("add_defer", "update_defer") and doc["version"] != 3:
+    if action in ("add_defer", "update_defer") and doc["version"] < 3:
         doc = {"version": 3, "contextId": doc["contextId"],
                "revision": doc["revision"],
                "rows": [{**row, "sourceMonth": ""} for row in doc["rows"]]}
+    if action in ("add_cadence", "update_cadence") and doc["version"] < 4:
+        doc = {"version": 4, "contextId": doc["contextId"],
+               "revision": doc["revision"],
+               "rows": ([{**row, "sourceMonth": ""} for row in doc["rows"]]
+                        if doc["version"] < 3 else list(doc["rows"]))}
     base = ("action", "contextId", "expectedRevision")
     rows = list(doc["rows"])
     kind = ("bill_due" if action.endswith("bill") else
             "bill_skip" if action.endswith("skip") else
-            "bill_defer" if action.endswith("defer") else "purchase")
+            "bill_defer" if action.endswith("defer") else
+            "bill_cadence" if action.endswith("cadence") else "purchase")
     if action in ("add_bill", "update_bill"):
         expected = base + (("id",) if action.startswith("update") else ()) + ("expenseId", "dueDay")
         if not exact(command, expected):
@@ -302,6 +350,13 @@ def apply(doc, command):
             fail("INVALID_COMMAND")
         record = make_defer(command["expenseId"], command["sourceMonth"],
                             command["targetDate"])
+    elif action in ("add_cadence", "update_cadence"):
+        expected = base + (("id",) if action.startswith("update") else ()) + (
+            "expenseId", "intervalMonths", "anchorMonth")
+        if not exact(command, expected):
+            fail("INVALID_COMMAND")
+        record = make_cadence(command["expenseId"], command["intervalMonths"],
+                              command["anchorMonth"])
     else:
         if not exact(command, base + ("id",)) or not valid_id(command["id"]):
             fail("INVALID_COMMAND")
@@ -309,7 +364,7 @@ def apply(doc, command):
         if len(found) != 1:
             fail("NOT_FOUND")
         if (found[0]["kind"] == "bill_due" and any(
-                r["kind"] in ("bill_skip", "bill_defer") and
+                r["kind"] in ("bill_skip", "bill_defer", "bill_cadence") and
                 r["expenseId"] == found[0]["expenseId"] for r in rows)):
             fail("BILL_HAS_EXCEPTIONS")
         rows = [r for r in rows if r["id"] != command["id"]]
@@ -317,7 +372,7 @@ def apply(doc, command):
                     "revision": doc["revision"]+1, "rows": rows}
         validate(next_doc, context)
         return next_doc, True
-    if doc["version"] == 3 and kind != "bill_defer":
+    if doc["version"] >= 3 and kind not in ("bill_defer", "bill_cadence"):
         record["sourceMonth"] = ""
     if action.startswith("update"):
         if not valid_id(command["id"]):
@@ -328,7 +383,7 @@ def apply(doc, command):
         if found[0]["kind"] != kind:
             fail("KIND_CHANGE_REFUSED")
         if (kind == "bill_due" and record["expenseId"] != found[0]["expenseId"]
-                and any(r["kind"] in ("bill_skip", "bill_defer")
+                and any(r["kind"] in ("bill_skip", "bill_defer", "bill_cadence")
                         and r["expenseId"] == found[0]["expenseId"] for r in rows)):
             fail("BILL_HAS_EXCEPTIONS")
         record["id"] = command["id"]
@@ -352,8 +407,9 @@ def run(directory, command):
     if command.get("action") == "list":
         return apply(read_doc(directory, context), command)[0]
     if command.get("action") not in ("add_bill", "add_purchase", "add_skip",
-                                   "add_defer", "update_bill", "update_purchase",
-                                   "update_skip", "update_defer", "delete"):
+                                   "add_defer", "add_cadence", "update_bill",
+                                   "update_purchase", "update_skip",
+                                   "update_defer", "update_cadence", "delete"):
         fail("INVALID_ACTION")
     private_dir(directory, True)
     lock_file = directory / (context + ".lock")

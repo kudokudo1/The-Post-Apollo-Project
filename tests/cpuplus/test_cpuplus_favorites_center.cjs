@@ -1594,12 +1594,20 @@ test("U8a CPU++ red X closes through the established lifecycle while glow probe 
   assert.match(cpu,/id: cpuPlusCloseButton/);
   const close=cpu.slice(cpu.indexOf("id: cpuPlusCloseButton"),
     cpu.indexOf("id: modeRailHeaderLine"));
-  assert.match(close,/text: "×"/);
-  assert.match(close,/font\.pixelSize: 27/);
-  assert.match(close,/color: Colors\.black/);
-  assert.match(close,/border\.color:[\s\S]*?Colors\.red/);
-  assert.match(close,/color: Colors\.red/);
-  assert.match(close,/onClicked: cpuPlusWindow\.close\(\)/);
+  const shared=read("components/CloseButton.qml");
+  assert.match(cpu,/CloseButton \{\s+id: cpuPlusCloseButton/);
+  assert.match(close,/anchors\.topMargin: 4/);
+  assert.match(close,/anchors\.rightMargin: 10/);
+  assert.match(close,/onCloseRequested: cpuPlusWindow\.close\(\)/);
+  assert.match(shared,/label: "×"/);
+  assert.match(shared,/idleFillColor: Colors\.black/);
+  assert.match(shared,/hoverFillColor: Colors\.yellow/);
+  assert.match(shared,/hoverForegroundColor: Colors\.red/);
+  assert.match(shared,/pressedFillColor: Colors\.red/);
+  assert.match(shared,/pressedForegroundColor: Colors\.black/);
+  assert.match(shared,/contentGlowPressedOpacity: 1\.0/);
+  assert.match(shared,/softGlowPressedOpacity: 1\.0/);
+  assert.match(shared,/wideGlowPressedOpacity: 1\.0/);
   assert.match(cpu,/\/\*\s*\/\/ Temporary test controls/);
   assert.match(cpu,/id: sampledGlowTestControls/);
   assert.match(cpu,/id: sampledGlowTestControls[\s\S]*?modeGlowExperiment = modelData\.value[\s\S]*?\*\//);
@@ -1804,9 +1812,9 @@ test("U8d network badge reuses the existing Network dock; header red X stays cle
   assert.match(cpu,/internetStatus\.code==="online" \? Colors\.omnitrix/);
   assert.match(cpu,/internetStatus\.code==="offline" \? Colors\.red/);
   assert.match(cpu,/internetStatus\.code==="limited" \? Colors\.orange : Colors\.cyan/);
-  assert.match(cpu,/id: cpuPlusCloseButton[\s\S]*?text: "×"/);
-  assert.match(cpu,/id: cpuPlusCloseButton[\s\S]*?color: Colors\.black/);
-  assert.match(cpu,/id: cpuPlusCloseMouse[\s\S]*?onClicked: cpuPlusWindow\.close\(\)/);
+  assert.match(cpu,/CloseButton \{\s+id: cpuPlusCloseButton/);
+  assert.match(cpu,/onCloseRequested: cpuPlusWindow\.close\(\)/);
+  assert.doesNotMatch(cpu,/id: cpuPlusCloseMouse/);
   const header=cpu.slice(cpu.indexOf("id: cpuPlusCloseButton"),
                          cpu.indexOf("id: modeButtonRow"));
   assert.match(header,/anchors\.top: cpuPlusCloseButton\.bottom/);
@@ -1903,25 +1911,26 @@ test("U9a original Home edit fields accept search selection without invoking Pla
   assert.doesNotMatch(selection,/\.saveHome\(|\.removeSavedPlace\(|\.startExplore\(/);
 });
 
-test("U9a close reuses Hospital's exact U+00D7 glyph, frame and red glow on black",()=>{
+test("U9a shared × component preserves red source-aligned three-plane glow",()=>{
   const cpu=read("widgets/CpuPlusW.qml");
   const hospital=read("widgets/HospitalW.qml");
   const git=read("widgets/GitW.qml");
   const close=cpu.slice(cpu.indexOf("id: cpuPlusCloseButton"),
     cpu.indexOf("id: cpuPlusInternetIndicator"));
-  assert.match(close,/width: 36\s+height: 30/);
-  assert.match(close,/color: Colors\.black/);
-  assert.match(close,/border\.width: 1/);
-  assert.match(close,/border\.color: cpuPlusCloseMouse\.pressed/);
-  assert.match(close,/text: "×"/);
-  assert.match(close,/font\.pixelSize: 27/);
-  assert.match(close,/color: Colors\.red/);
-  assert.match(close,/id: cpuPlusCloseMouse/);
-  assert.match(close,/onClicked: cpuPlusWindow\.close\(\)/);
-  assert.doesNotMatch(close,/Colors\.yellow|hoverFillColor|pressedFillColor|label: "✕"/);
-  assert.match(hospital,/text: "×"/);
-  assert.match(git,/text: "×"/);
-  assert.match(hospital,/id: hospitalCloseButton[\s\S]*?width: 40[\s\S]*?height: 34/);
+  const shared=read("components/CloseButton.qml");
+  assert.match(cpu,/CloseButton \{\s+id: cpuPlusCloseButton/);
+  assert.match(close,/anchors\.topMargin: 4/);
+  assert.match(close,/anchors\.rightMargin: 10/);
+  assert.match(close,/onCloseRequested: cpuPlusWindow\.close\(\)/);
+  assert.match(shared,/implicitWidth: 34[\s\S]*?implicitHeight: 32/);
+  assert.match(shared,/height: width \* 16 \/ 17/);
+  assert.match(shared,/label: "×"/);
+  assert.match(shared,/trackLabelGlowLocally: true/);
+  assert.match(shared,/contentGlowPressedOpacity: 1\.0/);
+  assert.match(shared,/softGlowPressedOpacity: 1\.0/);
+  assert.match(shared,/wideGlowPressedOpacity: 1\.0/);
+  assert.match(hospital,/CloseButton \{\s+id: hospitalCloseButton/);
+  assert.match(git,/SharedComponents\.CloseButton \{\s+id: gitCloseButton/);
   assert.match(cpu,/anchors\.top: cpuPlusCloseButton\.bottom/);
   assert.match(cpu,/anchors\.topMargin: 3[\s\S]*?height: 2[\s\S]*?color: Colors\.cyan/);
   assert.match(cpu,/text: "LIVE \/\/ NET \/\/ "\+cpuPlusWindow\.internetStatus\.label/);
@@ -1988,17 +1997,19 @@ test("U9b shared context is above Explore, with active location directly below i
   assert.match(cpu,/settingsLocationSelectionPane\.editingText/);
 });
 
-test("U9b smaller canonical CPU++ close preserves red-on-black and divider clearance",()=>{
+test("U9b canonical CPU++ close preserves red identity, click and divider clearance",()=>{
   const cpu=read("widgets/CpuPlusW.qml");
   const close=cpu.slice(cpu.indexOf('id: cpuPlusCloseButton'),
     cpu.indexOf('id: cpuPlusInternetIndicator'));
-  assert.match(close,/width: 36\s+height: 30/);
-  assert.match(close,/text: "×"/);
-  assert.match(close,/font\.pixelSize: 27/);
-  assert.match(close,/color: Colors\.black/);
-  assert.match(close,/border\.color: cpuPlusCloseMouse\.pressed/);
-  assert.match(close,/color: Colors\.red/);
-  assert.match(close,/onClicked: cpuPlusWindow\.close\(\)/);
+  const shared=read("components/CloseButton.qml");
+  assert.match(cpu,/CloseButton \{\s+id: cpuPlusCloseButton/);
+  assert.match(close,/anchors\.topMargin: 4/);
+  assert.match(close,/anchors\.rightMargin: 10/);
+  assert.match(close,/onCloseRequested: cpuPlusWindow\.close\(\)/);
+  assert.match(shared,/implicitWidth: 34[\s\S]*?implicitHeight: 32/);
+  assert.match(shared,/label: "×"/);
+  assert.match(shared,/hoverForegroundColor: Colors\.red/);
+  assert.match(shared,/wideGlowPressedOpacity: 1\.0/);
   assert.match(cpu,/anchors\.top: cpuPlusCloseButton\.bottom/);
   assert.match(cpu,/text: "LIVE \/\/ NET \/\/ "\+cpuPlusWindow\.internetStatus\.label/);
 });

@@ -5,6 +5,7 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[2]
 menu = (root / "widgets/FinanceW.qml").read_text(encoding="utf-8")
+shared_close = (root / "components/CloseButton.qml").read_text(encoding="utf-8")
 
 main_modes = [
     ('"budget"', '"Budget"', '"⋆$🗓₊˚"'),
@@ -40,7 +41,8 @@ assert "root.keyboardOwnershipRequested();" in menu
 assert menu.count("ModeButton {") == 1
 # Existing controls plus local-draft actions, ALLOCATE and CHECK WRITE LOCK.
 # Navigation grammar remains unchanged; no custom MouseArea introduced.
-assert menu.count("ActionButton {") == 23  # M0 size controls and two Research tool tabs
+assert menu.count("ActionButton {") == 22  # One header action now uses CloseButton
+assert menu.count("CloseButton {") == 1
 assert "MouseArea {" not in menu
 
 # Distinct header, divider, and canonical U+00D7 close control.
@@ -48,8 +50,26 @@ assert "id: financeHeader" in menu
 assert "color: Colors.magenta" in menu
 assert "id: headerDivider" in menu
 assert "color: Colors.cyan" in menu
-assert 'label: "×"' in menu
-assert "onLeftClicked: root.menuOpen = false" in menu
+# Finance retains the same click-to-hide behavior and inherited 34×32 button.
+# The glyph and three red glow planes belong to the shared component.
+assert 'label: "×"' in shared_close
+assert "height: width * 16 / 17" in shared_close
+assert "contentGlowPressedOpacity: 1.0" in shared_close
+assert "softGlowPressedOpacity: 1.0" in shared_close
+assert "wideGlowPressedOpacity: 1.0" in shared_close
+close_block = menu[menu.index("CloseButton {"):menu.index("id: headerDivider")]
+for needle in (
+    "id: closeButton",
+    "anchors.right: parent.right",
+    "anchors.rightMargin: 10",
+    "anchors.verticalCenter: parent.verticalCenter",
+    'Accessible.name: "Close Finance window"',
+    "onCloseRequested: root.menuOpen = false",
+):
+    assert needle in close_block, needle
+assert "destructive: true" not in close_block
+assert "onLeftClicked:" not in close_block
+assert "anchors.rightMargin: 7" in menu[menu.index("id: financeFeedIndicator"):menu.index("CloseButton {")]
 assert "id: mainModeRail" in menu
 assert "id: budgetSubRail" in menu
 assert 'visible: root.selectedMainMode === "budget"' in menu

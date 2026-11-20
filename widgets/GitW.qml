@@ -4214,36 +4214,12 @@ PanelWindow {
                         }
                     }
 
-                    // Red CLOSE identity, normal shared hover/press behavior.
-                    // Presentation only: existing root.close() authority is unchanged.
-                    SharedComponents.ActionButton {
+                    // Unified Finance-style close visuals; root.close() remains owned here.
+                    SharedComponents.CloseButton {
                         id: gitCloseButton
-                        width: 40
-                        height: 34
                         anchors.verticalCenter: parent.verticalCenter
-                        label: "×"
-                        labelPixelSize: 24
-                        contentPadding: 4
-                        accentColor: Colors.red
-                        destructive: false
-                        acceptedButtons: Qt.LeftButton
                         Accessible.name: "Close Git/GitHub window"
-
-                        // Preserve the familiar red X glow, but let ActionButton own
-                        // yellow hover fill, orange hover foreground/border and click state.
-                        softGlowEnabled: true
-                        idleSoftGlowColor: Colors.red
-                        hoverSoftGlowColor: Colors.red
-                        pressedSoftGlowColor: Colors.red
-                        softGlowIdleOpacity: 0.48
-                        softGlowHoverOpacity: 0.70
-                        wideGlowEnabled: true
-                        idleWideGlowColor: Colors.red
-                        hoverWideGlowColor: Colors.red
-                        pressedWideGlowColor: Colors.red
-                        wideGlowIdleOpacity: 0.22
-                        wideGlowHoverOpacity: 0.32
-                        onLeftClicked: root.close()
+                        onCloseRequested: root.close()
                     }
                 }
             }

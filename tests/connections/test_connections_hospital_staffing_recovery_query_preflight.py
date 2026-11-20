@@ -24,14 +24,12 @@ sys.path.insert(0, str(ROOT / "hospital-source/bin"))
 
 import StaffingRecoveryQueryPreflight as Q
 import StaffingTransportPreflight as T
-from test_connections_hospital_staffing_receipt_identity_preflight import (
-    StaffingReceiptIdentityTests as Fixture,
-)
+import test_connections_hospital_staffing_receipt_identity_preflight as Fixtures
 
 
 class RecoveryQueryTests(unittest.TestCase):
     def setUp(self):
-        case = Fixture("test_01_actual_hospital_pinned_source_protocols")
+        case = Fixtures.StaffingReceiptIdentityTests("test_01_actual_hospital_pinned_source_protocols")
         case.setUp()
         self.source = {
             "original_prepare_raw": case.original_raw,
@@ -52,7 +50,9 @@ class RecoveryQueryTests(unittest.TestCase):
         args.update(context)
         return Q.inspect_candidate_query_ci_only(
             candidate_query_raw=self.good["candidateQueryRawForTestOnly"]
-            if raw is None else raw, now_ms=self.now, **args)
+            if raw is None else raw, now_ms=self.now,
+            expected_query_id=self.query_id,
+            expected_challenge=self.challenge, **args)
 
     def change(self, **fields):
         return T.canonical({**self.query, **fields})
@@ -106,11 +106,11 @@ class RecoveryQueryTests(unittest.TestCase):
         candidate = Q.candidate_query_ci_only(**other)
         self.assertNotEqual(candidate["candidateSha256ForTestOnly"],
                             self.good["candidateSha256ForTestOnly"])
-        self.fail("QUERY_PROTOCOL_OR_ORIGINAL_IDENTITY_CHANGED",
+        self.fail("QUERY_NOT_BOUND_TO_EXPECTED_CHALLENGE",
                   raw=self.change(queryId=other["query_id"]))
 
     def test_07_invalid_query_uuid(self):
-        for bad in ("no", str(uuid.uuid1()), self.query_id.upper(), None):
+        for bad in ("no", str(uuid.uuid1()), str(uuid.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).upper(), None):
             with self.subTest(id=bad):
                 with self.assertRaisesRegex(Q.RecoveryQueryHold,
                                             "INVALID_QUERY_ID"):
@@ -156,7 +156,7 @@ class RecoveryQueryTests(unittest.TestCase):
                   raw=json.dumps(self.query).encode())
 
     def test_13_changed_challenge_or_unpadded_b64(self):
-        self.fail("QUERY_PROTOCOL_OR_ORIGINAL_IDENTITY_CHANGED",
+        self.fail("QUERY_NOT_BOUND_TO_EXPECTED_CHALLENGE",
                   raw=self.change(challengeB64=base64.urlsafe_b64encode(
                       b"D"*32).rstrip(b"=").decode()))
         self.fail("INVALID_QUERY_CHALLENGE",

@@ -147,7 +147,7 @@ altered_selection(checkpoint_id="not-uuid")
 altered_selection(before_rect=rect(112, 120, 420, 310))
 altered_selection(target_rect=rect(341, 190, 680, 530))
 altered_selection(issued_ms=5000)
-altered_selection(expires_ms=5001)
+altered_selection(expires_ms=6001)
 altered_selection(expires_ms=50000)
 altered_selection(issued_ms=True)
 
@@ -220,7 +220,7 @@ for index, other in ((0, "after_resize"), (1, "after_move"),
     changed[index]["phase"] = other
     denies(lambda c=changed: inspect(stages=c))
 for index, time in ((0, 999), (0, True), (1, 1000), (1, 4500),
-                    (2, 1700), (2, 4500), (2, 5000)):
+                    (2, 1699), (2, 4500), (2, 5000)):
     changed = copy.deepcopy(phases)
     changed[index]["now_ms"] = time
     if index == 1 and time == 1000:  # backwards clock

@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'services/time/MachineV2SelectedSurfaceReview.py'
+      - 'services/time/MachineV2SurfaceContinuityReview.py'
+      - 'tests/timew/test_machine_v2_surface_continuity_review.py'
+      - 'docs/timew-machine-v2-scope-a-continuity.md'
       - 'tests/timew/test_machine_v2_selected_surface_review.py'
       - 'docs/timew-machine-v2-scope-a-selected-surface.md'
       - '.github/workflows/timew-machine-v2-scope-a-review.yml'
@@ -27,6 +30,8 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
       - name: Prove selected-surface-only Scope A is deny-only under hostile fixtures
         run: python3 -B -I tests/timew/test_machine_v2_selected_surface_review.py
+      - name: Refuse inter-command surface reuse, compositor restart and geometry drift
+        run: python3 -B -I tests/timew/test_machine_v2_surface_continuity_review.py
       - name: Preserve existing separate signed Brave pairing and durable V2 journal
         run: |
           python3 -B -I tests/timew/test_machine_v2_pair_consent.py
@@ -42,13 +47,18 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p = Path("services/time/MachineV2SelectedSurfaceReview.py").read_text()
+          continuity = Path("services/time/MachineV2SurfaceContinuityReview.py").read_text()
           ui = Path("widgets/TimeW.qml").read_text()
           for forbidden in ("Ed25519PrivateKey", "swaymsg", "subprocess", "socket.socket", "def main(",
                             "write_response", "command_runner", "execute_disposable(", "def authorize("):
               assert forbidden not in p, forbidden
+              assert forbidden not in continuity, forbidden
           assert '"restore_allowed": False' in p
           assert '"production_authorized": False' in p
           assert '"source_origin_verified": False' in p
           assert "MachineV2SelectedSurfaceReview" not in ui
+          assert "MachineV2SurfaceContinuityReview" not in ui
+          assert '"restore_allowed": False' in continuity
+          assert '"production_authorized": False' in continuity
           print("TIMEW SCOPE A // READ-ONLY / NOT TRUSTED / NO PRODUCTION UI PATH")
           PY

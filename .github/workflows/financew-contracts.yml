@@ -68,6 +68,9 @@ on:
       - "tests/finance/test_household_recurrence_fp1h.mjs"
       - "widgets/FinanceHouseholdReservePolicy.js"
       - "tests/finance/test_household_reserves_fp1i.mjs"
+      - "tests/finance/test_household_reserve_cushion_fp1j.mjs"
+      - "tests/finance/test_household_reserve_cushion_fp1j_contracts.py"
+      - "scripts/finance/HOUSEHOLD_RESERVE_CUSHION_FP1J_README.md"
       - "tests/finance/test_household_reserves_fp1i_contracts.py"
       - "scripts/finance/HOUSEHOLD_RESERVES_FP1I_README.md"
       - "tests/finance/test_household_recurrence_fp1h_contracts.py"
@@ -220,6 +223,9 @@ on:
       - "tests/finance/test_household_recurrence_fp1h.mjs"
       - "widgets/FinanceHouseholdReservePolicy.js"
       - "tests/finance/test_household_reserves_fp1i.mjs"
+      - "tests/finance/test_household_reserve_cushion_fp1j.mjs"
+      - "tests/finance/test_household_reserve_cushion_fp1j_contracts.py"
+      - "scripts/finance/HOUSEHOLD_RESERVE_CUSHION_FP1J_README.md"
       - "tests/finance/test_household_reserves_fp1i_contracts.py"
       - "scripts/finance/HOUSEHOLD_RESERVES_FP1I_README.md"
       - "tests/finance/test_household_recurrence_fp1h_contracts.py"
@@ -357,6 +363,10 @@ jobs:
         run: node tests/finance/test_finance_household_planning.mjs
       - name: Test FP1c v1 file read compatibility and guarded edits
         run: python3 tests/finance/test_household_plan_store_fp1c.py
+      - name: Test FP1j 100/110/125 percent reserve cushions and conservation
+        run: node tests/finance/test_household_reserve_cushion_fp1j.mjs
+      - name: Verify FP1j cushion controls and no-storage sources
+        run: python3 tests/finance/test_household_reserve_cushion_fp1j_contracts.py
       - name: Test FP1i in-memory reserve earmarks and cent-conservation
         run: node tests/finance/test_household_reserves_fp1i.mjs
       - name: Verify FP1i read-only UI and no-write source boundary

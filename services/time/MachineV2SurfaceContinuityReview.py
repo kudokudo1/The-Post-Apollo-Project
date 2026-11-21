@@ -136,4 +136,5 @@ def inspect_fixture(*, selection, samples, expected_session_id,
         elif other != first_other:
             refuse()
 
-    return dict(NO_AUTHORITY)
+    # Do not leak a shared mutable action list even to untrusted callers.
+    return dict(NO_AUTHORITY, safe_actions=[])

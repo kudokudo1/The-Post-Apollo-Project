@@ -1,6 +1,7 @@
 import QtQuick
 import "../components"
 import "FinanceHouseholdTimelinePolicy.js" as Timeline
+import "FinanceHouseholdReservePolicy.js" as Reserves
 
 // FP1d: summary-only local timeline, installed inside the existing plans
 // scroll viewport. The parent provides only the selected manual plan rows.
@@ -19,6 +20,8 @@ Item {
     readonly property var projection: active && schedulesReady
         ? Timeline.project(sourceRows,scheduleRows,startMonth,horizonMonths,contextId)
         : null
+    readonly property var reserves: projection && projection.ok
+        ? Reserves.annotate(sourceRows,scheduleRows,projection) : null
     width: parent ? parent.width : 0
     implicitHeight: timelineBody.implicitHeight
     height: visible ? implicitHeight : 0
@@ -122,6 +125,19 @@ Item {
         GohuText {
             width: parent.width
             visible: timeline.coverage && timeline.coverage.ok
+                && timeline.coverage.cadenceCount>0
+            text: timeline.reserves && timeline.reserves.ok
+                ? "OPTIONAL SINKING FUNDS // EARMARK MONTHLY AMOUNTS FOR QUARTERLY/ANNUAL BILLS. THE EARMARK IS NOT AN EXTRA EXPENSE OR A BANK TRANSFER. INITIAL SAVINGS ARE UNKNOWN; MODEL STARTS RESERVES AT ZERO."
+                : "SINKING-FUND ESTIMATE UNAVAILABLE // "
+                    +(timeline.reserves?timeline.reserves.reason:"NO VALID TIMELINE")
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
+            visible: timeline.coverage && timeline.coverage.ok
                 && timeline.coverage.undatedExpenseCount>0
             text: timeline.coverage && timeline.coverage.ok
                 ? "MISSING DUE DAYS // "
@@ -195,6 +211,8 @@ Item {
             delegate: Rectangle {
                 id: monthCard
                 required property var modelData
+                readonly property var reserveInfo: timeline.reserves && timeline.reserves.ok
+                    ? timeline.reserves.byMonth[modelData.month] : null
                 width: timelineBody.width
                 height: monthContent.implicitHeight+16
                 color: Colors.black
@@ -246,6 +264,61 @@ Item {
                         color: Colors.cyan
                         textFormat: Text.PlainText
                         wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        visible: monthCard.reserveInfo !== null
+                            && timeline.reserves.monthlyReserveCount>0
+                        width: parent.width
+                        text: monthCard.reserveInfo
+                            ? "PERIODIC BILL EARMARK "+timeline.money(monthCard.reserveInfo.reserveAddedCents)
+                                +" // MODELED RESERVE USED "+timeline.money(monthCard.reserveInfo.reserveUsedCents)
+                                +" // ENDING EARMARK "+timeline.money(monthCard.reserveInfo.reserveBalanceCents)
+                                +" // UNRESERVED CHANGE "
+                                +timeline.signed(monthCard.reserveInfo.unreservedChangeCents)
+                            : ""
+                        font.pixelSize: 9
+                        color: Colors.magenta
+                        textFormat: Text.PlainText
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        visible: monthCard.reserveInfo !== null
+                            && timeline.reserves.monthlyReserveCount>0
+                        width: parent.width
+                        text: monthCard.reserveInfo
+                            ? "CUMULATIVE UNRESERVED CHANGE "
+                                +timeline.signed(monthCard.reserveInfo.cumulativeUnreservedChangeCents)
+                                +" // STARTING RESERVE ASSUMED $0.00"
+                                +(monthCard.reserveInfo.uncoveredPeriodicCents>0
+                                    ? " // PERIODIC CHARGE NOT COVERED BY MODELED RESERVE "
+                                        +timeline.money(monthCard.reserveInfo.uncoveredPeriodicCents)
+                                    : "")
+                            : ""
+                        font.pixelSize: 9
+                        color: monthCard.reserveInfo && monthCard.reserveInfo.uncoveredPeriodicCents>0
+                            ? Colors.orange : Colors.cyan
+                        textFormat: Text.PlainText
+                        wrapMode: Text.WordWrap
+                    }
+                    Repeater {
+                        model: monthCard.reserveInfo && timeline.reserves.monthlyReserveCount>0
+                            ? monthCard.reserveInfo.details : []
+                        delegate: GohuText {
+                            required property var modelData
+                            width: monthContent.width
+                            text: "EARMARK // "+modelData.title
+                                +" // EVERY "+modelData.intervalMonths+" MONTHS"
+                                +" // PLAN "+timeline.money(modelData.setAsideCents)
+                                +" // USED "+timeline.money(modelData.usedCents)
+                                +" // HELD "+timeline.money(modelData.heldCents)
+                                +(modelData.unfundedCents>0
+                                    ? " // MODEL SHORTFALL "+timeline.money(modelData.unfundedCents)
+                                    : "")
+                            font.pixelSize: 9
+                            color: modelData.unfundedCents>0?Colors.orange:Colors.cyan
+                            textFormat: Text.PlainText
+                            wrapMode: Text.WordWrap
+                        }
                     }
                     Repeater {
                         model: monthCard.modelData.events
@@ -349,7 +422,7 @@ Item {
         }
         GohuText {
             width: parent.width
-            text: "NONMONTHLY BILLS USE PER-CHARGE AMOUNTS ONLY IN OCCURRENCE MONTHS; THIS IS NOT MONTHLY ACCRUAL. ESTIMATES ONLY: AN EXPLICIT DEFERRED BILL IS MODELED IN ITS NEW MONTH, ON TOP OF THAT MONTH\u0027S ORDINARY BILL. DEFERRED AMOUNTS TRACK THE CURRENT MANUAL MONTHLY COST, NOT A CONTRACTUAL PAYMENT. A BILL EXCLUDED FOR ONE MONTH IS NOT ASSUMED FORGIVEN, PAID OR DEFERRED. DUE DAYS LABEL MONTHLY COSTS COUNTED ONCE. ONE-TIME PURCHASES ARE SEPARATE; GOAL RESERVES ARE USED FIRST. UNKNOWN BILLS, TAX, DEBT, INFLATION AND STARTING CASH ARE OMITTED. NOTHING IS TRANSFERRED."
+            text: "OPTIONAL MONTHLY EARMARKS ARE NOT MONEY MOVED, PAID, SAVED OR BANK-VERIFIED; UNRESERVED CHANGE IS NOT SPENDABLE CASH. NO PRE-EXISTING RESERVE BALANCES ARE ASSUMED. NONMONTHLY BILLS USE PER-CHARGE AMOUNTS ONLY IN OCCURRENCE MONTHS; THIS IS NOT MONTHLY ACCRUAL. ESTIMATES ONLY: AN EXPLICIT DEFERRED BILL IS MODELED IN ITS NEW MONTH, ON TOP OF THAT MONTH\u0027S ORDINARY BILL. DEFERRED AMOUNTS TRACK THE CURRENT MANUAL MONTHLY COST, NOT A CONTRACTUAL PAYMENT. A BILL EXCLUDED FOR ONE MONTH IS NOT ASSUMED FORGIVEN, PAID OR DEFERRED. DUE DAYS LABEL MONTHLY COSTS COUNTED ONCE. ONE-TIME PURCHASES ARE SEPARATE; GOAL RESERVES ARE USED FIRST. UNKNOWN BILLS, TAX, DEBT, INFLATION AND STARTING CASH ARE OMITTED. NOTHING IS TRANSFERRED."
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText

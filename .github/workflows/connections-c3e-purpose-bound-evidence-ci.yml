@@ -1,0 +1,75 @@
+name: Connections C3e TimeW/Hospital distinct signed evidence purpose (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_integration/ConnectionsPurposeBoundEvidencePreflight.py'
+      - 'tests/connections/test_connections_c3e_purpose_bound_evidence.py'
+      - '.github/workflows/connections-c3e-purpose-bound-evidence-ci.yml'
+      - 'docs/connections-c3e-purpose-bound-timew-hospital-evidence.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-cross-domain-signature-authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Checkout read-only pinned Hospital parser fixtures
+        uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: dae46d2a8752399dd18162845379ac847065a32c
+          path: hospital-source
+          persist-credentials: false
+      - name: Install ephemeral Ed25519 test dependency
+        shell: bash
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Reject production authority or signer in C3e preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_integration/ConnectionsPurposeBoundEvidencePreflight.py \
+            tests/connections/test_connections_c3e_purpose_bound_evidence.py
+          python3 - <<'PY'
+          from pathlib import Path
+          c=Path("tests/connections/c3e_integration/ConnectionsPurposeBoundEvidencePreflight.py").read_text()
+          for marker in ("TimeW.make_packet_ci_only", "Hospital.inspect_candidate_query_ci_only",
+                         "TIMEW_DOMAIN", "HOSPITAL_DOMAIN",
+                         '"realCompositorSelectedSurfaceAuthenticated": False',
+                         '"realHospitalWriterResultAuthenticated": False',
+                         '"challengeReplayOrSpendProtected": False',
+                         '"protectedOneUseOperatorConsentVerified": False',
+                         '"sameGrantCOMMITRetryAllowed": False',
+                         '"productionAuthority": False',
+                         "INDEPENDENT_ISSUER_AND_C5_NATIVE_ORIGIN_NOT_INSTALLED"):
+              assert marker in c, marker
+          for banned in ("Ed25519PrivateKey", "sqlite3.connect(", "subprocess.run(",
+                         "socket.socket(", "os.open(", "sendall(", "swaymsg",
+                         '"productionAuthority": True'):
+              assert banned not in c, banned
+          PY
+      - name: Run cross-domain purpose and signature hostile cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CI" = true
+          test "$GITHUB_ACTIONS" = true
+          python3 -B tests/connections/test_connections_c3e_purpose_bound_evidence.py
+          echo "C3E_CROSS_OWNER_DOMAINS_HOLD // NO_SIGNER_CUSTODY"
+      - name: Preserve existing selected-surface and Hospital RECOVER security cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3e_timew_scope_a_kernel_packet.py
+          python3 -B tests/connections/test_connections_hospital_staffing_recovery_query_preflight.py
+          echo "C3E_CROSS_OWNER_HOLD // NO_NATIVE_SWAY_HOSPITAL_OR_C5_AUTHORITY"

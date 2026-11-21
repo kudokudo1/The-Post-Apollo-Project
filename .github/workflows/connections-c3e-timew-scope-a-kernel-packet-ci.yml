@@ -1,0 +1,64 @@
+name: Connections C3e TimeW Scope A actual Linux packet custody (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_timew/TimeWSelectedSurfacePacketPreflight.py'
+      - 'tests/connections/test_connections_c3e_timew_scope_a_kernel_packet.py'
+      - '.github/workflows/connections-c3e-timew-scope-a-kernel-packet-ci.yml'
+      - 'docs/connections-c3e-timew-scope-a-linux-packet-boundary.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-selected-surface-trust-from-kernel-packet:
+    name: Real kernel sender != independently protected compositor selection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install TimeW source-only fixture dependency
+        shell: bash
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Static authority-denial check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_timew/TimeWSelectedSurfacePacketPreflight.py \
+            tests/connections/test_connections_c3e_timew_scope_a_kernel_packet.py
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path("tests/connections/c3e_timew/TimeWSelectedSurfacePacketPreflight.py").read_text()
+          for required in ("SO_PASSCRED", "SO_PEERCRED", "SCM_CREDENTIALS",
+                           "Lease.capture_socket_peer", "ScopeA.REQUIRED",
+                           "REAL_SWAYPX_SELECTED_SURFACE_ISSUER_NOT_INSTALLED",
+                           '"canMoveWindow": False', '"productionAuthority": False'):
+              assert required in code, required
+          for forbidden in ("socket.connect(", "socket.bind(", "subprocess.run(",
+                            "Ed25519PrivateKey", "sendall(", "swaymsg",
+                            '"canRestoreBrave": True', '"canSignSelectedSurface": True'):
+              assert forbidden not in code, forbidden
+          PY
+      - name: Real Linux packet sender and Scope A negative authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CI" = true
+          test "$GITHUB_ACTIONS" = true
+          python3 -B tests/connections/test_connections_c3e_timew_scope_a_kernel_packet.py
+          echo "C3E_TIMEW_SCOPE_A_CI_HOLD // NO_NATIVE_SURFACE_AUTHORITY"
+      - name: Preserve original TimeW Scope A and earlier kernel peer contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -I tests/timew/test_machine_v2_selected_surface_review.py
+          python3 -B tests/connections/test_connections_c3e_timew_sway_ipc_kernel_peer.py
+          echo "C3E_TIMEW_HOLD // NO_INSTALLED_SWAYPX_OR_C5_GRANT"

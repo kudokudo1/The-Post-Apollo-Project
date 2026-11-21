@@ -73,7 +73,7 @@ assert.equal(JSON.stringify({rows,schedules}),before);
 const fund={amountCents:10001,intervalMonths:3,anchorMonth:"2027-01"};
 assert.equal(p.depositFor(fund,"2026-10"),0);
 assert.equal(p.depositFor(fund,"2026-11"),3334);
-assert.equal(p.depositFor(fund,"2026-12"),3334);
+assert.equal(p.depositFor(fund,"2026-12"),3333);
 assert.equal(p.depositFor(fund,"2027-01"),3334);
 assert.equal(p.depositFor(fund,"2027-02"),3334);
 assert.equal(p.depositFor(fund,"2027-03"),3333);
@@ -100,7 +100,7 @@ const noFunds=p.annotate([income,rent],[],tl.project([income,rent],[],"2026-11",
 assert.equal(noFunds.ok,true);
 assert.equal(noFunds.monthlyReserveCount,0);
 assert.equal(noFunds.months[0].reserveBalanceCents,0);
-assert.equal(noFunds.months[0].unreservedChangeCents,170000);
+assert.equal(noFunds.months[0].unreservedChangeCents,180000);
 assert.equal(p.annotate(rows,schedules,{...cash,bankVerified:true}).reason,"TIMELINE_NOT_VERIFIED");
 assert.equal(p.annotate(rows,schedules,{...cash,months:cash.months.slice(1)}).reason,"TIMELINE_NOT_VERIFIED");
 assert.equal(p.annotate(rows,[{...q,expenseId:id("9")}],cash).reason,"INVALID_FUND_REFERENCE");

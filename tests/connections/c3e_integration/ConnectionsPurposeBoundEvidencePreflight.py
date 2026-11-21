@@ -161,6 +161,10 @@ def _inspect_ci_only(*, purpose, expected_source_raw, expected_challenge,
     try:
         obj = json.loads(signed_proof_raw.decode("ascii", "strict"),
                          object_pairs_hook=_unique, parse_constant=_nonfinite)
+    except ScopedEvidenceHold:
+        # Preserve a bounded duplicate/nonfinite refusal rather than
+        # hiding it as a generic JSON decode error.
+        raise
     except (ValueError, UnicodeError, RecursionError, OverflowError) as exc:
         raise ScopedEvidenceHold(
             "C3E_SCOPED_EVIDENCE_HOLD // SIGNED_PROOF_JSON_INVALID"

@@ -66,6 +66,10 @@ on:
       - "tests/finance/test_household_schedule_fp1g.py"
       - "tests/finance/test_household_schedule_fp1h.py"
       - "tests/finance/test_household_recurrence_fp1h.mjs"
+      - "widgets/FinanceHouseholdReservePolicy.js"
+      - "tests/finance/test_household_reserves_fp1i.mjs"
+      - "tests/finance/test_household_reserves_fp1i_contracts.py"
+      - "scripts/finance/HOUSEHOLD_RESERVES_FP1I_README.md"
       - "tests/finance/test_household_recurrence_fp1h_contracts.py"
       - "scripts/finance/HOUSEHOLD_RECURRENCE_FP1H_README.md"
       - "tests/finance/test_household_deferral_fp1g.mjs"
@@ -214,6 +218,10 @@ on:
       - "tests/finance/test_household_schedule_fp1g.py"
       - "tests/finance/test_household_schedule_fp1h.py"
       - "tests/finance/test_household_recurrence_fp1h.mjs"
+      - "widgets/FinanceHouseholdReservePolicy.js"
+      - "tests/finance/test_household_reserves_fp1i.mjs"
+      - "tests/finance/test_household_reserves_fp1i_contracts.py"
+      - "scripts/finance/HOUSEHOLD_RESERVES_FP1I_README.md"
       - "tests/finance/test_household_recurrence_fp1h_contracts.py"
       - "scripts/finance/HOUSEHOLD_RECURRENCE_FP1H_README.md"
       - "tests/finance/test_household_deferral_fp1g.mjs"
@@ -349,6 +357,10 @@ jobs:
         run: node tests/finance/test_finance_household_planning.mjs
       - name: Test FP1c v1 file read compatibility and guarded edits
         run: python3 tests/finance/test_household_plan_store_fp1c.py
+      - name: Test FP1i in-memory reserve earmarks and cent-conservation
+        run: node tests/finance/test_household_reserves_fp1i.mjs
+      - name: Verify FP1i read-only UI and no-write source boundary
+        run: python3 tests/finance/test_household_reserves_fp1i_contracts.py
       - name: Test FP1h v4 cadence storage, compatibility and reversibility
         run: python3 tests/finance/test_household_schedule_fp1h.py
       - name: Test FP1h quarterly and annual occurrence cashflow math

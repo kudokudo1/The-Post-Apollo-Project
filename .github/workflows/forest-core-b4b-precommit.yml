@@ -1,0 +1,31 @@
+name: Forest Core B4b Pre-Commit Authorization Fence
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/host_admission_b4a.py'
+      - 'scripts/forest/HOST_PRECOMMIT_B4B.md'
+      - 'tests/forest/test_host_precommit_b4b.py'
+      - '.github/workflows/forest-core-b4b-precommit.yml'
+  push:
+    paths:
+      - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/host_admission_b4a.py'
+      - 'scripts/forest/HOST_PRECOMMIT_B4B.md'
+      - 'tests/forest/test_host_precommit_b4b.py'
+      - '.github/workflows/forest-core-b4b-precommit.yml'
+
+jobs:
+  synthetic-precommit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify B4b revocation and caller continuity at commit
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_precommit_b4b.py' -v
+      - name: B4a regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_admission_b4a.py' -v
+      - name: B3 regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_turn_bridge_b3.py' -v
+      - name: Python syntax
+        run: python3 -m py_compile scripts/forest/host_admission_b4a.py scripts/forest/turn_bridge_b3.py tests/forest/test_host_precommit_b4b.py

@@ -1,22 +1,43 @@
 import QtQuick
 import "WidgetContentSpatialPolicy.js" as Spatial
 
-// Visual cursor for REAL controls in a widget's content area. The owner
-// retains Qt focus and all Tab / Shift / Ctrl submode routes. This Item
-// has NO input handlers, MouseArea, FocusScope or Sway focus requirement.
+// Coordinates one REAL button selector. Keyboard movement separates it
+// from a stationary secondary mouse hover, while actual pointer movement
+// recombines it. Existing Qt/key ownership and Tab/Sub Mode routes stay with
+// the window. This Item has NO input handlers, MouseArea or FocusScope.
 Item {
     id: navigator
     property Item contentRoot: null
     property bool navigationActive: false
     property var selectedItem: null
+    property bool keyboardPrimaryActive: false
+    // Never replace a button's pre-existing keyboardSelected QML binding.
+    // The content-specific flags below are owned only while registered here.
+    property var registeredControls: []
     property rect selectedBounds: Qt.rect(0,0,0,0)
     readonly property bool hasContentSelection:
         selectedItem !== null && selectedBounds.width > 0
     z: 500
     focus: false
 
+    function clearContentFlags(item) {
+        try {
+            if (item && item.contentNavigator === navigator) {
+                item.contentKeyboardPrimary = false;
+                item.contentKeyboardNavigationActive = false;
+                item.contentNavigator = null;
+            }
+        } catch(error) {
+            // A removed delegate cannot retain focus or input authority.
+        }
+    }
+
     function reset() {
+        for (let i=0;i<registeredControls.length;i++)
+            clearContentFlags(registeredControls[i]);
+        registeredControls = [];
         selectedItem = null;
+        keyboardPrimaryActive = false;
         selectedBounds = Qt.rect(0,0,0,0);
     }
     onContentRootChanged: reset()
@@ -61,6 +82,48 @@ Item {
             return result;
         collect(contentRoot,true,result,0);
         return result;
+    }
+
+    function synchronizeButtonCursor(controls) {
+        const live=controls.map(function(entry) { return entry.item; });
+        for(let i=0;i<registeredControls.length;i++) {
+            const old=registeredControls[i];
+            if(live.indexOf(old)<0) clearContentFlags(old);
+        }
+        // Only ActionButton descendants expose these new flags. Unknown
+        // controls retain a bounded fallback outline below.
+        for(let i=0;i<live.length;i++) {
+            const item=live[i];
+            try {
+                if(typeof item.contentKeyboardPrimary !== "boolean"
+                        || typeof item.contentKeyboardNavigationActive !== "boolean")
+                    continue;
+                item.contentNavigator=navigator;
+                item.contentKeyboardNavigationActive=keyboardPrimaryActive;
+                item.contentKeyboardPrimary=keyboardPrimaryActive
+                    && selectedItem===item;
+            } catch(error) {
+                // Disappearing delegates are excluded on next collection.
+            }
+        }
+        registeredControls=live;
+    }
+
+    // Called only from a real ActionButton pointer-position event. Neither
+    // passive hover, keyboard movement nor focus restoration may steal
+    // the keyboard-primary cursor.
+    function followPointer(item) {
+        if(!navigationActive || !item || !item.available
+                || !item.interactive || !item.keyboardNavTarget)
+            return false;
+        if(registeredControls.indexOf(item)<0)
+            return false;
+        selectedItem=item;
+        keyboardPrimaryActive=false;
+        const controls=candidates();
+        synchronizeButtonCursor(controls);
+        refreshBounds();
+        return true;
     }
 
     function scrollIntoView(target) {
@@ -108,9 +171,14 @@ Item {
     function selectInitial() {
         if(!navigationActive) return false;
         const controls=candidates();
-        const next=Spatial.initialIndex(controls);
+        let next=controls.findIndex(function(entry) {
+            return entry.item.hovered === true && entry.visible;
+        });
+        if(next<0) next=Spatial.initialIndex(controls);
         if(next<0) {reset();return false;}
         selectedItem=controls[next].item;
+        keyboardPrimaryActive=true;
+        synchronizeButtonCursor(controls);
         refreshBounds();
         return hasContentSelection;
     }
@@ -122,10 +190,15 @@ Item {
         let index=-1;
         for(let i=0;i<current.length;i++)
             if(current[i].item===selectedItem) {index=i;break;}
+        if(index<0) index=current.findIndex(function(entry) {
+            return entry.item.hovered === true && entry.visible;
+        });
         const next=Spatial.nextIndex(current,index,dx,dy);
         if(next<0) return false;
         selectedItem=current[next].item;
+        keyboardPrimaryActive=true;
         scrollIntoView(selectedItem);
+        synchronizeButtonCursor(current);
         refreshBounds();
         return true;
     }
@@ -157,27 +230,27 @@ Item {
         } catch(error) { reset();return false; }
     }
 
-    // Visual overlay is never a mouse target and never modifies the button's
-    // own keyboardSelected binding, preserving other current QML contracts.
+    // ActionButton draws the primary orange preview / activated magenta
+    // artwork, border and sampled glows itself. Never add a disconnected
+    // second yellow rectangle around a real ActionButton.
+    // Fallback only for a future non-ActionButton keyboard target.
     Rectangle {
         id: selectionFrame
         objectName: "widget-content-keyboard-selection"
-        visible: navigator.navigationActive && navigator.hasContentSelection
+        visible: navigator.navigationActive && navigator.keyboardPrimaryActive
+                 && navigator.hasContentSelection
+                 && (!navigator.selectedItem
+                     || typeof navigator.selectedItem.contentKeyboardPrimary
+                        !== "boolean")
         x: navigator.selectedBounds.x-3
         y: navigator.selectedBounds.y-3
         width: navigator.selectedBounds.width+6
         height: navigator.selectedBounds.height+6
         color: "transparent"
-        border.color: Colors.yellow
+        border.color: navigator.selectedItem && navigator.selectedItem.selected
+                      ? Colors.magenta : Colors.orange
         border.width: 2
         radius: 0
         z: 500
-        Rectangle {
-            width: 5
-            height: 5
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            color: Colors.magenta
-        }
     }
 }

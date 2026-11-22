@@ -892,6 +892,28 @@ PanelWindow {
             }
         }
 
+        // FOREST V0 // independent local-first AI workspace launcher.
+        // Do not inherit Hospital's authority, registry or worker identity.
+        Item {
+            id: forestHost
+            width: forestButton.implicitWidth
+            height: forestButton.implicitHeight
+
+            Forest {
+                id: forestButton
+                anchors.fill: parent
+                menuOpen: forestWindow.menuOpen
+                onToggleRequested: forestWindow.toggle()
+            }
+
+            ForestW {
+                id: forestWindow
+                screen: shellRoot.screen
+                dockCenterX: shellRoot.margins.left + leftModules.x
+                             + forestHost.x + forestButton.width / 2
+            }
+        }
+
         // Finance
 
         Item {

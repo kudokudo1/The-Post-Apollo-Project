@@ -1158,6 +1158,21 @@ PanelWindow {
         return true;
     }
 
+    // Header refresh never clears a Burn receipt or starts a destructive
+    // operation. Archive uses its read-only record index; Trash/Burn re-read
+    // the GIO inventory in passive mode, preserving unchanged status.
+    function refreshVisibleInventory() {
+        if (!menuOpen || busy || archiveBusy
+                || confirmMode !== "" || researchBurnId !== ""
+                || burnUiStage !== "" || activeMode === "cleanup")
+            return false;
+        if (activeMode === "archive")
+            return refreshArchive();
+        if (activeMode === "trash" || activeMode === "burn")
+            return refresh(false, true);
+        return false;
+    }
+
     function refresh(clearReceipt, passive) {
         if (busy) return false;
         if (activeMode === "trash" && hospitalBin.active && !hospitalBin.busy)
@@ -1761,7 +1776,7 @@ PanelWindow {
                 spacing: 6
 
                 GohuText {
-                    width: parent.width - 180
+                    width: parent.width - 216
                     height: parent.height
                     text: "TRASH++ // " + trashLauncher.activeMode.toUpperCase()
                           + " // " + trashLauncher.chassisSize.toUpperCase()
@@ -1813,6 +1828,26 @@ PanelWindow {
                         color: trashLauncher.liveColor
                         font.pixelSize: 10
                     }
+                }
+
+                // Local read-only index refresh. Receipt and confirmation
+                // state are left intact; Cleanup delegates to Camera's owner.
+                ReloadButton {
+                    id: trashHeaderReloadButton
+                    width: 30
+                    height: 27
+                    semanticColor: Colors.yellow
+                    hoverSurfaceColor: Colors.orange
+                    available: trashLauncher.menuOpen
+                               && !trashLauncher.busy && !trashLauncher.archiveBusy
+                               && trashLauncher.confirmMode === ""
+                               && trashLauncher.researchBurnId === ""
+                               && trashLauncher.burnUiStage === ""
+                               && trashLauncher.activeMode !== "cleanup"
+                    Accessible.name: trashLauncher.activeMode === "archive"
+                                     ? "Refresh local archive index"
+                                     : "Resync local Trash inventory"
+                    onReloadRequested: trashLauncher.refreshVisibleInventory()
                 }
 
                 // Shared CloseButton handles all three persistent red glows.

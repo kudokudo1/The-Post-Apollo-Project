@@ -30,10 +30,10 @@ Rectangle {
     }
     readonly property bool trayButtonHovered: trayHoverHandler.hovered
 
-    // Border, rear halos, icon halos, label and bottom marker agree:
-    // orange anywhere over the tray (or during a press), cyan at rest.
-    readonly property color accentColor:
-        trayButtonPressed || trayButtonHovered ? Colors.orange : Colors.cyan
+    // The tray keeps a visible ORANGE identity at rest, on hover and
+    // while pressed. Hover and press brighten halo energy, not its hue.
+    // Border, icon halos, empty label and bottom marker share this color.
+    readonly property color accentColor: Colors.orange
 
     // Exact application identity, never a substring match on a random tray
     // tooltip. Other applications retain their own native tray activation.
@@ -44,6 +44,16 @@ Rectangle {
         return id === "vesktop" || id === "dev.vencord.vesktop"
                || id === "discord" || title === "vesktop" || title === "discord"
                || tooltip === "vesktop" || tooltip === "discord";
+    }
+
+    // Lutris's AppIndicator commonly publishes an application-owned menu
+    // while Activate may be a no-op. Match exact known identities only;
+    // never rewrite another application's tray activation semantics.
+    function isLutrisTrayItem(item) {
+        const id = String(item.id || "").trim().toLowerCase().replace(/\.desktop$/, "");
+        const title = String(item.title || "").trim().toLowerCase();
+        return id === "lutris" || id === "net.lutris.lutris"
+               || id === "net_lutris_lutris" || title === "lutris";
     }
 
     function openDiscordFromTray() {
@@ -64,7 +74,7 @@ Rectangle {
 
         z: -1
 
-        opacity: trayButtonPressed ? 0.6 : trayButtonHovered ? 0.5 : 0.4
+        opacity: trayButtonPressed ? 0.82 : trayButtonHovered ? 0.7 : 0.55
 
         color: trayDock.accentColor
     }
@@ -78,7 +88,7 @@ Rectangle {
 
         z: 1
 
-        opacity: trayButtonPressed ? 0.12 : trayButtonHovered ? 0.09 : 0.07
+        opacity: trayButtonPressed ? 0.24 : trayButtonHovered ? 0.18 : 0.12
 
         color: trayDock.accentColor
     }
@@ -233,9 +243,16 @@ Rectangle {
                         if (mouse.button === Qt.LeftButton) {
                             // Some StatusNotifier entries are menu-only:
                             // activate() would be a no-op for those apps.
-                            if (trayButton.modelData.onlyMenu) {
-                                if (trayButton.modelData.hasMenu
-                                        && trayButton.modelData.menu)
+                            // A Lutris AppIndicator may advertise
+                            // onlyMenu=false yet ignore Activate entirely.
+                            // Its own native menu is the safe visible
+                            // fallback, not an untracked process launch.
+                            const nativeMenuAvailable = trayButton.modelData.hasMenu
+                                                        && trayButton.modelData.menu;
+                            if (trayButton.modelData.onlyMenu
+                                    || (nativeMenuAvailable
+                                        && trayDock.isLutrisTrayItem(trayButton.modelData))) {
+                                if (nativeMenuAvailable)
                                     trayNativeMenu.open();
                             } else if (trayDock.isDiscordTrayItem(trayButton.modelData)) {
                                 trayDock.openDiscordFromTray();

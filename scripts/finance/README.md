@@ -949,3 +949,35 @@ This PR does **not** authorize real budget mutations. First verify the UI's
 missing-permit LOCKED feedback with live Quickshell, then separately decide
 whether to test activation in a controlled backed-up budget. The sibling
 Account/Market/Radar/etc. workstreams are outside this implementation.
+
+
+## FinanceW Categories M4 // Expense-group create/rename preview (NO WRITES)
+
+This isolated milestone adds a second **preview-only** editor inside
+**Finance → Budget → Budget → CATEGORIES**, beneath the existing category
+create/rename controls.
+
+- **+ NEW GROUP** stages a new expense-group name.
+- **RENAME GROUP** stages a new name for one currently visible expense group.
+- **PREVIEW GROUP** shows the proposed group creation or rename.
+- **CANCEL GROUP** discards the proposal. There is **no group SAVE** action.
+
+The pure `FinanceCategoryGroupPlan.js` helper requires the authenticated,
+read-only Actual snapshot, current source fingerprint and month. It checks
+unique stable group IDs, unchanged/duplicate names, name length and control
+characters, and refuses reserved income-group names. Source/month changes
+or any snapshot refresh invalidate the displayed preview; an obsolete
+renamed group is cleared. The existing M3 category **PREVIEW → ARM SAVE →
+CONFIRM SAVE** workflow remains separate and unchanged.
+
+**This does not add an Actual group writer, enable category-write permits,
+create/delete groups, move categories between groups, modify household
+plans, or change real money.** Creating and renaming groups for real will
+require independently gated M4 follow-up and fresh disposable Actual tests.
+Until then the UI clearly states **PREVIEW ONLY // GROUP NOT SAVED IN ACTUAL**.
+
+Bounded files: `FinanceCategoriesPane.qml`, new
+`FinanceCategoryGroupPlan.js`, existing category preview tests and this
+documentation. No `FinanceW.qml` or shared widget-shell wiring.
+Nurse 2 coordination: [FinanceW Categories parallel lane issue
+#2182](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/2182).

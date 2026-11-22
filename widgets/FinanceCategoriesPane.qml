@@ -1,6 +1,7 @@
 import QtQuick
 import "../components"
 import "../services/finance/FinanceCategoryPlan.js" as CategoryPlan
+import "../services/finance/FinanceCategoryGroupPlan.js" as GroupPlan
 
 // Category create/rename staging. Only an explicitly armed confirmation can
 // reach M2's independently gated writer; preview never changes Actual.
@@ -18,6 +19,14 @@ Item {
     property bool previewVisible: false
     property bool approvalArmed: false
     property bool submitted: false
+    // M4: expense-group management is PREVIEW ONLY, separate from M3 writes.
+    property string groupDraftMode: "" // "", "create", "rename"
+    property string groupDraftId: ""
+    property string groupSourceAtOpen: ""
+    property string groupMonthAtOpen: ""
+    property string groupOriginalNameAtOpen: ""
+    property string groupDraftName: ""
+    property bool groupPreviewVisible: false
     property string writeState: "idle"
     property string writeMessage: ""
     signal editBudgetRequested(var category)
@@ -44,6 +53,8 @@ Item {
     }
     readonly property var plan: CategoryPlan.previewCategoryPlan(
         snapshot,openMode,selectedCategoryId,selectedGroupId,draftName)
+    readonly property var groupPlan: GroupPlan.previewGroupPlan(
+        snapshot,groupDraftMode,groupDraftId,groupDraftName)
     readonly property bool proposalEligible: previewVisible && !!plan && plan.ok
         && !busy && !submitted && snapshot && snapshot.readOnly===true
         && plan.sourceKey===sourceAtOpen
@@ -53,8 +64,41 @@ Item {
     width: parent ? parent.width : 0
     height: content.implicitHeight
 
+    function clearGroupDraft(){
+        if(busy)return false;
+        groupPreviewVisible=false;
+        groupDraftMode="";
+        groupDraftId="";
+        groupSourceAtOpen="";
+        groupMonthAtOpen="";
+        groupOriginalNameAtOpen="";
+        groupDraftName="";
+        return true;
+    }
+    function beginCreateGroup(){
+        if(busy || !snapshot || snapshot.readOnly!==true)return false;
+        clearDraft();
+        groupSourceAtOpen=snapshot.sourceKey;
+        groupMonthAtOpen=snapshot.month;
+        groupDraftMode="create";
+        return true;
+    }
+    function beginRenameGroup(row){
+        if(busy || !snapshot || snapshot.readOnly!==true || !row)return false;
+        if(groups.filter(function(g){return g && g.id===row.id
+                && g.name===row.name;}).length!==1)return false;
+        clearDraft();
+        groupSourceAtOpen=snapshot.sourceKey;
+        groupMonthAtOpen=snapshot.month;
+        groupDraftId=row.id;
+        groupOriginalNameAtOpen=row.name;
+        groupDraftName=row.name;
+        groupDraftMode="rename";
+        return true;
+    }
     function clearDraft(){
         if(busy)return false;
+        clearGroupDraft();
         previewVisible=false;
         approvalArmed=false;
         submitted=false;
@@ -122,8 +166,22 @@ Item {
         previewVisible=false;
         approvalArmed=false;
     }
+    onGroupDraftNameChanged: groupPreviewVisible=false
     onSnapshotChanged: {
         approvalArmed=false;
+        if(groupDraftMode) {
+            if(!snapshot || snapshot.sourceKey!==groupSourceAtOpen
+                    || snapshot.month!==groupMonthAtOpen) {
+                clearGroupDraft();
+            } else {
+                groupPreviewVisible=false;
+                if(groupDraftMode==="rename"
+                        && !groups.some(function(g){
+                            return g && g.id===groupDraftId
+                                && g.name===groupOriginalNameAtOpen;
+                        }))clearGroupDraft();
+            }
+        }
         if(!openMode)return;
         if(!snapshot || snapshot.sourceKey!==sourceAtOpen
                 || snapshot.month!==monthAtOpen){
@@ -350,6 +408,184 @@ Item {
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
             }
+        }
+
+        // M4 group management has no submit signal, save button, or writer.
+        Row {
+            id: groupHeader
+            width: parent.width
+            spacing: 6
+            GohuText {
+                width: parent.width - addGroup.width - 6
+                height: 28
+                verticalAlignment: Text.AlignVCenter
+                text: "CATEGORY GROUPS // "+categoryPane.groups.length
+                font.pixelSize: 10
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+            }
+            ActionButton {
+                id: addGroup
+                width: 111
+                height: 28
+                label: categoryPane.groupDraftMode==="create"
+                    ? "CLOSE GROUP" : "+ NEW GROUP"
+                labelPixelSize: 9
+                accentColor: Colors.orange
+                trackLabelGlowLocally: true
+                available: !!categoryPane.snapshot
+                    && categoryPane.snapshot.readOnly===true
+                    && !categoryPane.busy
+                onLeftClicked: {
+                    if(categoryPane.groupDraftMode==="create")
+                        categoryPane.clearGroupDraft();
+                    else
+                        categoryPane.beginCreateGroup();
+                }
+            }
+        }
+        Column {
+            id: groupEditor
+            width: parent.width
+            visible: categoryPane.groupDraftMode!==""
+            spacing: 6
+            GohuText {
+                width: parent.width
+                text: categoryPane.groupDraftMode==="create"
+                    ? "NEW EXPENSE GROUP // DRAFT"
+                    : "RENAME EXPENSE GROUP // DRAFT"
+                font.pixelSize: 10
+                color: Colors.magenta
+                textFormat: Text.PlainText
+            }
+            Rectangle {
+                width: parent.width
+                height: 32
+                color: Colors.dark
+                border.color: Colors.cyan
+                GohuText {
+                    anchors.fill: parent
+                    anchors.margins: 7
+                    visible: !groupNameEditor.text
+                    text: "GROUP NAME"
+                    color: Colors.cyan
+                    font.pixelSize: 10
+                }
+                TextInput {
+                    id: groupNameEditor
+                    anchors.fill: parent
+                    anchors.margins: 7
+                    text: categoryPane.groupDraftName
+                    color: Colors.white
+                    font.pixelSize: 11
+                    selectByMouse: true
+                    clip: true
+                    onTextEdited: categoryPane.groupDraftName=text
+                }
+            }
+            Row {
+                width: parent.width
+                spacing: 6
+                ActionButton {
+                    width: (parent.width-6)/2
+                    height: 28
+                    label: "PREVIEW GROUP"
+                    labelPixelSize: 9
+                    accentColor: Colors.orange
+                    trackLabelGlowLocally: true
+                    available: categoryPane.groupPlan.ok
+                        && !categoryPane.busy
+                        && categoryPane.groupSourceAtOpen
+                            ===categoryPane.snapshot.sourceKey
+                        && categoryPane.groupMonthAtOpen
+                            ===categoryPane.snapshot.month
+                    onLeftClicked: categoryPane.groupPreviewVisible=
+                        categoryPane.groupPlan.ok
+                }
+                ActionButton {
+                    width: (parent.width-6)/2
+                    height: 28
+                    label: "CANCEL GROUP"
+                    labelPixelSize: 9
+                    accentColor: Colors.red
+                    trackLabelGlowLocally: true
+                    available: !categoryPane.busy
+                    onLeftClicked: categoryPane.clearGroupDraft()
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: categoryPane.groupPlan.ok
+                    ? "GROUP PREVIEW AVAILABLE // NO SAVE"
+                    : categoryPane.groupPlan.reason
+                color: categoryPane.groupPlan.ok ? Colors.cyan : Colors.orange
+                font.pixelSize: 9
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: categoryPane.groupPreviewVisible
+                    && categoryPane.groupPlan.ok
+                text: categoryPane.groupPlan.mode==="create"
+                    ? "WOULD CREATE GROUP // "+categoryPane.groupPlan.proposedName
+                    : "WOULD RENAME GROUP // "+categoryPane.groupPlan.originalName
+                        +" → "+categoryPane.groupPlan.proposedName
+                color: Colors.magenta
+                font.pixelSize: 10
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: categoryPane.groupPreviewVisible
+                text: "PREVIEW ONLY // GROUP NOT SAVED IN ACTUAL"
+                color: Colors.orange
+                font.pixelSize: 9
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+        }
+        Repeater {
+            model: categoryPane.groups
+            delegate: Row {
+                id: groupRow
+                required property var modelData
+                width: content.width
+                height: 28
+                spacing: 5
+                GohuText {
+                    width: parent.width - renameGroupButton.width - 5
+                    height: parent.height
+                    verticalAlignment: Text.AlignVCenter
+                    text: modelData.name
+                    font.pixelSize: 10
+                    color: Colors.white
+                    textFormat: Text.PlainText
+                    elide: Text.ElideRight
+                }
+                ActionButton {
+                    id: renameGroupButton
+                    width: 104
+                    height: 26
+                    label: "RENAME GROUP"
+                    labelPixelSize: 8
+                    accentColor: Colors.cyan
+                    trackLabelGlowLocally: true
+                    available: !categoryPane.busy
+                    onLeftClicked: categoryPane.beginRenameGroup(groupRow.modelData)
+                }
+            }
+        }
+        GohuText {
+            width: parent.width
+            visible: categoryPane.groups.length===0
+            text: "NO EXPENSE GROUPS // CREATE PREVIEW AVAILABLE"
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
         }
 
         Rectangle {

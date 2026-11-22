@@ -1,0 +1,59 @@
+name: Connections C3e TimeW real connected peer image (untrusted candidate)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/ConnectionsTimeWNativePeerImageCandidate.py'
+      - 'tests/connections/test_connections_c3e_timew_native_peer_image.py'
+      - '.github/workflows/connections-c3e-timew-peer-image-candidate.yml'
+      - 'docs/connections-c3e-timew-real-peer-image-candidate.md'
+      - 'tests/connections/test_connections_c3e_timew_native_external_sender.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-peer-image-observed-not-enrolled:
+    name: Original Linux peer image observed, protected SwayPX still HOLD
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify image measurement has no native authority path
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/ConnectionsTimeWNativePeerImageCandidate.py \
+            tests/connections/test_connections_c3e_timew_native_peer_image.py
+          python3 - <<'PY'
+          from pathlib import Path
+          text=Path("services/connections/ConnectionsTimeWNativePeerImageCandidate.py").read_text()
+          for required in ("SO_PEERPIDFD", "SO_PEERCRED", "/proc",
+                           "_pidfd_alive", "_start_ticks", "_cgroup", "_lsm",
+                           "executableSha256ObservedUntrusted",
+                           '"sourceEvidenceTrusted": False',
+                           '"nativeGeometryAllowed": False',
+                           '"productionAuthority": False'):
+              assert required in text, required
+          for forbidden in ("swaymsg", "subprocess.run(", "socket.connect(",
+                            "socket.bind(", "Ed25519PrivateKey",
+                            '"productionAuthority": True',
+                            '"nativeGeometryAllowed": True'):
+              assert forbidden not in text, forbidden
+          PY
+      - name: Actual separate-process image, original packet observer and refusal suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CI" = true
+          python3 -B -I -m unittest discover \
+            -s tests/connections \
+            -p 'test_connections_c3e_timew_native_*.py' -v
+          echo 'C3E_TIMEW_PEER_IMAGE_DIAGNOSTIC_ONLY // NO_ENROLLED_SWAYPX_PRODUCER'

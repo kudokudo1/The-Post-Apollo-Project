@@ -130,7 +130,7 @@ class ForestC5SignedEvidencePreflightTests(unittest.TestCase):
         bad = self.pair.copy()
         bad[0] = b'{"schema":"x","schema":"y"}'
         self.assert_hold(bad, "DUPLICATE_JSON_KEY")
-        bad[0] = self.pair[0].replace(b',"action":', b', "action":')
+        bad[0] = self.pair[0].replace(b',"attempt":', b', "attempt":')
         self.assert_hold(bad, "NONCANONICAL_JSON")
         bad[0] = self.pair[0].replace(b',"attempt":', b',"productionAuthority":true,"attempt":')
         self.assert_hold(bad, "EXACT_FIELDS_REQUIRED")

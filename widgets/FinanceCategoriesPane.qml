@@ -550,6 +550,7 @@ Item {
         Repeater {
             model: categoryPane.groups
             delegate: Row {
+                id: groupRow
                 required property var modelData
                 width: content.width
                 height: 28
@@ -573,7 +574,7 @@ Item {
                     accentColor: Colors.cyan
                     trackLabelGlowLocally: true
                     available: !categoryPane.busy
-                    onLeftClicked: categoryPane.beginRenameGroup(modelData)
+                    onLeftClicked: categoryPane.beginRenameGroup(groupRow.modelData)
                 }
             }
         }

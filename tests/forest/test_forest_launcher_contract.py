@@ -171,6 +171,14 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertNotIn("Quickshell.execDetached", adapter)
         self.assertIn("generation_enabled !== false", policy)
         self.assertIn("model_count !== value.models.length", policy)
+        self.assertIn("InventoryPolicy.beginScan()", adapter)
+        self.assertIn("InventoryPolicy.captureStdoutScan(", adapter)
+        self.assertIn("InventoryPolicy.captureStderrScan(", adapter)
+        self.assertIn("InventoryPolicy.captureExitScan(", adapter)
+        self.assertIn("models = scanState.accepted ? scanState.models : []", adapter)
+        self.assertIn("if (!s.stdoutSeen || !s.stderrSeen || !s.exitSeen)", policy)
+        self.assertIn("s.exitStatus !== 0", policy)
+        self.assertNotIn("Qt.callLater(function() { inventory.complete(); })", adapter)
         self.assertTrue((ROOT / "scripts/forest/ollama_inventory.py").is_file())
         self.assertNotIn("Component.onCompleted", adapter)
         self.assertNotIn("running: true", adapter)
@@ -197,6 +205,65 @@ if(ctx.parseInventory("not-json").valid)process.exit(4);
 '''
         result = subprocess.run(
             ["node", "-e", node, str(ROOT / "services/forest/ForestInventoryPolicy.js")],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        # All 6 event orders must defer publication until the final event.
+        event_orders = r"""
+const fs = require("fs"), vm = require("vm");
+const ctx = {}; vm.runInNewContext(fs.readFileSync(process.argv[1], "utf8"),ctx);
+const output = JSON.stringify({
+  schema_version: 1, provider: "ollama", status: "REACHABLE",
+  models: [{name:"qwen3:1.7b",size_bytes:100}], model_count:1,
+  capabilities:["list_models"], generation_enabled:false,
+  tools_enabled:false, sessions_enabled:false
+});
+const unavailable = JSON.stringify({
+  schema_version:1, provider:"ollama", status:"UNAVAILABLE",
+  models:[],model_count:0,capabilities:[],generation_enabled:false,
+  tools_enabled:false,sessions_enabled:false,reason:"OLLAMA_UNAVAILABLE"
+});
+const events = {
+  o:s=>ctx.captureStdoutScan(s,output),
+  e:s=>ctx.captureStderrScan(s,""),
+  x:s=>ctx.captureExitScan(s,0,0)
+};
+const permutations = [
+  "oex","oxe","eox","exo","xoe","xeo"
+];
+for(const order of permutations) {
+  let s = ctx.beginScan();
+  for(let i=0;i<3;i++) {
+    s=events[order[i]](s);
+    if(i<2 && (s.complete || s.accepted || s.models.length))process.exit(10);
+  }
+  if(!s.complete||!s.accepted||s.status!=="REACHABLE"||s.models.length!==1)
+    process.exit(11);
+  if(ctx.captureStdoutScan(s,output).models.length!==1)process.exit(12);
+}
+const failures=[
+  ["stderr",["o","e","x"],(s,k)=> k==="e" ? ctx.captureStderrScan(s,"unexpected") : events[k](s)],
+  ["nonzero",["o","e","x"],(s,k)=> k==="x" ? ctx.captureExitScan(s,2,0) : events[k](s)],
+  ["crash",["o","e","x"],(s,k)=> k==="x" ? ctx.captureExitScan(s,0,1) : events[k](s)],
+  ["badjson",["x","o","e"],(s,k)=> k==="o" ? ctx.captureStdoutScan(s,"not-json") : events[k](s)],
+  ["dup",["o","o","e","x"],(s,k)=> events[k](s)]
+];
+for(const [label,seq,fn] of failures) {
+  let s=ctx.beginScan();
+  for(const k of seq) s=fn(s,k);
+  if(!s.complete||s.accepted||s.models.length||s.status!=="UNAVAILABLE")
+    process.exit(20);
+}
+let s=ctx.beginScan();
+s=ctx.captureExitScan(s,2,0);
+s=ctx.captureStderrScan(s,"");
+s=ctx.captureStdoutScan(s,unavailable);
+if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
+   ||s.reason!=="OLLAMA_UNAVAILABLE"||s.models.length)process.exit(30);
+"""
+        result = subprocess.run(
+            ["node", "-e", event_orders,
+             str(ROOT / "services/forest/ForestInventoryPolicy.js")],
             text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

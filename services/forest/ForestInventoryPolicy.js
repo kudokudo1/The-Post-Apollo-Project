@@ -38,3 +38,105 @@ function parseInventory(raw) {
     }
     return { valid: true, status: "REACHABLE", reason: "", models: models };
 }
+
+/*
+ * Process callback barrier. No model list is public until stdout, stderr
+ * and QProcess::NormalExit have all completed for this scan. Mirrors the
+ * principle of HospitalDoctorDirectoryExitPolicy without sharing ownership.
+ */
+function beginScan() {
+    return {
+        stdoutSeen: false, stderrSeen: false, exitSeen: false,
+        stagedStatus: "", stagedReason: "", stagedModels: [],
+        exitCode: -999, exitStatus: -999, error: "",
+        complete: false, accepted: false,
+        status: "CHECKING", reason: "", models: []
+    };
+}
+function cloneScan(s) {
+    return {
+        stdoutSeen: s.stdoutSeen, stderrSeen: s.stderrSeen,
+        exitSeen: s.exitSeen, stagedStatus: s.stagedStatus,
+        stagedReason: s.stagedReason, stagedModels: s.stagedModels,
+        exitCode: s.exitCode, exitStatus: s.exitStatus, error: s.error,
+        complete: s.complete, accepted: s.accepted,
+        status: s.status, reason: s.reason, models: s.models
+    };
+}
+function finishScan(s) {
+    if (!s.stdoutSeen || !s.stderrSeen || !s.exitSeen)
+        return s;
+    s.complete = true;
+    // QProcess::NormalExit is 0; a crash with an exit code of 0 is failure.
+    if (s.exitStatus !== 0 || s.error) {
+        s.status = "UNAVAILABLE";
+        s.reason = s.error || "BACKEND_EXIT";
+    } else if (s.stagedStatus === "REACHABLE" && s.exitCode === 0) {
+        s.status = "REACHABLE";
+        s.reason = "";
+        s.accepted = true;
+        s.models = s.stagedModels;
+    } else if (s.stagedStatus === "UNAVAILABLE" && s.exitCode === 2) {
+        s.status = "UNAVAILABLE";
+        s.reason = s.stagedReason;
+        s.accepted = true;
+    } else {
+        s.status = "UNAVAILABLE";
+        s.reason = "INVALID_RESPONSE";
+    }
+    // Never publish staged model names on failure.
+    s.stagedModels = [];
+    return s;
+}
+function captureStdoutScan(state, raw) {
+    if (!state || state.complete)
+        return state;
+    var s = cloneScan(state);
+    if (s.stdoutSeen) {
+        s.error = "DUPLICATE_STDOUT";
+        return finishScan(s);
+    }
+    s.stdoutSeen = true;
+    var response = parseInventory(raw);
+    if (!response.valid) {
+        s.error = "INVALID_RESPONSE";
+    } else {
+        s.stagedStatus = response.status;
+        s.stagedReason = response.reason;
+        s.stagedModels = response.models;
+    }
+    return finishScan(s);
+}
+function captureStderrScan(state, raw) {
+    if (!state || state.complete)
+        return state;
+    var s = cloneScan(state);
+    if (s.stderrSeen) {
+        s.error = "DUPLICATE_STDERR";
+        return finishScan(s);
+    }
+    s.stderrSeen = true;
+    if (String(raw || "").trim().length > 0)
+        s.error = "BACKEND_STDERR";
+    return finishScan(s);
+}
+function captureExitScan(state, code, exitStatus) {
+    if (!state || state.complete)
+        return state;
+    var s = cloneScan(state);
+    if (s.exitSeen) {
+        s.error = "DUPLICATE_EXIT";
+        return finishScan(s);
+    }
+    s.exitSeen = true;
+    if (typeof code !== "number" || typeof exitStatus !== "number"
+            || !isFinite(code) || !isFinite(exitStatus)) {
+        s.error = "BACKEND_EXIT";
+    } else {
+        s.exitCode = code;
+        s.exitStatus = exitStatus;
+        if (exitStatus !== 0 || (code !== 0 && code !== 2))
+            s.error = "BACKEND_EXIT";
+    }
+    return finishScan(s);
+}

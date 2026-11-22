@@ -56,10 +56,11 @@ assert "anchors.centerIn:" not in RESIZE
 assert "direction === \"up\"" in RESIZE
 assert "onResizeRequested:" not in BASE
 
-# EXACT operator-supplied code points, no ASCII/ordinary arrows.
-for token in ('"⮜"', '"⮝"', '"⮟"', '"➤"'):
+# Operator-approved matching horizontal arrowhead family; do not regress
+# to the visually mismatched former right glyph (➤).
+for token in ('"⮜"', '"⮝"', '"⮟"', '"⮞"'):
     present(token)
-for forbidden in ('"↑"', '"↓"', '"←"', '"→"', '"X"'):
+for forbidden in ('"↑"', '"↓"', '"←"', '"→"', '"➤"', '"X"'):
     assert forbidden not in RESIZE, forbidden
 
 # Both axes use their directional sign; no resizing is performed here.

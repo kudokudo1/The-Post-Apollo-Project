@@ -25,12 +25,25 @@ for field in (
     'loaded = false;',
     'listResponseAccepted = false;',
     'doctors = [];',
-    'listProcess.pendingRead = DoctorReadPolicy.begin();',
-    'listProcess.exec([nativeReaderPath, "doctor-directory"]);',
-    'function advanceDoctorRead(next)',
+    'property var activeRead: null',
+    'property int readGeneration: 0',
+    'readonly property int readTimeoutMs: 12000',
+    'readGeneration += 1;',
+    'doctorReadFactory.createObject(root, {',
+    'requestGeneration: generation',
+    'process.exec([nativeReaderPath, "doctor-directory"]);',
+    'function isCurrentDoctorRead(process, generation)',
+    'function advanceDoctorRead(process, generation, next)',
+    'function completeDoctorRead(process, generation, result)',
+    'function failDoctorRead(process, generation, reason)',
     'if (!next.complete)',
-    'listProcess.pendingRead = null;',
-    'if (next.accepted)',
+    'process.pendingRead = null;',
+    'activeRead = null;',
+    'if (result.accepted)',
+    'doctorReadWatchdog.stop();',
+    'process.running = false;',
+    'onTriggered: root.failDoctorRead(',
+    'Qt.callLater(function() { process.destroy(); });',
     'loaded = true;',
     'doctors = next.records;',
     'DoctorReadPolicy.captureStdout(',
@@ -55,12 +68,13 @@ for forbidden in (
     'store-command',
     'root.doctors = doctors;',
     'root.doctors = result.map(',
+    'listProcess.pendingRead',
 ):
     assert forbidden not in SERVICE, "LEGACY_DOCTOR_ROUTE_STILL_ACTIVE: " + forbidden
 
-# PR #2137 landed before independent event-order review. The pure policy
-# is also exercised dynamically by test_doctor_directory_exit_policy.js
-# using the actual QML publication method and all six event permutations.
+# The pure policy is exercised by test_doctor_directory_exit_policy.js
+# together with the ACTUAL QML refresh, accept, fail and retirement methods,
+# including old-process callbacks after a new generation starts.
 for field in (
     'function begin()',
     'function captureStdout(state, text)',

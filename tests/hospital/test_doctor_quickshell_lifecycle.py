@@ -106,7 +106,7 @@ def main():
             "XDG_DATA_HOME": str(work / "data"),
             "XDG_RUNTIME_DIR": str(runtime),
             "H1_DISPOSABLE_STATE_DIR": str(state),
-            "QT_QPA_PLATFORM": "xcb",
+            "QT_QPA_PLATFORM": "offscreen",
             "QT_QUICK_BACKEND": "software",
             "LIBGL_ALWAYS_SOFTWARE": "1",
             "NO_COLOR": "1",
@@ -115,7 +115,7 @@ def main():
             raise RuntimeError("NO_DISPOSABLE_XVFB_DISPLAY")
 
         cmd = [str(qs), "--path", str(work / "shell.qml"), "--no-color"]
-        print("H1 REAL QUICKSHELL START // disposable Xvfb fixture", flush=True)
+        print("H1 REAL QUICKSHELL START // disposable offscreen Qt fixture", flush=True)
         proc = subprocess.Popen(cmd, env=env, cwd=work,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True,

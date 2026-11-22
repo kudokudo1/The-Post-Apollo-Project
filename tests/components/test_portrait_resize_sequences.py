@@ -93,8 +93,8 @@ for p in actual["compactScreen"]:
     assert 0 < p["height"] <= 751
 
 finance = (ROOT / "widgets/FinanceW.qml").read_text(encoding="utf-8")
-assert "chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1, "finance");" in finance
-assert "chassisLevel = FinanceChassisPolicy.step(chassisLevel, -1, "finance");" in finance
+assert 'chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1, "finance");' in finance
+assert 'chassisLevel = FinanceChassisPolicy.step(chassisLevel, -1, "finance");' in finance
 assert 'glowGutter, frameTopInset, bottomScreenGap, "finance"' in finance
 assert "implicitHeight: frameHeight + frameTopInset + bottomScreenGap" in finance
 assert "property string selectorPreviewActive:" in finance

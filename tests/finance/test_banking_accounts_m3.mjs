@@ -165,4 +165,15 @@ assert.equal(policy.addEntry(upper,{accountId:upper.accounts[0].id,date:"2026-11
     description:"Overflow",direction:"in",amountText:"0.01"}).ok,false);
 assert.equal(policy.validState({...upper,entries:[{id:"entry-2",accountId:"acct-1",
     date:"2026-11-22",description:"Unsafe",amountCents:0,origin:"manual"}]}),false);
+// Account caps apply per account, not to legitimate combined holdings.
+let combined=policy.emptyState();
+for(const nickname of ["Checking A","Checking B"]) {
+    const res=policy.addAccount(combined,{providerId:"bank",productId:"bank-checking",
+        nickname,openingText:"9999999.99"});
+    assert.equal(res.ok,true);
+    combined=res.state;
+}
+assert.equal(policy.snapshot(combined).ok,true);
+assert.equal(policy.snapshot(combined).combinedBalanceCents,1999999998);
+
 console.log("Banking M3: manual account identities, unknown balances, USD cents, activity, undo, caps and demo isolation PASS");

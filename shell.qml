@@ -1167,7 +1167,7 @@ PanelWindow {
         }
     }
 
-    // FOREST V0 // beside the centered Apollo Hub dock, not leftModules.
+    // FOREST V0 // use the space LEFT of Apollo Hub, not the Network dock.
     // Visual proximity does not transfer the Hub's or Hospital's authority.
     Item {
         id: forestHost
@@ -1175,8 +1175,8 @@ PanelWindow {
         height: forestButton.implicitHeight
 
         anchors.top: apolloHubHost.top
-        anchors.left: apolloHubHost.right
-        anchors.leftMargin: 8
+        anchors.right: apolloHubHost.left
+        anchors.rightMargin: 8
 
         Forest {
             id: forestButton

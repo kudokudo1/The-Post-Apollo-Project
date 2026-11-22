@@ -8,6 +8,7 @@ by untrusted CI fixtures. NEVER call this as an authorization decision.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path
 import sys
@@ -140,6 +141,26 @@ def inspect_ci_only(*, request, selection, observed_surfaces, samples,
                 "c5_operator_consent_verified", "one_use_grant_spent"))
             or continuous.get("safe_actions") != []):
         hold()
+    # Additional TimeW-side *fixture* joins: the first continuity sample
+    # must describe the same entire desktop inventory that the initial
+    # selected-geometry preflight inspected. Container ordering is irrelevant,
+    # but an unrelated same-app window cannot silently change between them.
+    # The signed C3e CI proof is verified above; inspect its *validated*
+    # canonical expiry to ensure the hypothetical final phase still fits.
+    # These checks are NOT native timestamp, provenance or grant evidence.
+    try:
+        signed_fixture = json.loads(signed_proof_raw.decode("ascii", "strict"))
+        initial = {item["live_con_id"]: item for item in observed_surfaces}
+        phase0 = {item["live_con_id"]: item
+                  for item in samples[0]["observed_surfaces"]}
+        if (initial != phase0
+                or samples[0]["now_ms"] < now_ms
+                or samples[-1]["now_ms"] >= signed_fixture["expiresMs"]):
+            hold()
+    except (KeyError, TypeError, IndexError, UnicodeError, ValueError,
+            OverflowError, RecursionError):
+        hold()
+
     return {
         "kind": KIND,
         "status": "SIGNED_TEST_SOURCE_AND_GEOMETRY_CONSISTENT_NO_AUTHORITY",

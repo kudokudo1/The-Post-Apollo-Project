@@ -208,6 +208,15 @@ try:
         assert result["safe_actions"] == []
         assert sway.calls == 6
         assert call() == result, "replayed signed CI fixture still never authorizes"
+        # Inventory order is not identity; exact values and lifetime are.
+        reordered = copy.deepcopy(phases)
+        reordered[0]["observed_surfaces"].reverse()
+        assert call(samples=reordered) == result
+        # Boundary: the last hypothetical operation may finish just BEFORE
+        # the signed fixture expiry, not at or after expiry.
+        just_before_expiry = copy.deepcopy(phases)
+        just_before_expiry[-1]["now_ms"] = when + 999
+        assert call(samples=just_before_expiry) == result
 
         def changed_sel(**fields):
             s = copy.deepcopy(selection)
@@ -254,6 +263,15 @@ try:
         refuses(lambda: call(expected_host_id="ci-other-host"))
         refuses(lambda: call(now_ms=when+2200))
         refuses(lambda: call(now_ms=when-1))
+        # Initial selected-surface preflight must precede the first sample.
+        # Previously the separate validators allowed a first phase earlier
+        # than the same call's preflight instant.
+        refuses(lambda: call(now_ms=when+150))
+        after_signed_expiry = copy.deepcopy(phases)
+        after_signed_expiry[-1]["now_ms"] = when + 1000
+        refuses(lambda: call(samples=after_signed_expiry))
+        after_signed_expiry[-1]["now_ms"] = when + 1500
+        refuses(lambda: call(samples=after_signed_expiry))
         for i in range(3):
             changed_phase(i, surface_lifetime_id=uid())
             changed_phase(i, surface_generation=2)
@@ -279,6 +297,24 @@ try:
         invalid = copy.deepcopy(initial)
         invalid[0]["rect"]["x"] += 1
         refuses(lambda: call(observed_surfaces=invalid))
+        # Existing selected preflight checks the chosen window, not every
+        # unselected surface. A *stable but different* three-phase inventory
+        # must no longer be accepted as the same initial desktop observation.
+        initial_other = copy.deepcopy(initial)
+        initial_other[1]["rect"]["x"] += 1
+        refuses(lambda: call(observed_surfaces=initial_other))
+        phases_other = copy.deepcopy(phases)
+        for snapshot in phases_other:
+            snapshot["observed_surfaces"][1]["rect"]["x"] += 1
+        refuses(lambda: call(samples=phases_other))
+
+        # A mathematically valid signature with a shorter fixture lease
+        # cannot cover an after-move stage beyond its own expiry.
+        short_proof = copy.deepcopy(proof)
+        short_proof["expiresMs"] = when + 250
+        short_raw = C3e._canonical(short_proof)
+        refuses(lambda: call(signed_proof_raw=short_raw,
+                             signature=good_key.sign(C3e.TIMEW_DOMAIN + short_raw)))
         altered = copy.deepcopy(proof)
         altered["purpose"] = C3e.HOSPITAL_PURPOSE
         proof_raw = C3e._canonical(altered)

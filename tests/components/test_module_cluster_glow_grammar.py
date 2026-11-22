@@ -127,7 +127,10 @@ assert re.search(r"(?m)^\s*SafeDropShadow\s*\{", tray)
 assert not re.search(r"(?m)^\s*DropShadow\s*\{", tray)
 assert "safeSource: trayIcon" in tray
 assert "trayButtonMouse.containsMouse ? 0.95 : 0.75" in tray
-assert "trayButtonHovered ? 0.09 : 0.07" in tray
+# The tray has an orange identity even when not hovered. Hover and
+# press raise the two halo intensities without changing hue.
+assert "trayButtonPressed ? 0.82 : trayButtonHovered ? 0.7 : 0.55" in tray
+assert "trayButtonPressed ? 0.24 : trayButtonHovered ? 0.18 : 0.12" in tray
 # No phantom local toggle can precede a real system-tray activation.
 # External application menu/open state is not inferred from a click.
 assert "clickTest" not in tray

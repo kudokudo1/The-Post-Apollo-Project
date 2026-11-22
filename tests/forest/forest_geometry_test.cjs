@@ -12,11 +12,20 @@ assert.strictEqual(scope.step(0, 1), 1);
 assert.strictEqual(scope.step(1, 1), 2);
 assert.strictEqual(scope.step(2, 1), 3);
 assert.strictEqual(scope.step(3, 1), 3);
-const expected = [[480,340], [660,340], [660,540], [930,610]];
+const expected = [[930,610], [930,790], [1360,790], [1884,1051]];
 for (let i=0; i<4; i++) {
     const f = scope.frame(i, 1920, 1080, 12, 9, 8);
     assert.deepStrictEqual([f.width, f.height], expected[i]);
 }
+// Explicit Git fullscreen cap is honored even on large screens.
+assert.deepStrictEqual(
+    ((f) => [f.width, f.height])(scope.frame(3,1920,1080,12,9,8,1800,800)),
+    [1800,800]
+);
+assert.deepStrictEqual(
+    ((f) => [f.width, f.height])(scope.frame(0,1920,1080,12,9,8,850,550)),
+    [850,550]
+);
 for (const [sw, sh] of [[1920,1080],[1366,768],[360,640],[200,250]]) {
     for (let i=0; i<4; i++) {
         const f = scope.frame(i,sw,sh,12,9,8);
@@ -31,4 +40,4 @@ for (const [sw, sh] of [[1920,1080],[1366,768],[360,640],[200,250]]) {
         assert(left + windowWidth <= sw, 'horizontal overflow');
     }
 }
-console.log('Forest V0 geometry: shared top edge, four stages and 16 viewport checks PASS');
+console.log('Forest geometry: 930x610 default, vertical then horizontal, Git cap and viewport checks PASS');

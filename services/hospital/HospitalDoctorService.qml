@@ -17,6 +17,8 @@ Scope {
     // Each refresh owns a fresh Process and its own StdioCollector pair.
     // An old process cannot write the staging state of a newer refresh.
     property var activeRead: null
+    // A watchdog is scoped to exactly ONE Process+generation, never reused.
+    property var activeWatchdog: null
     property int readGeneration: 0
     readonly property int readTimeoutMs: 12000
 
@@ -111,7 +113,24 @@ Scope {
             return false;
         }
         activeRead = process;
-        doctorReadWatchdog.start();
+        // Qt Timer callbacks can be queued even after stop(). Therefore a
+        // timer must permanently refer to its original request, not consult
+        // whichever Process happens to be active when the callback arrives.
+        let watchdog = null;
+        try {
+            watchdog = doctorWatchdogFactory.createObject(root, {
+                ownerProcess: process,
+                requestGeneration: generation
+            });
+            if (!watchdog)
+                throw new Error("DOCTOR WATCHDOG CREATE FAILED");
+            activeWatchdog = watchdog;
+            watchdog.start();
+        } catch (error) {
+            failDoctorRead(process, generation,
+                "HOSPITAL BACKEND NOT READY // DOCTOR WATCHDOG UNAVAILABLE");
+            return false;
+        }
 
         // Installed native reader verifies root-owned inode/config/socket
         // and the writer's kernel peer. There is NO desktop PX fallback.
@@ -161,8 +180,11 @@ Scope {
         // anything, or publishing a signal that could synchronously refresh.
         process.pendingRead = null;
         activeRead = null;
+        const watchdog = activeWatchdog;
+        activeWatchdog = null;
         refreshing = false;
-        doctorReadWatchdog.stop();
+        if (watchdog)
+            watchdog.stop();
         if (process.running)
             process.running = false; // SIGTERM on a stuck read, no detached child.
 
@@ -183,7 +205,11 @@ Scope {
 
         // Destroy the retired Process after its signal handler unwinds. Late
         // handlers remain tied to that retired object, never to activeRead.
-        Qt.callLater(function() { process.destroy(); });
+        Qt.callLater(function() {
+            if (watchdog)
+                watchdog.destroy();
+            process.destroy();
+        });
         doctorsRefreshed();
         return true;
     }
@@ -207,15 +233,30 @@ Scope {
         });
     }
 
-    Timer {
-        id: doctorReadWatchdog
-        interval: root.readTimeoutMs
-        repeat: false
-        running: false
-        onTriggered: root.failDoctorRead(
-            root.activeRead, root.readGeneration,
-            "HOSPITAL BACKEND NOT READY // DOCTOR READ TIMED OUT"
-        )
+    // The timer callback carries its original watchdog+Process+generation.
+    // A delayed callback from request A is refused even if request B is
+    // active and its own watchdog has already started.
+    function timeoutDoctorRead(watchdog, process, generation) {
+        if (!watchdog || activeWatchdog !== watchdog)
+            return false;
+        return failDoctorRead(process, generation,
+            "HOSPITAL BACKEND NOT READY // DOCTOR READ TIMED OUT");
+    }
+
+    Component {
+        id: doctorWatchdogFactory
+        Timer {
+            id: requestWatchdog
+            property var ownerProcess: null
+            property int requestGeneration: 0
+            interval: root.readTimeoutMs
+            repeat: false
+            running: false
+            onTriggered: root.timeoutDoctorRead(
+                requestWatchdog, requestWatchdog.ownerProcess,
+                requestWatchdog.requestGeneration
+            )
+        }
     }
 
     // Every new read gets its own Process/StdioCollector objects. Those

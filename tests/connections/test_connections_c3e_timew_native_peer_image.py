@@ -116,5 +116,10 @@ class RealOriginalPeerImageTests(unittest.TestCase):
         self.assertFalse(observed["productionAuthority"])
 
 
+    def test_09_proc_records_are_bounded_before_allocation(self):
+        with self.assertRaisesRegex(P.PeerImageHold, "PROC_RECORD_BOUNDS"):
+            P._read_proc(os.getpid(), "status", maximum=4)
+
+
 if __name__ == "__main__":
     unittest.main()

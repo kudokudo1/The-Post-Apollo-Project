@@ -1,0 +1,29 @@
+name: Finance shared ResizeButton pilot
+
+on:
+  pull_request:
+    paths:
+      - "widgets/FinanceW.qml"
+      - "components/ResizeButton.qml"
+      - "tests/components/test_finance_resize_button_pilot.py"
+      - "tests/components/test_finance_navigation_contracts.py"
+      - ".github/workflows/finance-resize-button-pilot.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/FinanceW.qml"
+      - "components/ResizeButton.qml"
+      - "tests/components/test_finance_resize_button_pilot.py"
+      - "tests/components/test_finance_navigation_contracts.py"
+      - ".github/workflows/finance-resize-button-pilot.yml"
+
+jobs:
+  source-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shared ResizeButton pilot contract
+        run: python3 -B -I tests/components/test_finance_resize_button_pilot.py
+      - name: Existing Finance navigation contract
+        run: python3 -B -I tests/components/test_finance_navigation_contracts.py

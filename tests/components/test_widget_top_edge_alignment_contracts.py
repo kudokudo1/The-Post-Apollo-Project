@@ -175,7 +175,8 @@ assert "const HOSPITAL_WIDTH_STEPS = [744, 984, 1224, 1464]" in hospital_width
 assert "anchors.topMargin: root.frameInset" in hospital
 assert "height: root.panelHeight" in hospital
 assert "property int defaultPanelWidth: 1210" in social
-assert "property int panelHeight: 790" in git
+assert "{ width: 1120, height: 790 }" in git
+assert "readonly property int panelHeight: Math.min(" in git
 assert "visible: true" in hospital and "visible: true" in git
 assert "visible: true" in tasks and "visible: true" in time
 assert "visible: menuOpen" in deck

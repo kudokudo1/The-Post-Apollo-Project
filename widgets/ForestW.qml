@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import "../components"
 import "ForestChassisPolicy.js" as ForestSizing
+import "../services/forest"
 
 // FOREST V0: self-contained visual workspace. No model, PX or Hospital calls.
 PanelWindow {
@@ -12,6 +13,19 @@ PanelWindow {
     property real dockCenterX: 0
     property int chassisLevel: 0
     property int selectedTreeIndex: 0
+    property int selectedModelIndex: 0
+    readonly property string selectedLocalModel:
+        localInventory.modelCount > 0
+        ? localInventory.models[Math.min(selectedModelIndex, localInventory.modelCount - 1)].name
+        : ""
+    function cycleLocalModel() {
+        if (localInventory.modelCount > 1)
+            selectedModelIndex = (selectedModelIndex + 1) % localInventory.modelCount;
+    }
+    ForestInventoryAdapter {
+        id: localInventory
+        onModelsChanged: root.selectedModelIndex = 0
+    }
     // Tree identities remain model-independent; outline icons are local SVG
     // assets in Post-Apollo's fixed palette, not emoji font fallbacks.
     readonly property var treeSlots: [
@@ -342,10 +356,109 @@ PanelWindow {
                 height: 1
                 color: Colors.cyan
             }
+
+            // Real B0 read-only local inventory; a scan is never automatic.
+            Rectangle {
+                id: modelStrip
+                anchors.top: chatHeading.bottom
+                anchors.topMargin: 20
+                anchors.left: parent.left
+                anchors.leftMargin: 12
+                anchors.right: parent.right
+                anchors.rightMargin: 12
+                height: 58
+                color: Colors.dark
+                border.color: Colors.cyan
+                border.width: 1
+
+                GohuText {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    anchors.top: parent.top
+                    anchors.topMargin: 8
+                    anchors.right: scanButton.left
+                    anchors.rightMargin: 6
+                    elide: Text.ElideRight
+                    font.pixelSize: 10
+                    color: localInventory.status === "REACHABLE" ? Colors.green : Colors.orange
+                    text: localInventory.scanning ? "OLLAMA // SCANNING"
+                         : localInventory.status === "REACHABLE"
+                            ? "OLLAMA // " + localInventory.modelCount + " LOCAL"
+                         : localInventory.status === "NOT_CHECKED"
+                            ? "OLLAMA // NOT CHECKED" : "OLLAMA // UNAVAILABLE"
+                }
+
+                Rectangle {
+                    id: scanButton
+                    anchors.top: parent.top
+                    anchors.topMargin: 4
+                    anchors.right: parent.right
+                    anchors.rightMargin: 6
+                    width: 55
+                    height: 24
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: localInventory.scanning ? "..." : "SCAN"
+                        font.pixelSize: 10
+                        color: localInventory.scanning ? Colors.orange : Colors.cyan
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: !localInventory.scanning
+                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: localInventory.scanModels()
+                    }
+                }
+
+                GohuText {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 8
+                    anchors.right: nextModelButton.left
+                    anchors.rightMargin: 6
+                    font.pixelSize: 10
+                    elide: Text.ElideRight
+                    color: root.selectedLocalModel ? Colors.white : Colors.cyan
+                    text: root.selectedLocalModel
+                        ? "MODEL // " + root.selectedLocalModel
+                        : "MODEL // NONE SELECTED"
+                }
+                Rectangle {
+                    id: nextModelButton
+                    anchors.right: parent.right
+                    anchors.rightMargin: 6
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 4
+                    width: 55
+                    height: 23
+                    color: Colors.black
+                    border.width: 1
+                    border.color: localInventory.modelCount > 1 ? Colors.magenta : Colors.cyan
+                    opacity: localInventory.modelCount > 1 ? 1.0 : 0.45
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "NEXT >"
+                        font.pixelSize: 9
+                        color: Colors.magenta
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: localInventory.modelCount > 1
+                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: root.cycleLocalModel()
+                    }
+                }
+            }
             Column {
-                anchors.centerIn: parent
+                x: (parent.width - width) / 2
+                y: Math.max(modelStrip.y + modelStrip.height + 18,
+                            (parent.height - height) / 2)
                 width: Math.max(120, parent.width - 30)
-                spacing: 13
+                spacing: 8
                 GohuText {
                     width: parent.width
                     text: "NO ACTIVE SESSION"
@@ -363,7 +476,7 @@ PanelWindow {
                 }
                 GohuText {
                     width: parent.width
-                    text: "Forest V0 launcher preview. No model is running from this widget."
+                    text: "B1 / B2 / B3 READY AS CONTRACTS // TRUSTED HOST NOT CONNECTED"
                     color: Colors.cyan
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap
@@ -384,7 +497,7 @@ PanelWindow {
                 opacity: 0.65
                 GohuText {
                     anchors.centerIn: parent
-                    text: "MESSAGE // AVAILABLE AFTER LOCAL ADAPTER"
+                    text: "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
                     color: Colors.white
                     font.pixelSize: 9
                 }
@@ -409,7 +522,7 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
-                text: "LOCAL FIRST // NO NETWORK REQUESTS"
+                text: "LOCAL FIRST // OPTIONAL LOOPBACK MODEL SCAN"
                 color: Colors.cyan
                 font.pixelSize: 10
             }

@@ -665,34 +665,30 @@ PanelWindow {
 
             // Size controls stay inside FinanceW; they never open another app.
             // They only update the window geometry, not financial or edit state.
-            ActionButton {
+            ResizeButton {
                 id: collapseChassisButton
                 anchors.right: expandChassisButton.left
                 anchors.rightMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
-                width: 30
-                height: 30
-                label: "↓"
-                labelPixelSize: 17
-                accentColor: Colors.cyan
+                direction: "down"
                 available: root.chassisLevel !== "compact"
-                onLeftClicked: {
+                onResizeRequested: function(delta) {
+                    if (delta !== -1)
+                        return;
                     root.collapseChassis();
                     root.keyboardOwnershipRequested();
                 }
             }
-            ActionButton {
+            ResizeButton {
                 id: expandChassisButton
                 anchors.right: financeFeedIndicator.left
                 anchors.rightMargin: 7
                 anchors.verticalCenter: parent.verticalCenter
-                width: 30
-                height: 30
-                label: "↑"
-                labelPixelSize: 17
-                accentColor: Colors.magenta
+                direction: "up"
                 available: root.chassisLevel !== "fullscreen"
-                onLeftClicked: {
+                onResizeRequested: function(delta) {
+                    if (delta !== 1)
+                        return;
                     root.expandChassis();
                     root.keyboardOwnershipRequested();
                 }

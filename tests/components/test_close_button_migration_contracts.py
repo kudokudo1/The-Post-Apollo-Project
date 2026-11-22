@@ -38,7 +38,12 @@ popup = (ROOT / "widgets/TimeResyncPopup.qml").read_text(encoding="utf-8")
 assert 'width: 25' in popup
 trash = (ROOT / "modules/Trash.qml").read_text(encoding="utf-8")
 assert "id: closeTrashButton" in trash and "width: 30" in trash
-assert "width: parent.width - 180" in trash
+# ReloadButton joins the same header row without displacing the Close ×.
+# The title width follows actual siblings instead of a stale fixed deduction.
+assert "id: trashHeaderRow" in trash
+assert "collapseTrashButton.width - expandTrashButton.width" in trash
+assert "trashLiveIndicator.width - trashHeaderReloadButton.width" in trash
+assert "closeTrashButton.width - trashHeaderRow.spacing * 5" in trash
 camera = (ROOT / "widgets/CameraW.qml").read_text(encoding="utf-8")
 assert "cameraCloseButton.width" in camera
 assert 'label: "X"' not in camera

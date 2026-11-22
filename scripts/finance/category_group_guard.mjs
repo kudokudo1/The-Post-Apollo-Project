@@ -52,7 +52,8 @@ export function preflightGroup(input,groups){
   if(!Array.isArray(groups) || groups.some(g=>!g
       || typeof g.id!=="string" || !id.test(g.id)
       || typeof g.name!=="string"
-      || typeof g.is_income!=="boolean"))
+      || (g.is_income!==undefined && g.is_income!==null
+        && typeof g.is_income!=="boolean")))
     refuse("invalid-group-source");
   if(new Set(groups.map(g=>g.id)).size!==groups.length)
     refuse("ambiguous-group-source");

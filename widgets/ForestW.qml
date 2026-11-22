@@ -780,7 +780,7 @@ PanelWindow {
                 Column {
                     anchors.centerIn: parent
                     width: Math.max(120, parent.width - 30)
-                    spacing: root.chassisLevel >= 2 ? 8 : 4
+                    spacing: root.frameHeight >= 540 ? 8 : 4
                     GohuText {
                         width: parent.width
                         text: "NO ACTIVE SESSION"
@@ -801,7 +801,7 @@ PanelWindow {
                     GohuText {
                         // Keep explanatory detail in taller stages. This does
                         // not hide any active chat or personal conversation.
-                        visible: root.chassisLevel >= 2
+                        visible: root.frameHeight >= 540
                         width: parent.width
                         text: "B1 / B2 / B3 READY AS CONTRACTS // TRUSTED HOST NOT CONNECTED"
                         color: Colors.cyan
@@ -838,7 +838,7 @@ PanelWindow {
                     GohuText {
                         anchors.centerIn: parent
                         width: Math.max(0, parent.width - 12)
-                        text: root.chassisLevel < 2
+                        text: root.frameHeight < 540
                             ? "SEND LOCKED // HOST NOT CONNECTED"
                             : "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
                         color: Colors.white

@@ -24,7 +24,8 @@ DETAIL_STORE = (ROOT / "services/social/SocialAccountDetailsStore.qml").read_tex
 
 class CpuPlusLocalOrganizationLinksContracts(unittest.TestCase):
     def test_no_chassis_change_and_editor_stays_in_existing_right_bay(self):
-        for expected in ("implicitWidth: 1000", "implicitHeight: 834",
+        for expected in ("{ width: 1000, height: 834 }",
+                         "implicitWidth: Math.min(", "implicitHeight: Math.min(",
                          "id: sharedInstrumentPane", "width: 390",
                          "id: targetPane", "width: 260",
                          "id: actuatorPane", 'name: "ID MANAGEMENT"',

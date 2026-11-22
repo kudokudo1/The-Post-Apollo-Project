@@ -66,8 +66,19 @@ jobs:
           assert "client.send(ready)" in service
           assert "client.sendall(signed)" not in service
           assert "client.sendall(grant)" not in service
-          assert "review.operatorAuthenticated === true" in ui
-          assert "review.requiresOwnerReview === false" in ui
+          # Hospital #2069 moved to native-first approval, not a desktop
+          # owner-authenticated preview. Check the current source/receipt
+          # refusal boundary instead of the removed preview booleans.
+          assert 'executeProcess.exec([nativeClientPath, action, room]);' in ui
+          assert 'payload.schema !== "postapollo.connections.hospital-native-issuer-response.v1"' in ui
+          assert 'payload.status !== "COMMITTED"' in ui
+          assert 'payload.action !== root.pendingAction' in ui
+          assert 'payload.roomId !== root.pendingRoomId' in ui
+          assert 'payload.originalPreserved !== true' in ui
+          assert 'payload.burnAllowed !== false' in ui
+          assert 'active && nativeClientInstalled' in ui
+          assert '"room-lifecycle-trash"' not in ui
+          assert '"room-lifecycle-restore"' not in ui
           assert "readonly property bool credentialActionsEnabled: false" in broker
           assert "room-lifecycle-issuer.pub" in px
           assert policy.count("<allow_active>auth_self</allow_active>") == 2

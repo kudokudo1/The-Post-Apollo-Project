@@ -14,16 +14,37 @@ const end = "\n                    }\n\n                    onWheel:";
 assert.equal(source.split(start).length - 1, 1);
 const body = source.split(start, 2)[1].split(end, 1)[0];
 assert.ok(body.includes("trayNativeMenu.open();"));
+// Execute the real QML Lutris identity predicate as JavaScript. An exact
+// registered app identity may use a Desktop ID or AppIndicator service ID.
+const lutrisStart = "function isLutrisTrayItem(item) {";
+assert.equal(source.split(lutrisStart).length - 1, 1);
+const lutrisBody = source.split(lutrisStart, 2)[1].split(
+    "\n    }\n\n    function openDiscordFromTray()", 1
+)[0];
+const isLutrisTrayItem = vm.runInNewContext(
+    "(function(item) {" + lutrisBody + "\n})"
+);
+for (const id of ["lutris", "net.lutris.Lutris",
+                  "net_lutris_Lutris", "net.lutris.Lutris.desktop"])
+    assert.equal(isLutrisTrayItem({id}), true, id);
+assert.equal(isLutrisTrayItem({title:"Lutris"}), true);
+for (const id of ["vesktop", "org.kde.LutrisHelper", "fake-lutris-app"])
+    assert.equal(isLutrisTrayItem({id}), false, id);
+
 const context = {
     Qt: { LeftButton: 1, RightButton: 2 },
     trayButton: { modelData: {} },
-    trayDock: { isDiscordTrayItem: () => false, openDiscordFromTray: () => {} },
+    trayDock: {
+        isDiscordTrayItem: () => false, isLutrisTrayItem,
+        openDiscordFromTray: () => {}
+    },
     trayNativeMenu: { open: () => {} },
 };
 const clicked = vm.runInNewContext("(function(mouse) {" + body + "\n})", context);
 function click(button, settings) {
     let opens = 0, activates = 0, discord = 0;
     context.trayButton.modelData = {
+        id: settings.id ?? "", title: settings.title ?? "",
         hasMenu: !!settings.hasMenu,
         onlyMenu: !!settings.onlyMenu,
         menu: settings.menu ?? null,
@@ -47,6 +68,15 @@ assert.deepEqual(click(1, {hasMenu:false,menu:null,onlyMenu:false}),
     {opens:0,activates:1,discord:0}, "normal app left activation");
 assert.deepEqual(click(1, {hasMenu:true,menu:{},discord:true}),
     {opens:0,activates:0,discord:1}, "existing Vesktop bridge retained");
+assert.deepEqual(click(1, {id:"net.lutris.Lutris",hasMenu:true,menu:{}}),
+    {opens:1,activates:0,discord:0},
+    "Lutris left-click opens its own advertised menu when Activate may do nothing");
+assert.deepEqual(click(1, {id:"lutris",hasMenu:false,menu:null}),
+    {opens:0,activates:1,discord:0},
+    "Lutris without a native menu retains normal activation fallback");
+assert.deepEqual(click(1, {id:"another-app",hasMenu:true,menu:{}}),
+    {opens:0,activates:1,discord:0},
+    "another application's left-click activation is not replaced");
 assert.deepEqual(click(2, {hasMenu:true,menu:{},discord:true}),
     {opens:1,activates:0,discord:0}, "right-click Discord remains native");
 
@@ -61,10 +91,12 @@ function accent(pressed, hovered) {
         trayButtonPressed:pressed, trayButtonHovered:hovered, Colors
     });
 }
-assert.equal(accent(false,false),Colors.cyan);
+assert.equal(accent(false,false),Colors.orange);
 assert.equal(accent(false,true),Colors.orange);
 assert.equal(accent(true,true),Colors.orange);
 assert.equal(accent(true,false),Colors.orange);
+assert.match(source,/opacity: trayButtonPressed \? 0\.82 : trayButtonHovered \? 0\.7 : 0\.55/);
+assert.match(source,/opacity: trayButtonPressed \? 0\.24 : trayButtonHovered \? 0\.18 : 0\.12/);
 assert.match(source,/border\.color:\s*accentColor/);
 assert.equal((source.match(/color: trayDock\.accentColor/g)||[]).length,5);
 assert.match(source,/HoverHandler\s*\{\s*id:\s*trayHoverHandler\s*blocking:\s*false/);

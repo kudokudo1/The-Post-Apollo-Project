@@ -99,11 +99,22 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertNotIn('mark: "🍁"', view)
         self.assertNotIn('mark: "✿"', view)
 
+        # Forest-specific icon identity: foreground and halo are different
+        # color axes, with the effect sampling its sibling Image.
+        self.assertIn("TextHashGlow {", view)
+        self.assertIn("id: treeGlyphGlow", view)
+        self.assertIn("safeSource: treeGlyph", view)
+        self.assertIn("requestedVisible: root.menuOpen", view)
+        self.assertIn('foregroundColor: modelData.name === "CHERRY" ? Colors.white : Colors.orange', view)
+        self.assertIn('preferredGlowColor: modelData.name === "CHERRY" ? Colors.magenta : Colors.red', view)
+        self.assertIn("z: -1", view)
+        self.assertNotIn("layer.effect: DropShadow", view)
+
         palette = (ROOT / "components/Colors.qml").read_text()
         self.assertIn('#C74EC7', palette)
         self.assertIn('#ED981A', palette)
         for asset, color, min_paths in (
-            ("cherry-outline.svg", "#C74EC7", 5),
+            ("cherry-outline.svg", "#DCF3FA", 6),
             ("maple-outline.svg", "#ED981A", 2),
         ):
             with self.subTest(icon=asset):
@@ -125,6 +136,24 @@ class ForestLauncherContract(unittest.TestCase):
                     self.assertIn(el.attrib.get("fill", "none"), ("none",))
                     if "stroke" in el.attrib:
                         self.assertEqual(el.attrib["stroke"], color)
+
+        cherry = ET.parse(ROOT / "assets/forest/cherry-outline.svg").getroot()
+        petals = cherry.find(".//" + ns + "g[@id='sakura-petals']")
+        self.assertIsNotNone(petals)
+        self.assertEqual(len(petals.findall(ns + "path")), 5)
+        self.assertEqual(
+            [petal.attrib.get("transform") for petal in petals.findall(ns + "path")],
+            [None] + [f"rotate({i} 24 24)" for i in (72, 144, 216, 288)],
+        )
+        stamens = cherry.find(".//" + ns + "g[@id='sakura-stamens']")
+        self.assertIsNotNone(stamens)
+        self.assertGreaterEqual(len(stamens.findall(ns + "circle")), 6)
+        maple = ET.parse(ROOT / "assets/forest/maple-outline.svg").getroot()
+        contour = maple.find(".//" + ns + "path[@id='maple-contour']")
+        veins = maple.find(".//" + ns + "path[@id='maple-veins']")
+        self.assertIsNotNone(contour)
+        self.assertIsNotNone(veins)
+        self.assertGreaterEqual(contour.attrib["d"].count("C"), 8)
 
     def test_live_status_is_between_resize_and_close(self):
         text = (ROOT / "widgets/ForestW.qml").read_text()

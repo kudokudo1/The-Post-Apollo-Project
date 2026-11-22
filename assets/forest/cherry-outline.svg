@@ -1,15 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
-  <title>Cherry blossom, five broad notched sakura petals</title>
-  <desc>Hollow magenta sakura outline with five individually notched petals and a compact stamen starburst; readable at small sizes.</desc>
-  <g fill="none" stroke="#C74EC7" stroke-linecap="round" stroke-linejoin="round">
-    <path stroke-width="2.7" d="M17.42 14.94 C12.13 12.54 10.89 7.22 17.23 4.33 C20.13 2.04 22.22 3.68 24.00 6.50 C25.78 3.68 27.87 2.04 30.77 4.33 C37.11 7.22 35.87 12.54 30.58 14.94 C31.23 9.17 35.91 6.34 40.61 11.48 C43.69 13.53 42.78 16.03 40.64 18.59 C43.88 19.41 46.08 20.90 44.80 24.36 C44.02 31.29 38.57 31.75 34.65 27.46 C40.34 26.30 44.47 29.87 41.04 35.93 C40.04 39.49 37.38 39.40 34.29 38.16 C34.51 41.49 33.78 44.04 30.08 43.89 C23.26 45.29 21.13 40.25 24.00 35.20 C26.87 40.25 24.74 45.29 17.92 43.89 C14.22 44.04 13.49 41.49 13.71 38.16 C10.62 39.40 7.96 39.49 6.96 35.93 C3.53 29.87 7.66 26.30 13.35 27.46 C9.43 31.75 3.98 31.29 3.20 24.36 C1.92 20.90 4.12 19.41 7.36 18.59 C5.22 16.03 4.31 13.53 7.39 11.48 C12.09 6.34 16.77 9.17 17.42 14.94 Z"/>
-    <g stroke-width="2.0">
-      <path d="M24.00 19.40 L24.00 16.40"/>
-      <path d="M28.37 22.58 L31.23 21.65"/>
-      <path d="M26.70 27.72 L28.47 30.15"/>
-      <path d="M21.30 27.72 L19.53 30.15"/>
-      <path d="M19.63 22.58 L16.77 21.65"/>
+  <title>Cherry blossom, separated sakura petals</title>
+  <desc>Five separated notched sakura petals and stamen ring in Post-Apollo white line art, with a magenta QML glow.</desc>
+  <g fill="none" stroke="#DCF3FA" stroke-linecap="round" stroke-linejoin="round">
+    <g id="sakura-petals" stroke-width="2.5">
+    <path d="M20.5 17.6 C17 15.4 14.5 12.4 16 9.0 C16.9 5.4 20.1 4.8 24 8.4 C27.9 4.8 31.1 5.4 32 9.0 C33.5 12.4 31 15.4 27.5 17.6 Q24 16.4 20.5 17.6 Z"/>
+    <path transform="rotate(72 24 24)" d="M20.5 17.6 C17 15.4 14.5 12.4 16 9.0 C16.9 5.4 20.1 4.8 24 8.4 C27.9 4.8 31.1 5.4 32 9.0 C33.5 12.4 31 15.4 27.5 17.6 Q24 16.4 20.5 17.6 Z"/>
+    <path transform="rotate(144 24 24)" d="M20.5 17.6 C17 15.4 14.5 12.4 16 9.0 C16.9 5.4 20.1 4.8 24 8.4 C27.9 4.8 31.1 5.4 32 9.0 C33.5 12.4 31 15.4 27.5 17.6 Q24 16.4 20.5 17.6 Z"/>
+    <path transform="rotate(216 24 24)" d="M20.5 17.6 C17 15.4 14.5 12.4 16 9.0 C16.9 5.4 20.1 4.8 24 8.4 C27.9 4.8 31.1 5.4 32 9.0 C33.5 12.4 31 15.4 27.5 17.6 Q24 16.4 20.5 17.6 Z"/>
+    <path transform="rotate(288 24 24)" d="M20.5 17.6 C17 15.4 14.5 12.4 16 9.0 C16.9 5.4 20.1 4.8 24 8.4 C27.9 4.8 31.1 5.4 32 9.0 C33.5 12.4 31 15.4 27.5 17.6 Q24 16.4 20.5 17.6 Z"/>
     </g>
-    <circle cx="24" cy="24" r="2.7" stroke-width="2.1"/>
+    <g id="sakura-stamens" stroke-width="1.6">
+      <circle cx="24" cy="24" r="2.5"/>
+      <path d="M24 20.8 L24 19.5 M27.1 23 L28.4 22.6 M26 26.4 L26.9 27.5 M22 26.4 L21.1 27.5 M20.9 23 L19.6 22.6"/>
+      <circle cx="24" cy="18.5" r="0.85"/>
+      <circle cx="29.2" cy="22.3" r="0.85"/>
+      <circle cx="27.2" cy="28.3" r="0.85"/>
+      <circle cx="20.8" cy="28.3" r="0.85"/>
+      <circle cx="18.8" cy="22.3" r="0.85"/>
+    </g>
   </g>
 </svg>

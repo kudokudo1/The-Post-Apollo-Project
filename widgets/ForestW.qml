@@ -242,6 +242,21 @@ PanelWindow {
                                 smooth: true
                             }
 
+                            // The actual Image remains the foreground source. Sample it
+                            // from a sibling so the glow tracks its exact coordinates
+                            // and disconnects safely when the QML window goes away.
+                            TextHashGlow {
+                                id: treeGlyphGlow
+                                safeSource: treeGlyph
+                                requestedVisible: root.menuOpen
+                                foregroundColor: modelData.name === "CHERRY" ? Colors.white : Colors.orange
+                                preferredGlowColor: modelData.name === "CHERRY" ? Colors.magenta : Colors.red
+                                radius: 8
+                                samples: 17
+                                opacity: 0.82
+                                z: -1
+                            }
+
                             GohuText {
                                 anchors.left: treeGlyph.right
                                 anchors.leftMargin: 6

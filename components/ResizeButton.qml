@@ -12,13 +12,19 @@ ActionButton {
     id: resizeButton
 
     // Supported direction values: "left", "up", "down", "right".
-    // Left/down decrease; up/right increase.
+    // Left/down decrease; up/right increase by default.
+    // A right-anchored panel can grow toward the LEFT; opt-in reversal
+    // changes both the delta and the semantic orange/purple artwork.
     property string direction: "down"
+    property bool reverseHorizontalGrowth: false
     readonly property bool directionValid:
         direction === "left" || direction === "up"
         || direction === "down" || direction === "right"
     readonly property bool increasing:
-        direction === "up" || direction === "right"
+        reverseHorizontalGrowth
+        && (direction === "left" || direction === "right")
+        ? direction === "left"
+        : direction === "up" || direction === "right"
     readonly property int sizeDelta: increasing ? 1 : -1
 
     // Canonical orange for decreasing; purple is not in Colors yet, so keep

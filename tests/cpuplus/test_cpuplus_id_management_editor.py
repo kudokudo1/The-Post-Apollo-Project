@@ -26,7 +26,9 @@ DETAIL_STORE = (ROOT / "services/social/SocialAccountDetailsStore.qml").read_tex
 
 class CpuPlusIdEditorContracts(unittest.TestCase):
     def test_existing_three_column_geometry_and_main_mode_untouched(self):
-        for snippet in ("implicitWidth: 1000", "implicitHeight: 834",
+        for snippet in ("property int resizeLevel: 1",
+                        "{ width: 1000, height: 834 }",
+                        "implicitWidth: Math.min(", "implicitHeight: Math.min(",
                         "width: 390", "width: 260", "height: 110",
                         "name: \"ID MANAGEMENT\"",
                         "id: idManagementOverviewPane",

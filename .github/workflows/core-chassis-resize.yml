@@ -10,6 +10,10 @@ on:
       - "widgets/CpuPlusW.qml"
       - "widgets/notifications/NotificationsHubW.qml"
       - "widgets/FinanceW.qml"
+      - "widgets/FinanceChassisPolicy.js"
+      - "tests/components/test_portrait_resize_sequences.py"
+      - "tests/finance/test_finance_adaptive_chassis_contracts.py"
+      - "tests/components/test_widget_top_edge_alignment_contracts.py"
       - "shell.qml"
       - "components/ResizeButton.qml"
       - "tests/components/test_core_chassis_resize_controls.py"
@@ -24,6 +28,10 @@ on:
       - "widgets/CpuPlusW.qml"
       - "widgets/notifications/NotificationsHubW.qml"
       - "widgets/FinanceW.qml"
+      - "widgets/FinanceChassisPolicy.js"
+      - "tests/components/test_portrait_resize_sequences.py"
+      - "tests/finance/test_finance_adaptive_chassis_contracts.py"
+      - "tests/components/test_widget_top_edge_alignment_contracts.py"
       - "shell.qml"
       - "components/ResizeButton.qml"
       - "tests/components/test_core_chassis_resize_controls.py"
@@ -43,6 +51,9 @@ jobs:
         run: |
           python3 -B -I tests/components/test_core_chassis_resize_controls.py
           python3 -B -I tests/components/test_header_resize_social_bottom_finance_selector.py
+          python3 -B -I tests/components/test_portrait_resize_sequences.py
+          python3 -B -I tests/components/test_widget_top_edge_alignment_contracts.py
+          python3 -B -I tests/finance/test_finance_adaptive_chassis_contracts.py
       - name: Shared component and chassis rollout remain intact
         run: |
           python3 -B -I tests/components/test_resize_button_contracts.py

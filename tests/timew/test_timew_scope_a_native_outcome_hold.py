@@ -65,7 +65,7 @@ def refuses(fn):
     raise AssertionError("Expected malformed fixture to be refused")
 
 with tempfile.TemporaryDirectory(prefix="timew-scopea-outcome-") as temp:
-    db = Path(temp) / "isolated" / DB_NAME
+    db = Path(temp) / "post-apollo" / "machine" / DB_NAME
     journal = GeometryJournal(db)
     op = journal.begin(summary)
     prepared = journal.get(op)

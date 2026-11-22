@@ -168,12 +168,19 @@ check('def model_started(process)' in script
       and 'if command == "CANCEL":' in script
       and 'tail += bytes(minimum - len(tail))' in script,
       "Model teardown and subsecond speech tail remain bounded under cancellation")
-check('voiceSelected: root.speechInputService.busy' in reception
-      and 'color: micButton.voiceSelected ? Colors.yellow' in reception
-      and 'color: micButton.voiceSelected ? Colors.magenta' in reception
-      and 'voiceSelected: root.speechInputService.busy' in intercom
-      and 'color: micButton.voiceSelected ? Colors.yellow' in intercom
-      and 'color: micButton.voiceSelected ? Colors.magenta' in intercom,
+# The reusable control now owns the canonical active/open presentation;
+# each host still owns its own speech-input authority and busy state.
+voice_button = (root / "components/VoiceToTextButton.qml").read_text()
+check('VoiceToTextButton {' in reception
+      and 'busy: root.speechInputService.busy' in reception
+      and 'VoiceToTextButton {' in intercom
+      and 'busy: root.speechInputService.busy' in intercom
+      and 'selected: busy' in voice_button
+      and 'selectedFillColor: Colors.yellow' in voice_button
+      and 'selectedForegroundColor: Colors.magenta' in voice_button
+      and 'selectedBorderColor: Colors.magenta' in voice_button
+      and 'selectedSoftGlowColor: Colors.magenta' in voice_button
+      and 'onLeftClicked: toggleRequested()' in voice_button,
       "Front desk microphones use canonical active/open selection colors")
 
 check('property bool safetyHold: true' in live

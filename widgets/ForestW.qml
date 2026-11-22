@@ -794,20 +794,47 @@ PanelWindow {
                     }
                 }
 
-                Rectangle {
+                // Match Forest's ordinary DockButton state grammar: green
+                // fruit identity and perimeter when idle/hovered, magenta
+                // foreground + border + glow on open, yellow selected fill.
+                // The shared control owns the hover/pressed/open transitions
+                // and its teardown-safe source-sampled artwork glow.
+                DockButton {
                     id: modelPickerButton
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     width: 51
-                    color: root.modelPopupOpen ? Colors.yellow : Colors.black
-                    border.width: 1
-                    border.color: Colors.magenta
+                    radius: 0
+                    acceptedButtons: Qt.LeftButton
+                    open: root.modelPopupOpen
                     Accessible.name: "Open Forest model selector"
 
-                    // Split the decorated identity ⊹❦︎๋࣭⭑ into independent
-                    // Gohu layers. The botanical core stays AI green and its
-                    // two white ornaments do not inherit the selected tint.
+                    normalForegroundColor: Colors.green
+                    hoverForegroundColor: Colors.green
+                    pressedForegroundColor: Colors.green
+                    openForegroundColor: Colors.magenta
+
+                    normalDockGlowColor: Colors.green
+                    hoverDockGlowColor: Colors.green
+                    pressedDockGlowColor: Colors.green
+                    openGlowColor: Colors.magenta
+
+                    normalContentGlowColor: Colors.green
+                    hoverContentGlowColor: Colors.green
+                    pressedContentGlowColor: Colors.green
+                    contentGlowSource: pickerFlower
+                    trackArtworkGlowLocally: true
+
+                    // Border follows the same resolved color as flower/glow.
+                    border.width: 1
+                    border.color: dockGlowColor
+
+                    // Forest dock precedent: white idle/hover ornaments,
+                    // magenta together with the flower when open.
+                    readonly property color pickerStarColor:
+                        modelPickerButton.open ? Colors.magenta : Colors.white
+
                     Item {
                         id: modelPickerArt
                         anchors.centerIn: parent
@@ -821,7 +848,7 @@ PanelWindow {
                             text: "⊹"
                             textFormat: Text.PlainText
                             font.pixelSize: 14
-                            color: Colors.white
+                            color: modelPickerButton.pickerStarColor
                         }
                         GohuText {
                             id: pickerFlower
@@ -829,7 +856,7 @@ PanelWindow {
                             text: "❦︎๋࣭"
                             textFormat: Text.PlainText
                             font.pixelSize: 21
-                            color: Colors.green
+                            color: modelPickerButton.foregroundColor
                         }
                         GohuText {
                             id: pickerRightStars
@@ -838,24 +865,10 @@ PanelWindow {
                             text: "⭑"
                             textFormat: Text.PlainText
                             font.pixelSize: 13
-                            color: Colors.white
-                        }
-                        TextHashGlow {
-                            safeSource: pickerFlower
-                            requestedVisible: root.menuOpen
-                            foregroundColor: Colors.green
-                            preferredGlowColor: Colors.green
-                            radius: 8
-                            samples: 17
-                            opacity: 0.75
-                            z: -1
+                            color: modelPickerButton.pickerStarColor
                         }
                     }
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.modelPopupOpen = !root.modelPopupOpen
-                    }
+                    onLeftClicked: root.modelPopupOpen = !root.modelPopupOpen
                 }
             }
         }

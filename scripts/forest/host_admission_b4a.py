@@ -13,7 +13,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Any
 
-from ollama_chat_transport import _model_name
+from ollama_chat_transport import ChatRefusal, _model_name
 from session_journal_v0 import ForestSessionJournal, JournalRefusal, _key
 from turn_bridge_b3 import BridgeRefusal, ForestTurnBridge
 
@@ -91,7 +91,7 @@ def decode_intent(wire: object) -> dict[str, Any]:
             raise AdmissionRefusal("INVALID_REVISION")
         try:
             _model_name(intent["model"])
-        except (ValueError, TypeError, Exception) as exc:
+        except ChatRefusal as exc:
             # The model is a selection, NOT a source of authority.
             raise AdmissionRefusal("INVALID_MODEL") from exc
     return intent

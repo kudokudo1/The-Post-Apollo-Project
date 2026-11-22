@@ -85,7 +85,7 @@ present('property color increaseAccentColor: "#A46AFF"')
 present("accentColor: increasing ? increaseAccentColor : decreaseAccentColor")
 assert 'readonly property color orange:' in COLORS
 assert 'readonly property color yellow:' in COLORS
-assert not re.search(r"(?m)^\\s*readonly property color purple:", COLORS)
+assert not re.search(r"(?m)^\s*readonly property color purple:", COLORS)
 assert "Colors.magenta" not in RESIZE
 
 # CloseButton-like behavior, but each direction owns its own semantic hue.
@@ -108,7 +108,7 @@ visual_colors = {
     "keyboardSelectedBorderColor": "accentColor",
 }
 for prop, value in visual_colors.items():
-    assert re.search(rf"(?m)^\\s*{prop}:\\s*{re.escape(value)}\\s*$", RESIZE), (prop, value)
+    assert re.search(rf"(?m)^\s*{prop}:\s*{re.escape(value)}\s*$", RESIZE), (prop, value)
 
 # Hover and press preserve the directional hue across all three glow planes.
 # Use CloseButton intensities, including visible pressed glyph and wide glow.

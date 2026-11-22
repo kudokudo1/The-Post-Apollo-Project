@@ -155,6 +155,60 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIsNotNone(veins)
         self.assertGreaterEqual(contour.attrib["d"].count("C"), 8)
 
+    def test_forest_prompt_reuses_voice_and_ask_send_without_permissions(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        voice = (ROOT / "components/VoiceToTextButton.qml").read_text()
+        action = (ROOT / "components/AskSendButton.qml").read_text()
+        workflow = (ROOT / ".github/workflows/forestw-v0.yml").read_text()
+
+        self.assertIn('import "../components"', view)
+        self.assertIn("readonly property bool voiceHostTrusted: false", view)
+        self.assertIn("readonly property bool chatHostTrusted: false", view)
+        self.assertEqual(view.count("VoiceToTextButton {"), 1)
+        self.assertEqual(view.count("AskSendButton {"), 1)
+        self.assertIn("id: voiceToTextButton", view)
+        self.assertIn("id: forestAskSendButton", view)
+        self.assertIn("id: modelPickerButton", view)
+        self.assertIn("anchors.right: voiceToTextButton.left", view)
+        self.assertIn("anchors.right: forestAskSendButton.left", view)
+        self.assertIn("anchors.right: modelPickerButton.left", view)
+        self.assertIn("available: root.voiceHostTrusted && !processing", view)
+        self.assertIn("enabledAction: root.chatHostTrusted", view)
+        self.assertIn("backendReady: root.voiceHostTrusted", view)
+        self.assertIn("busy: false", view)
+        self.assertIn("recording: false", view)
+        self.assertIn("allowSecondaryAction: false", view)
+        self.assertIn('askLabel: "ASK"', view)
+        self.assertIn('sendLabel: "SEND"', view)
+        self.assertIn("VOICE LOCKED // TRUSTED FOREST AUDIO HOST NOT CONNECTED", view)
+        self.assertIn("ASK LOCKED // TRUSTED FOREST CHAT HOST NOT CONNECTED", view)
+        self.assertIn("SEND LOCKED // HOST NOT CONNECTED", view)
+        self.assertIn("SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED", view)
+        self.assertNotIn("onToggleRequested:", view)
+        self.assertNotIn("onPrimaryRequested:", view)
+        self.assertNotIn("onSecondaryRequested:", view)
+        self.assertNotIn("HospitalSpeechInputService {", view)
+        self.assertNotIn("HospitalLiveDictationService {", view)
+        self.assertNotIn("onClicked: root.submit", view)
+        self.assertIn("signal toggleRequested()", voice)
+        self.assertIn("available: !processing", voice)
+        self.assertIn("signal primaryRequested()", action)
+        self.assertIn("signal secondaryRequested()", action)
+        self.assertIn("available: enabledAction", action)
+        for path in ("components/VoiceToTextButton.qml",
+                     "components/AskSendButton.qml"):
+            self.assertEqual(workflow.count(path), 2)
+
+        # Nominal chassis sizes from ForestChassisPolicy, including the
+        # narrow 480px stage. The placeholder retains meaningful width.
+        for frame_width in (480, 660, 660, 930):
+            side = min(204, max(144, round(frame_width * 0.31)))
+            row = frame_width - side - 24
+            mic = max(32, min(42, round(row * 0.12)))
+            send = max(54, min(86, round(row * 0.21)))
+            placeholder = row - mic - send - 51 - 3 * 6
+            self.assertGreaterEqual(placeholder, 100)
+
     def test_b0_inventory_ui_is_explicit_and_fail_closed(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
         adapter = (ROOT / "services/forest/ForestInventoryAdapter.qml").read_text()

@@ -156,7 +156,7 @@ with tempfile.TemporaryDirectory(prefix="resize-button-qt-") as temp:
         up.setProperty("direction", "right")
         app.processEvents()
         check_identity(down, "left", "⮜", -1, "#ED981A")
-        check_identity(up, "right", "➤", 1, "#A46AFF")
+        check_identity(up, "right", "⮞", 1, "#A46AFF")
         check_visual(down, "left hover", "#ED981A", "#1B0623", "#ED981A", "#ED981A", (.34, .48, .22))
         check_visual(up, "right hover", "#A46AFF", "#F2BE4E", "#A46AFF", "#A46AFF", (.72, .70, .32))
         assert window.property("downAligned") is True

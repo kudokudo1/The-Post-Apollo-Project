@@ -855,14 +855,26 @@ PanelWindow {
     readonly property var resizeSteps: [
         { width: 960, height: 834 },
         { width: 1000, height: 834 },
-        { width: 1180, height: 980 }
+        { width: 1180, height: 980 },
+        { width: 99999, height: 99999 }
     ]
+    // The visible frame begins at y=-3+12=9. On the fourth level,
+    // preserve the top and align its actual bottom with Notifications.
+    property var notificationsReference: null
+    readonly property int visualBottomGap: notificationsReference
+        ? notificationsReference.panelBottomMargin + notificationsReference.frameInset
+        : 13
+    readonly property int chassisRightMargin:
+        resizeLevel === resizeSteps.length - 1 ? 1 : 220
     implicitWidth: Math.min(
         resizeSteps[resizeLevel].width,
-        Math.max(1, (screen ? screen.width : 2560) - 220))
+        Math.max(1, (screen ? screen.width : 2560)
+                 - chassisRightMargin
+                 - (resizeLevel === resizeSteps.length - 1 ? 1 : 0)))
     implicitHeight: Math.min(
         resizeSteps[resizeLevel].height,
-        Math.max(1, (screen ? screen.height : 1440) - 12))
+        Math.max(1, (screen ? screen.height : 1440)
+                 - (resizeLevel === resizeSteps.length - 1 ? 0 : 12)))
     function stepWindowSize(delta) {
         if (delta !== -1 && delta !== 1)
             return;
@@ -879,7 +891,7 @@ PanelWindow {
     // now expands it leftward into the available DP-5 workspace.
     margins {
         top: -3
-        right: 220
+        right: chassisRightMargin
     }
 
     color: "transparent"
@@ -897,6 +909,11 @@ PanelWindow {
 
         anchors.fill: parent
         anchors.margins: 12
+        // Fullscreen frame ends at screen.height-visualBottomGap.
+        // Top margin stays 12 so the original visual y9 never moves.
+        anchors.bottomMargin: cpuPlusWindow.resizeLevel
+            === cpuPlusWindow.resizeSteps.length - 1
+            ? Math.max(0, cpuPlusWindow.visualBottomGap - 3) : 12
 
         fillVisible: false
         borderVisible: false
@@ -1051,8 +1068,8 @@ PanelWindow {
         ResizeButton {
             id: growCpuButton
             anchors.verticalCenter: cpuPlusCloseButton.verticalCenter
-            anchors.right: cpuPlusCloseButton.left
-            anchors.rightMargin: 7
+            anchors.right: cpuPlusInternetIndicator.left
+            anchors.rightMargin: 8
             direction: "up"
             available: cpuPlusWindow.resizeLevel
                        < cpuPlusWindow.resizeSteps.length - 1
@@ -1064,8 +1081,8 @@ PanelWindow {
         Rectangle {
             id: cpuPlusInternetIndicator
             anchors.verticalCenter: cpuPlusCloseButton.verticalCenter
-            anchors.right: shrinkCpuButton.left
-            anchors.rightMargin: 8
+            anchors.right: cpuPlusCloseButton.left
+            anchors.rightMargin: 7
             width: 156
             height: 22
             color: Colors.black

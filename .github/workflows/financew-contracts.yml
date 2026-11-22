@@ -69,6 +69,11 @@ on:
       - "widgets/FinanceHouseholdReservePolicy.js"
       - "tests/finance/test_household_reserves_fp1i.mjs"
       - "tests/finance/test_household_reserve_cushion_fp1j.mjs"
+      - "scripts/finance/household_reserve_preference_store.py"
+      - "services/finance/FinanceHouseholdReservePreferenceStore.qml"
+      - "tests/finance/test_household_reserve_preferences_fp1k.py"
+      - "tests/finance/test_household_reserve_preferences_fp1k_contracts.py"
+      - "scripts/finance/HOUSEHOLD_RESERVE_PREFERENCES_FP1K_README.md"
       - "tests/finance/test_household_reserve_cushion_fp1j_contracts.py"
       - "scripts/finance/HOUSEHOLD_RESERVE_CUSHION_FP1J_README.md"
       - "tests/finance/test_household_reserves_fp1i_contracts.py"
@@ -224,6 +229,11 @@ on:
       - "widgets/FinanceHouseholdReservePolicy.js"
       - "tests/finance/test_household_reserves_fp1i.mjs"
       - "tests/finance/test_household_reserve_cushion_fp1j.mjs"
+      - "scripts/finance/household_reserve_preference_store.py"
+      - "services/finance/FinanceHouseholdReservePreferenceStore.qml"
+      - "tests/finance/test_household_reserve_preferences_fp1k.py"
+      - "tests/finance/test_household_reserve_preferences_fp1k_contracts.py"
+      - "scripts/finance/HOUSEHOLD_RESERVE_PREFERENCES_FP1K_README.md"
       - "tests/finance/test_household_reserve_cushion_fp1j_contracts.py"
       - "scripts/finance/HOUSEHOLD_RESERVE_CUSHION_FP1J_README.md"
       - "tests/finance/test_household_reserves_fp1i_contracts.py"
@@ -363,6 +373,10 @@ jobs:
         run: node tests/finance/test_finance_household_planning.mjs
       - name: Test FP1c v1 file read compatibility and guarded edits
         run: python3 tests/finance/test_household_plan_store_fp1c.py
+      - name: Test FP1k preference private store, permissions and stale writes
+        run: python3 tests/finance/test_household_reserve_preferences_fp1k.py
+      - name: Verify FP1k preference UI, context and IO isolation contracts
+        run: python3 tests/finance/test_household_reserve_preferences_fp1k_contracts.py
       - name: Test FP1j 100/110/125 percent reserve cushions and conservation
         run: node tests/finance/test_household_reserve_cushion_fp1j.mjs
       - name: Verify FP1j cushion controls and no-storage sources

@@ -25,7 +25,12 @@ assert "actualTransfersMade:false" in reserve
 assert "startingReserveKnown:false" in reserve
 
 assert "property int reserveMarginPercent: 100" in ui
-assert "onContextIdChanged: reserveMarginPercent=100" in ui
+# FP1k extends context switching with a persisted local preference read.
+# The immediate fail-safe reset remains 100 until the matching result loads.
+assert ('onContextIdChanged: reserveMarginPercent=100' in ui or
+        ('onContextIdChanged: {' in ui and
+         'reserveMarginPercent=100;' in ui and
+         'armedPreferenceReset=false;' in ui))
 assert "Reserves.annotate(sourceRows,scheduleRows,projection,reserveMarginPercent)" in ui
 assert "QUARTERLY/ANNUAL" in ui
 for token in ("100% // BASE","110% // +10%","125% // +25%",

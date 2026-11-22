@@ -1556,6 +1556,19 @@ PanelWindow {
                     glowColor: Colors.magenta
                 }
 
+                // Whole-hub red X in the universal top-right position.
+                // This only closes the history UI, never dismisses a card.
+                CloseButton {
+                    id: closeNotificationsHubButton
+                    anchors.top: parent.top
+                    anchors.topMargin: 7
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    z: 3
+                    Accessible.name: "Close Notifications Hub"
+                    onCloseRequested: root.close()
+                }
+
                 // Stored notification count:
                 // > 0 = orange/orange
                 // 0   = white/cyan
@@ -1597,7 +1610,8 @@ PanelWindow {
                     }
 
                     anchors.topMargin: 8
-                    anchors.rightMargin: 18
+                    anchors.right: closeNotificationsHubButton.left
+                    anchors.rightMargin: 8
 
                     width: 56
                     height: 30
@@ -1611,8 +1625,8 @@ PanelWindow {
                 }
 
                 // Resize the full-height history *width* only. The red X
-                // hides this mapped hub; it never dismisses notifications
-                // or applies pending changes to service preferences.
+                // in the title row hides this mapped hub and never dismisses
+                // history or applies pending service preference changes.
                 Row {
                     id: notificationHeaderActions
                     anchors.top: parent.top
@@ -1637,11 +1651,6 @@ PanelWindow {
                         onResizeRequested: function(delta) {
                             root.stepWindowWidth(delta);
                         }
-                    }
-                    CloseButton {
-                        id: closeNotificationsHubButton
-                        Accessible.name: "Close Notifications Hub"
-                        onCloseRequested: root.close()
                     }
                 }
 

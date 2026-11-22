@@ -380,16 +380,16 @@ PanelWindow {
         chassisLevel,
         root.screen ? root.screen.width : 456,
         root.screen ? root.screen.height : 768,
-        glowGutter, frameTopInset, bottomScreenGap
+        glowGutter, frameTopInset, bottomScreenGap, "finance"
     )
     readonly property int frameWidth: chassisFrame.width
     readonly property int frameHeight: chassisFrame.height
 
     function expandChassis() {
-        chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1);
+        chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1, "finance");
     }
     function collapseChassis() {
-        chassisLevel = FinanceChassisPolicy.step(chassisLevel, -1);
+        chassisLevel = FinanceChassisPolicy.step(chassisLevel, -1, "finance");
     }
     function toggle() {
         menuOpen = !menuOpen;

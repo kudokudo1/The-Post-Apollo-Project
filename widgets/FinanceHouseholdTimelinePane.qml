@@ -31,9 +31,9 @@ Item {
         id: reservePreferenceStore
         contextId: timeline.contextId
         monitoring: timeline.active
-        onPreferenceLoaded: timeline.reserveMarginPercent=marginPercent
-        onPreferenceSaved: timeline.reserveMarginPercent=marginPercent
-        onPreferenceReset: timeline.reserveMarginPercent=marginPercent
+        onPreferenceLoaded: timeline.reserveMarginPercent=reservePreferenceStore.marginPercent
+        onPreferenceSaved: timeline.reserveMarginPercent=reservePreferenceStore.marginPercent
+        onPreferenceReset: timeline.reserveMarginPercent=reservePreferenceStore.marginPercent
     }
     signal horizonRequested(int months)
     readonly property var coverage: active && schedulesReady

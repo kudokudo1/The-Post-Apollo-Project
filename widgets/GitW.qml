@@ -4136,6 +4136,10 @@ PanelWindow {
                         left: parent.left
                         top: parent.top
                     }
+                    // Header actions gained a shared reload control; prevent
+                    // title ink from occupying their space at compact sizes.
+                    width: Math.max(0, parent.width - gitHeaderActions.width - 12)
+                    elide: Text.ElideRight
 
                     text:
                         root.activePage === "git"
@@ -4167,6 +4171,8 @@ PanelWindow {
                         left: parent.left
                         bottom: parent.bottom
                     }
+                    width: Math.max(0, parent.width - gitHeaderActions.width - 12)
+                    elide: Text.ElideRight
 
                     text:
                         root.activePage === "git"
@@ -4185,6 +4191,7 @@ PanelWindow {
                 }
 
                 Row {
+                    id: gitHeaderActions
                     anchors {
                         right: parent.right
                         verticalCenter: parent.verticalCenter

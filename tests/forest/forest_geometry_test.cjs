@@ -25,9 +25,10 @@ for (const [sw, sh] of [[1920,1080],[1366,768],[360,640],[200,250]]) {
         const top = scope.topMargin(sh,windowHeight);
         const left = scope.leftMargin(sw,windowWidth,sw/2);
         assert(f.width > 0 && f.height > 0);
-        assert(top>=0 && left>=0);
+        assert.strictEqual(top, 0, 'visible top edge must align with other menus');
+        assert(left>=0);
         assert(top + windowHeight <= sh - 11, 'vertical overflow');
         assert(left + windowWidth <= sw, 'horizontal overflow');
     }
 }
-console.log('Forest V0 geometry: four stages and 16 viewport checks PASS');
+console.log('Forest V0 geometry: shared top edge, four stages and 16 viewport checks PASS');

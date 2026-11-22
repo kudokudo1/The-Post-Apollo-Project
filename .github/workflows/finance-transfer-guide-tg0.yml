@@ -1,4 +1,4 @@
-name: FinanceW Banking TG0 + M1 + M2
+name: FinanceW Banking TG0 + M1 + M2 + M3
 
 on:
   pull_request:
@@ -8,6 +8,10 @@ on:
       - 'widgets/FinanceAccountsPane.qml'
       - 'widgets/FinanceW.qml'
       - 'widgets/FinanceBankingPane.qml'
+      - 'widgets/FinanceBankingAccountsPane.qml'
+      - 'widgets/FinanceBankingAccountsPolicy.js'
+      - 'tests/finance/test_banking_accounts_m3.mjs'
+      - 'tests/finance/test_banking_accounts_m3_contracts.py'
       - 'scripts/finance/banking_csv_reader.py'
       - 'tests/finance/test_banking_file_picker_m2.py'
       - 'tests/finance/test_banking_file_picker_m2_contracts.py'
@@ -24,6 +28,10 @@ on:
       - 'widgets/FinanceAccountsPane.qml'
       - 'widgets/FinanceW.qml'
       - 'widgets/FinanceBankingPane.qml'
+      - 'widgets/FinanceBankingAccountsPane.qml'
+      - 'widgets/FinanceBankingAccountsPolicy.js'
+      - 'tests/finance/test_banking_accounts_m3.mjs'
+      - 'tests/finance/test_banking_accounts_m3_contracts.py'
       - 'scripts/finance/banking_csv_reader.py'
       - 'tests/finance/test_banking_file_picker_m2.py'
       - 'tests/finance/test_banking_file_picker_m2_contracts.py'
@@ -55,3 +63,7 @@ jobs:
         run: python3 tests/finance/test_banking_file_picker_m2.py
       - name: Test Banking M2 file-picker integration and source isolation
         run: python3 tests/finance/test_banking_file_picker_m2_contracts.py
+      - name: Test manual account identities, money arithmetic and demo isolation
+        run: node tests/finance/test_banking_accounts_m3.mjs
+      - name: Test Banking M3 account UI and authority contracts
+        run: python3 tests/finance/test_banking_accounts_m3_contracts.py

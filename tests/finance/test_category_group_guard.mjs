@@ -37,7 +37,7 @@ test("M5 preflight uses fresh IDs and all hidden group names",()=>{
   assert.throws(()=>preflightGroup({...rename,expectedName:"Earlier"},groups),
     fails("stale-group"));
   assert.throws(()=>preflightGroup({...rename,groupId:"group-income",
-    expectedName:"Income"},groups),fails("stale-group"));
+    expectedName:"Income"},groups),fails("reserved-income-group"));
   assert.throws(()=>preflightGroup(create,[...groups,groups[0]]),
     fails("ambiguous-group-source"));
   assert.throws(()=>preflightGroup(create,[{id:"no",name:"X"}]),

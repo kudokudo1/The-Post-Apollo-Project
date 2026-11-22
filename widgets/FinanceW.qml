@@ -253,6 +253,9 @@ PanelWindow {
     // future slots never enter the keyboard selection cycle.
     property string navigationZone: "main"
     property int navigationIndex: 0
+    // Presentation-only selector samples: no finance service, transaction
+    // mutation, storage writer or persistent account selection.
+    property string selectorPreviewActive: "a"
     readonly property bool standardKeysAvailable:
         menuOpen && keyboardActive && !transactionDraftPane.open
 
@@ -966,8 +969,9 @@ PanelWindow {
             anchors.leftMargin: 8
             anchors.rightMargin: 8
 
-            // The yellow cursor follows real buttons in the work area,
-            // never the left main-mode rail or the global header.
+            // Unified orange preview / activated magenta selection follows
+            // actual ActionButtons; no independent yellow keyboard outline.
+            // It never overlaps the separate left Main Mode rail.
             WidgetContentKeyboardNavigator {
                 id: financeContentKeys
                 anchors.fill: parent
@@ -981,12 +985,51 @@ PanelWindow {
                 anchors.top: parent.top
                 anchors.topMargin: 16
                 anchors.left: parent.left
-                anchors.right: parent.right
+                anchors.right: selectorPreviewRow.left
+                anchors.rightMargin: 8
                 text: root.mainModeName().toUpperCase()
                 font.pixelSize: 15
                 font.bold: true
                 color: Colors.white
                 elide: Text.ElideRight
+            }
+
+            // Interactive selection demonstration. Preview A starts as a
+            // REAL activated magenta button. Hover/keyboard-preview B to
+            // see orange; click or safely Enter B to activate magenta.
+            // Neither option changes financial accounts, plans or budgets.
+            Row {
+                id: selectorPreviewRow
+                anchors.top: parent.top
+                anchors.topMargin: 9
+                anchors.right: parent.right
+                spacing: 6
+                z: 4
+
+                ActionButton {
+                    id: selectorPreviewA
+                    width: 72
+                    height: 28
+                    label: "CURSOR A"
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    keyboardActivationSignal: "leftClicked"
+                    selected: root.selectorPreviewActive === "a"
+                    Accessible.name: "Select preview cursor A"
+                    onLeftClicked: root.selectorPreviewActive = "a"
+                }
+                ActionButton {
+                    id: selectorPreviewB
+                    width: 72
+                    height: 28
+                    label: "CURSOR B"
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    keyboardActivationSignal: "leftClicked"
+                    selected: root.selectorPreviewActive === "b"
+                    Accessible.name: "Select preview cursor B"
+                    onLeftClicked: root.selectorPreviewActive = "b"
+                }
             }
 
             // BUDGET SUB MODES: symbol and glow colors are independent.

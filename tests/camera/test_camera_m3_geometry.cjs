@@ -164,15 +164,18 @@ test("Camera's transparent Zoom frame seals its inner 2px perimeter but leaves d
     assert.match(camera, /intersection: Intersection\.Subtract/);
 });
 
-test("Header has Finance-style independent down/up size controls and close", () => {
-    assert.match(camera, /id: cameraCollapseButton/);
-    assert.match(camera, /label: "↓"/);
+test("Header uses shared ResizeButton for bounded down/up sizing and close", () => {
+    assert.match(camera, /ResizeButton \{\s+id: cameraCollapseButton/);
+    assert.match(camera, /direction: "down"/);
     assert.match(camera, /available: camera\.chassisLevel !== "compact"/);
-    assert.match(camera, /onLeftClicked: camera\.collapseChassis\(\)/);
-    assert.match(camera, /id: cameraExpandButton/);
-    assert.match(camera, /label: "↑"/);
+    assert.match(camera, /onResizeRequested: function\(delta\)/);
+    assert.match(camera, /if \(delta !== -1\)/);
+    assert.match(camera, /camera\.collapseChassis\(\);/);
+    assert.match(camera, /ResizeButton \{\s+id: cameraExpandButton/);
+    assert.match(camera, /direction: "up"/);
     assert.match(camera, /available: camera\.chassisLevel !== "fullscreen"/);
-    assert.match(camera, /onLeftClicked: camera\.expandChassis\(\)/);
+    assert.match(camera, /if \(delta !== 1\)/);
+    assert.match(camera, /camera\.expandChassis\(\);/);
     assert.match(camera, /CloseButton \{\s+id: cameraCloseButton/);
     assert.match(camera, /onCloseRequested: camera\.menuOpen = false/);
     assert.match(camera, /cameraCloseButton\.width/);

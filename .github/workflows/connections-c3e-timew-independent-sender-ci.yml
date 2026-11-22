@@ -1,0 +1,57 @@
+name: Connections C3e TimeW independent Linux sender + ancillary refusal (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/test_connections_c3e_timew_native_external_sender.py'
+      - 'tests/connections/test_connections_c3e_timew_native_packet_observer.py'
+      - 'services/connections/ConnectionsTimeWNativePacketObservation.py'
+      - '.github/workflows/connections-c3e-timew-independent-sender-ci.yml'
+      - 'docs/connections-c3e-timew-independent-sender-rehearsal.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  distinct-linux-peer-still-not-trusted-compositor:
+    name: Distinct Linux sender verified, native origin still HOLD
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile new hostile peer test without production imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/test_connections_c3e_timew_native_external_sender.py
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path('services/connections/ConnectionsTimeWNativePacketObservation.py').read_text()
+          for phrase in ('SO_PEERPIDFD','SO_PEERCRED','SCM_CREDENTIALS',
+                         '"productionAuthority": False',
+                         '"nativeGeometryAllowed": False',
+                         'PROTECTED_SWAYPX_SOURCE_AND_C5_NOT_ENROLLED'):
+              assert phrase in code,phrase
+          new=Path('tests/connections/test_connections_c3e_timew_native_external_sender.py').read_text()
+          for phrase in ('os.fork()', 'listener.accept()', 'SOCK_SEQPACKET',
+                         'SCM_RIGHTS', 'PACKET_TRUNCATED_OVERSIZED_OR_EMPTY',
+                         'KERNEL_PEER_OBSERVATION_UNAVAILABLE'):
+              assert phrase in new,phrase
+          PY
+      - name: Real independent producer + existing original peer tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CI" = true
+          test "$GITHUB_ACTIONS" = true
+          python3 -B -I -m unittest discover \
+            -s tests/connections \
+            -p 'test_connections_c3e_timew_native_*.py' -v
+          echo 'C3E_TIMEW_HOLD // KERNEL_PROCESS_NOT_COMPOSITOR_SELECTION_OR_C5'

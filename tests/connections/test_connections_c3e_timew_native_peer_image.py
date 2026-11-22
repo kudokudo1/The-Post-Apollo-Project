@@ -121,5 +121,77 @@ class RealOriginalPeerImageTests(unittest.TestCase):
             P._read_proc(os.getpid(), "status", maximum=4)
 
 
+    def test_10_expired_proc_budget_refuses_before_reading(self):
+        with patch.object(P.time, "monotonic_ns", return_value=100):
+            with self.assertRaisesRegex(
+                    P.PeerImageHold, "OBSERVATION_DEADLINE_EXPIRED"):
+                P._read_proc(os.getpid(), "status", deadline_ns=100)
+
+    def test_11_executable_read_exceeding_budget_closes_fd(self):
+        # Real Linux exe descriptor, but a deterministic simulated slow read.
+        clock = [0]
+        original_read = os.read
+        before = len(os.listdir("/proc/self/fd"))
+
+        def slow_read(fd, length):
+            result = original_read(fd, length)
+            clock[0] = 101  # Deadline crossed *while* read returned data.
+            return result
+
+        with (patch.object(P.time, "monotonic_ns",
+                           side_effect=lambda: clock[0]),
+              patch.object(P.os, "read", side_effect=slow_read)):
+            with self.assertRaisesRegex(
+                    P.PeerImageHold, "OBSERVATION_DEADLINE_EXPIRED"):
+                P._image(os.getpid(), deadline_ns=100)
+        self.assertEqual(len(os.listdir("/proc/self/fd")), before)
+
+    def test_12_full_observation_refuses_when_budget_expires_mid_snapshot(self):
+        clock = [0]
+        real_image = P._image
+
+        def complete_image_then_advance(pid, *, deadline_ns):
+            result = real_image(pid, deadline_ns=deadline_ns)
+            clock[0] = 101
+            return result
+
+        with E.independent_linux_packet_sender(stay_alive=True) as (reader, _):
+            before = len(os.listdir("/proc/self/fd"))
+            with (patch.object(P, "MAX_OBSERVATION_NS", 100),
+                  patch.object(P.time, "monotonic_ns",
+                               side_effect=lambda: clock[0]),
+                  patch.object(P, "_image", side_effect=complete_image_then_advance)):
+                with self.assertRaisesRegex(
+                        P.PeerImageHold, "OBSERVATION_DEADLINE_EXPIRED"):
+                    P.observe_untrusted_peer_process_image(reader)
+            # The original socket remains open, and the received pidfd is
+            # disposed even after a timeout in the second process read.
+            self.assertEqual(len(os.listdir("/proc/self/fd")), before)
+
+    def test_13_expiry_after_first_socket_probe_holds_without_authority(self):
+        calls = [0]
+        def advancing_clock():
+            calls[0] += 1
+            return 0 if calls[0] == 1 else 101
+
+        with E.independent_linux_packet_sender(stay_alive=True) as (reader, _):
+            before = len(os.listdir("/proc/self/fd"))
+            with (patch.object(P, "MAX_OBSERVATION_NS", 100),
+                  patch.object(P.time, "monotonic_ns",
+                               side_effect=advancing_clock)):
+                with self.assertRaisesRegex(
+                        P.PeerImageHold, "OBSERVATION_DEADLINE_EXPIRED"):
+                    P.observe_untrusted_peer_process_image(reader)
+            self.assertEqual(len(os.listdir("/proc/self/fd")), before)
+
+    def test_14_no_timeout_can_be_promoted_by_untrusted_peer_data(self):
+        a, b = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+        self.addCleanup(a.close)
+        self.addCleanup(b.close)
+        b.send(b'{"deadline":"infinite","productionAuthority":true}')
+        with self.assertRaisesRegex(P.PeerImageHold,
+                                    "BOUNDED_CONNECTED_UNIX_SEQPACKET_REQUIRED"):
+            P.observe_untrusted_peer_process_image(a)
+
 if __name__ == "__main__":
     unittest.main()

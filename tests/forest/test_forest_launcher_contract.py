@@ -171,7 +171,7 @@ class ForestLauncherContract(unittest.TestCase):
         # sampled interior halo while retaining the perimeter glow.
         self.assertIn('property string voiceGlyph: "🗣︎"', voice)
         self.assertNotIn("voiceGlyph:", view)
-        forest_voice = view.split("VoiceToTextButton {", 1)[1].split("\\n                }", 1)[0]
+        forest_voice = view.split("VoiceToTextButton {", 1)[1].split("\n                }", 1)[0]
         self.assertIn("glyphGlowEnabled: false", forest_voice)
         self.assertIn("id: forestAskSendButton", view)
         self.assertIn("id: modelPickerButton", view)

@@ -24,6 +24,12 @@ Item {
         armedPreferenceReset=false;
     }
     onReserveMarginPercentChanged: armedPreferenceReset=false
+    onActiveChanged: {
+        if(!active) {
+            reserveMarginPercent=100;
+            armedPreferenceReset=false;
+        }
+    }
     readonly property bool preferenceReady: reservePreferenceStore.state==="ready"
     readonly property bool preferenceDirty: preferenceReady
         && reserveMarginPercent!==reservePreferenceStore.marginPercent
@@ -34,6 +40,10 @@ Item {
         onPreferenceLoaded: timeline.reserveMarginPercent=reservePreferenceStore.marginPercent
         onPreferenceSaved: timeline.reserveMarginPercent=reservePreferenceStore.marginPercent
         onPreferenceReset: timeline.reserveMarginPercent=reservePreferenceStore.marginPercent
+        onPreferenceUnavailable: {
+            timeline.reserveMarginPercent=100;
+            timeline.armedPreferenceReset=false;
+        }
     }
     signal horizonRequested(int months)
     readonly property var coverage: active && schedulesReady
@@ -253,6 +263,7 @@ Item {
                 accentColor: Colors.cyan
                 onLeftClicked: {
                     timeline.armedPreferenceReset=false;
+                    timeline.reserveMarginPercent=100;
                     reservePreferenceStore.refresh();
                 }
             }

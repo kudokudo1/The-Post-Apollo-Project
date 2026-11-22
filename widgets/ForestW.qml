@@ -454,7 +454,9 @@ PanelWindow {
                 color: Colors.black
                 border.width: 1
                 border.color: Colors.magenta
-                clip: true
+                // The ListView clips its own content. Keep this outer popup
+                // unclipped so the shared red CloseButton halos remain intact.
+                clip: false
 
                 Item {
                     id: popupHeader
@@ -824,7 +826,7 @@ PanelWindow {
                         GohuText {
                             id: pickerFlower
                             anchors.centerIn: parent
-                            text: "❦︎"
+                            text: "❦︎๋࣭"
                             textFormat: Text.PlainText
                             font.pixelSize: 21
                             color: Colors.green
@@ -833,7 +835,7 @@ PanelWindow {
                             id: pickerRightStars
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
-                            text: "๋࣭⭑"
+                            text: "⭑"
                             textFormat: Text.PlainText
                             font.pixelSize: 13
                             color: Colors.white

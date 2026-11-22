@@ -1501,17 +1501,27 @@ PanelWindow {
                 && financeWindow.chassisLevel === "fullscreen")
             || (weatherStationWindow.menuOpen
                 && weatherStationWindow.chassisLevel === "fullscreen")
-        visible: !fullscreenWidgetActive
+        // Retain the permanently mapped, transparent layer-shell window:
+        // toggling PanelWindow.visible would recreate the surface during
+        // frequent resize transitions. Hide only its painted child and
+        // collapse its input mask while a full-size widget owns the output.
+        visible: true
 
         // Match the existing bottom utility button clearance: a 50px tray
         // centered in 70px ends 20px above the physical output bottom.
         Tray {
             id: bottomCenteredTray
             anchors.centerIn: parent
+            visible: !bottomCenterTrayWindow.fullscreenWidgetActive
         }
 
         mask: Region {
-            item: bottomCenteredTray
+            x: bottomCenteredTray.x
+            y: bottomCenteredTray.y
+            width: bottomCenterTrayWindow.fullscreenWidgetActive
+                   ? 0 : bottomCenteredTray.width
+            height: bottomCenterTrayWindow.fullscreenWidgetActive
+                    ? 0 : bottomCenteredTray.height
         }
     }
 

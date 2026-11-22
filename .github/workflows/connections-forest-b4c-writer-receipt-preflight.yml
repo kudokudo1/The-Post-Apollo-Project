@@ -1,0 +1,84 @@
+name: Connections Forest B4c writer terminal receipt preflight (NO AUTHORITY)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/forest/ForestC5TerminalReceiptPreflight.py'
+      - 'tests/connections/test_connections_forest_c5_terminal_receipt_preflight.py'
+      - 'docs/connections-forest-b4c-writer-terminal-receipt-preflight.md'
+      - '.github/workflows/connections-forest-b4c-writer-receipt-preflight.yml'
+      - 'services/connections/forest/ForestC5SignedEvidencePreflight.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-writer-receipt-no-settlement:
+    name: Terminal writer signature consistency only, no real C5 or SQLite settlement
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin disposable signature test dependency
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Static no signer/no state mutation gate and Python compilation
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/forest/ForestC5TerminalReceiptPreflight.py \
+            tests/connections/test_connections_forest_c5_terminal_receipt_preflight.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('services/connections/forest/ForestC5TerminalReceiptPreflight.py').read_text()
+          for required in (
+              'Ed25519PublicKey', 'RECEIPT_NO_AUTHORITY',
+              '"terminalOutcomeAuthenticated": False',
+              '"c5RevocationFenceSettled": False',
+              '"writerJournalDurabilityVerified": False',
+              '"productionAuthority": False',
+              '"safeActions": []',
+              '"claimedTerminalOutcomeUntrusted"',
+              'now_ms=original["issuedAtMs"]',
+          ):
+              assert required in source, required
+          for forbidden in (
+              'Ed25519PrivateKey', 'subprocess.run(',
+              'sqlite3.connect(', 'socket.bind(', 'socket.connect(',
+              'os.open(', '"productionAuthority": True',
+              '"terminalOutcomeAuthenticated": True',
+              '"c5RevocationFenceSettled": True',
+          ):
+              assert forbidden not in source, forbidden
+          for path in (
+              'scripts/forest/host_admission_b4a.py',
+              'scripts/forest/turn_bridge_b3.py',
+          ):
+              assert 'ForestC5TerminalReceiptPreflight' not in Path(path).read_text()
+          print('FOREST_C5_RECEIPT_PREFLIGHT // NO_ENROLLED_ROOT_OR_AUTHORITATIVE_SETTLEMENT')
+          PY
+      - name: Sixteen terminal receipt adversarial and recovery tests
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_terminal_receipt_preflight.py' -v
+      - name: Preserve original B4c signatures, interop, two-store and B4b
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_signed_role_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_b4c_contract_interop.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_b4c_fence_reference.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_host_precommit_b4b.py' -v
+          echo 'FOREST_C5_RECEIPT_SOURCE_ONLY // NO_C5_FENCE_OR_PRIVATE_DB_WRITE'

@@ -208,9 +208,10 @@ function snapshot(state) {
             creditsCents:ins,transactionCount:activity.length,
             recent:activity.slice(-12).reverse()});
     }
+    // Each account is bounded separately; the aggregate may legitimately
+    // exceed the per-account ceiling when several accounts are listed.
     if(!Number.isSafeInteger(total)||!Number.isSafeInteger(debits)
-       ||!Number.isSafeInteger(credits)||Math.abs(total)>MAX_CENTS
-       ||debits>MAX_CENTS||credits>MAX_CENTS)
+       ||!Number.isSafeInteger(credits))
         return resultError("SESSION AMOUNT LIMIT REACHED");
     return {ok:true,mode:state.mode,accounts:rows,accountCount:rows.length,
         transactionCount:state.entries.length,knownBalanceCount:known,

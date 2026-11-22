@@ -187,7 +187,9 @@ Item {
             GohuText {
                 width: parent.width
                 text: manager.review.combinedBalanceCents!==null
-                    ? "COMBINED MANUAL ESTIMATE // "+Accounts.money(manager.review.combinedBalanceCents)
+                    ? (manager.session.mode==="demo"
+                        ? "FICTIONAL COMBINED TOTAL // ":"COMBINED MANUAL ESTIMATE // ")
+                        +Accounts.money(manager.review.combinedBalanceCents)
                     : manager.review.accountCount===0
                       ? "NO MANUAL BALANCES ADDED"
                       : "PARTIAL KNOWN TOTAL // "+Accounts.money(manager.review.knownBalanceSubtotalCents)

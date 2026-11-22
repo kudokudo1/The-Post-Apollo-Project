@@ -1701,71 +1701,22 @@ Rectangle {
                 }
             }
 
-            Rectangle {
+            VoiceToTextButton {
                 id: micButton
-
-                readonly property bool voiceSelected: root.speechInputService.busy
-
                 width: 42
                 height: composer.height
-                color: micButton.voiceSelected ? Colors.yellow : Colors.dark
-                border.width: micButton.voiceSelected || micMouse.containsMouse ? 2 : 1
-                border.color: micButton.voiceSelected ? Colors.magenta
-                    : micMouse.containsMouse ? Colors.orange : Colors.omnitrix
-
-                RectangularShadow {
-                    anchors.fill: parent
-                    spread: 4
-                    z: -1
-                    opacity: micButton.voiceSelected ? 0.55
-                        : micMouse.containsMouse ? 0.48 : 0.34
-                    color: micButton.voiceSelected ? Colors.magenta
-                        : micMouse.containsMouse ? Colors.orange : Colors.omnitrix
-                }
-
-                opacity: micButton.voiceSelected || root.speechInputService.backendReady
-                    ? 1.0 : 0.48
-
-                GohuText {
-                    anchors.centerIn: parent
-                    anchors.verticalCenterOffset: 1
-                    text: "🗣︎"
-                    font.pixelSize: 22
-                    color: micButton.voiceSelected ? Colors.magenta
-                        : micMouse.containsMouse ? Colors.orange : Colors.omnitrix
-
-                    layer.enabled: true
-                    layer.effect: DropShadow {
-                        radius: 7
-                        samples: 9
-                        opacity: 0.54
-                        color: micButton.voiceSelected ? Colors.magenta
-                            : micMouse.containsMouse ? Colors.orange : Colors.omnitrix
-                        transparentBorder: true
-                    }
-                }
-
-                MouseArea {
-                    id: micMouse
-
-                    anchors.fill: parent
-                    enabled:
-                        !root.speechInputService.stopping
-                        && !root.speechInputService.transcribing
-                    hoverEnabled: true
-                    cursorShape:
-                        enabled
-                        ? Qt.PointingHandCursor
-                        : Qt.ArrowCursor
-
-                    onClicked: {
-                        receptionInput.forceActiveFocus();
-
-                        if (root.speechInputService.recording)
-                            root.speechInputService.stopRecording(false);
-                        else
-                            root.speechInputService.startRecording();
-                    }
+                backendReady: root.speechInputService.backendReady
+                busy: root.speechInputService.busy
+                processing: root.speechInputService.stopping
+                    || root.speechInputService.transcribing
+                glyphGlowEnabled: true
+            
+                onToggleRequested: {
+                    receptionInput.forceActiveFocus();
+                    if (root.speechInputService.recording)
+                        root.speechInputService.stopRecording(false);
+                    else
+                        root.speechInputService.startRecording();
                 }
             }
 
@@ -1824,90 +1775,31 @@ Rectangle {
                 }
             }
 
-            Rectangle {
+            AskSendButton {
                 id: sendButton
-
-                readonly property bool enabledAction:
-                    root.speechInputService.recording
-                    || (
-                        !root.speechInputService.stopping
+                enabledAction: root.speechInputService.recording
+                    || (!root.speechInputService.stopping
                         && !root.speechInputService.transcribing
-                        && receptionInput.text.trim().length > 0
-                       )
-
+                        && receptionInput.text.trim().length > 0)
+                recording: root.speechInputService.recording
+                processing: root.speechInputService.stopping
+                    || root.speechInputService.transcribing
+                idleAccent: Colors.green
+                recordingAccent: Colors.magenta
+                restingGlowOpacity: 0.30
+                askLabel: "ASK"
+                sendLabel: "SEND"
+                allowSecondaryAction: false
                 width: 86
                 height: composer.height
-                color:
-                    sendMouse.pressed
-                    ? Colors.black
-                    : Colors.dark
-                border.width:
-                    sendMouse.containsMouse
-                    ? 2 : 1
-                border.color:
-                    root.speechInputService.recording
-                    ? Colors.magenta
-                    : sendMouse.containsMouse
-                    ? Colors.orange
-                    : Colors.green
-
-                RectangularShadow {
-                    anchors.fill: parent
-                    spread: 4
-                    z: -1
-                    opacity:
-                        sendMouse.containsMouse
-                        ? 0.48
-                        : sendButton.enabledAction
-                        ? 0.30 : 0.12
-                    color:
-                        root.speechInputService.recording
-                        ? Colors.magenta
-                        : sendMouse.containsMouse
-                        ? Colors.orange
-                        : Colors.green
-                }
-
-                GohuText {
-                    anchors.centerIn: parent
-                    text:
-                        root.speechInputService.recording
-                        ? "SEND"
-                        : root.speechInputService.stopping
-                          || root.speechInputService.transcribing
-                        ? "..."
-                        : "ASK"
-                    font.pixelSize: 11
-                    opacity: sendButton.enabledAction ? 1.0 : 0.34
-                    color:
-                        root.speechInputService.recording
-                        ? Colors.magenta
-                        : sendMouse.containsMouse
-                        ? Colors.orange
-                        : Colors.green
-                }
-
-                MouseArea {
-                    id: sendMouse
-
-                    anchors.fill: parent
-                    enabled: sendButton.enabledAction
-                    hoverEnabled: true
-                    cursorShape:
-                        enabled
-                        ? Qt.PointingHandCursor
-                        : Qt.ArrowCursor
-
-                    onClicked: {
-                        receptionInput.forceActiveFocus();
-
-                        if (root.speechInputService.recording) {
-                            root.speechInputService.stopRecording(true);
-                            return;
-                        }
-
-                        root.submitReceptionInput();
+            
+                onPrimaryRequested: {
+                    receptionInput.forceActiveFocus();
+                    if (root.speechInputService.recording) {
+                        root.speechInputService.stopRecording(true);
+                        return;
                     }
+                    root.submitReceptionInput();
                 }
             }
         }

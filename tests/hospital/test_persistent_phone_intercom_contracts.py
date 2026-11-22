@@ -76,10 +76,31 @@ require(
     "LEFT ATTACH ROOM DOCTOR // RIGHT FRESH TERMINAL",
     "Phone semantics help",
 )
+# The UI now binds explicit secondary action on the shared ASK/SEND
+# component. Verify both its button's right-click input and the Intercom
+# owner's distinct fresh-terminal dispatch path.
+ASK_SEND_CONTROL = (
+    ROOT / "components/AskSendButton.qml"
+).read_text(encoding="utf-8")
+require(
+    ASK_SEND_CONTROL,
+    "Qt.LeftButton | Qt.RightButton",
+    "Reusable ASK/SEND exposes right-click only when enabled",
+)
 require(
     INTERCOM_VIEW,
-    "Qt.LeftButton | Qt.RightButton",
-    "Intercom explicit fresh gesture",
+    "allowSecondaryAction: true",
+    "Intercom explicitly enables fresh secondary gesture",
+)
+require(
+    INTERCOM_VIEW,
+    "onSecondaryRequested: root.sendCurrent(true)",
+    "Intercom secondary gesture retains fresh-terminal routing",
+)
+require(
+    INTERCOM_VIEW,
+    "onPrimaryRequested: root.sendCurrentVoiceAware()",
+    "Intercom primary gesture retains ordinary dispatch",
 )
 
 for needle, label in (

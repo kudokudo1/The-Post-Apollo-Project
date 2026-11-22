@@ -702,11 +702,8 @@ Rectangle {
         }
     }
 
-    Rectangle {
+    VoiceToTextButton {
         id: micButton
-
-        readonly property bool voiceSelected: root.speechInputService.busy
-
         anchors {
             right: voiceCancelButton.left
             top: transcriptFrame.bottom
@@ -714,57 +711,20 @@ Rectangle {
             rightMargin: 6
             topMargin: 8
         }
-
         width: 42
         height: 42
-        color: micButton.voiceSelected ? Colors.yellow : Colors.dark
-        border.width: micButton.voiceSelected || micMouse.containsMouse ? 2 : 1
-        border.color: micButton.voiceSelected ? Colors.magenta
-            : micMouse.containsMouse ? Colors.orange : Colors.omnitrix
-
-        RectangularShadow {
-            anchors.fill: parent
-            spread: 4
-            z: -1
-            opacity: micButton.voiceSelected ? 0.55
-                : micMouse.containsMouse ? 0.48 : 0.34
-            color: micButton.voiceSelected ? Colors.magenta
-                : micMouse.containsMouse ? Colors.orange : Colors.omnitrix
-        }
-
-        opacity: micButton.voiceSelected || root.speechInputService.backendReady
-            ? 1.0 : 0.48
-
-        GohuText {
-            anchors.centerIn: parent
-            anchors.verticalCenterOffset: 1
-            text: "🗣︎"
-            font.pixelSize: 22
-            color: micButton.voiceSelected ? Colors.magenta
-                : micMouse.containsMouse ? Colors.orange : Colors.omnitrix
-        }
-
-        MouseArea {
-            id: micMouse
-
-            anchors.fill: parent
-            enabled:
-                !root.speechInputService.stopping
-                && !root.speechInputService.transcribing
-            hoverEnabled: true
-            cursorShape:
-                enabled
-                ? Qt.PointingHandCursor
-                : Qt.ArrowCursor
-
-            onClicked: {
-                messageInput.forceActiveFocus();
-
-                if (root.speechInputService.recording)
-                    root.speechInputService.stopRecording(false);
-                else
-                    root.speechInputService.startRecording();
-            }
+        backendReady: root.speechInputService.backendReady
+        busy: root.speechInputService.busy
+        processing: root.speechInputService.stopping
+            || root.speechInputService.transcribing
+        glyphGlowEnabled: false
+    
+        onToggleRequested: {
+            messageInput.forceActiveFocus();
+            if (root.speechInputService.recording)
+                root.speechInputService.stopRecording(false);
+            else
+                root.speechInputService.startRecording();
         }
     }
 
@@ -827,99 +787,34 @@ Rectangle {
         }
     }
 
-    Rectangle {
+    AskSendButton {
         id: sendButton
-
-        readonly property bool enabledAction:
-            root.selectedSpecialist
+        enabledAction: !!root.selectedSpecialist
             && String(root.selectedSpecialist.presence || "") === "READY"
-            && (
-                root.speechInputService.recording
-                || (
-                    !root.speechInputService.stopping
+            && (root.speechInputService.recording
+                || (!root.speechInputService.stopping
                     && !root.speechInputService.transcribing
-                    && messageInput.text.trim().length > 0
-                   )
-               )
-
+                    && messageInput.text.trim().length > 0))
+        recording: root.speechInputService.recording
+        processing: root.speechInputService.stopping
+            || root.speechInputService.transcribing
+        idleAccent: Colors.green
+        recordingAccent: Colors.omnitrix
+        restingGlowOpacity: 0.28
+        askLabel: "SEND"
+        sendLabel: "SEND"
+        allowSecondaryAction: true
         anchors {
             right: parent.right
             top: transcriptFrame.bottom
             rightMargin: 8
             topMargin: 8
         }
-
         width: 86
         height: 42
-        color:
-            sendMouse.pressed
-            ? Colors.black
-            : Colors.dark
-        border.width:
-            sendMouse.containsMouse ? 2 : 1
-        border.color:
-            root.speechInputService.recording
-            ? Colors.omnitrix
-            : sendMouse.containsMouse
-            ? Colors.orange
-            : Colors.green
-
-        RectangularShadow {
-            anchors.fill: parent
-            spread: 4
-            z: -1
-            opacity:
-                sendMouse.containsMouse
-                ? 0.48
-                : sendButton.enabledAction
-                ? 0.28 : 0.12
-            color:
-                root.speechInputService.recording
-                ? Colors.omnitrix
-                : sendMouse.containsMouse
-                ? Colors.orange
-                : Colors.green
-        }
-
-        GohuText {
-            anchors.centerIn: parent
-            text:
-                root.speechInputService.stopping
-                  || root.speechInputService.transcribing
-                ? "..."
-                : "SEND"
-            font.pixelSize: 11
-            opacity: sendButton.enabledAction ? 1.0 : 0.34
-            color:
-                root.speechInputService.recording
-                ? Colors.omnitrix
-                : sendMouse.containsMouse
-                ? Colors.orange
-                : Colors.green
-        }
-
-        MouseArea {
-            id: sendMouse
-
-            anchors.fill: parent
-            enabled: sendButton.enabledAction
-            hoverEnabled: true
-            acceptedButtons:
-                Qt.LeftButton | Qt.RightButton
-            cursorShape:
-                enabled
-                ? Qt.PointingHandCursor
-                : Qt.ArrowCursor
-
-            onClicked: function(mouse) {
-                if (mouse.button === Qt.RightButton) {
-                    root.sendCurrent(true);
-                    return;
-                }
-
-                root.sendCurrentVoiceAware();
-            }
-        }
+    
+        onPrimaryRequested: root.sendCurrentVoiceAware()
+        onSecondaryRequested: root.sendCurrent(true)
     }
 
     GohuText {

@@ -227,11 +227,11 @@ class ForestC5WriterTerminalReceiptTests(unittest.TestCase):
         original = self.intentwire
         self.intentwire = S.canonical_bytes(
             SAMPLES.sample_intent(phase="PREPARE_GENERATE"))
-        with self.assertRaises(S.EvidenceHold):
+        with self.assertRaises(R.ReceiptHold):
             self.check()
         self.intentwire = S.canonical_bytes(
             SAMPLES.sample_intent(model="bad model"))
-        with self.assertRaises(S.EvidenceHold):
+        with self.assertRaises(R.ReceiptHold):
             self.check()
         self.intentwire = original
 

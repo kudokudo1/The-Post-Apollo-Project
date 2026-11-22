@@ -405,6 +405,7 @@ PanelWindow {
                         font.pixelSize: 10
                         color: localInventory.scanning ? Colors.orange : Colors.cyan
                     }
+                    Accessible.name: "Scan local Ollama models, read-only"
                     MouseArea {
                         anchors.fill: parent
                         enabled: !localInventory.scanning
@@ -445,6 +446,7 @@ PanelWindow {
                         font.pixelSize: 9
                         color: Colors.magenta
                     }
+                    Accessible.name: "Select next inventoried local model"
                     MouseArea {
                         anchors.fill: parent
                         enabled: localInventory.modelCount > 1
@@ -453,37 +455,55 @@ PanelWindow {
                     }
                 }
             }
-            Column {
-                x: (parent.width - width) / 2
-                y: Math.max(modelStrip.y + modelStrip.height + 18,
-                            (parent.height - height) / 2)
-                width: Math.max(120, parent.width - 30)
-                spacing: 8
-                GohuText {
-                    width: parent.width
-                    text: "NO ACTIVE SESSION"
-                    color: Colors.white
-                    font.pixelSize: 15
-                    horizontalAlignment: Text.AlignHCenter
-                }
-                GohuText {
-                    width: parent.width
-                    text: "OLLAMA / HERMES ADAPTER NOT CONNECTED"
-                    color: Colors.orange
-                    font.pixelSize: 10
-                    wrapMode: Text.WordWrap
-                    horizontalAlignment: Text.AlignHCenter
-                }
-                GohuText {
-                    width: parent.width
-                    text: "B1 / B2 / B3 READY AS CONTRACTS // TRUSTED HOST NOT CONNECTED"
-                    color: Colors.cyan
-                    font.pixelSize: 10
-                    wrapMode: Text.WordWrap
-                    horizontalAlignment: Text.AlignHCenter
+            // Keep this panel strictly between model inventory and send gate.
+            // The previous free-positioned Column could overlap the gate on
+            // compact 340px chassis stages when wrapped text grew taller.
+            Item {
+                id: sessionPreview
+                anchors.top: modelStrip.bottom
+                anchors.topMargin: 8
+                anchors.bottom: sendGate.top
+                anchors.bottomMargin: 6
+                anchors.left: parent.left
+                anchors.right: parent.right
+                clip: true
+
+                Column {
+                    anchors.centerIn: parent
+                    width: Math.max(120, parent.width - 30)
+                    spacing: root.chassisLevel >= 2 ? 8 : 4
+                    GohuText {
+                        width: parent.width
+                        text: "NO ACTIVE SESSION"
+                        color: Colors.white
+                        font.pixelSize: 15
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: localInventory.status === "REACHABLE"
+                            ? "MODEL LIST READY // CHAT HOST NOT CONNECTED"
+                            : "OLLAMA / HERMES ADAPTER NOT CONNECTED"
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                    GohuText {
+                        // Keep explanatory detail in taller stages. This does
+                        // not hide any active chat or personal conversation.
+                        visible: root.chassisLevel >= 2
+                        width: parent.width
+                        text: "B1 / B2 / B3 READY AS CONTRACTS // TRUSTED HOST NOT CONNECTED"
+                        color: Colors.cyan
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                    }
                 }
             }
             Rectangle {
+                id: sendGate
                 anchors.left: parent.left
                 anchors.leftMargin: 12
                 anchors.right: parent.right
@@ -497,9 +517,14 @@ PanelWindow {
                 opacity: 0.65
                 GohuText {
                     anchors.centerIn: parent
-                    text: "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
+                    width: parent.width - 12
+                    text: root.chassisLevel < 2
+                        ? "SEND LOCKED // HOST NOT CONNECTED"
+                        : "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
                     color: Colors.white
                     font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
                 }
             }
         }

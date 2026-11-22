@@ -41,6 +41,12 @@ Rectangle {
     property int labelElide: Text.ElideRight
     property int contentPadding: 8
 
+    // Optional optical alignment for single-glyph descendants. Zero leaves
+    // every existing ActionButton label centered by its text layout box.
+    property real labelCenterOffsetX: 0
+    property real labelCenterOffsetY: 0
+    property alias labelItem: labelText
+
     // Base identity. These defaults are AppControl-derived starting points,
     // not a claim that every migrated button should be normalized to them.
     property color accentColor: Colors.cyan
@@ -364,6 +370,8 @@ Rectangle {
                 id: labelText
 
                 anchors.centerIn: parent
+                anchors.horizontalCenterOffset: actionButton.labelCenterOffsetX
+                anchors.verticalCenterOffset: actionButton.labelCenterOffsetY
                 width: Math.max(0, parent.width - actionButton.contentPadding)
 
                 visible: actionButton.showLabel

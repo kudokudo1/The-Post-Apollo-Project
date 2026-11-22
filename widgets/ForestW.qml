@@ -13,18 +13,75 @@ PanelWindow {
     property real dockCenterX: 0
     property int chassisLevel: 0
     property int selectedTreeIndex: 0
-    property int selectedModelIndex: 0
-    readonly property string selectedLocalModel:
-        localInventory.modelCount > 0
-        ? localInventory.models[Math.min(selectedModelIndex, localInventory.modelCount - 1)].name
-        : ""
-    function cycleLocalModel() {
-        if (localInventory.modelCount > 1)
-            selectedModelIndex = (selectedModelIndex + 1) % localInventory.modelCount;
+    // One explicit model choice per Tree. Inventory refreshes never silently
+    // switch either Tree to the first returned model.
+    property var selectedTreeModels: ["", ""]
+    property bool modelPopupOpen: false
+    property string pendingModelScan: ""
+    property string lastScannedModel: ""
+    property string lastModelScanResult: ""
+    readonly property string selectedLocalModel: {
+        const desired = String(selectedTreeModels[selectedTreeIndex] || "");
+        if (!desired || localInventory.status !== "REACHABLE")
+            return "";
+        for (let i = 0; i < localInventory.models.length; i++) {
+            if (localInventory.models[i].name === desired)
+                return desired;
+        }
+        return "";
+    }
+
+    function chooseLocalModel(name) {
+        if (localInventory.status !== "REACHABLE" || localInventory.scanning)
+            return false;
+        for (let i = 0; i < localInventory.models.length; i++) {
+            if (localInventory.models[i].name === name) {
+                const choices = selectedTreeModels.slice();
+                choices[selectedTreeIndex] = name;
+                selectedTreeModels = choices;
+                return true;
+            }
+        }
+        return false;
+    }
+    function scanModel(name) {
+        if (!menuOpen || !modelPopupOpen || !name || localInventory.scanning)
+            return false;
+        if (!localInventory.scanModels())
+            return false;
+        pendingModelScan = name;
+        lastScannedModel = "";
+        lastModelScanResult = "";
+        return true;
+    }
+    onSelectedTreeIndexChanged: modelPopupOpen = false
+    onMenuOpenChanged: {
+        if (!menuOpen)
+            modelPopupOpen = false;
     }
     ForestInventoryAdapter {
         id: localInventory
-        onModelsChanged: root.selectedModelIndex = 0
+        // A row SCAN is a B0 inventory refresh, NOT a probe of inference,
+        // running status, resource readiness or permissions.
+        onScanningChanged: {
+            if (scanning || !root.pendingModelScan)
+                return;
+            const requested = root.pendingModelScan;
+            let found = false;
+            if (status === "REACHABLE") {
+                for (let i = 0; i < models.length; i++) {
+                    if (models[i].name === requested) {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            root.lastScannedModel = requested;
+            root.lastModelScanResult = status === "REACHABLE"
+                ? (found ? "DISCOVERED" : "NOT FOUND")
+                : "NOT CONNECTED";
+            root.pendingModelScan = "";
+        }
     }
     // Tree identities remain model-independent; outline icons are local SVG
     // assets in Post-Apollo's fixed palette, not emoji font fallbacks.
@@ -98,7 +155,10 @@ PanelWindow {
         glowColor: Colors.magenta
         glowVisible: root.menuOpen
         Keys.onEscapePressed: function(event) {
-            root.menuOpen = false;
+            if (root.modelPopupOpen)
+                root.modelPopupOpen = false;
+            else
+                root.menuOpen = false;
             event.accepted = true;
         }
 
@@ -349,6 +409,7 @@ PanelWindow {
                 font.pixelSize: 10
             }
             Rectangle {
+                id: chatDivider
                 anchors.top: chatHeading.bottom
                 anchors.topMargin: 12
                 anchors.left: parent.left
@@ -357,113 +418,305 @@ PanelWindow {
                 color: Colors.cyan
             }
 
-            // Real B0 read-only local inventory; a scan is never automatic.
+            // The prompt-adjacent flower button owns this selector. The popup
+            // stays inside Forest's input mask and never opens another window.
+            MouseArea {
+                id: dismissModelPopup
+                anchors.fill: parent
+                visible: root.modelPopupOpen
+                z: 20
+                onClicked: root.modelPopupOpen = false
+            }
+
             Rectangle {
-                id: modelStrip
-                anchors.top: chatHeading.bottom
-                anchors.topMargin: 20
-                anchors.left: parent.left
-                anchors.leftMargin: 12
-                anchors.right: parent.right
-                anchors.rightMargin: 12
-                height: 58
-                color: Colors.dark
-                border.color: Colors.cyan
+                id: modelPopup
+                visible: root.modelPopupOpen
+                z: 30
+                anchors.right: promptRow.right
+                anchors.bottom: promptRow.top
+                anchors.bottomMargin: 6
+                width: Math.min(390, chatPane.width - 24)
+                // Compact stages retain a scrollable list without covering
+                // the Forest header or escaping the 340px viewport.
+                height: Math.max(120, Math.min(360, promptRow.y - 42))
+                color: Colors.black
                 border.width: 1
+                border.color: Colors.magenta
+                clip: true
+
+                Item {
+                    id: popupHeader
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    height: 33
+
+                    GohuText {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 9
+                        anchors.right: scanAllButton.left
+                        anchors.rightMargin: 4
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "FOREST // MODELS"
+                        color: Colors.magenta
+                        font.pixelSize: 12
+                        elide: Text.ElideRight
+                    }
+
+                    Rectangle {
+                        id: scanAllButton
+                        anchors.right: closeModelPopupButton.left
+                        anchors.rightMargin: 5
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 66
+                        height: 23
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.cyan
+                        Accessible.name: "Scan local Ollama models, read-only"
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: localInventory.scanning ? "..." : "SCAN ALL"
+                            color: Colors.cyan
+                            font.pixelSize: 9
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: !localInventory.scanning
+                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: {
+                                root.lastScannedModel = "";
+                                root.lastModelScanResult = "";
+                                localInventory.scanModels();
+                            }
+                        }
+                    }
+                    Rectangle {
+                        id: closeModelPopupButton
+                        anchors.right: parent.right
+                        anchors.rightMargin: 6
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 22
+                        height: 23
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.magenta
+                        Accessible.name: "Close Forest model selector"
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "×"
+                            color: Colors.magenta
+                            font.pixelSize: 14
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.modelPopupOpen = false
+                        }
+                    }
+                }
 
                 GohuText {
+                    id: popupProviderStatus
+                    anchors.top: popupHeader.bottom
                     anchors.left: parent.left
-                    anchors.leftMargin: 8
-                    anchors.top: parent.top
-                    anchors.topMargin: 8
-                    anchors.right: scanButton.left
-                    anchors.rightMargin: 6
+                    anchors.leftMargin: 9
+                    anchors.right: parent.right
+                    anchors.rightMargin: 9
+                    height: 19
+                    font.pixelSize: 9
                     elide: Text.ElideRight
-                    font.pixelSize: 10
                     color: localInventory.status === "REACHABLE" ? Colors.green : Colors.orange
                     text: localInventory.scanning ? "OLLAMA // SCANNING"
-                         : localInventory.status === "REACHABLE"
-                            ? "OLLAMA // " + localInventory.modelCount + " LOCAL"
-                         : localInventory.status === "NOT_CHECKED"
-                            ? "OLLAMA // NOT CHECKED" : "OLLAMA // UNAVAILABLE"
+                        : localInventory.status === "REACHABLE"
+                            ? "OLLAMA // " + localInventory.modelCount + " DISCOVERED"
+                        : localInventory.status === "NOT_CHECKED"
+                            ? "OLLAMA // NOT CHECKED"
+                        : "OLLAMA // NOT CONNECTED"
                 }
 
-                Rectangle {
-                    id: scanButton
-                    anchors.top: parent.top
-                    anchors.topMargin: 4
+                ListView {
+                    id: modelList
+                    anchors.top: popupProviderStatus.bottom
+                    anchors.topMargin: 2
+                    anchors.bottom: popupFoot.top
+                    anchors.bottomMargin: 3
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
                     anchors.right: parent.right
-                    anchors.rightMargin: 6
-                    width: 55
-                    height: 24
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.cyan
-                    GohuText {
-                        anchors.centerIn: parent
-                        text: localInventory.scanning ? "..." : "SCAN"
-                        font.pixelSize: 10
-                        color: localInventory.scanning ? Colors.orange : Colors.cyan
-                    }
-                    Accessible.name: "Scan local Ollama models, read-only"
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: !localInventory.scanning
-                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: localInventory.scanModels()
+                    anchors.rightMargin: 7
+                    clip: true
+                    spacing: 5
+                    boundsBehavior: Flickable.StopAtBounds
+                    model: localInventory.status === "REACHABLE" ? localInventory.models : []
+                    delegate: Rectangle {
+                        id: modelEntry
+                        property string modelName: String(modelData.name || "")
+                        width: modelList.width
+                        height: 82
+                        color: root.selectedLocalModel === modelName ? Colors.dark : Colors.black
+                        border.width: 1
+                        border.color: root.selectedLocalModel === modelName ? Colors.magenta : Colors.cyan
+
+                        GohuText {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 7
+                            anchors.top: parent.top
+                            anchors.topMargin: 7
+                            anchors.right: selectModelButton.left
+                            anchors.rightMargin: 5
+                            font.pixelSize: 11
+                            font.bold: root.selectedLocalModel === modelEntry.modelName
+                            color: root.selectedLocalModel === modelEntry.modelName ? Colors.magenta : Colors.white
+                            text: modelEntry.modelName
+                            elide: Text.ElideRight
+                        }
+
+                        Rectangle {
+                            id: selectModelButton
+                            anchors.right: scanModelButton.left
+                            anchors.rightMargin: 4
+                            anchors.top: parent.top
+                            anchors.topMargin: 4
+                            width: 46
+                            height: 23
+                            color: root.selectedLocalModel === modelEntry.modelName ? Colors.dark : Colors.black
+                            border.width: 1
+                            border.color: Colors.magenta
+                            Accessible.name: "Select model " + modelEntry.modelName + " for current Tree"
+                            GohuText {
+                                anchors.centerIn: parent
+                                text: root.selectedLocalModel === modelEntry.modelName ? "SET" : "USE"
+                                font.pixelSize: 9
+                                color: Colors.magenta
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.chooseLocalModel(modelEntry.modelName)
+                            }
+                        }
+                        Rectangle {
+                            id: scanModelButton
+                            anchors.right: parent.right
+                            anchors.rightMargin: 5
+                            anchors.top: parent.top
+                            anchors.topMargin: 4
+                            width: 45
+                            height: 23
+                            color: Colors.black
+                            border.width: 1
+                            border.color: Colors.cyan
+                            Accessible.name: "Recheck Ollama inventory for " + modelEntry.modelName
+                            GohuText {
+                                anchors.centerIn: parent
+                                text: "SCAN"
+                                font.pixelSize: 9
+                                color: Colors.cyan
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: !localInventory.scanning
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                onClicked: root.scanModel(modelEntry.modelName)
+                            }
+                        }
+
+                        // Three distinct evidence classes. B0 only establishes
+                        // discovery. Live execution and B4 permission cannot
+                        // be inferred from the installed model list.
+                        Row {
+                            id: modelStatusBar
+                            anchors.left: parent.left
+                            anchors.leftMargin: 7
+                            anchors.right: parent.right
+                            anchors.rightMargin: 7
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 8
+                            height: 22
+                            spacing: 3
+                            Rectangle {
+                                width: (modelStatusBar.width - 6) / 3
+                                height: parent.height
+                                color: Colors.dark
+                                border.width: 1
+                                border.color: Colors.green
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: "FOUND"
+                                    font.pixelSize: 9
+                                    color: Colors.green
+                                }
+                            }
+                            Rectangle {
+                                width: (modelStatusBar.width - 6) / 3
+                                height: parent.height
+                                color: Colors.dark
+                                border.width: 1
+                                border.color: Colors.orange
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: "LIVE ?"
+                                    font.pixelSize: 9
+                                    color: Colors.orange
+                                }
+                            }
+                            Rectangle {
+                                width: (modelStatusBar.width - 6) / 3
+                                height: parent.height
+                                color: Colors.dark
+                                border.width: 1
+                                border.color: Colors.cyan
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: "ACCESS ?"
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                }
+                            }
+                        }
                     }
                 }
 
                 GohuText {
+                    visible: localInventory.modelCount === 0
+                    anchors.centerIn: modelList
+                    width: modelList.width - 12
+                    text: localInventory.scanning ? "SCANNING INVENTORY"
+                        : localInventory.status === "NOT_CHECKED" ? "PRESS SCAN ALL"
+                        : localInventory.status === "REACHABLE" ? "NO MODELS FOUND"
+                        : "OLLAMA NOT CONNECTED"
+                    color: Colors.orange
+                    font.pixelSize: 10
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                }
+
+                GohuText {
+                    id: popupFoot
                     anchors.left: parent.left
                     anchors.leftMargin: 8
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 8
-                    anchors.right: nextModelButton.left
-                    anchors.rightMargin: 6
-                    font.pixelSize: 10
-                    elide: Text.ElideRight
-                    color: root.selectedLocalModel ? Colors.white : Colors.cyan
-                    text: root.selectedLocalModel
-                        ? "MODEL // " + root.selectedLocalModel
-                        : "MODEL // NONE SELECTED"
-                }
-                Rectangle {
-                    id: nextModelButton
                     anchors.right: parent.right
-                    anchors.rightMargin: 6
+                    anchors.rightMargin: 8
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 4
-                    width: 55
-                    height: 23
-                    color: Colors.black
-                    border.width: 1
-                    border.color: localInventory.modelCount > 1 ? Colors.magenta : Colors.cyan
-                    opacity: localInventory.modelCount > 1 ? 1.0 : 0.45
-                    GohuText {
-                        anchors.centerIn: parent
-                        text: "NEXT >"
-                        font.pixelSize: 9
-                        color: Colors.magenta
-                    }
-                    Accessible.name: "Select next inventoried local model"
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: localInventory.modelCount > 1
-                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: root.cycleLocalModel()
-                    }
+                    height: 17
+                    color: root.lastScannedModel ? Colors.cyan : Colors.orange
+                    font.pixelSize: 9
+                    elide: Text.ElideRight
+                    text: root.lastScannedModel
+                        ? "SCAN // " + root.lastScannedModel + " // " + root.lastModelScanResult
+                        : "SCAN = INVENTORY ONLY // LIVE & ACCESS UNVERIFIED"
                 }
             }
-            // Keep this panel strictly between model inventory and send gate.
-            // The previous free-positioned Column could overlap the gate on
-            // compact 340px chassis stages when wrapped text grew taller.
+            // Compact empty-session state remains below the chat heading.
+            // The selector lives in its own overlay and cannot cover the prompt.
             Item {
                 id: sessionPreview
-                anchors.top: modelStrip.bottom
-                anchors.topMargin: 8
-                anchors.bottom: sendGate.top
-                anchors.bottomMargin: 6
+                anchors.top: chatDivider.bottom
+                anchors.topMargin: 12
+                anchors.bottom: promptRow.top
+                anchors.bottomMargin: 8
                 anchors.left: parent.left
                 anchors.right: parent.right
                 clip: true
@@ -502,8 +755,9 @@ PanelWindow {
                     }
                 }
             }
-            Rectangle {
-                id: sendGate
+            Item {
+                id: promptRow
+                z: 40
                 anchors.left: parent.left
                 anchors.leftMargin: 12
                 anchors.right: parent.right
@@ -511,20 +765,68 @@ PanelWindow {
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 13
                 height: 40
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.cyan
-                opacity: 0.65
-                GohuText {
-                    anchors.centerIn: parent
-                    width: parent.width - 12
-                    text: root.chassisLevel < 2
-                        ? "SEND LOCKED // HOST NOT CONNECTED"
-                        : "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
-                    color: Colors.white
-                    font.pixelSize: 9
-                    wrapMode: Text.WordWrap
-                    horizontalAlignment: Text.AlignHCenter
+
+                // Remains a non-editable preview until a trusted host exists.
+                Rectangle {
+                    id: sendGate
+                    anchors.left: parent.left
+                    anchors.right: modelPickerButton.left
+                    anchors.rightMargin: 6
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.cyan
+                    opacity: 0.65
+                    GohuText {
+                        anchors.centerIn: parent
+                        width: parent.width - 12
+                        text: root.chassisLevel < 2
+                            ? "SEND LOCKED // HOST NOT CONNECTED"
+                            : "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
+                        color: Colors.white
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                }
+
+                Rectangle {
+                    id: modelPickerButton
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: 51
+                    color: root.modelPopupOpen ? Colors.yellow : Colors.black
+                    border.width: 1
+                    border.color: Colors.magenta
+                    Accessible.name: "Open Forest model selector"
+
+                    GohuText {
+                        id: modelPickerGlyph
+                        anchors.centerIn: parent
+                        width: parent.width - 4
+                        text: "⊹❦︎๋࣭⭑"
+                        textFormat: Text.PlainText
+                        font.pixelSize: 16
+                        color: Colors.magenta
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                    TextHashGlow {
+                        safeSource: modelPickerGlyph
+                        requestedVisible: root.menuOpen
+                        foregroundColor: Colors.magenta
+                        preferredGlowColor: Colors.magenta
+                        radius: 8
+                        samples: 17
+                        opacity: 0.75
+                        z: -1
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.modelPopupOpen = !root.modelPopupOpen
+                    }
                 }
             }
         }

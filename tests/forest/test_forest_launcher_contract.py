@@ -88,6 +88,7 @@ class ForestLauncherContract(unittest.TestCase):
         view = (ROOT / "widgets/ForestW.qml").read_text()
         self.assertIn('iconPath: "../assets/forest/cherry-outline.svg"', view)
         self.assertIn('iconPath: "../assets/forest/maple-outline.svg"', view)
+        self.assertIn('hoverIconPath: "../assets/forest/maple-hover-orange.svg"', view)
         self.assertIn("source: Qt.resolvedUrl(", view)
         self.assertIn("modelData.hoverIconPath", view)
         self.assertIn("modelData.openIconPath", view)
@@ -129,35 +130,52 @@ class ForestLauncherContract(unittest.TestCase):
         palette = (ROOT / "components/Colors.qml").read_text()
         self.assertIn('#C74EC7', palette)
         self.assertIn('#ED981A', palette)
-        for asset, color, min_paths in (
-            ("cherry-outline.svg", "#DCF3FA", 6),
-            ("maple-outline.svg", "#ED981A", 2),
+        ns = "{http://www.w3.org/2000/svg}"
+        # Only the two idle SVGs have gradients, using the existing palette.
+        # No runtime shader, bitmap, mask or unrelated markup is permitted.
+        for asset, kind, gradient_id, colors, min_paths in (
+            ("cherry-outline.svg", "radialGradient", "cherry-petal-stroke",
+             ("#F29CC5", "#F1B1D3", "#DCF3FA"), 6),
+            ("maple-outline.svg", "linearGradient", "maple-vertical-stroke",
+             ("#D16041", "#DC7940", "#E98D29", "#ED981A"), 2),
         ):
             with self.subTest(icon=asset):
-                filename = ROOT / "assets/forest" / asset
-                svg = ET.parse(filename).getroot()
-                ns = "{http://www.w3.org/2000/svg}"
+                svg = ET.parse(ROOT / "assets/forest" / asset).getroot()
                 self.assertEqual(svg.tag, ns + "svg")
                 self.assertEqual(svg.attrib.get("viewBox"), "0 0 48 48")
                 descendants = list(svg.iter())
-                self.assertTrue(any(el.attrib.get("stroke") == color for el in descendants))
-                self.assertTrue(any(el.attrib.get("fill") == "none" for el in descendants))
+                self.assertTrue(any(el.attrib.get("fill") == "none"
+                                    for el in descendants))
                 self.assertGreaterEqual(
                     sum(el.tag == ns + "path" for el in descendants), min_paths)
-                # No gradients, masks, bitmap/foreign embeds or filled petals.
-                forbidden = {"rect", "image", "foreignObject", "linearGradient",
-                             "radialGradient", "filter", "pattern"}
+                forbidden = {"rect", "image", "foreignObject", "mask",
+                             "filter", "pattern", "script", "style"}
                 for el in descendants:
                     self.assertNotIn(el.tag.removeprefix(ns), forbidden)
-                    self.assertIn(el.attrib.get("fill", "none"), ("none",))
-                    if "stroke" in el.attrib:
-                        self.assertEqual(el.attrib["stroke"], color)
+                    self.assertEqual(el.attrib.get("fill", "none"), "none")
+                gradients = [el for el in descendants
+                             if el.tag in (ns + "linearGradient",
+                                           ns + "radialGradient")]
+                self.assertEqual(len(gradients), 1)
+                gradient = gradients[0]
+                self.assertEqual(gradient.tag, ns + kind)
+                self.assertEqual(gradient.attrib.get("id"), gradient_id)
+                self.assertEqual(gradient.attrib.get("gradientUnits"),
+                                 "userSpaceOnUse")
+                stops = gradient.findall(ns + "stop")
+                self.assertEqual(tuple(el.attrib.get("stop-color")
+                                       for el in stops), colors)
+                self.assertEqual(stops[0].attrib.get("offset"), "0%")
+                self.assertEqual(stops[-1].attrib.get("offset"), "100%")
+                self.assertIn("url(#" + gradient_id + ")",
+                              [el.attrib.get("stroke") for el in descendants])
 
         # Variant SVGs must keep every original outline path intact while
         # carrying the shared orange hover and magenta open palette.
         for original, variant, ink in (
             ("cherry-outline.svg", "cherry-hover-orange.svg", "#ED981A"),
             ("cherry-outline.svg", "cherry-open-magenta.svg", "#C74EC7"),
+            ("maple-outline.svg", "maple-hover-orange.svg", "#ED981A"),
             ("maple-outline.svg", "maple-open-magenta.svg", "#C74EC7"),
         ):
             normal = ET.parse(ROOT / "assets/forest" / original).getroot()
@@ -175,6 +193,8 @@ class ForestLauncherContract(unittest.TestCase):
         cherry = ET.parse(ROOT / "assets/forest/cherry-outline.svg").getroot()
         petals = cherry.find(".//" + ns + "g[@id='sakura-petals']")
         self.assertIsNotNone(petals)
+        self.assertEqual(petals.attrib.get("stroke"),
+                         "url(#cherry-petal-stroke)")
         self.assertEqual(len(petals.findall(ns + "path")), 5)
         self.assertEqual(
             [petal.attrib.get("transform") for petal in petals.findall(ns + "path")],
@@ -182,12 +202,16 @@ class ForestLauncherContract(unittest.TestCase):
         )
         stamens = cherry.find(".//" + ns + "g[@id='sakura-stamens']")
         self.assertIsNotNone(stamens)
+        self.assertEqual(stamens.attrib.get("stroke"), "#F29CC5")
         self.assertGreaterEqual(len(stamens.findall(ns + "circle")), 6)
         maple = ET.parse(ROOT / "assets/forest/maple-outline.svg").getroot()
         contour = maple.find(".//" + ns + "path[@id='maple-contour']")
         veins = maple.find(".//" + ns + "path[@id='maple-veins']")
         self.assertIsNotNone(contour)
         self.assertIsNotNone(veins)
+        maple_group = maple.find(".//" + ns + "g")
+        self.assertEqual(maple_group.attrib.get("stroke"),
+                         "url(#maple-vertical-stroke)")
         self.assertGreaterEqual(contour.attrib["d"].count("C"), 8)
 
     def test_forest_prompt_reuses_voice_and_ask_send_without_permissions(self):

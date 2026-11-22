@@ -114,7 +114,7 @@ PanelWindow {
         {
             name: "MAPLE", role: "FILES & ORGANIZATION",
             iconPath: "../assets/forest/maple-outline.svg",
-            hoverIconPath: "../assets/forest/maple-outline.svg",
+            hoverIconPath: "../assets/forest/maple-hover-orange.svg",
             openIconPath: "../assets/forest/maple-open-magenta.svg"
         }
     ]

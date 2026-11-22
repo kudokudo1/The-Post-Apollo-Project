@@ -4450,9 +4450,9 @@ PanelWindow {
                         readonly property int flexibleRowsHeight:
                             Math.max(0, height - fixedRowsHeight)
                         readonly property int branchMapHeight:
-                            Math.max(160, Math.round(flexibleRowsHeight * 0.67))
+                            Math.max(140, Math.round(flexibleRowsHeight * 0.67))
                         readonly property int outputPanelHeight:
-                            Math.max(88, flexibleRowsHeight - branchMapHeight)
+                            Math.max(70, flexibleRowsHeight - branchMapHeight)
 
                         anchors {
                             fill: parent

@@ -313,7 +313,7 @@ Item {
                 width: parent.width
                 text: stocks.dayMode
                     ? "Choose a calendar day and LOAD DAY. Weekends and market holidays may return NO TRADING SESSION."
-                    : "Choose 7D/30D/90D/180D ending today, or set START/END. Then LOAD RANGE. Only actual trading sessions appear."
+                    : "Select an issuer and START/END dates, or choose 7D/30D/90D/180D ending today. Then LOAD RANGE. Only actual trading sessions appear."
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
                 font.pixelSize: 9

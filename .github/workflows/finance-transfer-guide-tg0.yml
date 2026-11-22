@@ -1,4 +1,4 @@
-name: FinanceW Transfer Guide TG0
+name: FinanceW Banking TG0 + M1
 
 on:
   pull_request:
@@ -6,6 +6,11 @@ on:
       - 'widgets/FinanceTransferGuidePolicy.js'
       - 'widgets/FinanceTransferGuidePane.qml'
       - 'widgets/FinanceAccountsPane.qml'
+      - 'widgets/FinanceW.qml'
+      - 'widgets/FinanceBankingPane.qml'
+      - 'widgets/FinanceBankingImportPolicy.js'
+      - 'tests/finance/test_banking_import_m1.mjs'
+      - 'tests/finance/test_banking_import_m1_contracts.py'
       - 'tests/finance/test_finance_transfer_guide_tg0.mjs'
       - 'tests/finance/test_finance_transfer_guide_tg0_contract.py'
       - '.github/workflows/finance-transfer-guide-tg0.yml'
@@ -14,6 +19,11 @@ on:
       - 'widgets/FinanceTransferGuidePolicy.js'
       - 'widgets/FinanceTransferGuidePane.qml'
       - 'widgets/FinanceAccountsPane.qml'
+      - 'widgets/FinanceW.qml'
+      - 'widgets/FinanceBankingPane.qml'
+      - 'widgets/FinanceBankingImportPolicy.js'
+      - 'tests/finance/test_banking_import_m1.mjs'
+      - 'tests/finance/test_banking_import_m1_contracts.py'
       - 'tests/finance/test_finance_transfer_guide_tg0.mjs'
       - 'tests/finance/test_finance_transfer_guide_tg0_contract.py'
       - '.github/workflows/finance-transfer-guide-tg0.yml'
@@ -31,3 +41,7 @@ jobs:
         run: node tests/finance/test_finance_transfer_guide_tg0.mjs
       - name: Test isolated read-only QML integration
         run: python3 tests/finance/test_finance_transfer_guide_tg0_contract.py
+      - name: Test manual CSV parsing and conservative reconciliation
+        run: node tests/finance/test_banking_import_m1.mjs
+      - name: Test Banking menu, icon and offline boundaries
+        run: python3 tests/finance/test_banking_import_m1_contracts.py

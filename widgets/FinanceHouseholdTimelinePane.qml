@@ -2,6 +2,7 @@ import QtQuick
 import "../components"
 import "FinanceHouseholdTimelinePolicy.js" as Timeline
 import "FinanceHouseholdReservePolicy.js" as Reserves
+import "../services/finance" as FinanceServices
 
 // FP1d: summary-only local timeline, installed inside the existing plans
 // scroll viewport. The parent provides only the selected manual plan rows.
@@ -14,9 +15,26 @@ Item {
     property var sourceRows: []
     property var scheduleRows: []
     property bool schedulesReady: false
-    // This UI choice is in-memory only and resets between households.
+    // The selection is still a preview until the explicit per-context SAVE.
+    // Loading a verified local preference restores it after context reset.
     property int reserveMarginPercent: 100
-    onContextIdChanged: reserveMarginPercent=100
+    property bool armedPreferenceReset: false
+    onContextIdChanged: {
+        reserveMarginPercent=100;
+        armedPreferenceReset=false;
+    }
+    onReserveMarginPercentChanged: armedPreferenceReset=false
+    readonly property bool preferenceReady: reservePreferenceStore.state==="ready"
+    readonly property bool preferenceDirty: preferenceReady
+        && reserveMarginPercent!==reservePreferenceStore.marginPercent
+    FinanceServices.FinanceHouseholdReservePreferenceStore {
+        id: reservePreferenceStore
+        contextId: timeline.contextId
+        monitoring: timeline.active
+        onPreferenceLoaded: timeline.reserveMarginPercent=marginPercent
+        onPreferenceSaved: timeline.reserveMarginPercent=marginPercent
+        onPreferenceReset: timeline.reserveMarginPercent=marginPercent
+    }
     signal horizonRequested(int months)
     readonly property var coverage: active && schedulesReady
         ? Timeline.coverage(sourceRows,scheduleRows) : null
@@ -142,9 +160,14 @@ Item {
             width: parent.width
             visible: timeline.coverage && timeline.coverage.ok
                 && timeline.coverage.cadenceCount>0
-            text: "RESERVE CUSHION // OPTIONAL PLANNING SCENARIO // "
+            text: "RESERVE CUSHION // PLANNING SCENARIO // "
                 +timeline.reserveMarginPercent+"% OF EACH PERIODIC CHARGE TARGET"
-                +" // RESETS WHEN HOUSEHOLD CONTEXT CHANGES; NOT SAVED"
+                +(timeline.preferenceReady
+                    ? timeline.preferenceDirty
+                        ? " // PREVIEW NOT SAVED UNTIL SAVE"
+                        : " // SAVED LOCAL PREFERENCE FOR "+timeline.contextId.toUpperCase()
+                    : " // PREFERENCE UNAVAILABLE: DEFAULT PREVIEW ONLY")
+                +" // SAME LINUX LOGIN; NOT A HOUSEHOLD IDENTITY GRANT"
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText
@@ -170,7 +193,67 @@ Item {
                     labelPixelSize: 9
                     selected: timeline.reserveMarginPercent===modelData.percent
                     accentColor: Colors.magenta
+                    available: timeline.preferenceReady
                     onLeftClicked: timeline.reserveMarginPercent=modelData.percent
+                }
+            }
+        }
+        GohuText {
+            width: parent.width
+            visible: timeline.coverage && timeline.coverage.ok
+                && timeline.coverage.cadenceCount>0
+            text: reservePreferenceStore.message
+                +" // SELECTING A CUSHION IS A PREVIEW UNTIL SAVE"
+            font.pixelSize: 9
+            color: reservePreferenceStore.state==="failed"?Colors.orange:Colors.cyan
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        Flow {
+            id: preferenceActions
+            width: parent.width
+            visible: timeline.coverage && timeline.coverage.ok
+                && timeline.coverage.cadenceCount>0
+            spacing: 5
+            ActionButton {
+                width: Math.max(132,(preferenceActions.width-10)/3)
+                height: 29
+                label: "SAVE FOR "+timeline.contextId.toUpperCase()
+                labelPixelSize: 9
+                available: timeline.preferenceReady && timeline.preferenceDirty
+                accentColor: Colors.magenta
+                onLeftClicked: reservePreferenceStore.save(timeline.reserveMarginPercent)
+            }
+            ActionButton {
+                width: Math.max(132,(preferenceActions.width-10)/3)
+                height: 29
+                label: timeline.armedPreferenceReset
+                    ? "CONFIRM RESET 100%" : "RESET SAVED TO 100%"
+                labelPixelSize: 9
+                available: timeline.preferenceReady
+                    && (reservePreferenceStore.marginPercent!==100
+                        || timeline.reserveMarginPercent!==100)
+                accentColor: Colors.orange
+                onLeftClicked: {
+                    if(!timeline.armedPreferenceReset) {
+                        timeline.armedPreferenceReset=true;
+                        return;
+                    }
+                    timeline.armedPreferenceReset=false;
+                    reservePreferenceStore.reset();
+                }
+            }
+            ActionButton {
+                width: Math.max(116,(preferenceActions.width-10)/3)
+                height: 29
+                label: "REFRESH SAVED"
+                labelPixelSize: 9
+                available: !["loading","pending"].includes(reservePreferenceStore.state)
+                    && timeline.active
+                accentColor: Colors.cyan
+                onLeftClicked: {
+                    timeline.armedPreferenceReset=false;
+                    reservePreferenceStore.refresh();
                 }
             }
         }
@@ -463,7 +546,7 @@ Item {
         }
         GohuText {
             width: parent.width
-            text: "RESERVE CUSHION CONTROLS ARE SCENARIO-ONLY AND NEVER SAVE SETTINGS OR ADD A SECOND BILL. THE EXTRA BUFFER IS CAPPED AND DRAWS DOWN ONLY WHEN NEEDED BY A MODELED CHARGE. OPTIONAL MONTHLY EARMARKS ARE NOT MONEY MOVED, PAID, SAVED OR BANK-VERIFIED; UNRESERVED CHANGE IS NOT SPENDABLE CASH. NO PRE-EXISTING RESERVE BALANCES ARE ASSUMED. NONMONTHLY BILLS USE PER-CHARGE AMOUNTS ONLY IN OCCURRENCE MONTHS; THIS IS NOT MONTHLY ACCRUAL. ESTIMATES ONLY: AN EXPLICIT DEFERRED BILL IS MODELED IN ITS NEW MONTH, ON TOP OF THAT MONTH\u0027S ORDINARY BILL. DEFERRED AMOUNTS TRACK THE CURRENT MANUAL MONTHLY COST, NOT A CONTRACTUAL PAYMENT. A BILL EXCLUDED FOR ONE MONTH IS NOT ASSUMED FORGIVEN, PAID OR DEFERRED. DUE DAYS LABEL MONTHLY COSTS COUNTED ONCE. ONE-TIME PURCHASES ARE SEPARATE; GOAL RESERVES ARE USED FIRST. UNKNOWN BILLS, TAX, DEBT, INFLATION AND STARTING CASH ARE OMITTED. NOTHING IS TRANSFERRED."
+            text: "RESERVE CUSHION PREVIEWS ARE SESSION-ONLY UNTIL AN EXPLICIT SAVE; ONLY THE SELECTED PERCENTAGE IS WRITTEN TO A PRIVATE LOCAL FILE PER CONTEXT LABEL. A SAVED SETTING IS NOT BANK DATA OR VERIFIED HOUSEHOLD IDENTITY. RESERVE CUSHIONS NEVER ADD A SECOND BILL. THE EXTRA BUFFER IS CAPPED AND DRAWS DOWN ONLY WHEN NEEDED BY A MODELED CHARGE. OPTIONAL MONTHLY EARMARKS ARE NOT MONEY MOVED, PAID, SAVED OR BANK-VERIFIED; UNRESERVED CHANGE IS NOT SPENDABLE CASH. NO PRE-EXISTING RESERVE BALANCES ARE ASSUMED. NONMONTHLY BILLS USE PER-CHARGE AMOUNTS ONLY IN OCCURRENCE MONTHS; THIS IS NOT MONTHLY ACCRUAL. ESTIMATES ONLY: AN EXPLICIT DEFERRED BILL IS MODELED IN ITS NEW MONTH, ON TOP OF THAT MONTH\u0027S ORDINARY BILL. DEFERRED AMOUNTS TRACK THE CURRENT MANUAL MONTHLY COST, NOT A CONTRACTUAL PAYMENT. A BILL EXCLUDED FOR ONE MONTH IS NOT ASSUMED FORGIVEN, PAID OR DEFERRED. DUE DAYS LABEL MONTHLY COSTS COUNTED ONCE. ONE-TIME PURCHASES ARE SEPARATE; GOAL RESERVES ARE USED FIRST. UNKNOWN BILLS, TAX, DEBT, INFLATION AND STARTING CASH ARE OMITTED. NOTHING IS TRANSFERRED."
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText

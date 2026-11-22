@@ -113,9 +113,44 @@ Item {
             }
         }
     }
+    Row {
+        id: rangePresets
+        anchors.top: modeControls.bottom
+        anchors.topMargin: visible ? 8 : 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        visible: !stocks.dayMode
+        height: visible ? 27 : 0
+        spacing: 6
+        Repeater {
+            model: [
+                {days:7,label:"7D"},
+                {days:30,label:"30D"},
+                {days:90,label:"90D"},
+                {days:180,label:"180D"}
+            ]
+            delegate: ActionButton {
+                required property var modelData
+                width: Math.max(0, (rangePresets.width - 18) / 4)
+                height: 26
+                label: modelData.label
+                labelPixelSize: 10
+                accentColor: Colors.cyan
+                selected: stocks.stockFeed
+                    && stocks.stockFeed.rangeDays === modelData.days - 1
+                    && stocks.stockFeed.endDate === stocks.stockFeed.dateOffset(0)
+                available: stocks.stockFeed && stocks.stockFeed.monitoring
+                    && !stocks.stockFeed.loading
+                onLeftClicked: {
+                    if (stocks.stockFeed)
+                        stocks.stockFeed.selectPresetRange(modelData.days);
+                }
+            }
+        }
+    }
     GohuText {
         id: dateLabel
-        anchors.top: modeControls.bottom
+        anchors.top: rangePresets.bottom
         anchors.topMargin: 10
         anchors.left: parent.left
         anchors.right: parent.right
@@ -278,7 +313,7 @@ Item {
                 width: parent.width
                 text: stocks.dayMode
                     ? "Choose a calendar day and LOAD DAY. Weekends and market holidays may return NO TRADING SESSION."
-                    : "Select an issuer and START/END dates, then LOAD RANGE. Dates are inclusive; only actual trading sessions appear."
+                    : "Choose 7D/30D/90D/180D ending today, or set START/END. Then LOAD RANGE. Only actual trading sessions appear."
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
                 font.pixelSize: 9

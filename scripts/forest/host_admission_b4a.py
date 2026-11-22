@@ -187,20 +187,31 @@ class ForestHostAdmission:
                  ) -> Iterator[dict[str, Any]]:
         """Host-approved *fixture* generation; no real listener or activation.
 
-        Revocation during an in-flight model stream is NOT yet guaranteed.
-        The production host must add trusted pre-COMMIT reauthorization,
-        cancellation, and durable receipt/seat checks before any real use.
+        B4b repeats host verification and approval just before durable COMMIT.
+        This is not real kernel-process re-attestation or cross-service atomic
+        revocation. In-flight provisional DELTAs can precede the final check.
         """
         intent = decode_intent(wire)
         if intent["action"] != "GENERATE":
             raise AdmissionRefusal("INVALID_ACTION")
         principal = self._authorize(peer, intent)
+
+        def pre_commit_check() -> bool:
+            # Always ask the host again, never reuse the earlier approval.
+            # The returned owner/PID/UID must still match the reserved turn.
+            # Real host must reobserve live PID/seat and signature state.
+            fresh = self._authorize(peer, intent)
+            return (fresh.owner_key == principal.owner_key
+                    and fresh.peer_pid == principal.peer_pid
+                    and fresh.peer_uid == principal.peer_uid)
+
         try:
             with_stream = self._bridge.exchange(
                 owner=principal.owner_key,
                 session_id=intent["sessionId"],
                 expected_revision=intent["expectedRevision"],
                 model=intent["model"],
+                pre_commit=pre_commit_check,
             )
             try:
                 for event in with_stream:

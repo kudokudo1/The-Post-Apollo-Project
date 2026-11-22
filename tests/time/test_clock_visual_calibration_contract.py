@@ -22,6 +22,7 @@ TIMEW = (ROOT / "widgets/TimeW.qml").read_text()
 PANE = (ROOT / "widgets/TimeSettingsPane.qml").read_text()
 SERVICE = (ROOT / "services/time/TimeSettings.qml").read_text()
 ACTION = (ROOT / "widgets/TimeActionButton.qml").read_text()
+RELOAD = (ROOT / "components/ReloadButton.qml").read_text()
 PICKER = (ROOT / "widgets/TimeZonePicker.qml").read_text()
 AUTH = (ROOT / "widgets/TimeResyncAuthW.qml").read_text()
 
@@ -38,7 +39,8 @@ class ClockVisualCalibrationTests(unittest.TestCase):
         self.assertTrue(order.rstrip().endswith('{ id: "settings", name: "SETTINGS" }'))
         # ⟳ stays on the active mode; the resync controls open in-place.
         self.assertNotIn("timew.chooseMode(timew.modes.length - 1)", TIMEW)
-        self.assertIn("onLeftClicked: timew.toggleResyncPopup()", TIMEW)
+        self.assertIn("ReloadButton {", TIMEW)
+        self.assertIn("onReloadRequested: timew.toggleResyncPopup()", TIMEW)
         self.assertIn("ANGEL // EXPLICIT JOURNAL // LOCAL ONLY", TIMEW)
 
     def test_selected_mode_uses_open_clock_style(self):
@@ -78,7 +80,10 @@ class ClockVisualCalibrationTests(unittest.TestCase):
         self.assertIn("idleSoftGlowColor: roleColor", ACTION)
         self.assertIn("pressedContentGlowColor: roleColor", ACTION)
         self.assertIn("wideGlowEnabled: true", ACTION)
-        self.assertIn("accentColor: Colors.yellow", TIMEW)
+        self.assertIn("semanticColor: Colors.yellow", TIMEW)
+        self.assertIn("accentColor: semanticColor", RELOAD)
+        self.assertIn("property color hoverSurfaceColor: Colors.orange", RELOAD)
+        self.assertIn("hoverContentGlowColor: accentColor", RELOAD)
         self.assertIn('label: "CONFIRM RESYNC"', PANE)
         self.assertIn('actionRole: "sync"', PANE)
         self.assertIn('actionRole: "cancel"', PANE)

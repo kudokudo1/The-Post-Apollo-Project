@@ -34,7 +34,9 @@ SOCIAL = (
 class CpuPlusSocialManagementBays(unittest.TestCase):
     def test_seven_mode_rail_keeps_three_existing_bays(self):
         for expected in (
-            "implicitWidth: 1000", "implicitHeight: 834",
+            # Original CPU++ 1000x834 is preserved as the middle level.
+            "{ width: 1000, height: 834 }",
+            "implicitWidth: Math.min(", "implicitHeight: Math.min(",
             'name: "ID MANAGEMENT"', "id: modeRail", "height: 110",
             "id: sharedInstrumentPane", "width: 390",
             "id: targetPane", "width: 260",

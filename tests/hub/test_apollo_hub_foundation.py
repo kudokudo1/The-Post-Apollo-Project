@@ -73,8 +73,12 @@ assert "ModeButton {" in window
 
 # ApolloHub chassis: 1000x700 visible body flush with top of screen,
 # centered horizontally, square frame, magenta title and cyan inner outline.
-assert "readonly property int frameWidth: 1000" in window
-assert "readonly property int frameHeight: 700" in window
+# 1000x700 remains the default (middle) step; window geometry is now
+# explicitly adjustable without reconstructing ApolloHub's tile layout.
+assert "property int resizeLevel: 1" in window
+assert "{ width: 1000, height: 700 }" in window
+assert "readonly property int frameWidth: Math.min(" in window
+assert "readonly property int frameHeight: Math.min(" in window
 assert "readonly property int frameInset: 8" in window
 assert "implicitHeight: frameHeight + glowGutter" in window
 assert "        top: 0" in window

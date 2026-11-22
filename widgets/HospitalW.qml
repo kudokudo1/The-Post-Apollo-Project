@@ -3846,32 +3846,26 @@ PanelWindow {
                     // Finance-style geometry controls, rotated horizontal.
                     // They resize this SAME PanelWindow; no new window, Room,
                     // Provider command, or vertical extent is created.
-                    ActionButton {
+                    ResizeButton {
                         id: narrowHospitalButton
-                        width: 30
-                        height: 30
-                        label: "←"
-                        labelPixelSize: 17
-                        accentColor: Colors.cyan
-                        contentGlowEnabled: false
+                        direction: "left"
                         available: root.canNarrowHospital
                         Accessible.name: "Narrow Hospital window"
-                        onLeftClicked: {
+                        onResizeRequested: function(delta) {
+                            if (delta !== -1)
+                                return;
                             root.stepHospitalWidth(-1);
                             root.keyboardOwnershipRequested();
                         }
                     }
-                    ActionButton {
+                    ResizeButton {
                         id: widenHospitalButton
-                        width: 30
-                        height: 30
-                        label: "→"
-                        labelPixelSize: 17
-                        accentColor: Colors.magenta
-                        contentGlowEnabled: false
+                        direction: "right"
                         available: root.canWidenHospital
                         Accessible.name: "Widen Hospital window"
-                        onLeftClicked: {
+                        onResizeRequested: function(delta) {
+                            if (delta !== 1)
+                                return;
                             root.stepHospitalWidth(1);
                             root.keyboardOwnershipRequested();
                         }

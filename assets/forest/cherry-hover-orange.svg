@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <title>Cherry blossom, separated sakura petals</title>
+  <desc>Cherry blossom, orange hover line art, using the same original outline geometry.</desc>
+  <g fill="none" stroke="#ED981A" stroke-linecap="round" stroke-linejoin="round">
+    <g id="sakura-petals" stroke-width="2.5">
+    <path d="M20.5 17.6 C17 15.4 14.5 12.4 16 9.0 C16.9 5.4 20.1 4.8 24 8.4 C27.9 4.8 31.1 5.4 32 9.0 C33.5 12.4 31 15.4 27.5 17.6 Q24 16.4 20.5 17.6 Z"/>
+    <path transform="rotate(72 24 24)" d="M20.5 17.6 C17 15.4 14.5 12.4 16 9.0 C16.9 5.4 20.1 4.8 24 8.4 C27.9 4.8 31.1 5.4 32 9.0 C33.5 12.4 31 15.4 27.5 17.6 Q24 16.4 20.5 17.6 Z"/>
+    <path transform="rotate(144 24 24)" d="M20.5 17.6 C17 15.4 14.5 12.4 16 9.0 C16.9 5.4 20.1 4.8 24 8.4 C27.9 4.8 31.1 5.4 32 9.0 C33.5 12.4 31 15.4 27.5 17.6 Q24 16.4 20.5 17.6 Z"/>
+    <path transform="rotate(216 24 24)" d="M20.5 17.6 C17 15.4 14.5 12.4 16 9.0 C16.9 5.4 20.1 4.8 24 8.4 C27.9 4.8 31.1 5.4 32 9.0 C33.5 12.4 31 15.4 27.5 17.6 Q24 16.4 20.5 17.6 Z"/>
+    <path transform="rotate(288 24 24)" d="M20.5 17.6 C17 15.4 14.5 12.4 16 9.0 C16.9 5.4 20.1 4.8 24 8.4 C27.9 4.8 31.1 5.4 32 9.0 C33.5 12.4 31 15.4 27.5 17.6 Q24 16.4 20.5 17.6 Z"/>
+    </g>
+    <g id="sakura-stamens" stroke-width="1.6">
+      <circle cx="24" cy="24" r="2.5"/>
+      <path d="M24 20.8 L24 19.5 M27.1 23 L28.4 22.6 M26 26.4 L26.9 27.5 M22 26.4 L21.1 27.5 M20.9 23 L19.6 22.6"/>
+      <circle cx="24" cy="18.5" r="0.85"/>
+      <circle cx="29.2" cy="22.3" r="0.85"/>
+      <circle cx="27.2" cy="28.3" r="0.85"/>
+      <circle cx="20.8" cy="28.3" r="0.85"/>
+      <circle cx="18.8" cy="22.3" r="0.85"/>
+    </g>
+  </g>
+</svg>

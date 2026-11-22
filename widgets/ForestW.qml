@@ -16,6 +16,8 @@ PanelWindow {
     readonly property bool voiceHostTrusted: false
     readonly property bool chatHostTrusted: false
     property real dockCenterX: 0
+    // Read-only reference solely for Git's fullscreen size cap.
+    property var gitFullscreenReference: null
     property int chassisLevel: 0
     property int selectedTreeIndex: 0
     // One explicit model choice per Tree. Inventory refreshes never silently
@@ -103,17 +105,41 @@ PanelWindow {
     // Tree identities remain model-independent; outline icons are local SVG
     // assets in Post-Apollo's fixed palette, not emoji font fallbacks.
     readonly property var treeSlots: [
-        { name: "CHERRY", role: "GENERAL COORDINATOR", iconPath: "../assets/forest/cherry-outline.svg" },
-        { name: "MAPLE", role: "FILES & ORGANIZATION", iconPath: "../assets/forest/maple-outline.svg" }
+        {
+            name: "CHERRY", role: "GENERAL COORDINATOR",
+            iconPath: "../assets/forest/cherry-outline.svg",
+            hoverIconPath: "../assets/forest/cherry-hover-orange.svg",
+            openIconPath: "../assets/forest/cherry-open-magenta.svg"
+        },
+        {
+            name: "MAPLE", role: "FILES & ORGANIZATION",
+            iconPath: "../assets/forest/maple-outline.svg",
+            hoverIconPath: "../assets/forest/maple-outline.svg",
+            openIconPath: "../assets/forest/maple-open-magenta.svg"
+        }
     ]
     readonly property var activeTree: treeSlots[selectedTreeIndex]
     readonly property int glowGutter: 12
     readonly property int frameTopInset: 9
     readonly property int bottomScreenGap: 8
+    // Git fullscreen is bounded to screen width minus its two 14px
+    // gutters and its measured notification boundary minus 9px.
+    // The reference stays read-only; Forest never changes Git sizing.
+    readonly property int gitFullscreenWidthCap: gitFullscreenReference
+        ? Math.max(1, (gitFullscreenReference.screen
+                        ? gitFullscreenReference.screen.width : 1366)
+                      - 2 * gitFullscreenReference.glowGutter)
+        : Math.max(1, (root.screen ? root.screen.width : 1366) - 28)
+    readonly property int gitFullscreenHeightCap: gitFullscreenReference
+        ? Math.max(1, gitFullscreenReference.visualBottomY
+                      - gitFullscreenReference.panelTopMargin
+                      - gitFullscreenReference.topGlowGutter)
+        : Math.max(1, (root.screen ? root.screen.height : 768) - 22)
     readonly property var chassisFrame: ForestSizing.frame(
         chassisLevel, root.screen ? root.screen.width : 1366,
         root.screen ? root.screen.height : 768,
-        glowGutter, frameTopInset, bottomScreenGap)
+        glowGutter, frameTopInset, bottomScreenGap,
+        gitFullscreenWidthCap, gitFullscreenHeightCap)
     readonly property int frameWidth: chassisFrame.width
     readonly property int frameHeight: chassisFrame.height
     readonly property int sideWidth:
@@ -166,10 +192,10 @@ PanelWindow {
         focus: root.menuOpen
         fillColor: Colors.black
         fillOpacity: 0.97
-        borderColor: Colors.cyan
+        borderColor: Colors.green
         borderWidth: 1
         radius: 0
-        glowColor: Colors.magenta
+        glowColor: Colors.green
         glowVisible: root.menuOpen
         Keys.onEscapePressed: function(event) {
             if (root.modelPopupOpen)
@@ -216,7 +242,7 @@ PanelWindow {
                 anchors.rightMargin: 7
                 anchors.verticalCenter: parent.verticalCenter
                 direction: "up"
-                available: root.chassisLevel < 3
+                available: root.chassisLevel < ForestSizing.stages.length - 1
                 onResizeRequested: function(delta) {
                     if (delta === 1) root.expandChassis();
                 }
@@ -300,17 +326,29 @@ PanelWindow {
                 spacing: 7
                 Repeater {
                     model: root.treeSlots
-                    Rectangle {
+                    DockButton {
                         id: treeRow
                         width: treeColumn.width
                         height: 59
-                        color: index === root.selectedTreeIndex ? Colors.dark : Colors.black
+                        open: index === root.selectedTreeIndex
+                        // Each Tree keeps its own idle outline identity.
+                        // Hover, press, and open use the SAME shared DockButton
+                        // orange/magenta state grammar with no Tree exception.
+                        readonly property color iconIdentityColor:
+                            modelData.name === "CHERRY" ? Colors.white : Colors.orange
+                        normalForegroundColor: iconIdentityColor
+                        hoverForegroundColor: Colors.orange
+                        pressedForegroundColor: Colors.magenta
+                        normalDockGlowColor: iconIdentityColor
+                        normalContentGlowColor: iconIdentityColor
+                        // DockButton owns the two perimeter halos; separate
+                        // text and icon samples avoid duplicate full-row glow.
+                        contentGlowEnabled: false
                         border.width: 1
-                        border.color: index === root.selectedTreeIndex ? Colors.magenta : Colors.cyan
-                        // Hollow line artwork uses the same independent QML
-                        // layout as CameraGlyph, with an SVG Image as source.
-                        // Keep selected-state emphasis on text/border, not
-                        // recoloring Maple into Cherry's magenta.
+                        border.color: treeRow.dockGlowColor
+                        Accessible.name: modelData.name + " Tree"
+                        onLeftClicked: root.selectedTreeIndex = index
+
                         Item {
                             id: treeTitleRow
                             anchors.left: parent.left
@@ -327,28 +365,32 @@ PanelWindow {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: 26
                                 height: 26
-                                source: Qt.resolvedUrl(modelData.iconPath)
+                                // Same vector silhouette in identity, hover,
+                                // and open palettes: no overlay tint or font fallback.
+                                source: Qt.resolvedUrl(
+                                    treeRow.open || treeRow.pressed
+                                    ? modelData.openIconPath
+                                    : treeRow.hovered
+                                      ? modelData.hoverIconPath : modelData.iconPath)
                                 sourceSize: Qt.size(64, 64)
                                 fillMode: Image.PreserveAspectFit
                                 smooth: true
                             }
 
-                            // The actual Image remains the foreground source. Sample it
-                            // from a sibling so the glow tracks its exact coordinates
-                            // and disconnects safely when the QML window goes away.
                             TextHashGlow {
                                 id: treeGlyphGlow
                                 safeSource: treeGlyph
                                 requestedVisible: root.menuOpen
-                                foregroundColor: modelData.name === "CHERRY" ? Colors.white : Colors.orange
-                                preferredGlowColor: modelData.name === "CHERRY" ? Colors.magenta : Colors.red
+                                foregroundColor: treeRow.foregroundColor
+                                preferredGlowColor: treeRow.contentGlowColor
                                 radius: 8
                                 samples: 17
-                                opacity: 0.82
+                                opacity: treeRow.contentGlowOpacity
                                 z: -1
                             }
 
                             GohuText {
+                                id: treeName
                                 anchors.left: treeGlyph.right
                                 anchors.leftMargin: 6
                                 anchors.right: parent.right
@@ -357,7 +399,18 @@ PanelWindow {
                                 font.pixelSize: 12
                                 font.bold: true
                                 elide: Text.ElideRight
-                                color: index === root.selectedTreeIndex ? Colors.magenta : Colors.white
+                                color: treeRow.foregroundColor
+                            }
+                            TextHashGlow {
+                                id: treeNameGlow
+                                safeSource: treeName
+                                requestedVisible: root.menuOpen
+                                foregroundColor: treeRow.foregroundColor
+                                preferredGlowColor: treeRow.contentGlowColor
+                                radius: 7
+                                samples: 13
+                                opacity: treeRow.contentGlowOpacity
+                                z: -1
                             }
                         }
                         GohuText {
@@ -369,12 +422,7 @@ PanelWindow {
                             elide: Text.ElideRight
                             text: modelData.role
                             font.pixelSize: 9
-                            color: Colors.cyan
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.selectedTreeIndex = index
+                            color: treeRow.foregroundColor
                         }
                     }
                 }
@@ -732,7 +780,7 @@ PanelWindow {
                 Column {
                     anchors.centerIn: parent
                     width: Math.max(120, parent.width - 30)
-                    spacing: root.chassisLevel >= 2 ? 8 : 4
+                    spacing: root.frameHeight >= 540 ? 8 : 4
                     GohuText {
                         width: parent.width
                         text: "NO ACTIVE SESSION"
@@ -753,7 +801,7 @@ PanelWindow {
                     GohuText {
                         // Keep explanatory detail in taller stages. This does
                         // not hide any active chat or personal conversation.
-                        visible: root.chassisLevel >= 2
+                        visible: root.frameHeight >= 540
                         width: parent.width
                         text: "B1 / B2 / B3 READY AS CONTRACTS // TRUSTED HOST NOT CONNECTED"
                         color: Colors.cyan
@@ -790,7 +838,7 @@ PanelWindow {
                     GohuText {
                         anchors.centerIn: parent
                         width: Math.max(0, parent.width - 12)
-                        text: root.chassisLevel < 2
+                        text: root.frameHeight < 540
                             ? "SEND LOCKED // HOST NOT CONNECTED"
                             : "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
                         color: Colors.white

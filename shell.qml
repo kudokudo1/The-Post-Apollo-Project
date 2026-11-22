@@ -1055,6 +1055,8 @@ PanelWindow {
             ForestW {
                 id: forestWindow
                 screen: shellRoot.screen
+                // Read Git's fullscreen cap without resizing or controlling Git.
+                gitFullscreenReference: gitWindow
                 dockCenterX: shellRoot.margins.left + leftModules.x
                              + forestHost.x + forestButton.width / 2
             }

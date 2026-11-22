@@ -10,7 +10,7 @@ import "FinanceBankingImportPolicy.js" as BankingPolicy
 Item {
     id: banking
     property bool active: false
-    property string selectedTool: "transfers"
+    property string selectedTool: "accounts" // accounts | transfers | import
     property int importSourceIndex: 0
     property var ledger: []
     property var pending: null
@@ -154,6 +154,7 @@ Item {
         armedPairKey="";
         clearArmed=false;
         if(fileState==="pending")fileState="cancelled";
+        bankingScroll.flickable.contentY=0;
     }
     onActiveChanged: {
         if(!active && fileState==="pending")fileState="cancelled";
@@ -238,20 +239,29 @@ Item {
         anchors.topMargin: 4
         anchors.left: parent.left
         anchors.right: parent.right
-        spacing: 6
+        spacing: 5
         ActionButton {
-            width: (toolTabs.width-6)/2
+            width: (toolTabs.width-10)/3
+            height: 31
+            label: "ACCOUNTS"
+            labelPixelSize: 9
+            accentColor: Colors.magenta
+            selected: banking.selectedTool==="accounts"
+            onLeftClicked: banking.selectedTool="accounts"
+        }
+        ActionButton {
+            width: (toolTabs.width-10)/3
             height: 31
             label: "TRANSFERS"
-            labelPixelSize: 10
+            labelPixelSize: 9
             accentColor: Colors.cyan
             selected: banking.selectedTool==="transfers"
             onLeftClicked: banking.selectedTool="transfers"
         }
         ActionButton {
-            width: (toolTabs.width-6)/2
+            width: (toolTabs.width-10)/3
             height: 31
-            label: "IMPORT / REVIEW"
+            label: "IMPORT"
             labelPixelSize: 9
             accentColor: Colors.omnitrix
             selected: banking.selectedTool==="import"
@@ -280,8 +290,10 @@ Item {
 
             GohuText {
                 width: parent.width
-                text: banking.selectedTool==="transfers"
-                      ? "BANKING // TRANSFER ASSISTANT" : "BANKING // TRANSACTION IMPORT"
+                text: banking.selectedTool==="accounts"
+                      ? "BANKING // ACCOUNT MANAGER"
+                      : banking.selectedTool==="transfers"
+                        ? "BANKING // TRANSFER ASSISTANT" : "BANKING // TRANSACTION IMPORT"
                 font.pixelSize: 12
                 font.bold: true
                 color: Colors.magenta
@@ -294,6 +306,13 @@ Item {
                 textFormat: Text.PlainText
                 color: Colors.orange
                 wrapMode: Text.WordWrap
+            }
+            FinanceBankingAccountsPane {
+                width: parent.width
+                visible: banking.selectedTool==="accounts"
+                height: visible ? implicitHeight : 0
+                active: banking.active && banking.selectedTool==="accounts"
+                onReturnToTopRequested: bankingScroll.flickable.contentY=0
             }
             FinanceTransferGuidePane {
                 width: parent.width

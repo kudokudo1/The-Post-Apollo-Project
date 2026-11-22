@@ -1,0 +1,85 @@
+name: Connections C3e protected witness signed history continuity (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_release_trust/C3eOperatorWitnessHistoryContinuity.py'
+      - 'tests/connections/test_connections_c3e_operator_witness_history_continuity.py'
+      - 'tests/connections/c3e_release_trust/C3eOperatorWitnessEnrollmentPreflight.py'
+      - '.github/workflows/connections-c3e-operator-witness-history-continuity-ci.yml'
+      - 'docs/connections-c3e-operator-witness-history-continuity.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-history-head-continuity-deny-only:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned disposable test-only signature dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Check static no-grant and no-history-writer boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eOperatorWitnessHistoryContinuity.py \
+            tests/connections/test_connections_c3e_operator_witness_history_continuity.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/c3e_release_trust/C3eOperatorWitnessHistoryContinuity.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          for forbidden in ("sqlite3.connect(", "subprocess.run(", "socket.socket(",
+                            "Ed25519PrivateKey", '"productionAuthority": True',
+                            '"credentialActionsEnabled": True'):
+              assert forbidden not in source, forbidden
+          for flag in ("independentlyCustodiedHistorySignerVerified",
+                       "independentlyPersistedPreviousHeadVerified",
+                       "externallyRecordedNextHeadVerified",
+                       "externallyConsumedOneUseChallengeVerified",
+                       "externalRollbackResistanceVerified",
+                       "operatorEnrollmentRootCustodyVerified",
+                       "realInstalledHostAuthenticated",
+                       "authenticatedActiveSeatVerified",
+                       "c5HumanConsentVerified",
+                       "hostAuthenticated", "canApprove", "canBeginSignIn",
+                       "credentialActionsEnabled", "productionAuthority"):
+              assert '"'+flag+'": False' in source, flag
+          assert "P.inspect_enrollment_preflight_ci_only(" in source
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          print("C3E_HISTORY_HOLD // SIGNED_HISTORY_NOT_EXTERNAL_STORAGE_OR_AUTHORITY")
+          PY
+      - name: 24 adversarial signed history head, challenge and rollback-input cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true "$(command -v python3)" -B \
+            tests/connections/test_connections_c3e_operator_witness_history_continuity.py
+          echo "C3E_HISTORY_PASS // 24_SIGNED_HISTORY_CONTINUITY_DENIAL_CASES"
+      - name: Preserve C3e operator enrollment and C3e-AF/Z signed role regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test in \
+            tests/connections/test_connections_c3e_operator_witness_enrollment_preflight.py \
+            tests/connections/test_connections_c3eaf_signed_role_enrollment.py \
+            tests/connections/test_connections_c3ez_release_bound_host_evidence.py
+          do
+            sudo -n env GITHUB_ACTIONS=true "$(command -v python3)" -B "$test"
+          done
+          echo "C3E_HISTORY_HOLD // NO_REAL_ISSUER_NONCE_CUSTODY_OR_SIGN_IN"

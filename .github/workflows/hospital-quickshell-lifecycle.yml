@@ -35,7 +35,8 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            xvfb dbus-x11 libxcb-cursor0 libxkbcommon-x11-0 libgl1
+            xvfb dbus-x11 libxcb-cursor0 libxkbcommon-x11-0 libgl1 \
+            libegl1 libgles2 libopengl0 libpipewire-0.3-0 libwayland-client0
 
       - name: Download checked relocatable Quickshell v0.3.0 binary (Qt bundled)
         env:
@@ -50,6 +51,11 @@ jobs:
           printf '%s  %s\n' "$QS_SHA256" "$work/quickshell.tar.gz" | sha256sum --check -
           tar -xzf "$work/quickshell.tar.gz" -C "$work"
           test -x "$work/quickshell/bin/quickshell"
+          if ldd "$work/quickshell/bin/quickshell.bin" | grep -q 'not found'; then
+            echo "::error::Pinned Quickshell executable is missing shared libraries"
+            ldd "$work/quickshell/bin/quickshell.bin"
+            exit 1
+          fi
 
       - name: Exercise real Quickshell Process/Timer and fake hung native reader
         env:

@@ -126,6 +126,10 @@ Item {
             available: accountsPane.accountRows.length>0
             onLeftClicked: accountsPane.newTransactionRequested()
         }
+        // Transfer guidance is fictional and never consumes the Actual snapshot.
+        FinanceTransferGuidePane {
+            width: parent.width
+        }
         GohuText {
             width: parent.width
             text: "ACCOUNT CREATION / RENAME AND OPENING-BALANCE CORRECTION ARE NOT ACTIVE YET"

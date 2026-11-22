@@ -892,28 +892,6 @@ PanelWindow {
             }
         }
 
-        // FOREST V0 // independent local-first AI workspace launcher.
-        // Do not inherit Hospital's authority, registry or worker identity.
-        Item {
-            id: forestHost
-            width: forestButton.implicitWidth
-            height: forestButton.implicitHeight
-
-            Forest {
-                id: forestButton
-                anchors.fill: parent
-                menuOpen: forestWindow.menuOpen
-                onToggleRequested: forestWindow.toggle()
-            }
-
-            ForestW {
-                id: forestWindow
-                screen: shellRoot.screen
-                dockCenterX: shellRoot.margins.left + leftModules.x
-                             + forestHost.x + forestButton.width / 2
-            }
-        }
-
         // Finance
 
         Item {
@@ -1190,6 +1168,32 @@ PanelWindow {
             keyboardActive: !relationshipFocus.active
             relationshipFocusModeActive: relationshipFocus.active
             relationshipFocused: false
+        }
+    }
+
+    // FOREST V0 // beside the centered Apollo Hub dock, not leftModules.
+    // Visual proximity does not transfer the Hub's or Hospital's authority.
+    Item {
+        id: forestHost
+        width: forestButton.implicitWidth
+        height: forestButton.implicitHeight
+
+        anchors.top: apolloHubHost.top
+        anchors.left: apolloHubHost.right
+        anchors.leftMargin: 8
+
+        Forest {
+            id: forestButton
+            anchors.fill: parent
+            menuOpen: forestWindow.menuOpen
+            onToggleRequested: forestWindow.toggle()
+        }
+
+        ForestW {
+            id: forestWindow
+            screen: shellRoot.screen
+            dockCenterX: shellRoot.margins.left + forestHost.x
+                         + forestButton.width / 2
         }
     }
 

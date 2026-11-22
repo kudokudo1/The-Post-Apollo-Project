@@ -1,0 +1,87 @@
+name: Hospital H1 / Disposable Real Quickshell Doctor Lifecycle
+
+on:
+  pull_request:
+    paths:
+      - "services/hospital/HospitalDoctorService.qml"
+      - "services/hospital/HospitalDoctorDirectoryExitPolicy.js"
+      - "tests/hospital/quickshell/**"
+      - "tests/hospital/test_doctor_quickshell_lifecycle.py"
+      - ".github/workflows/hospital-quickshell-lifecycle.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/hospital/HospitalDoctorService.qml"
+      - "services/hospital/HospitalDoctorDirectoryExitPolicy.js"
+      - "tests/hospital/quickshell/**"
+      - "tests/hospital/test_doctor_quickshell_lifecycle.py"
+      - ".github/workflows/hospital-quickshell-lifecycle.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  real-quickshell:
+    # A disposable hosted runner, never the operator's installed Quickshell.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Prepare disposable X11/QML display
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            xvfb dbus-x11 libxcb-cursor0 libxkbcommon-x11-0 libgl1 \
+            libegl1 libgles2 libopengl0 libpipewire-0.3-0 libwayland-client0
+
+      - name: Download checked relocatable Quickshell v0.3.0 binary (Qt bundled)
+        env:
+          QS_URL: https://github.com/actions-precompiled/quickshell-bin/releases/download/v0.3.0/quickshell-0.3.0-linux-amd64.tar.gz
+          QS_SHA256: 3de3ac310a856a635fb6ed2d9850370ab7c4c06f7a4ecbc70773a93b4d0dd0b9
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/h1-quickshell-0.3.0"
+          mkdir -p "$work"
+          curl --proto '=https' --tlsv1.2 -fLSs --retry 2 \
+            "$QS_URL" -o "$work/quickshell.tar.gz"
+          printf '%s  %s\n' "$QS_SHA256" "$work/quickshell.tar.gz" | sha256sum --check -
+          tar -xzf "$work/quickshell.tar.gz" -C "$work"
+          test -x "$work/quickshell/bin/quickshell"
+          if ldd "$work/quickshell/bin/quickshell.bin" | grep -q 'not found'; then
+            echo "::error::Pinned Quickshell executable is missing shared libraries"
+            ldd "$work/quickshell/bin/quickshell.bin"
+            exit 1
+          fi
+
+      - name: Exercise real Quickshell Process/Timer and fake hung native reader
+        env:
+          NO_COLOR: "1"
+        run: |
+          set -euo pipefail
+          dbus-run-session -- xvfb-run -a \
+            python3 tests/hospital/test_doctor_quickshell_lifecycle.py \
+            --quickshell "$RUNNER_TEMP/h1-quickshell-0.3.0/quickshell/bin/quickshell"
+
+      - name: State isolation contract
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          service = Path("services/hospital/HospitalDoctorService.qml").read_text()
+          test = Path("tests/hospital/test_doctor_quickshell_lifecycle.py").read_text()
+          workflow = Path(".github/workflows/hospital-quickshell-lifecycle.yml").read_text()
+          assert service.count('"/usr/libexec/post-apollo/hospital/hospital-room-read"') == 1
+          assert "NOT_EXACTLY_ONE_NATIVE_CLIENT_PATH" in test
+          assert "TemporaryDirectory" in test
+          assert "H1_DISPOSABLE_STATE_DIR" in test
+          assert "sha256sum --check" in workflow
+          # Check execution steps, excluding this assertion block itself.
+          execution_steps = workflow.split("      - name: State isolation contract", 1)[0]
+          assert "sudo install" not in execution_steps
+          assert "quickshell --reload" not in execution_steps
+          print("HOSPITAL H1 QML ISOLATION // PASS // fake reader in temporary directory only")
+          PY

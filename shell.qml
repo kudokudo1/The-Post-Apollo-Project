@@ -1501,6 +1501,14 @@ PanelWindow {
                 && financeWindow.chassisLevel === "fullscreen")
             || (weatherStationWindow.menuOpen
                 && weatherStationWindow.chassisLevel === "fullscreen")
+            || (companyNetworkWindow.menuOpen
+                && companyNetworkWindow.chassisLevel === "fullscreen")
+            || (hospitalWindow.menuOpen
+                && hospitalWindow.panelWidthLevel === 3)
+            || (forestWindow.menuOpen
+                && forestWindow.chassisLevel === 3)
+            || (trashWindow.menuOpen
+                && trashWindow.chassisSize === "full")
         // Retain the permanently mapped, transparent layer-shell window:
         // toggling PanelWindow.visible would recreate the surface during
         // frequent resize transitions. Hide only its painted child and

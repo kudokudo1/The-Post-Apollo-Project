@@ -171,6 +171,9 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertNotIn("Quickshell.execDetached", adapter)
         self.assertIn("generation_enabled !== false", policy)
         self.assertIn("model_count !== value.models.length", policy)
+        self.assertTrue((ROOT / "scripts/forest/ollama_inventory.py").is_file())
+        self.assertNotIn("Component.onCompleted", adapter)
+        self.assertNotIn("running: true", adapter)
 
         node = r'''
 const fs=require("fs"), vm=require("vm");

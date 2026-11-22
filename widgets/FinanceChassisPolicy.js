@@ -2,7 +2,7 @@
 
 // FinanceW M0: geometry is presentation state, never financial data state.
 // A single mapped PanelWindow survives every transition.
-var levels = ["compact", "expanded", "fullscreen"];
+var levels = ["compact", "expanded", "tall", "large", "fullscreen"];
 
 function normalize(level) {
     return levels.indexOf(level) >= 0 ? level : "compact";
@@ -28,13 +28,16 @@ function frame(level, viewportWidth, viewportHeight, gutter, topInset, bottomGap
     var width = Math.max(1, viewportPixels(viewportWidth, 456) - 2 * inset);
     var height = Math.max(1, viewportPixels(viewportHeight, 768) - top - bottom);
     var mode = normalize(level);
+    // One width-only increase, two height-only increases, then full width.
+    // The 1345px portrait ceiling matches TASKS' largest visible frame.
+    // Viewport clamps remain active on every level.
+    var targetWidth = mode === "fullscreen" ? width
+                    : mode === "compact" ? 432 : 1000;
+    var targetHeight = mode === "compact" || mode === "expanded" ? 790
+                     : mode === "tall" ? 1020 : 1345;
     return {
-        width: mode === "fullscreen" ? width
-             : Math.min(width, mode === "expanded" ? 1000 : 432),
-        // Large now uses Social's default 1355px frame height minus 10px.
-        // The 8px bottom gap remains the minimum on smaller displays.
-        height: Math.min(height, mode === "fullscreen" ? 1345
-                                   : mode === "expanded" ? 900 : 790)
+        width: Math.min(width, targetWidth),
+        height: Math.min(height, targetHeight)
     };
 }
 

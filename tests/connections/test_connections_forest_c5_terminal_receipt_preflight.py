@@ -164,7 +164,10 @@ class ForestC5WriterTerminalReceiptTests(unittest.TestCase):
                 expected_permit_id=self.permit,
                 expected_minimum_journal_counter=4,
             )
-        self.hold("UNPINNED_WRITER_KEY", wire, sig,
+        # Changing the expected pin first mismatches the signed record's
+        # own writer key fingerprint; the independent substituted-public-key
+        # path above reaches the UNPINNED_WRITER_KEY check.
+        self.hold("EXACT_RECEIPT_BINDING_MISMATCH", wire, sig,
                   expected_writer_key_sha256="f" * 64)
 
     def test_08_permit_and_released_writer_must_be_exact(self):
@@ -206,7 +209,7 @@ class ForestC5WriterTerminalReceiptTests(unittest.TestCase):
         wire, sig = self.signed()
         duplicate = b'{"schema":"a","schema":"b"}'
         self.hold("DUPLICATE_JSON_KEY", duplicate, sig)
-        altered = wire.replace(b',"attempt":', b', "attempt":')
+        altered = wire.replace(b',"grant":', b', "grant":')
         self.assertNotEqual(altered, wire)
         self.hold("NONCANONICAL_JSON", altered, sig)
 

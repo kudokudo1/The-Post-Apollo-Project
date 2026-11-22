@@ -31,8 +31,11 @@ Item {
         }
     }
     readonly property bool preferenceReady: reservePreferenceStore.state==="ready"
+    // A missing preference has no saved value: an explicit SAVE must also
+    // be possible for the default 100% choice, not only 110% or 125%.
     readonly property bool preferenceDirty: preferenceReady
-        && reserveMarginPercent!==reservePreferenceStore.marginPercent
+        && (!reservePreferenceStore.savedOnDisk
+            || reserveMarginPercent!==reservePreferenceStore.marginPercent)
     FinanceServices.FinanceHouseholdReservePreferenceStore {
         id: reservePreferenceStore
         contextId: timeline.contextId
@@ -173,9 +176,13 @@ Item {
             text: "RESERVE CUSHION // PLANNING SCENARIO // "
                 +timeline.reserveMarginPercent+"% OF EACH PERIODIC CHARGE TARGET"
                 +(timeline.preferenceReady
-                    ? timeline.preferenceDirty
-                        ? " // PREVIEW NOT SAVED UNTIL SAVE"
-                        : " // SAVED LOCAL PREFERENCE FOR "+timeline.contextId.toUpperCase()
+                    ? !reservePreferenceStore.savedOnDisk
+                        ? timeline.reserveMarginPercent===100
+                            ? " // DEFAULT 100% // NO SAVED FILE"
+                            : " // PREVIEW NOT SAVED UNTIL SAVE"
+                        : timeline.preferenceDirty
+                            ? " // PREVIEW NOT SAVED UNTIL SAVE"
+                            : " // SAVED LOCAL PREFERENCE FOR "+timeline.contextId.toUpperCase()
                     : " // PREFERENCE UNAVAILABLE: DEFAULT PREVIEW ONLY")
                 +" // SAME LINUX LOGIN; NOT A HOUSEHOLD IDENTITY GRANT"
             font.pixelSize: 9

@@ -16,6 +16,20 @@ WORKFLOW = ROOT / ".github/workflows/hospital-acceptance.yml"
 
 
 class HospitalComposerButtonReuseContracts(unittest.TestCase):
+    def test_public_qmldir_registers_both_controls(self):
+        """Hospital imports qs.components, so the types must be exported."""
+        manifest = (ROOT / "components/qmldir").read_text()
+        self.assertIn("module qs.components", manifest)
+        for name in ("VoiceToTextButton", "AskSendButton"):
+            declaration = f"{name} 1.0 {name}.qml"
+            self.assertEqual(manifest.splitlines().count(declaration), 1)
+            self.assertTrue((ROOT / "components" / (name + ".qml")).is_file())
+        for path in (RECEPTION, INTERCOM):
+            source = path.read_text()
+            self.assertIn("import qs.components", source)
+            self.assertIn("VoiceToTextButton {", source)
+            self.assertIn("AskSendButton {", source)
+
     def test_shared_controls_use_existing_action_button_family(self):
         for filename in (VOICE, ASK_SEND):
             with self.subTest(component=filename.name):

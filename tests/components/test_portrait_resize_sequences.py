@@ -49,20 +49,23 @@ const source = fs.readFileSync(process.argv[1], "utf8")
 const context = {};
 vm.createContext(context);
 vm.runInContext(source, context, {timeout: 1000});
-const levels = Array.from(context.levels);
+const levels = Array.from(context.financeLevels);
+const cameraLevels = Array.from(context.levels);
 let stage = "compact", forward = [stage];
 for (let i = 0; i < 5; i++) {
-    stage = context.step(stage, 1);
+    stage = context.step(stage, 1, "finance");
     forward.push(stage);
 }
 let backward = [stage];
 for (let i = 0; i < 5; i++) {
-    stage = context.step(stage, -1);
+    stage = context.step(stage, -1, "finance");
     backward.push(stage);
 }
-const profiles = levels.map(l => context.frame(l, 2560, 1440, 12, 9, 8));
-const compactScreen = levels.map(l => context.frame(l, 900, 768, 12, 9, 8));
-console.log(JSON.stringify({levels, forward, backward, profiles, compactScreen}));
+const profiles = levels.map(l => context.frame(l, 2560, 1440, 12, 9, 8, "finance"));
+const compactScreen = levels.map(l => context.frame(l, 900, 768, 12, 9, 8, "finance"));
+const cameraExpanded = context.frame("expanded", 2560, 1440, 12, 9, 8);
+const cameraNext = context.step("expanded", 1);
+console.log(JSON.stringify({levels, cameraLevels, cameraNext, cameraExpanded, forward, backward, profiles, compactScreen}));
 '''
 p = subprocess.run(
     ["node", "-e", js, str(finance_policy)],
@@ -72,6 +75,9 @@ actual = json.loads(p.stdout)
 assert actual["levels"] == [
     "compact", "expanded", "tall", "large", "fullscreen"
 ], actual["levels"]
+assert actual["cameraLevels"] == ["compact", "expanded", "fullscreen"]
+assert actual["cameraNext"] == "fullscreen"
+assert actual["cameraExpanded"] == {"width": 1000, "height": 900}
 assert actual["forward"] == [
     "compact", "expanded", "tall", "large", "fullscreen", "fullscreen"
 ], actual["forward"]
@@ -87,8 +93,9 @@ for p in actual["compactScreen"]:
     assert 0 < p["height"] <= 751
 
 finance = (ROOT / "widgets/FinanceW.qml").read_text(encoding="utf-8")
-assert "chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1);" in finance
-assert "chassisLevel = FinanceChassisPolicy.step(chassisLevel, -1);" in finance
+assert "chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1, "finance");" in finance
+assert "chassisLevel = FinanceChassisPolicy.step(chassisLevel, -1, "finance");" in finance
+assert 'glowGutter, frameTopInset, bottomScreenGap, "finance"' in finance
 assert "implicitHeight: frameHeight + frameTopInset + bottomScreenGap" in finance
 assert "property string selectorPreviewActive:" in finance
 assert "visible: true" in finance

@@ -167,10 +167,12 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertEqual(view.count("VoiceToTextButton {"), 1)
         self.assertEqual(view.count("AskSendButton {"), 1)
         self.assertIn("id: voiceToTextButton", view)
-        # Forest overrides only the icon, not Hospital shared component behavior.
-        self.assertIn('voiceGlyph: "🎤"', view)
-        self.assertNotIn('voiceGlyph: "🗣︎"', view)
+        # Shared talking-mouth glyph remains; Forest turns off only its
+        # sampled interior halo while retaining the perimeter glow.
         self.assertIn('property string voiceGlyph: "🗣︎"', voice)
+        self.assertNotIn("voiceGlyph:", view)
+        forest_voice = view.split("VoiceToTextButton {", 1)[1].split("\\n                }", 1)[0]
+        self.assertIn("glyphGlowEnabled: false", forest_voice)
         self.assertIn("id: forestAskSendButton", view)
         self.assertIn("id: modelPickerButton", view)
         self.assertIn("anchors.right: voiceToTextButton.left", view)

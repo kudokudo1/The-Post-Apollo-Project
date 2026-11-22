@@ -1092,27 +1092,27 @@ PanelWindow {
                 }
 
                 // Reused TASKS/Finance size controls; no automatic changes.
-                ActionButton {
+                ResizeButton {
                     id: collapseChassisButton
-                    width: 30
-                    height: 30
-                    label: "↓"
-                    labelPixelSize: 17
-                    accentColor: Colors.cyan
+                    direction: "down"
                     available: weatherStation.menuOpen
                                && weatherStation.chassisLevel !== "compact"
-                    onLeftClicked: weatherStation.collapseChassis()
+                    onResizeRequested: function(delta) {
+                        if (delta !== -1)
+                            return;
+                        weatherStation.collapseChassis();
+                    }
                 }
-                ActionButton {
+                ResizeButton {
                     id: expandChassisButton
-                    width: 30
-                    height: 30
-                    label: "↑"
-                    labelPixelSize: 17
-                    accentColor: Colors.magenta
+                    direction: "up"
                     available: weatherStation.menuOpen
                                && weatherStation.chassisLevel !== "fullscreen"
-                    onLeftClicked: weatherStation.expandChassis()
+                    onResizeRequested: function(delta) {
+                        if (delta !== 1)
+                            return;
+                        weatherStation.expandChassis();
+                    }
                 }
 
                 // Live source badge, matching the Git/Finance header grammar.

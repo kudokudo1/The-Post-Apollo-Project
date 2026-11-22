@@ -75,10 +75,13 @@ assert "onRightClicked: {" in clock
 assert "clockArea.is24Hour = !clockArea.is24Hour;" in clock
 assert "clockArea.timeWindow.toggle();" in clock
 
-# TimeW now matches FinanceW Compact's 790px visible frame height.
-# FinanceW remains dynamic; the source contract checks TimeW's fixed cap.
-for dim in ("frameWidth: 432", "frameHeight: 790", "glowGutter: 12"):
-    assert dim in window, dim
+# TimeW retains its original 432x790 first size level. The owner-controlled
+# arrows offer larger frames without changing the shared Clock dock.
+assert "property int resizeLevel: 0" in window
+assert "{ width: 432, height: 790 }" in window
+assert "readonly property int frameWidth: Math.min(" in window
+assert "readonly property int frameHeight: Math.min(" in window
+assert "glowGutter: 12" in window
 for dim in ("readonly property int frameWidth:", "readonly property int frameHeight:",
             "glowGutter: 12"):
     assert dim in finance, dim

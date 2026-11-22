@@ -74,7 +74,7 @@ test("no mutators, files, network or authorization in preview policy",()=>{
 });
 
 const groupSource=readFileSync(new URL("../../services/finance/FinanceCategoryGroupPlan.js",
-  import.meta.url),"utf8").replace(/^\\.pragma library\\s*/,"");
+  import.meta.url),"utf8").replace(/^\.pragma library\s*/,"");
 const groupContext={};
 runInNewContext(groupSource,groupContext);
 const previewGroup=groupContext.previewGroupPlan;

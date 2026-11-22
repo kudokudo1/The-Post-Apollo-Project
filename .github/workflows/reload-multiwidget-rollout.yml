@@ -1,0 +1,41 @@
+name: Shared ReloadButton multi-widget safe refresh
+
+on:
+  pull_request:
+    paths:
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "widgets/CompanyNetworkW.qml"
+      - "widgets/CompanyCoveragePane.qml"
+      - "widgets/FinanceW.qml"
+      - "modules/Trash.qml"
+      - "widgets/CameraW.qml"
+      - "components/ReloadButton.qml"
+      - "tests/components/test_reload_multiwidget_rollout.py"
+      - ".github/workflows/reload-multiwidget-rollout.yml"
+  push:
+    branches: [main]
+    paths:
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "widgets/CompanyNetworkW.qml"
+      - "widgets/CompanyCoveragePane.qml"
+      - "widgets/FinanceW.qml"
+      - "modules/Trash.qml"
+      - "widgets/CameraW.qml"
+      - "components/ReloadButton.qml"
+      - "tests/components/test_reload_multiwidget_rollout.py"
+      - ".github/workflows/reload-multiwidget-rollout.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify six header connections and data-boundary rules
+        run: python3 -B -I tests/components/test_reload_multiwidget_rollout.py
+      - name: Confirm unchanged ReloadButton source contract
+        run: python3 -B -I tests/components/test_reload_button_contracts.py

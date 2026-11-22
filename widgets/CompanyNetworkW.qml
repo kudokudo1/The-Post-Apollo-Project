@@ -387,7 +387,7 @@ PanelWindow {
 
             Rectangle {
                 id: feedStatus
-                anchors.right: closeButton.left
+                anchors.right: companyHeaderReloadButton.left
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 width: 76
@@ -401,6 +401,31 @@ PanelWindow {
                     font.pixelSize: 10
                     color: Colors.yellow
                     text: "NO DATA"
+                }
+            }
+
+            // The local map can re-read saved hubs without resetting zoom
+            // or selection. An already-consented street map may resync its
+            // visible tile viewport; unfinished Company modes stay disabled.
+            ReloadButton {
+                id: companyHeaderReloadButton
+                anchors.right: closeButton.left
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                semanticColor: Colors.yellow
+                hoverSurfaceColor: Colors.orange
+                available: root.menuOpen && root.selectedMainModeIndex === 0
+                           && root.coverageLoaded && !!coverageLoader.item
+                           && !coverageLoader.item.hubEditorOpen
+                           && !coverageLoader.item.hubPlacementArmed
+                           && !coverageLoader.item.vectorConsentOpen
+                           && !coverageLoader.item.streetConsentOpen
+                Accessible.name: coverageLoader.item && coverageLoader.item.streetMode
+                                 ? "Resync consented visible street tiles"
+                                 : "Refresh locally saved Company hubs"
+                onReloadRequested: {
+                    if (coverageLoader.item)
+                        coverageLoader.item.refreshVisibleCoverage();
                 }
             }
 

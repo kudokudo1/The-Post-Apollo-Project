@@ -535,6 +535,20 @@ PanelWindow {
         return true;
     }
 
+    // Header refresh only interrogates existing read-only sources.
+    // Camera capture reads local device availability; Gallery reuses the
+    // existing bounded search. Zoom and Cleanup have separate owner-controlled
+    // lifecycles, so they deliberately have no global reload.
+    function refreshVisibleCamera() {
+        if (!menuOpen || busy)
+            return false;
+        if (activeView === "gallery")
+            return loadGallery(false, "gallery");
+        if (activeView === "capture")
+            return run("status", ["status"]);
+        return false;
+    }
+
     function loadGallery(append, targetView) {
         if (busy)
             return false;
@@ -2566,7 +2580,9 @@ PanelWindow {
                 spacing: 8
 
                 GohuText {
-                    width: parent.width - (30 * 2 + cameraCloseButton.width + cameraHeader.spacing * 3)
+                    width: parent.width - (30 * 2 + cameraCloseButton.width
+                                             + cameraHeaderReloadButton.width
+                                             + cameraHeader.spacing * 4)
                            - (camera.activeView === "zoom" ? 110 : 0)
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
@@ -2618,6 +2634,23 @@ PanelWindow {
                         camera.expandChassis();
                     }
                 }
+                // Capture checks live local device status. Gallery reads
+                // files; no screenshot, GIO move, Zoom restart or deletion.
+                ReloadButton {
+                    id: cameraHeaderReloadButton
+                    width: 33
+                    height: 32
+                    semanticColor: Colors.yellow
+                    hoverSurfaceColor: Colors.orange
+                    available: camera.menuOpen && !camera.busy
+                               && (camera.activeView === "capture"
+                                   || camera.activeView === "gallery")
+                    Accessible.name: camera.activeView === "capture"
+                                     ? "Resync local Camera device status"
+                                     : "Refresh local Camera gallery"
+                    onReloadRequested: camera.refreshVisibleCamera()
+                }
+
                 CloseButton {
                     id: cameraCloseButton
                     Accessible.name: "Close Camera menu"

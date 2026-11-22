@@ -172,6 +172,40 @@ PanelWindow {
         feedStatus === "OFFLINE" || feedStatus === "ERROR"
         || feedStatus === "NO FEED" ? feedStatusColor : Colors.omnitrix
 
+    // The header refresh re-reads the CURRENT visible source only. A live
+    // public-market/SEC read is not an account connection or money transfer.
+    // Unsupported panes stay disabled rather than pretending to sync data.
+    readonly property bool headerReloadAvailable: root.menuOpen && (
+        (selectedMainMode === "market" && !marketService.loading)
+        || (selectedMainMode === "research"
+            && (researchTool === "sec" || researchTool === "crawl")
+            && (researchTool === "sec" ? !secService.loading
+                                      : !crawlService.loading))
+        || (selectedMainMode === "budget"
+            && selectedBudgetSubMode === "budget"
+            && !financeBudget.loading && !fundingReviewOpen
+            && !transactionDraftPane.open
+            && financeWrite.state !== "pending"
+            && financeWrite.state !== "uncertain"
+            && financeCategoryWrite.state !== "pending"
+            && financeCategoryWrite.state !== "uncertain"
+            && financeFundingWrite.state !== "pending"
+            && financeAllocationWrite.state !== "pending")
+    )
+
+    function refreshFinanceVisibleSource() {
+        if (!headerReloadAvailable)
+            return false;
+        if (selectedMainMode === "market")
+            return marketService.refresh();
+        if (selectedMainMode === "research")
+            return researchTool === "sec"
+                   ? secService.refresh() : crawlService.refresh();
+        if (selectedMainMode === "budget" && selectedBudgetSubMode === "budget")
+            return financeBudget.refresh();
+        return false;
+    }
+
     function selectBudgetSection(section) {
         if(["budget","transactions","accounts","categories"].indexOf(section)<0)
             return false;
@@ -705,7 +739,7 @@ PanelWindow {
                 id: financeFeedIndicator
                 width: 68
                 height: 26
-                anchors.right: closeButton.left
+                anchors.right: financeHeaderReloadButton.left
                 anchors.rightMargin: 7
                 anchors.verticalCenter: parent.verticalCenter
                 color: Colors.dark
@@ -740,6 +774,24 @@ PanelWindow {
                     color: root.feedStatusColor
                     transparentBorder: true
                 }
+            }
+
+            // Live public feed = read-only resync; saved crawl/budget =
+            // local refresh. Never import, transfer, submit or reset drafts.
+            ReloadButton {
+                id: financeHeaderReloadButton
+                anchors.right: closeButton.left
+                anchors.rightMargin: 7
+                anchors.verticalCenter: parent.verticalCenter
+                semanticColor: Colors.yellow
+                hoverSurfaceColor: Colors.orange
+                available: root.headerReloadAvailable
+                Accessible.name: root.selectedMainMode === "market"
+                                 || (root.selectedMainMode === "research"
+                                     && root.researchTool === "sec")
+                                 ? "Resync visible public Finance data"
+                                 : "Refresh visible local Finance data"
+                onReloadRequested: root.refreshFinanceVisibleSource()
             }
 
             // Finance is the first visual pilot of the shared 17:16 ×.

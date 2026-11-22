@@ -1425,6 +1425,38 @@ PanelWindow {
         );
     }
 
+    // Shared header refresh is observation only. The currently visible
+    // Hospital pane selects its own existing reader; none of these routes
+    // performs a Room operation, certification, merge, or process restart.
+    function refreshHospitalView() {
+        if (!root.menuOpen || root.operationsSurface === "archive")
+            return false;
+        if (root.operationsSurface === "attention")
+            return root.refreshGithubAttention();
+        if (root.operationsSurface === "reports")
+            return roomReportCatalogService.refresh();
+        if (root.operationsSurface === "rounds")
+            return roundsService.refresh();
+        if (root.operationsSurface === "staff")
+            return specialistRegistryService.refreshPresence();
+        if (root.operationsSurface === "reception") {
+            // Unlike a passive reopen, an explicit header click requests
+            // fresh local reads before rebuilding the receptionist summary.
+            if (!roundsService.running)
+                roundsService.refresh();
+            if (specialistRegistryService.loaded
+                    && !specialistRegistryService.probing)
+                specialistRegistryService.refreshPresence();
+            root.refreshReceptionData();
+            return true;
+        }
+        // SURGERY displays the locally discovered Floor/Patient sources.
+        if (!patientService.refreshing)
+            patientService.refresh();
+        floorService.discover();
+        return true;
+    }
+
     function refreshReceptionData() {
         root.syncReceptionistActivity();
 
@@ -3806,7 +3838,10 @@ PanelWindow {
                     anchors {
                         left: parent.left
                         bottom: parent.bottom
+                        right: hospitalHeaderActions.left
+                        rightMargin: 10
                     }
+                    elide: Text.ElideRight
 
                     text:
                         root.operationsSurface === "reception"
@@ -4147,6 +4182,20 @@ PanelWindow {
                                 transparentBorder: true
                             }
                         }
+                    }
+
+                    // Hospital mode-aware read-only refresh. Remote ATTENTION
+                    // re-reads GitHub; local views use their existing readers.
+                    ReloadButton {
+                        id: hospitalHeaderReloadButton
+                        anchors.verticalCenter: parent.verticalCenter
+                        semanticColor: Colors.yellow
+                        hoverSurfaceColor: Colors.orange
+                        available: root.menuOpen && root.operationsSurface !== "archive"
+                        Accessible.name: root.operationsSurface === "attention"
+                                         ? "Resync Hospital GitHub attention"
+                                         : "Refresh visible Hospital information"
+                        onReloadRequested: root.refreshHospitalView()
                     }
 
                     // Finance-style CloseButton visuals, existing root.close() authority.

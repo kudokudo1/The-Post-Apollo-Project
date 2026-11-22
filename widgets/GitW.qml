@@ -4136,6 +4136,10 @@ PanelWindow {
                         left: parent.left
                         top: parent.top
                     }
+                    // Header actions gained a shared reload control; prevent
+                    // title ink from occupying their space at compact sizes.
+                    width: Math.max(0, parent.width - gitHeaderActions.width - 12)
+                    elide: Text.ElideRight
 
                     text:
                         root.activePage === "git"
@@ -4167,6 +4171,8 @@ PanelWindow {
                         left: parent.left
                         bottom: parent.bottom
                     }
+                    width: Math.max(0, parent.width - gitHeaderActions.width - 12)
+                    elide: Text.ElideRight
 
                     text:
                         root.activePage === "git"
@@ -4185,6 +4191,7 @@ PanelWindow {
                 }
 
                 Row {
+                    id: gitHeaderActions
                     anchors {
                         right: parent.right
                         verticalCenter: parent.verticalCenter
@@ -4270,6 +4277,25 @@ PanelWindow {
                                 transparentBorder: true
                             }
                         }
+                    }
+
+                    // Resync the current remote READ view or refresh local Git
+                    // discovery. Deliberately not FETCH/PULL/PUSH, which may
+                    // change Git state and keep their own explicit actions.
+                    SharedComponents.ReloadButton {
+                        id: gitHeaderReloadButton
+                        anchors.verticalCenter: parent.verticalCenter
+                        semanticColor: Colors.yellow
+                        hoverSurfaceColor: Colors.orange
+                        available: root.menuOpen && !gitService.actionBusy
+                                   && !(root.activePage === "git"
+                                        && gitService.refreshing)
+                                   && !(root.activePage === "github"
+                                        && githubService.refreshing)
+                        Accessible.name: root.activePage === "github"
+                                         ? "Resync visible GitHub information"
+                                         : "Refresh local Git information"
+                        onReloadRequested: root.invokeGitHotkey("REFRESH")
                     }
 
                     // Unified Finance-style close visuals; root.close() remains owned here.

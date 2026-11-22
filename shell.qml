@@ -1453,11 +1453,13 @@ PanelWindow {
     }
 
     // ===== BOTTOM-CENTER SYSTEM TRAY =============================
-    // One existing SystemTray owner, moved out of the top-left dock row.
-    // Anchoring BOTH sides gives an output-wide centering plane, independent
-    // of the 50px top-bar margins and of the tray's changing item count.
-    // Only the Tray item takes pointer input; the transparent remainder
-    // cannot obstruct apps, Trash or Power.
+    // Center on the entire DP-5 output (the screenshot also includes a
+    // DIFFERENT right-hand output). Never center relative to the top bar's
+    // 50px side margins or to the count of currently registered tray icons.
+    // Use TOP, not OVERLAY: Sway draws the top layer above ordinary windows
+    // but below true fullscreen windows; Post-Apollo full-window overlays
+    // also stack above it. The empty state is a visible 92px Gohu plaque.
+    // Only that plaque and its items capture pointer input.
     PanelWindow {
         id: bottomCenterTrayWindow
         screen: shellRoot.screen
@@ -1476,12 +1478,30 @@ PanelWindow {
 
         implicitHeight: 70
         exclusiveZone: 0
-        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
         focusable: false
         color: "transparent"
         surfaceFormat.opaque: false
-        visible: true
+
+        // A few internal "fullscreen" modes are full-size layer-shell
+        // panels, not compositor xdg fullscreen windows. Explicitly unmap
+        // the tray while those modes own the output so it cannot show
+        // through a partially transparent panel or win a same-layer race.
+        readonly property bool fullscreenWidgetActive:
+            (gitWindow.menuOpen
+             && gitWindow.resizeLevel === gitWindow.resizeSteps.length - 1)
+            || (apolloHubWindow.menuOpen
+                && apolloHubWindow.resizeLevel
+                   === apolloHubWindow.resizeSteps.length - 1)
+            || (cpuPlusWindow.menuOpen
+                && cpuPlusWindow.resizeLevel
+                   === cpuPlusWindow.resizeSteps.length - 1)
+            || (financeWindow.menuOpen
+                && financeWindow.chassisLevel === "fullscreen")
+            || (weatherStationWindow.menuOpen
+                && weatherStationWindow.chassisLevel === "fullscreen")
+        visible: !fullscreenWidgetActive
 
         // Match the existing bottom utility button clearance: a 50px tray
         // centered in 70px ends 20px above the physical output bottom.

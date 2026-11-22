@@ -4437,6 +4437,23 @@ PanelWindow {
                     Column {
                         id: gitControlCamera
 
+                        // The repository map and output pane share the camera's
+                        // remaining height. A chassis increase must enlarge
+                        // useful work areas, not create a blank purple void.
+                        // Control rows and action ownership stay at their
+                        // established sizes at every tier.
+                        readonly property int fixedRowsHeight:
+                            branchControlStrip.height
+                            + gitSyncControlStrip.height
+                            + gitLocalToolStrip.height
+                            + spacing * 4
+                        readonly property int flexibleRowsHeight:
+                            Math.max(0, height - fixedRowsHeight)
+                        readonly property int branchMapHeight:
+                            Math.max(160, Math.round(flexibleRowsHeight * 0.67))
+                        readonly property int outputPanelHeight:
+                            Math.max(88, flexibleRowsHeight - branchMapHeight)
+
                         anchors {
                             fill: parent
                             leftMargin: 46
@@ -5462,7 +5479,7 @@ PanelWindow {
 
                         BranchMap {
                             width: parent.width
-                            height: 220
+                            height: gitControlCamera.branchMapHeight
 
                             topologyService: gitService
                             titleText: "REPOSITORY BRANCH MAP"
@@ -5480,6 +5497,7 @@ PanelWindow {
                         // ===== SYNC CONTROLS ===========================
 
                         Rectangle {
+                            id: gitSyncControlStrip
                             width: parent.width
                             height: 58
                             color: Colors.dark
@@ -5719,6 +5737,7 @@ PanelWindow {
                         // ===== LOCAL TOOLS =============================
 
                         Row {
+                            id: gitLocalToolStrip
                             width: parent.width
                             height: 36
                             spacing: 10
@@ -5802,7 +5821,7 @@ PanelWindow {
                         Rectangle {
                             id: gitOutputPanel
                             width: parent.width
-                            height: 112
+                            height: gitControlCamera.outputPanelHeight
                             color: Colors.dark
                             border.width: 1
                             border.color:

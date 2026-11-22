@@ -12,34 +12,23 @@ Scope {
     property string lastError: ""
     property string lastRefreshedAt: ""
     property var lastSavedDoctor: null
+    property bool listResponseAccepted: false
+
+    // Source-only H1 cutover candidate. This executable must itself prove
+    // installed root-owned identity, policy, protected socket and writer peer.
+    // Never fall back to desktop PX if the protected reader is unavailable.
+    readonly property string nativeReaderPath:
+        "/usr/libexec/post-apollo/hospital/hospital-room-read"
+    readonly property bool protectedDoctorWritesReady: false
 
     signal doctorsRefreshed()
     signal doctorSaved(var doctor)
-
-    function pxArgs(args) {
-        const suffix = Array.isArray(args) ? args : [];
-        return [
-            "bash",
-            "-lc",
-            'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"; '
-                + '[ -x "$px" ] || px="$HOME/.local/bin/px"; '
-                + 'exec "$px" "$@"',
-            "hospital-doctor-service"
-        ].concat(suffix);
-    }
 
     function compactPxError(value, context) {
         const detail = String(value || "").trim();
 
         if (!detail)
             return "";
-
-        const lower = detail.toLowerCase();
-
-        if (lower.indexOf("unknown command hospital") >= 0
-                || lower.indexOf("unknown command agent") >= 0
-                || lower.indexOf("post-apollo px control bus") >= 0)
-            return "PX RUNTIME OUT OF DATE // UPDATE POST-APOLLO DEV EXPERIENCE";
 
         const rows = detail.split("\n").map(function(row) {
             return String(row || "").trim();
@@ -89,47 +78,27 @@ Scope {
             return false;
 
         refreshing = true;
+        loaded = false;
+        listResponseAccepted = false;
+        doctors = [];
+        lastRefreshedAt = "";
         lastError = "";
 
-        listProcess.exec(pxArgs([
-            "hospital",
-            "doctors",
-            "--json"
-        ]));
+        // Installed native reader validates executable/source identity,
+        // root-owned policy, protected writer identity and exact metadata.
+        // No desktop SQLite or alternate PX command may be used here.
+        listProcess.exec([nativeReaderPath, "doctor-directory"]);
         return true;
     }
 
     function saveDoctor(idValue, nameValue, roleValue, statusValue) {
-        const id = String(idValue || "").trim();
-        const name = String(nameValue || id || "DOCTOR").trim();
-        const role = String(roleValue || "DOCTOR").trim();
-        const status = String(statusValue || "ACTIVE").toUpperCase();
-
-        if (!id || saving || saveProcess.running)
-            return false;
-
-        if (["ACTIVE", "INACTIVE", "RELEASED"].indexOf(status) < 0) {
-            lastError = "HOSPITAL DOCTOR // INVALID STATUS";
-            return false;
-        }
-
-        saving = true;
-        lastError = "";
+        // Do not reuse legacy desktop Doctor mutations after native read
+        // cutover. A separately authorized protected write contract must
+        // be implemented and accepted before Doctor changes can be saved.
+        saving = false;
         lastSavedDoctor = null;
-
-        saveProcess.exec(pxArgs([
-            "hospital",
-            "doctor-put",
-            id,
-            "--name",
-            name,
-            "--role",
-            role,
-            "--status",
-            status,
-            "--json"
-        ]));
-        return true;
+        lastError = "HOSPITAL DOCTOR WRITE // PROTECTED ROUTE NOT ENABLED";
+        return false;
     }
 
     function releaseDoctor(idValue) {
@@ -149,23 +118,36 @@ Scope {
             onStreamFinished: {
                 const body = String(this.text || "").trim();
 
+                // Empty stdout is NOT an empty roster: the native client
+                // must explicitly emit [] or a validated metadata array.
+                if (!body)
+                    return;
+
                 try {
-                    const result = JSON.parse(body || "[]");
+                    const result = JSON.parse(body);
+                    if (!Array.isArray(result) || result.length > 250)
+                        throw new Error("INVALID PROTECTED DOCTOR DIRECTORY");
 
-                    if (!Array.isArray(result))
-                        throw new Error("PX Hospital doctors returned non-array data");
-
-                    root.doctors = result.map(function(row) {
-                        return root.normalizeDoctor(row);
-                    }).filter(function(row) {
-                        return !!row.id;
+                    const identities = {};
+                    const doctors = result.map(function(row) {
+                        const normalized = root.normalizeDoctor(row);
+                        if (!normalized.id
+                                || Object.prototype.hasOwnProperty.call(
+                                    identities, normalized.id))
+                            throw new Error("INVALID PROTECTED DOCTOR ID");
+                        identities[normalized.id] = true;
+                        return normalized;
                     });
+
+                    root.doctors = doctors;
+                    root.listResponseAccepted = true;
                     root.lastError = "";
                 } catch (error) {
                     root.doctors = [];
+                    root.listResponseAccepted = false;
                     root.lastError = root.compactPxError(
-                        body || error,
-                        "HOSPITAL DOCTORS"
+                        error,
+                        "HOSPITAL PROTECTED DOCTORS"
                     );
                 }
             }
@@ -184,64 +166,21 @@ Scope {
 
         onExited: function(code, exitStatus) {
             root.refreshing = false;
-            root.loaded = true;
-            root.lastRefreshedAt = new Date().toLocaleString();
-
-            if (Number(code) !== 0 && !root.lastError)
-                root.lastError =
-                    "PX HOSPITAL DOCTORS EXIT " + String(code);
+            const accepted = Number(code) === 0
+                && root.listResponseAccepted && !root.lastError;
+            root.loaded = accepted;
+            if (accepted) {
+                root.lastRefreshedAt = new Date().toLocaleString();
+            } else {
+                root.doctors = [];
+                root.lastRefreshedAt = "";
+                root.listResponseAccepted = false;
+                if (!root.lastError)
+                    root.lastError =
+                        "HOSPITAL BACKEND NOT READY // PROTECTED DOCTOR READER";
+            }
 
             root.doctorsRefreshed();
-        }
-    }
-
-    Process {
-        id: saveProcess
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const body = String(this.text || "").trim();
-
-                if (!body)
-                    return;
-
-                try {
-                    root.lastSavedDoctor =
-                        root.normalizeDoctor(JSON.parse(body));
-                } catch (error) {
-                    root.lastError = root.compactPxError(
-                        body || error,
-                        "HOSPITAL DOCTOR SAVE"
-                    );
-                }
-            }
-        }
-
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const detail = String(this.text || "").trim();
-                if (detail)
-                    root.lastError = root.compactPxError(
-                        detail,
-                        "HOSPITAL DOCTOR"
-                    );
-            }
-        }
-
-        onExited: function(code, exitStatus) {
-            root.saving = false;
-
-            if (Number(code) === 0
-                    && !root.lastError
-                    && root.lastSavedDoctor) {
-                root.doctorSaved(root.lastSavedDoctor);
-                root.refresh();
-                return;
-            }
-
-            if (!root.lastError)
-                root.lastError =
-                    "PX HOSPITAL DOCTOR SAVE EXIT " + String(code);
         }
     }
 

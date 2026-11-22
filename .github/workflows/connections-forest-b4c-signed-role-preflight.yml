@@ -1,0 +1,75 @@
+name: Connections Forest B4c distinct signed role preflight (NO AUTHORITY)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/forest/ForestC5SignedEvidencePreflight.py'
+      - 'tests/connections/test_connections_forest_c5_signed_role_preflight.py'
+      - 'docs/connections-forest-b4c-signed-role-evidence-preflight.md'
+      - '.github/workflows/connections-forest-b4c-signed-role-preflight.yml'
+      - 'tests/connections/test_connections_forest_b4c_fence_reference.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-forest-roles-no-human-consent:
+    name: Distinct signed fixture roles plus two-store fence, all native grants HOLD
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin disposable Ed25519 verification dependency
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Source-scope static refusal and bytecode preflight
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/forest/ForestC5SignedEvidencePreflight.py \
+            tests/connections/test_connections_forest_c5_signed_role_preflight.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("services/connections/forest/ForestC5SignedEvidencePreflight.py").read_text()
+          for key in ("Ed25519PublicKey", "SOURCE_ROLE", "REVIEW_ROLE",
+                      "canonical_bytes", "SIGNATURE_INVALID", "NO_AUTHORITY",
+                      '"humanConsentVerified": False',
+                      '"c5RevocationFenceGranted": False',
+                      '"forestDatabaseCommitAllowed": False',
+                      '"productionAuthority": False'):
+              assert key in source, key
+          for forbidden in ("Ed25519PrivateKey", "subprocess.run(",
+                            "socket.connect(", "socket.bind(",
+                            "sqlite3.connect(", "os.open(",
+                            '"humanConsentVerified": True',
+                            '"productionAuthority": True',
+                            '"forestDatabaseCommitAllowed": True'):
+              assert forbidden not in source, forbidden
+          PY
+      - name: Execute distinct signed-role adversarial fixture test cases
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover \
+            -s tests/connections \
+            -p 'test_connections_forest_c5_signed_role_preflight.py' -v
+      - name: Preserve two-store crash/revoke ordering reference
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover \
+            -s tests/connections \
+            -p 'test_connections_forest_b4c_fence_reference.py' -v
+      - name: Preserve original Forest B4b synthetic pre-commit regression
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover \
+            -s tests/forest \
+            -p 'test_host_precommit_b4b.py' -v
+          echo 'FOREST_C5_SOURCE_PRECHECK_ONLY // NO_HUMAN_CONSENT_OR_PRODUCTION_COMMIT'

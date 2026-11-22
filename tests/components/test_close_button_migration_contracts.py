@@ -25,7 +25,8 @@ cases = {
 }
 for path, (component, handler) in cases.items():
     source = (ROOT / path).read_text(encoding="utf-8")
-    assert source.count(component) == 1, (path, "exactly one shared CloseButton")
+    expected = 2 if path == "widgets/notifications/NotificationsHubW.qml" else 1
+    assert source.count(component) == expected, (path, "reviewed CloseButton count")
     assert handler in source, (path, "original close behavior")
     if path == "widgets/CameraW.qml":
         assert 'label: "X"' not in source
@@ -44,12 +45,15 @@ assert 'label: "X"' not in camera
 cpu = (ROOT / "widgets/CpuPlusW.qml").read_text(encoding="utf-8")
 assert "id: cpuPlusCloseMouse" not in cpu
 
-# Notification × is one-item dismiss. CLEAR ALL remains separate.
+# Notification card × is one-item dismiss, while the new header × only
+# closes the history window. CLEAR ALL remains a separate destructive action.
 notifications = (ROOT / "widgets/notifications/NotificationsHubW.qml").read_text(encoding="utf-8")
 assert 'label: "CLEAR ALL"' in notifications
 assert "root.requestClearAllForApp(notificationEntry.appKey, notificationEntry.source)" in notifications
 assert "onCloseRequested:" in notifications
 assert "root.dismissNotification(notificationEntry.notificationId)" in notifications
+assert "id: closeNotificationsHubButton" in notifications
+assert "onCloseRequested: root.close()" in notifications
 
 # An Identity Center X intentionally removes a specific identity: not a Close.
 identity = (ROOT / "widgets/cpuplus/CpuPlusIdManagementPane.qml").read_text(encoding="utf-8")

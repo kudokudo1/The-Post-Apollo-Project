@@ -38,7 +38,7 @@ for field in (
     'DoctorReadPolicy.captureExit(',
     'HOSPITAL BACKEND NOT READY // PROTECTED DOCTOR READER',
     'HOSPITAL DOCTOR WRITE // PROTECTED ROUTE NOT ENABLED',
-    'root.doctorsRefreshed();',
+    'doctorsRefreshed();',
 ):
     require(field, SERVICE, "Native Doctor list mode")
 

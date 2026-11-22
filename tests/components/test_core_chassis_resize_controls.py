@@ -13,13 +13,13 @@ WINDOWS = (
     ("widgets/TimeW.qml", "timew", "stepWindowSize", "shrinkTimeButton",
      "growTimeButton", "down", "up", 0, (432, 560, 700), (790, 840, 920)),
     ("widgets/ApolloHubW.qml", "hub", "stepWindowSize", "shrinkHubButton",
-     "growHubButton", "down", "up", 1, (860, 1000, 1200), (640, 700, 850)),
+     "growHubButton", "down", "up", 1, (860, 1000, 1200, 99999), (640, 700, 850, 99999)),
     ("widgets/GitW.qml", "root", "stepWindowSize", "shrinkGitButton",
-     "growGitButton", "down", "up", 1, (1000, 1120, 1360), (720, 790, 920)),
+     "growGitButton", "down", "up", 1, (1000, 1120, 1360, 99999), (720, 790, 920, 99999)),
     ("widgets/CpuPlusW.qml", "cpuPlusWindow", "stepWindowSize", "shrinkCpuButton",
-     "growCpuButton", "down", "up", 1, (960, 1000, 1180), (834, 834, 980)),
+     "growCpuButton", "down", "up", 1, (960, 1000, 1180, 99999), (834, 834, 980, 99999)),
     ("widgets/notifications/NotificationsHubW.qml", "root", "stepWindowWidth",
-     "narrowNotificationButton", "widenNotificationButton", "left", "right",
+     "narrowNotificationButton", "widenNotificationButton", "right", "left",
      1, (480, 520, 680), None),
 )
 
@@ -71,6 +71,8 @@ for path, owner, func, low_id, high_id, low_dir, high_dir, default, widths, heig
         else:
             assert bound in block, (path, ident)
         assert f"{owner}.{func}(delta);" in block, (path, ident)
+        if path == "widgets/notifications/NotificationsHubW.qml":
+            assert "reverseHorizontalGrowth: true" in block, (path, ident)
         assert "onResizeRequested: function(delta)" in block, (path, ident)
         assert not any(f"{x}:" in block for x in ("label", "accentColor", "labelPixelSize"))
     if path in ("widgets/TimeW.qml", "widgets/ApolloHubW.qml", "widgets/GitW.qml",
@@ -83,7 +85,9 @@ for path, owner, func, low_id, high_id, low_dir, high_dir, default, widths, heig
 
 notification = (ROOT / "widgets/notifications/NotificationsHubW.qml").read_text(encoding="utf-8")
 assert "id: notificationHeaderActions" in notification
-assert "anchors.rightMargin: notificationHeaderActions.width + 22" in notification
+assert "anchors.right: storedCountNumber.left" in notification
+assert "anchors.topMargin: 7" in notification
+assert "anchors.rightMargin: notificationHeaderActions.width + 22" not in notification
 assert "id: closeNotificationsHubButton" in notification
 assert "Accessible.name: \"Close Notifications Hub\"" in notification
 assert "onCloseRequested: root.close()" in notification

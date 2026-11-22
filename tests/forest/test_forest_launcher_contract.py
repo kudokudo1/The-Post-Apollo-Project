@@ -172,23 +172,26 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("generation_enabled !== false", policy)
         self.assertIn("model_count !== value.models.length", policy)
         self.assertIn("id: sessionPreview", view)
-        self.assertIn("anchors.top: modelStrip.bottom", view)
-        self.assertIn("anchors.bottom: sendGate.top", view)
+        self.assertIn("anchors.top: chatDivider.bottom", view)
+        self.assertIn("anchors.bottom: promptRow.top", view)
         self.assertIn("clip: true", view)
         self.assertIn("id: sendGate", view)
+        self.assertIn("id: promptRow", view)
         self.assertIn('visible: root.chassisLevel >= 2', view)
         self.assertIn('MODEL LIST READY // CHAT HOST NOT CONNECTED', view)
         self.assertIn('SEND LOCKED // HOST NOT CONNECTED', view)
         self.assertIn('Accessible.name: "Scan local Ollama models, read-only"', view)
-        self.assertIn('Accessible.name: "Select next inventoried local model"', view)
-        self.assertNotIn('y: Math.max(modelStrip.y + modelStrip.height', view)
-        # Bounded layout at all four nominal chassis heights. Native font
-        # metrics remain an operator verification, not a source-test proof.
+        self.assertIn('Accessible.name: "Open Forest model selector"', view)
+        self.assertNotIn("id: modelStrip", view)
+        self.assertNotIn("id: nextModelButton", view)
+        # Popups are bounded to the local chat panel even at the 340px stage.
         for height in (340, 340, 540, 610):
             chat_height = height - 56 - 30
-            strip_bottom = 14 + 20 + 58 + 18
-            send_gate_top = chat_height - 13 - 40
-            self.assertGreater(send_gate_top - 6 - (strip_bottom + 8), 0)
+            prompt_top = chat_height - 13 - 40
+            popup_height = max(120, min(360, prompt_top - 42))
+            popup_top = prompt_top - 6 - popup_height
+            self.assertGreaterEqual(popup_top, 35)
+            self.assertGreaterEqual(popup_height, 120)
 
         self.assertIn("InventoryPolicy.beginScan()", adapter)
         self.assertIn("InventoryPolicy.captureStdoutScan(", adapter)
@@ -285,6 +288,40 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
              str(ROOT / "services/forest/ForestInventoryPolicy.js")],
             text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_prompt_anchored_model_popup_and_truthful_statuses(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        self.assertIn('text: "⊹❦︎๋࣭⭑"', view)
+        self.assertIn("textFormat: Text.PlainText", view)
+        self.assertIn("id: modelPickerButton", view)
+        self.assertIn("anchors.right: modelPickerButton.left", view)
+        self.assertIn("onClicked: root.modelPopupOpen = !root.modelPopupOpen", view)
+        self.assertIn("anchors.bottom: promptRow.top", view)
+        self.assertIn("anchors.right: promptRow.right", view)
+        self.assertIn("width: Math.min(390, chatPane.width - 24)", view)
+        self.assertIn("id: dismissModelPopup", view)
+        self.assertIn("id: modelPopup", view)
+        self.assertIn("id: modelList", view)
+        self.assertIn("clip: true", view)
+        self.assertIn("boundsBehavior: Flickable.StopAtBounds", view)
+        self.assertIn('text: "FOREST // MODELS"', view)
+        self.assertIn('text: "FOUND"', view)
+        self.assertIn('text: "LIVE ?"', view)
+        self.assertIn('text: "ACCESS ?"', view)
+        self.assertIn("SCAN = INVENTORY ONLY // LIVE & ACCESS UNVERIFIED", view)
+        self.assertIn("onClicked: root.scanModel(modelEntry.modelName)", view)
+        self.assertIn("onClicked: root.chooseLocalModel(modelEntry.modelName)", view)
+        self.assertIn("property var selectedTreeModels:", view)
+        self.assertIn("choices[selectedTreeIndex] = name", view)
+        self.assertIn("onSelectedTreeIndexChanged: modelPopupOpen = false", view)
+        self.assertIn("if (root.modelPopupOpen)", view)
+        self.assertIn("root.lastModelScanResult", view)
+        # No live/readiness/permission claims are set from B0 model names.
+        self.assertNotIn('text: "ACCEPTED"', view)
+        self.assertNotIn('text: "LIVE"', view[view.index("id: modelPopup"):])
+        self.assertNotIn("modelPickerButton: true", view)
+        self.assertNotIn("ollama_chat_transport", view)
+        self.assertNotIn("host_admission_b4a", view)
 
     def test_live_status_is_between_resize_and_close(self):
         text = (ROOT / "widgets/ForestW.qml").read_text()

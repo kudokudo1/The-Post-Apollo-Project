@@ -76,7 +76,7 @@ for directory in ("widgets", "modules", "components"):
             for j in range(i + 1, len(lines)):
                 if lines[j] == indent + "}":
                     block = "\n".join(lines[i : j + 1])
-                    if re.search(r'(?m)^\s*label:\s*"[↑↓←→⮜⮝⮟➤]"', block) and re.search(
+                    if re.search(r'(?m)^\s*label:\s*"[↑↓←→⮜⮝⮟➤⮞]"', block) and re.search(
                         r'\b(?:collapseChassis|expandChassis|stepChassis|stepHospitalWidth)\s*\(', block
                     ):
                         legacy.append(f"{path.relative_to(ROOT)}:{i + 1}")

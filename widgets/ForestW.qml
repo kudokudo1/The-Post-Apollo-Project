@@ -813,6 +813,10 @@ PanelWindow {
                     width: Math.max(32, Math.min(42,
                         Math.round(promptRow.width * 0.12)))
                     idleAccent: Colors.omnitrix
+                    // Render one microphone glyph instead of the multi-part
+                    // speech-head emoji, which doubles in some font fallbacks.
+                    // Forest-only override; Hospital keeps its shared default.
+                    voiceGlyph: "🎤"
                     glyphGlowEnabled: true
                     backendReady: root.voiceHostTrusted
                     busy: false

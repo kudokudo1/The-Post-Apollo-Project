@@ -33,7 +33,16 @@ for label, fragment in (("single-line", short), ("multiline", long)):
 check('import QtQuick.Effects' in view
       and 'import Qt5Compat.GraphicalEffects' in view,
       "Use existing Reception shadow components")
-check('text: "🗣︎"' in reception
+# Reception delegates its shared mic artwork to VoiceToTextButton.
+# Surgery Manage retains its independent inline field-specific dictation
+# control and must still match the same icon/color family.
+voice_button = (root / "components/VoiceToTextButton.qml").read_text()
+check('VoiceToTextButton {' in reception
+      and 'glyphGlowEnabled: true' in reception
+      and 'property string voiceGlyph: "🗣︎"' in voice_button
+      and 'idleAccent: Colors.omnitrix' in voice_button
+      and 'hoverForegroundColor: Colors.orange' in voice_button
+      and 'contentGlowSource: speechGlyph' in voice_button
       and 'text: "🗣︎"' in long
       and 'Colors.omnitrix' in long
       and 'RectangularShadow {' in long

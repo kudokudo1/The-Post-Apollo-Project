@@ -289,6 +289,11 @@ def _polkit_approve(request, prepared, peer, seat):
             "--detail", "hospital-room-id", prepared["roomId"],
             "--detail", "hospital-action", action,
             "--detail", "hospital-graph", prepared["expectedDigest"],
+            "--detail", "hospital-patient-id", prepared["patientId"],
+            "--detail", "hospital-repository", prepared["repository"],
+            "--detail", "hospital-revision", str(prepared["expectedRevision"]),
+            "--detail", "hospital-seat-id", seat,
+            "--detail", "hospital-retention", "PRESERVE_ORIGINAL_NO_BURN",
         ], capture_output=True, timeout=35, check=False)
         if done.returncode != 0:
             C.deny("OPERATOR_POLKIT_INTERACTION_NOT_APPROVED")

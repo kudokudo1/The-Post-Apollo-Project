@@ -5,6 +5,8 @@ on:
     paths:
       - 'modules/Forest.qml'
       - 'widgets/ForestW.qml'
+      - 'components/VoiceToTextButton.qml'
+      - 'components/AskSendButton.qml'
       - 'services/forest/**'
       - 'assets/forest/**'
       - 'widgets/ForestChassisPolicy.js'
@@ -15,6 +17,8 @@ on:
     paths:
       - 'modules/Forest.qml'
       - 'widgets/ForestW.qml'
+      - 'components/VoiceToTextButton.qml'
+      - 'components/AskSendButton.qml'
       - 'services/forest/**'
       - 'assets/forest/**'
       - 'widgets/ForestChassisPolicy.js'

@@ -14,6 +14,11 @@ Scope {
     property string lastRefreshedAt: ""
     property var lastSavedDoctor: null
     property bool listResponseAccepted: false
+    // Each refresh owns a fresh Process and its own StdioCollector pair.
+    // An old process cannot write the staging state of a newer refresh.
+    property var activeRead: null
+    property int readGeneration: 0
+    readonly property int readTimeoutMs: 12000
 
     // Source-only H1 cutover candidate. This executable must itself prove
     // installed root-owned identity, policy, protected socket and writer peer.
@@ -75,21 +80,48 @@ Scope {
     }
 
     function refresh() {
-        if (refreshing || listProcess.running)
+        if (refreshing || activeRead)
             return false;
 
         refreshing = true;
         loaded = false;
         listResponseAccepted = false;
         doctors = [];
-        listProcess.pendingRead = DoctorReadPolicy.begin();
         lastRefreshedAt = "";
         lastError = "";
+        readGeneration += 1;
+        const generation = readGeneration;
 
-        // Installed native reader validates executable/source identity,
-        // root-owned policy, protected writer identity and exact metadata.
-        // No desktop SQLite or alternate PX command may be used here.
-        listProcess.exec([nativeReaderPath, "doctor-directory"]);
+        // Allocating one Process per request is essential: an event from
+        // the previous StdioCollector must NEVER be assigned a new request's
+        // generation merely because a shared Process was reused.
+        let process = null;
+        try {
+            process = doctorReadFactory.createObject(root, {
+                requestGeneration: generation
+            });
+        } catch (error) {
+            process = null;
+        }
+        if (!process) {
+            refreshing = false;
+            lastError =
+                "HOSPITAL BACKEND NOT READY // DOCTOR READER START FAILED";
+            doctorsRefreshed();
+            return false;
+        }
+        activeRead = process;
+        doctorReadWatchdog.start();
+
+        // Installed native reader verifies root-owned inode/config/socket
+        // and the writer's kernel peer. There is NO desktop PX fallback.
+        try {
+            process.exec([nativeReaderPath, "doctor-directory"]);
+        } catch (error) {
+            failDoctorRead(process, generation,
+                "HOSPITAL BACKEND NOT READY // DOCTOR READER START FAILED");
+            return false;
+        }
         return true;
     }
 
@@ -113,68 +145,125 @@ Scope {
         );
     }
 
-    // Only this callback publishes the directory. The policy refuses to
-    // complete before stdout, stderr, AND exit are all observed; it also
-    // refuses all malformed/nonzero/crashed outcomes. Until then only the
-    // internal Process.pendingRead may hold staged metadata.
-    function advanceDoctorRead(next) {
-        if (!refreshing || !listProcess.pendingRead || !next)
-            return;
-        listProcess.pendingRead = next;
-        if (!next.complete)
-            return;
+    // A request is accepted only from its *own* Process object and its
+    // monotonically changed generation. This is the trust boundary that
+    // guards against callbacks from an earlier refresh arriving late.
+    function isCurrentDoctorRead(process, generation) {
+        return refreshing && !!process && activeRead === process
+            && generation === readGeneration && !!process.pendingRead;
+    }
 
-        // Once all three callbacks have arrived, no output from this
-        // process instance may be promoted by a late/duplicate callback.
-        listProcess.pendingRead = null;
+    function completeDoctorRead(process, generation, result) {
+        if (!isCurrentDoctorRead(process, generation) || !result)
+            return false;
+
+        // Revoke the request BEFORE touching Process.running, destroying
+        // anything, or publishing a signal that could synchronously refresh.
+        process.pendingRead = null;
+        activeRead = null;
         refreshing = false;
-        if (next.accepted) {
+        doctorReadWatchdog.stop();
+        if (process.running)
+            process.running = false; // SIGTERM on a stuck read, no detached child.
+
+        if (result.accepted) {
             listResponseAccepted = true;
             loaded = true;
             lastError = "";
             lastRefreshedAt = new Date().toLocaleString();
-            doctors = next.records;
+            doctors = result.records;
         } else {
             listResponseAccepted = false;
             loaded = false;
             doctors = [];
             lastRefreshedAt = "";
-            lastError = next.error ||
+            lastError = result.error ||
                 "HOSPITAL BACKEND NOT READY // PROTECTED DOCTOR READER";
         }
+
+        // Destroy the retired Process after its signal handler unwinds. Late
+        // handlers remain tied to that retired object, never to activeRead.
+        Qt.callLater(function() { process.destroy(); });
         doctorsRefreshed();
+        return true;
     }
 
-    Process {
-        id: listProcess
-        property var pendingRead: null
+    function advanceDoctorRead(process, generation, next) {
+        if (!isCurrentDoctorRead(process, generation) || !next)
+            return;
+        process.pendingRead = next;
+        if (!next.complete)
+            return;
+        completeDoctorRead(process, generation, next);
+    }
 
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (!root.refreshing || !listProcess.pendingRead)
-                    return;
-                root.advanceDoctorRead(DoctorReadPolicy.captureStdout(
-                    listProcess.pendingRead, this.text
-                ));
+    function failDoctorRead(process, generation, reason) {
+        if (!isCurrentDoctorRead(process, generation))
+            return false;
+        return completeDoctorRead(process, generation, {
+            accepted: false,
+            records: [],
+            error: reason || "HOSPITAL BACKEND NOT READY // PROTECTED DOCTOR READER"
+        });
+    }
+
+    Timer {
+        id: doctorReadWatchdog
+        interval: root.readTimeoutMs
+        repeat: false
+        running: false
+        onTriggered: root.failDoctorRead(
+            root.activeRead, root.readGeneration,
+            "HOSPITAL BACKEND NOT READY // DOCTOR READ TIMED OUT"
+        )
+    }
+
+    // Every new read gets its own Process/StdioCollector objects. Those
+    // callbacks pass the source object and original generation explicitly;
+    // no old callback is permitted to mutate a current read or the roster.
+    Component {
+        id: doctorReadFactory
+        Process {
+            id: requestProcess
+            property int requestGeneration: 0
+            property var pendingRead: DoctorReadPolicy.begin()
+
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    if (!root.isCurrentDoctorRead(
+                            requestProcess, requestProcess.requestGeneration))
+                        return;
+                    root.advanceDoctorRead(
+                        requestProcess, requestProcess.requestGeneration,
+                        DoctorReadPolicy.captureStdout(
+                            requestProcess.pendingRead, this.text)
+                    );
+                }
             }
-        }
 
-        stderr: StdioCollector {
-            onStreamFinished: {
-                if (!root.refreshing || !listProcess.pendingRead)
-                    return;
-                root.advanceDoctorRead(DoctorReadPolicy.captureStderr(
-                    listProcess.pendingRead, this.text
-                ));
+            stderr: StdioCollector {
+                onStreamFinished: {
+                    if (!root.isCurrentDoctorRead(
+                            requestProcess, requestProcess.requestGeneration))
+                        return;
+                    root.advanceDoctorRead(
+                        requestProcess, requestProcess.requestGeneration,
+                        DoctorReadPolicy.captureStderr(
+                            requestProcess.pendingRead, this.text)
+                    );
+                }
             }
-        }
 
-        onExited: function(code, exitStatus) {
-            if (!root.refreshing || !listProcess.pendingRead)
-                return;
-            root.advanceDoctorRead(DoctorReadPolicy.captureExit(
-                listProcess.pendingRead, code, exitStatus
-            ));
+            onExited: function(code, exitStatus) {
+                if (!root.isCurrentDoctorRead(
+                        requestProcess, requestProcess.requestGeneration))
+                    return;
+                root.advanceDoctorRead(
+                    requestProcess, requestProcess.requestGeneration,
+                    DoctorReadPolicy.captureExit(
+                        requestProcess.pendingRead, code, exitStatus)
+                );
+            }
         }
     }
 

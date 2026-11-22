@@ -281,32 +281,32 @@ PanelWindow {
             }
 
             // FinanceW's up/down ActionButtons, scoped to this one TASKS window.
-            ActionButton {
+            ResizeButton {
                 id: collapseChassisButton
                 anchors.right: expandChassisButton.left
                 anchors.rightMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
-                width: 30
-                height: 30
-                label: "↓"
-                labelPixelSize: 17
-                accentColor: Colors.cyan
+                direction: "down"
                 available: root.chassisLevel !== "compact"
-                onLeftClicked: root.collapseChassis()
+                onResizeRequested: function(delta) {
+                    if (delta !== -1)
+                        return;
+                    root.collapseChassis();
+                }
             }
 
-            ActionButton {
+            ResizeButton {
                 id: expandChassisButton
                 anchors.right: feedBadge.left
                 anchors.rightMargin: 7
                 anchors.verticalCenter: parent.verticalCenter
-                width: 30
-                height: 30
-                label: "↑"
-                labelPixelSize: 17
-                accentColor: Colors.magenta
+                direction: "up"
                 available: root.chassisLevel !== "large"
-                onLeftClicked: root.expandChassis()
+                onResizeRequested: function(delta) {
+                    if (delta !== 1)
+                        return;
+                    root.expandChassis();
+                }
             }
 
             // Local store health for TASKS; reserved pages have no feed.

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <title>Cherry blossom, outline glyph</title>
+  <!-- Hollow five-petal line art. Post-Apollo magenta, no emoji or filled regions. -->
+  <g fill="none" stroke="#C74EC7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M24 22 C19 19 16 15 18 11 C19.5 8.5 22 8.5 24 11 C26 8.5 28.5 8.5 30 11 C32 15 29 19 24 22 Z"/>
+    <path transform="rotate(72 24 24)" d="M24 22 C19 19 16 15 18 11 C19.5 8.5 22 8.5 24 11 C26 8.5 28.5 8.5 30 11 C32 15 29 19 24 22 Z"/>
+    <path transform="rotate(144 24 24)" d="M24 22 C19 19 16 15 18 11 C19.5 8.5 22 8.5 24 11 C26 8.5 28.5 8.5 30 11 C32 15 29 19 24 22 Z"/>
+    <path transform="rotate(216 24 24)" d="M24 22 C19 19 16 15 18 11 C19.5 8.5 22 8.5 24 11 C26 8.5 28.5 8.5 30 11 C32 15 29 19 24 22 Z"/>
+    <path transform="rotate(288 24 24)" d="M24 22 C19 19 16 15 18 11 C19.5 8.5 22 8.5 24 11 C26 8.5 28.5 8.5 30 11 C32 15 29 19 24 22 Z"/>
+    <circle cx="24" cy="24" r="2.9"/>
+  </g>
+</svg>

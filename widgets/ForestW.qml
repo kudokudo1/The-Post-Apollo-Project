@@ -12,9 +12,11 @@ PanelWindow {
     property real dockCenterX: 0
     property int chassisLevel: 0
     property int selectedTreeIndex: 0
+    // Tree identities remain model-independent; outline icons are local SVG
+    // assets in Post-Apollo's fixed palette, not emoji font fallbacks.
     readonly property var treeSlots: [
-        { name: "CHERRY", role: "GENERAL COORDINATOR", mark: "✿" },
-        { name: "MAPLE", role: "FILES & ORGANIZATION", mark: "🍁" }
+        { name: "CHERRY", role: "GENERAL COORDINATOR", iconPath: "../assets/forest/cherry-outline.svg" },
+        { name: "MAPLE", role: "FILES & ORGANIZATION", iconPath: "../assets/forest/maple-outline.svg" }
     ]
     readonly property var activeTree: treeSlots[selectedTreeIndex]
     readonly property int glowGutter: 12
@@ -214,15 +216,43 @@ PanelWindow {
                         color: index === root.selectedTreeIndex ? Colors.dark : Colors.black
                         border.width: 1
                         border.color: index === root.selectedTreeIndex ? Colors.magenta : Colors.cyan
-                        GohuText {
+                        // Hollow line artwork uses the same independent QML
+                        // layout as CameraGlyph, with an SVG Image as source.
+                        // Keep selected-state emphasis on text/border, not
+                        // recoloring Maple into Cherry's magenta.
+                        Item {
+                            id: treeTitleRow
                             anchors.left: parent.left
-                            anchors.leftMargin: 9
+                            anchors.right: parent.right
                             anchors.top: parent.top
-                            anchors.topMargin: 9
-                            text: modelData.mark + "  " + modelData.name
-                            font.pixelSize: 12
-                            font.bold: true
-                            color: index === root.selectedTreeIndex ? Colors.magenta : Colors.white
+                            anchors.topMargin: 7
+                            anchors.leftMargin: 9
+                            anchors.rightMargin: 9
+                            height: 24
+
+                            Image {
+                                id: treeGlyph
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 22
+                                height: 22
+                                source: Qt.resolvedUrl(modelData.iconPath)
+                                sourceSize: Qt.size(64, 64)
+                                fillMode: Image.PreserveAspectFit
+                                smooth: true
+                            }
+
+                            GohuText {
+                                anchors.left: treeGlyph.right
+                                anchors.leftMargin: 6
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modelData.name
+                                font.pixelSize: 12
+                                font.bold: true
+                                elide: Text.ElideRight
+                                color: index === root.selectedTreeIndex ? Colors.magenta : Colors.white
+                            }
                         }
                         GohuText {
                             anchors.left: parent.left

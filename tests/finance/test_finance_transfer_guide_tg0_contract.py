@@ -6,8 +6,10 @@ root = Path(__file__).resolve().parents[2]
 policy = (root / "widgets/FinanceTransferGuidePolicy.js").read_text()
 pane = (root / "widgets/FinanceTransferGuidePane.qml").read_text()
 accounts = (root / "widgets/FinanceAccountsPane.qml").read_text()
+banking = (root / "widgets/FinanceBankingPane.qml").read_text()
 
-assert "FinanceTransferGuidePane {" in accounts
+assert "FinanceTransferGuidePane {" in banking
+assert "FinanceTransferGuidePane {" not in accounts
 assert 'import "FinanceTransferGuidePolicy.js" as TransferGuidePolicy' in pane
 assert "GUIDANCE ONLY // NO ACCOUNTS CONNECTED // NO PAYMENT EXECUTED" in pane
 assert "PREVIEW TRANSFER INSTRUCTIONS" in pane

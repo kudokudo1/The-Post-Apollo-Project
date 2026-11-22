@@ -85,6 +85,9 @@ def _start_ticks(pid, *, deadline_ns=None):
         if not start.isdecimal() or int(start) < 1:
             _hold("PROCESS_START_INVALID")
         return int(start)
+    except PeerImageHold:
+        # Preserve deadline HOLD rather than masking it as a stat parse error.
+        raise
     except (IndexError, ValueError, UnicodeError) as exc:
         raise PeerImageHold(
             "C3E_TIMEW_PEER_IMAGE_HOLD // PROCESS_START_UNAVAILABLE") from exc

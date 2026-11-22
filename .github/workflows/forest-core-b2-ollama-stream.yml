@@ -1,0 +1,25 @@
+name: Forest Core B2 Ollama Streaming Contract
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/ollama_chat_transport.py'
+      - 'scripts/forest/OLLAMA_CHAT_B2.md'
+      - 'tests/forest/test_ollama_chat_transport.py'
+      - '.github/workflows/forest-core-b2-ollama-stream.yml'
+  push:
+    paths:
+      - 'scripts/forest/ollama_chat_transport.py'
+      - 'scripts/forest/OLLAMA_CHAT_B2.md'
+      - 'tests/forest/test_ollama_chat_transport.py'
+      - '.github/workflows/forest-core-b2-ollama-stream.yml'
+
+jobs:
+  disposable-local-stream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disposable Ollama streaming tests
+        run: python3 -m unittest discover -s tests/forest -p 'test_ollama_chat_transport.py' -v
+      - name: Python syntax
+        run: python3 -m py_compile scripts/forest/ollama_chat_transport.py tests/forest/test_ollama_chat_transport.py

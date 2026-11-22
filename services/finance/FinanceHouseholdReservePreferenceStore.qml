@@ -9,6 +9,8 @@ Scope {
     property string contextId: "mine"
     property bool monitoring: false
     property int marginPercent: 100
+    // Provenance from the verified local response, not the current preview.
+    property bool savedOnDisk: false
     property int revision: 0
     property string state: "idle" // idle, loading, pending, ready, failed
     property string message: "RESERVE PREFERENCE NOT LOADED"
@@ -27,6 +29,7 @@ Scope {
     }
     function clearView() {
         marginPercent=100;
+        savedOnDisk=false;
         revision=0;
         state="idle";
         message="RESERVE PREFERENCE NOT LOADED";
@@ -45,6 +48,7 @@ Scope {
     function refresh() {
         if (!monitoring || !validContext()) return false;
         marginPercent=100;
+        savedOnDisk=false;
         revision=0;
         if (worker.running || state==="pending" || state==="loading") {
             pendingReload=true;
@@ -118,8 +122,11 @@ Scope {
                                 && doc.contextId===store.contextId
                                 && Number.isSafeInteger(doc.revision)
                                 && doc.revision>=0
+                                && typeof doc.savedOnDisk==="boolean"
+                                && doc.savedOnDisk===(doc.revision>0)
                                 && [100,110,125].indexOf(doc.marginPercent)>=0) {
                             store.marginPercent=doc.marginPercent;
+                            store.savedOnDisk=doc.savedOnDisk;
                             store.revision=doc.revision;
                             store.state="ready";
                             store.message="LOCAL PREFERENCE // NOT BANK VERIFIED";
@@ -135,6 +142,7 @@ Scope {
                 }
                 if(!accepted && same) {
                     store.marginPercent=100;
+                    store.savedOnDisk=false;
                     store.state="failed";
                     store.message="PREFERENCE STORE UNAVAILABLE // REFRESH BEFORE RETRY";
                     // Do not silently overwrite or fall back to a saved guess.

@@ -32,21 +32,22 @@ class CameraWidgetContracts(unittest.TestCase):
         self.assertIn("WlrLayershell.layer: WlrLayer.Overlay", PANEL)
         self.assertIn("exclusiveZone: 0", PANEL)
 
-    def test_left_top_tray_order_launcher_workspaces_tray_music_camera(self):
-        # This tests the real declaration order in the LEFT Row, not a
-        # screenshot-only mock or just the presence of five module names.
+    def test_left_top_media_camera_order_and_separate_bottom_tray(self):
+        # PR #2133 moved the one native SystemTray owner to the bottom.
+        # Camera/Media still retain their exact left dock order.
         left = SHELL.split("id: leftModules", 1)[1].split(
             "// Hospital", 1)[0]
         ordered = [
             "Applauncher {",
             "Workspaces {}",
-            "Tray {}",
             "Mediaplayer {",
             "id: cameraHost",
         ]
         offsets = [left.index(marker) for marker in ordered]
         self.assertEqual(offsets, sorted(offsets))
-        self.assertEqual(left.count("Tray {}"), 1)
+        self.assertNotIn("Tray {", left)
+        self.assertEqual(SHELL.count("        Tray {"), 1)
+        self.assertIn("id: bottomCenteredTray", SHELL)
         self.assertEqual(left.count("Mediaplayer {"), 1)
         self.assertEqual(left.count("Screenshot {"), 1)
         # Preserve the existing left-row spacing and 25px launcher gap.

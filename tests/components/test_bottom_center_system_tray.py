@@ -4,6 +4,7 @@
 Does not run a user's compositor, inspect tray contents, or mutate the desktop.
 """
 from pathlib import Path
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 shell = (ROOT / "shell.qml").read_text(encoding="utf-8")
@@ -27,24 +28,121 @@ for token in ("top: false", "bottom: true", "left: true",
               "implicitHeight: 70", "anchors.centerIn: parent"):
     assert token in bottom, token
 assert "id: bottomCenteredTray" in bottom
-assert "mask: Region {\n            item: bottomCenteredTray\n        }" in bottom
+assert "mask: Region {" in bottom
+assert "x: bottomCenteredTray.x" in bottom
+assert "y: bottomCenteredTray.y" in bottom
+assert "fullscreenWidgetActive\n                   ? 0 : bottomCenteredTray.width" in bottom
+assert "fullscreenWidgetActive\n                    ? 0 : bottomCenteredTray.height" in bottom
 assert "exclusiveZone: 0" in bottom
-assert "WlrLayershell.layer: WlrLayer.Overlay" in bottom
+assert "WlrLayershell.layer: WlrLayer.Top" in bottom
+assert "WlrLayershell.layer: WlrLayer.Overlay" not in bottom
+assert "readonly property bool fullscreenWidgetActive:" in bottom
+assert "visible: !bottomCenterTrayWindow.fullscreenWidgetActive" in bottom
+assert "visible: true" in bottom  # Surface remains mapped while art + input hide
+for owner in (
+    "gitWindow", "apolloHubWindow", "cpuPlusWindow", "financeWindow",
+    "weatherStationWindow", "companyNetworkWindow", "hospitalWindow",
+    "forestWindow", "trashWindow",
+):
+    assert owner + ".menuOpen" in bottom, owner
+assert 'financeWindow.chassisLevel === "fullscreen"' in bottom
+assert 'weatherStationWindow.chassisLevel === "fullscreen"' in bottom
+assert 'companyNetworkWindow.chassisLevel === "fullscreen"' in bottom
+assert 'hospitalWindow.panelWidthLevel === 3' in bottom
+assert 'forestWindow.chassisLevel === 3' in bottom
+assert 'trashWindow.chassisSize === "full"' in bottom
+# No extra shell/service process to poll Sway state; compositor z-order owns
+# external fullscreen and the opt-in guard owns the internal full-size modes.
+assert "Process {" not in bottom
 assert "WlrLayershell.keyboardFocus: WlrKeyboardFocus.None" in bottom
 assert "focusable: false" in bottom
 assert 'color: "transparent"' in bottom
 assert "surfaceFormat.opaque: false" in bottom
 assert "visible: true" in bottom
 
+# Execute the actual source boolean in JavaScript against every known
+# internal fullscreen tier; none should leave visible tray artwork or input.
+# The compositor itself owns external fullscreen through WlrLayer.Top.
+fullscreen_expression = bottom.split(
+    "readonly property bool fullscreenWidgetActive:", 1
+)[1].split("// Retain the permanently", 1)[0].strip()
+node = r"""
+const assert = require("node:assert/strict");
+const vm = require("node:vm");
+const expression = process.argv[1];
+const root = {
+ gitWindow: {menuOpen:false, resizeLevel:1, resizeSteps:[0,1,2,3]},
+ apolloHubWindow: {menuOpen:false, resizeLevel:1, resizeSteps:[0,1,2,3]},
+ cpuPlusWindow: {menuOpen:false, resizeLevel:1, resizeSteps:[0,1,2,3]},
+ financeWindow: {menuOpen:false, chassisLevel:"compact"},
+ weatherStationWindow: {menuOpen:false, chassisLevel:"compact"},
+ companyNetworkWindow: {menuOpen:false, chassisLevel:"standard"},
+ hospitalWindow: {menuOpen:false, panelWidthLevel:0},
+ forestWindow: {menuOpen:false, chassisLevel:0},
+ trashWindow: {menuOpen:false, chassisSize:"compact"}
+};
+function blocked() { return vm.runInNewContext("Boolean(" + expression + ")", root); }
+assert.equal(blocked(), false);
+for(const key of ["gitWindow", "apolloHubWindow", "cpuPlusWindow"]) {
+ root[key].menuOpen = true;
+ root[key].resizeLevel = 2;
+ assert.equal(blocked(), false, key + " mid tier");
+ root[key].resizeLevel = 3;
+ assert.equal(blocked(), true, key + " full tier");
+ root[key].menuOpen = false;
+ assert.equal(blocked(), false, key + " closed");
+}
+for(const key of ["financeWindow", "weatherStationWindow"]) {
+ root[key].menuOpen = true;
+ root[key].chassisLevel = "large";
+ assert.equal(blocked(), false, key + " non-full tier");
+ root[key].chassisLevel = "fullscreen";
+ assert.equal(blocked(), true, key + " full tier");
+ root[key].menuOpen = false;
+ assert.equal(blocked(), false, key + " closed");
+}
+for(const [name, key, full, middle] of [
+ ["companyNetworkWindow", "chassisLevel", "fullscreen", "standard"],
+ ["hospitalWindow", "panelWidthLevel", 3, 2],
+ ["forestWindow", "chassisLevel", 3, 2],
+ ["trashWindow", "chassisSize", "full", "large"]
+]) {
+ root[name].menuOpen = true;
+ root[name][key] = middle;
+ assert.equal(blocked(), false, name + " intermediate tier");
+ root[name][key] = full;
+ assert.equal(blocked(), true, name + " final tier");
+ root[name].menuOpen = false;
+ assert.equal(blocked(), false, name + " closed");
+}
+console.log("Post-Apollo fullscreen tray visibility gate: PASS");
+"""
+p = subprocess.run(
+    ["node", "-e", node, fullscreen_expression],
+    check=False, capture_output=True, text=True, timeout=12
+)
+assert p.returncode == 0, p.stdout + "\n" + p.stderr
+
 # The tray width changes as applications register/unregister. Centering must
 # be computed from the whole screen, without a left/right dock size offset.
-for screen_width in (900, 1360, 1920, 2560, 3440):
-    for tray_width in (13, 43, 73, 163, 333):
+for screen_width in (900, 1332, 1360, 1920, 2560, 3440):
+    # The 2048px composite screenshot includes another monitor. The tray
+    # centers on its bound DP-5 output, not on stitched-image width.
+    for tray_width in (92, 108, 163, 333):
         x = (screen_width - tray_width) / 2
         assert x + tray_width / 2 == screen_width / 2
 # Match bottom utility buttons: 10px outer margin + 10px centered offset.
 assert 10 + (70 - 50) / 2 == 20
 assert "implicitHeight: 50" in tray
+assert "implicitWidth: Math.max(92, trayRow.implicitWidth + 16)" in tray
+assert "anchors.centerIn: parent" in tray
+assert "id: trayItems" in tray
+assert "visible: trayItems.count === 0" in tray
+assert 'text: "TRAY"' in tray and 'text: "NO ICONS"' in tray
+assert tray.count("GohuText {") >= 2
+assert "border.width: 1" in tray
+assert "border.color: trayButtonPressed ? Colors.orange" in tray
+assert "anchors.fill: parent\n        anchors.margins: 4" not in tray
 assert "bottom: 10" in trash
 assert "bottom: 10" in power
 
@@ -54,4 +152,4 @@ assert "model: SystemTray.items" in tray
 assert "SocialTrayBridge.requestDiscordActivation();" in tray
 assert "trayButton.modelData.activate();" in tray
 assert "Process {" not in tray
-print("Single system tray bottom-center geometry and native activation: PASS")
+print("System tray true output center, empty-state, fullscreen z-order and input safety: PASS")

@@ -37,7 +37,10 @@ class TrashBottomLeftLauncherTests(unittest.TestCase):
         self.assertIn("cameraCleanupBusy: cameraWindow.busy", SHELL)
         self.assertIn("cameraCleanupController: cameraWindow", SHELL)
         self.assertNotIn("onCleanupRequested: function(technique)", SHELL)
-        self.assertIn("Tray {}", SHELL)
+        # The unique tray lives in a separate bottom-center PanelWindow,
+        # not inside the pre-2133 left dock row.
+        self.assertIn("id: bottomCenteredTray", SHELL)
+        self.assertEqual(SHELL.count("        Tray {"), 1)
         self.assertIn("id: leftModules", SHELL)
 
     def test_mirror_power_real_geometry_not_window_size_guess(self):

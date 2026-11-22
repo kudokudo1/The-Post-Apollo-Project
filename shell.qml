@@ -1453,11 +1453,13 @@ PanelWindow {
     }
 
     // ===== BOTTOM-CENTER SYSTEM TRAY =============================
-    // One existing SystemTray owner, moved out of the top-left dock row.
-    // Anchoring BOTH sides gives an output-wide centering plane, independent
-    // of the 50px top-bar margins and of the tray's changing item count.
-    // Only the Tray item takes pointer input; the transparent remainder
-    // cannot obstruct apps, Trash or Power.
+    // Center on the entire DP-5 output (the screenshot also includes a
+    // DIFFERENT right-hand output). Never center relative to the top bar's
+    // 50px side margins or to the count of currently registered tray icons.
+    // Use TOP, not OVERLAY: Sway draws the top layer above ordinary windows
+    // but below true fullscreen windows; Post-Apollo full-window overlays
+    // also stack above it. The empty state is a visible 92px Gohu plaque.
+    // Only that plaque and its items capture pointer input.
     PanelWindow {
         id: bottomCenterTrayWindow
         screen: shellRoot.screen
@@ -1476,11 +1478,41 @@ PanelWindow {
 
         implicitHeight: 70
         exclusiveZone: 0
-        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
         focusable: false
         color: "transparent"
         surfaceFormat.opaque: false
+
+        // A few internal "fullscreen" modes are full-size layer-shell
+        // panels, not compositor xdg fullscreen windows. Explicitly unmap
+        // the tray while those modes own the output so it cannot show
+        // through a partially transparent panel or win a same-layer race.
+        readonly property bool fullscreenWidgetActive:
+            (gitWindow.menuOpen
+             && gitWindow.resizeLevel === gitWindow.resizeSteps.length - 1)
+            || (apolloHubWindow.menuOpen
+                && apolloHubWindow.resizeLevel
+                   === apolloHubWindow.resizeSteps.length - 1)
+            || (cpuPlusWindow.menuOpen
+                && cpuPlusWindow.resizeLevel
+                   === cpuPlusWindow.resizeSteps.length - 1)
+            || (financeWindow.menuOpen
+                && financeWindow.chassisLevel === "fullscreen")
+            || (weatherStationWindow.menuOpen
+                && weatherStationWindow.chassisLevel === "fullscreen")
+            || (companyNetworkWindow.menuOpen
+                && companyNetworkWindow.chassisLevel === "fullscreen")
+            || (hospitalWindow.menuOpen
+                && hospitalWindow.panelWidthLevel === 3)
+            || (forestWindow.menuOpen
+                && forestWindow.chassisLevel === 3)
+            || (trashWindow.menuOpen
+                && trashWindow.chassisSize === "full")
+        // Retain the permanently mapped, transparent layer-shell window:
+        // toggling PanelWindow.visible would recreate the surface during
+        // frequent resize transitions. Hide only its painted child and
+        // collapse its input mask while a full-size widget owns the output.
         visible: true
 
         // Match the existing bottom utility button clearance: a 50px tray
@@ -1488,10 +1520,16 @@ PanelWindow {
         Tray {
             id: bottomCenteredTray
             anchors.centerIn: parent
+            visible: !bottomCenterTrayWindow.fullscreenWidgetActive
         }
 
         mask: Region {
-            item: bottomCenteredTray
+            x: bottomCenteredTray.x
+            y: bottomCenteredTray.y
+            width: bottomCenterTrayWindow.fullscreenWidgetActive
+                   ? 0 : bottomCenteredTray.width
+            height: bottomCenterTrayWindow.fullscreenWidgetActive
+                    ? 0 : bottomCenteredTray.height
         }
     }
 

@@ -151,6 +151,7 @@ PanelWindow {
              : marketService.loading ? "READING"
              : marketService.state === "failed" ? "ERROR"
              : marketService.live ? "SNAPSHOT" : "NO FEED")
+        : selectedMainMode === "banking" ? "MANUAL"
         : !hasBudgetFeed ? "NO FEED"
         : !menuOpen ? "IDLE"
         : financeBudget.healthStatus === "offline" ? "OFFLINE"
@@ -229,6 +230,8 @@ PanelWindow {
 
     // Independent navigation state; no financial services are attached.
     readonly property var mainModes: [
+        { id: "banking", name: "Banking", icon: "₊˚⋆🏛⊹",
+          prefix: "₊˚⋆", core: "🏛", suffix: "⊹", coreSize: 30 },
         { id: "budget", name: "Budget", icon: "⋆$🗓₊˚" },
         { id: "market", name: "Market", icon: "₊˚$🗠๋࣭⭑", prefix: "₊˚", dollar: "$", core: "🗠๋࣭", suffix: "⭑" },
         { id: "radar", name: "Radar", icon: "࣪ ˖(˓🛰₊˚⊹", prefix: "࣪ ˖(˓", core: "🛰", suffix: "₊˚⊹", coreSize: 30 },
@@ -765,7 +768,7 @@ PanelWindow {
         }
 
         // MAIN MODE: AppControl's borderless, centered icon/label column.
-        // All nine positions share one rail centerline; later slots are inert.
+        // All ten positions share one rail centerline; later slots are inert.
         Column {
             id: mainModeRail
             anchors.top: headerDivider.bottom
@@ -2158,12 +2161,21 @@ Row {
                     visible: !actualBudgetPage.visible
                              && root.selectedMainMode !== "research"
                              && root.selectedMainMode !== "strategies"
+                             && root.selectedMainMode !== "banking"
                     // Component persists while navigating/resizing, not just while Market is selected.
                     embeddedComponent: marketPaneComponent
                     showEmbedded: root.selectedMainMode === "market"
                     domainTitle: root.selectedMainMode === "budget"
                                  ? root.selectedBudgetSubMode.toUpperCase()
                                  : root.mainModeName().toUpperCase()
+                }
+
+                // Owner-scoped Banking page: manual CSV review + provider-native
+                // instructions. No Actual write or Connections/Identity route.
+                FinanceBankingPane {
+                    anchors.fill: parent
+                    visible: root.selectedMainMode === "banking"
+                    active: root.menuOpen && root.selectedMainMode === "banking"
                 }
 
                 // Independent simulation-only Strategies pane.

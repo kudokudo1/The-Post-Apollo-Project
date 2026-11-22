@@ -1,0 +1,25 @@
+name: Forest Core B1 Synthetic Session Journal
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/session_journal_v0.py'
+      - 'scripts/forest/SESSION_JOURNAL_B1.md'
+      - 'tests/forest/test_session_journal_v0.py'
+      - '.github/workflows/forest-core-b1-session-journal.yml'
+  push:
+    paths:
+      - 'scripts/forest/session_journal_v0.py'
+      - 'scripts/forest/SESSION_JOURNAL_B1.md'
+      - 'tests/forest/test_session_journal_v0.py'
+      - '.github/workflows/forest-core-b1-session-journal.yml'
+
+jobs:
+  durable-synthetic-session:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate explicit synthetic conversation journal
+        run: python3 -m unittest discover -s tests/forest -p 'test_session_journal_v0.py' -v
+      - name: Syntax
+        run: python3 -m py_compile scripts/forest/session_journal_v0.py tests/forest/test_session_journal_v0.py

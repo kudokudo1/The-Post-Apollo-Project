@@ -80,7 +80,8 @@ time_header=time.split("id: header\n",1)[1].split("id: headerDivider",1)[0]
 assert first(time_header,"id: growTimeButton") < first(time_header,"id: stateIndicator")
 assert first(time_header,"id: shrinkTimeButton") < first(time_header,"id: stateIndicator")
 git_header=git.split('text: "GIT // LOCAL REPOSITORY"',1)[1].split("id: pageStatusText",1)[0]
-assert first(git_header,"id: shrinkGitButton") < first(git_header,"id: pageStatusText") if False else "id: growGitButton" in git_header
+assert "id: shrinkGitButton" in git_header
+assert "id: growGitButton" in git_header
 # Place the LIVE badge after both controls inside one shared row.
 assert git_header.index("id: growGitButton") < git_header.index("width: 94")
 cpu_header=cpu.split("id: cpuPlusCloseButton",1)[1].split("id: cpuPlusInternetText",1)[0]

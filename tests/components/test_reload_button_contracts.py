@@ -57,9 +57,6 @@ expected_colors = {
 for prop, value in expected_colors.items():
     assert re.search(rf"(?m)^\s*{prop}:\s*{re.escape(value)}\s*$", RELOAD), prop
 for stage in ("idle", "hover", "pressed", "selected", "keyboardSelected"):
-    for surface in ("ForegroundColor", "BorderColor"):
-        # Each state is tested explicitly above.
-        pass
     for layer in ("ContentGlow", "SoftGlow", "WideGlow"):
         require(f"{stage}{layer}Color: accentColor")
 for prop in (

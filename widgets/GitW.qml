@@ -4272,6 +4272,25 @@ PanelWindow {
                         }
                     }
 
+                    // Resync the current remote READ view or refresh local Git
+                    // discovery. Deliberately not FETCH/PULL/PUSH, which may
+                    // change Git state and keep their own explicit actions.
+                    SharedComponents.ReloadButton {
+                        id: gitHeaderReloadButton
+                        anchors.verticalCenter: parent.verticalCenter
+                        semanticColor: Colors.yellow
+                        hoverSurfaceColor: Colors.orange
+                        available: root.menuOpen && !gitService.actionBusy
+                                   && !(root.activePage === "git"
+                                        && gitService.refreshing)
+                                   && !(root.activePage === "github"
+                                        && githubService.refreshing)
+                        Accessible.name: root.activePage === "github"
+                                         ? "Resync visible GitHub information"
+                                         : "Refresh local Git information"
+                        onReloadRequested: root.invokeGitHotkey("REFRESH")
+                    }
+
                     // Unified Finance-style close visuals; root.close() remains owned here.
                     SharedComponents.CloseButton {
                         id: gitCloseButton

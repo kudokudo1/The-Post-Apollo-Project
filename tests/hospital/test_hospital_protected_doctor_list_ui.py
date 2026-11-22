@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SERVICE = (ROOT / "services/hospital/HospitalDoctorService.qml").read_text()
+POLICY = (ROOT / "services/hospital/HospitalDoctorDirectoryExitPolicy.js").read_text()
 NATIVE = (ROOT / "services/hospital/native/hospital_room_read_client.py").read_text()
 HOST = (ROOT / "widgets/HospitalW.qml").read_text()
 NAME = (ROOT / "services/hospital/HospitalDoctorNameService.qml").read_text()
@@ -19,20 +20,22 @@ for field in (
     '"/usr/libexec/post-apollo/hospital/hospital-room-read"',
     'readonly property bool protectedDoctorWritesReady: false',
     'property bool listResponseAccepted: false',
+    'import "HospitalDoctorDirectoryExitPolicy.js" as DoctorReadPolicy',
     'function refresh()',
     'loaded = false;',
     'listResponseAccepted = false;',
     'doctors = [];',
+    'listProcess.pendingRead = DoctorReadPolicy.begin();',
     'listProcess.exec([nativeReaderPath, "doctor-directory"]);',
-    'if (!body)',
-    'const result = JSON.parse(body);',
-    'result.length > 250',
-    'Object.prototype.hasOwnProperty.call(',
-    'root.listResponseAccepted = true;',
-    'const accepted = Number(code) === 0',
-    '&& root.listResponseAccepted && !root.lastError;',
-    'root.loaded = accepted;',
-    'root.doctors = [];',
+    'function advanceDoctorRead(next)',
+    'if (!next.complete)',
+    'listProcess.pendingRead = null;',
+    'if (next.accepted)',
+    'loaded = true;',
+    'doctors = next.records;',
+    'DoctorReadPolicy.captureStdout(',
+    'DoctorReadPolicy.captureStderr(',
+    'DoctorReadPolicy.captureExit(',
     'HOSPITAL BACKEND NOT READY // PROTECTED DOCTOR READER',
     'HOSPITAL DOCTOR WRITE // PROTECTED ROUTE NOT ENABLED',
     'root.doctorsRefreshed();',
@@ -50,12 +53,26 @@ for forbidden in (
     '$HOME/.local',
     'sqlite3',
     'store-command',
+    'root.doctors = doctors;',
+    'root.doctors = result.map(',
 ):
     assert forbidden not in SERVICE, "LEGACY_DOCTOR_ROUTE_STILL_ACTIVE: " + forbidden
 
-# The old service remains present on application main until the operator
-# explicitly accepts this draft. Within this staged source, Doctor writes
-# cannot silently fall back to the unprotected PX program.
+# PR #2137 landed before independent event-order review. The pure policy
+# is also exercised dynamically by test_doctor_directory_exit_policy.js
+# using the actual QML publication method and all six event permutations.
+for field in (
+    'function begin()',
+    'function captureStdout(state, text)',
+    'function captureStderr(state, text)',
+    'function captureExit(state, code, exitStatus)',
+    'if (!next.stdoutSeen || !next.stderrSeen || !next.exitSeen)',
+    'next.accepted = next.exitAccepted && !next.error;',
+    'next.records = next.accepted ? next.staged : [];',
+):
+    require(field, POLICY, "Doctor reader event-order policy")
+
+# Doctor writes cannot silently fall back to the unprotected PX program.
 save = SERVICE.split("function saveDoctor(", 1)[1].split(
     "function releaseDoctor(", 1
 )[0]

@@ -22,7 +22,9 @@ CLI = (ROOT / "services/identity/identity_display_reader_cli_v0.py").read_text(
 class CpuPlusIdentityHostContextContracts(unittest.TestCase):
     def test_uses_existing_cpuplus_overview_not_an_extra_window(self):
         for expected in (
-            "implicitWidth: 1000", "implicitHeight: 834",
+            "property int resizeLevel: 1",
+            "{ width: 1000, height: 834 }",
+            "implicitWidth: Math.min(", "implicitHeight: Math.min(",
             "id: modeRail", "height: 110",
             "id: sharedInstrumentPane", "width: 390",
             "id: targetPane", "width: 260",

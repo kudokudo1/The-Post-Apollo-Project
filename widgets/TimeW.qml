@@ -3119,35 +3119,16 @@ PanelWindow {
                     }
                 }
 
-                ActionButton {
+                ReloadButton {
                     id: syncButton
-                    width: 35
-                    height: 32
-                    label: "⟳"
-                    labelPixelSize: 22
-                    contentPadding: 3
-                    trackLabelGlowLocally: true
-                    accentColor: Colors.yellow
-                    idleForegroundColor: Colors.yellow
-                    hoverForegroundColor: Colors.yellow
-                    pressedForegroundColor: Colors.yellow
-                    idleBorderColor: Colors.yellow
-                    hoverBorderColor: Colors.yellow
-                    pressedBorderColor: Colors.yellow
-                    idleContentGlowColor: Colors.yellow
-                    hoverContentGlowColor: Colors.yellow
-                    pressedContentGlowColor: Colors.yellow
-                    idleSoftGlowColor: Colors.yellow
-                    hoverSoftGlowColor: Colors.yellow
-                    pressedSoftGlowColor: Colors.yellow
-                    idleWideGlowColor: Colors.yellow
-                    hoverWideGlowColor: Colors.yellow
-                    pressedWideGlowColor: Colors.yellow
-                    wideGlowEnabled: true
-                    // Keep status and diagnostic access available while a
-                    // confirmed correction is awaiting authorization.
+                    // ⟳ is the TimeW resync OPTIONS trigger, not a direct
+                    // system-clock mutation. Its yellow identity and
+                    // yellow glow stay visible on the orange hover surface.
+                    semanticColor: Colors.yellow
+                    hoverSurfaceColor: Colors.orange
+                    Accessible.name: "Time resync options"
                     selected: timew.resyncPopupOpen
-                    onLeftClicked: timew.toggleResyncPopup()
+                    onReloadRequested: timew.toggleResyncPopup()
                 }
 
                 CloseButton {

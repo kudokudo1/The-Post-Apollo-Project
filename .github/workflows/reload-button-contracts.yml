@@ -1,0 +1,56 @@
+name: Shared ReloadButton and TimeW header semantics
+
+on:
+  pull_request:
+    paths:
+      - "components/ReloadButton.qml"
+      - "components/qmldir"
+      - "widgets/TimeW.qml"
+      - "tests/components/test_reload_button_contracts.py"
+      - "tests/components/test_reload_button_qt_runtime.py"
+      - "tests/components/reload_button_runtime_harness.qml"
+      - "tests/timew/test_timew_foundation_contracts.py"
+      - ".github/workflows/reload-button-contracts.yml"
+  push:
+    branches: [main]
+    paths:
+      - "components/ReloadButton.qml"
+      - "components/qmldir"
+      - "widgets/TimeW.qml"
+      - "tests/components/test_reload_button_contracts.py"
+      - "tests/components/test_reload_button_qt_runtime.py"
+      - "tests/components/reload_button_runtime_harness.qml"
+      - "tests/timew/test_timew_foundation_contracts.py"
+      - ".github/workflows/reload-button-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shared reload and TimeW resync handoff
+        run: |
+          python3 -B -I tests/components/test_reload_button_contracts.py
+          python3 -B -I tests/timew/test_timew_foundation_contracts.py
+
+  offscreen-qt:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install minimal Qt runtime libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+      - name: Install PySide6 runtime
+        run: python -m pip install "PySide6>=6.10,<6.12"
+      - name: Test real inherited hover, press, selected glows and glyph alignment
+        run: python tests/components/test_reload_button_qt_runtime.py

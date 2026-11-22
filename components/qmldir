@@ -21,6 +21,7 @@ ActionButton 1.0 ActionButton.qml
 VoiceToTextButton 1.0 VoiceToTextButton.qml
 AskSendButton 1.0 AskSendButton.qml
 CloseButton 1.0 CloseButton.qml
+ReloadButton 1.0 ReloadButton.qml
 ResizeButton 1.0 ResizeButton.qml
 TrashLifecycleActionDeck 1.0 TrashLifecycleActionDeck.qml
 FavoritesToggleButton 1.0 FavoritesToggleButton.qml

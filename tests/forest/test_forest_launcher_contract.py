@@ -292,9 +292,12 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
 
     def test_prompt_anchored_model_popup_and_truthful_statuses(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
-        self.assertIn('text: "❦︎"', view)
+        self.assertIn('text: "❦︎๋࣭"', view)
         self.assertIn('text: "⊹"', view)
-        self.assertIn('text: "๋࣭⭑"', view)
+        self.assertIn('text: "⭑"', view)
+        self.assertNotIn('text: "๋࣭⭑"', view)
+        self.assertIn("clip: false", view)
+        self.assertIn("boundsBehavior: Flickable.StopAtBounds", view)
         self.assertIn("id: modelPickerArt", view)
         self.assertIn("id: pickerFlower", view)
         self.assertIn("id: pickerLeftStar", view)

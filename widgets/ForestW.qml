@@ -813,7 +813,14 @@ PanelWindow {
                     width: Math.max(32, Math.min(42,
                         Math.round(promptRow.width * 0.12)))
                     idleAccent: Colors.omnitrix
+                    // The talking-mouth text is centered dynamically as this
+                    // button resizes. Sampling the glyph directly can leave
+                    // a stale DropShadow origin when that center moves.
+                    // Sample ActionButton's anchored contentHost instead:
+                    // the same glyph still glows, but both source and glow
+                    // keep a resize-stable (0, 0) origin in contentLayer.
                     glyphGlowEnabled: true
+                    contentGlowSource: contentItem
                     backendReady: root.voiceHostTrusted
                     busy: false
                     processing: false

@@ -3831,7 +3831,10 @@ PanelWindow {
                     anchors {
                         left: parent.left
                         bottom: parent.bottom
+                        right: hospitalHeaderActions.left
+                        rightMargin: 10
                     }
+                    elide: Text.ElideRight
 
                     text:
                         root.operationsSurface === "reception"

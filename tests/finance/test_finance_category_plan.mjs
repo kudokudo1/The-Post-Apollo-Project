@@ -72,3 +72,55 @@ test("no mutators, files, network or authorization in preview policy",()=>{
     assert.equal(source.includes(bad),false,bad);
   }
 });
+
+const groupSource=readFileSync(new URL("../../services/finance/FinanceCategoryGroupPlan.js",
+  import.meta.url),"utf8").replace(/^\\.pragma library\\s*/,"");
+const groupContext={};
+runInNewContext(groupSource,groupContext);
+const previewGroup=groupContext.previewGroupPlan;
+
+test("M4 group creation only previews against an authenticated source",()=>{
+  const r=previewGroup(snapshot,"create","","  Future repairs  ");
+  assert.equal(r.ok,true);
+  assert.equal(r.mode,"create");
+  assert.equal(r.groupId,"");
+  assert.equal(r.proposedName,"Future repairs");
+  assert.equal(r.sourceKey,snapshot.sourceKey);
+  assert.equal(r.month,snapshot.month);
+  assert.equal(r.savesToActual,false);
+});
+test("M4 rename binds exactly one existing expense group ID",()=>{
+  const r=previewGroup(snapshot,"rename","needs","  Essentials  ");
+  assert.equal(r.ok,true);
+  assert.equal(r.groupId,"needs");
+  assert.equal(r.originalName,"Needs");
+  assert.equal(r.proposedName,"Essentials");
+  assert.equal(previewGroup(snapshot,"rename","wrong-id","New").ok,false);
+  assert.equal(previewGroup(snapshot,"rename","needs","needs").ok,false);
+  assert.equal(previewGroup(snapshot,"rename","needs","WANTS").ok,false);
+});
+test("M4 duplicate, reserved, untrusted IDs and unsafe group names refuse",()=>{
+  for(const name of ["", "  ", "Income", "INCOME", "Needs", "needs",
+      "Z".repeat(81), "\\u0001unsafe"]) {
+    assert.equal(previewGroup(snapshot,"create","",name).ok,false,name);
+  }
+  assert.equal(previewGroup(snapshot,"create","needs","Other").ok,false);
+  assert.equal(previewGroup(snapshot,"delete","needs","Other").ok,false);
+  assert.equal(previewGroup({...snapshot,readOnly:false},"create","","Other").ok,false);
+  assert.equal(previewGroup({...snapshot,sourceKey:"fake"},"create","","Other").ok,false);
+  assert.equal(previewGroup({...snapshot,month:"2026-00"},"create","","Other").ok,false);
+  assert.equal(previewGroup({...snapshot,categoryGroups:[
+    ...snapshot.categoryGroups,snapshot.categoryGroups[0]
+  ]},"rename","needs","Other").ok,false);
+  assert.equal(previewGroup({...snapshot,categoryGroups:[{
+    id:"broken!",name:"bad"
+  }]},"create","","Other").ok,false);
+});
+test("M4 group policy does not mutate Actual, disk or permissions",()=>{
+  for(const method of ["createCategoryGroup(", "updateCategoryGroup(",
+    "deleteCategoryGroup(","createCategory(","updateCategory(",
+    "writeFile(","fetch(","Process {","LocalStorage","api.",
+    "FINANCEW_","approvalArmed"]) {
+    assert.equal(groupSource.includes(method),false,method);
+  }
+});

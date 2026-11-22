@@ -49,7 +49,7 @@ def pid_exists(pid):
 def fake_pid_is_ours(pid, fake_path):
     cmd_path = Path(f"/proc/{pid}/cmdline")
     try:
-        cmd = cmd_path.read_bytes().replace(b"\\x00", b" ")
+        cmd = cmd_path.read_bytes().replace(b"\x00", b" ")
     except (FileNotFoundError, PermissionError):
         return False
     return str(fake_path).encode() in cmd

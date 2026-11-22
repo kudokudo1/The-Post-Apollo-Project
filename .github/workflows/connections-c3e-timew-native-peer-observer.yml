@@ -1,0 +1,57 @@
+name: Connections C3e TimeW native kernel packet observation (deny-only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/ConnectionsTimeWNativePacketObservation.py'
+      - 'tests/connections/test_connections_c3e_timew_native_packet_observer.py'
+      - '.github/workflows/connections-c3e-timew-native-peer-observer.yml'
+      - 'docs/connections-c3e-timew-native-peer-observer.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-linux-peer-is-not-swaypx-selection:
+    name: Kernel peer observed, native TimeW authority denied
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Source compilation and frozen non-authority contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/ConnectionsTimeWNativePacketObservation.py \
+            tests/connections/test_connections_c3e_timew_native_packet_observer.py
+          python3 - <<'PY'
+          from pathlib import Path
+          code = Path("services/connections/ConnectionsTimeWNativePacketObservation.py").read_text()
+          for required in ("SO_PEERPIDFD", "SO_PEERCRED", "SO_PASSCRED",
+                           "SCM_CREDENTIALS", "recvmsg(", "KERNEL_PACKET_PEER_OBSERVED_BUT_SWAYPX_UNENROLLED",
+                           "PROTECTED_SWAYPX_SOURCE_AND_C5_NOT_ENROLLED",
+                           '"nativeGeometryAllowed": False',
+                           '"productionAuthority": False'):
+              assert required in code, required
+          for forbidden in ("swaymsg", "subprocess.run(", "Ed25519PrivateKey",
+                            "sendall(", "socket.connect(", "socket.bind(",
+                            '"nativeGeometryAllowed": True',
+                            '"timewRestoreAllowed": True'):
+              assert forbidden not in code, forbidden
+          PY
+      - name: Genuine Linux SO_PEERPIDFD and SCM_CREDENTIALS hostile tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CI" = true
+          test "$GITHUB_ACTIONS" = true
+          python3 -B -I -m unittest discover \
+            -s tests/connections -p test_connections_c3e_timew_native_packet_observer.py -v
+          echo 'C3E_TIMEW_NATIVE_SOURCE_HOLD // no independent SwayPX/C5 authority'

@@ -10,6 +10,11 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    // Forest B0 inventory only proves model discovery. It is not permission
+    // to record audio, submit a prompt, or attach a provider session.
+    // Until protected Forest host adapters exist both controls fail closed.
+    readonly property bool voiceHostTrusted: false
+    readonly property bool chatHostTrusted: false
     property real dockCenterX: 0
     property int chassisLevel: 0
     property int selectedTreeIndex: 0
@@ -769,11 +774,12 @@ PanelWindow {
                 anchors.bottomMargin: 13
                 height: 40
 
-                // Remains a non-editable preview until a trusted host exists.
+                // A disabled prompt placeholder; the B1-B4 trusted session
+                // host has not been connected, so no editable draft or SEND.
                 Rectangle {
                     id: sendGate
                     anchors.left: parent.left
-                    anchors.right: modelPickerButton.left
+                    anchors.right: voiceToTextButton.left
                     anchors.rightMargin: 6
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
@@ -783,7 +789,7 @@ PanelWindow {
                     opacity: 0.65
                     GohuText {
                         anchors.centerIn: parent
-                        width: parent.width - 12
+                        width: Math.max(0, parent.width - 12)
                         text: root.chassisLevel < 2
                             ? "SEND LOCKED // HOST NOT CONNECTED"
                             : "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
@@ -792,6 +798,53 @@ PanelWindow {
                         wrapMode: Text.WordWrap
                         horizontalAlignment: Text.AlignHCenter
                     }
+                }
+
+                // Shared Hospital-derived presentation component. Reusing a
+                // button does not import or start Hospital's mic service.
+                // Disabled until a separately reviewed Forest voice host
+                // supplies recorder custody, consent and stop behavior.
+                VoiceToTextButton {
+                    id: voiceToTextButton
+                    anchors.right: forestAskSendButton.left
+                    anchors.rightMargin: 6
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: Math.max(32, Math.min(42,
+                        Math.round(promptRow.width * 0.12)))
+                    idleAccent: Colors.omnitrix
+                    glyphGlowEnabled: true
+                    backendReady: root.voiceHostTrusted
+                    busy: false
+                    processing: false
+                    available: root.voiceHostTrusted && !processing
+                    Accessible.name:
+                        "VOICE LOCKED // TRUSTED FOREST AUDIO HOST NOT CONNECTED"
+                    // No onToggleRequested: protected voice service unavailable.
+                }
+
+                // The same ASK/SEND component used by Hospital Reception and
+                // Intercom. It owns visual states only, never provider calls.
+                AskSendButton {
+                    id: forestAskSendButton
+                    anchors.right: modelPickerButton.left
+                    anchors.rightMargin: 6
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: Math.max(54, Math.min(86,
+                        Math.round(promptRow.width * 0.21)))
+                    enabledAction: root.chatHostTrusted
+                    recording: false
+                    processing: false
+                    idleAccent: Colors.green
+                    recordingAccent: Colors.magenta
+                    askLabel: "ASK"
+                    sendLabel: "SEND"
+                    allowSecondaryAction: false
+                    Accessible.name:
+                        "ASK LOCKED // TRUSTED FOREST CHAT HOST NOT CONNECTED"
+                    // No onPrimaryRequested/onSecondaryRequested:
+                    // a selected B0 model is not an authorized session.
                 }
 
                 // Match Forest's ordinary DockButton state grammar: green

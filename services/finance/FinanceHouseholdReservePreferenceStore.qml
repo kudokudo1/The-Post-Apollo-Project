@@ -20,6 +20,7 @@ Scope {
     signal preferenceLoaded()
     signal preferenceSaved()
     signal preferenceReset()
+    signal preferenceUnavailable()
 
     function validContext() {
         return /^(mine|shared|mom|granny|family)$/.test(contextId);
@@ -133,10 +134,12 @@ Scope {
                     } catch(error) { /* Refuse, do not log personal content. */ }
                 }
                 if(!accepted && same) {
+                    store.marginPercent=100;
                     store.state="failed";
                     store.message="PREFERENCE STORE UNAVAILABLE // REFRESH BEFORE RETRY";
                     // Do not silently overwrite or fall back to a saved guess.
                     store.revision=0;
+                    store.preferenceUnavailable();
                 }
                 store.output="";
                 store.activeAction="";

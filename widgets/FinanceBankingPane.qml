@@ -176,7 +176,6 @@ Item {
             FinanceTransferGuidePane {
                 width: parent.width
                 visible: banking.selectedTool==="transfers"
-                height: visible ? implicitHeight : 0
             }
             // Import is deliberately opt-in. Do not ingest Actual transactions
             // or credentials, and never save statement contents to a log or disk.

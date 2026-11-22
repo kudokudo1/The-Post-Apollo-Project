@@ -8,6 +8,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 TIMEW = (ROOT / "widgets/TimeW.qml").read_text(encoding="utf-8")
+RELOAD = (ROOT / "components/ReloadButton.qml").read_text(encoding="utf-8")
 POPUP = (ROOT / "widgets/TimeResyncPopup.qml").read_text(encoding="utf-8")
 SETTINGS = (ROOT / "widgets/TimeSettingsPane.qml").read_text(encoding="utf-8")
 SERVICE = (ROOT / "services/time/TimeSettings.qml").read_text(encoding="utf-8")
@@ -31,7 +32,10 @@ class TimeResyncPopupContracts(unittest.TestCase):
     def test_resync_trigger_opens_in_place_with_no_actuation(self):
         sync = TIMEW.split("id: syncButton", 1)[1].split(
             "id: closeButton", 1)[0]
-        self.assertIn("onLeftClicked: timew.toggleResyncPopup()", sync)
+        self.assertIn("onReloadRequested: timew.toggleResyncPopup()", sync)
+        self.assertIn("ReloadButton {", TIMEW)
+        self.assertIn("signal reloadRequested()", RELOAD)
+        self.assertNotIn("TimeSettings.", RELOAD)
         self.assertNotIn("chooseMode(", sync)
         self.assertNotIn("requestResync(", sync)
         self.assertNotIn("prepareResync(", sync)

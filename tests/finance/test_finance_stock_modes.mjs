@@ -8,7 +8,7 @@ import {normalizePriceRange,validateRange}
 
 const src=readFileSync(new URL("../../widgets/FinanceStockModePolicy.js",import.meta.url),"utf8");
 const scope=vm.createContext({});
-const policy=vm.runInContext(src+"\n({calendarDay,selectWindow,daySession})",scope);
+const policy=vm.runInContext(src+"\n({calendarDay,selectWindow,presetWindow,daySession})",scope);
 const today="2026-10-24";
 const w=(mode,day,start,end)=>policy.selectWindow(mode,day,start,end,today);
 const day=w("day","2026-10-21","2026-09-01","2026-10-01");
@@ -33,6 +33,43 @@ assert.equal(w("range","2026-10-21","2026-10-22","2026-10-21"),null);
 assert.equal(w("range","2026-10-21","2026-04-01","2026-10-24"),null);
 assert.equal(policy.calendarDay("2026-02-30"),null);
 assert.notEqual(policy.calendarDay("2024-02-29"),null);
+
+// M15 quick calendar windows end today, are inclusive and never exceed 180.
+for (const count of [7,30,90,180]) {
+  const preset=policy.presetWindow(count,today);
+  assert.equal(preset.kind,"range");
+  assert.equal(preset.to,today);
+  assert.equal(policy.calendarDay(preset.to)-policy.calendarDay(preset.from)+1,count);
+  assert.deepEqual(validateRange("0000320193",preset.from,preset.to,today),{
+    cik:"0000320193",from:preset.from,to:preset.to
+  });
+}
+assert.equal(policy.presetWindow(7,today).from,"2026-10-18");
+assert.equal(policy.presetWindow(181,today),null);
+assert.equal(policy.presetWindow(0,today),null);
+assert.equal(policy.presetWindow("7",today),null);
+assert.equal(policy.presetWindow(30,"not-a-date"),null);
+assert.equal(policy.presetWindow(7,"2000-01-01"),null);
+assert.equal(policy.presetWindow(7,"2000-01-07").from,"2000-01-01");
+assert.equal(policy.presetWindow(7,"2024-03-01").from,"2024-02-24");
+
+const readSource=relative=>readFileSync(new URL(relative,import.meta.url),"utf8");
+const marketService=readSource("../../services/finance/FinanceStockHistoryReadService.qml");
+const stocksPane=readSource("../../widgets/FinanceStockHistoryPane.qml");
+const presetHandler=marketService.split("function selectPresetRange(days) {")[1]
+  ?.split("function selectDayDate(day) {")[0];
+assert.ok(presetHandler,"M15 source handler must exist");
+assert.match(presetHandler,/!monitoring.*displayMode !== "range".*loading.*reader.running/);
+assert.match(presetHandler,/StockModePolicy.presetWindow\(days, dateOffset\(0\)\)/);
+assert.match(presetHandler,/startDate = window.from;/);
+assert.match(presetHandler,/endDate = window.to;/);
+assert.match(presetHandler,/clear\(\);/);
+assert.doesNotMatch(presetHandler,/reader.exec|refresh\(|writeFile|Qt.openUrlExternally/);
+for (const label of ["7D","30D","90D","180D"])
+  assert.ok(stocksPane.includes('label:"'+label+'"'));
+assert.ok(stocksPane.includes("stocks.stockFeed.selectPresetRange(modelData.days)"));
+assert.ok(stocksPane.includes("visible: !stocks.dayMode"));
+assert.equal((marketService.match(/reader.exec\(\[/g)||[]).length,1);
 
 // Provider returns real session row only. No weekend/holiday approximation.
 const cik="0000320193";

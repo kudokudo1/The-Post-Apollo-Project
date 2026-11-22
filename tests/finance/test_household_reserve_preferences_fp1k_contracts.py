@@ -59,6 +59,8 @@ for token in (
     'SAVED LOCAL PREFERENCE',
     'SAME LINUX LOGIN; NOT A HOUSEHOLD IDENTITY GRANT',
     'onContextIdChanged: {',
+    'onActiveChanged: {',
+    'onPreferenceUnavailable: {',
     'reserveMarginPercent=100;',
     'armedPreferenceReset=false;',
     'Reserves.annotate(sourceRows,scheduleRows,projection,reserveMarginPercent)'
@@ -76,6 +78,8 @@ for token in (
     'doc.marginPercent',
     'Number.isSafeInteger(doc.revision)',
     'state="failed"',
+    'store.marginPercent=100;',
+    'store.preferenceUnavailable();',
     'pendingReload=true',
     'onContextIdChanged:',
     'onMonitoringChanged:',

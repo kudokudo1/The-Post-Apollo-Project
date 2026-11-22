@@ -37,21 +37,19 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             xvfb dbus-x11 libxcb-cursor0 libxkbcommon-x11-0 libgl1
 
-      - name: Download exact Quickshell v0.3.2 AppImage and verify SHA-256
+      - name: Download checked relocatable Quickshell v0.3.0 binary (Qt bundled)
         env:
-          QS_URL: https://github.com/pkgforge-dev/Quickshell-AppImage/releases/download/0.3.2-1%402026-11-01_1793557939/quickshell-0.3.2-1-anylinux-x86_64.AppImage
-          QS_SHA256: 429a7cedfe35b1dab416fa67941096585fa69d8d59487f42899e68e47e23190a
+          QS_URL: https://github.com/actions-precompiled/quickshell-bin/releases/download/v0.3.0/quickshell-0.3.0-linux-amd64.tar.gz
+          QS_SHA256: 3de3ac310a856a635fb6ed2d9850370ab7c4c06f7a4ecbc70773a93b4d0dd0b9
         run: |
           set -euo pipefail
-          work="$RUNNER_TEMP/h1-quickshell-0.3.2"
+          work="$RUNNER_TEMP/h1-quickshell-0.3.0"
           mkdir -p "$work"
           curl --proto '=https' --tlsv1.2 -fLSs --retry 2 \
-            "$QS_URL" -o "$work/quickshell.AppImage"
-          printf '%s  %s\n' "$QS_SHA256" "$work/quickshell.AppImage" | sha256sum --check -
-          chmod 700 "$work/quickshell.AppImage"
-          cd "$work"
-          ./quickshell.AppImage --appimage-extract >/dev/null
-          test -x "$work/squashfs-root/AppRun"
+            "$QS_URL" -o "$work/quickshell.tar.gz"
+          printf '%s  %s\n' "$QS_SHA256" "$work/quickshell.tar.gz" | sha256sum --check -
+          tar -xzf "$work/quickshell.tar.gz" -C "$work"
+          test -x "$work/quickshell/bin/quickshell"
 
       - name: Exercise real Quickshell Process/Timer and fake hung native reader
         env:
@@ -60,7 +58,7 @@ jobs:
           set -euo pipefail
           dbus-run-session -- xvfb-run -a \
             python3 tests/hospital/test_doctor_quickshell_lifecycle.py \
-            --quickshell "$RUNNER_TEMP/h1-quickshell-0.3.2/squashfs-root/AppRun"
+            --quickshell "$RUNNER_TEMP/h1-quickshell-0.3.0/quickshell/bin/quickshell"
 
       - name: State isolation contract
         run: |

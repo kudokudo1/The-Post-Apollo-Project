@@ -138,10 +138,12 @@ assert "if (mouse.button === Qt.RightButton)" in tray
 # one stateful color; no independently colored icon halo can contradict it.
 assert 'readonly property color accentColor:' in tray
 assert 'border.color: accentColor' in tray
-assert tray.count('color: trayDock.accentColor') == 4
+assert tray.count('color: trayDock.accentColor') == 5
 assert 'color: trayButtonMouse.pressed ? Colors.cyan' not in tray
 assert "trayDock.trayButtonPressed = false;" in tray
-assert "trayDock.trayButtonHovered = false;" in tray
+assert "readonly property bool trayButtonHovered: trayHoverHandler.hovered" in tray
+assert "HoverHandler {" in tray
+assert "trayDock.trayButtonHovered =" not in tray
 assert 'model: SystemTray.items' in tray
 
 workspaces = module("Workspaces")

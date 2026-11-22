@@ -143,7 +143,14 @@ assert tray.count("GohuText {") >= 2
 assert "border.width: 1" in tray
 assert "border.color: accentColor" in tray
 assert "readonly property color accentColor:" in tray
-assert tray.count("color: trayDock.accentColor") == 4
+assert "readonly property bool trayButtonHovered: trayHoverHandler.hovered" in tray
+assert "HoverHandler {" in tray and "blocking: false" in tray
+assert "trayDock.trayButtonHovered =" not in tray
+# Frame-wide hover includes gaps and the empty state; item MouseArea retains
+# all app-owned activation and menu semantics.
+assert 'text: "TRAY"' in tray
+assert 'color: trayDock.accentColor' in tray
+assert tray.count("color: trayDock.accentColor") == 5
 assert "QsMenuAnchor {" in tray
 assert "menu: trayButton.modelData.menu" in tray
 assert "anchor.item: trayButton" in tray

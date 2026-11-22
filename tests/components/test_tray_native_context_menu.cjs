@@ -62,11 +62,15 @@ function accent(pressed, hovered) {
     });
 }
 assert.equal(accent(false,false),Colors.cyan);
-assert.equal(accent(false,true),Colors.magenta);
+assert.equal(accent(false,true),Colors.orange);
 assert.equal(accent(true,true),Colors.orange);
 assert.equal(accent(true,false),Colors.orange);
 assert.match(source,/border\.color:\s*accentColor/);
-assert.equal((source.match(/color: trayDock\.accentColor/g)||[]).length,4);
+assert.equal((source.match(/color: trayDock\.accentColor/g)||[]).length,5);
+assert.match(source,/HoverHandler\s*\{\s*id:\s*trayHoverHandler\s*blocking:\s*false/);
+assert.match(source,/readonly property bool trayButtonHovered:\s*trayHoverHandler\.hovered/);
+assert.doesNotMatch(source,/trayDock\.trayButtonHovered\s*=/);
+assert.match(source,/text:\s*"TRAY"[\s\S]*?color:\s*trayDock\.accentColor/);
 assert.match(source,/QsMenuAnchor\s*\{[\s\S]*?menu:\s*trayButton\.modelData\.menu/);
 assert.match(source,/anchor\.item:\s*trayButton/);
 assert.match(source,/anchor\.edges:\s*Edges\.Top/);

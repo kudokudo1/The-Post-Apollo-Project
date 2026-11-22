@@ -21,13 +21,19 @@ Rectangle {
     radius: 0
 
     property bool trayButtonPressed: false
-    property bool trayButtonHovered: false
-    // Border, rear halos, icon halos and bottom marker all use the same
-    // single interaction state. Right-click no longer lights up the border
-    // in orange while the two shadows remain cyan.
+    // Observe the whole 92px+ plaque, including gaps and the empty state.
+    // A passive HoverHandler coexists with every app's own MouseArea, so
+    // it does not steal native left/right-click activation.
+    HoverHandler {
+        id: trayHoverHandler
+        blocking: false
+    }
+    readonly property bool trayButtonHovered: trayHoverHandler.hovered
+
+    // Border, rear halos, icon halos, label and bottom marker agree:
+    // orange anywhere over the tray (or during a press), cyan at rest.
     readonly property color accentColor:
-        trayButtonPressed ? Colors.orange
-        : trayButtonHovered ? Colors.magenta : Colors.cyan
+        trayButtonPressed || trayButtonHovered ? Colors.orange : Colors.cyan
 
     // Exact application identity, never a substring match on a random tray
     // tooltip. Other applications retain their own native tray activation.
@@ -91,7 +97,7 @@ Rectangle {
             horizontalAlignment: Text.AlignHCenter
             text: "TRAY"
             font.pixelSize: 14
-            color: Colors.cyan
+            color: trayDock.accentColor
         }
         GohuText {
             width: 92
@@ -221,14 +227,6 @@ Rectangle {
 
                     onCanceled: {
                         trayDock.trayButtonPressed = false;
-                    }
-
-                    onEntered: {
-                        trayDock.trayButtonHovered = true;
-                    }
-
-                    onExited: {
-                        trayDock.trayButtonHovered = false;
                     }
 
                     onClicked: function (mouse) {
